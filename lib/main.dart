@@ -1,0 +1,166 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'core/utils/bloc_observer.dart';
+import 'features/stock/data/datasources/app_database.dart';
+import 'features/stock/data/repositories/item_repository_impl.dart';
+import 'features/stock/domain/usecases/stock_usecases.dart';
+import 'features/stock/presentation/bloc/stock_bloc.dart';
+import 'features/invoicing/data/repositories/invoice_repository_impl.dart';
+import 'features/invoicing/domain/usecases/history_usecases.dart';
+import 'features/invoicing/domain/services/invoice_calculation_service.dart';
+import 'features/invoicing/presentation/bloc/invoice_bloc.dart';
+import 'features/invoicing/presentation/history/bloc/history_bloc.dart';
+import 'features/settings/data/repositories/settings_repository_impl.dart';
+import 'features/settings/domain/services/security_service.dart';
+import 'features/settings/presentation/bloc/settings_bloc.dart';
+import 'features/printer/data/repositories/cross_platform_printer_service.dart';
+import 'features/printer/domain/usecases/printer_usecases.dart';
+import 'features/printer/presentation/bloc/printer_bloc.dart';
+import 'features/dashboard/presentation/pages/dashboard_page.dart';
+import 'core/services/backup_service.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Set up global BLoC observer
+  Bloc.observer = SimpleBlocObserver();
+  
+  // Initialize database
+  final database = AppDatabase();
+  
+  // Initialize repositories
+  final itemRepository = ItemRepositoryImpl(database);
+  final invoiceRepository = InvoiceRepositoryImpl(database);
+  final settingsRepository = SettingsRepositoryImpl(database);
+  
+  // Initialize services
+  final printerService = CrossPlatformPrinterService();
+  final securityService = SecurityService();
+  final calculationService = InvoiceCalculationService();
+  final backupService = BackupService(database);
+  
+  // Initialize use cases
+  final getItems = GetItems(itemRepository);
+  final addItem = AddItem(itemRepository);
+  final updateItem = UpdateItem(itemRepository);
+  final deleteItem = DeleteItem(itemRepository);
+  
+  final getDevices = GetBluetoothDevices(printerService);
+  final connectPrinter = ConnectToPrinter(printerService);
+  final printInvoice = PrintInvoiceCommands(printerService);
+  
+  final getInvoiceHistory = GetInvoiceHistory(invoiceRepository);
+  final getInvoiceDetails = GetInvoiceDetails(invoiceRepository);
+  
+  runApp(MyApp(
+    database: database,
+    itemRepository: itemRepository,
+    invoiceRepository: invoiceRepository,
+    settingsRepository: settingsRepository,
+    printerService: printerService,
+    securityService: securityService,
+    calculationService: calculationService,
+    backupService: backupService,
+    getItems: getItems,
+    addItem: addItem,
+    updateItem: updateItem,
+    deleteItem: deleteItem,
+    getDevices: getDevices,
+    connectPrinter: connectPrinter,
+    printInvoice: printInvoice,
+    getInvoiceHistory: getInvoiceHistory,
+    getInvoiceDetails: getInvoiceDetails,
+  ));
+}
+
+class MyApp extends StatelessWidget {
+  final AppDatabase database;
+  final ItemRepositoryImpl itemRepository;
+  final InvoiceRepositoryImpl invoiceRepository;
+  final SettingsRepositoryImpl settingsRepository;
+  final CrossPlatformPrinterService printerService;
+  final SecurityService securityService;
+  final InvoiceCalculationService calculationService;
+  final BackupService backupService;
+  final GetItems getItems;
+  final AddItem addItem;
+  final UpdateItem updateItem;
+  final DeleteItem deleteItem;
+  final GetBluetoothDevices getDevices;
+  final ConnectToPrinter connectPrinter;
+  final PrintInvoiceCommands printInvoice;
+  final GetInvoiceHistory getInvoiceHistory;
+  final GetInvoiceDetails getInvoiceDetails;
+
+  const MyApp({
+    super.key,
+    required this.database,
+    required this.itemRepository,
+    required this.invoiceRepository,
+    required this.settingsRepository,
+    required this.printerService,
+    required this.securityService,
+    required this.calculationService,
+    required this.backupService,
+    required this.getItems,
+    required this.addItem,
+    required this.updateItem,
+    required this.deleteItem,
+    required this.getDevices,
+    required this.connectPrinter,
+    required this.printInvoice,
+    required this.getInvoiceHistory,
+    required this.getInvoiceDetails,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => StockBloc(
+            getItems: getItems,
+            addItem: addItem,
+            updateItem: updateItem,
+            deleteItem: deleteItem,
+          )..add(LoadItems()),
+        ),
+        BlocProvider(
+          create: (_) => InvoiceBloc(
+            repository: invoiceRepository,
+            calculator: calculationService,
+          ),
+        ),
+        BlocProvider(
+          create: (_) => HistoryBloc(
+            getInvoiceHistory: getInvoiceHistory,
+            getInvoiceDetails: getInvoiceDetails,
+          ),
+        ),
+        BlocProvider(
+          create: (_) => SettingsBloc(
+            repository: settingsRepository,
+            securityService: securityService,
+            backupService: backupService,
+          )..add(LoadSettings()),
+        ),
+        BlocProvider(
+          create: (_) => PrinterBloc(
+            getDevices: getDevices,
+            connectPrinter: connectPrinter,
+            printInvoice: printInvoice,
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        title: 'Bar & Hotel POS',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          useMaterial3: true,
+        ),
+        home: const DashboardPage(),
+      ),
+    );
+  }
+}
