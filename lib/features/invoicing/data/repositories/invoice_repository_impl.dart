@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 import '../../../stock/data/datasources/app_database.dart';
 import '../../domain/entities/invoice.dart';
-import '../../domain/entities/item.dart';
+import '../../../stock/domain/entities/item.dart';
 import '../../domain/repositories/invoice_repository.dart';
 
 class InvoiceRepositoryImpl implements InvoiceRepository {
@@ -43,6 +43,14 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
   }
 
   @override
+  Future<Invoice?> getInvoiceById(int id) async {
+    final query = db.select(db.invoices)..where((t) => t.id.equals(id));
+    final results = await _getInvoicesWithItems(query);
+    if (results.isEmpty) return null;
+    return results.first;
+  }
+
+  @override
   Future<List<Invoice>> getInvoicesByDateRange(DateTime start, DateTime end) async {
     final query = db.select(db.invoices)
       ..where((t) => t.dateCreated.isBetweenValues(start, end));
@@ -70,8 +78,10 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
             id: itemData.id,
             name: itemData.name,
             category: ItemCategory.values.byName(itemData.category),
+            categoryId: itemData.categoryId,
             price: itemData.price,
             stockQty: itemData.stockQty,
+            image: itemData.image,
           ),
           quantity: invoiceItemData.quantity,
           unitPrice: invoiceItemData.unitPrice,

@@ -1,5 +1,6 @@
 import 'invoice_template.dart';
 import '../entities/invoice.dart';
+import '../../../settings/domain/entities/settings.dart';
 
 class CompactInvoiceTemplate extends InvoiceTemplate {
   @override
@@ -15,15 +16,16 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
 
   @override
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final settings = orgSettings as AppSettings;
     return [
-      TextCommand(orgSettings.name.toUpperCase(), align: 'center', isBold: true),
+      TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
       DividerCommand(),
       ...invoice.items.map((item) => TextCommand(
             '${item.quantity}x ${item.item.name} @ ${item.unitPrice} : ${item.total}',
           )),
       DividerCommand(),
-      TextCommand('TOTAL: \$${invoice.totalAmount}', align: 'right', isBold: true),
+      TextCommand('TOTAL: ${settings.currency} ${invoice.totalAmount}', align: 'right', isBold: true),
     ];
   }
 }
@@ -42,24 +44,25 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
 
   @override
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final settings = orgSettings as AppSettings;
     return [
-      ImageCommand('logo.png'),
-      TextCommand(orgSettings.name, align: 'center', isBold: true),
-      TextCommand(orgSettings.address, align: 'center'),
-      TextCommand('Phone: ${orgSettings.phone}', align: 'center'),
+      ImageCommand('logo.png'), // Placeholder
+      TextCommand(settings.organizationName, align: 'center', isBold: true),
+      TextCommand(settings.address, align: 'center'),
+      TextCommand('Phone: ${settings.phone}', align: 'center'),
       DividerCommand(),
       TextCommand('INVOICE DETAIL', align: 'left', isBold: true),
       TextCommand('Number: ${invoice.invoiceNumber}'),
-      TextCommand('Date: ${invoice.dateCreated.toIso8601String()}'),
+      TextCommand('Date: ${invoice.dateCreated.toIso8601String().split('T')[0]}'),
       DividerCommand(),
       ...invoice.items.map((item) => TextCommand(
             '${item.item.name.padRight(20)} ${item.quantity} x ${item.unitPrice.toString().padLeft(8)}',
           )),
       DividerCommand(),
-      TextCommand('Subtotal: \$${invoice.subtotal}', align: 'right'),
-      TextCommand('Tax: \$${invoice.taxAmount}', align: 'right'),
-      TextCommand('Discount: \$${invoice.discountAmount}', align: 'right'),
-      TextCommand('GRAND TOTAL: \$${invoice.totalAmount}', align: 'right', isBold: true),
+      TextCommand('Subtotal: ${settings.currency} ${invoice.subtotal}', align: 'right'),
+      TextCommand('Tax: ${settings.currency} ${invoice.taxAmount}', align: 'right'),
+      TextCommand('Discount: ${settings.currency} ${invoice.discountAmount}', align: 'right'),
+      TextCommand('GRAND TOTAL: ${settings.currency} ${invoice.totalAmount}', align: 'right', isBold: true),
     ];
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../stock/presentation/pages/stock_management_page.dart';
-import '../../invoicing/presentation/pages/create_invoice_page.dart';
-import '../../invoicing/presentation/history/pages/invoice_history_page.dart';
-import '../../settings/presentation/pages/settings_page.dart';
+import '../../../stock/presentation/pages/stock_management_page.dart';
+import '../../../invoicing/presentation/pages/create_invoice_page.dart';
+import '../../../invoicing/presentation/history/pages/invoice_history_page.dart';
+import '../../../settings/presentation/pages/settings_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});

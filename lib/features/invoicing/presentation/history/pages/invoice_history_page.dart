@@ -114,8 +114,8 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   void _reprint(BuildContext context, Invoice invoice) {
     // Logic to reprint using existing printer bloc and template engine
     final template = TemplateRegistry.getTemplate(TemplateType.compact);
-    final commands = template.generateCommands(invoice, {}); // Dummy settings for now
-    context.read<PrinterBloc>().printInvoice(commands, 58);
+    final commands = template.generateCommands(invoice, {});
+    context.read<PrinterBloc>().printInvoiceCmd(commands, 58);
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Reprinting invoice...')),

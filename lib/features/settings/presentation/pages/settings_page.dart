@@ -94,8 +94,9 @@ class SettingsPage extends StatelessWidget {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildAuthRequired(BuildContext context) {
     return Center(

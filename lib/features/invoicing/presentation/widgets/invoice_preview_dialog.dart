@@ -1,8 +1,12 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/invoice_bloc.dart';
 import '../bloc/invoice_state.dart';
-import '../../printer/presentation/bloc/printer_bloc.dart';
-import '../../printer/domain/usecases/printer_usecases.dart';
+import '../../../printer/presentation/bloc/printer_bloc.dart';
+import '../../../printer/domain/usecases/printer_usecases.dart';
 import '../../domain/templates/template_registry.dart';
+import '../../domain/templates/invoice_template.dart';
+import '../../domain/entities/invoice.dart';
 
 class InvoicePreviewDialog extends StatelessWidget {
   final InvoiceBloc invoiceBloc;
@@ -68,10 +72,10 @@ class InvoicePreviewDialog extends StatelessWidget {
                     final commands = template.generateCommands(
                       // This would normally be the saved invoice from state
                       // Simplified for demonstration
-                      const Invoice(invoiceNumber: '...', dateCreated: null, items: [], subtotal: 0, taxAmount: 0, discountAmount: 0, totalAmount: 0, paymentStatus: ''), 
+                      Invoice(invoiceNumber: '...', dateCreated: DateTime.now(), items: [], subtotal: 0, taxAmount: 0, discountAmount: 0, totalAmount: 0, paymentStatus: ''), 
                       {} 
                     );
-                    context.read<PrinterBloc>().printInvoice(commands, 58);
+                    context.read<PrinterBloc>().printInvoiceCmd(commands, 58);
                   },
                   child: state.isSaving ? const CircularProgressIndicator() : const Text('SAVE & PRINT'),
                 ),

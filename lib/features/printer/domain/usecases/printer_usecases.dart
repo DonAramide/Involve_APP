@@ -1,16 +1,16 @@
 import '../repositories/printer_service.dart';
-import '../../invoicing/domain/templates/invoice_template.dart';
+import '../../../invoicing/domain/templates/invoice_template.dart';
 
 class GetBluetoothDevices {
   final IPrinterService service;
   GetBluetoothDevices(this.service);
-  Future<List<BluetoothDevice>> call() => service.scanDevices();
+  Future<List<PrinterDevice>> call() => service.scanDevices();
 }
 
 class ConnectToPrinter {
   final IPrinterService service;
   ConnectToPrinter(this.service);
-  Future<bool> call(BluetoothDevice device) => service.connect(device);
+  Future<bool> call(PrinterDevice device) => service.connect(device);
 }
 
 class PrintInvoiceCommands {

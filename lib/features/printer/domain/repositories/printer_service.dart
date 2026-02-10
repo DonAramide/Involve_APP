@@ -1,4 +1,4 @@
-import '../../invoicing/domain/templates/invoice_template.dart';
+import '../../../invoicing/domain/templates/invoice_template.dart';
 
 abstract class IPrinterService {
   Future<List<PrinterDevice>> scanDevices();

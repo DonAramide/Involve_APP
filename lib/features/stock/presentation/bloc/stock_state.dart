@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/item.dart';
+import '../../domain/entities/category.dart';
 
 // Events
 abstract class StockEvent extends Equatable {
@@ -30,6 +31,23 @@ class DeleteStockItem extends StockEvent {
   List<Object?> get props => [id];
 }
 
+// Category Events
+class LoadCategories extends StockEvent {}
+
+class AddCategory extends StockEvent {
+  final String name;
+  AddCategory(this.name);
+  @override
+  List<Object?> get props => [name];
+}
+
+class DeleteCategory extends StockEvent {
+  final int id;
+  DeleteCategory(this.id);
+  @override
+  List<Object?> get props => [id];
+}
+
 // States
 abstract class StockState extends Equatable {
   @override
@@ -42,9 +60,19 @@ class StockLoading extends StockState {}
 
 class StockLoaded extends StockState {
   final List<Item> items;
-  StockLoaded(this.items);
+  final List<Category> categories;
+
+  StockLoaded(this.items, {this.categories = const []});
+  
+  StockLoaded copyWith({List<Item>? items, List<Category>? categories}) {
+    return StockLoaded(
+      items ?? this.items,
+      categories: categories ?? this.categories,
+    );
+  }
+
   @override
-  List<Object?> get props => [items];
+  List<Object?> get props => [items, categories];
 }
 
 class StockError extends StockState {

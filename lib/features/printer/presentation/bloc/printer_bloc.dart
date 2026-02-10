@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'printer_state.dart';
 import '../../domain/usecases/printer_usecases.dart';
+import '../../../invoicing/domain/templates/invoice_template.dart';
 
 class PrinterBloc extends Bloc<PrinterEvent, PrinterState> {
   final GetBluetoothDevices getDevices;
@@ -12,14 +13,14 @@ class PrinterBloc extends Bloc<PrinterEvent, PrinterState> {
     required this.connectPrinter,
     required this.printInvoice,
   }) : super(const PrinterState()) {
-    on<ScanPrinters>(_onScan);
-    on<ConnectPrinter>(_onConnect);
+    on<ScanForDevices>(_onScan);
+    on<ConnectToDevice>(_onConnect);
     on<DisconnectPrinter>(_onDisconnect);
     on<PrintCommandsEvent>(_onPrint);
   }
 
   // Helper method for easy UI access
-  void printInvoice(List<PrintCommand> commands, int paperWidth) {
+  void printInvoiceCmd(List<PrintCommand> commands, int paperWidth) {
     add(PrintCommandsEvent(commands, paperWidth));
   }
 
@@ -48,7 +49,7 @@ class PrinterBloc extends Bloc<PrinterEvent, PrinterState> {
     }
   }
 
-  Future<void> _onScan(ScanPrinters event, Emitter<PrinterState> emit) async {
+  Future<void> _onScan(ScanForDevices event, Emitter<PrinterState> emit) async {
     emit(state.copyWith(isScanning: true));
     try {
       final devices = await getDevices();
@@ -58,7 +59,7 @@ class PrinterBloc extends Bloc<PrinterEvent, PrinterState> {
     }
   }
 
-  Future<void> _onConnect(ConnectPrinter event, Emitter<PrinterState> emit) async {
+  Future<void> _onConnect(ConnectToDevice event, Emitter<PrinterState> emit) async {
     emit(state.copyWith(isConnecting: true));
     try {
       final success = await connectPrinter(event.device);

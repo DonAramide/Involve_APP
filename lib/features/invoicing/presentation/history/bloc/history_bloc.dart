@@ -4,8 +4,12 @@ import '../../../domain/usecases/history_usecases.dart';
 
 class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
   final GetInvoiceHistory getHistory;
+  final GetInvoiceDetails getInvoiceDetails;
 
-  HistoryBloc({required this.getHistory}) : super(HistoryInitial()) {
+  HistoryBloc({
+    required this.getHistory,
+    required this.getInvoiceDetails,
+  }) : super(HistoryInitial()) {
     on<LoadHistory>(_onLoadHistory);
   }
 

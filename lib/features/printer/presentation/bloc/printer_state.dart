@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/repositories/printer_service.dart';
 
+import '../../../invoicing/domain/templates/invoice_template.dart';
+
 // Printer Events
 abstract class PrinterEvent {}
 
@@ -19,7 +21,7 @@ class ConnectToDevice extends PrinterEvent implements Equatable {
 class DisconnectPrinter extends PrinterEvent {}
 
 class PrintCommandsEvent extends PrinterEvent {
-  final List<dynamic> commands;
+  final List<PrintCommand> commands;
   final int paperWidth;
   PrintCommandsEvent(this.commands, this.paperWidth);
   @override
@@ -28,8 +30,8 @@ class PrintCommandsEvent extends PrinterEvent {
 
 // States
 class PrinterState extends Equatable {
-  final List<BluetoothDevice> devices;
-  final BluetoothDevice? connectedDevice;
+  final List<PrinterDevice> devices;
+  final PrinterDevice? connectedDevice;
   final bool isScanning;
   final bool isConnecting;
   final String? error;

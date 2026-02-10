@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import '../../domain/repositories/printer_service.dart';
@@ -19,7 +20,7 @@ class CrossPlatformPrinterService implements IPrinterService {
     }
 
     // Turn on Bluetooth (if possible)
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       await FlutterBluePlus.turnOn();
     }
 
@@ -62,11 +63,11 @@ class CrossPlatformPrinterService implements IPrinterService {
       }
 
       // Connect to device
-      await targetDevice.connect(timeout: const Duration(seconds: 10));
+      await targetDevice!.connect();
       _connectedDevice = targetDevice;
 
       // Discover services
-      List<BluetoothService> services = await targetDevice.discoverServices();
+      List<BluetoothService> services = await targetDevice!.discoverServices();
       
       // Find write characteristic (usually in Serial Port service)
       for (BluetoothService service in services) {

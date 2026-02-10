@@ -12,3 +12,9 @@ class GetInvoiceHistory {
     return repository.getAllInvoices();
   }
 }
+
+class GetInvoiceDetails {
+  final InvoiceRepository repository;
+  GetInvoiceDetails(this.repository);
+  Future<Invoice?> call(int id) => repository.getInvoiceById(id);
+}

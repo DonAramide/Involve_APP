@@ -4,6 +4,7 @@ import '../bloc/stock_bloc.dart';
 import '../bloc/stock_state.dart';
 import '../../domain/entities/item.dart';
 import '../widgets/item_form_dialog.dart';
+import 'manage_categories_page.dart';
 
 class StockManagementPage extends StatelessWidget {
   const StockManagementPage({super.key});
@@ -15,6 +16,14 @@ class StockManagementPage extends StatelessWidget {
         title: const Text('Stock Management'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.category, size: 28),
+            tooltip: 'Manage Categories',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ManageCategoriesPage()),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.add, size: 32),
             onPressed: () => _showItemDialog(context),
           ),
@@ -25,6 +34,8 @@ class StockManagementPage extends StatelessWidget {
           if (state is StockLoading) {
             return const Center(child: CircularProgressIndicator());
           } else if (state is StockLoaded) {
+            // Check if we need to filter by category? 
+            // For now just list all
             return ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: state.items.length,
@@ -49,8 +60,23 @@ class StockManagementPage extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        leading: item.image != null
+            ? Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  image: DecorationImage(image: MemoryImage(item.image!), fit: BoxFit.cover),
+                ),
+              )
+            : Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                child: const Icon(Icons.inventory_2, color: Colors.grey),
+              ),
         title: Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        subtitle: Text('${item.category.name.toUpperCase()} • Qty: ${item.stockQty}', 
+        subtitle: Text('Qty: ${item.stockQty}', 
                        style: TextStyle(color: Colors.grey[600])),
         trailing: Text('\$${item.price.toStringAsFixed(2)}', 
                         style: const TextStyle(fontSize: 20, color: Colors.green, fontWeight: FontWeight.bold)),

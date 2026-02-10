@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import '../../stock/data/models/item_table.dart';
+import '../../../stock/data/models/item_table.dart';
 
 @DataClassName('InvoiceTable')
 class Invoices extends Table {

@@ -1,12 +1,8 @@
 import 'package:drift/drift.dart';
 import '../models/settings_table.dart';
-import '../../stock/data/datasources/app_database.dart';
-import '../../settings/domain/entities/settings.dart';
-
-abstract class SettingsRepository {
-  Future<AppSettings> getSettings();
-  Future<void> updateSettings(AppSettings settings);
-}
+import '../../../stock/data/datasources/app_database.dart';
+import '../../domain/entities/settings.dart';
+import '../../domain/repositories/settings_repository.dart';
 
 class SettingsRepositoryImpl implements SettingsRepository {
   final AppDatabase db;
@@ -21,6 +17,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
         organizationName: 'My Business',
         address: '123 Street',
         phone: '000-000',
+        currency: 'NGN',
       );
     }
     return _toEntity(result);

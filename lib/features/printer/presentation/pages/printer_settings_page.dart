@@ -29,7 +29,7 @@ class PrinterSettingsPage extends StatelessWidget {
                           ? const Icon(Icons.check_circle, color: Colors.green)
                           : ElevatedButton(
                               onPressed: state.isConnecting ? null : () {
-                                context.read<PrinterBloc>().add(ConnectPrinter(device));
+                                context.read<PrinterBloc>().add(ConnectToDevice(device));
                               },
                               child: const Text('CONNECT'),
                             ),
@@ -40,7 +40,7 @@ class PrinterSettingsPage extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: ElevatedButton.icon(
-                  onPressed: state.isScanning ? null : () => context.read<PrinterBloc>().add(ScanPrinters()),
+                  onPressed: state.isScanning ? null : () => context.read<PrinterBloc>().add(ScanForDevices()),
                   icon: state.isScanning 
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.search),

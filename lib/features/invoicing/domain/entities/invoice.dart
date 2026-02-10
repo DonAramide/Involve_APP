@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../stock/domain/entities/item.dart';
+import '../../../stock/domain/entities/item.dart';
 
 class InvoiceItem extends Equatable {
   final int? id;

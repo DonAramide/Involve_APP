@@ -32,12 +32,13 @@ dependencies:
   sqlite3_flutter_libs: any
   path_provider: any
   path: any
-  flutter_blue_plus: any
+  flutter_blue_plus: ^1.32.0
   esc_pos_utils_plus: any
   flutter_secure_storage: any
   intl: any
   get_it: any
   permission_handler: any
+  image_picker: ^1.2.1
 
 dev_dependencies:
   flutter_test:

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/utils/bloc_observer.dart';
 import 'features/stock/data/datasources/app_database.dart';
 import 'features/stock/data/repositories/item_repository_impl.dart';
+import 'features/stock/data/repositories/category_repository_impl.dart';
 import 'features/stock/domain/usecases/stock_usecases.dart';
 import 'features/stock/presentation/bloc/stock_bloc.dart';
 import 'features/invoicing/data/repositories/invoice_repository_impl.dart';
@@ -16,6 +17,8 @@ import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/printer/data/repositories/cross_platform_printer_service.dart';
 import 'features/printer/domain/usecases/printer_usecases.dart';
 import 'features/printer/presentation/bloc/printer_bloc.dart';
+import 'features/stock/presentation/bloc/stock_state.dart';
+import 'features/settings/presentation/bloc/settings_state.dart';
 import 'features/dashboard/presentation/pages/dashboard_page.dart';
 import 'core/services/backup_service.dart';
 
@@ -32,18 +35,24 @@ void main() async {
   final itemRepository = ItemRepositoryImpl(database);
   final invoiceRepository = InvoiceRepositoryImpl(database);
   final settingsRepository = SettingsRepositoryImpl(database);
+  final categoryRepository = CategoryRepositoryImpl(database);
   
   // Initialize services
   final printerService = CrossPlatformPrinterService();
   final securityService = SecurityService();
   final calculationService = InvoiceCalculationService();
-  final backupService = BackupService(database);
+  final backupService = BackupService();
   
   // Initialize use cases
   final getItems = GetItems(itemRepository);
   final addItem = AddItem(itemRepository);
   final updateItem = UpdateItem(itemRepository);
   final deleteItem = DeleteItem(itemRepository);
+
+  // Category Use Cases
+  final getCategories = GetCategories(categoryRepository);
+  final addCategory = AddNewCategory(categoryRepository);
+  final deleteCategory = DeleteCategoryUseCase(categoryRepository);
   
   final getDevices = GetBluetoothDevices(printerService);
   final connectPrinter = ConnectToPrinter(printerService);
@@ -55,6 +64,7 @@ void main() async {
   runApp(MyApp(
     database: database,
     itemRepository: itemRepository,
+    categoryRepository: categoryRepository,
     invoiceRepository: invoiceRepository,
     settingsRepository: settingsRepository,
     printerService: printerService,
@@ -65,6 +75,9 @@ void main() async {
     addItem: addItem,
     updateItem: updateItem,
     deleteItem: deleteItem,
+    getCategories: getCategories,
+    addCategory: addCategory,
+    deleteCategory: deleteCategory,
     getDevices: getDevices,
     connectPrinter: connectPrinter,
     printInvoice: printInvoice,
@@ -76,6 +89,7 @@ void main() async {
 class MyApp extends StatelessWidget {
   final AppDatabase database;
   final ItemRepositoryImpl itemRepository;
+  final CategoryRepositoryImpl categoryRepository; // NEW
   final InvoiceRepositoryImpl invoiceRepository;
   final SettingsRepositoryImpl settingsRepository;
   final CrossPlatformPrinterService printerService;
@@ -86,6 +100,12 @@ class MyApp extends StatelessWidget {
   final AddItem addItem;
   final UpdateItem updateItem;
   final DeleteItem deleteItem;
+  
+  // Category Use Cases
+  final GetCategories getCategories;
+  final AddNewCategory addCategory;
+  final DeleteCategoryUseCase deleteCategory;
+
   final GetBluetoothDevices getDevices;
   final ConnectToPrinter connectPrinter;
   final PrintInvoiceCommands printInvoice;
@@ -96,6 +116,7 @@ class MyApp extends StatelessWidget {
     super.key,
     required this.database,
     required this.itemRepository,
+    required this.categoryRepository, // NEW
     required this.invoiceRepository,
     required this.settingsRepository,
     required this.printerService,
@@ -106,6 +127,9 @@ class MyApp extends StatelessWidget {
     required this.addItem,
     required this.updateItem,
     required this.deleteItem,
+    required this.getCategories,
+    required this.addCategory,
+    required this.deleteCategory,
     required this.getDevices,
     required this.connectPrinter,
     required this.printInvoice,
@@ -123,17 +147,20 @@ class MyApp extends StatelessWidget {
             addItem: addItem,
             updateItem: updateItem,
             deleteItem: deleteItem,
+            getCategories: getCategories,
+            addCategory: addCategory,
+            deleteCategory: deleteCategory,
           )..add(LoadItems()),
         ),
         BlocProvider(
           create: (_) => InvoiceBloc(
             repository: invoiceRepository,
-            calculator: calculationService,
+            calculationService: calculationService,
           ),
         ),
         BlocProvider(
           create: (_) => HistoryBloc(
-            getInvoiceHistory: getInvoiceHistory,
+            getHistory: getInvoiceHistory,
             getInvoiceDetails: getInvoiceDetails,
           ),
         ),
@@ -159,7 +186,7 @@ class MyApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
           useMaterial3: true,
         ),
-        home: const DashboardPage(),
+        home: DashboardPage(),
       ),
     );
   }

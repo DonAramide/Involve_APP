@@ -32,41 +32,98 @@ class CreateInvoicePage extends StatelessWidget {
   }
 }
 
-class _ItemSelector extends StatelessWidget {
+class _ItemSelector extends StatefulWidget {
+  @override
+  State<_ItemSelector> createState() => _ItemSelectorState();
+}
+
+class _ItemSelectorState extends State<_ItemSelector> {
+  int? _selectedCategoryId;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ensure data is loaded
+    context.read<StockBloc>().add(LoadCategories());
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<StockBloc, StockState>(
       builder: (context, state) {
         if (state is StockLoaded) {
-          return GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 1,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-            ),
-            itemCount: state.items.length,
-            itemBuilder: (context, index) {
-              final item = state.items[index];
-              return BlocBuilder<InvoiceBloc, InvoiceState>(
-                builder: (context, invState) {
-                  final cartItem = invState.items.where((i) => i.item.id == item.id).firstOrNull;
-                  final quantity = cartItem?.quantity ?? 0;
+          // Filter Items
+          final filteredItems = _selectedCategoryId == null
+              ? state.items
+              : state.items.where((i) => i.categoryId == _selectedCategoryId).toList();
 
-                  return _POSItemCard(
-                    item: item,
-                    quantity: quantity,
-                    onAdd: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, 1)),
-                    onRemove: quantity > 0 ? () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, -1)) : null,
-                  );
-                },
-              );
-            },
+          return Column(
+            children: [
+              // Category Chips
+              Container(
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    _buildFilterChip('All', null),
+                    ...state.categories.map((cat) => _buildFilterChip(cat.name, cat.id)),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Item Grid
+              Expanded(
+                child: filteredItems.isEmpty
+                    ? const Center(child: Text('No items in this category.'))
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          childAspectRatio: 0.8, // Adjusted for image
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                        ),
+                        itemCount: filteredItems.length,
+                        itemBuilder: (context, index) {
+                          final item = filteredItems[index];
+                          return BlocBuilder<InvoiceBloc, InvoiceState>(
+                            builder: (context, invState) {
+                              final cartItem = invState.items.where((i) => i.item.id == item.id).firstOrNull;
+                              final quantity = cartItem?.quantity ?? 0;
+
+                              return _POSItemCard(
+                                item: item,
+                                quantity: quantity,
+                                onAdd: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, 1)),
+                                onRemove: quantity > 0 ? () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, -1)) : null,
+                              );
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
           );
         }
         return const Center(child: CircularProgressIndicator());
       },
+    );
+  }
+
+  Widget _buildFilterChip(String label, int? id) {
+    final isSelected = _selectedCategoryId == id;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (selected) {
+          setState(() {
+            _selectedCategoryId = id;
+          });
+        },
+      ),
     );
   }
 }

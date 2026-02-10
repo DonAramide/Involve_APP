@@ -21,8 +21,10 @@ class ItemRepositoryImpl implements ItemRepository {
           ItemsCompanion.insert(
             name: item.name,
             category: item.category.name,
+            categoryId: Value(item.categoryId),
             price: item.price,
             stockQty: Value(item.stockQty),
+            image: Value(item.image),
           ),
         );
   }
@@ -33,8 +35,10 @@ class ItemRepositoryImpl implements ItemRepository {
           ItemsCompanion(
             name: Value(item.name),
             category: Value(item.category.name),
+            categoryId: Value(item.categoryId),
             price: Value(item.price),
             stockQty: Value(item.stockQty),
+            image: Value(item.image),
           ),
         );
   }
@@ -49,8 +53,10 @@ class ItemRepositoryImpl implements ItemRepository {
       id: row.id,
       name: row.name,
       category: ItemCategory.values.byName(row.category),
+      categoryId: row.categoryId,
       price: row.price,
       stockQty: row.stockQty,
+      image: row.image,
     );
   }
 }

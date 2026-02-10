@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../domain/entities/settings.dart';
+import '../../domain/entities/settings.dart';
 
 abstract class SettingsEvent extends Equatable {
   @override
