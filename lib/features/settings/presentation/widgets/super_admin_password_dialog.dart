@@ -42,7 +42,12 @@ class _SuperAdminPasswordDialogState extends State<SuperAdminPasswordDialog> {
           children: const [
             Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
             SizedBox(width: 8),
-            Text('Super Admin Access'),
+            const Flexible(
+              child: Text(
+                'Super Admin Access',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
         content: Column(

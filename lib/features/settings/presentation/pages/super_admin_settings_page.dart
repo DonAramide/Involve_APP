@@ -72,7 +72,12 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
             children: const [
               Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
               SizedBox(width: 8),
-              Text('Super Admin Settings'),
+              const Flexible(
+                child: Text(
+                  'Super Admin Settings',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
           backgroundColor: Colors.deepPurple,

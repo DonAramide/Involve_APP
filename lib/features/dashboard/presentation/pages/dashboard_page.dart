@@ -46,7 +46,12 @@ class DashboardPage extends StatelessWidget {
                     ),
                   ),
                 // Organization name
-                Text(settings?.organizationName ?? 'Bar & Hotel POS'),
+                Expanded(
+                  child: Text(
+                    settings?.organizationName ?? 'Bar & Hotel POS',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             centerTitle: false,
