@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:image/image.dart' as img; // Import image package
 import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 
@@ -127,8 +128,21 @@ class CrossPlatformPrinterService implements IPrinterService {
       } else if (cmd is DividerCommand) {
         bytes += generator.hr();
       } else if (cmd is ImageCommand) {
-        // Image printing can be implemented here
-        // bytes += generator.image(posImage);
+        if (cmd.bytes != null) {
+          final img.Image? image = img.decodeImage(cmd.bytes!);
+          if (image != null) {
+             // Resize logic based on paper width
+             // 58mm = ~384 dots, 80mm = ~576 dots
+             final maxWidth = paperWidth == 58 ? 370 : 550;
+             img.Image resized = image;
+             if (image.width > maxWidth) {
+               resized = img.copyResize(image, width: maxWidth);
+             }
+             
+             // Use high density printing for better logo quality
+             bytes += generator.image(resized, align: _getAlign(cmd.align));
+          }
+        }
       }
     }
 

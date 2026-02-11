@@ -33,11 +33,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
             phone: Value(settings.phone),
             taxId: Value(settings.taxId),
             logoPath: Value(settings.logoPath),
+            logo: Value(settings.logo),
+            themeMode: Value(settings.themeMode),
             currency: Value(settings.currency),
             taxEnabled: Value(settings.taxEnabled),
             discountEnabled: Value(settings.discountEnabled),
             defaultInvoiceTemplate: Value(settings.defaultInvoiceTemplate),
             allowPriceUpdates: Value(settings.allowPriceUpdates),
+            failedAttempts: Value(settings.failedAttempts),
+            isLocked: Value(settings.isLocked),
+            lockedAt: Value(settings.lockedAt),
           ),
         );
   }
@@ -50,11 +55,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
       phone: row.phone,
       taxId: row.taxId,
       logoPath: row.logoPath,
+      logo: row.logo,
+      themeMode: row.themeMode,
       currency: row.currency,
       taxEnabled: row.taxEnabled,
       discountEnabled: row.discountEnabled,
       defaultInvoiceTemplate: row.defaultInvoiceTemplate,
       allowPriceUpdates: row.allowPriceUpdates,
+      failedAttempts: row.failedAttempts,
+      isLocked: row.isLocked,
+      lockedAt: row.lockedAt,
     );
   }
 }

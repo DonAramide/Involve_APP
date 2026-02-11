@@ -47,6 +47,35 @@ class RestoreFromPath extends SettingsEvent {
   List<Object?> get props => [path];
 }
 
+class RecordFailedAttempt extends SettingsEvent {}
+
+class UnlockSystem extends SettingsEvent {
+  final String unlockCode;
+  UnlockSystem(this.unlockCode);
+  @override
+  List<Object?> get props => [unlockCode];
+}
+
+class ResetFailedAttempts extends SettingsEvent {}
+
+class VerifySuperAdminPassword extends SettingsEvent {
+  final String password;
+  VerifySuperAdminPassword(this.password);
+  @override
+  List<Object?> get props => [password];
+}
+
+class SetSuperAdminPassword extends SettingsEvent {
+  final String password;
+  SetSuperAdminPassword(this.password);
+  @override
+  List<Object?> get props => [password];
+}
+
+class ResetSuperAdminAuth extends SettingsEvent {}
+
+class ResetSystemAuth extends SettingsEvent {}
+
 class SettingsState extends Equatable {
   final AppSettings? settings;
   final bool isLoading;
@@ -55,8 +84,10 @@ class SettingsState extends Equatable {
   final bool isImporting;
   final bool isAuthorized; // For settings access
   final bool isDeviceAuthorized; // For lifetime activation
+  final bool isSuperAdminAuthorized;
   final String? error;
   final String? successMessage;
+  final String? backupPath;
 
   const SettingsState({
     this.settings,
@@ -66,8 +97,10 @@ class SettingsState extends Equatable {
     this.isImporting = false,
     this.isAuthorized = false,
     this.isDeviceAuthorized = false,
+    this.isSuperAdminAuthorized = false,
     this.error,
     this.successMessage,
+    this.backupPath,
   });
 
   SettingsState copyWith({
@@ -78,8 +111,10 @@ class SettingsState extends Equatable {
     bool? isImporting,
     bool? isAuthorized,
     bool? isDeviceAuthorized,
+    bool? isSuperAdminAuthorized,
     String? error,
     String? successMessage,
+    String? backupPath,
   }) {
     return SettingsState(
       settings: settings ?? this.settings,
@@ -89,8 +124,10 @@ class SettingsState extends Equatable {
       isImporting: isImporting ?? this.isImporting,
       isAuthorized: isAuthorized ?? this.isAuthorized,
       isDeviceAuthorized: isDeviceAuthorized ?? this.isDeviceAuthorized,
+      isSuperAdminAuthorized: isSuperAdminAuthorized ?? this.isSuperAdminAuthorized,
       error: error,
       successMessage: successMessage,
+      backupPath: backupPath ?? this.backupPath,
     );
   }
 
@@ -103,7 +140,9 @@ class SettingsState extends Equatable {
         isImporting,
         isAuthorized,
         isDeviceAuthorized,
+        isSuperAdminAuthorized,
         error,
-        successMessage
+        successMessage,
+        backupPath,
       ];
 }

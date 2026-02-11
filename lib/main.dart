@@ -179,14 +179,31 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ],
-      child: MaterialApp(
-        title: 'Bar & Hotel POS',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-          useMaterial3: true,
-        ),
-        home: DashboardPage(),
+      child: BlocBuilder<SettingsBloc, SettingsState>(
+        builder: (context, state) {
+          final themeMode = state.settings?.themeMode ?? 'system';
+          return MaterialApp(
+            title: 'Bar & Hotel POS',
+            debugShowCheckedModeBanner: false,
+            themeMode: themeMode == 'light' 
+                ? ThemeMode.light 
+                : themeMode == 'dark' 
+                    ? ThemeMode.dark 
+                    : ThemeMode.system,
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+              useMaterial3: true,
+            ),
+            darkTheme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.blue, 
+                brightness: Brightness.dark,
+              ),
+              useMaterial3: true,
+            ),
+            home: const DashboardPage(),
+          );
+        },
       ),
     );
   }

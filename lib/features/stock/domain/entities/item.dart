@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'dart:typed_data';
 
 enum ItemCategory {
   drink,
@@ -8,8 +9,6 @@ enum ItemCategory {
 }
 
 class Item extends Equatable {
-import 'dart:typed_data';
-
   final int? id;
   final String name;
   final ItemCategory category; // Kept for backward compatibility/type grouping

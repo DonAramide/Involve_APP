@@ -5,6 +5,9 @@ import '../bloc/stock_state.dart';
 import '../../domain/entities/item.dart';
 import '../widgets/item_form_dialog.dart';
 import 'manage_categories_page.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
+import '../../../settings/presentation/bloc/settings_state.dart';
+import '../../../settings/presentation/widgets/password_dialog.dart';
 
 class StockManagementPage extends StatelessWidget {
   const StockManagementPage({super.key});
@@ -18,14 +21,20 @@ class StockManagementPage extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.category, size: 28),
             tooltip: 'Manage Categories',
-            onPressed: () => Navigator.push(
+            onPressed: () => _verifyAndExecute(
               context,
-              MaterialPageRoute(builder: (_) => const ManageCategoriesPage()),
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ManageCategoriesPage()),
+              ),
             ),
           ),
           IconButton(
             icon: const Icon(Icons.add, size: 32),
-            onPressed: () => _showItemDialog(context),
+            onPressed: () => _verifyAndExecute(
+              context,
+              () => _showItemDialog(context),
+            ),
           ),
         ],
       ),
@@ -80,8 +89,43 @@ class StockManagementPage extends StatelessWidget {
                        style: TextStyle(color: Colors.grey[600])),
         trailing: Text('\$${item.price.toStringAsFixed(2)}', 
                         style: const TextStyle(fontSize: 20, color: Colors.green, fontWeight: FontWeight.bold)),
-        onTap: () => _showItemDialog(context, item: item),
-        onLongPress: () => _confirmDelete(context, item),
+        onTap: () => _verifyAndExecute(
+          context,
+          () => _showItemDialog(context, item: item),
+        ),
+        onLongPress: () => _verifyAndExecute(
+          context,
+          () => _confirmDelete(context, item),
+        ),
+      ),
+    );
+  }
+
+  void _verifyAndExecute(BuildContext context, VoidCallback onSuccess) {
+    final settingsBloc = context.read<SettingsBloc>();
+    
+    // Reset auth to ensure listener catches new success
+    settingsBloc.add(ResetSystemAuth());
+    
+    // Show password dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => BlocListener<SettingsBloc, SettingsState>(
+        bloc: settingsBloc,
+        listener: (context, state) {
+          if (state.isAuthorized) {
+            // Dialog closes itself. Just execute action.
+            onSuccess();
+            // No need to update settings here intentionally
+          } else if (state.error != null) {
+            // Show error but keep dialog open
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
+            );
+          }
+        },
+        child: PasswordDialog(bloc: settingsBloc),
       ),
     );
   }
@@ -105,6 +149,9 @@ class StockManagementPage extends StatelessWidget {
             onPressed: () {
               context.read<StockBloc>().add(DeleteStockItem(item.id!));
               Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${item.name} deleted')),
+              );
             },
             child: const Text('DELETE', style: TextStyle(color: Colors.red)),
           ),

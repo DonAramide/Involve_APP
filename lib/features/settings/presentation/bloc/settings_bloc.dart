@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart';
 import 'settings_state.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/services/security_service.dart';
@@ -22,6 +23,13 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<CheckDeviceAuthorization>(_onCheckDeviceAuth);
     on<CreateBackup>(_onBackup);
     on<RestoreFromPath>(_onRestore);
+    on<RecordFailedAttempt>(_onRecordFailedAttempt);
+    on<UnlockSystem>(_onUnlockSystem);
+    on<ResetFailedAttempts>(_onResetFailedAttempts);
+    on<VerifySuperAdminPassword>(_onVerifySuperAdminPassword);
+    on<SetSuperAdminPassword>(_onSetSuperAdminPassword);
+    on<ResetSuperAdminAuth>((event, emit) => emit(state.copyWith(isSuperAdminAuthorized: false)));
+    on<ResetSystemAuth>((event, emit) => emit(state.copyWith(isAuthorized: false, error: null)));
   }
 
   Future<void> _onBackup(CreateBackup event, Emitter<SettingsState> emit) async {
@@ -60,6 +68,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   Future<void> _onLoadSettings(LoadSettings event, Emitter<SettingsState> emit) async {
+    print('SettingsBloc: LoadSettings called'); // Debug
     add(CheckDeviceAuthorization()); // Check auth on load
     emit(state.copyWith(isLoading: true));
     try {
@@ -71,6 +80,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   Future<void> _onUpdateSettings(UpdateAppSettings event, Emitter<SettingsState> emit) async {
+    print('SettingsBloc: UpdateSettings called'); // Debug
     emit(state.copyWith(isSaving: true));
     try {
       await repository.updateSettings(event.settings);
@@ -81,10 +91,29 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   Future<void> _onVerifyPassword(VerifySystemPassword event, Emitter<SettingsState> emit) async {
+    final currentSettings = state.settings;
+    if (currentSettings == null) return;
+
+    // Check if system is locked
+    if (currentSettings.isLocked) {
+      emit(state.copyWith(error: 'System is locked. Use unlock code.', isAuthorized: false));
+      return;
+    }
+
     final success = await securityService.verifyPassword(event.password);
     if (success) {
+      // Reset failed attempts on successful login
+      add(ResetFailedAttempts());
       emit(state.copyWith(isAuthorized: true, error: null));
     } else {
+      // DEBUG: Log correct password on failure
+      final correctPassword = await securityService.getStoredPassword();
+      debugPrint('❌ Password verification failed.');
+      debugPrint('   Input: ${event.password}');
+      debugPrint('   Correct: $correctPassword');
+
+      // Record failed attempt
+      add(RecordFailedAttempt());
       emit(state.copyWith(error: 'Invalid Password', isAuthorized: false));
     }
   }
@@ -93,6 +122,169 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     final success = await securityService.setPassword(event.newPassword);
     if (!success) {
       emit(state.copyWith(error: 'Failed to set password'));
+    }
+  }
+
+  Future<void> _onRecordFailedAttempt(RecordFailedAttempt event, Emitter<SettingsState> emit) async {
+    final currentSettings = state.settings;
+    if (currentSettings == null) return;
+
+    final newAttempts = currentSettings.failedAttempts + 1;
+    
+    if (newAttempts >= 6) {
+      // Lock the system
+      final lockedSettings = currentSettings.copyWith(
+        failedAttempts: newAttempts,
+        isLocked: true,
+        lockedAt: DateTime.now(),
+      );
+      await repository.updateSettings(lockedSettings);
+      emit(state.copyWith(
+        settings: lockedSettings,
+        error: 'System locked! Too many failed attempts. Use unlock code.',
+      ));
+    } else {
+      // Just increment failed attempts
+      final updatedSettings = currentSettings.copyWith(failedAttempts: newAttempts);
+      await repository.updateSettings(updatedSettings);
+      emit(state.copyWith(
+        settings: updatedSettings,
+        error: 'Invalid password. ${6 - newAttempts} attempts remaining.',
+      ));
+    }
+  }
+
+  Future<void> _onUnlockSystem(UnlockSystem event, Emitter<SettingsState> emit) async {
+    final currentSettings = state.settings;
+    if (currentSettings == null) return;
+
+    // Get admin password from secure storage
+    final adminPassword = await securityService.getStoredPassword();
+    if (adminPassword == null) {
+      emit(state.copyWith(error: 'Admin password not set'));
+      return;
+    }
+
+    // Validate unlock code
+    if (_validateUnlockCode(event.unlockCode, adminPassword)) {
+      // Unlock system and reset failed attempts
+      final unlockedSettings = currentSettings.copyWith(
+        failedAttempts: 0,
+        isLocked: false,
+        lockedAt: null,
+      );
+      await repository.updateSettings(unlockedSettings);
+      emit(state.copyWith(
+        settings: unlockedSettings,
+        isAuthorized: true,
+        error: null,
+        successMessage: 'System unlocked successfully!',
+      ));
+    } else {
+      emit(state.copyWith(error: 'Invalid unlock code'));
+    }
+  }
+
+  Future<void> _onResetFailedAttempts(ResetFailedAttempts event, Emitter<SettingsState> emit) async {
+    final currentSettings = state.settings;
+    if (currentSettings == null) return;
+
+    final resetSettings = currentSettings.copyWith(failedAttempts: 0);
+    await repository.updateSettings(resetSettings);
+    emit(state.copyWith(settings: resetSettings));
+  }
+
+  bool _validateUnlockCode(String unlockCode, String adminPassword) {
+    final parts = unlockCode.split('/');
+    if (parts.length != 3) {
+      debugPrint('❌ Unlock code format invalid. Expected 3 parts, got ${parts.length}');
+      return false;
+    }
+    
+    final dateStr = parts[0]; // YYYYMMDD
+    final timeStr = parts[1]; // HHmm
+    final password = parts[2];
+    
+    debugPrint('🔓 Validating unlock code:');
+    debugPrint('  Date: $dateStr');
+    debugPrint('  Time: $timeStr');
+    debugPrint('  Password: ${password.replaceAll(RegExp(r'.'), '*')}');
+    
+    // Validate password
+    if (password != adminPassword) {
+      debugPrint('❌ Password mismatch');
+      debugPrint('   Input (from code): $password');
+      debugPrint('   Expected (system admin password): $adminPassword');
+      return false;
+    }
+    debugPrint('✅ Password correct');
+    
+    // Validate date (current date)
+    final now = DateTime.now();
+    final expectedDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    if (dateStr != expectedDate) {
+      debugPrint('❌ Date mismatch. Expected: $expectedDate, Got: $dateStr');
+      return false;
+    }
+    debugPrint('✅ Date correct');
+    
+    // Validate time (current hour and minute with ±1 minute tolerance)
+    final currentMinute = now.hour * 60 + now.minute;
+    final inputHour = int.tryParse(timeStr.substring(0, 2)) ?? -1;
+    final inputMinute = int.tryParse(timeStr.substring(2, 4)) ?? -1;
+    final inputTotalMinutes = inputHour * 60 + inputMinute;
+    
+    final timeDifference = (currentMinute - inputTotalMinutes).abs();
+    
+    debugPrint('  Current time: ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}');
+    debugPrint('  Input time: ${inputHour.toString().padLeft(2, '0')}:${inputMinute.toString().padLeft(2, '0')}');
+    debugPrint('  Time difference: $timeDifference minutes');
+    
+    if (timeDifference > 1) {
+      debugPrint('❌ Time difference too large (>1 minute)');
+      return false;
+    }
+    
+    debugPrint('✅ Time within tolerance');
+    debugPrint('🎉 Unlock code validated successfully!');
+    return true;
+  }
+
+  Future<void> _onVerifySuperAdminPassword(VerifySuperAdminPassword event, Emitter<SettingsState> emit) async {
+    final isValid = await securityService.verifySuperAdminPassword(event.password);
+    
+    if (isValid) {
+      emit(state.copyWith(
+        isSuperAdminAuthorized: true,
+        error: null,
+        successMessage: 'Super admin access granted',
+      ));
+    } else {
+      // DEBUG: Log correct password on failure
+      final correctPassword = await securityService.getSuperAdminPassword();
+      debugPrint('❌ Super Admin verification failed.');
+      debugPrint('   Input: ${event.password}');
+      debugPrint('   Correct: ${correctPassword ?? "Not Set (Any input accepts)"}');
+
+      emit(state.copyWith(
+        isSuperAdminAuthorized: false,
+        error: 'Invalid super admin password',
+      ));
+    }
+  }
+
+  Future<void> _onSetSuperAdminPassword(SetSuperAdminPassword event, Emitter<SettingsState> emit) async {
+    final success = await securityService.setSuperAdminPassword(event.password);
+    
+    if (success) {
+      emit(state.copyWith(
+        successMessage: 'Super admin password set successfully',
+        error: null,
+      ));
+    } else {
+      emit(state.copyWith(
+        error: 'Failed to set super admin password',
+      ));
     }
   }
 }

@@ -1,4 +1,5 @@
 import '../entities/invoice.dart';
+import 'dart:typed_data';
 
 enum TemplateType {
   compact,
@@ -40,8 +41,10 @@ class TextCommand extends PrintCommand {
 
 class DividerCommand extends PrintCommand {}
 
+
 class ImageCommand extends PrintCommand {
-  final String path;
+  final String? path;
+  final Uint8List? bytes;
   final String align;
-  ImageCommand(this.path, {this.align = 'center'});
+  ImageCommand({this.path, this.bytes, this.align = 'center'});
 }

@@ -1,7 +1,9 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../../../core/utils/validators.dart';
 import '../../domain/entities/item.dart';
 import '../../domain/entities/category.dart';
@@ -42,13 +44,48 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
-    if (image != null) {
-      final bytes = await image.readAsBytes();
-      setState(() {
-        _imageBytes = bytes;
-      });
+    try {
+      Uint8List? bytes;
+      
+      if (kIsWeb) {
+        // Use file_picker for web - better browser support
+        FilePickerResult? result = await FilePicker.platform.pickFiles(
+          type: FileType.image,
+          allowMultiple: false,
+        );
+        
+        if (result != null && result.files.isNotEmpty) {
+          bytes = result.files.first.bytes;
+        }
+      } else {
+        // Use image_picker for mobile - better image handling
+        final picker = ImagePicker();
+        final XFile? image = await picker.pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 600,
+          imageQuality: 85,
+        );
+        
+        if (image != null) {
+          bytes = await image.readAsBytes();
+        }
+      }
+      
+      if (bytes != null) {
+        setState(() {
+          _imageBytes = bytes;
+        });
+      }
+    } catch (e) {
+      // Show error if image picking fails
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to pick image: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

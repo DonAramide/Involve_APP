@@ -39,12 +39,27 @@ class _ItemSelector extends StatefulWidget {
 
 class _ItemSelectorState extends State<_ItemSelector> {
   int? _selectedCategoryId;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     // Ensure data is loaded
     context.read<StockBloc>().add(LoadCategories());
+    
+    // Listen to search changes
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -52,13 +67,45 @@ class _ItemSelectorState extends State<_ItemSelector> {
     return BlocBuilder<StockBloc, StockState>(
       builder: (context, state) {
         if (state is StockLoaded) {
-          // Filter Items
-          final filteredItems = _selectedCategoryId == null
+          // Filter Items by category and search query
+          var filteredItems = _selectedCategoryId == null
               ? state.items
               : state.items.where((i) => i.categoryId == _selectedCategoryId).toList();
+          
+          // Apply search filter
+          if (_searchQuery.isNotEmpty) {
+            filteredItems = filteredItems
+                .where((i) => i.name.toLowerCase().contains(_searchQuery))
+                .toList();
+          }
 
           return Column(
             children: [
+              // Search Bar
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search products...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+              ),
+              
               // Category Chips
               Container(
                 height: 50,
@@ -72,10 +119,25 @@ class _ItemSelectorState extends State<_ItemSelector> {
                 ),
               ),
               const Divider(height: 1),
+              
               // Item Grid
               Expanded(
                 child: filteredItems.isEmpty
-                    ? const Center(child: Text('No items in this category.'))
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              _searchQuery.isNotEmpty
+                                  ? 'No products found for "$_searchQuery"'
+                                  : 'No items in this category.',
+                              style: TextStyle(color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      )
                     : GridView.builder(
                         padding: const EdgeInsets.all(16),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -159,25 +221,66 @@ class _POSItemCard extends StatelessWidget {
           // Main Tappable Area
           InkWell(
             onTap: onAdd,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    item.name,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Product Image
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    color: Colors.grey[200],
+                    child: item.image != null
+                        ? Image.memory(
+                            item.image!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Icon(
+                                Icons.image_not_supported,
+                                size: 40,
+                                color: Colors.grey[400],
+                              );
+                            },
+                          )
+                        : Icon(
+                            Icons.shopping_bag,
+                            size: 40,
+                            color: Colors.grey[400],
+                          ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '\$${item.price.toStringAsFixed(2)}',
-                    style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                ),
+                
+                // Product Info
+                Expanded(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0), // Reduced from 8.0 to fix overflow
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          item.name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${item.price.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.green,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           // Quantity Badge

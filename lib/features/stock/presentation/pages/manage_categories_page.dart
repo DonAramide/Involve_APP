@@ -4,14 +4,23 @@ import '../../domain/entities/category.dart';
 import '../bloc/stock_bloc.dart';
 import '../bloc/stock_state.dart';
 
-class ManageCategoriesPage extends StatelessWidget {
+class ManageCategoriesPage extends StatefulWidget {
   const ManageCategoriesPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Trigger load on enter
-    context.read<StockBloc>().add(LoadCategories());
+  State<ManageCategoriesPage> createState() => _ManageCategoriesPageState();
+}
 
+class _ManageCategoriesPageState extends State<ManageCategoriesPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Trigger load only once
+    context.read<StockBloc>().add(LoadCategories());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Manage Categories')),
       body: BlocConsumer<StockBloc, StockState>(
@@ -88,6 +97,24 @@ class _AddCategoryForm extends StatefulWidget {
 
 class _AddCategoryFormState extends State<_AddCategoryForm> {
   final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    print('Submit called. Text: ${_controller.text}'); // Debug
+    if (_controller.text.isNotEmpty) {
+      context.read<StockBloc>().add(AddCategory(_controller.text));
+      _controller.clear();
+      // Keep focus for rapid entry
+      _focusNode.requestFocus();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,20 +123,18 @@ class _AddCategoryFormState extends State<_AddCategoryForm> {
         Expanded(
           child: TextField(
             controller: _controller,
+            focusNode: _focusNode,
+            autofocus: false, // Disabled for debugging
             decoration: const InputDecoration(
               labelText: 'New Category Name',
               border: OutlineInputBorder(),
             ),
+            onSubmitted: (_) => _submit(),
           ),
         ),
         const SizedBox(width: 10),
         ElevatedButton.icon(
-          onPressed: () {
-            if (_controller.text.isNotEmpty) {
-              context.read<StockBloc>().add(AddCategory(_controller.text));
-              _controller.clear();
-            }
-          },
+          onPressed: _submit,
           icon: const Icon(Icons.add),
           label: const Text('ADD'),
         ),

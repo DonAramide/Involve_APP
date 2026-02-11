@@ -30,15 +30,21 @@ dependencies:
   drift: any
   drift_sqflite: any
   sqlite3_flutter_libs: any
-  path_provider: any
+  path_provider: ^2.1.5
   path: any
   flutter_blue_plus: ^1.32.0
   esc_pos_utils_plus: any
   flutter_secure_storage: any
   intl: any
   get_it: any
-  permission_handler: any
+  permission_handler: ^12.0.1
   image_picker: ^1.2.1
+  file_picker: ^10.3.10
+  usb_serial: ^0.5.2
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  share_plus: ^12.0.1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart'; // For logo picking
 import '../../../../core/utils/validators.dart';
 import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
 import '../widgets/password_dialog.dart';
 import '../widgets/super_admin_dialog.dart';
+import '../widgets/super_admin_password_dialog.dart';
+import '../../../printer/presentation/pages/printer_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -35,40 +39,21 @@ class SettingsPage extends StatelessWidget {
               children: [
                 _buildActivationBanner(context, isSuperAdmin),
                 const SizedBox(height: 10),
+                _buildSectionHeader('Branding'),
+                _buildReadOnlyLogoTile(context, settings.logo),
+                const SizedBox(height: 10),
                 _buildSectionHeader('Organization Detail'),
-                _buildTextTile(
-                  context,
-                  'Name',
-                  settings.organizationName,
-                  isSuperAdmin ? (val) => _update(context, settings.copyWith(organizationName: val)) : null,
-                  validator: (val) => InputValidator.validateNotEmpty(val, 'Org Name'),
-                ),
-                _buildTextTile(
-                  context,
-                  'Address',
-                  settings.address,
-                  isSuperAdmin ? (val) => _update(context, settings.copyWith(address: val)) : null,
-                  validator: (val) => InputValidator.validateNotEmpty(val, 'Address'),
-                ),
-                _buildTextTile(
-                  context,
-                  'Phone',
-                  settings.phone,
-                  isSuperAdmin ? (val) => _update(context, settings.copyWith(phone: val)) : null,
-                  validator: (val) => InputValidator.validatePhone(val),
-                ),
-                _buildTextTile(
-                  context,
-                  'Tax ID (VAT/GST)',
-                  settings.taxId ?? 'Not Set',
-                  isSuperAdmin ? (val) => _update(context, settings.copyWith(taxId: val)) : null,
-                ),
+                _buildReadOnlyTile('Name', settings.organizationName, Icons.business),
+                _buildReadOnlyTile('Address', settings.address, Icons.location_on),
+                _buildReadOnlyTile('Phone', settings.phone, Icons.phone),
+                _buildReadOnlyTile('Tax ID (VAT/GST)', (settings.taxId != null && settings.taxId!.isNotEmpty) ? settings.taxId! : 'Not Set', Icons.receipt_long),
                 const Divider(),
                 _buildSectionHeader('Preferences'),
                 _buildSwitchTile('Enable Tax (15%)', settings.taxEnabled, (val) => _update(context, settings.copyWith(taxEnabled: val))),
                 _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
                 _buildSwitchTile('Allow Price Updates', settings.allowPriceUpdates, (val) => _update(context, settings.copyWith(allowPriceUpdates: val))),
-                _buildDropdownTile(context, 'Currency', settings.currency, ['USD', 'EUR', 'GBP', 'KES'], (val) => _update(context, settings.copyWith(currency: val))),
+                _buildDropdownTile(context, 'Currency', settings.currency, ['NGN', 'USD', 'EUR', 'GBP', 'KES'], (val) => _update(context, settings.copyWith(currency: val))),
+                _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
                 const Divider(),
                 _buildSectionHeader('Maintenance'),
                 ListTile(
@@ -84,11 +69,32 @@ class SettingsPage extends StatelessWidget {
                   onTap: () => _showRestoreDialog(context),
                 ),
                 const Divider(),
+                _buildSectionHeader('Printer'),
+                ListTile(
+                  title: const Text('Printer Settings'),
+                  subtitle: const Text('Configure WiFi, USB, or Bluetooth printer'),
+                  trailing: const Icon(Icons.print),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const PrinterSettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(),
                 _buildSectionHeader('Security'),
               ListTile(
                 title: const Text('Change System Password'),
                 trailing: const Icon(Icons.lock_outline),
                 onTap: () => _showChangePassword(context),
+              ),
+              ListTile(
+                title: const Text('Set Super Admin Password'),
+                subtitle: const Text('Protects organization name, address, phone'),
+                trailing: const Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
+                onTap: () => _showSetSuperAdminPassword(context),
               ),
             ],
           );
@@ -275,6 +281,178 @@ class SettingsPage extends StatelessWidget {
             Navigator.pop(ctx);
           }, child: const Text('SET')),
         ],
+      ),
+    );
+  }
+
+  void _showSetSuperAdminPassword(BuildContext context) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
+            SizedBox(width: 8),
+            Text('Set Super Admin Password'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'This password will protect critical settings like organization name, address, and phone.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Super Admin Password',
+                hintText: 'Enter a strong password',
+                prefixIcon: Icon(Icons.lock),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              context.read<SettingsBloc>().add(SetSuperAdminPassword(controller.text));
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+            child: const Text('SET'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProtectedTextTile(
+    BuildContext context,
+    String label,
+    String value,
+    Function(String) onSave, {
+    String? Function(String?)? validator,
+  }) {
+    return ListTile(
+      title: Text(label),
+      subtitle: Text(value),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.admin_panel_settings, color: Colors.deepPurple, size: 16),
+          SizedBox(width: 4),
+          Icon(Icons.edit),
+        ],
+      ),
+      onTap: () async {
+        // Show super admin password dialog first
+        final settingsBloc = context.read<SettingsBloc>();
+        
+        // Reset authorization state to ensure dialog works correctly
+        settingsBloc.add(ResetSuperAdminAuth());
+        
+        final authorized = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => SuperAdminPasswordDialog(bloc: settingsBloc),
+        );
+
+        if (authorized == true) {
+          // Reset super admin authorization after use
+          // settingsBloc.add(UpdateAppSettings(settingsBloc.state.settings!)); // Not needed for auth reset
+          
+          // Show edit dialog
+          final newVal = await _showEditDialog(context, label, value, validator);
+          if (newVal != null) {
+            onSave(newVal);
+          }
+        }
+      },
+    );
+  }
+
+  Widget _buildLogoTile(BuildContext context, Uint8List? logo, Function(Uint8List?) onSave) {
+    return ListTile(
+      title: const Text('Company Logo'),
+      subtitle: const Text('Tap to change (Requires Super Admin)'),
+      leading: CircleAvatar(
+        radius: 30,
+        backgroundColor: Colors.grey[200],
+        backgroundImage: logo != null ? MemoryImage(logo) : null,
+        child: logo == null ? const Icon(Icons.business, color: Colors.grey) : null,
+      ),
+      trailing: const Icon(Icons.edit, color: Colors.blue),
+      onTap: () async {
+        // Log it needs permission
+        final settingsBloc = context.read<SettingsBloc>();
+        settingsBloc.add(ResetSuperAdminAuth());
+        
+        final authorized = await showDialog<bool>(
+          context: context,
+          builder: (_) => SuperAdminPasswordDialog(bloc: settingsBloc),
+        );
+        
+        if (authorized == true) {
+          final ImagePicker picker = ImagePicker();
+          final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+          
+          if (image != null) {
+            final bytes = await image.readAsBytes();
+            onSave(bytes);
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Logo updated successfully!')));
+          }
+        }
+      },
+    );
+  }
+
+  Widget _buildReadOnlyTile(String label, String value, IconData icon) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.grey),
+      title: Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+      subtitle: Text(
+        value,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Colors.black87),
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyLogoTile(BuildContext context, Uint8List? logo) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            if (logo != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.memory(logo, width: 60, height: 60, fit: BoxFit.cover),
+              )
+            else
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.business, size: 30, color: Colors.grey),
+              ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Text(
+                'Company Logo',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

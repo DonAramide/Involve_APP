@@ -46,7 +46,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     return [
-      ImageCommand('logo.png'), // Placeholder
+      if (settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName, align: 'center', isBold: true),
       TextCommand(settings.address, align: 'center'),
       TextCommand('Phone: ${settings.phone}', align: 'center'),

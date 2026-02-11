@@ -12,7 +12,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -26,6 +26,20 @@ class AppDatabase extends _$AppDatabase {
           await m.createTable(categories);
           await m.addColumn(items, items.image);
           await m.addColumn(items, items.categoryId);
+        }
+        if (from < 3) {
+          // Security lockout migration
+          await m.addColumn(settings, settings.failedAttempts);
+          await m.addColumn(settings, settings.isLocked);
+          await m.addColumn(settings, settings.lockedAt);
+        }
+        if (from < 4) {
+          // Company logo migration
+          await m.addColumn(settings, settings.logo);
+        }
+        if (from < 5) {
+          // Dark/Light mode migration
+          await m.addColumn(settings, settings.themeMode);
         }
       },
       beforeOpen: (details) async {

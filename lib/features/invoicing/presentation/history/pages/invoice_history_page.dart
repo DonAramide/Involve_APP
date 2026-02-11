@@ -7,6 +7,8 @@ import '../../../../printer/presentation/bloc/printer_bloc.dart';
 import '../../../../printer/domain/usecases/printer_usecases.dart';
 import '../../../domain/templates/template_registry.dart';
 import '../../../domain/templates/invoice_template.dart';
+import '../../../../settings/presentation/bloc/settings_bloc.dart';
+import '../../pages/receipt_preview_page.dart';
 
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
@@ -112,13 +114,22 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   }
 
   void _reprint(BuildContext context, Invoice invoice) {
-    // Logic to reprint using existing printer bloc and template engine
-    final template = TemplateRegistry.getTemplate(TemplateType.compact);
-    final commands = template.generateCommands(invoice, {});
-    context.read<PrinterBloc>().printInvoiceCmd(commands, 58);
+    // Get settings from SettingsBloc
+    final settingsState = context.read<SettingsBloc>().state;
+    final settings = settingsState.settings;
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reprinting invoice...')),
-    );
+    if (settings != null) {
+      // Logic to reprint using existing printer bloc and template engine
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReceiptPreviewPage(invoice: invoice),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Settings not loaded. Cannot print.')),
+      );
+    }
   }
 }
