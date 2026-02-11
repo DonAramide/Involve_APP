@@ -40,9 +40,16 @@ class ReceiptPreviewPage extends StatelessWidget {
         canChangePageFormat: false,
         initialPageFormat: PdfPageFormat.roll80,
         pdfFileName: 'Invoice-${invoice.id}.pdf',
-        // Printing package handles Share/Print/Save actions in its toolbar
+        // Enabling default actions
+        canDebug: false,
+        canPrint: true,
+        canShare: true,
       ),
     );
+  }
+
+  Future<void> _onShareManual(BuildContext context, PdfPageFormat format, Uint8List bytes) async {
+    await Printing.sharePdf(bytes: bytes, filename: 'Invoice-${invoice.id}.pdf');
   }
 
   Future<void> _printThermal(BuildContext context, Invoice invoice) async {
@@ -78,11 +85,11 @@ class ReceiptPreviewPage extends StatelessWidget {
       
       for (final item in invoice.items) {
         commands.add(TextCommand('${item.item.name} x${item.quantity}'));
-        commands.add(TextCommand('${(item.unitPrice * item.quantity).toStringAsFixed(2)}', align: 'right'));
+        commands.add(TextCommand('${settings?.currency ?? '₦'} ${(item.unitPrice * item.quantity).toStringAsFixed(2)}', align: 'right'));
       }
       
       commands.add(DividerCommand());
-      commands.add(TextCommand('Total: ${invoice.totalAmount.toStringAsFixed(2)}', isBold: true, align: 'right'));
+      commands.add(TextCommand('Total: ${settings?.currency ?? '₦'} ${invoice.totalAmount.toStringAsFixed(2)}', isBold: true, align: 'right'));
       commands.add(TextCommand('Thank you!', align: 'center'));
 
       await printerService.printCommands(commands);

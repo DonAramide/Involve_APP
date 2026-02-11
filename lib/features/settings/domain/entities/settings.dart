@@ -30,7 +30,7 @@ class AppSettings extends Equatable {
     this.logoPath,
     this.logo,
     this.themeMode = 'system',
-    this.currency = 'USD',
+    this.currency = '₦',
     this.taxEnabled = true,
     this.discountEnabled = true,
     this.defaultInvoiceTemplate = 'compact',

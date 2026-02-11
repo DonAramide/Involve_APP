@@ -87,7 +87,7 @@ class StockManagementPage extends StatelessWidget {
         title: Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         subtitle: Text('Qty: ${item.stockQty}', 
                        style: TextStyle(color: Colors.grey[600])),
-        trailing: Text('\$${item.price.toStringAsFixed(2)}', 
+        trailing: Text('${settingsState.settings?.currency ?? '₦'}${item.price.toStringAsFixed(2)}', 
                         style: const TextStyle(fontSize: 20, color: Colors.green, fontWeight: FontWeight.bold)),
         onTap: () => _verifyAndExecute(
           context,

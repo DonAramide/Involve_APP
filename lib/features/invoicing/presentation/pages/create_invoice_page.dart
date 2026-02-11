@@ -269,7 +269,7 @@ class _POSItemCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '\$${item.price.toStringAsFixed(2)}',
+                          '${settings?.currency ?? '₦'}${item.price.toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: Colors.green,
                             fontWeight: FontWeight.w600,
@@ -350,6 +350,7 @@ class _CartSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<InvoiceBloc, InvoiceState>(
       builder: (context, state) {
+        final settings = state.settings; // Access settings from state
         return Container(
           decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey[300]!))),
           child: Column(
@@ -374,9 +375,9 @@ class _CartSummary extends StatelessWidget {
                       child: ListTile(
                         dense: true,
                         title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${item.quantity} x \$${item.unitPrice}'),
+                        subtitle: Text('${item.quantity} x ${settings?.currency ?? '₦'}${item.unitPrice}'),
                         trailing: Text(
-                          '\$${item.total.toStringAsFixed(2)}',
+                          '${settings?.currency ?? '₦'}${item.total.toStringAsFixed(2)}',
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),

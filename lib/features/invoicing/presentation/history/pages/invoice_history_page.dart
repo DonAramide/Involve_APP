@@ -75,12 +75,12 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ExpansionTile(
         title: Text('${invoice.invoiceNumber}'),
-        subtitle: Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • Total: \$${invoice.totalAmount.toStringAsFixed(2)}'),
+        subtitle: Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • Total: ${context.read<SettingsBloc>().state.settings?.currency ?? '₦'}${invoice.totalAmount.toStringAsFixed(2)}'),
         children: [
           ...invoice.items.map((item) => ListTile(
                 dense: true,
                 title: Text(item.item.name),
-                trailing: Text('${item.quantity} x \$${item.unitPrice}'),
+                trailing: Text('${item.quantity} x ${context.read<SettingsBloc>().state.settings?.currency ?? '₦'}${item.unitPrice}'),
               )),
           const Divider(),
           Padding(

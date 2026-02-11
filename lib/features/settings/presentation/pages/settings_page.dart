@@ -52,7 +52,7 @@ class SettingsPage extends StatelessWidget {
                 _buildSwitchTile('Enable Tax (15%)', settings.taxEnabled, (val) => _update(context, settings.copyWith(taxEnabled: val))),
                 _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
                 _buildSwitchTile('Allow Price Updates', settings.allowPriceUpdates, (val) => _update(context, settings.copyWith(allowPriceUpdates: val))),
-                _buildDropdownTile(context, 'Currency', settings.currency, ['NGN', 'USD', 'EUR', 'GBP', 'KES'], (val) => _update(context, settings.copyWith(currency: val))),
+                _buildDropdownTile(context, 'Currency', settings.currency, ['₦', '$', '€', '£', 'KSh'], (val) => _update(context, settings.copyWith(currency: val))),
                 _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
                 const Divider(),
                 _buildSectionHeader('Maintenance'),
