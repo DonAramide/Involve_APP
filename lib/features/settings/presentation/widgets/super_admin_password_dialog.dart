@@ -14,6 +14,7 @@ class SuperAdminPasswordDialog extends StatefulWidget {
 class _SuperAdminPasswordDialogState extends State<SuperAdminPasswordDialog> {
   final _controller = TextEditingController();
   bool _passwordVisible = false;
+  String? _errorMessage;
 
   @override
   Widget build(BuildContext context) {
