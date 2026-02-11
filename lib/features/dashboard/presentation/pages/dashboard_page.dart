@@ -165,25 +165,18 @@ class DashboardPage extends StatelessWidget {
     settingsBloc.add(ResetSystemAuth());
     
     // Show password dialog
-    showDialog(
+    showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => BlocListener<SettingsBloc, SettingsState>(
-        bloc: settingsBloc,
-        listener: (context, state) {
-          if (state.isAuthorized && state.error == null) {
-            // Dialog closes itself. Navigate to settings.
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SettingsPage()),
-            );
-          } else if (state.error != null) {
-            // Error is shown in the dialog itself
-          }
-        },
-        child: PasswordDialog(bloc: settingsBloc),
-      ),
-    );
+      builder: (dialogContext) => PasswordDialog(bloc: settingsBloc),
+    ).then((authorized) {
+      if (authorized == true && context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SettingsPage()),
+        );
+      }
+    });
   }
 
 

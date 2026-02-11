@@ -49,23 +49,19 @@ class _HelpPageState extends State<HelpPage> {
     settingsBloc.add(ResetSuperAdminAuth());
     
     // Show super admin password dialog
-    showDialog(
+    showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => BlocListener<SettingsBloc, SettingsState>(
-        bloc: settingsBloc,
-        listener: (context, state) {
-          if (state.isSuperAdminAuthorized && state.error == null) {
-            // Navigate to Super Admin Settings
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SuperAdminSettingsPage()),
-            );
-          }
-        },
-        child: SuperAdminPasswordDialog(bloc: settingsBloc),
-      ),
-    );
+      builder: (dialogContext) => SuperAdminPasswordDialog(bloc: settingsBloc),
+    ).then((authorized) {
+      if (authorized == true && mounted) {
+        // Navigate to Super Admin Settings
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SuperAdminSettingsPage()),
+        );
+      }
+    });
   }
 
   @override
