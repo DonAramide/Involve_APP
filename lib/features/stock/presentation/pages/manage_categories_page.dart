@@ -135,6 +135,10 @@ class _AddCategoryFormState extends State<_AddCategoryForm> {
         const SizedBox(width: 10),
         ElevatedButton.icon(
           onPressed: _submit,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.deepPurple,
+            foregroundColor: Colors.white,
+          ),
           icon: const Icon(Icons.add),
           label: const Text('ADD'),
         ),

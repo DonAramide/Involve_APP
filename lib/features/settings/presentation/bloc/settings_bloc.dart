@@ -81,10 +81,15 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   Future<void> _onUpdateSettings(UpdateAppSettings event, Emitter<SettingsState> emit) async {
     print('SettingsBloc: UpdateSettings called'); // Debug
-    emit(state.copyWith(isSaving: true));
+    emit(state.copyWith(isSaving: true, successMessage: null, error: null));
     try {
       await repository.updateSettings(event.settings);
-      emit(state.copyWith(settings: event.settings, isSaving: false));
+      emit(state.copyWith(
+        settings: event.settings, 
+        isSaving: false,
+        successMessage: 'Settings updated successfully',
+        error: null,
+      ));
     } catch (e) {
       emit(state.copyWith(error: e.toString(), isSaving: false));
     }

@@ -250,6 +250,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                               : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.deepPurple,
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
                           child: const Text('SAVE CHANGES'),
@@ -318,6 +319,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                   label: Text(_selectedLogo != null ? 'Change Logo' : 'Upload Logo'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
                   ),
                 ),
                 if (_selectedLogo != null) ...[

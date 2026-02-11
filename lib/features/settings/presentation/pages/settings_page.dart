@@ -115,6 +115,10 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 10),
           ElevatedButton(
             onPressed: () => showDialog(context: context, builder: (_) => PasswordDialog(bloc: context.read<SettingsBloc>())),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueGrey,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('ENTER PASSWORD'),
           ),
         ],
@@ -161,6 +165,10 @@ class SettingsPage extends StatelessWidget {
               onPressed: () => showDialog(
                 context: context,
                 builder: (_) => SuperAdminDialog(bloc: context.read<SettingsBloc>()),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
               ),
               child: const Text('ACTIVATE'),
             ),
@@ -323,7 +331,10 @@ class SettingsPage extends StatelessWidget {
               context.read<SettingsBloc>().add(SetSuperAdminPassword(controller.text));
               Navigator.pop(ctx);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('SET'),
           ),
         ],

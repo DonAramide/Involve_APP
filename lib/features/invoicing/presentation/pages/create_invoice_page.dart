@@ -397,7 +397,11 @@ class _CartSummary extends StatelessWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: state.items.isEmpty ? null : () => _showPreview(context),
-                        style: ElevatedButton.styleFrom(minimumSize: const Size(0, 50)),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(0, 50),
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
                         child: const Text('PREVIEW'),
                       ),
                     ),
