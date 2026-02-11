@@ -13,7 +13,7 @@ class SuperAdminPasswordDialog extends StatefulWidget {
 
 class _SuperAdminPasswordDialogState extends State<SuperAdminPasswordDialog> {
   final _controller = TextEditingController();
-  String? _errorMessage;
+  bool _passwordVisible = false;
 
   @override
   Widget build(BuildContext context) {
@@ -76,14 +76,24 @@ class _SuperAdminPasswordDialogState extends State<SuperAdminPasswordDialog> {
             ],
             TextField(
               controller: _controller,
-              obscureText: true,
+              obscureText: !_passwordVisible,
               autofocus: true,
               onSubmitted: (_) => _handleSubmit(),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Super Admin Password',
                 hintText: 'Enter super admin password',
-                prefixIcon: Icon(Icons.lock),
-                border: OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.lock),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _passwordVisible ? Icons.visibility : Icons.visibility_off,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _passwordVisible = !_passwordVisible;
+                    });
+                  },
+                ),
+                border: const OutlineInputBorder(),
               ),
             ),
           ],

@@ -45,7 +45,9 @@ class SecurityService {
 
   Future<bool> verifySuperAdminPassword(String input) async {
     final stored = await _storage.read(key: _superAdminPasswordKey);
-    if (stored == null) return true; // Default no password set
+    if (stored == null) {
+      return input == 'admin123'; // Default password
+    }
     return stored == input;
   }
 
