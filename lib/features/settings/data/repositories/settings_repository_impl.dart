@@ -17,10 +17,15 @@ class SettingsRepositoryImpl implements SettingsRepository {
         organizationName: 'My Business',
         address: '123 Street',
         phone: '000-000',
-        currency: 'NGN',
+        currency: '₦',
       );
     }
-    return _toEntity(result);
+    final entity = _toEntity(result);
+    // Auto-normalize legacy currency
+    if (entity.currency == 'NGN') {
+      return entity.copyWith(currency: '₦');
+    }
+    return entity;
   }
 
   @override

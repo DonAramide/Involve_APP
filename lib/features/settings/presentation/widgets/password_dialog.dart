@@ -52,7 +52,7 @@ class _PasswordDialogState extends State<PasswordDialog> {
         // Close dialog on successful unlock/authorization
         if (state.isAuthorized && state.error == null) {
           if (ModalRoute.of(context)?.isCurrent == true) {
-            Navigator.pop(context);
+            Navigator.pop(context, true);
           }
         }
       },

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/invoice_bloc.dart';
 import '../bloc/invoice_state.dart';
 import '../../../printer/presentation/bloc/printer_bloc.dart';
+import '../../../printer/presentation/bloc/printer_state.dart';
 import '../../../printer/domain/usecases/printer_usecases.dart';
 import '../../domain/templates/template_registry.dart';
 import '../../domain/templates/invoice_template.dart';
@@ -10,6 +11,8 @@ import '../../domain/entities/invoice.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import '../pages/receipt_preview_page.dart';
+import '../../domain/templates/concrete_templates.dart';
+import '../../domain/usecases/history_usecases.dart';
 
 class InvoicePreviewDialog extends StatelessWidget {
   final InvoiceBloc invoiceBloc;
@@ -88,19 +91,57 @@ class InvoicePreviewDialog extends StatelessWidget {
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(context), child: const Text('EDIT')),
                     ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: invoiceState.isSaving ? null : () async {
+                        // Capture data for printing
+                        final items = List<InvoiceItem>.from(invoiceState.items);
+                        final subtotal = invoiceState.subtotal;
+                        final tax = invoiceState.tax;
+                        final total = invoiceState.total;
+                        
+                        // Save invoice
+                        context.read<InvoiceBloc>().add(SaveInvoice());
+                        
+                        // Create temporary invoice object for printing
+                        final invoice = Invoice(
+                          id: 0, 
+                          invoiceNumber: 'TEMP',
+                          dateCreated: DateTime.now(),
+                          items: items,
+                          subtotal: subtotal,
+                          taxAmount: tax,
+                          discountAmount: 0,
+                          totalAmount: total,
+                          paymentStatus: 'Paid',
+                        );
+
+                        // Trigger Print using preferred template
+                        final templateName = settings?.defaultInvoiceTemplate ?? 'compact';
+                        final template = templateName == 'detailed' ? DetailedInvoiceTemplate() : CompactInvoiceTemplate();
+                        final commands = template.generateCommands(invoice, settings!);
+                        
+                        context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Saving and sending to printer...')),
+                        );
+                      },
+                      child: invoiceState.isSaving 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('SAVE & PRINT'),
+                    ),
+                    ElevatedButton(
                       onPressed: invoiceState.isSaving ? null : () async {
                         context.read<InvoiceBloc>().add(SaveInvoice());
                         
                         // Wait for invoice to be saved and get the saved invoice
                         await Future.delayed(const Duration(milliseconds: 500));
                         
-                        // Get the last saved invoice from state
-                        // The bloc logic might not update 'items' immediately if ResetInvoice is called?
-                        // Actually ResetInvoice clears state.
-                        // We must capture data BEFORE ResetInvoice triggers.
-                        
                         final savedInvoice = Invoice(
-                          id: int.tryParse('INV-${DateTime.now().millisecondsSinceEpoch}') ?? 0, // Placeholder ID until reload
+                          id: 0, 
                           invoiceNumber: 'INV-${DateTime.now().millisecondsSinceEpoch}',
                           dateCreated: DateTime.now(),
                           items: List.from(invoiceState.items),
@@ -111,37 +152,12 @@ class InvoicePreviewDialog extends StatelessWidget {
                           paymentStatus: 'Paid',
                         );
 
-                        // Trigger Navigation instead of direct print
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => ReceiptPreviewPage(invoice: savedInvoice),
                           ),
-                        ).then((_) {
-                           // When returning from preview, close dialog?
-                           // Or close dialog first, then navigate?
-                           // If we navigate, dialog stays open in background?
-                           // Better: Pop dialog, then Push page.
-                        });
-                        
-                        // But we want to confirm Save first.
-                        // The 'listener' on line 23 pops the dialog when isSaved is true.
-                        // That listener also calls ResetInvoice().
-                        
-                        // If we navigate here, the listener might pop the PREVIEW page if we are not careful.
-                        // Wait. The listener listens to 'state.isSaved'.
-                        // If we add SaveInvoice(), state becomes successful.
-                        // Listener pops context.
-                        
-                        // We need to intercept that flow or Change logic.
-                        // Let's modify the Listener logic via code?
-                        
-                        // Modification: Remove the automatic Pop in listener?
-                        // Or modify this button to NOT close dialog but let listener handle it?
-                        
-                        // If we change listener to Navigate instead of Pop?
-                        // Let's rely on the listener to navigate!
-                        
+                        );
                       },
                       child: invoiceState.isSaving ? const CircularProgressIndicator() : const Text('SAVE & PREVIEW'),
                     ),

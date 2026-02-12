@@ -29,7 +29,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<VerifySuperAdminPassword>(_onVerifySuperAdminPassword);
     on<SetSuperAdminPassword>(_onSetSuperAdminPassword);
     on<ResetSuperAdminAuth>((event, emit) => emit(state.copyWith(isSuperAdminAuthorized: false)));
-    on<ResetSystemAuth>((event, emit) => emit(state.copyWith(isAuthorized: false, error: null)));
+    on<ResetSystemAuth>((event, emit) {
+      debugPrint('SettingsBloc: Resetting system auth');
+      emit(state.copyWith(isAuthorized: false, error: null));
+    });
   }
 
   Future<void> _onBackup(CreateBackup event, Emitter<SettingsState> emit) async {
@@ -68,19 +71,21 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   Future<void> _onLoadSettings(LoadSettings event, Emitter<SettingsState> emit) async {
-    print('SettingsBloc: LoadSettings called'); // Debug
+    debugPrint('SettingsBloc: LoadSettings called');
     add(CheckDeviceAuthorization()); // Check auth on load
     emit(state.copyWith(isLoading: true));
     try {
       final settings = await repository.getSettings();
+      debugPrint('SettingsBloc: Settings loaded: ${settings?.organizationName}');
       emit(state.copyWith(settings: settings, isLoading: false));
     } catch (e) {
+      debugPrint('SettingsBloc: Error loading settings: $e');
       emit(state.copyWith(error: e.toString(), isLoading: false));
     }
   }
 
   Future<void> _onUpdateSettings(UpdateAppSettings event, Emitter<SettingsState> emit) async {
-    print('SettingsBloc: UpdateSettings called'); // Debug
+    debugPrint('SettingsBloc: UpdateSettings called');
     emit(state.copyWith(isSaving: true, successMessage: null, error: null));
     try {
       await repository.updateSettings(event.settings);
@@ -96,27 +101,28 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   Future<void> _onVerifyPassword(VerifySystemPassword event, Emitter<SettingsState> emit) async {
+    debugPrint('SettingsBloc: VerifySystemPassword called with input: ${event.password}');
     final currentSettings = state.settings;
-    if (currentSettings == null) return;
+    if (currentSettings == null) {
+      debugPrint('SettingsBloc: ERROR - Settings are NULL');
+      return;
+    }
 
     // Check if system is locked
     if (currentSettings.isLocked) {
+      debugPrint('SettingsBloc: System is LOCKED');
       emit(state.copyWith(error: 'System is locked. Use unlock code.', isAuthorized: false));
       return;
     }
 
     final success = await securityService.verifyPassword(event.password);
+    debugPrint('SettingsBloc: Password verification success: $success');
     if (success) {
       // Reset failed attempts on successful login
       add(ResetFailedAttempts());
       emit(state.copyWith(isAuthorized: true, error: null));
+      debugPrint('SettingsBloc: Emitted isAuthorized: true');
     } else {
-      // DEBUG: Log correct password on failure
-      final correctPassword = await securityService.getStoredPassword();
-      debugPrint('❌ Password verification failed.');
-      debugPrint('   Input: ${event.password}');
-      debugPrint('   Correct: $correctPassword');
-
       // Record failed attempt
       add(RecordFailedAttempt());
       emit(state.copyWith(error: 'Invalid Password', isAuthorized: false));

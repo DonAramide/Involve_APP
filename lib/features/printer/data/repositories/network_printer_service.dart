@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:image/image.dart' as img;
 import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 
@@ -24,6 +25,11 @@ class NetworkPrinterService implements IPrinterService {
   /// Connect to printer by IP address
   /// Example: connectByIp('192.168.1.100')
   Future<bool> connectByIp(String ipAddress, {int port = 9100}) async {
+    debugPrint('NetworkPrinterService: Attempting connection to $ipAddress:$port');
+    if (kIsWeb) {
+      debugPrint('NetworkPrinterService: Network sockets are not supported on Web.');
+      return false;
+    }
     try {
       _port = port;
       
@@ -34,10 +40,11 @@ class NetworkPrinterService implements IPrinterService {
         timeout: const Duration(seconds: 5),
       );
       
+      debugPrint('NetworkPrinterService: Connected successfully to $ipAddress');
       _connectedIp = ipAddress;
       return true;
     } catch (e) {
-      debugPrint('Network connection error: $e');
+      debugPrint('NetworkPrinterService: Connection error: $e');
       return false;
     }
   }
@@ -93,9 +100,17 @@ class NetworkPrinterService implements IPrinterService {
         } else if (cmd is DividerCommand) {
           bytes += generator.text('--------------------------------');
         } else if (cmd is ImageCommand) {
-          // Image printing would require additional processing
-          // For now, skip images in network printing
-          bytes += generator.text('[IMAGE]');
+          if (cmd.bytes != null) {
+            final image = img.decodeImage(cmd.bytes!);
+            if (image != null) {
+              final maxWidth = paperWidth == 58 ? 370 : 550;
+              var resized = image;
+              if (image.width > maxWidth) {
+                resized = img.copyResize(image, width: maxWidth);
+              }
+              bytes += generator.image(resized, align: cmd.align == 'center' ? PosAlign.center : (cmd.align == 'right' ? PosAlign.right : PosAlign.left));
+            }
+          }
         }
       }
 
@@ -131,15 +146,18 @@ class NetworkPrinterService implements IPrinterService {
 
   /// Test connection to a printer IP
   static Future<bool> testConnection(String ipAddress, {int port = 9100}) async {
+    debugPrint('NetworkPrinterService: Testing connection to $ipAddress:$port');
     try {
       final socket = await Socket.connect(
         ipAddress,
         port,
         timeout: const Duration(seconds: 3),
       );
+      debugPrint('NetworkPrinterService: Test connection SUCCESS');
       await socket.close();
       return true;
     } catch (e) {
+      debugPrint('NetworkPrinterService: Test connection FAILED: $e');
       return false;
     }
   }

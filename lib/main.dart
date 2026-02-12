@@ -15,6 +15,9 @@ import 'features/settings/data/repositories/settings_repository_impl.dart';
 import 'features/settings/domain/services/security_service.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/printer/data/repositories/cross_platform_printer_service.dart';
+import 'features/printer/data/repositories/network_printer_service.dart';
+import 'features/printer/data/repositories/unified_printer_service.dart';
+import 'features/printer/domain/repositories/printer_service.dart';
 import 'features/printer/domain/usecases/printer_usecases.dart';
 import 'features/printer/presentation/bloc/printer_bloc.dart';
 import 'features/stock/presentation/bloc/stock_state.dart';
@@ -38,7 +41,12 @@ void main() async {
   final categoryRepository = CategoryRepositoryImpl(database);
   
   // Initialize services
-  final printerService = CrossPlatformPrinterService();
+  final bluetoothService = CrossPlatformPrinterService();
+  final networkService = NetworkPrinterService();
+  final printerService = UnifiedPrinterService(
+    bluetoothService: bluetoothService,
+    networkService: networkService,
+  );
   final securityService = SecurityService();
   final calculationService = InvoiceCalculationService();
   final backupService = BackupService();
@@ -92,7 +100,7 @@ class MyApp extends StatelessWidget {
   final CategoryRepositoryImpl categoryRepository; // NEW
   final InvoiceRepositoryImpl invoiceRepository;
   final SettingsRepositoryImpl settingsRepository;
-  final CrossPlatformPrinterService printerService;
+  final IPrinterService printerService;
   final SecurityService securityService;
   final InvoiceCalculationService calculationService;
   final BackupService backupService;

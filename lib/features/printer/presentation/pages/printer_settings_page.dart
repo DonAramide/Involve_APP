@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/printer_bloc.dart';
 import '../bloc/printer_state.dart';
 import '../widgets/network_printer_config_dialog.dart';
+import '../../../invoicing/domain/templates/invoice_template.dart';
+import '../../domain/repositories/printer_service.dart';
 import '../../data/repositories/network_printer_service.dart';
 
 class PrinterSettingsPage extends StatelessWidget {
@@ -16,7 +18,7 @@ class PrinterSettingsPage extends StatelessWidget {
         builder: (context, state) {
           return Column(
             children: [
-              _buildConnectionStatus(state),
+              _buildConnectionStatus(context, state),
               const Divider(),
               
               // Connection Type Selector
@@ -136,35 +138,16 @@ class PrinterSettingsPage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => NetworkPrinterConfigDialog(
-        onConnect: (ipAddress) async {
-          // Create network printer service and connect
-          final networkService = NetworkPrinterService();
-          final success = await networkService.connectByIp(ipAddress);
-          
-          if (success && context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Connected to printer at $ipAddress'),
-                backgroundColor: Colors.green,
-              ),
-            );
-            
-            // TODO: Update PrinterBloc to support network printers
-            // For now, this is a standalone connection
-          } else if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to connect to network printer'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+        onConnect: (ipAddress) {
+          context.read<PrinterBloc>().add(ConnectToDevice(
+            PrinterDevice(name: 'WiFi Printer', address: ipAddress)
+          ));
         },
       ),
     );
   }
 
-  Widget _buildConnectionStatus(PrinterState state) {
+  Widget _buildConnectionStatus(BuildContext context, PrinterState state) {
     return ListTile(
       tileColor: state.connectedDevice != null ? Colors.green[50] : Colors.red[50],
       title: Text(
@@ -182,7 +165,19 @@ class PrinterSettingsPage extends StatelessWidget {
       trailing: state.connectedDevice != null 
           ? TextButton(
               onPressed: () {
-                // TODO: Implement test print
+                context.read<PrinterBloc>().add(
+                  PrintCommandsEvent([
+                    TextCommand('*** TEST PRINT ***', isBold: true, align: 'center'),
+                    TextCommand('Printer Connected Successfully', align: 'center'),
+                    DividerCommand(),
+                    TextCommand('Date: ${DateTime.now().toString().split('.')[0]}', align: 'center'),
+                    TextCommand('Thank you for choosing Involve APP', align: 'center'),
+                    DividerCommand(),
+                  ], 58)
+                );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Test print sent!')),
+                );
               }, 
               child: const Text('TEST PRINT'),
             ) 

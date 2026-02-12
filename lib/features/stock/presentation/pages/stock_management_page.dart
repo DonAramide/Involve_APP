@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/stock_bloc.dart';
-import '../bloc/stock_state.dart';
-import '../../domain/entities/item.dart';
-import '../widgets/item_form_dialog.dart';
-import 'manage_categories_page.dart';
-import '../../../settings/presentation/bloc/settings_bloc.dart';
-import '../../../settings/presentation/bloc/settings_state.dart';
-import '../../../settings/presentation/widgets/password_dialog.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
+import 'package:involve_app/features/stock/domain/entities/item.dart';
+import 'package:involve_app/features/stock/presentation/widgets/item_form_dialog.dart';
+import 'package:involve_app/features/stock/presentation/pages/manage_categories_page.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/features/settings/presentation/widgets/password_dialog.dart';
 
 class StockManagementPage extends StatelessWidget {
   const StockManagementPage({super.key});
@@ -38,32 +39,34 @@ class StockManagementPage extends StatelessWidget {
           ),
         ],
       ),
-      body: BlocBuilder<StockBloc, StockState>(
-        builder: (context, state) {
-          if (state is StockLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is StockLoaded) {
-            // Check if we need to filter by category? 
-            // For now just list all
-            return ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: state.items.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final item = state.items[index];
-                return _buildItemCard(context, item);
-              },
-            );
-          } else if (state is StockError) {
-            return Center(child: Text(state.message));
-          }
-          return const Center(child: Text('Add your first item!'));
+      body: BlocBuilder<SettingsBloc, SettingsState>(
+        builder: (context, settingsState) {
+          return BlocBuilder<StockBloc, StockState>(
+            builder: (context, state) {
+              if (state is StockLoading) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (state is StockLoaded) {
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: state.items.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = state.items[index];
+                    return _buildItemCard(context, item, settingsState.settings);
+                  },
+                );
+              } else if (state is StockError) {
+                return Center(child: Text(state.message));
+              }
+              return const Center(child: Text('Add your first item!'));
+            },
+          );
         },
       ),
     );
   }
 
-  Widget _buildItemCard(BuildContext context, Item item) {
+  Widget _buildItemCard(BuildContext context, Item item, AppSettings? settings) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -87,7 +90,7 @@ class StockManagementPage extends StatelessWidget {
         title: Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         subtitle: Text('Qty: ${item.stockQty}', 
                        style: TextStyle(color: Colors.grey[600])),
-        trailing: Text('${settingsState.settings?.currency ?? '₦'}${item.price.toStringAsFixed(2)}', 
+        trailing: Text('${settings?.currency ?? '₦'}${item.price.toStringAsFixed(2)}', 
                         style: const TextStyle(fontSize: 20, color: Colors.green, fontWeight: FontWeight.bold)),
         onTap: () => _verifyAndExecute(
           context,

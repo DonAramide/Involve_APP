@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/invoice_bloc.dart';
-import '../bloc/invoice_state.dart';
-import '../../../stock/presentation/bloc/stock_bloc.dart';
-import '../../../stock/presentation/bloc/stock_state.dart';
-import '../../../stock/domain/entities/item.dart';
-import '../widgets/invoice_preview_dialog.dart';
+import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
+import 'package:involve_app/features/invoicing/presentation/bloc/invoice_state.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
+import 'package:involve_app/features/stock/domain/entities/item.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/invoice_preview_dialog.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
 class CreateInvoicePage extends StatelessWidget {
   const CreateInvoicePage({super.key});
@@ -64,25 +67,28 @@ class _ItemSelectorState extends State<_ItemSelector> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<StockBloc, StockState>(
-      builder: (context, state) {
-        if (state is StockLoaded) {
-          // Filter Items by category and search query
-          var filteredItems = _selectedCategoryId == null
-              ? state.items
-              : state.items.where((i) => i.categoryId == _selectedCategoryId).toList();
-          
-          // Apply search filter
-          if (_searchQuery.isNotEmpty) {
-            filteredItems = filteredItems
-                .where((i) => i.name.toLowerCase().contains(_searchQuery))
-                .toList();
-          }
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, settingsState) {
+        final settings = settingsState.settings;
+        return BlocBuilder<StockBloc, StockState>(
+          builder: (context, state) {
+            if (state is StockLoaded) {
+              // Filter Items by category and search query
+              var filteredItems = _selectedCategoryId == null
+                  ? state.items
+                  : state.items.where((i) => i.categoryId == _selectedCategoryId).toList();
+              
+              // Apply search filter
+              if (_searchQuery.isNotEmpty) {
+                filteredItems = filteredItems
+                    .where((i) => i.name.toLowerCase().contains(_searchQuery))
+                    .toList();
+              }
 
-          return Column(
-            children: [
-              // Search Bar
-              Padding(
+              return Column(
+                children: [
+                  // Search Bar
+                  Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: TextField(
                   controller: _searchController,
@@ -159,16 +165,19 @@ class _ItemSelectorState extends State<_ItemSelector> {
                                 quantity: quantity,
                                 onAdd: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, 1)),
                                 onRemove: quantity > 0 ? () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, -1)) : null,
+                                settings: settings,
                               );
                             },
                           );
                         },
                       ),
               ),
-            ],
-          );
-        }
-        return const Center(child: CircularProgressIndicator());
+              ],
+              );
+            }
+            return const Center(child: CircularProgressIndicator());
+          },
+        );
       },
     );
   }
@@ -195,12 +204,14 @@ class _POSItemCard extends StatelessWidget {
   final int quantity;
   final VoidCallback onAdd;
   final VoidCallback? onRemove;
+  final AppSettings? settings;
 
   const _POSItemCard({
     required this.item,
     required this.quantity,
     required this.onAdd,
     this.onRemove,
+    this.settings,
   });
 
   @override
@@ -348,82 +359,86 @@ class _QuickBtn extends StatelessWidget {
 class _CartSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<InvoiceBloc, InvoiceState>(
-      builder: (context, state) {
-        final settings = state.settings; // Access settings from state
-        return Container(
-          decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey[300]!))),
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  itemCount: state.items.length,
-                  itemBuilder: (context, index) {
-                    final item = state.items[index];
-                    return Dismissible(
-                      key: ValueKey(item.item.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        color: Colors.red,
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      onDismissed: (_) {
-                        context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -item.quantity));
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, settingsState) {
+        final settings = settingsState.settings;
+        return BlocBuilder<InvoiceBloc, InvoiceState>(
+          builder: (context, state) {
+            return Container(
+              decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey[300]!))),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: state.items.length,
+                      itemBuilder: (context, index) {
+                        final item = state.items[index];
+                        return Dismissible(
+                          key: ValueKey(item.item.id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20),
+                            color: Colors.red,
+                            child: const Icon(Icons.delete, color: Colors.white),
+                          ),
+                          onDismissed: (_) {
+                            context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -item.quantity));
+                          },
+                          child: ListTile(
+                            dense: true,
+                            title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('${item.quantity} x ${settings?.currency ?? '₦'}${item.unitPrice}'),
+                            trailing: Text(
+                              '${settings?.currency ?? '₦'}${item.total.toStringAsFixed(2)}',
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        );
                       },
-                      child: ListTile(
-                        dense: true,
-                        title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${item.quantity} x ${settings?.currency ?? '₦'}${item.unitPrice}'),
-                        trailing: Text(
-                          '${settings?.currency ?? '₦'}${item.total.toStringAsFixed(2)}',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const Divider(),
-              _buildSummaryRow('Subtotal', state.subtotal),
-              _buildSummaryRow('Tax (15%)', state.tax),
-              _buildSummaryRow('Discount', state.discount),
-              _buildSummaryRow('Total', state.total, isTotal: true),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: state.items.isEmpty ? null : () => _showPreview(context),
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(0, 50),
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('PREVIEW'),
-                      ),
                     ),
-                  ],
-                ),
+                  ),
+                  const Divider(),
+                  _buildSummaryRow('Subtotal', state.subtotal, settings?.currency ?? '₦'),
+                  _buildSummaryRow('Tax (15%)', state.tax, settings?.currency ?? '₦'),
+                  _buildSummaryRow('Discount', state.discount, settings?.currency ?? '₦'),
+                  _buildSummaryRow('Total', state.total, settings?.currency ?? '₦', isTotal: true),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: state.items.isEmpty ? null : () => _showPreview(context),
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(0, 50),
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('PREVIEW'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildSummaryRow(String label, double amount, {bool isTotal = false}) {
+  Widget _buildSummaryRow(String label, double amount, String currency, {bool isTotal = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(fontSize: isTotal ? 20 : 16, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal)),
-          Text('\$${amount.toStringAsFixed(2)}', style: TextStyle(fontSize: isTotal ? 22 : 16, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, color: isTotal ? Colors.blue : Colors.black)),
+          Text('$currency${amount.toStringAsFixed(2)}', style: TextStyle(fontSize: isTotal ? 22 : 16, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, color: isTotal ? Colors.blue : Colors.black)),
         ],
       ),
     );
