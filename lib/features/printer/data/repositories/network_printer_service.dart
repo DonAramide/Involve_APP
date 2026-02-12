@@ -81,36 +81,50 @@ class NetworkPrinterService implements IPrinterService {
       bytes += generator.reset();
 
       for (var cmd in commands) {
-        if (cmd is TextCommand) {
-          PosStyles styles = const PosStyles();
-          
-          if (cmd.isBold) {
-            styles = const PosStyles(bold: true);
-          }
-          
-          if (cmd.align == 'center') {
-            styles = PosStyles(align: PosAlign.center, bold: cmd.isBold);
-          } else if (cmd.align == 'right') {
-            styles = PosStyles(align: PosAlign.right, bold: cmd.isBold);
-          } else {
-            styles = PosStyles(bold: cmd.isBold);
-          }
-          
-          bytes += generator.text(cmd.text, styles: styles);
-        } else if (cmd is DividerCommand) {
-          bytes += generator.text('--------------------------------');
-        } else if (cmd is ImageCommand) {
-          if (cmd.bytes != null) {
-            final image = img.decodeImage(cmd.bytes!);
-            if (image != null) {
-              final maxWidth = paperWidth == 58 ? 370 : 550;
-              var resized = image;
-              if (image.width > maxWidth) {
-                resized = img.copyResize(image, width: maxWidth);
+        try {
+          if (cmd is TextCommand) {
+            // Sanitize text for thermal printers (Naira symbol often fails)
+            String sanitizedText = cmd.text.replaceAll('₦', 'N');
+            
+            PosStyles styles = const PosStyles();
+            
+            if (cmd.isBold) {
+              styles = const PosStyles(bold: true);
+            }
+            
+            if (cmd.align == 'center') {
+              styles = PosStyles(align: PosAlign.center, bold: cmd.isBold);
+            } else if (cmd.align == 'right') {
+              styles = PosStyles(align: PosAlign.right, bold: cmd.isBold);
+            } else {
+              styles = PosStyles(bold: cmd.isBold);
+            }
+            
+            bytes += generator.text(sanitizedText, styles: styles);
+            debugPrint('NetworkPrinterService: Sent text: $sanitizedText');
+          } else if (cmd is DividerCommand) {
+            bytes += generator.text('--------------------------------');
+            debugPrint('NetworkPrinterService: Sent divider');
+          } else if (cmd is ImageCommand) {
+            if (cmd.bytes != null) {
+              debugPrint('NetworkPrinterService: Decoding image (${cmd.bytes!.length} bytes)');
+              final image = img.decodeImage(cmd.bytes!);
+              if (image != null) {
+                final maxWidth = paperWidth == 58 ? 370 : 550;
+                var resized = image;
+                if (image.width > maxWidth) {
+                  resized = img.copyResize(image, width: maxWidth);
+                }
+                bytes += generator.image(resized, align: cmd.align == 'center' ? PosAlign.center : (cmd.align == 'right' ? PosAlign.right : PosAlign.left));
+                debugPrint('NetworkPrinterService: Sent image');
+              } else {
+                debugPrint('NetworkPrinterService: Image decoding FAILED');
               }
-              bytes += generator.image(resized, align: cmd.align == 'center' ? PosAlign.center : (cmd.align == 'right' ? PosAlign.right : PosAlign.left));
             }
           }
+        } catch (cmdError) {
+          debugPrint('NetworkPrinterService: Error processing command: $cmdError');
+          // Continue with other commands
         }
       }
 

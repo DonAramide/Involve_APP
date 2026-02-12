@@ -40,7 +40,7 @@ class SettingsPage extends StatelessWidget {
                 _buildActivationBanner(context, isSuperAdmin),
                 const SizedBox(height: 10),
                 _buildSectionHeader('Branding'),
-                _buildReadOnlyLogoTile(context, settings.logo),
+                _buildLogoTile(context, settings.logo, (bytes) => _update(context, settings.copyWith(logo: bytes))),
                 const SizedBox(height: 10),
                 _buildSectionHeader('Organization Detail'),
                 _buildReadOnlyTile('Name', settings.organizationName, Icons.business),

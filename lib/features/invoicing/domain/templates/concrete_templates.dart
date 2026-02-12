@@ -8,7 +8,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
   @override
   TemplateType get type => TemplateType.compact;
   @override
-  LogoPlacement get logoPlacement => LogoPlacement.none;
+  LogoPlacement get logoPlacement => LogoPlacement.topCenter;
   @override
   bool get useBoldHeaders => true;
   @override
@@ -18,6 +18,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     return [
+      if (settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
       if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
