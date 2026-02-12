@@ -37,6 +37,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       TextCommand('TOTAL: ${settings.currency} ${invoice.totalAmount.toStringAsFixed(2)}', align: 'right', isBold: true),
       DividerCommand(),
       TextCommand('Thank you!', align: 'center'),
+      TextCommand('Powered by IIPS', align: 'center'),
     ];
   }
 }
@@ -80,7 +81,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       if (invoice.discountAmount > 0) TextCommand('Discount: ${settings.currency} ${invoice.discountAmount.toStringAsFixed(2)}', align: 'right'),
       TextCommand('GRAND TOTAL: ${settings.currency} ${invoice.totalAmount.toStringAsFixed(2)}', align: 'right', isBold: true),
       DividerCommand(),
-      TextCommand('Powered by Involve APP', align: 'center'),
+      TextCommand('Powered by IIPS', align: 'center'),
     ];
   }
 }
