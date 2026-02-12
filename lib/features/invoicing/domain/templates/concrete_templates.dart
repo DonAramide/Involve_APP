@@ -19,13 +19,24 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
     final settings = orgSettings as AppSettings;
     return [
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
+      if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
+      if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
+      TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}', align: 'center'),
       TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
       DividerCommand(),
       ...invoice.items.map((item) => TextCommand(
-            '${item.quantity}x ${item.item.name} @ ${item.unitPrice} : ${item.total}',
+            '${item.item.name} x${item.quantity}',
+          )),
+      ...invoice.items.map((item) => TextCommand(
+            '   Price: ${item.unitPrice} Total: ${item.total}',
+            align: 'right',
           )),
       DividerCommand(),
-      TextCommand('TOTAL: ${settings.currency} ${invoice.totalAmount}', align: 'right', isBold: true),
+      if (invoice.taxAmount > 0) TextCommand('Subtotal: ${settings.currency} ${invoice.subtotal.toStringAsFixed(2)}', align: 'right'),
+      if (invoice.taxAmount > 0) TextCommand('Tax: ${settings.currency} ${invoice.taxAmount.toStringAsFixed(2)}', align: 'right'),
+      TextCommand('TOTAL: ${settings.currency} ${invoice.totalAmount.toStringAsFixed(2)}', align: 'right', isBold: true),
+      DividerCommand(),
+      TextCommand('Thank you!', align: 'center'),
     ];
   }
 }
@@ -48,21 +59,28 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
     return [
       if (settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName, align: 'center', isBold: true),
-      TextCommand(settings.address, align: 'center'),
-      TextCommand('Phone: ${settings.phone}', align: 'center'),
+      if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
+      if (settings.phone.isNotEmpty) TextCommand('Phone: ${settings.phone}', align: 'center'),
       DividerCommand(),
-      TextCommand('INVOICE DETAIL', align: 'left', isBold: true),
+      TextCommand('INVOICE DETAIL', align: 'center', isBold: true),
       TextCommand('Number: ${invoice.invoiceNumber}'),
-      TextCommand('Date: ${invoice.dateCreated.toIso8601String().split('T')[0]}'),
+      TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}'),
       DividerCommand(),
       ...invoice.items.map((item) => TextCommand(
-            '${item.item.name.padRight(20)} ${item.quantity} x ${item.unitPrice.toString().padLeft(8)}',
+            '${item.item.name}',
+            isBold: true,
+          )),
+      ...invoice.items.map((item) => TextCommand(
+            '${item.quantity} x ${item.unitPrice} = ${item.total}',
+            align: 'right',
           )),
       DividerCommand(),
-      TextCommand('Subtotal: ${settings.currency} ${invoice.subtotal}', align: 'right'),
-      TextCommand('Tax: ${settings.currency} ${invoice.taxAmount}', align: 'right'),
-      TextCommand('Discount: ${settings.currency} ${invoice.discountAmount}', align: 'right'),
-      TextCommand('GRAND TOTAL: ${settings.currency} ${invoice.totalAmount}', align: 'right', isBold: true),
+      TextCommand('Subtotal: ${settings.currency} ${invoice.subtotal.toStringAsFixed(2)}', align: 'right'),
+      TextCommand('Tax: ${settings.currency} ${invoice.taxAmount.toStringAsFixed(2)}', align: 'right'),
+      if (invoice.discountAmount > 0) TextCommand('Discount: ${settings.currency} ${invoice.discountAmount.toStringAsFixed(2)}', align: 'right'),
+      TextCommand('GRAND TOTAL: ${settings.currency} ${invoice.totalAmount.toStringAsFixed(2)}', align: 'right', isBold: true),
+      DividerCommand(),
+      TextCommand('Powered by Involve APP', align: 'center'),
     ];
   }
 }
