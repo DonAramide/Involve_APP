@@ -46,26 +46,98 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             ),
         ],
       ),
-      body: BlocBuilder<HistoryBloc, HistoryState>(
-        builder: (context, state) {
-          if (state is HistoryLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (state is HistoryLoaded) {
-            if (state.invoices.isEmpty) {
-              return const Center(child: Text('No invoices found.'));
-            }
-            return ListView.builder(
-              itemCount: state.invoices.length,
-              itemBuilder: (context, index) {
-                final invoice = state.invoices[index];
-                return _buildInvoiceCard(context, invoice);
+      body: Column(
+        children: [
+          _buildFilterHeader(context),
+          Expanded(
+            child: BlocBuilder<HistoryBloc, HistoryState>(
+              builder: (context, state) {
+                if (state is HistoryLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (state is HistoryLoaded) {
+                  if (state.invoices.isEmpty) {
+                    return const Center(child: Text('No invoices found.'));
+                  }
+                  return ListView.builder(
+                    itemCount: state.invoices.length,
+                    itemBuilder: (context, index) {
+                      final invoice = state.invoices[index];
+                      return _buildInvoiceCard(context, invoice);
+                    },
+                  );
+                } else if (state is HistoryError) {
+                  return Center(child: Text(state.message));
+                }
+                return const Center(child: Text('Start searching!'));
               },
-            );
-          } else if (state is HistoryError) {
-            return Center(child: Text(state.message));
-          }
-          return const Center(child: Text('Start searching!'));
-        },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterHeader(BuildContext context) {
+    final state = context.watch<HistoryBloc>().state;
+    String currentQuery = '';
+    double? currentAmount;
+    
+    if (state is HistoryLoaded) {
+      currentQuery = state.query ?? '';
+      currentAmount = state.amount;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      color: Colors.grey[100],
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Search Invoice ID',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onChanged: (value) {
+                context.read<HistoryBloc>().add(LoadHistory(
+                  start: _selectedRange?.start,
+                  end: _selectedRange?.end,
+                  query: value,
+                  amount: currentAmount,
+                ));
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 1,
+            child: TextField(
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                hintText: 'Amount',
+                prefixIcon: Icon(Icons.attach_money),
+                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: EdgeInsets.symmetric(horizontal: 12),
+              ),
+              onChanged: (value) {
+                final amount = double.tryParse(value);
+                context.read<HistoryBloc>().add(LoadHistory(
+                  start: _selectedRange?.start,
+                  end: _selectedRange?.end,
+                  query: currentQuery,
+                  amount: amount,
+                ));
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

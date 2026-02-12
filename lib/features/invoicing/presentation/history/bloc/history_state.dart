@@ -10,10 +10,13 @@ abstract class HistoryEvent extends Equatable {
 class LoadHistory extends HistoryEvent {
   final DateTime? start;
   final DateTime? end;
-  LoadHistory({this.start, this.end});
+  final String? query;
+  final double? amount;
+
+  LoadHistory({this.start, this.end, this.query, this.amount});
 
   @override
-  List<Object?> get props => [start, end];
+  List<Object?> get props => [start, end, query, amount];
 }
 
 // States
@@ -26,9 +29,13 @@ class HistoryInitial extends HistoryState {}
 class HistoryLoading extends HistoryState {}
 class HistoryLoaded extends HistoryState {
   final List<Invoice> invoices;
-  HistoryLoaded(this.invoices);
+  final String? query;
+  final double? amount;
+
+  HistoryLoaded(this.invoices, {this.query, this.amount});
+
   @override
-  List<Object?> get props => [invoices];
+  List<Object?> get props => [invoices, query, amount];
 }
 class HistoryError extends HistoryState {
   final String message;

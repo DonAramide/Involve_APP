@@ -16,8 +16,23 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
   Future<void> _onLoadHistory(LoadHistory event, Emitter<HistoryState> emit) async {
     emit(HistoryLoading());
     try {
-      final invoices = await getHistory(start: event.start, end: event.end);
-      emit(HistoryLoaded(invoices));
+      var invoices = await getHistory(start: event.start, end: event.end);
+      
+      // Apply filters
+      if (event.query != null && event.query!.isNotEmpty) {
+        invoices = invoices.where((inv) => 
+          inv.invoiceNumber.toLowerCase().contains(event.query!.toLowerCase())
+        ).toList();
+      }
+      
+      if (event.amount != null) {
+        // Filter by approximate amount (within 1 unit) or exact
+        invoices = invoices.where((inv) => 
+          (inv.totalAmount - event.amount!).abs() < 1.0
+        ).toList();
+      }
+
+      emit(HistoryLoaded(invoices, query: event.query, amount: event.amount));
     } catch (e) {
       emit(HistoryError('Failed to load history: ${e.toString()}'));
     }
