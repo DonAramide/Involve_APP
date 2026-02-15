@@ -23,8 +23,6 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   final _phoneController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _taxIdController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
   
   // License Generator State
   final _licenseBusinessNameController = TextEditingController();
@@ -71,8 +69,6 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     _phoneController.dispose();
     _descriptionController.dispose();
     _taxIdController.dispose();
-    _newPasswordController.dispose();
-    _confirmPasswordController.dispose();
     _licenseBusinessNameController.dispose();
     super.dispose();
   }
@@ -95,7 +91,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
             children: const [
               Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
               SizedBox(width: 8),
-              const Flexible(
+              Flexible(
                 child: Text(
                   'Super Admin Settings',
                   overflow: TextOverflow.ellipsis,
@@ -206,64 +202,6 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                   ),
                   const SizedBox(height: 32),
                   
-                  // Super Admin Password Section
-                  _buildSectionHeader('Super Admin Password'),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: const [
-                            Icon(Icons.info, color: Colors.orange, size: 20),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Change the super admin password used to access this page.',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          controller: _newPasswordController,
-                          label: 'New Super Admin Password',
-                          icon: Icons.lock,
-                          obscureText: true,
-                          validator: (val) {
-                            if (val != null && val.isNotEmpty && val.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        _buildTextField(
-                          controller: _confirmPasswordController,
-                          label: 'Confirm Password',
-                          icon: Icons.lock_outline,
-                          obscureText: true,
-                          validator: (val) {
-                            if (_newPasswordController.text.isNotEmpty) {
-                              if (val != _newPasswordController.text) {
-                                return 'Passwords do not match';
-                              }
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  
                   // Action Buttons
                   Row(
                     children: [
@@ -280,7 +218,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                       Expanded(
                         flex: 2,
                         child: ElevatedButton(
-                          onPressed: _hasChanges || _newPasswordController.text.isNotEmpty
+                          onPressed: _hasChanges
                               ? _saveChanges
                               : null,
                           style: ElevatedButton.styleFrom(
@@ -448,8 +386,6 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
         _descriptionController.text = settings.businessDescription ?? '';
         _taxIdController.text = settings.taxId ?? '';
         _selectedLogo = settings.logo;
-        _newPasswordController.clear();
-        _confirmPasswordController.clear();
         _hasChanges = false;
       });
     }
@@ -474,12 +410,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     
     settingsBloc.add(UpdateAppSettings(updatedSettings));
 
-    // Save super admin password if changed
-    if (_newPasswordController.text.isNotEmpty) {
-      settingsBloc.add(SetSuperAdminPassword(_newPasswordController.text));
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
-    }
+    settingsBloc.add(UpdateAppSettings(updatedSettings));
   }
 
   // --- License Generator Methods ---
