@@ -16,6 +16,8 @@ import 'contact_page.dart';
 import 'package:involve_app/features/printer/presentation/pages/printer_settings_page.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
+import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'dart:async';
 
 class DashboardPage extends StatelessWidget {
@@ -206,6 +208,62 @@ class DashboardPage extends StatelessWidget {
           ),
         ],
       ),
+      bottomNavigationBar: FutureBuilder<bool>(
+            future: LicenseService.isActivated(),
+            builder: (context, snapshot) {
+              if (snapshot.data == true) return const SizedBox.shrink();
+              
+              return FutureBuilder<int>(
+                future: LicenseService.getTrialDaysRemaining(),
+                builder: (context, trialSnapshot) {
+                  if (!trialSnapshot.hasData || trialSnapshot.data == 0) return const SizedBox.shrink();
+                  
+                  return Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Colors.orange, Colors.deepOrange],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, -2)),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.timer_outlined, color: Colors.white, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          'TRIAL VERSION: ${trialSnapshot.data} DAYS REMAINING',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        TextButton(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ActivationPage())),
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                            minimumSize: const Size(0, 24),
+                          ),
+                          child: const Text(
+                            'ACTIVATE',
+                            style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );

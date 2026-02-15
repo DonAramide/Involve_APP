@@ -9,6 +9,7 @@ class StorageService {
   static const _secureStorage = FlutterSecureStorage();
   static const _licenseKey = 'app_license_data';
   static const _lastOpenedKey = 'last_opened_date';
+  static const _trialStartKey = 'trial_start_date';
   static const _businessLockedKey = 'is_business_locked';
   static const _licenseFileName = 'license.dat';
 
@@ -74,6 +75,36 @@ class StorageService {
         dateStr = await prefsFile.readAsString();
       }
     }
+      return dateStr != null ? DateTime.tryParse(dateStr) : null;
+  }
+
+  static Future<void> saveTrialStartDate(DateTime date) async {
+    final dateStr = date.toIso8601String();
+    if (kIsWeb) {
+       await _secureStorage.write(key: _trialStartKey, value: dateStr);
+       return;
+    }
+    
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _trialStartKey, value: dateStr);
+    } else {
+      final file = await _getDesktopFile('trial_start.dat');
+      await file.writeAsString(dateStr);
+    }
+  }
+
+  static Future<DateTime?> getTrialStartDate() async {
+    String? dateStr;
+    if (kIsWeb) {
+      dateStr = await _secureStorage.read(key: _trialStartKey);
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      dateStr = await _secureStorage.read(key: _trialStartKey);
+    } else {
+      final file = await _getDesktopFile('trial_start.dat');
+      if (await file.exists()) {
+        dateStr = await file.readAsString();
+      }
+    }
     return dateStr != null ? DateTime.tryParse(dateStr) : null;
   }
 
@@ -107,21 +138,14 @@ class StorageService {
     return value == 'true';
   }
 
-  // Helper methods for desktop
-  static Future<File> _getDesktopLicenseFile() async {
+  static Future<File> _getDesktopFile(String fileName) async {
     final dir = await getApplicationSupportDirectory();
-    return File(p.join(dir.path, _licenseFileName));
+    return File(p.join(dir.path, fileName));
   }
 
-  static Future<File> _getDesktopPrefsFile() async {
-    final dir = await getApplicationSupportDirectory();
-    return File(p.join(dir.path, 'prefs.dat'));
-  }
-
-  static Future<File> _getDesktopBusinessLockFile() async {
-    final dir = await getApplicationSupportDirectory();
-    return File(p.join(dir.path, 'lock.dat'));
-  }
+  static Future<File> _getDesktopLicenseFile() async => _getDesktopFile(_licenseFileName);
+  static Future<File> _getDesktopPrefsFile() async => _getDesktopFile('prefs.dat');
+  static Future<File> _getDesktopBusinessLockFile() async => _getDesktopFile('lock.dat');
 
   static List<int> _encryptDecrypt(String data) {
     final bytes = utf8.encode(data);

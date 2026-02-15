@@ -27,8 +27,8 @@ class _LandingPageState extends State<LandingPage> {
       return;
     }
 
-    final isActivated = await LicenseService.isActivated();
-    if (isActivated) {
+    final hasAccess = await LicenseService.canAccess();
+    if (hasAccess) {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const DashboardPage()),

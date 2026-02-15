@@ -92,4 +92,36 @@ class LicenseService {
     if (license == null) return false;
     return DateTime.now().isAfter(license.expiryDate);
   }
+
+  static Future<int> getTrialDaysRemaining() async {
+    final trialStart = await StorageService.getTrialStartDate();
+    if (trialStart == null) return 0;
+    
+    final trialExpiry = trialStart.add(const Duration(days: 3));
+    final remaining = trialExpiry.difference(DateTime.now()).inDays;
+    return remaining < 0 ? 0 : remaining + 1; // +1 to include today
+  }
+
+  static Future<bool> isTrialValid() async {
+    final trialStart = await StorageService.getTrialStartDate();
+    if (trialStart == null) return false;
+    
+    final trialExpiry = trialStart.add(const Duration(days: 3));
+    return DateTime.now().isBefore(trialExpiry);
+  }
+
+  static Future<bool> canAccess() async {
+    // 1. Check for valid license
+    if (await isActivated()) return true;
+    
+    // 2. Check for trial
+    final trialStart = await StorageService.getTrialStartDate();
+    if (trialStart == null) {
+      // First run - initialize trial
+      await StorageService.saveTrialStartDate(DateTime.now());
+      return true; // Just started trial
+    }
+    
+    return await isTrialValid();
+  }
 }
