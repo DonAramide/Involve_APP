@@ -16,7 +16,19 @@ class CreateInvoicePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New Invoice')),
+      appBar: AppBar(
+        title: const Text('NEW INVOICE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue, Colors.indigo],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        foregroundColor: Colors.white,
+      ),
       body: Row(
         children: [
           // Left Side: Item Selection
@@ -160,13 +172,13 @@ class _ItemSelectorState extends State<_ItemSelector> {
                               final cartItem = invState.items.where((i) => i.item.id == item.id).firstOrNull;
                               final quantity = cartItem?.quantity ?? 0;
 
-                              return _POSItemCard(
-                                item: item,
-                                quantity: quantity,
-                                onAdd: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, 1)),
-                                onRemove: quantity > 0 ? () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, -1)) : null,
-                                settings: settings,
-                              );
+                                return _POSItemCard(
+                                  item: item,
+                                  quantity: quantity,
+                                  onAdd: () => _handleItemAdd(context, item, settings),
+                                  onRemove: quantity > 0 ? () => context.read<InvoiceBloc>().add(AddItemToInvoice(item, -1)) : null,
+                                  settings: settings,
+                                );
                             },
                           );
                         },
@@ -197,6 +209,58 @@ class _ItemSelectorState extends State<_ItemSelector> {
       ),
     );
   }
+
+  void _handleItemAdd(BuildContext context, Item item, AppSettings? settings) {
+    if (settings?.confirmPriceOnSelection == true) {
+      _showPriceConfirmation(context, item, settings?.currency ?? '₦');
+    } else {
+      context.read<InvoiceBloc>().add(AddItemToInvoice(item, 1));
+    }
+  }
+
+  Future<void> _showPriceConfirmation(BuildContext context, Item item, String currency) async {
+    final controller = TextEditingController(text: item.price.toStringAsFixed(2));
+    final invoiceBloc = context.read<InvoiceBloc>();
+    
+    return showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Price'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Item: ${item.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Price ($currency)',
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              final newPrice = double.tryParse(controller.text);
+              if (newPrice != null) {
+                // Update item price and add to invoice
+                final updatedItem = item.copyWith(price: newPrice);
+                invoiceBloc.add(AddItemToInvoice(updatedItem, 1));
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('CONFIRM'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _POSItemCard extends StatelessWidget {
@@ -216,117 +280,107 @@ class _POSItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      elevation: quantity > 0 ? 4 : 1,
-      color: quantity > 0 ? Colors.blue[50] : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: quantity > 0 ? Colors.blue : Colors.transparent,
-          width: 2,
+    final currency = settings?.currency ?? '₦';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: quantity > 0 ? Colors.blue.withOpacity(0.05) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: quantity > 0 ? Colors.blue : Colors.grey[200]!,
+          width: quantity > 0 ? 2 : 1,
         ),
-      ),
-      child: Stack(
-        children: [
-          // Main Tappable Area
-          InkWell(
-            onTap: onAdd,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Product Image
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    color: Colors.grey[200],
-                    child: item.image != null
-                        ? Image.memory(
-                            item.image!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Icon(
-                                Icons.image_not_supported,
-                                size: 40,
-                                color: Colors.grey[400],
-                              );
-                            },
-                          )
-                        : Icon(
-                            Icons.shopping_bag,
-                            size: 40,
-                            color: Colors.grey[400],
-                          ),
-                  ),
-                ),
-                
-                // Product Info
-                Expanded(
-                  flex: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(4.0), // Reduced from 8.0 to fix overflow
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          item.name,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${settings?.currency ?? '₦'}${item.price.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Quantity Badge
-          if (quantity > 0)
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: const BoxDecoration(
-                  color: Colors.blue,
-                  borderRadius: BorderRadius.only(bottomLeft: Radius.circular(12)),
-                ),
-                child: Text(
-                  'x$quantity',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          // Quick Action Buttons
-          Positioned(
-            bottom: 4,
-            left: 4,
-            right: 4,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (onRemove != null)
-                  _QuickBtn(icon: Icons.remove, color: Colors.red, onTap: onRemove!),
-                if (onRemove == null) const Spacer(),
-                _QuickBtn(icon: Icons.add, color: Colors.blue, onTap: onAdd),
-              ],
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: quantity > 0 
+                ? Colors.blue.withOpacity(0.2) 
+                : Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          children: [
+            InkWell(
+              onTap: onAdd,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Image Area
+                  Expanded(
+                    flex: 3,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        gradient: LinearGradient(
+                          colors: [Colors.grey[100]!, Colors.grey[200]!],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      child: item.image != null
+                          ? Image.memory(item.image!, fit: BoxFit.cover)
+                          : Icon(Icons.inventory_2_outlined, size: 40, color: Colors.blue.withOpacity(0.3)),
+                    ),
+                  ),
+                  // Info Area
+                  Expanded(
+                    flex: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            item.name.toUpperCase(),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$currency${item.price.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: Colors.blue[700],
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Quantity Badge
+            if (quantity > 0)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 4, spreadRadius: 1),
+                    ],
+                  ),
+                  child: Text(
+                    'x$quantity',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -359,86 +413,153 @@ class _QuickBtn extends StatelessWidget {
 class _CartSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SettingsBloc, SettingsState>(
-      builder: (context, settingsState) {
-        final settings = settingsState.settings;
-        return BlocBuilder<InvoiceBloc, InvoiceState>(
-          builder: (context, state) {
-            return Container(
-              decoration: BoxDecoration(border: Border(left: BorderSide(color: Colors.grey[300]!))),
-              child: Column(
-                children: [
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: state.items.length,
-                      itemBuilder: (context, index) {
-                        final item = state.items[index];
-                        return Dismissible(
-                          key: ValueKey(item.item.id),
-                          direction: DismissDirection.endToStart,
-                          background: Container(
-                            alignment: Alignment.centerRight,
-                            padding: const EdgeInsets.only(right: 20),
-                            color: Colors.red,
-                            child: const Icon(Icons.delete, color: Colors.white),
-                          ),
-                          onDismissed: (_) {
-                            context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -item.quantity));
-                          },
-                          child: ListTile(
-                            dense: true,
-                            title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: Text('${item.quantity} x ${settings?.currency ?? '₦'}${item.unitPrice}'),
-                            trailing: Text(
-                              '${settings?.currency ?? '₦'}${item.total.toStringAsFixed(2)}',
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        );
-                      },
+    final settings = context.watch<SettingsBloc>().state.settings;
+    
+    return Container(
+      width: 350, // Fixed width for cart summary on tablets/desktop
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(left: BorderSide(color: Colors.grey[200]!)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(-5, 0)),
+        ],
+      ),
+      child: BlocBuilder<InvoiceBloc, InvoiceState>(
+        builder: (context, state) {
+          return Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shopping_cart_outlined, color: Colors.blue),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'YOUR CART',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.1),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const Divider(),
-                  _buildSummaryRow('Subtotal', state.subtotal, settings?.currency ?? '₦'),
-                  _buildSummaryRow('Tax (15%)', state.tax, settings?.currency ?? '₦'),
-                  _buildSummaryRow('Discount', state.discount, settings?.currency ?? '₦'),
-                  _buildSummaryRow('Total', state.total, settings?.currency ?? '₦', isTotal: true),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: state.items.isEmpty ? null : () => _showPreview(context),
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size(0, 50),
-                              backgroundColor: Colors.blue,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('PREVIEW'),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(12)),
+                      child: Text(
+                        '${state.items.length}',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            );
-          },
-        );
-      },
+              // Cart Items List
+              Expanded(
+                child: ListView.builder(
+                  itemCount: state.items.length,
+                  itemBuilder: (context, index) {
+                    final item = state.items[index];
+                    return Dismissible(
+                      key: ValueKey(item.item.id),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        color: Colors.red,
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      onDismissed: (_) {
+                        context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -item.quantity));
+                      },
+                      child: ListTile(
+                        dense: true,
+                        title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('${item.quantity} x ${settings?.currency ?? '₦'}${item.unitPrice}'),
+                        trailing: Text(
+                          '${settings?.currency ?? '₦'}${item.total.toStringAsFixed(2)}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const Divider(height: 1),
+              // Summary Area (Fixed Layout)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildSummaryRow('Subtotal', state.subtotal, settings?.currency ?? '₦'),
+                    _buildSummaryRow('Tax (15%)', state.tax, settings?.currency ?? '₦'),
+                    if (state.discount > 0)
+                      _buildSummaryRow('Discount', -state.discount, settings?.currency ?? '₦'),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8.0),
+                      child: Divider(),
+                    ),
+                    _buildSummaryRow('Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: state.items.isEmpty ? null : () => _showPreview(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue[700],
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('PROCEED TO CHECKOUT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
   Widget _buildSummaryRow(String label, double amount, String currency, {bool isTotal = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontSize: isTotal ? 20 : 16, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal)),
-          Text('$currency${amount.toStringAsFixed(2)}', style: TextStyle(fontSize: isTotal ? 22 : 16, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, color: isTotal ? Colors.blue : Colors.black)),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: isTotal ? 18 : 14,
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
+                color: isTotal ? Colors.black : Colors.grey[600],
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$currency${amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: isTotal ? 20 : 15,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
+              color: isTotal ? Colors.blue[800] : Colors.black,
+            ),
+          ),
         ],
       ),
     );

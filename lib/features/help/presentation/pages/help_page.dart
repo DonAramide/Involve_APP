@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
-import '../../../settings/presentation/bloc/settings_bloc.dart';
-import '../../../settings/presentation/bloc/settings_state.dart';
-import '../../../settings/presentation/widgets/super_admin_password_dialog.dart';
-import '../../../settings/presentation/pages/super_admin_settings_page.dart';
+import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
+import 'package:involve_app/features/admin/presentation/widgets/admin_login_dialog.dart';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key});
@@ -43,19 +41,12 @@ class _HelpPageState extends State<HelpPage> {
   }
 
   void _showSuperAdminAccess() {
-    final settingsBloc = context.read<SettingsBloc>();
-    
-    // Reset super admin auth state
-    settingsBloc.add(ResetSuperAdminAuth());
-    
-    // Show super admin password dialog
     showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => SuperAdminPasswordDialog(bloc: settingsBloc),
+      builder: (dialogContext) => AdminLoginDialog(),
     ).then((authorized) {
       if (authorized == true && mounted) {
-        // Navigate to Super Admin Settings
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const SuperAdminSettingsPage()),

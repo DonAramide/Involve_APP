@@ -1,0 +1,135 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+
+class StorageService {
+  static const _secureStorage = FlutterSecureStorage();
+  static const _licenseKey = 'app_license_data';
+  static const _lastOpenedKey = 'last_opened_date';
+  static const _businessLockedKey = 'is_business_locked';
+  static const _licenseFileName = 'license.dat';
+
+  // Desktop simple encryption key (could be improved)
+  static const _encryptionKey = 0xAF;
+
+  static Future<void> saveLicense(String licenseData) async {
+    if (kIsWeb) {
+      await _secureStorage.write(key: _licenseKey, value: licenseData);
+      return;
+    }
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _licenseKey, value: licenseData);
+    } else {
+      final file = await _getDesktopLicenseFile();
+      final encrypted = _encryptDecrypt(licenseData);
+      await file.writeAsBytes(encrypted);
+    }
+  }
+
+  static Future<String?> getLicense() async {
+    if (kIsWeb) {
+      return await _secureStorage.read(key: _licenseKey);
+    }
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      return await _secureStorage.read(key: _licenseKey);
+    } else {
+      final file = await _getDesktopLicenseFile();
+      if (await file.exists()) {
+        final encrypted = await file.readAsBytes();
+        return _encryptDecryptRaw(encrypted);
+      }
+    }
+    return null;
+  }
+
+  static Future<void> saveLastOpenedDate(DateTime date) async {
+    final dateStr = date.toIso8601String();
+    if (kIsWeb) {
+       await _secureStorage.write(key: _lastOpenedKey, value: dateStr);
+       return;
+    }
+    
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _lastOpenedKey, value: dateStr);
+    } else {
+      final prefsFile = await _getDesktopPrefsFile();
+      await prefsFile.writeAsString(dateStr);
+    }
+  }
+
+  static Future<DateTime?> getLastOpenedDate() async {
+    String? dateStr;
+    if (kIsWeb) {
+      dateStr = await _secureStorage.read(key: _lastOpenedKey);
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      dateStr = await _secureStorage.read(key: _lastOpenedKey);
+    } else {
+      final prefsFile = await _getDesktopPrefsFile();
+      if (await prefsFile.exists()) {
+        dateStr = await prefsFile.readAsString();
+      }
+    }
+    return dateStr != null ? DateTime.tryParse(dateStr) : null;
+  }
+
+  static Future<void> setBusinessNameLocked(bool locked) async {
+    final value = locked ? 'true' : 'false';
+    if (kIsWeb) {
+      await _secureStorage.write(key: _businessLockedKey, value: value);
+      return;
+    }
+    
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _businessLockedKey, value: value);
+    } else {
+      final file = await _getDesktopBusinessLockFile();
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<bool> isBusinessNameLocked() async {
+    String? value;
+    if (kIsWeb) {
+      value = await _secureStorage.read(key: _businessLockedKey);
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _businessLockedKey);
+    } else {
+      final file = await _getDesktopBusinessLockFile();
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    return value == 'true';
+  }
+
+  // Helper methods for desktop
+  static Future<File> _getDesktopLicenseFile() async {
+    final dir = await getApplicationSupportDirectory();
+    return File(p.join(dir.path, _licenseFileName));
+  }
+
+  static Future<File> _getDesktopPrefsFile() async {
+    final dir = await getApplicationSupportDirectory();
+    return File(p.join(dir.path, 'prefs.dat'));
+  }
+
+  static Future<File> _getDesktopBusinessLockFile() async {
+    final dir = await getApplicationSupportDirectory();
+    return File(p.join(dir.path, 'lock.dat'));
+  }
+
+  static List<int> _encryptDecrypt(String data) {
+    final bytes = utf8.encode(data);
+    return bytes.map((b) => b ^ _encryptionKey).toList();
+  }
+
+  static String _encryptDecryptRaw(List<int> bytes) {
+    final decrypted = bytes.map((b) => b ^ _encryptionKey).toList();
+    return utf8.decode(decrypted);
+  }
+}

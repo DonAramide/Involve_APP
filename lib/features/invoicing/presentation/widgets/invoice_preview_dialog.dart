@@ -53,6 +53,14 @@ class InvoicePreviewDialog extends StatelessWidget {
                               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                             ),
                           ),
+                          if (settings?.businessDescription != null && settings!.businessDescription!.isNotEmpty)
+                            Center(
+                              child: Text(
+                                settings.businessDescription!,
+                                style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                           Center(child: Text(settings?.address ?? 'Address Line 1, City')),
                           Center(child: Text('Phone: ${settings?.phone ?? 'N/A'}')),
                           const Divider(),

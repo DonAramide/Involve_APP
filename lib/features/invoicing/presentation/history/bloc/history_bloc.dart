@@ -32,7 +32,9 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         ).toList();
       }
 
-      emit(HistoryLoaded(invoices, query: event.query, amount: event.amount));
+      final totalSales = invoices.fold<double>(0, (sum, inv) => sum + inv.totalAmount);
+
+      emit(HistoryLoaded(invoices, totalSales: totalSales, query: event.query, amount: event.amount));
     } catch (e) {
       emit(HistoryError('Failed to load history: ${e.toString()}'));
     }

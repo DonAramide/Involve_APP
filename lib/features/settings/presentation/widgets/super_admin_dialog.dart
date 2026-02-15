@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
 
@@ -12,10 +13,29 @@ class SuperAdminDialog extends StatefulWidget {
 
 class _SuperAdminDialogState extends State<SuperAdminDialog> {
   final _controller = TextEditingController();
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    return BlocListener<SettingsBloc, SettingsState>(
+      bloc: widget.bloc,
+      listener: (context, state) {
+        if (state.isDeviceAuthorized && state.error == null) {
+          Navigator.pop(context, true);
+        }
+        if (state.error != null) {
+          setState(() {
+            _errorMessage = state.error;
+          });
+        }
+      },
+      child: AlertDialog(
       title: const Text('Lifetime Device Activation'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
@@ -30,18 +50,26 @@ class _SuperAdminDialogState extends State<SuperAdminDialog> {
               border: OutlineInputBorder(),
             ),
           ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ],
         ],
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
         ElevatedButton(
           onPressed: () {
+            setState(() => _errorMessage = null);
             widget.bloc.add(CheckSuperAdminPassword(_controller.text));
-            Navigator.pop(context);
           },
           child: const Text('ACTIVATE DEVICE'),
         ),
       ],
+      ),
     );
   }
 }

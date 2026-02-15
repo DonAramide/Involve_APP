@@ -76,6 +76,10 @@ class ResetSuperAdminAuth extends SettingsEvent {}
 
 class ResetSystemAuth extends SettingsEvent {}
 
+class LoadBusinessLock extends SettingsEvent {}
+
+class LockBusinessName extends SettingsEvent {}
+
 class SettingsState extends Equatable {
   final AppSettings? settings;
   final bool isLoading;
@@ -85,6 +89,7 @@ class SettingsState extends Equatable {
   final bool isAuthorized; // For settings access
   final bool isDeviceAuthorized; // For lifetime activation
   final bool isSuperAdminAuthorized;
+  final bool isBusinessLocked;
   final String? error;
   final String? successMessage;
   final String? backupPath;
@@ -98,6 +103,7 @@ class SettingsState extends Equatable {
     this.isAuthorized = false,
     this.isDeviceAuthorized = false,
     this.isSuperAdminAuthorized = false,
+    this.isBusinessLocked = false,
     this.error,
     this.successMessage,
     this.backupPath,
@@ -112,6 +118,7 @@ class SettingsState extends Equatable {
     bool? isAuthorized,
     bool? isDeviceAuthorized,
     bool? isSuperAdminAuthorized,
+    bool? isBusinessLocked,
     String? error,
     String? successMessage,
     String? backupPath,
@@ -125,6 +132,7 @@ class SettingsState extends Equatable {
       isAuthorized: isAuthorized ?? this.isAuthorized,
       isDeviceAuthorized: isDeviceAuthorized ?? this.isDeviceAuthorized,
       isSuperAdminAuthorized: isSuperAdminAuthorized ?? this.isSuperAdminAuthorized,
+      isBusinessLocked: isBusinessLocked ?? this.isBusinessLocked,
       error: error,
       successMessage: successMessage,
       backupPath: backupPath ?? this.backupPath,
@@ -141,6 +149,7 @@ class SettingsState extends Equatable {
         isAuthorized,
         isDeviceAuthorized,
         isSuperAdminAuthorized,
+        isBusinessLocked,
         error,
         successMessage,
         backupPath,

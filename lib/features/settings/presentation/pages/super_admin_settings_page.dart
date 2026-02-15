@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import '../../../../core/license/hmac_service.dart';
+import '../../../../core/license/license_model.dart';
+import 'package:uuid/uuid.dart';
 import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
 
@@ -17,11 +21,24 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   final _orgNameController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _taxIdController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   
+  // License Generator State
+  final _licenseBusinessNameController = TextEditingController();
+  final _uuid = const Uuid();
+  String _selectedDuration = '1 month';
+  PlanType _selectedPlan = PlanType.basic;
+  String _generatedCode = '';
+
+  final List<String> _durations = [
+    '1 month', '2 months', '3 months', '6 months', '9 months', '1 year', '2 years', '3 years', 'lifetime'
+  ];
+
   Uint8List? _selectedLogo;
+  bool _confirmPriceOnSelection = false;
   bool _hasChanges = false;
 
   @override
@@ -32,14 +49,18 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       _orgNameController.text = settings.organizationName;
       _addressController.text = settings.address;
       _phoneController.text = settings.phone;
+      _descriptionController.text = settings.businessDescription ?? '';
       _taxIdController.text = settings.taxId ?? '';
       _selectedLogo = settings.logo;
+      _confirmPriceOnSelection = settings.confirmPriceOnSelection;
+      _licenseBusinessNameController.text = settings.organizationName;
     }
     
     // Track changes
     _orgNameController.addListener(() => setState(() => _hasChanges = true));
     _addressController.addListener(() => setState(() => _hasChanges = true));
     _phoneController.addListener(() => setState(() => _hasChanges = true));
+    _descriptionController.addListener(() => setState(() => _hasChanges = true));
     _taxIdController.addListener(() => setState(() => _hasChanges = true));
   }
 
@@ -48,9 +69,11 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     _orgNameController.dispose();
     _addressController.dispose();
     _phoneController.dispose();
+    _descriptionController.dispose();
     _taxIdController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _licenseBusinessNameController.dispose();
     super.dispose();
   }
 
@@ -174,6 +197,13 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                     label: 'Tax ID',
                     icon: Icons.receipt_long,
                   ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _descriptionController,
+                    label: 'Business Description',
+                    icon: Icons.description,
+                    maxLines: 3,
+                  ),
                   const SizedBox(height: 32),
                   
                   // Super Admin Password Section
@@ -263,6 +293,33 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 32),
+                  
+                  // Invoicing Controls Section
+                  _buildSectionHeader('Invoicing Controls'),
+                  const SizedBox(height: 16),
+                  Card(
+                    elevation: 1,
+                    child: SwitchListTile(
+                      title: const Text('Confirm Item Price on Selection'),
+                      subtitle: const Text('Ask user to confirm or edit price when adding items to invoice'),
+                      secondary: const Icon(Icons.price_check, color: Colors.deepPurple),
+                      value: _confirmPriceOnSelection,
+                      activeColor: Colors.deepPurple,
+                      onChanged: (val) {
+                        setState(() {
+                          _confirmPriceOnSelection = val;
+                          _hasChanges = true;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+
+                  // License Generator Section
+                  _buildSectionHeader('License Management'),
+                  const SizedBox(height: 16),
+                  _buildLicenseGenerator(),
                 ],
               ),
             ),
@@ -388,6 +445,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
         _orgNameController.text = settings.organizationName;
         _addressController.text = settings.address;
         _phoneController.text = settings.phone;
+        _descriptionController.text = settings.businessDescription ?? '';
         _taxIdController.text = settings.taxId ?? '';
         _selectedLogo = settings.logo;
         _newPasswordController.clear();
@@ -408,8 +466,10 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       organizationName: _orgNameController.text,
       address: _addressController.text,
       phone: _phoneController.text,
+      businessDescription: _descriptionController.text,
       taxId: _taxIdController.text,
       logo: _selectedLogo,
+      confirmPriceOnSelection: _confirmPriceOnSelection,
     );
     
     settingsBloc.add(UpdateAppSettings(updatedSettings));
@@ -420,6 +480,145 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       _newPasswordController.clear();
       _confirmPasswordController.clear();
     }
+  }
+
+  // --- License Generator Methods ---
+
+  Widget _buildLicenseGenerator() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Issue Subscription License',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 20),
+            _buildTextField(
+              controller: _licenseBusinessNameController,
+              label: 'Licensed Business Name',
+              icon: Icons.badge,
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedDuration,
+              decoration: const InputDecoration(
+                labelText: 'Duration',
+                prefixIcon: Icon(Icons.timer),
+                border: OutlineInputBorder(),
+              ),
+              items: _durations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+              onChanged: (val) => setState(() => _selectedDuration = val!),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<PlanType>(
+              value: _selectedPlan,
+              decoration: const InputDecoration(
+                labelText: 'Plan Type',
+                prefixIcon: Icon(Icons.card_membership),
+                border: OutlineInputBorder(),
+              ),
+              items: PlanType.values.map((p) => DropdownMenuItem(value: p, child: Text(p.name.toUpperCase()))).toList(),
+              onChanged: (val) => setState(() => _selectedPlan = val!),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _generateLicense,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('GENERATE LICENSE KEY'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueGrey[800],
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.all(16),
+              ),
+            ),
+            if (_generatedCode.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
+              const Text(
+                'Activation Code:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _generatedCode,
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _copyToClipboard,
+                      icon: const Icon(Icons.copy, size: 18),
+                      tooltip: 'Copy',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _generateLicense() {
+    if (_licenseBusinessNameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter licensed business name')),
+      );
+      return;
+    }
+
+    final now = DateTime.now();
+    DateTime expiryDate;
+
+    switch (_selectedDuration) {
+      case '1 month': expiryDate = DateTime(now.year, now.month + 1, now.day); break;
+      case '2 months': expiryDate = DateTime(now.year, now.month + 2, now.day); break;
+      case '3 months': expiryDate = DateTime(now.year, now.month + 3, now.day); break;
+      case '6 months': expiryDate = DateTime(now.year, now.month + 6, now.day); break;
+      case '9 months': expiryDate = DateTime(now.year, now.month + 9, now.day); break;
+      case '1 year': expiryDate = DateTime(now.year + 1, now.month, now.day); break;
+      case '2 years': expiryDate = DateTime(now.year + 2, now.month, now.day); break;
+      case '3 years': expiryDate = DateTime(now.year + 3, now.month, now.day); break;
+      case 'lifetime': expiryDate = DateTime(now.year + 100, now.month, now.day); break;
+      default: expiryDate = DateTime(now.year, now.month + 1, now.day);
+    }
+
+    final license = LicenseModel(
+      businessName: _licenseBusinessNameController.text.trim(),
+      expiryDate: expiryDate,
+      planType: _selectedPlan,
+      licenseId: _uuid.v4(),
+    );
+
+    final base64Json = license.toBase64Json();
+    final signature = HMACService.generateSignature(base64Json);
+
+    setState(() {
+      _generatedCode = '$base64Json.$signature';
+    });
+  }
+
+  void _copyToClipboard() {
+    Clipboard.setData(ClipboardData(text: _generatedCode));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Activation code copied to clipboard')),
+    );
   }
 
   Future<bool?> _showDiscardDialog() {

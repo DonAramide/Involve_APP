@@ -6,6 +6,7 @@ class AppSettings extends Equatable {
   final String organizationName;
   final String address;
   final String phone;
+  final String? businessDescription;
   final String? taxId;
   final String? logoPath;
   final Uint8List? logo; // New field
@@ -15,6 +16,7 @@ class AppSettings extends Equatable {
   final bool discountEnabled;
   final String defaultInvoiceTemplate;
   final bool allowPriceUpdates;
+  final bool confirmPriceOnSelection;
   
   // Security lockout fields
   final int failedAttempts;
@@ -26,6 +28,7 @@ class AppSettings extends Equatable {
     required this.organizationName,
     required this.address,
     required this.phone,
+    this.businessDescription,
     this.taxId,
     this.logoPath,
     this.logo,
@@ -35,6 +38,7 @@ class AppSettings extends Equatable {
     this.discountEnabled = true,
     this.defaultInvoiceTemplate = 'compact',
     this.allowPriceUpdates = true,
+    this.confirmPriceOnSelection = false,
     this.failedAttempts = 0,
     this.isLocked = false,
     this.lockedAt,
@@ -45,6 +49,7 @@ class AppSettings extends Equatable {
     String? organizationName,
     String? address,
     String? phone,
+    String? businessDescription,
     String? taxId,
     String? logoPath,
     Uint8List? logo,
@@ -54,6 +59,7 @@ class AppSettings extends Equatable {
     bool? discountEnabled,
     String? defaultInvoiceTemplate,
     bool? allowPriceUpdates,
+    bool? confirmPriceOnSelection,
     int? failedAttempts,
     bool? isLocked,
     DateTime? lockedAt,
@@ -63,6 +69,7 @@ class AppSettings extends Equatable {
       organizationName: organizationName ?? this.organizationName,
       address: address ?? this.address,
       phone: phone ?? this.phone,
+      businessDescription: businessDescription ?? this.businessDescription,
       taxId: taxId ?? this.taxId,
       logoPath: logoPath ?? this.logoPath,
       logo: logo ?? this.logo,
@@ -72,6 +79,7 @@ class AppSettings extends Equatable {
       discountEnabled: discountEnabled ?? this.discountEnabled,
       defaultInvoiceTemplate: defaultInvoiceTemplate ?? this.defaultInvoiceTemplate,
       allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
+      confirmPriceOnSelection: confirmPriceOnSelection ?? this.confirmPriceOnSelection,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
@@ -84,6 +92,7 @@ class AppSettings extends Equatable {
         organizationName,
         address,
         phone,
+        businessDescription,
         taxId,
         logoPath,
         logo,
@@ -93,6 +102,7 @@ class AppSettings extends Equatable {
         discountEnabled,
         defaultInvoiceTemplate,
         allowPriceUpdates,
+        confirmPriceOnSelection,
         failedAttempts,
         isLocked,
         lockedAt,

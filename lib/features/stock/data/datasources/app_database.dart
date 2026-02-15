@@ -12,7 +12,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -40,6 +40,14 @@ class AppDatabase extends _$AppDatabase {
         if (from < 5) {
           // Dark/Light mode migration
           await m.addColumn(settings, settings.themeMode);
+        }
+        if (from < 6) {
+          // Business description migration
+          await m.addColumn(settings, settings.businessDescription as GeneratedColumn<Object>);
+        }
+        if (from < 7) {
+          // Price confirmation toggle migration
+          await m.addColumn(settings, settings.confirmPriceOnSelection as GeneratedColumn<Object>);
         }
       },
       beforeOpen: (details) async {

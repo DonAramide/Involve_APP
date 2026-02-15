@@ -8,7 +8,6 @@ import '../bloc/settings_state.dart';
 import '../widgets/password_dialog.dart';
 import '../widgets/super_admin_dialog.dart';
 import '../widgets/super_admin_password_dialog.dart';
-import '../../../printer/presentation/pages/printer_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -37,13 +36,15 @@ class SettingsPage extends StatelessWidget {
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                _buildActivationBanner(context, isSuperAdmin),
+                _buildActivationBanner(context, state),
                 const SizedBox(height: 10),
                 _buildSectionHeader('Branding'),
                 _buildLogoTile(context, settings.logo, (bytes) => _update(context, settings.copyWith(logo: bytes))),
                 const SizedBox(height: 10),
                 _buildSectionHeader('Organization Detail'),
-                _buildReadOnlyTile('Name', settings.organizationName, Icons.business),
+                state.isBusinessLocked 
+                  ? _buildReadOnlyTile('Name', settings.organizationName, Icons.business)
+                  : _buildTextTile(context, 'Name', settings.organizationName, (val) => _update(context, settings.copyWith(organizationName: val))),
                 _buildReadOnlyTile('Address', settings.address, Icons.location_on),
                 _buildReadOnlyTile('Phone', settings.phone, Icons.phone),
                 _buildReadOnlyTile('Tax ID (VAT/GST)', (settings.taxId != null && settings.taxId!.isNotEmpty) ? settings.taxId! : 'Not Set', Icons.receipt_long),
@@ -73,21 +74,6 @@ class SettingsPage extends StatelessWidget {
                   subtitle: const Text('Import database file (Requires path)'),
                   trailing: state.isImporting ? const CircularProgressIndicator() : const Icon(Icons.restore),
                   onTap: () => _showRestoreDialog(context),
-                ),
-                const Divider(),
-                _buildSectionHeader('Printer'),
-                ListTile(
-                  title: const Text('Printer Settings'),
-                  subtitle: const Text('Configure WiFi, USB, or Bluetooth printer'),
-                  trailing: const Icon(Icons.print),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PrinterSettingsPage(),
-                      ),
-                    );
-                  },
                 ),
                 const Divider(),
                 _buildSectionHeader('Security'),
@@ -132,18 +118,21 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildActivationBanner(BuildContext context, bool isAuthorized) {
+  Widget _buildActivationBanner(BuildContext context, SettingsState state) {
+    final isLocked = state.isBusinessLocked;
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isAuthorized ? Colors.green[100] : Colors.orange[100],
-        borderRadius: BorderRadius.circular(8),
+        color: isLocked ? Colors.blue[50] : Colors.orange[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isLocked ? Colors.blue[200]! : Colors.orange[200]!),
       ),
       child: Row(
         children: [
           Icon(
-            isAuthorized ? Icons.verified : Icons.warning_amber_rounded,
-            color: isAuthorized ? Colors.green : Colors.orange,
+            isLocked ? Icons.verified_user : Icons.info_outline,
+            color: isLocked ? Colors.blue : Colors.orange,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -151,33 +140,21 @@ class SettingsPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isAuthorized ? 'Device Fully Authorized' : 'Trial / Limited Mode',
+                  isLocked ? 'Identity Verified' : 'Initial Setup',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: isAuthorized ? Colors.green[900] : Colors.orange[900],
+                    color: isLocked ? Colors.blue[900] : Colors.orange[900],
                   ),
                 ),
                 Text(
-                  isAuthorized 
-                      ? 'Lifetime service active on this device.' 
-                      : 'Please authorize device for lifetime service.',
+                  isLocked 
+                      ? 'Business name is permanently locked for security.' 
+                      : 'You can edit your business name once. It will be locked after saving.',
                   style: const TextStyle(fontSize: 12),
                 ),
               ],
             ),
           ),
-          if (!isAuthorized)
-            ElevatedButton(
-              onPressed: () => showDialog(
-                context: context,
-                builder: (_) => SuperAdminDialog(bloc: context.read<SettingsBloc>()),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('ACTIVATE'),
-            ),
         ],
       ),
     );

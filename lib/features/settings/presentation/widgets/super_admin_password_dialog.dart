@@ -31,10 +31,8 @@ class _SuperAdminPasswordDialogState extends State<SuperAdminPasswordDialog> {
         }
         
         // Close dialog on successful authorization
-        if (state.isSuperAdminAuthorized && state.error == null) {
-          if (ModalRoute.of(context)?.isCurrent == true) {
-            Navigator.pop(context, true); // Return true to indicate success
-          }
+        if (state.isSuperAdminAuthorized) {
+          Navigator.of(context, rootNavigator: true).pop(true); // Return true to indicate success
         }
       },
       child: AlertDialog(

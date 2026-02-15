@@ -4,6 +4,7 @@ import 'settings_state.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/services/security_service.dart';
 import '../../../../core/services/backup_service.dart';
+import '../../../../core/license/storage_service.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   final SettingsRepository repository;
@@ -28,6 +29,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<ResetFailedAttempts>(_onResetFailedAttempts);
     on<VerifySuperAdminPassword>(_onVerifySuperAdminPassword);
     on<SetSuperAdminPassword>(_onSetSuperAdminPassword);
+    on<LoadBusinessLock>(_onLoadBusinessLock);
+    on<LockBusinessName>(_onLockBusinessName);
     on<ResetSuperAdminAuth>((event, emit) => emit(state.copyWith(isSuperAdminAuthorized: false)));
     on<ResetSystemAuth>((event, emit) {
       debugPrint('SettingsBloc: Resetting system auth');
@@ -73,6 +76,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   Future<void> _onLoadSettings(LoadSettings event, Emitter<SettingsState> emit) async {
     debugPrint('SettingsBloc: LoadSettings called');
     add(CheckDeviceAuthorization()); // Check auth on load
+    add(LoadBusinessLock());
     emit(state.copyWith(isLoading: true));
     try {
       final settings = await repository.getSettings();
@@ -86,9 +90,23 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   Future<void> _onUpdateSettings(UpdateAppSettings event, Emitter<SettingsState> emit) async {
     debugPrint('SettingsBloc: UpdateSettings called');
+    
+    // Check if business name is being changed and if it is locked
+    if (state.isBusinessLocked && state.settings?.organizationName != event.settings.organizationName) {
+      emit(state.copyWith(error: 'Business name is permanently locked.'));
+      return;
+    }
+
     emit(state.copyWith(isSaving: true, successMessage: null, error: null));
     try {
+      final oldName = state.settings?.organizationName;
       await repository.updateSettings(event.settings);
+      
+      // If business name changed and it wasn't locked before, lock it now
+      if (!state.isBusinessLocked && oldName != event.settings.organizationName) {
+        add(LockBusinessName());
+      }
+
       emit(state.copyWith(
         settings: event.settings, 
         isSaving: false,
@@ -98,6 +116,16 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     } catch (e) {
       emit(state.copyWith(error: e.toString(), isSaving: false));
     }
+  }
+
+  Future<void> _onLoadBusinessLock(LoadBusinessLock event, Emitter<SettingsState> emit) async {
+    final isLocked = await StorageService.isBusinessNameLocked();
+    emit(state.copyWith(isBusinessLocked: isLocked));
+  }
+
+  Future<void> _onLockBusinessName(LockBusinessName event, Emitter<SettingsState> emit) async {
+    await StorageService.setBusinessNameLocked(true);
+    emit(state.copyWith(isBusinessLocked: true));
   }
 
   Future<void> _onVerifyPassword(VerifySystemPassword event, Emitter<SettingsState> emit) async {
@@ -118,9 +146,18 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     final success = await securityService.verifyPassword(event.password);
     debugPrint('SettingsBloc: Password verification success: $success');
     if (success) {
-      // Reset failed attempts on successful login
-      add(ResetFailedAttempts());
-      emit(state.copyWith(isAuthorized: true, error: null));
+      // Reset failed attempts on successful login directly here to be atomic
+      if (currentSettings.failedAttempts > 0) {
+        final resetSettings = currentSettings.copyWith(failedAttempts: 0);
+        await repository.updateSettings(resetSettings);
+        emit(state.copyWith(
+          isAuthorized: true, 
+          settings: resetSettings,
+          error: null,
+        ));
+      } else {
+        emit(state.copyWith(isAuthorized: true, error: null));
+      }
       debugPrint('SettingsBloc: Emitted isAuthorized: true');
     } else {
       // Record failed attempt

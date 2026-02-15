@@ -13,6 +13,9 @@ import '../../../../core/widgets/live_datetime_widget.dart';
 import '../../../help/presentation/pages/help_page.dart';
 import 'about_page.dart';
 import 'contact_page.dart';
+import 'package:involve_app/features/printer/presentation/pages/printer_settings_page.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
 import 'dart:async';
 
 class DashboardPage extends StatelessWidget {
@@ -49,78 +52,109 @@ class DashboardPage extends StatelessWidget {
                 Expanded(
                   child: Text(
                     settings?.organizationName ?? 'Bar & Hotel POS',
+                    style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
+            flexibleSpace: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue, Colors.indigo],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+            foregroundColor: Colors.white,
             centerTitle: false,
             actions: [
-          LiveDateTimeWidget(),
-          SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'About',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AboutPage()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.contact_support),
-            tooltip: 'Contact Us',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ContactPage()),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            tooltip: 'Help & Support',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const HelpPage()),
-            ),
-          ),
-          SizedBox(width: 8),
-          BlocBuilder<SettingsBloc, SettingsState>(
-            builder: (context, state) {
-              final currentTheme = state.settings?.themeMode ?? 'system';
-              IconData icon;
-              String tooltip;
-              
-              switch (currentTheme) {
-                case 'light':
-                  icon = Icons.light_mode;
-                  tooltip = 'Switch to Dark Mode';
-                  break;
-                case 'dark':
-                  icon = Icons.dark_mode;
-                  tooltip = 'Switch to System Mode';
-                  break;
-                default:
-                  icon = Icons.brightness_auto;
-                  tooltip = 'Switch to Light Mode';
-              }
-
-              return IconButton(
-                icon: Icon(icon),
-                tooltip: tooltip,
-                onPressed: () {
-                  String nextTheme;
-                  if (currentTheme == 'system') nextTheme = 'light';
-                  else if (currentTheme == 'light') nextTheme = 'dark';
-                  else nextTheme = 'system';
+              const LiveDateTimeWidget(),
+              const SizedBox(width: 4),
+              BlocBuilder<SettingsBloc, SettingsState>(
+                builder: (context, state) {
+                  final currentTheme = state.settings?.themeMode ?? 'system';
+                  IconData icon;
+                  String tooltip;
                   
-                  context.read<SettingsBloc>().add(
-                    UpdateAppSettings(state.settings!.copyWith(themeMode: nextTheme)),
+                  switch (currentTheme) {
+                    case 'light':
+                      icon = Icons.light_mode;
+                      tooltip = 'Light Mode';
+                      break;
+                    case 'dark':
+                      icon = Icons.dark_mode;
+                      tooltip = 'Dark Mode';
+                      break;
+                    default:
+                      icon = Icons.brightness_auto;
+                      tooltip = 'System Mode';
+                  }
+
+                  return IconButton(
+                    icon: Icon(icon, size: 20),
+                    tooltip: tooltip,
+                    onPressed: () {
+                      String nextTheme;
+                      if (currentTheme == 'system') nextTheme = 'light';
+                      else if (currentTheme == 'light') nextTheme = 'dark';
+                      else nextTheme = 'system';
+                      
+                      context.read<SettingsBloc>().add(
+                        UpdateAppSettings(state.settings!.copyWith(themeMode: nextTheme)),
+                      );
+                    },
                   );
                 },
-              );
-            },
-          ),
-          SizedBox(width: 16),
-        ],
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'about':
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => AboutPage()));
+                      break;
+                    case 'contact':
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ContactPage()));
+                      break;
+                    case 'help':
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => HelpPage()));
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'about',
+                    child: ListTile(
+                      leading: Icon(Icons.info_outline),
+                      title: Text('About'),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'contact',
+                    child: ListTile(
+                      leading: Icon(Icons.contact_support),
+                      title: Text('Contact Us'),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'help',
+                    child: ListTile(
+                      leading: Icon(Icons.help_outline),
+                      title: Text('Help & Support'),
+                      contentPadding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 8),
+            ],
       ),
       body: GridView.count(
         padding: const EdgeInsets.all(24),
@@ -135,6 +169,20 @@ class DashboardPage extends StatelessWidget {
             Colors.blue,
             () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateInvoicePage())),
           ),
+          BlocBuilder<PrinterBloc, PrinterState>(
+            builder: (context, printerState) {
+              final isConnected = printerState.connectedDevice != null;
+              return _buildMenuCard(
+                context,
+                'PRINTER',
+                Icons.print,
+                Colors.purple,
+                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrinterSettingsPage())),
+                indicatorColor: isConnected ? Colors.green : Colors.red,
+                indicatorTooltip: isConnected ? 'Connected' : 'Disconnected',
+              );
+            },
+          ),
           _buildMenuCard(
             context,
             'STOCK / ITEMS',
@@ -144,8 +192,8 @@ class DashboardPage extends StatelessWidget {
           ),
           _buildMenuCard(
             context,
-            'HISTORY',
-            Icons.history,
+            'SALES RECORDS',
+            Icons.assessment,
             Colors.green,
             () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvoiceHistoryPage())),
           ),
@@ -185,23 +233,84 @@ class DashboardPage extends StatelessWidget {
   }
 
 
-  Widget _buildMenuCard(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 48, color: color),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-          ],
+  Widget _buildMenuCard(
+    BuildContext context, 
+    String title, 
+    IconData icon, 
+    Color color, 
+    VoidCallback onTap, {
+    Color? indicatorColor,
+    String? indicatorTooltip,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.15),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Stack(
+            children: [
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 40, color: color),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800, 
+                        fontSize: 14, 
+                        color: Colors.grey[800],
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (indicatorColor != null)
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Tooltip(
+                    message: indicatorTooltip ?? '',
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: indicatorColor,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: indicatorColor.withOpacity(0.5),
+                            blurRadius: 6,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

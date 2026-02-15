@@ -29,13 +29,14 @@ class HistoryInitial extends HistoryState {}
 class HistoryLoading extends HistoryState {}
 class HistoryLoaded extends HistoryState {
   final List<Invoice> invoices;
+  final double totalSales;
   final String? query;
   final double? amount;
 
-  HistoryLoaded(this.invoices, {this.query, this.amount});
+  HistoryLoaded(this.invoices, {this.totalSales = 0.0, this.query, this.amount});
 
   @override
-  List<Object?> get props => [invoices, query, amount];
+  List<Object?> get props => [invoices, totalSales, query, amount];
 }
 class HistoryError extends HistoryState {
   final String message;

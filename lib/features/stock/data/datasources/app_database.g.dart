@@ -1341,6 +1341,12 @@ class $SettingsTable extends Settings
   late final GeneratedColumn<String> phone = GeneratedColumn<String>(
       'phone', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _businessDescriptionMeta =
+      const VerificationMeta('businessDescription');
+  @override
+  late final GeneratedColumn<String> businessDescription =
+      GeneratedColumn<String>('business_description', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _taxIdMeta = const VerificationMeta('taxId');
   @override
   late final GeneratedColumn<String> taxId = GeneratedColumn<String>(
@@ -1411,6 +1417,16 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("allow_price_updates" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _confirmPriceOnSelectionMeta =
+      const VerificationMeta('confirmPriceOnSelection');
+  @override
+  late final GeneratedColumn<bool> confirmPriceOnSelection =
+      GeneratedColumn<bool>('confirm_price_on_selection', aliasedName, false,
+          type: DriftSqlType.bool,
+          requiredDuringInsert: false,
+          defaultConstraints: GeneratedColumn.constraintIsAlways(
+              'CHECK ("confirm_price_on_selection" IN (0, 1))'),
+          defaultValue: const Constant(false));
   static const VerificationMeta _failedAttemptsMeta =
       const VerificationMeta('failedAttempts');
   @override
@@ -1441,6 +1457,7 @@ class $SettingsTable extends Settings
         organizationName,
         address,
         phone,
+        businessDescription,
         taxId,
         logoPath,
         logo,
@@ -1450,6 +1467,7 @@ class $SettingsTable extends Settings
         discountEnabled,
         defaultInvoiceTemplate,
         allowPriceUpdates,
+        confirmPriceOnSelection,
         failedAttempts,
         isLocked,
         lockedAt
@@ -1486,6 +1504,12 @@ class $SettingsTable extends Settings
           _phoneMeta, phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta));
     } else if (isInserting) {
       context.missing(_phoneMeta);
+    }
+    if (data.containsKey('business_description')) {
+      context.handle(
+          _businessDescriptionMeta,
+          businessDescription.isAcceptableOrUnknown(
+              data['business_description']!, _businessDescriptionMeta));
     }
     if (data.containsKey('tax_id')) {
       context.handle(
@@ -1531,6 +1555,13 @@ class $SettingsTable extends Settings
           allowPriceUpdates.isAcceptableOrUnknown(
               data['allow_price_updates']!, _allowPriceUpdatesMeta));
     }
+    if (data.containsKey('confirm_price_on_selection')) {
+      context.handle(
+          _confirmPriceOnSelectionMeta,
+          confirmPriceOnSelection.isAcceptableOrUnknown(
+              data['confirm_price_on_selection']!,
+              _confirmPriceOnSelectionMeta));
+    }
     if (data.containsKey('failed_attempts')) {
       context.handle(
           _failedAttemptsMeta,
@@ -1562,6 +1593,8 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.string, data['${effectivePrefix}address'])!,
       phone: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}phone'])!,
+      businessDescription: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}business_description']),
       taxId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}tax_id']),
       logoPath: attachedDatabase.typeMapping
@@ -1581,6 +1614,9 @@ class $SettingsTable extends Settings
           data['${effectivePrefix}default_invoice_template'])!,
       allowPriceUpdates: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}allow_price_updates'])!,
+      confirmPriceOnSelection: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool,
+          data['${effectivePrefix}confirm_price_on_selection'])!,
       failedAttempts: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}failed_attempts'])!,
       isLocked: attachedDatabase.typeMapping
@@ -1601,6 +1637,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final String organizationName;
   final String address;
   final String phone;
+  final String? businessDescription;
   final String? taxId;
   final String? logoPath;
   final Uint8List? logo;
@@ -1610,6 +1647,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool discountEnabled;
   final String defaultInvoiceTemplate;
   final bool allowPriceUpdates;
+  final bool confirmPriceOnSelection;
   final int failedAttempts;
   final bool isLocked;
   final DateTime? lockedAt;
@@ -1618,6 +1656,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.organizationName,
       required this.address,
       required this.phone,
+      this.businessDescription,
       this.taxId,
       this.logoPath,
       this.logo,
@@ -1627,6 +1666,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.discountEnabled,
       required this.defaultInvoiceTemplate,
       required this.allowPriceUpdates,
+      required this.confirmPriceOnSelection,
       required this.failedAttempts,
       required this.isLocked,
       this.lockedAt});
@@ -1637,6 +1677,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['organization_name'] = Variable<String>(organizationName);
     map['address'] = Variable<String>(address);
     map['phone'] = Variable<String>(phone);
+    if (!nullToAbsent || businessDescription != null) {
+      map['business_description'] = Variable<String>(businessDescription);
+    }
     if (!nullToAbsent || taxId != null) {
       map['tax_id'] = Variable<String>(taxId);
     }
@@ -1652,6 +1695,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['discount_enabled'] = Variable<bool>(discountEnabled);
     map['default_invoice_template'] = Variable<String>(defaultInvoiceTemplate);
     map['allow_price_updates'] = Variable<bool>(allowPriceUpdates);
+    map['confirm_price_on_selection'] = Variable<bool>(confirmPriceOnSelection);
     map['failed_attempts'] = Variable<int>(failedAttempts);
     map['is_locked'] = Variable<bool>(isLocked);
     if (!nullToAbsent || lockedAt != null) {
@@ -1666,6 +1710,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       organizationName: Value(organizationName),
       address: Value(address),
       phone: Value(phone),
+      businessDescription: businessDescription == null && nullToAbsent
+          ? const Value.absent()
+          : Value(businessDescription),
       taxId:
           taxId == null && nullToAbsent ? const Value.absent() : Value(taxId),
       logoPath: logoPath == null && nullToAbsent
@@ -1678,6 +1725,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       discountEnabled: Value(discountEnabled),
       defaultInvoiceTemplate: Value(defaultInvoiceTemplate),
       allowPriceUpdates: Value(allowPriceUpdates),
+      confirmPriceOnSelection: Value(confirmPriceOnSelection),
       failedAttempts: Value(failedAttempts),
       isLocked: Value(isLocked),
       lockedAt: lockedAt == null && nullToAbsent
@@ -1694,6 +1742,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       organizationName: serializer.fromJson<String>(json['organizationName']),
       address: serializer.fromJson<String>(json['address']),
       phone: serializer.fromJson<String>(json['phone']),
+      businessDescription:
+          serializer.fromJson<String?>(json['businessDescription']),
       taxId: serializer.fromJson<String?>(json['taxId']),
       logoPath: serializer.fromJson<String?>(json['logoPath']),
       logo: serializer.fromJson<Uint8List?>(json['logo']),
@@ -1704,6 +1754,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       defaultInvoiceTemplate:
           serializer.fromJson<String>(json['defaultInvoiceTemplate']),
       allowPriceUpdates: serializer.fromJson<bool>(json['allowPriceUpdates']),
+      confirmPriceOnSelection:
+          serializer.fromJson<bool>(json['confirmPriceOnSelection']),
       failedAttempts: serializer.fromJson<int>(json['failedAttempts']),
       isLocked: serializer.fromJson<bool>(json['isLocked']),
       lockedAt: serializer.fromJson<DateTime?>(json['lockedAt']),
@@ -1717,6 +1769,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'organizationName': serializer.toJson<String>(organizationName),
       'address': serializer.toJson<String>(address),
       'phone': serializer.toJson<String>(phone),
+      'businessDescription': serializer.toJson<String?>(businessDescription),
       'taxId': serializer.toJson<String?>(taxId),
       'logoPath': serializer.toJson<String?>(logoPath),
       'logo': serializer.toJson<Uint8List?>(logo),
@@ -1727,6 +1780,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'defaultInvoiceTemplate':
           serializer.toJson<String>(defaultInvoiceTemplate),
       'allowPriceUpdates': serializer.toJson<bool>(allowPriceUpdates),
+      'confirmPriceOnSelection':
+          serializer.toJson<bool>(confirmPriceOnSelection),
       'failedAttempts': serializer.toJson<int>(failedAttempts),
       'isLocked': serializer.toJson<bool>(isLocked),
       'lockedAt': serializer.toJson<DateTime?>(lockedAt),
@@ -1738,6 +1793,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           String? organizationName,
           String? address,
           String? phone,
+          Value<String?> businessDescription = const Value.absent(),
           Value<String?> taxId = const Value.absent(),
           Value<String?> logoPath = const Value.absent(),
           Value<Uint8List?> logo = const Value.absent(),
@@ -1747,6 +1803,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? discountEnabled,
           String? defaultInvoiceTemplate,
           bool? allowPriceUpdates,
+          bool? confirmPriceOnSelection,
           int? failedAttempts,
           bool? isLocked,
           Value<DateTime?> lockedAt = const Value.absent()}) =>
@@ -1755,6 +1812,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         organizationName: organizationName ?? this.organizationName,
         address: address ?? this.address,
         phone: phone ?? this.phone,
+        businessDescription: businessDescription.present
+            ? businessDescription.value
+            : this.businessDescription,
         taxId: taxId.present ? taxId.value : this.taxId,
         logoPath: logoPath.present ? logoPath.value : this.logoPath,
         logo: logo.present ? logo.value : this.logo,
@@ -1765,6 +1825,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         defaultInvoiceTemplate:
             defaultInvoiceTemplate ?? this.defaultInvoiceTemplate,
         allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
+        confirmPriceOnSelection:
+            confirmPriceOnSelection ?? this.confirmPriceOnSelection,
         failedAttempts: failedAttempts ?? this.failedAttempts,
         isLocked: isLocked ?? this.isLocked,
         lockedAt: lockedAt.present ? lockedAt.value : this.lockedAt,
@@ -1777,6 +1839,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           : this.organizationName,
       address: data.address.present ? data.address.value : this.address,
       phone: data.phone.present ? data.phone.value : this.phone,
+      businessDescription: data.businessDescription.present
+          ? data.businessDescription.value
+          : this.businessDescription,
       taxId: data.taxId.present ? data.taxId.value : this.taxId,
       logoPath: data.logoPath.present ? data.logoPath.value : this.logoPath,
       logo: data.logo.present ? data.logo.value : this.logo,
@@ -1793,6 +1858,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       allowPriceUpdates: data.allowPriceUpdates.present
           ? data.allowPriceUpdates.value
           : this.allowPriceUpdates,
+      confirmPriceOnSelection: data.confirmPriceOnSelection.present
+          ? data.confirmPriceOnSelection.value
+          : this.confirmPriceOnSelection,
       failedAttempts: data.failedAttempts.present
           ? data.failedAttempts.value
           : this.failedAttempts,
@@ -1808,6 +1876,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('organizationName: $organizationName, ')
           ..write('address: $address, ')
           ..write('phone: $phone, ')
+          ..write('businessDescription: $businessDescription, ')
           ..write('taxId: $taxId, ')
           ..write('logoPath: $logoPath, ')
           ..write('logo: $logo, ')
@@ -1817,6 +1886,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('discountEnabled: $discountEnabled, ')
           ..write('defaultInvoiceTemplate: $defaultInvoiceTemplate, ')
           ..write('allowPriceUpdates: $allowPriceUpdates, ')
+          ..write('confirmPriceOnSelection: $confirmPriceOnSelection, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -1830,6 +1900,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       organizationName,
       address,
       phone,
+      businessDescription,
       taxId,
       logoPath,
       $driftBlobEquality.hash(logo),
@@ -1839,6 +1910,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       discountEnabled,
       defaultInvoiceTemplate,
       allowPriceUpdates,
+      confirmPriceOnSelection,
       failedAttempts,
       isLocked,
       lockedAt);
@@ -1850,6 +1922,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.organizationName == this.organizationName &&
           other.address == this.address &&
           other.phone == this.phone &&
+          other.businessDescription == this.businessDescription &&
           other.taxId == this.taxId &&
           other.logoPath == this.logoPath &&
           $driftBlobEquality.equals(other.logo, this.logo) &&
@@ -1859,6 +1932,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.discountEnabled == this.discountEnabled &&
           other.defaultInvoiceTemplate == this.defaultInvoiceTemplate &&
           other.allowPriceUpdates == this.allowPriceUpdates &&
+          other.confirmPriceOnSelection == this.confirmPriceOnSelection &&
           other.failedAttempts == this.failedAttempts &&
           other.isLocked == this.isLocked &&
           other.lockedAt == this.lockedAt);
@@ -1869,6 +1943,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<String> organizationName;
   final Value<String> address;
   final Value<String> phone;
+  final Value<String?> businessDescription;
   final Value<String?> taxId;
   final Value<String?> logoPath;
   final Value<Uint8List?> logo;
@@ -1878,6 +1953,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> discountEnabled;
   final Value<String> defaultInvoiceTemplate;
   final Value<bool> allowPriceUpdates;
+  final Value<bool> confirmPriceOnSelection;
   final Value<int> failedAttempts;
   final Value<bool> isLocked;
   final Value<DateTime?> lockedAt;
@@ -1886,6 +1962,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.organizationName = const Value.absent(),
     this.address = const Value.absent(),
     this.phone = const Value.absent(),
+    this.businessDescription = const Value.absent(),
     this.taxId = const Value.absent(),
     this.logoPath = const Value.absent(),
     this.logo = const Value.absent(),
@@ -1895,6 +1972,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.discountEnabled = const Value.absent(),
     this.defaultInvoiceTemplate = const Value.absent(),
     this.allowPriceUpdates = const Value.absent(),
+    this.confirmPriceOnSelection = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -1904,6 +1982,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     required String organizationName,
     required String address,
     required String phone,
+    this.businessDescription = const Value.absent(),
     this.taxId = const Value.absent(),
     this.logoPath = const Value.absent(),
     this.logo = const Value.absent(),
@@ -1913,6 +1992,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.discountEnabled = const Value.absent(),
     this.defaultInvoiceTemplate = const Value.absent(),
     this.allowPriceUpdates = const Value.absent(),
+    this.confirmPriceOnSelection = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -1924,6 +2004,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<String>? organizationName,
     Expression<String>? address,
     Expression<String>? phone,
+    Expression<String>? businessDescription,
     Expression<String>? taxId,
     Expression<String>? logoPath,
     Expression<Uint8List>? logo,
@@ -1933,6 +2014,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? discountEnabled,
     Expression<String>? defaultInvoiceTemplate,
     Expression<bool>? allowPriceUpdates,
+    Expression<bool>? confirmPriceOnSelection,
     Expression<int>? failedAttempts,
     Expression<bool>? isLocked,
     Expression<DateTime>? lockedAt,
@@ -1942,6 +2024,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (organizationName != null) 'organization_name': organizationName,
       if (address != null) 'address': address,
       if (phone != null) 'phone': phone,
+      if (businessDescription != null)
+        'business_description': businessDescription,
       if (taxId != null) 'tax_id': taxId,
       if (logoPath != null) 'logo_path': logoPath,
       if (logo != null) 'logo': logo,
@@ -1952,6 +2036,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (defaultInvoiceTemplate != null)
         'default_invoice_template': defaultInvoiceTemplate,
       if (allowPriceUpdates != null) 'allow_price_updates': allowPriceUpdates,
+      if (confirmPriceOnSelection != null)
+        'confirm_price_on_selection': confirmPriceOnSelection,
       if (failedAttempts != null) 'failed_attempts': failedAttempts,
       if (isLocked != null) 'is_locked': isLocked,
       if (lockedAt != null) 'locked_at': lockedAt,
@@ -1963,6 +2049,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String>? organizationName,
       Value<String>? address,
       Value<String>? phone,
+      Value<String?>? businessDescription,
       Value<String?>? taxId,
       Value<String?>? logoPath,
       Value<Uint8List?>? logo,
@@ -1972,6 +2059,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? discountEnabled,
       Value<String>? defaultInvoiceTemplate,
       Value<bool>? allowPriceUpdates,
+      Value<bool>? confirmPriceOnSelection,
       Value<int>? failedAttempts,
       Value<bool>? isLocked,
       Value<DateTime?>? lockedAt}) {
@@ -1980,6 +2068,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       organizationName: organizationName ?? this.organizationName,
       address: address ?? this.address,
       phone: phone ?? this.phone,
+      businessDescription: businessDescription ?? this.businessDescription,
       taxId: taxId ?? this.taxId,
       logoPath: logoPath ?? this.logoPath,
       logo: logo ?? this.logo,
@@ -1990,6 +2079,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       defaultInvoiceTemplate:
           defaultInvoiceTemplate ?? this.defaultInvoiceTemplate,
       allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
+      confirmPriceOnSelection:
+          confirmPriceOnSelection ?? this.confirmPriceOnSelection,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
@@ -2010,6 +2101,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     }
     if (phone.present) {
       map['phone'] = Variable<String>(phone.value);
+    }
+    if (businessDescription.present) {
+      map['business_description'] = Variable<String>(businessDescription.value);
     }
     if (taxId.present) {
       map['tax_id'] = Variable<String>(taxId.value);
@@ -2039,6 +2133,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (allowPriceUpdates.present) {
       map['allow_price_updates'] = Variable<bool>(allowPriceUpdates.value);
     }
+    if (confirmPriceOnSelection.present) {
+      map['confirm_price_on_selection'] =
+          Variable<bool>(confirmPriceOnSelection.value);
+    }
     if (failedAttempts.present) {
       map['failed_attempts'] = Variable<int>(failedAttempts.value);
     }
@@ -2058,6 +2156,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('organizationName: $organizationName, ')
           ..write('address: $address, ')
           ..write('phone: $phone, ')
+          ..write('businessDescription: $businessDescription, ')
           ..write('taxId: $taxId, ')
           ..write('logoPath: $logoPath, ')
           ..write('logo: $logo, ')
@@ -2067,6 +2166,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('discountEnabled: $discountEnabled, ')
           ..write('defaultInvoiceTemplate: $defaultInvoiceTemplate, ')
           ..write('allowPriceUpdates: $allowPriceUpdates, ')
+          ..write('confirmPriceOnSelection: $confirmPriceOnSelection, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -3299,6 +3399,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   required String organizationName,
   required String address,
   required String phone,
+  Value<String?> businessDescription,
   Value<String?> taxId,
   Value<String?> logoPath,
   Value<Uint8List?> logo,
@@ -3308,6 +3409,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> discountEnabled,
   Value<String> defaultInvoiceTemplate,
   Value<bool> allowPriceUpdates,
+  Value<bool> confirmPriceOnSelection,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -3317,6 +3419,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String> organizationName,
   Value<String> address,
   Value<String> phone,
+  Value<String?> businessDescription,
   Value<String?> taxId,
   Value<String?> logoPath,
   Value<Uint8List?> logo,
@@ -3326,6 +3429,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> discountEnabled,
   Value<String> defaultInvoiceTemplate,
   Value<bool> allowPriceUpdates,
+  Value<bool> confirmPriceOnSelection,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -3352,6 +3456,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get phone => $composableBuilder(
       column: $table.phone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get businessDescription => $composableBuilder(
+      column: $table.businessDescription,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get taxId => $composableBuilder(
       column: $table.taxId, builder: (column) => ColumnFilters(column));
@@ -3381,6 +3489,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get allowPriceUpdates => $composableBuilder(
       column: $table.allowPriceUpdates,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get confirmPriceOnSelection => $composableBuilder(
+      column: $table.confirmPriceOnSelection,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get failedAttempts => $composableBuilder(
@@ -3416,6 +3528,10 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<String> get phone => $composableBuilder(
       column: $table.phone, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get businessDescription => $composableBuilder(
+      column: $table.businessDescription,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get taxId => $composableBuilder(
       column: $table.taxId, builder: (column) => ColumnOrderings(column));
 
@@ -3444,6 +3560,10 @@ class $$SettingsTableOrderingComposer
 
   ColumnOrderings<bool> get allowPriceUpdates => $composableBuilder(
       column: $table.allowPriceUpdates,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get confirmPriceOnSelection => $composableBuilder(
+      column: $table.confirmPriceOnSelection,
       builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<int> get failedAttempts => $composableBuilder(
@@ -3478,6 +3598,9 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<String> get phone =>
       $composableBuilder(column: $table.phone, builder: (column) => column);
 
+  GeneratedColumn<String> get businessDescription => $composableBuilder(
+      column: $table.businessDescription, builder: (column) => column);
+
   GeneratedColumn<String> get taxId =>
       $composableBuilder(column: $table.taxId, builder: (column) => column);
 
@@ -3504,6 +3627,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get allowPriceUpdates => $composableBuilder(
       column: $table.allowPriceUpdates, builder: (column) => column);
+
+  GeneratedColumn<bool> get confirmPriceOnSelection => $composableBuilder(
+      column: $table.confirmPriceOnSelection, builder: (column) => column);
 
   GeneratedColumn<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts, builder: (column) => column);
@@ -3545,6 +3671,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String> organizationName = const Value.absent(),
             Value<String> address = const Value.absent(),
             Value<String> phone = const Value.absent(),
+            Value<String?> businessDescription = const Value.absent(),
             Value<String?> taxId = const Value.absent(),
             Value<String?> logoPath = const Value.absent(),
             Value<Uint8List?> logo = const Value.absent(),
@@ -3554,6 +3681,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> discountEnabled = const Value.absent(),
             Value<String> defaultInvoiceTemplate = const Value.absent(),
             Value<bool> allowPriceUpdates = const Value.absent(),
+            Value<bool> confirmPriceOnSelection = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -3563,6 +3691,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             organizationName: organizationName,
             address: address,
             phone: phone,
+            businessDescription: businessDescription,
             taxId: taxId,
             logoPath: logoPath,
             logo: logo,
@@ -3572,6 +3701,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             discountEnabled: discountEnabled,
             defaultInvoiceTemplate: defaultInvoiceTemplate,
             allowPriceUpdates: allowPriceUpdates,
+            confirmPriceOnSelection: confirmPriceOnSelection,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
@@ -3581,6 +3711,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             required String organizationName,
             required String address,
             required String phone,
+            Value<String?> businessDescription = const Value.absent(),
             Value<String?> taxId = const Value.absent(),
             Value<String?> logoPath = const Value.absent(),
             Value<Uint8List?> logo = const Value.absent(),
@@ -3590,6 +3721,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> discountEnabled = const Value.absent(),
             Value<String> defaultInvoiceTemplate = const Value.absent(),
             Value<bool> allowPriceUpdates = const Value.absent(),
+            Value<bool> confirmPriceOnSelection = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -3599,6 +3731,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             organizationName: organizationName,
             address: address,
             phone: phone,
+            businessDescription: businessDescription,
             taxId: taxId,
             logoPath: logoPath,
             logo: logo,
@@ -3608,6 +3741,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             discountEnabled: discountEnabled,
             defaultInvoiceTemplate: defaultInvoiceTemplate,
             allowPriceUpdates: allowPriceUpdates,
+            confirmPriceOnSelection: confirmPriceOnSelection,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,

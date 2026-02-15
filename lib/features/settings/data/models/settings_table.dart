@@ -6,6 +6,7 @@ class Settings extends Table {
   TextColumn get organizationName => text().withLength(min: 1, max: 100)();
   TextColumn get address => text()();
   TextColumn get phone => text()();
+  TextColumn get businessDescription => text().nullable()();
   TextColumn get taxId => text().nullable()();
   TextColumn get logoPath => text().nullable()();
   BlobColumn get logo => blob().nullable()();
@@ -15,6 +16,7 @@ class Settings extends Table {
   BoolColumn get discountEnabled => boolean().withDefault(const Constant(true))();
   TextColumn get defaultInvoiceTemplate => text().withDefault(const Constant('compact'))();
   BoolColumn get allowPriceUpdates => boolean().withDefault(const Constant(true))();
+  BoolColumn get confirmPriceOnSelection => boolean().withDefault(const Constant(false))();
   
   // Security lockout columns
   IntColumn get failedAttempts => integer().withDefault(const Constant(0))();

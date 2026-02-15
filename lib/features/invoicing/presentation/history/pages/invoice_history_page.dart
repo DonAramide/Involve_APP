@@ -58,12 +58,19 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   if (state.invoices.isEmpty) {
                     return const Center(child: Text('No invoices found.'));
                   }
-                  return ListView.builder(
-                    itemCount: state.invoices.length,
-                    itemBuilder: (context, index) {
-                      final invoice = state.invoices[index];
-                      return _buildInvoiceCard(context, invoice);
-                    },
+                  return Column(
+                    children: [
+                      _buildTotalSummary(context, state),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: state.invoices.length,
+                          itemBuilder: (context, index) {
+                            final invoice = state.invoices[index];
+                            return _buildInvoiceCard(context, invoice);
+                          },
+                        ),
+                      ),
+                    ],
                   );
                 } else if (state is HistoryError) {
                   return Center(child: Text(state.message));
@@ -177,11 +184,47 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     final range = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      initialDateRange: _selectedRange,
     );
-    if (range != null) {
-      setState(() => _selectedRange = range);
-      context.read<HistoryBloc>().add(LoadHistory(start: range.start, end: range.end));
+    
+    if (range != null && context.mounted) {
+      // Pick start time
+      final startTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(range.start),
+        helpText: 'SELECT START TIME',
+      );
+      
+      if (startTime == null || !context.mounted) return;
+      
+      // Pick end time
+      final endTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(range.end.add(const Duration(hours: 23, minutes: 59))),
+        helpText: 'SELECT END TIME',
+      );
+      
+      if (endTime == null || !context.mounted) return;
+      
+      final startDateTime = DateTime(
+        range.start.year,
+        range.start.month,
+        range.start.day,
+        startTime.hour,
+        startTime.minute,
+      );
+      
+      final endDateTime = DateTime(
+        range.end.year,
+        range.end.month,
+        range.end.day,
+        endTime.hour,
+        endTime.minute,
+      );
+
+      setState(() => _selectedRange = DateTimeRange(start: startDateTime, end: endDateTime));
+      context.read<HistoryBloc>().add(LoadHistory(start: startDateTime, end: endDateTime));
     }
   }
 
@@ -203,5 +246,49 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         const SnackBar(content: Text('Settings not loaded. Cannot print.')),
       );
     }
+  }
+
+  Widget _buildTotalSummary(BuildContext context, HistoryLoaded state) {
+    final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'TOTAL SALES FOR PERIOD',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.blueGrey,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$currency${state.totalSales.toStringAsFixed(2)}',
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${state.invoices.length} Invoices',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

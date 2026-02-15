@@ -50,10 +50,8 @@ class _PasswordDialogState extends State<PasswordDialog> {
         }
         
         // Close dialog on successful unlock/authorization
-        if (state.isAuthorized && state.error == null) {
-          if (ModalRoute.of(context)?.isCurrent == true) {
-            Navigator.pop(context, true);
-          }
+        if (state.isAuthorized) {
+          Navigator.of(context, rootNavigator: true).pop(true);
         }
       },
       child: AlertDialog(

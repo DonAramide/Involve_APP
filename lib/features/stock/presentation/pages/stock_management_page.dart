@@ -111,26 +111,15 @@ class StockManagementPage extends StatelessWidget {
     settingsBloc.add(ResetSystemAuth());
     
     // Show password dialog
-    showDialog(
+    showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => BlocListener<SettingsBloc, SettingsState>(
-        bloc: settingsBloc,
-        listener: (context, state) {
-          if (state.isAuthorized) {
-            // Dialog closes itself. Just execute action.
-            onSuccess();
-            // No need to update settings here intentionally
-          } else if (state.error != null) {
-            // Show error but keep dialog open
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
-            );
-          }
-        },
-        child: PasswordDialog(bloc: settingsBloc),
-      ),
-    );
+      builder: (dialogContext) => PasswordDialog(bloc: settingsBloc),
+    ).then((authorized) {
+      if (authorized == true && context.mounted) {
+        onSuccess();
+      }
+    });
   }
 
   void _showItemDialog(BuildContext context, {Item? item}) {
