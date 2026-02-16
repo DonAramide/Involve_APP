@@ -177,3 +177,74 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
     ];
   }
 }
+
+class ProfessionalInvoiceTemplate extends InvoiceTemplate {
+  @override
+  String get name => 'Professional';
+  @override
+  TemplateType get type => TemplateType.professional;
+  @override
+  LogoPlacement get logoPlacement => LogoPlacement.topCenter;
+  @override
+  bool get useBoldHeaders => true;
+  @override
+  double get columnSpacing => 1.0;
+
+  @override
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final settings = orgSettings as AppSettings;
+    const int width = 32;
+
+    return [
+      if (settings.logo != null) ImageCommand(bytes: settings.logo!),
+      TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
+      if (settings.businessDescription != null && settings.businessDescription!.isNotEmpty)
+        TextCommand(settings.businessDescription!, align: 'center'),
+      TextCommand(settings.address, align: 'center'),
+      TextCommand('Tel: ${settings.phone}', align: 'center'),
+      DividerCommand(),
+      TextCommand('INVOICE: ${invoice.invoiceNumber}', isBold: true),
+      TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}'),
+      DividerCommand(),
+      // Column widths: Qty(3), Item(12), Price(8), Total(9) = 32
+      TextCommand('QTY ITEM        PRICE    TOTAL', isBold: true),
+      DividerCommand(),
+      ...invoice.items.map((item) {
+        final qty = item.quantity.toString().padRight(3).substring(0, 3);
+        final name = item.item.name.padRight(12).substring(0, 12);
+        final price = CurrencyFormatter.format(item.unitPrice).padLeft(8).substring(0, 8);
+        final total = CurrencyFormatter.format(item.total).padLeft(9).substring(0, 9);
+        return TextCommand('$qty$name$price$total');
+      }),
+      DividerCommand(),
+      TextCommand(_formatSummaryRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal), width)),
+      if (invoice.taxAmount > 0)
+        TextCommand(_formatSummaryRow('TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%)', CurrencyFormatter.format(invoice.taxAmount), width)),
+      if (invoice.discountAmount > 0)
+        TextCommand(_formatSummaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
+      TextCommand(_formatSummaryRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', width), isBold: true),
+      if (settings.showAccountDetails && settings.bankName != null) ...[
+        DividerCommand(),
+        TextCommand('PAYMENT DETAILS', align: 'center', isBold: true),
+        TextCommand('Bank: ${settings.bankName}', align: 'center'),
+        if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
+        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+      ],
+      if (settings.showSignatureSpace) ...[
+        SizedBoxCommand(height: 1),
+        TextCommand('Signature: .................', align: 'center'),
+      ],
+      DividerCommand(),
+      TextCommand(settings.receiptFooter, align: 'center'),
+      TextCommand('Powered by IIPS', align: 'center'),
+    ];
+  }
+
+  String _formatSummaryRow(String label, String value, int width) {
+    if (label.length + value.length >= width) {
+      return '$label $value';
+    }
+    final spaces = ' ' * (width - label.length - value.length);
+    return label + spaces + value;
+  }
+}

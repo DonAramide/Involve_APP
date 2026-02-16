@@ -88,7 +88,7 @@ class SettingsPage extends StatelessWidget {
                   context, 
                   'Invoice Template', 
                   settings.defaultInvoiceTemplate, 
-                  ['compact', 'detailed', 'minimalist'], 
+                  ['compact', 'detailed', 'minimalist', 'professional'], 
                   (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
                 ),
                 _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),

@@ -8,6 +8,7 @@ enum TemplateType {
   classic,
   elegant,
   bold,
+  professional,
 }
 
 enum LogoPlacement {

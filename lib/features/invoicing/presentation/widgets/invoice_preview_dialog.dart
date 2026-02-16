@@ -192,6 +192,8 @@ class InvoicePreviewDialog extends StatelessWidget {
                           template = DetailedInvoiceTemplate();
                         } else if (templateName == 'minimalist') {
                           template = MinimalistInvoiceTemplate();
+                        } else if (templateName == 'professional') {
+                          template = ProfessionalInvoiceTemplate();
                         } else {
                           template = CompactInvoiceTemplate();
                         }
