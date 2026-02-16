@@ -61,7 +61,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       ],
       if (settings.showSignatureSpace) ...[
         DividerCommand(),
-        const SizedBoxCommand(height: 10),
+        SizedBoxCommand(height: 10),
         TextCommand('Signature: .................', align: 'center'),
       ],
       DividerCommand(),
@@ -125,7 +125,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       ],
       if (settings.showSignatureSpace) ...[
         DividerCommand(),
-        const SizedBoxCommand(height: 10),
+        SizedBoxCommand(height: 10),
         TextCommand('Signature: .................'),
       ],
       DividerCommand(),
@@ -160,22 +160,22 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
     return [
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Date: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'center'),
-      const DividerCommand(),
+      DividerCommand(),
       ...invoice.items.map((item) => 
         TextCommand('${item.item.name} x${item.quantity}  ${CurrencyFormatter.format(item.total)}')),
-      const DividerCommand(),
+      DividerCommand(),
       TextCommand('TOTAL: ${settings.currency}${CurrencyFormatter.format(invoice.totalAmount)}', align: 'right', isBold: true),
       if (settings.showAccountDetails && settings.bankName != null) ...[
-        const DividerCommand(),
+        DividerCommand(),
         TextCommand('PAYMENT: ${settings.bankName}', align: 'center'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
       ],
       if (settings.showSignatureSpace) ...[
-        const DividerCommand(),
-        const SizedBoxCommand(height: 5),
+        DividerCommand(),
+        SizedBoxCommand(height: 5),
         TextCommand('Sign: .................', align: 'center'),
       ],
-      const DividerCommand(),
+      DividerCommand(),
       TextCommand(settings.receiptFooter, align: 'center'),
     ];
   }

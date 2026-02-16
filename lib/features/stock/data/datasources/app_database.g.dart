@@ -1435,6 +1435,52 @@ class $SettingsTable extends Settings
       type: DriftSqlType.double,
       requiredDuringInsert: false,
       defaultValue: const Constant(0.15));
+  static const VerificationMeta _bankNameMeta =
+      const VerificationMeta('bankName');
+  @override
+  late final GeneratedColumn<String> bankName = GeneratedColumn<String>(
+      'bank_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _accountNumberMeta =
+      const VerificationMeta('accountNumber');
+  @override
+  late final GeneratedColumn<String> accountNumber = GeneratedColumn<String>(
+      'account_number', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _accountNameMeta =
+      const VerificationMeta('accountName');
+  @override
+  late final GeneratedColumn<String> accountName = GeneratedColumn<String>(
+      'account_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _showAccountDetailsMeta =
+      const VerificationMeta('showAccountDetails');
+  @override
+  late final GeneratedColumn<bool> showAccountDetails = GeneratedColumn<bool>(
+      'show_account_details', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_account_details" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _receiptFooterMeta =
+      const VerificationMeta('receiptFooter');
+  @override
+  late final GeneratedColumn<String> receiptFooter = GeneratedColumn<String>(
+      'receipt_footer', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('Thank you!'));
+  static const VerificationMeta _showSignatureSpaceMeta =
+      const VerificationMeta('showSignatureSpace');
+  @override
+  late final GeneratedColumn<bool> showSignatureSpace = GeneratedColumn<bool>(
+      'show_signature_space', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_signature_space" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _failedAttemptsMeta =
       const VerificationMeta('failedAttempts');
   @override
@@ -1477,6 +1523,12 @@ class $SettingsTable extends Settings
         allowPriceUpdates,
         confirmPriceOnSelection,
         taxRate,
+        bankName,
+        accountNumber,
+        accountName,
+        showAccountDetails,
+        receiptFooter,
+        showSignatureSpace,
         failedAttempts,
         isLocked,
         lockedAt
@@ -1575,6 +1627,40 @@ class $SettingsTable extends Settings
       context.handle(_taxRateMeta,
           taxRate.isAcceptableOrUnknown(data['tax_rate']!, _taxRateMeta));
     }
+    if (data.containsKey('bank_name')) {
+      context.handle(_bankNameMeta,
+          bankName.isAcceptableOrUnknown(data['bank_name']!, _bankNameMeta));
+    }
+    if (data.containsKey('account_number')) {
+      context.handle(
+          _accountNumberMeta,
+          accountNumber.isAcceptableOrUnknown(
+              data['account_number']!, _accountNumberMeta));
+    }
+    if (data.containsKey('account_name')) {
+      context.handle(
+          _accountNameMeta,
+          accountName.isAcceptableOrUnknown(
+              data['account_name']!, _accountNameMeta));
+    }
+    if (data.containsKey('show_account_details')) {
+      context.handle(
+          _showAccountDetailsMeta,
+          showAccountDetails.isAcceptableOrUnknown(
+              data['show_account_details']!, _showAccountDetailsMeta));
+    }
+    if (data.containsKey('receipt_footer')) {
+      context.handle(
+          _receiptFooterMeta,
+          receiptFooter.isAcceptableOrUnknown(
+              data['receipt_footer']!, _receiptFooterMeta));
+    }
+    if (data.containsKey('show_signature_space')) {
+      context.handle(
+          _showSignatureSpaceMeta,
+          showSignatureSpace.isAcceptableOrUnknown(
+              data['show_signature_space']!, _showSignatureSpaceMeta));
+    }
     if (data.containsKey('failed_attempts')) {
       context.handle(
           _failedAttemptsMeta,
@@ -1632,6 +1718,18 @@ class $SettingsTable extends Settings
           data['${effectivePrefix}confirm_price_on_selection'])!,
       taxRate: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}tax_rate'])!,
+      bankName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}bank_name']),
+      accountNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_number']),
+      accountName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_name']),
+      showAccountDetails: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_account_details'])!,
+      receiptFooter: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}receipt_footer'])!,
+      showSignatureSpace: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_signature_space'])!,
       failedAttempts: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}failed_attempts'])!,
       isLocked: attachedDatabase.typeMapping
@@ -1664,6 +1762,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool allowPriceUpdates;
   final bool confirmPriceOnSelection;
   final double taxRate;
+  final String? bankName;
+  final String? accountNumber;
+  final String? accountName;
+  final bool showAccountDetails;
+  final String receiptFooter;
+  final bool showSignatureSpace;
   final int failedAttempts;
   final bool isLocked;
   final DateTime? lockedAt;
@@ -1684,6 +1788,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.allowPriceUpdates,
       required this.confirmPriceOnSelection,
       required this.taxRate,
+      this.bankName,
+      this.accountNumber,
+      this.accountName,
+      required this.showAccountDetails,
+      required this.receiptFooter,
+      required this.showSignatureSpace,
       required this.failedAttempts,
       required this.isLocked,
       this.lockedAt});
@@ -1714,6 +1824,18 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['allow_price_updates'] = Variable<bool>(allowPriceUpdates);
     map['confirm_price_on_selection'] = Variable<bool>(confirmPriceOnSelection);
     map['tax_rate'] = Variable<double>(taxRate);
+    if (!nullToAbsent || bankName != null) {
+      map['bank_name'] = Variable<String>(bankName);
+    }
+    if (!nullToAbsent || accountNumber != null) {
+      map['account_number'] = Variable<String>(accountNumber);
+    }
+    if (!nullToAbsent || accountName != null) {
+      map['account_name'] = Variable<String>(accountName);
+    }
+    map['show_account_details'] = Variable<bool>(showAccountDetails);
+    map['receipt_footer'] = Variable<String>(receiptFooter);
+    map['show_signature_space'] = Variable<bool>(showSignatureSpace);
     map['failed_attempts'] = Variable<int>(failedAttempts);
     map['is_locked'] = Variable<bool>(isLocked);
     if (!nullToAbsent || lockedAt != null) {
@@ -1745,6 +1867,18 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       allowPriceUpdates: Value(allowPriceUpdates),
       confirmPriceOnSelection: Value(confirmPriceOnSelection),
       taxRate: Value(taxRate),
+      bankName: bankName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankName),
+      accountNumber: accountNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accountNumber),
+      accountName: accountName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accountName),
+      showAccountDetails: Value(showAccountDetails),
+      receiptFooter: Value(receiptFooter),
+      showSignatureSpace: Value(showSignatureSpace),
       failedAttempts: Value(failedAttempts),
       isLocked: Value(isLocked),
       lockedAt: lockedAt == null && nullToAbsent
@@ -1776,6 +1910,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       confirmPriceOnSelection:
           serializer.fromJson<bool>(json['confirmPriceOnSelection']),
       taxRate: serializer.fromJson<double>(json['taxRate']),
+      bankName: serializer.fromJson<String?>(json['bankName']),
+      accountNumber: serializer.fromJson<String?>(json['accountNumber']),
+      accountName: serializer.fromJson<String?>(json['accountName']),
+      showAccountDetails: serializer.fromJson<bool>(json['showAccountDetails']),
+      receiptFooter: serializer.fromJson<String>(json['receiptFooter']),
+      showSignatureSpace: serializer.fromJson<bool>(json['showSignatureSpace']),
       failedAttempts: serializer.fromJson<int>(json['failedAttempts']),
       isLocked: serializer.fromJson<bool>(json['isLocked']),
       lockedAt: serializer.fromJson<DateTime?>(json['lockedAt']),
@@ -1803,6 +1943,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'confirmPriceOnSelection':
           serializer.toJson<bool>(confirmPriceOnSelection),
       'taxRate': serializer.toJson<double>(taxRate),
+      'bankName': serializer.toJson<String?>(bankName),
+      'accountNumber': serializer.toJson<String?>(accountNumber),
+      'accountName': serializer.toJson<String?>(accountName),
+      'showAccountDetails': serializer.toJson<bool>(showAccountDetails),
+      'receiptFooter': serializer.toJson<String>(receiptFooter),
+      'showSignatureSpace': serializer.toJson<bool>(showSignatureSpace),
       'failedAttempts': serializer.toJson<int>(failedAttempts),
       'isLocked': serializer.toJson<bool>(isLocked),
       'lockedAt': serializer.toJson<DateTime?>(lockedAt),
@@ -1826,6 +1972,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? allowPriceUpdates,
           bool? confirmPriceOnSelection,
           double? taxRate,
+          Value<String?> bankName = const Value.absent(),
+          Value<String?> accountNumber = const Value.absent(),
+          Value<String?> accountName = const Value.absent(),
+          bool? showAccountDetails,
+          String? receiptFooter,
+          bool? showSignatureSpace,
           int? failedAttempts,
           bool? isLocked,
           Value<DateTime?> lockedAt = const Value.absent()}) =>
@@ -1850,6 +2002,13 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         confirmPriceOnSelection:
             confirmPriceOnSelection ?? this.confirmPriceOnSelection,
         taxRate: taxRate ?? this.taxRate,
+        bankName: bankName.present ? bankName.value : this.bankName,
+        accountNumber:
+            accountNumber.present ? accountNumber.value : this.accountNumber,
+        accountName: accountName.present ? accountName.value : this.accountName,
+        showAccountDetails: showAccountDetails ?? this.showAccountDetails,
+        receiptFooter: receiptFooter ?? this.receiptFooter,
+        showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
         failedAttempts: failedAttempts ?? this.failedAttempts,
         isLocked: isLocked ?? this.isLocked,
         lockedAt: lockedAt.present ? lockedAt.value : this.lockedAt,
@@ -1885,6 +2044,21 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ? data.confirmPriceOnSelection.value
           : this.confirmPriceOnSelection,
       taxRate: data.taxRate.present ? data.taxRate.value : this.taxRate,
+      bankName: data.bankName.present ? data.bankName.value : this.bankName,
+      accountNumber: data.accountNumber.present
+          ? data.accountNumber.value
+          : this.accountNumber,
+      accountName:
+          data.accountName.present ? data.accountName.value : this.accountName,
+      showAccountDetails: data.showAccountDetails.present
+          ? data.showAccountDetails.value
+          : this.showAccountDetails,
+      receiptFooter: data.receiptFooter.present
+          ? data.receiptFooter.value
+          : this.receiptFooter,
+      showSignatureSpace: data.showSignatureSpace.present
+          ? data.showSignatureSpace.value
+          : this.showSignatureSpace,
       failedAttempts: data.failedAttempts.present
           ? data.failedAttempts.value
           : this.failedAttempts,
@@ -1912,6 +2086,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('allowPriceUpdates: $allowPriceUpdates, ')
           ..write('confirmPriceOnSelection: $confirmPriceOnSelection, ')
           ..write('taxRate: $taxRate, ')
+          ..write('bankName: $bankName, ')
+          ..write('accountNumber: $accountNumber, ')
+          ..write('accountName: $accountName, ')
+          ..write('showAccountDetails: $showAccountDetails, ')
+          ..write('receiptFooter: $receiptFooter, ')
+          ..write('showSignatureSpace: $showSignatureSpace, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -1920,26 +2100,33 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      organizationName,
-      address,
-      phone,
-      businessDescription,
-      taxId,
-      logoPath,
-      $driftBlobEquality.hash(logo),
-      themeMode,
-      currency,
-      taxEnabled,
-      discountEnabled,
-      defaultInvoiceTemplate,
-      allowPriceUpdates,
-      confirmPriceOnSelection,
-      taxRate,
-      failedAttempts,
-      isLocked,
-      lockedAt);
+  int get hashCode => Object.hashAll([
+        id,
+        organizationName,
+        address,
+        phone,
+        businessDescription,
+        taxId,
+        logoPath,
+        $driftBlobEquality.hash(logo),
+        themeMode,
+        currency,
+        taxEnabled,
+        discountEnabled,
+        defaultInvoiceTemplate,
+        allowPriceUpdates,
+        confirmPriceOnSelection,
+        taxRate,
+        bankName,
+        accountNumber,
+        accountName,
+        showAccountDetails,
+        receiptFooter,
+        showSignatureSpace,
+        failedAttempts,
+        isLocked,
+        lockedAt
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1960,6 +2147,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.allowPriceUpdates == this.allowPriceUpdates &&
           other.confirmPriceOnSelection == this.confirmPriceOnSelection &&
           other.taxRate == this.taxRate &&
+          other.bankName == this.bankName &&
+          other.accountNumber == this.accountNumber &&
+          other.accountName == this.accountName &&
+          other.showAccountDetails == this.showAccountDetails &&
+          other.receiptFooter == this.receiptFooter &&
+          other.showSignatureSpace == this.showSignatureSpace &&
           other.failedAttempts == this.failedAttempts &&
           other.isLocked == this.isLocked &&
           other.lockedAt == this.lockedAt);
@@ -1982,6 +2175,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> allowPriceUpdates;
   final Value<bool> confirmPriceOnSelection;
   final Value<double> taxRate;
+  final Value<String?> bankName;
+  final Value<String?> accountNumber;
+  final Value<String?> accountName;
+  final Value<bool> showAccountDetails;
+  final Value<String> receiptFooter;
+  final Value<bool> showSignatureSpace;
   final Value<int> failedAttempts;
   final Value<bool> isLocked;
   final Value<DateTime?> lockedAt;
@@ -2002,6 +2201,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.allowPriceUpdates = const Value.absent(),
     this.confirmPriceOnSelection = const Value.absent(),
     this.taxRate = const Value.absent(),
+    this.bankName = const Value.absent(),
+    this.accountNumber = const Value.absent(),
+    this.accountName = const Value.absent(),
+    this.showAccountDetails = const Value.absent(),
+    this.receiptFooter = const Value.absent(),
+    this.showSignatureSpace = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -2023,6 +2228,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.allowPriceUpdates = const Value.absent(),
     this.confirmPriceOnSelection = const Value.absent(),
     this.taxRate = const Value.absent(),
+    this.bankName = const Value.absent(),
+    this.accountNumber = const Value.absent(),
+    this.accountName = const Value.absent(),
+    this.showAccountDetails = const Value.absent(),
+    this.receiptFooter = const Value.absent(),
+    this.showSignatureSpace = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -2046,6 +2257,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? allowPriceUpdates,
     Expression<bool>? confirmPriceOnSelection,
     Expression<double>? taxRate,
+    Expression<String>? bankName,
+    Expression<String>? accountNumber,
+    Expression<String>? accountName,
+    Expression<bool>? showAccountDetails,
+    Expression<String>? receiptFooter,
+    Expression<bool>? showSignatureSpace,
     Expression<int>? failedAttempts,
     Expression<bool>? isLocked,
     Expression<DateTime>? lockedAt,
@@ -2070,6 +2287,14 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (confirmPriceOnSelection != null)
         'confirm_price_on_selection': confirmPriceOnSelection,
       if (taxRate != null) 'tax_rate': taxRate,
+      if (bankName != null) 'bank_name': bankName,
+      if (accountNumber != null) 'account_number': accountNumber,
+      if (accountName != null) 'account_name': accountName,
+      if (showAccountDetails != null)
+        'show_account_details': showAccountDetails,
+      if (receiptFooter != null) 'receipt_footer': receiptFooter,
+      if (showSignatureSpace != null)
+        'show_signature_space': showSignatureSpace,
       if (failedAttempts != null) 'failed_attempts': failedAttempts,
       if (isLocked != null) 'is_locked': isLocked,
       if (lockedAt != null) 'locked_at': lockedAt,
@@ -2093,6 +2318,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? allowPriceUpdates,
       Value<bool>? confirmPriceOnSelection,
       Value<double>? taxRate,
+      Value<String?>? bankName,
+      Value<String?>? accountNumber,
+      Value<String?>? accountName,
+      Value<bool>? showAccountDetails,
+      Value<String>? receiptFooter,
+      Value<bool>? showSignatureSpace,
       Value<int>? failedAttempts,
       Value<bool>? isLocked,
       Value<DateTime?>? lockedAt}) {
@@ -2115,6 +2346,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       confirmPriceOnSelection:
           confirmPriceOnSelection ?? this.confirmPriceOnSelection,
       taxRate: taxRate ?? this.taxRate,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      accountName: accountName ?? this.accountName,
+      showAccountDetails: showAccountDetails ?? this.showAccountDetails,
+      receiptFooter: receiptFooter ?? this.receiptFooter,
+      showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
@@ -2174,6 +2411,24 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (taxRate.present) {
       map['tax_rate'] = Variable<double>(taxRate.value);
     }
+    if (bankName.present) {
+      map['bank_name'] = Variable<String>(bankName.value);
+    }
+    if (accountNumber.present) {
+      map['account_number'] = Variable<String>(accountNumber.value);
+    }
+    if (accountName.present) {
+      map['account_name'] = Variable<String>(accountName.value);
+    }
+    if (showAccountDetails.present) {
+      map['show_account_details'] = Variable<bool>(showAccountDetails.value);
+    }
+    if (receiptFooter.present) {
+      map['receipt_footer'] = Variable<String>(receiptFooter.value);
+    }
+    if (showSignatureSpace.present) {
+      map['show_signature_space'] = Variable<bool>(showSignatureSpace.value);
+    }
     if (failedAttempts.present) {
       map['failed_attempts'] = Variable<int>(failedAttempts.value);
     }
@@ -2205,6 +2460,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('allowPriceUpdates: $allowPriceUpdates, ')
           ..write('confirmPriceOnSelection: $confirmPriceOnSelection, ')
           ..write('taxRate: $taxRate, ')
+          ..write('bankName: $bankName, ')
+          ..write('accountNumber: $accountNumber, ')
+          ..write('accountName: $accountName, ')
+          ..write('showAccountDetails: $showAccountDetails, ')
+          ..write('receiptFooter: $receiptFooter, ')
+          ..write('showSignatureSpace: $showSignatureSpace, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -3879,6 +4140,12 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> allowPriceUpdates,
   Value<bool> confirmPriceOnSelection,
   Value<double> taxRate,
+  Value<String?> bankName,
+  Value<String?> accountNumber,
+  Value<String?> accountName,
+  Value<bool> showAccountDetails,
+  Value<String> receiptFooter,
+  Value<bool> showSignatureSpace,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -3900,6 +4167,12 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> allowPriceUpdates,
   Value<bool> confirmPriceOnSelection,
   Value<double> taxRate,
+  Value<String?> bankName,
+  Value<String?> accountNumber,
+  Value<String?> accountName,
+  Value<bool> showAccountDetails,
+  Value<String> receiptFooter,
+  Value<bool> showSignatureSpace,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -3967,6 +4240,26 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<double> get taxRate => $composableBuilder(
       column: $table.taxRate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get bankName => $composableBuilder(
+      column: $table.bankName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get accountNumber => $composableBuilder(
+      column: $table.accountNumber, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get accountName => $composableBuilder(
+      column: $table.accountName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showAccountDetails => $composableBuilder(
+      column: $table.showAccountDetails,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get receiptFooter => $composableBuilder(
+      column: $table.receiptFooter, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showSignatureSpace => $composableBuilder(
+      column: $table.showSignatureSpace,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
@@ -4042,6 +4335,28 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<double> get taxRate => $composableBuilder(
       column: $table.taxRate, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get bankName => $composableBuilder(
+      column: $table.bankName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get accountNumber => $composableBuilder(
+      column: $table.accountNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get accountName => $composableBuilder(
+      column: $table.accountName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showAccountDetails => $composableBuilder(
+      column: $table.showAccountDetails,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get receiptFooter => $composableBuilder(
+      column: $table.receiptFooter,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showSignatureSpace => $composableBuilder(
+      column: $table.showSignatureSpace,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
       builder: (column) => ColumnOrderings(column));
@@ -4110,6 +4425,24 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<double> get taxRate =>
       $composableBuilder(column: $table.taxRate, builder: (column) => column);
 
+  GeneratedColumn<String> get bankName =>
+      $composableBuilder(column: $table.bankName, builder: (column) => column);
+
+  GeneratedColumn<String> get accountNumber => $composableBuilder(
+      column: $table.accountNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get accountName => $composableBuilder(
+      column: $table.accountName, builder: (column) => column);
+
+  GeneratedColumn<bool> get showAccountDetails => $composableBuilder(
+      column: $table.showAccountDetails, builder: (column) => column);
+
+  GeneratedColumn<String> get receiptFooter => $composableBuilder(
+      column: $table.receiptFooter, builder: (column) => column);
+
+  GeneratedColumn<bool> get showSignatureSpace => $composableBuilder(
+      column: $table.showSignatureSpace, builder: (column) => column);
+
   GeneratedColumn<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts, builder: (column) => column);
 
@@ -4162,6 +4495,12 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> allowPriceUpdates = const Value.absent(),
             Value<bool> confirmPriceOnSelection = const Value.absent(),
             Value<double> taxRate = const Value.absent(),
+            Value<String?> bankName = const Value.absent(),
+            Value<String?> accountNumber = const Value.absent(),
+            Value<String?> accountName = const Value.absent(),
+            Value<bool> showAccountDetails = const Value.absent(),
+            Value<String> receiptFooter = const Value.absent(),
+            Value<bool> showSignatureSpace = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -4183,6 +4522,12 @@ class $$SettingsTableTableManager extends RootTableManager<
             allowPriceUpdates: allowPriceUpdates,
             confirmPriceOnSelection: confirmPriceOnSelection,
             taxRate: taxRate,
+            bankName: bankName,
+            accountNumber: accountNumber,
+            accountName: accountName,
+            showAccountDetails: showAccountDetails,
+            receiptFooter: receiptFooter,
+            showSignatureSpace: showSignatureSpace,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
@@ -4204,6 +4549,12 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> allowPriceUpdates = const Value.absent(),
             Value<bool> confirmPriceOnSelection = const Value.absent(),
             Value<double> taxRate = const Value.absent(),
+            Value<String?> bankName = const Value.absent(),
+            Value<String?> accountNumber = const Value.absent(),
+            Value<String?> accountName = const Value.absent(),
+            Value<bool> showAccountDetails = const Value.absent(),
+            Value<String> receiptFooter = const Value.absent(),
+            Value<bool> showSignatureSpace = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -4225,6 +4576,12 @@ class $$SettingsTableTableManager extends RootTableManager<
             allowPriceUpdates: allowPriceUpdates,
             confirmPriceOnSelection: confirmPriceOnSelection,
             taxRate: taxRate,
+            bankName: bankName,
+            accountNumber: accountNumber,
+            accountName: accountName,
+            showAccountDetails: showAccountDetails,
+            receiptFooter: receiptFooter,
+            showSignatureSpace: showSignatureSpace,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,

@@ -105,6 +105,9 @@ class NetworkPrinterService implements IPrinterService {
           } else if (cmd is DividerCommand) {
             bytes += generator.text('--------------------------------');
             debugPrint('NetworkPrinterService: Sent divider');
+          } else if (cmd is SizedBoxCommand) {
+            bytes += generator.feed(cmd.height);
+            debugPrint('NetworkPrinterService: Sent vertical space: ${cmd.height}');
           } else if (cmd is ImageCommand) {
             if (cmd.bytes != null) {
               debugPrint('NetworkPrinterService: Decoding image (${cmd.bytes!.length} bytes)');

@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import '../models/settings_table.dart';
 import '../../../stock/data/datasources/app_database.dart';
 import '../../domain/entities/settings.dart';
 import '../../domain/repositories/settings_repository.dart';

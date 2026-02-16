@@ -66,18 +66,18 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 11) {
           // Account details migration
-          await m.addColumn(settings, settings.bankName);
-          await m.addColumn(settings, settings.accountNumber);
-          await m.addColumn(settings, settings.accountName);
-          await m.addColumn(settings, settings.showAccountDetails);
+          await m.addColumn(settings, settings.bankName as GeneratedColumn<Object>);
+          await m.addColumn(settings, settings.accountNumber as GeneratedColumn<Object>);
+          await m.addColumn(settings, settings.accountName as GeneratedColumn<Object>);
+          await m.addColumn(settings, settings.showAccountDetails as GeneratedColumn<Object>);
         }
         if (from < 12) {
           // Receipt footer migration
-          await m.addColumn(settings, settings.receiptFooter);
+          await m.addColumn(settings, settings.receiptFooter as GeneratedColumn<Object>);
         }
         if (from < 13) {
           // Signature space migration
-          await m.addColumn(settings, settings.showSignatureSpace);
+          await m.addColumn(settings, settings.showSignatureSpace as GeneratedColumn<Object>);
         }
       },
       beforeOpen: (details) async {

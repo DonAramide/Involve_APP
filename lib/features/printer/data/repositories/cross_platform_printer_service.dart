@@ -127,6 +127,8 @@ class CrossPlatformPrinterService implements IPrinterService {
         );
       } else if (cmd is DividerCommand) {
         bytes += generator.hr();
+      } else if (cmd is SizedBoxCommand) {
+        bytes += generator.feed(cmd.height);
       } else if (cmd is ImageCommand) {
         if (cmd.bytes != null) {
           final img.Image? image = img.decodeImage(cmd.bytes!);

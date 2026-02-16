@@ -41,6 +41,11 @@ class TextCommand extends PrintCommand {
 
 class DividerCommand extends PrintCommand {}
 
+class SizedBoxCommand extends PrintCommand {
+  final int height;
+  SizedBoxCommand({this.height = 1});
+}
+
 
 class ImageCommand extends PrintCommand {
   final String? path;
