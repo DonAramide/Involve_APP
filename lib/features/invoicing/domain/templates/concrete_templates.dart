@@ -60,8 +60,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
         if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
       ],
       if (settings.showSignatureSpace) ...[
-        DividerCommand(),
-        SizedBoxCommand(height: 10),
+        SizedBoxCommand(height: 1),
         TextCommand('Signature: .................', align: 'center'),
       ],
       DividerCommand(),
@@ -124,8 +123,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
         if (settings.accountName != null) TextCommand('Account Name: ${settings.accountName}'),
       ],
       if (settings.showSignatureSpace) ...[
-        DividerCommand(),
-        SizedBoxCommand(height: 10),
+        SizedBoxCommand(height: 1),
         TextCommand('Signature: .................'),
       ],
       DividerCommand(),
@@ -171,8 +169,7 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
       ],
       if (settings.showSignatureSpace) ...[
-        DividerCommand(),
-        SizedBoxCommand(height: 5),
+        SizedBoxCommand(height: 1),
         TextCommand('Sign: .................', align: 'center'),
       ],
       DividerCommand(),

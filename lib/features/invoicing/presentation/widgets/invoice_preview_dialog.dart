@@ -128,7 +128,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                             ),
                           ],
                           if (settings?.showSignatureSpace == true) ...[
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 8),
                             const Center(
                               child: Text(
                                 'Signature: ____________________',

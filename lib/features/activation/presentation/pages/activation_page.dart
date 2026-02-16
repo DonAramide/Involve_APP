@@ -173,7 +173,7 @@ class _ActivationPageState extends State<ActivationPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.asset('assets/images/logo.png', height: 120),
+                      const Icon(Icons.lock_person, size: 80, color: Colors.blue),
                       const SizedBox(height: 24),
                       Text(
                         widget.isExpired ? 'Subscription Expired' : 'App Activation',
