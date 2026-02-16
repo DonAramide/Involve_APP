@@ -1,65 +1,53 @@
-import 'package:involve_app/core/license/hmac_service.dart';
 import 'package:involve_app/core/license/license_model.dart';
 import 'package:involve_app/core/license/storage_service.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:drift/drift.dart';
+import 'package:involve_app/core/license/license_validator.dart';
+import 'package:involve_app/core/license/license_generator.dart';
 
 class LicenseService {
-  static Future<bool> activate(String businessName, String activationCode) async {
+  static AppDatabase? _db;
+
+  static void init(AppDatabase db) {
+    _db = db;
+  }
+
+  static Future<LicenseModel?> activate(String businessName, String activationCode) async {
     try {
-      final parts = activationCode.split('.');
-      if (parts.length != 2) return false;
+      // 1. Validate key and integrity
+      final license = LicenseValidator.validate(activationCode, businessName);
+      if (license == null) return null;
 
-      final base64Json = parts[0];
-      final signature = parts[1];
+      // 2. Check expiry date
+      if (DateTime.now().isAfter(license.expiryDate)) return null;
 
-      // 1. Verify signature
-      if (!HMACService.verifySignature(base64Json, signature)) {
-        return false;
-      }
-
-      // 2. Decode license
-      final license = LicenseModel.fromBase64Json(base64Json);
-
-      // 3. Compare business name
-      if (license.businessName.toLowerCase().trim() != businessName.toLowerCase().trim()) {
-        return false;
-      }
-
-      // 4. Check expiry date
-      if (DateTime.now().isAfter(license.expiryDate)) {
-        return false;
-      }
-
-      // 5. Save license locally
+      // 3. Save license locally
       await StorageService.saveLicense(activationCode);
       
-      // Update last opened date on activation
+      // 4. Update last opened date on activation
       await StorageService.saveLastOpenedDate(DateTime.now());
 
-      return true;
+      // 5. Lock business name to this license
+      await StorageService.setBusinessNameLocked(true);
+
+      // 6. Save to local history as activated
+      await saveLicenseRecord(license, activationCode, isActivated: true);
+
+      return license;
     } catch (e) {
-      return false;
-    }
-  }
-
-  static Future<LicenseModel?> getActiveLicense() async {
-    final code = await StorageService.getLicense();
-    if (code == null) return null;
-
-    final parts = code.split('.');
-    if (parts.length != 2) return null;
-
-    final base64Json = parts[0];
-    final signature = parts[1];
-
-    if (!HMACService.verifySignature(base64Json, signature)) {
       return null;
     }
-
-    return LicenseModel.fromBase64Json(base64Json);
   }
 
-  static Future<bool> isActivated() async {
-    final license = await getActiveLicense();
+  static Future<LicenseModel?> getActiveLicense(String? businessName) async {
+    final code = await StorageService.getLicense();
+    if (code == null || businessName == null) return null;
+
+    return LicenseValidator.validate(code, businessName);
+  }
+
+  static Future<bool> isActivated(String? currentBusinessName) async {
+    final license = await getActiveLicense(currentBusinessName);
     if (license == null) return false;
     
     // Check expiry
@@ -87,8 +75,8 @@ class LicenseService {
     return DateTime.now().isBefore(lastOpened);
   }
 
-  static Future<bool> isExpired() async {
-    final license = await getActiveLicense();
+  static Future<bool> isExpired(String? currentBusinessName) async {
+    final license = await getActiveLicense(currentBusinessName);
     if (license == null) return false;
     return DateTime.now().isAfter(license.expiryDate);
   }
@@ -110,9 +98,9 @@ class LicenseService {
     return DateTime.now().isBefore(trialExpiry);
   }
 
-  static Future<bool> canAccess() async {
+  static Future<bool> canAccess(String? currentBusinessName) async {
     // 1. Check for valid license
-    if (await isActivated()) return true;
+    if (await isActivated(currentBusinessName)) return true;
     
     // 2. Check for trial
     final trialStart = await StorageService.getTrialStartDate();
@@ -123,5 +111,45 @@ class LicenseService {
     }
     
     return await isTrialValid();
+  }
+
+  static Future<void> saveLicenseRecord(LicenseModel license, String code, {bool isActivated = false}) async {
+    if (_db == null) return;
+    
+    await _db!.into(_db!.licenseHistory).insert(
+      LicenseHistoryCompanion.insert(
+        licenseId: license.licenseId.toString(),
+        businessName: license.businessName,
+        code: code,
+        plan: license.planType.name,
+        expiryDate: license.expiryDate,
+        createdAt: DateTime.now(),
+        isActivated: Value(isActivated),
+      ),
+    );
+  }
+
+  static Future<List<LicenseHistoryData>> getGeneratedLicenses() async {
+    if (_db == null) return [];
+    return await (_db!.select(_db!.licenseHistory)
+      ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]))
+      .get();
+  }
+
+  static Future<List<LicenseHistoryData>> getActivationHistory() async {
+    if (_db == null) return [];
+    return await (_db!.select(_db!.licenseHistory)
+      ..where((t) => t.isActivated.equals(true))
+      ..orderBy([(t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)]))
+      .get();
+  }
+
+  static LicenseModel? validateAndParseCode(String activationCode, String businessName) {
+    return LicenseValidator.validate(activationCode, businessName);
+  }
+
+  /// Special peek for Admin tools that don't know the business name yet
+  static Map<String, dynamic>? peekCode(String activationCode) {
+    return LicenseValidator.peek(activationCode);
   }
 }

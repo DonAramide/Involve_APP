@@ -6,6 +6,7 @@ import 'package:printing/printing.dart';
 import '../../../invoicing/domain/entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class ReceiptService {
   Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings) async {
@@ -81,8 +82,8 @@ class ReceiptService {
                      return pw.TableRow(
                        children: [
                          pw.Text(item.item.name),
-                         pw.Text('${item.quantity} x ${item.unitPrice.toStringAsFixed(0)}', textAlign: pw.TextAlign.center),
-                         pw.Text((item.quantity * item.unitPrice).toStringAsFixed(0), textAlign: pw.TextAlign.right),
+                         pw.Text('${item.quantity} x ${CurrencyFormatter.format(item.unitPrice)}', textAlign: pw.TextAlign.center),
+                         pw.Text(CurrencyFormatter.format(item.quantity * item.unitPrice), textAlign: pw.TextAlign.right),
                        ]
                      );
                    }).toList(),
@@ -95,7 +96,7 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('Subtotal:'),
-                  pw.Text(invoice.subtotal.toStringAsFixed(2)),
+                  pw.Text(CurrencyFormatter.format(invoice.subtotal)),
                 ],
               ),
               if (settings.taxEnabled && invoice.taxAmount > 0)
@@ -103,7 +104,7 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('Tax:'),
-                  pw.Text(invoice.taxAmount.toStringAsFixed(2)),
+                  pw.Text(CurrencyFormatter.format(invoice.taxAmount)),
                 ],
               ),
               if (settings.discountEnabled && invoice.discountAmount > 0)
@@ -111,7 +112,7 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('Discount:'),
-                  pw.Text('-${invoice.discountAmount.toStringAsFixed(2)}'),
+                  pw.Text('-${CurrencyFormatter.format(invoice.discountAmount)}'),
                 ],
               ),
               pw.Divider(),
@@ -119,7 +120,7 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('TOTAL', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                  pw.Text('${settings.currency} ${invoice.totalAmount.toStringAsFixed(2)}', 
+                  pw.Text('${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', 
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
               ),

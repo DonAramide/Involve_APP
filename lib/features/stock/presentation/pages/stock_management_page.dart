@@ -9,6 +9,7 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/settings/presentation/widgets/password_dialog.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class StockManagementPage extends StatelessWidget {
   const StockManagementPage({super.key});
@@ -90,8 +91,13 @@ class StockManagementPage extends StatelessWidget {
         title: Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         subtitle: Text('Qty: ${item.stockQty}', 
                        style: TextStyle(color: Colors.grey[600])),
-        trailing: Text('${settings?.currency ?? '₦'}${item.price.toStringAsFixed(2)}', 
-                        style: const TextStyle(fontSize: 20, color: Colors.green, fontWeight: FontWeight.bold)),
+        trailing: Text(
+          CurrencyFormatter.formatWithSymbol(
+            item.price,
+            symbol: settings?.currency ?? '₦',
+          ),
+          style: const TextStyle(fontSize: 20, color: Colors.green, fontWeight: FontWeight.bold),
+        ),
         onTap: () => _verifyAndExecute(
           context,
           () => _showItemDialog(context, item: item),

@@ -1427,6 +1427,14 @@ class $SettingsTable extends Settings
           defaultConstraints: GeneratedColumn.constraintIsAlways(
               'CHECK ("confirm_price_on_selection" IN (0, 1))'),
           defaultValue: const Constant(false));
+  static const VerificationMeta _taxRateMeta =
+      const VerificationMeta('taxRate');
+  @override
+  late final GeneratedColumn<double> taxRate = GeneratedColumn<double>(
+      'tax_rate', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.15));
   static const VerificationMeta _failedAttemptsMeta =
       const VerificationMeta('failedAttempts');
   @override
@@ -1468,6 +1476,7 @@ class $SettingsTable extends Settings
         defaultInvoiceTemplate,
         allowPriceUpdates,
         confirmPriceOnSelection,
+        taxRate,
         failedAttempts,
         isLocked,
         lockedAt
@@ -1562,6 +1571,10 @@ class $SettingsTable extends Settings
               data['confirm_price_on_selection']!,
               _confirmPriceOnSelectionMeta));
     }
+    if (data.containsKey('tax_rate')) {
+      context.handle(_taxRateMeta,
+          taxRate.isAcceptableOrUnknown(data['tax_rate']!, _taxRateMeta));
+    }
     if (data.containsKey('failed_attempts')) {
       context.handle(
           _failedAttemptsMeta,
@@ -1617,6 +1630,8 @@ class $SettingsTable extends Settings
       confirmPriceOnSelection: attachedDatabase.typeMapping.read(
           DriftSqlType.bool,
           data['${effectivePrefix}confirm_price_on_selection'])!,
+      taxRate: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}tax_rate'])!,
       failedAttempts: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}failed_attempts'])!,
       isLocked: attachedDatabase.typeMapping
@@ -1648,6 +1663,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final String defaultInvoiceTemplate;
   final bool allowPriceUpdates;
   final bool confirmPriceOnSelection;
+  final double taxRate;
   final int failedAttempts;
   final bool isLocked;
   final DateTime? lockedAt;
@@ -1667,6 +1683,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.defaultInvoiceTemplate,
       required this.allowPriceUpdates,
       required this.confirmPriceOnSelection,
+      required this.taxRate,
       required this.failedAttempts,
       required this.isLocked,
       this.lockedAt});
@@ -1696,6 +1713,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['default_invoice_template'] = Variable<String>(defaultInvoiceTemplate);
     map['allow_price_updates'] = Variable<bool>(allowPriceUpdates);
     map['confirm_price_on_selection'] = Variable<bool>(confirmPriceOnSelection);
+    map['tax_rate'] = Variable<double>(taxRate);
     map['failed_attempts'] = Variable<int>(failedAttempts);
     map['is_locked'] = Variable<bool>(isLocked);
     if (!nullToAbsent || lockedAt != null) {
@@ -1726,6 +1744,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       defaultInvoiceTemplate: Value(defaultInvoiceTemplate),
       allowPriceUpdates: Value(allowPriceUpdates),
       confirmPriceOnSelection: Value(confirmPriceOnSelection),
+      taxRate: Value(taxRate),
       failedAttempts: Value(failedAttempts),
       isLocked: Value(isLocked),
       lockedAt: lockedAt == null && nullToAbsent
@@ -1756,6 +1775,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       allowPriceUpdates: serializer.fromJson<bool>(json['allowPriceUpdates']),
       confirmPriceOnSelection:
           serializer.fromJson<bool>(json['confirmPriceOnSelection']),
+      taxRate: serializer.fromJson<double>(json['taxRate']),
       failedAttempts: serializer.fromJson<int>(json['failedAttempts']),
       isLocked: serializer.fromJson<bool>(json['isLocked']),
       lockedAt: serializer.fromJson<DateTime?>(json['lockedAt']),
@@ -1782,6 +1802,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'allowPriceUpdates': serializer.toJson<bool>(allowPriceUpdates),
       'confirmPriceOnSelection':
           serializer.toJson<bool>(confirmPriceOnSelection),
+      'taxRate': serializer.toJson<double>(taxRate),
       'failedAttempts': serializer.toJson<int>(failedAttempts),
       'isLocked': serializer.toJson<bool>(isLocked),
       'lockedAt': serializer.toJson<DateTime?>(lockedAt),
@@ -1804,6 +1825,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           String? defaultInvoiceTemplate,
           bool? allowPriceUpdates,
           bool? confirmPriceOnSelection,
+          double? taxRate,
           int? failedAttempts,
           bool? isLocked,
           Value<DateTime?> lockedAt = const Value.absent()}) =>
@@ -1827,6 +1849,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
         confirmPriceOnSelection:
             confirmPriceOnSelection ?? this.confirmPriceOnSelection,
+        taxRate: taxRate ?? this.taxRate,
         failedAttempts: failedAttempts ?? this.failedAttempts,
         isLocked: isLocked ?? this.isLocked,
         lockedAt: lockedAt.present ? lockedAt.value : this.lockedAt,
@@ -1861,6 +1884,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       confirmPriceOnSelection: data.confirmPriceOnSelection.present
           ? data.confirmPriceOnSelection.value
           : this.confirmPriceOnSelection,
+      taxRate: data.taxRate.present ? data.taxRate.value : this.taxRate,
       failedAttempts: data.failedAttempts.present
           ? data.failedAttempts.value
           : this.failedAttempts,
@@ -1887,6 +1911,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('defaultInvoiceTemplate: $defaultInvoiceTemplate, ')
           ..write('allowPriceUpdates: $allowPriceUpdates, ')
           ..write('confirmPriceOnSelection: $confirmPriceOnSelection, ')
+          ..write('taxRate: $taxRate, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -1911,6 +1936,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       defaultInvoiceTemplate,
       allowPriceUpdates,
       confirmPriceOnSelection,
+      taxRate,
       failedAttempts,
       isLocked,
       lockedAt);
@@ -1933,6 +1959,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.defaultInvoiceTemplate == this.defaultInvoiceTemplate &&
           other.allowPriceUpdates == this.allowPriceUpdates &&
           other.confirmPriceOnSelection == this.confirmPriceOnSelection &&
+          other.taxRate == this.taxRate &&
           other.failedAttempts == this.failedAttempts &&
           other.isLocked == this.isLocked &&
           other.lockedAt == this.lockedAt);
@@ -1954,6 +1981,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<String> defaultInvoiceTemplate;
   final Value<bool> allowPriceUpdates;
   final Value<bool> confirmPriceOnSelection;
+  final Value<double> taxRate;
   final Value<int> failedAttempts;
   final Value<bool> isLocked;
   final Value<DateTime?> lockedAt;
@@ -1973,6 +2001,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.defaultInvoiceTemplate = const Value.absent(),
     this.allowPriceUpdates = const Value.absent(),
     this.confirmPriceOnSelection = const Value.absent(),
+    this.taxRate = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -1993,6 +2022,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.defaultInvoiceTemplate = const Value.absent(),
     this.allowPriceUpdates = const Value.absent(),
     this.confirmPriceOnSelection = const Value.absent(),
+    this.taxRate = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -2015,6 +2045,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<String>? defaultInvoiceTemplate,
     Expression<bool>? allowPriceUpdates,
     Expression<bool>? confirmPriceOnSelection,
+    Expression<double>? taxRate,
     Expression<int>? failedAttempts,
     Expression<bool>? isLocked,
     Expression<DateTime>? lockedAt,
@@ -2038,6 +2069,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (allowPriceUpdates != null) 'allow_price_updates': allowPriceUpdates,
       if (confirmPriceOnSelection != null)
         'confirm_price_on_selection': confirmPriceOnSelection,
+      if (taxRate != null) 'tax_rate': taxRate,
       if (failedAttempts != null) 'failed_attempts': failedAttempts,
       if (isLocked != null) 'is_locked': isLocked,
       if (lockedAt != null) 'locked_at': lockedAt,
@@ -2060,6 +2092,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String>? defaultInvoiceTemplate,
       Value<bool>? allowPriceUpdates,
       Value<bool>? confirmPriceOnSelection,
+      Value<double>? taxRate,
       Value<int>? failedAttempts,
       Value<bool>? isLocked,
       Value<DateTime?>? lockedAt}) {
@@ -2081,6 +2114,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
       confirmPriceOnSelection:
           confirmPriceOnSelection ?? this.confirmPriceOnSelection,
+      taxRate: taxRate ?? this.taxRate,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
@@ -2137,6 +2171,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       map['confirm_price_on_selection'] =
           Variable<bool>(confirmPriceOnSelection.value);
     }
+    if (taxRate.present) {
+      map['tax_rate'] = Variable<double>(taxRate.value);
+    }
     if (failedAttempts.present) {
       map['failed_attempts'] = Variable<int>(failedAttempts.value);
     }
@@ -2167,9 +2204,439 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('defaultInvoiceTemplate: $defaultInvoiceTemplate, ')
           ..write('allowPriceUpdates: $allowPriceUpdates, ')
           ..write('confirmPriceOnSelection: $confirmPriceOnSelection, ')
+          ..write('taxRate: $taxRate, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $LicenseHistoryTable extends LicenseHistory
+    with TableInfo<$LicenseHistoryTable, LicenseHistoryData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LicenseHistoryTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _licenseIdMeta =
+      const VerificationMeta('licenseId');
+  @override
+  late final GeneratedColumn<String> licenseId = GeneratedColumn<String>(
+      'license_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _businessNameMeta =
+      const VerificationMeta('businessName');
+  @override
+  late final GeneratedColumn<String> businessName = GeneratedColumn<String>(
+      'business_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+      'code', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _planMeta = const VerificationMeta('plan');
+  @override
+  late final GeneratedColumn<String> plan = GeneratedColumn<String>(
+      'plan', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _expiryDateMeta =
+      const VerificationMeta('expiryDate');
+  @override
+  late final GeneratedColumn<DateTime> expiryDate = GeneratedColumn<DateTime>(
+      'expiry_date', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _isActivatedMeta =
+      const VerificationMeta('isActivated');
+  @override
+  late final GeneratedColumn<bool> isActivated = GeneratedColumn<bool>(
+      'is_activated', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_activated" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        licenseId,
+        businessName,
+        code,
+        plan,
+        expiryDate,
+        createdAt,
+        isActivated
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'license_history';
+  @override
+  VerificationContext validateIntegrity(Insertable<LicenseHistoryData> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('license_id')) {
+      context.handle(_licenseIdMeta,
+          licenseId.isAcceptableOrUnknown(data['license_id']!, _licenseIdMeta));
+    } else if (isInserting) {
+      context.missing(_licenseIdMeta);
+    }
+    if (data.containsKey('business_name')) {
+      context.handle(
+          _businessNameMeta,
+          businessName.isAcceptableOrUnknown(
+              data['business_name']!, _businessNameMeta));
+    } else if (isInserting) {
+      context.missing(_businessNameMeta);
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+          _codeMeta, code.isAcceptableOrUnknown(data['code']!, _codeMeta));
+    } else if (isInserting) {
+      context.missing(_codeMeta);
+    }
+    if (data.containsKey('plan')) {
+      context.handle(
+          _planMeta, plan.isAcceptableOrUnknown(data['plan']!, _planMeta));
+    } else if (isInserting) {
+      context.missing(_planMeta);
+    }
+    if (data.containsKey('expiry_date')) {
+      context.handle(
+          _expiryDateMeta,
+          expiryDate.isAcceptableOrUnknown(
+              data['expiry_date']!, _expiryDateMeta));
+    } else if (isInserting) {
+      context.missing(_expiryDateMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('is_activated')) {
+      context.handle(
+          _isActivatedMeta,
+          isActivated.isAcceptableOrUnknown(
+              data['is_activated']!, _isActivatedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  LicenseHistoryData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LicenseHistoryData(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      licenseId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}license_id'])!,
+      businessName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}business_name'])!,
+      code: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}code'])!,
+      plan: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}plan'])!,
+      expiryDate: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}expiry_date'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      isActivated: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_activated'])!,
+    );
+  }
+
+  @override
+  $LicenseHistoryTable createAlias(String alias) {
+    return $LicenseHistoryTable(attachedDatabase, alias);
+  }
+}
+
+class LicenseHistoryData extends DataClass
+    implements Insertable<LicenseHistoryData> {
+  final int id;
+  final String licenseId;
+  final String businessName;
+  final String code;
+  final String plan;
+  final DateTime expiryDate;
+  final DateTime createdAt;
+  final bool isActivated;
+  const LicenseHistoryData(
+      {required this.id,
+      required this.licenseId,
+      required this.businessName,
+      required this.code,
+      required this.plan,
+      required this.expiryDate,
+      required this.createdAt,
+      required this.isActivated});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['license_id'] = Variable<String>(licenseId);
+    map['business_name'] = Variable<String>(businessName);
+    map['code'] = Variable<String>(code);
+    map['plan'] = Variable<String>(plan);
+    map['expiry_date'] = Variable<DateTime>(expiryDate);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['is_activated'] = Variable<bool>(isActivated);
+    return map;
+  }
+
+  LicenseHistoryCompanion toCompanion(bool nullToAbsent) {
+    return LicenseHistoryCompanion(
+      id: Value(id),
+      licenseId: Value(licenseId),
+      businessName: Value(businessName),
+      code: Value(code),
+      plan: Value(plan),
+      expiryDate: Value(expiryDate),
+      createdAt: Value(createdAt),
+      isActivated: Value(isActivated),
+    );
+  }
+
+  factory LicenseHistoryData.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LicenseHistoryData(
+      id: serializer.fromJson<int>(json['id']),
+      licenseId: serializer.fromJson<String>(json['licenseId']),
+      businessName: serializer.fromJson<String>(json['businessName']),
+      code: serializer.fromJson<String>(json['code']),
+      plan: serializer.fromJson<String>(json['plan']),
+      expiryDate: serializer.fromJson<DateTime>(json['expiryDate']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      isActivated: serializer.fromJson<bool>(json['isActivated']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'licenseId': serializer.toJson<String>(licenseId),
+      'businessName': serializer.toJson<String>(businessName),
+      'code': serializer.toJson<String>(code),
+      'plan': serializer.toJson<String>(plan),
+      'expiryDate': serializer.toJson<DateTime>(expiryDate),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'isActivated': serializer.toJson<bool>(isActivated),
+    };
+  }
+
+  LicenseHistoryData copyWith(
+          {int? id,
+          String? licenseId,
+          String? businessName,
+          String? code,
+          String? plan,
+          DateTime? expiryDate,
+          DateTime? createdAt,
+          bool? isActivated}) =>
+      LicenseHistoryData(
+        id: id ?? this.id,
+        licenseId: licenseId ?? this.licenseId,
+        businessName: businessName ?? this.businessName,
+        code: code ?? this.code,
+        plan: plan ?? this.plan,
+        expiryDate: expiryDate ?? this.expiryDate,
+        createdAt: createdAt ?? this.createdAt,
+        isActivated: isActivated ?? this.isActivated,
+      );
+  LicenseHistoryData copyWithCompanion(LicenseHistoryCompanion data) {
+    return LicenseHistoryData(
+      id: data.id.present ? data.id.value : this.id,
+      licenseId: data.licenseId.present ? data.licenseId.value : this.licenseId,
+      businessName: data.businessName.present
+          ? data.businessName.value
+          : this.businessName,
+      code: data.code.present ? data.code.value : this.code,
+      plan: data.plan.present ? data.plan.value : this.plan,
+      expiryDate:
+          data.expiryDate.present ? data.expiryDate.value : this.expiryDate,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      isActivated:
+          data.isActivated.present ? data.isActivated.value : this.isActivated,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LicenseHistoryData(')
+          ..write('id: $id, ')
+          ..write('licenseId: $licenseId, ')
+          ..write('businessName: $businessName, ')
+          ..write('code: $code, ')
+          ..write('plan: $plan, ')
+          ..write('expiryDate: $expiryDate, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('isActivated: $isActivated')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, licenseId, businessName, code, plan,
+      expiryDate, createdAt, isActivated);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LicenseHistoryData &&
+          other.id == this.id &&
+          other.licenseId == this.licenseId &&
+          other.businessName == this.businessName &&
+          other.code == this.code &&
+          other.plan == this.plan &&
+          other.expiryDate == this.expiryDate &&
+          other.createdAt == this.createdAt &&
+          other.isActivated == this.isActivated);
+}
+
+class LicenseHistoryCompanion extends UpdateCompanion<LicenseHistoryData> {
+  final Value<int> id;
+  final Value<String> licenseId;
+  final Value<String> businessName;
+  final Value<String> code;
+  final Value<String> plan;
+  final Value<DateTime> expiryDate;
+  final Value<DateTime> createdAt;
+  final Value<bool> isActivated;
+  const LicenseHistoryCompanion({
+    this.id = const Value.absent(),
+    this.licenseId = const Value.absent(),
+    this.businessName = const Value.absent(),
+    this.code = const Value.absent(),
+    this.plan = const Value.absent(),
+    this.expiryDate = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.isActivated = const Value.absent(),
+  });
+  LicenseHistoryCompanion.insert({
+    this.id = const Value.absent(),
+    required String licenseId,
+    required String businessName,
+    required String code,
+    required String plan,
+    required DateTime expiryDate,
+    required DateTime createdAt,
+    this.isActivated = const Value.absent(),
+  })  : licenseId = Value(licenseId),
+        businessName = Value(businessName),
+        code = Value(code),
+        plan = Value(plan),
+        expiryDate = Value(expiryDate),
+        createdAt = Value(createdAt);
+  static Insertable<LicenseHistoryData> custom({
+    Expression<int>? id,
+    Expression<String>? licenseId,
+    Expression<String>? businessName,
+    Expression<String>? code,
+    Expression<String>? plan,
+    Expression<DateTime>? expiryDate,
+    Expression<DateTime>? createdAt,
+    Expression<bool>? isActivated,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (licenseId != null) 'license_id': licenseId,
+      if (businessName != null) 'business_name': businessName,
+      if (code != null) 'code': code,
+      if (plan != null) 'plan': plan,
+      if (expiryDate != null) 'expiry_date': expiryDate,
+      if (createdAt != null) 'created_at': createdAt,
+      if (isActivated != null) 'is_activated': isActivated,
+    });
+  }
+
+  LicenseHistoryCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? licenseId,
+      Value<String>? businessName,
+      Value<String>? code,
+      Value<String>? plan,
+      Value<DateTime>? expiryDate,
+      Value<DateTime>? createdAt,
+      Value<bool>? isActivated}) {
+    return LicenseHistoryCompanion(
+      id: id ?? this.id,
+      licenseId: licenseId ?? this.licenseId,
+      businessName: businessName ?? this.businessName,
+      code: code ?? this.code,
+      plan: plan ?? this.plan,
+      expiryDate: expiryDate ?? this.expiryDate,
+      createdAt: createdAt ?? this.createdAt,
+      isActivated: isActivated ?? this.isActivated,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (licenseId.present) {
+      map['license_id'] = Variable<String>(licenseId.value);
+    }
+    if (businessName.present) {
+      map['business_name'] = Variable<String>(businessName.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (plan.present) {
+      map['plan'] = Variable<String>(plan.value);
+    }
+    if (expiryDate.present) {
+      map['expiry_date'] = Variable<DateTime>(expiryDate.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (isActivated.present) {
+      map['is_activated'] = Variable<bool>(isActivated.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LicenseHistoryCompanion(')
+          ..write('id: $id, ')
+          ..write('licenseId: $licenseId, ')
+          ..write('businessName: $businessName, ')
+          ..write('code: $code, ')
+          ..write('plan: $plan, ')
+          ..write('expiryDate: $expiryDate, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('isActivated: $isActivated')
           ..write(')'))
         .toString();
   }
@@ -2183,12 +2650,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $InvoicesTable invoices = $InvoicesTable(this);
   late final $InvoiceItemsTable invoiceItems = $InvoiceItemsTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
+  late final $LicenseHistoryTable licenseHistory = $LicenseHistoryTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [categories, items, invoices, invoiceItems, settings];
+      [categories, items, invoices, invoiceItems, settings, licenseHistory];
 }
 
 typedef $$CategoriesTableCreateCompanionBuilder = CategoriesCompanion Function({
@@ -3410,6 +3878,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<String> defaultInvoiceTemplate,
   Value<bool> allowPriceUpdates,
   Value<bool> confirmPriceOnSelection,
+  Value<double> taxRate,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -3430,6 +3899,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String> defaultInvoiceTemplate,
   Value<bool> allowPriceUpdates,
   Value<bool> confirmPriceOnSelection,
+  Value<double> taxRate,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -3494,6 +3964,9 @@ class $$SettingsTableFilterComposer
   ColumnFilters<bool> get confirmPriceOnSelection => $composableBuilder(
       column: $table.confirmPriceOnSelection,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get taxRate => $composableBuilder(
+      column: $table.taxRate, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
@@ -3566,6 +4039,9 @@ class $$SettingsTableOrderingComposer
       column: $table.confirmPriceOnSelection,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get taxRate => $composableBuilder(
+      column: $table.taxRate, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
       builder: (column) => ColumnOrderings(column));
@@ -3631,6 +4107,9 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<bool> get confirmPriceOnSelection => $composableBuilder(
       column: $table.confirmPriceOnSelection, builder: (column) => column);
 
+  GeneratedColumn<double> get taxRate =>
+      $composableBuilder(column: $table.taxRate, builder: (column) => column);
+
   GeneratedColumn<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts, builder: (column) => column);
 
@@ -3682,6 +4161,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String> defaultInvoiceTemplate = const Value.absent(),
             Value<bool> allowPriceUpdates = const Value.absent(),
             Value<bool> confirmPriceOnSelection = const Value.absent(),
+            Value<double> taxRate = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -3702,6 +4182,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             defaultInvoiceTemplate: defaultInvoiceTemplate,
             allowPriceUpdates: allowPriceUpdates,
             confirmPriceOnSelection: confirmPriceOnSelection,
+            taxRate: taxRate,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
@@ -3722,6 +4203,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String> defaultInvoiceTemplate = const Value.absent(),
             Value<bool> allowPriceUpdates = const Value.absent(),
             Value<bool> confirmPriceOnSelection = const Value.absent(),
+            Value<double> taxRate = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -3742,6 +4224,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             defaultInvoiceTemplate: defaultInvoiceTemplate,
             allowPriceUpdates: allowPriceUpdates,
             confirmPriceOnSelection: confirmPriceOnSelection,
+            taxRate: taxRate,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
@@ -3768,6 +4251,220 @@ typedef $$SettingsTableProcessedTableManager = ProcessedTableManager<
     ),
     SettingsTable,
     PrefetchHooks Function()>;
+typedef $$LicenseHistoryTableCreateCompanionBuilder = LicenseHistoryCompanion
+    Function({
+  Value<int> id,
+  required String licenseId,
+  required String businessName,
+  required String code,
+  required String plan,
+  required DateTime expiryDate,
+  required DateTime createdAt,
+  Value<bool> isActivated,
+});
+typedef $$LicenseHistoryTableUpdateCompanionBuilder = LicenseHistoryCompanion
+    Function({
+  Value<int> id,
+  Value<String> licenseId,
+  Value<String> businessName,
+  Value<String> code,
+  Value<String> plan,
+  Value<DateTime> expiryDate,
+  Value<DateTime> createdAt,
+  Value<bool> isActivated,
+});
+
+class $$LicenseHistoryTableFilterComposer
+    extends Composer<_$AppDatabase, $LicenseHistoryTable> {
+  $$LicenseHistoryTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get licenseId => $composableBuilder(
+      column: $table.licenseId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get businessName => $composableBuilder(
+      column: $table.businessName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get code => $composableBuilder(
+      column: $table.code, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get plan => $composableBuilder(
+      column: $table.plan, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get expiryDate => $composableBuilder(
+      column: $table.expiryDate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isActivated => $composableBuilder(
+      column: $table.isActivated, builder: (column) => ColumnFilters(column));
+}
+
+class $$LicenseHistoryTableOrderingComposer
+    extends Composer<_$AppDatabase, $LicenseHistoryTable> {
+  $$LicenseHistoryTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get licenseId => $composableBuilder(
+      column: $table.licenseId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get businessName => $composableBuilder(
+      column: $table.businessName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get code => $composableBuilder(
+      column: $table.code, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get plan => $composableBuilder(
+      column: $table.plan, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get expiryDate => $composableBuilder(
+      column: $table.expiryDate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isActivated => $composableBuilder(
+      column: $table.isActivated, builder: (column) => ColumnOrderings(column));
+}
+
+class $$LicenseHistoryTableAnnotationComposer
+    extends Composer<_$AppDatabase, $LicenseHistoryTable> {
+  $$LicenseHistoryTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get licenseId =>
+      $composableBuilder(column: $table.licenseId, builder: (column) => column);
+
+  GeneratedColumn<String> get businessName => $composableBuilder(
+      column: $table.businessName, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get plan =>
+      $composableBuilder(column: $table.plan, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get expiryDate => $composableBuilder(
+      column: $table.expiryDate, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActivated => $composableBuilder(
+      column: $table.isActivated, builder: (column) => column);
+}
+
+class $$LicenseHistoryTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $LicenseHistoryTable,
+    LicenseHistoryData,
+    $$LicenseHistoryTableFilterComposer,
+    $$LicenseHistoryTableOrderingComposer,
+    $$LicenseHistoryTableAnnotationComposer,
+    $$LicenseHistoryTableCreateCompanionBuilder,
+    $$LicenseHistoryTableUpdateCompanionBuilder,
+    (
+      LicenseHistoryData,
+      BaseReferences<_$AppDatabase, $LicenseHistoryTable, LicenseHistoryData>
+    ),
+    LicenseHistoryData,
+    PrefetchHooks Function()> {
+  $$LicenseHistoryTableTableManager(
+      _$AppDatabase db, $LicenseHistoryTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LicenseHistoryTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LicenseHistoryTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LicenseHistoryTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> licenseId = const Value.absent(),
+            Value<String> businessName = const Value.absent(),
+            Value<String> code = const Value.absent(),
+            Value<String> plan = const Value.absent(),
+            Value<DateTime> expiryDate = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<bool> isActivated = const Value.absent(),
+          }) =>
+              LicenseHistoryCompanion(
+            id: id,
+            licenseId: licenseId,
+            businessName: businessName,
+            code: code,
+            plan: plan,
+            expiryDate: expiryDate,
+            createdAt: createdAt,
+            isActivated: isActivated,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String licenseId,
+            required String businessName,
+            required String code,
+            required String plan,
+            required DateTime expiryDate,
+            required DateTime createdAt,
+            Value<bool> isActivated = const Value.absent(),
+          }) =>
+              LicenseHistoryCompanion.insert(
+            id: id,
+            licenseId: licenseId,
+            businessName: businessName,
+            code: code,
+            plan: plan,
+            expiryDate: expiryDate,
+            createdAt: createdAt,
+            isActivated: isActivated,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$LicenseHistoryTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $LicenseHistoryTable,
+    LicenseHistoryData,
+    $$LicenseHistoryTableFilterComposer,
+    $$LicenseHistoryTableOrderingComposer,
+    $$LicenseHistoryTableAnnotationComposer,
+    $$LicenseHistoryTableCreateCompanionBuilder,
+    $$LicenseHistoryTableUpdateCompanionBuilder,
+    (
+      LicenseHistoryData,
+      BaseReferences<_$AppDatabase, $LicenseHistoryTable, LicenseHistoryData>
+    ),
+    LicenseHistoryData,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3782,4 +4479,6 @@ class $AppDatabaseManager {
       $$InvoiceItemsTableTableManager(_db, _db.invoiceItems);
   $$SettingsTableTableManager get settings =>
       $$SettingsTableTableManager(_db, _db.settings);
+  $$LicenseHistoryTableTableManager get licenseHistory =>
+      $$LicenseHistoryTableTableManager(_db, _db.licenseHistory);
 }

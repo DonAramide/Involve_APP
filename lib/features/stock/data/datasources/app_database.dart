@@ -4,15 +4,16 @@ import '../../../invoicing/data/models/invoice_table.dart';
 import '../../../settings/data/models/settings_table.dart';
 import '../models/item_table.dart';
 import '../models/category_table.dart';
+import '../../../../core/license/license_history_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Items, Invoices, InvoiceItems, Settings, Categories])
+@DriftDatabase(tables: [Items, Invoices, InvoiceItems, Settings, Categories, LicenseHistory])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration {
@@ -48,6 +49,35 @@ class AppDatabase extends _$AppDatabase {
         if (from < 7) {
           // Price confirmation toggle migration
           await m.addColumn(settings, settings.confirmPriceOnSelection as GeneratedColumn<Object>);
+        }
+        if (from < 8) {
+          // License history migration
+          await m.createTable(licenseHistory);
+        }
+        if (from < 9) {
+          // Remove unique constraint from licenseId (sqlite doesn't support DROP CONSTRAINT)
+          // Easiest dev-friendly way is to drop and recreate for this table specifically
+          await m.deleteTable('license_history');
+          await m.createTable(licenseHistory);
+        }
+        if (from < 10) {
+          // Configurable tax rate migration
+          await m.addColumn(settings, settings.taxRate);
+        }
+        if (from < 11) {
+          // Account details migration
+          await m.addColumn(settings, settings.bankName);
+          await m.addColumn(settings, settings.accountNumber);
+          await m.addColumn(settings, settings.accountName);
+          await m.addColumn(settings, settings.showAccountDetails);
+        }
+        if (from < 12) {
+          // Receipt footer migration
+          await m.addColumn(settings, settings.receiptFooter);
+        }
+        if (from < 13) {
+          // Signature space migration
+          await m.addColumn(settings, settings.showSignatureSpace);
         }
       },
       beforeOpen: (details) async {

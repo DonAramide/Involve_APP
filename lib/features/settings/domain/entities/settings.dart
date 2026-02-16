@@ -17,11 +17,21 @@ class AppSettings extends Equatable {
   final String defaultInvoiceTemplate;
   final bool allowPriceUpdates;
   final bool confirmPriceOnSelection;
+  final double taxRate;
   
   // Security lockout fields
   final int failedAttempts;
   final bool isLocked;
   final DateTime? lockedAt;
+  final bool showSignatureSpace;
+  
+  // Account Details
+  final String? bankName;
+  final String? accountNumber;
+  final String? accountName;
+  final bool showAccountDetails;
+  final String receiptFooter;
+
 
   const AppSettings({
     this.id,
@@ -39,9 +49,16 @@ class AppSettings extends Equatable {
     this.defaultInvoiceTemplate = 'compact',
     this.allowPriceUpdates = true,
     this.confirmPriceOnSelection = false,
+    this.taxRate = 0.15,
+    this.bankName,
+    this.accountNumber,
+    this.accountName,
+    this.showAccountDetails = false,
     this.failedAttempts = 0,
     this.isLocked = false,
     this.lockedAt,
+    this.receiptFooter = 'Thank you!',
+    this.showSignatureSpace = false,
   });
 
   AppSettings copyWith({
@@ -60,9 +77,16 @@ class AppSettings extends Equatable {
     String? defaultInvoiceTemplate,
     bool? allowPriceUpdates,
     bool? confirmPriceOnSelection,
+    double? taxRate,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    bool? showAccountDetails,
     int? failedAttempts,
     bool? isLocked,
     DateTime? lockedAt,
+    String? receiptFooter,
+    bool? showSignatureSpace,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -80,9 +104,16 @@ class AppSettings extends Equatable {
       defaultInvoiceTemplate: defaultInvoiceTemplate ?? this.defaultInvoiceTemplate,
       allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
       confirmPriceOnSelection: confirmPriceOnSelection ?? this.confirmPriceOnSelection,
+      taxRate: taxRate ?? this.taxRate,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      accountName: accountName ?? this.accountName,
+      showAccountDetails: showAccountDetails ?? this.showAccountDetails,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
+      receiptFooter: receiptFooter ?? this.receiptFooter,
+      showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
     );
   }
 
@@ -103,8 +134,15 @@ class AppSettings extends Equatable {
         defaultInvoiceTemplate,
         allowPriceUpdates,
         confirmPriceOnSelection,
+        taxRate,
+        bankName,
+        accountNumber,
+        accountName,
+        showAccountDetails,
         failedAttempts,
         isLocked,
         lockedAt,
+        receiptFooter,
+        showSignatureSpace,
       ];
 }

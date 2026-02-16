@@ -17,6 +17,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<UpdateDiscount>(_onUpdateDiscount);
     on<SaveInvoice>(_onSaveInvoice);
     on<ResetInvoice>(_onReset);
+    on<UpdateInvoiceSettings>(_onUpdateSettings);
   }
 
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
@@ -70,12 +71,20 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   }
 
   void _onReset(ResetInvoice event, Emitter<InvoiceState> emit) {
-    emit(const InvoiceState());
+    emit(InvoiceState(taxRate: state.taxRate, taxEnabled: state.taxEnabled));
+  }
+
+  void _onUpdateSettings(UpdateInvoiceSettings event, Emitter<InvoiceState> emit) {
+    emit(state.copyWith(
+      taxRate: event.taxRate,
+      taxEnabled: event.taxEnabled,
+    ));
+    _emitUpdatedState(state.items, state.discount, emit);
   }
 
   void _emitUpdatedState(List<InvoiceItem> items, double discount, Emitter<InvoiceState> emit) {
     final subtotal = calculationService.calculateSubtotal(items);
-    final tax = calculationService.calculateTax(subtotal);
+    final tax = calculationService.calculateTax(subtotal, state.taxRate, state.taxEnabled);
     final total = calculationService.calculateTotal(subtotal, tax, discount);
 
     emit(state.copyWith(

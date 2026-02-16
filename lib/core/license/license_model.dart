@@ -6,7 +6,7 @@ class LicenseModel {
   final String businessName;
   final DateTime expiryDate;
   final PlanType planType;
-  final String licenseId;
+  final int licenseId; // Changed from String UUID to 16-bit int
 
   LicenseModel({
     required this.businessName,
@@ -32,7 +32,7 @@ class LicenseModel {
         (e) => e.name == json['planType'],
         orElse: () => PlanType.basic,
       ),
-      licenseId: json['licenseId'] as String,
+      licenseId: json['licenseId'] as int,
     );
   }
 

@@ -26,6 +26,8 @@ import 'features/settings/presentation/bloc/settings_state.dart';
 import 'features/dashboard/presentation/pages/dashboard_page.dart';
 import 'core/services/backup_service.dart';
 
+import 'package:involve_app/core/license/license_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -34,6 +36,9 @@ void main() async {
   
   // Initialize database
   final database = AppDatabase();
+  
+  // Initialize License Service
+  LicenseService.init(database);
   
   // Initialize repositories
   final itemRepository = ItemRepositoryImpl(database);
@@ -192,7 +197,7 @@ class MyApp extends StatelessWidget {
         builder: (context, state) {
           final themeMode = state.settings?.themeMode ?? 'system';
           return MaterialApp(
-            title: 'Bar & Hotel POS',
+            title: 'MyInvoice',
             debugShowCheckedModeBanner: false,
             themeMode: themeMode == 'light' 
                 ? ThemeMode.light 
@@ -210,7 +215,7 @@ class MyApp extends StatelessWidget {
               ),
               useMaterial3: true,
             ),
-            home: const DashboardPage(),
+            home: const LandingPage(),
           );
         },
       ),

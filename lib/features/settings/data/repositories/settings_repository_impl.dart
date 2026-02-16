@@ -47,9 +47,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
             defaultInvoiceTemplate: Value(settings.defaultInvoiceTemplate),
             allowPriceUpdates: Value(settings.allowPriceUpdates),
             confirmPriceOnSelection: Value(settings.confirmPriceOnSelection),
+            taxRate: Value(settings.taxRate),
+            bankName: Value(settings.bankName),
+            accountNumber: Value(settings.accountNumber),
+            accountName: Value(settings.accountName),
+            showAccountDetails: Value(settings.showAccountDetails),
             failedAttempts: Value(settings.failedAttempts),
             isLocked: Value(settings.isLocked),
             lockedAt: Value(settings.lockedAt),
+            receiptFooter: Value(settings.receiptFooter),
+            showSignatureSpace: Value(settings.showSignatureSpace),
           ),
         );
   }
@@ -71,9 +78,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
       defaultInvoiceTemplate: row.defaultInvoiceTemplate,
       allowPriceUpdates: row.allowPriceUpdates,
       confirmPriceOnSelection: row.confirmPriceOnSelection,
+      taxRate: row.taxRate,
+      bankName: row.bankName,
+      accountNumber: row.accountNumber,
+      accountName: row.accountName,
+      showAccountDetails: row.showAccountDetails,
       failedAttempts: row.failedAttempts,
       isLocked: row.isLocked,
       lockedAt: row.lockedAt,
+      receiptFooter: row.receiptFooter,
+      showSignatureSpace: row.showSignatureSpace,
     );
   }
 }

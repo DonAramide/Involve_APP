@@ -1,6 +1,7 @@
 import 'invoice_template.dart';
 import '../entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class CompactInvoiceTemplate extends InvoiceTemplate {
   @override
@@ -32,7 +33,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       ...invoice.items.map((item) {
         final name = item.item.name;
         final qtyLine = 'x${item.quantity}';
-        final priceLine = '${item.total.toStringAsFixed(2)}';
+        final priceLine = CurrencyFormatter.format(item.total);
         
         // Format: Name xQty ........ Price
         // Truncate name if too long
@@ -47,12 +48,24 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       }),
       DividerCommand(),
       if (invoice.taxAmount > 0) 
-        TextCommand(_formatRow('Subtotal', invoice.subtotal.toStringAsFixed(2), width)),
+        TextCommand(_formatRow('Subtotal', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0) 
-        TextCommand(_formatRow('Tax', invoice.taxAmount.toStringAsFixed(2), width)),
-      TextCommand(_formatRow('TOTAL', '${settings.currency} ${invoice.totalAmount.toStringAsFixed(2)}', width), isBold: true),
+        TextCommand(_formatRow('Tax', CurrencyFormatter.format(invoice.taxAmount), width)),
+      TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', width), isBold: true),
+      if (settings.showAccountDetails && settings.bankName != null) ...[
+        DividerCommand(),
+        TextCommand('PAYMENT DETAILS', align: 'center', isBold: true),
+        TextCommand('Bank: ${settings.bankName}', align: 'center'),
+        if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
+        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+      ],
+      if (settings.showSignatureSpace) ...[
+        DividerCommand(),
+        const SizedBoxCommand(height: 10),
+        TextCommand('Signature: .................', align: 'center'),
+      ],
       DividerCommand(),
-      TextCommand('Thank you!', align: 'center'),
+      TextCommand(settings.receiptFooter, align: 'center'),
       TextCommand('Powered by IIPS', align: 'center'),
     ];
   }
@@ -95,15 +108,28 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       ...invoice.items.map((item) {
         // Detailed shows Name on one line, then Qty/Price on another
         // OR we can try to fit them if short
-        return TextCommand(_formatRow('${item.item.name} x${item.quantity}', item.total.toStringAsFixed(2), width));
+        return TextCommand(_formatRow('${item.item.name} x${item.quantity}', CurrencyFormatter.format(item.total), width));
       }),
       DividerCommand(),
-      TextCommand(_formatRow('Subtotal', invoice.subtotal.toStringAsFixed(2), width)),
-      TextCommand(_formatRow('Tax', invoice.taxAmount.toStringAsFixed(2), width)),
+      TextCommand(_formatRow('Subtotal', CurrencyFormatter.format(invoice.subtotal), width)),
+      TextCommand(_formatRow('Tax', CurrencyFormatter.format(invoice.taxAmount), width)),
       if (invoice.discountAmount > 0) 
-        TextCommand(_formatRow('Discount', '-${invoice.discountAmount.toStringAsFixed(2)}', width)),
-      TextCommand(_formatRow('GRAND TOTAL', '${settings.currency} ${invoice.totalAmount.toStringAsFixed(2)}', width), isBold: true),
+        TextCommand(_formatRow('Discount', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
+      TextCommand(_formatRow('GRAND TOTAL', '${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', width), isBold: true),
+      if (settings.showAccountDetails && settings.bankName != null) ...[
+        DividerCommand(),
+        TextCommand('ACCOUNT DETAILS', align: 'center', isBold: true),
+        TextCommand('Bank: ${settings.bankName}'),
+        if (settings.accountNumber != null) TextCommand('Account: ${settings.accountNumber}'),
+        if (settings.accountName != null) TextCommand('Account Name: ${settings.accountName}'),
+      ],
+      if (settings.showSignatureSpace) ...[
+        DividerCommand(),
+        const SizedBoxCommand(height: 10),
+        TextCommand('Signature: .................'),
+      ],
       DividerCommand(),
+      TextCommand(settings.receiptFooter, align: 'center'),
       TextCommand('Powered by IIPS', align: 'center'),
     ];
   }
@@ -111,5 +137,46 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
   String _formatRow(String left, String right, int width) {
     final spacesCount = (width - left.length - right.length).clamp(1, width);
     return left + (' ' * spacesCount) + right;
+  }
+}
+
+class MinimalistInvoiceTemplate extends InvoiceTemplate {
+  @override
+  String get name => 'Minimalist';
+  @override
+  TemplateType get type => TemplateType.compact;
+  @override
+  LogoPlacement get logoPlacement => LogoPlacement.none;
+  @override
+  bool get useBoldHeaders => false;
+  @override
+  double get columnSpacing => 1.0;
+
+  @override
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final settings = orgSettings as AppSettings;
+    const int width = 32;
+
+    return [
+      TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
+      TextCommand('Date: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'center'),
+      const DividerCommand(),
+      ...invoice.items.map((item) => 
+        TextCommand('${item.item.name} x${item.quantity}  ${CurrencyFormatter.format(item.total)}')),
+      const DividerCommand(),
+      TextCommand('TOTAL: ${settings.currency}${CurrencyFormatter.format(invoice.totalAmount)}', align: 'right', isBold: true),
+      if (settings.showAccountDetails && settings.bankName != null) ...[
+        const DividerCommand(),
+        TextCommand('PAYMENT: ${settings.bankName}', align: 'center'),
+        if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
+      ],
+      if (settings.showSignatureSpace) ...[
+        const DividerCommand(),
+        const SizedBoxCommand(height: 5),
+        TextCommand('Sign: .................', align: 'center'),
+      ],
+      const DividerCommand(),
+      TextCommand(settings.receiptFooter, align: 'center'),
+    ];
   }
 }

@@ -17,6 +17,15 @@ class Settings extends Table {
   TextColumn get defaultInvoiceTemplate => text().withDefault(const Constant('compact'))();
   BoolColumn get allowPriceUpdates => boolean().withDefault(const Constant(true))();
   BoolColumn get confirmPriceOnSelection => boolean().withDefault(const Constant(false))();
+  RealColumn get taxRate => real().withDefault(const Constant(0.15))();
+  
+  // Account Details
+  TextColumn get bankName => text().nullable()();
+  TextColumn get accountNumber => text().nullable()();
+  TextColumn get accountName => text().nullable()();
+  BoolColumn get showAccountDetails => boolean().withDefault(const Constant(false))();
+  TextColumn get receiptFooter => text().withDefault(const Constant('Thank you!'))();
+  BoolColumn get showSignatureSpace => boolean().withDefault(const Constant(false))();
   
   // Security lockout columns
   IntColumn get failedAttempts => integer().withDefault(const Constant(0))();

@@ -9,6 +9,7 @@ import '../../../domain/templates/template_registry.dart';
 import '../../../domain/templates/invoice_template.dart';
 import '../../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../pages/receipt_preview_page.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
@@ -154,12 +155,12 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ExpansionTile(
         title: Text('${invoice.invoiceNumber}'),
-        subtitle: Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • Total: ${context.read<SettingsBloc>().state.settings?.currency ?? '₦'}${invoice.totalAmount.toStringAsFixed(2)}'),
+        subtitle: Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
         children: [
           ...invoice.items.map((item) => ListTile(
                 dense: true,
                 title: Text(item.item.name),
-                trailing: Text('${item.quantity} x ${context.read<SettingsBloc>().state.settings?.currency ?? '₦'}${item.unitPrice}'),
+                trailing: Text('${item.quantity} x ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
               )),
           const Divider(),
           Padding(
@@ -272,7 +273,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            '$currency${state.totalSales.toStringAsFixed(2)}',
+            CurrencyFormatter.formatWithSymbol(
+              state.totalSales,
+              symbol: currency,
+            ),
             style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,

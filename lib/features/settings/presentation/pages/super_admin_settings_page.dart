@@ -8,6 +8,11 @@ import '../../../../core/license/license_model.dart';
 import 'package:uuid/uuid.dart';
 import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
+import '../../../../core/license/license_service.dart';
+import '../../../../core/license/license_generator.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:intl/intl.dart';
+import 'dart:math';
 
 class SuperAdminSettingsPage extends StatefulWidget {
   const SuperAdminSettingsPage({super.key});
@@ -30,6 +35,12 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   String _selectedDuration = '1 month';
   PlanType _selectedPlan = PlanType.basic;
   String _generatedCode = '';
+  
+  // History & Validation State
+  List<LicenseHistoryData> _licenseHistory = [];
+  final _validatorController = TextEditingController();
+  LicenseModel? _validatedLicense;
+  String? _validationError;
 
   final List<String> _durations = [
     '1 month', '2 months', '3 months', '6 months', '9 months', '1 year', '2 years', '3 years', 'lifetime'
@@ -60,6 +71,13 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     _phoneController.addListener(() => setState(() => _hasChanges = true));
     _descriptionController.addListener(() => setState(() => _hasChanges = true));
     _taxIdController.addListener(() => setState(() => _hasChanges = true));
+
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final history = await LicenseService.getGeneratedLicenses();
+    setState(() => _licenseHistory = history);
   }
 
   @override
@@ -254,10 +272,22 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                   ),
                   const SizedBox(height: 48),
 
-                  // License Generator Section
+                   // License Generator Section
                   _buildSectionHeader('License Management'),
                   const SizedBox(height: 16),
                   _buildLicenseGenerator(),
+                  const SizedBox(height: 32),
+
+                  // License Validator Section
+                  _buildSectionHeader('License Validator'),
+                  const SizedBox(height: 16),
+                  _buildLicenseValidator(),
+                  const SizedBox(height: 32),
+
+                  // License History Section
+                  _buildSectionHeader('Generation History'),
+                  const SizedBox(height: 16),
+                  _buildLicenseHistory(),
                 ],
               ),
             ),
@@ -506,7 +536,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     );
   }
 
-  void _generateLicense() {
+  Future<void> _generateLicense() async {
     if (_licenseBusinessNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter licensed business name')),
@@ -534,15 +564,16 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       businessName: _licenseBusinessNameController.text.trim(),
       expiryDate: expiryDate,
       planType: _selectedPlan,
-      licenseId: _uuid.v4(),
+      licenseId: Random().nextInt(65535), // 16-bit random ID
     );
 
-    final base64Json = license.toBase64Json();
-    final signature = HMACService.generateSignature(base64Json);
-
     setState(() {
-      _generatedCode = '$base64Json.$signature';
+      _generatedCode = LicenseGenerator.generate(license);
     });
+
+    // Save to database
+    await LicenseService.saveLicenseRecord(license, _generatedCode);
+    await _loadHistory();
   }
 
   void _copyToClipboard() {
@@ -571,5 +602,140 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildLicenseValidator() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Decode & Validate Code',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _validatorController,
+                    decoration: InputDecoration(
+                      hintText: 'Paste activation code here...',
+                      border: const OutlineInputBorder(),
+                      errorText: _validationError,
+                    ),
+                    maxLines: 2,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: _validateCode,
+                  icon: const Icon(Icons.search),
+                  style: IconButton.styleFrom(backgroundColor: Colors.deepPurple),
+                ),
+              ],
+            ),
+            if (_validatedLicense != null) ...[
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 16),
+              _buildValidationInfo('Business Name', _validatedLicense!.businessName, Icons.business),
+              _buildValidationInfo('Plan Type', _validatedLicense!.planType.name.toUpperCase(), Icons.card_membership),
+              _buildValidationInfo('Expiry Date', DateFormat('MMM dd, yyyy').format(_validatedLicense!.expiryDate), Icons.event),
+              _buildValidationInfo('License ID', _validatedLicense!.licenseId.toString(), Icons.fingerprint),
+              const SizedBox(height: 8),
+              if (_validatedLicense!.expiryDate.isBefore(DateTime.now()))
+                const Text('STATUS: EXPIRED', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
+              else
+                const Text('STATUS: VALID', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildValidationInfo(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLicenseHistory() {
+    if (_licenseHistory.isEmpty) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Center(child: Text('No codes generated yet', style: TextStyle(color: Colors.grey))),
+        ),
+      );
+    }
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _licenseHistory.length,
+        separatorBuilder: (context, index) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final item = _licenseHistory[index];
+          return ListTile(
+            title: Text(item.businessName, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Plan: ${item.plan.toUpperCase()} • Expires: ${DateFormat('MMM dd, yyyy').format(item.expiryDate)}'),
+                Text('Generated: ${DateFormat('MMM dd, HH:mm').format(item.createdAt)}', style: const TextStyle(fontSize: 11)),
+              ],
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.copy, size: 18),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: item.code));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Code copied to clipboard')),
+                );
+              },
+            ),
+            isThreeLine: true,
+          );
+        },
+      ),
+    );
+  }
+
+  void _validateCode() {
+    final code = _validatorController.text.trim();
+    if (code.isEmpty) return;
+
+    final peeked = LicenseService.peekCode(code);
+    setState(() {
+      if (peeked != null) {
+        _validatedLicense = LicenseModel(
+          businessName: '[ENCODED HASH]', // We don't know the plain name from peek
+          expiryDate: peeked['expiryDate'],
+          planType: peeked['planType'],
+          licenseId: peeked['licenseId'],
+        );
+        _validationError = null;
+      } else {
+        _validatedLicense = null;
+        _validationError = 'Invalid or corrupted activation code';
+      }
+    });
   }
 }

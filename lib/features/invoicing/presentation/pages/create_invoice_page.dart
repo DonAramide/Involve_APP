@@ -9,6 +9,7 @@ import 'package:involve_app/features/invoicing/presentation/widgets/invoice_prev
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class CreateInvoicePage extends StatelessWidget {
   const CreateInvoicePage({super.key});
@@ -29,19 +30,30 @@ class CreateInvoicePage extends StatelessWidget {
         ),
         foregroundColor: Colors.white,
       ),
-      body: Row(
-        children: [
-          // Left Side: Item Selection
-          Expanded(
-            flex: 3,
-            child: _ItemSelector(),
-          ),
-          // Right Side: Cart Summary
-          Expanded(
-            flex: 2,
-            child: _CartSummary(),
-          ),
-        ],
+      body: BlocListener<SettingsBloc, SettingsState>(
+        listener: (context, settingsState) {
+          final settings = settingsState.settings;
+          if (settings != null) {
+            context.read<InvoiceBloc>().add(UpdateInvoiceSettings(
+              taxRate: settings.taxRate,
+              taxEnabled: settings.taxEnabled,
+            ));
+          }
+        },
+        child: Row(
+          children: [
+            // Left Side: Item Selection
+            Expanded(
+              flex: 3,
+              child: _ItemSelector(),
+            ),
+            // Right Side: Cart Summary
+            Expanded(
+              flex: 2,
+              child: _CartSummary(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -345,7 +357,10 @@ class _POSItemCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            '$currency${item.price.toStringAsFixed(2)}',
+                            CurrencyFormatter.formatWithSymbol(
+                              item.price,
+                              symbol: currency,
+                            ),
                             style: TextStyle(
                               color: Colors.blue[700],
                               fontWeight: FontWeight.w600,
@@ -479,9 +494,12 @@ class _CartSummary extends StatelessWidget {
                       child: ListTile(
                         dense: true,
                         title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${item.quantity} x ${settings?.currency ?? '₦'}${item.unitPrice}'),
+                        subtitle: Text('${item.quantity} x ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: settings?.currency ?? '₦')}'),
                         trailing: Text(
-                          '${settings?.currency ?? '₦'}${item.total.toStringAsFixed(2)}',
+                          CurrencyFormatter.formatWithSymbol(
+                            item.total,
+                            symbol: settings?.currency ?? '₦',
+                          ),
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -501,7 +519,7 @@ class _CartSummary extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildSummaryRow('Subtotal', state.subtotal, settings?.currency ?? '₦'),
-                    _buildSummaryRow('Tax (15%)', state.tax, settings?.currency ?? '₦'),
+                    _buildSummaryRow('Tax (${(state.taxRate * 100).toStringAsFixed(0)}%)', state.tax, settings?.currency ?? '₦'),
                     if (state.discount > 0)
                       _buildSummaryRow('Discount', -state.discount, settings?.currency ?? '₦'),
                     const Padding(
@@ -553,7 +571,10 @@ class _CartSummary extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '$currency${amount.toStringAsFixed(2)}',
+            CurrencyFormatter.formatWithSymbol(
+              amount,
+              symbol: currency,
+            ),
             style: TextStyle(
               fontSize: isTotal ? 20 : 15,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,

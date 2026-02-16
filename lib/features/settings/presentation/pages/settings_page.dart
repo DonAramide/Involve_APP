@@ -8,6 +8,10 @@ import '../bloc/settings_state.dart';
 import '../widgets/password_dialog.dart';
 import '../widgets/super_admin_dialog.dart';
 import '../widgets/super_admin_password_dialog.dart';
+import '../../../../core/license/license_service.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:intl/intl.dart';
+import '../../domain/entities/settings.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -38,19 +42,39 @@ class SettingsPage extends StatelessWidget {
               children: [
                 _buildActivationBanner(context, state),
                 const SizedBox(height: 10),
+                _buildActivationHistoryTile(context),
+                const SizedBox(height: 10),
                 _buildSectionHeader('Branding'),
-                _buildLogoTile(context, settings.logo, (bytes) => _update(context, settings.copyWith(logo: bytes))),
+                _buildReadOnlyLogoTile(context, settings),
                 const SizedBox(height: 10),
                 _buildSectionHeader('Organization Detail'),
                 state.isBusinessLocked 
                   ? _buildReadOnlyTile('Name', settings.organizationName, Icons.business)
                   : _buildTextTile(context, 'Name', settings.organizationName, (val) => _update(context, settings.copyWith(organizationName: val))),
-                _buildReadOnlyTile('Address', settings.address, Icons.location_on),
-                _buildReadOnlyTile('Phone', settings.phone, Icons.phone),
-                _buildReadOnlyTile('Tax ID (VAT/GST)', (settings.taxId != null && settings.taxId!.isNotEmpty) ? settings.taxId! : 'Not Set', Icons.receipt_long),
+                _buildTextTile(context, 'Address', settings.address, (val) => _update(context, settings.copyWith(address: val))),
+                _buildTextTile(context, 'Phone', settings.phone, (val) => _update(context, settings.copyWith(phone: val))),
+                _buildTextTile(context, 'Description', settings.businessDescription ?? '', (val) => _update(context, settings.copyWith(businessDescription: val))),
+                _buildTextTile(context, 'Tax ID (VAT/GST)', settings.taxId ?? '', (val) => _update(context, settings.copyWith(taxId: val))),
                 const Divider(),
                 _buildSectionHeader('Preferences'),
-                _buildSwitchTile('Enable Tax (15%)', settings.taxEnabled, (val) => _update(context, settings.copyWith(taxEnabled: val))),
+                _buildSwitchTile('Enable Tax', settings.taxEnabled, (val) => _update(context, settings.copyWith(taxEnabled: val))),
+                if (settings.taxEnabled)
+                  _buildTextTile(
+                    context, 
+                    'Tax Rate (%)', 
+                    (settings.taxRate * 100).toStringAsFixed(0), 
+                    (val) {
+                      final rate = double.tryParse(val);
+                      if (rate != null) {
+                        _update(context, settings.copyWith(taxRate: rate / 100));
+                      }
+                    },
+                    validator: (val) {
+                      final n = double.tryParse(val ?? '');
+                      if (n == null || n < 0 || n > 100) return 'Enter 0-100';
+                      return null;
+                    },
+                  ),
                 _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
                 _buildSwitchTile('Allow Price Updates', settings.allowPriceUpdates, (val) => _update(context, settings.copyWith(allowPriceUpdates: val))),
                 _buildDropdownTile(
@@ -60,7 +84,24 @@ class SettingsPage extends StatelessWidget {
                   ['₦', '\$', '€', '£', 'KSh'], 
                   (val) => _update(context, settings.copyWith(currency: val)),
                 ),
+                _buildDropdownTile(
+                  context, 
+                  'Invoice Template', 
+                  settings.defaultInvoiceTemplate, 
+                  ['compact', 'detailed', 'minimalist'], 
+                  (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
+                ),
                 _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
+                _buildTextTile(context, 'Receipt Footer', settings.receiptFooter, (val) => _update(context, settings.copyWith(receiptFooter: val))),
+                const Divider(),
+                _buildSectionHeader('Account Details'),
+                _buildSwitchTile('Show Account Details on Invoice', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
+                _buildSwitchTile('Show Signature Space on Receipt', settings.showSignatureSpace, (val) => _update(context, settings.copyWith(showSignatureSpace: val))),
+                if (settings.showAccountDetails) ...[
+                  _buildTextTile(context, 'Bank Name', settings.bankName ?? '', (val) => _update(context, settings.copyWith(bankName: val))),
+                  _buildTextTile(context, 'Account Number', settings.accountNumber ?? '', (val) => _update(context, settings.copyWith(accountNumber: val))),
+                  _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
+                ],
                 const Divider(),
                 _buildSectionHeader('Maintenance'),
                 ListTile(
@@ -81,12 +122,6 @@ class SettingsPage extends StatelessWidget {
                 title: const Text('Change System Password'),
                 trailing: const Icon(Icons.lock_outline),
                 onTap: () => _showChangePassword(context),
-              ),
-              ListTile(
-                title: const Text('Set Super Admin Password'),
-                subtitle: const Text('Protects organization name, address, phone'),
-                trailing: const Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
-                onTap: () => _showSetSuperAdminPassword(context),
               ),
             ],
           );
@@ -276,55 +311,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  void _showSetSuperAdminPassword(BuildContext context) {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: const [
-            Icon(Icons.admin_panel_settings, color: Colors.deepPurple),
-            SizedBox(width: 8),
-            Text('Set Super Admin Password'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'This password will protect critical settings like organization name, address, and phone.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'Super Admin Password',
-                hintText: 'Enter a strong password',
-                prefixIcon: Icon(Icons.lock),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              context.read<SettingsBloc>().add(SetSuperAdminPassword(controller.text));
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('SET'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildProtectedTextTile(
     BuildContext context,
     String label,
@@ -370,41 +356,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoTile(BuildContext context, Uint8List? logo, Function(Uint8List?) onSave) {
-    return ListTile(
-      title: const Text('Company Logo'),
-      subtitle: const Text('Tap to change (Requires Super Admin)'),
-      leading: CircleAvatar(
-        radius: 30,
-        backgroundColor: Colors.grey[200],
-        backgroundImage: logo != null ? MemoryImage(logo) : null,
-        child: logo == null ? const Icon(Icons.business, color: Colors.grey) : null,
-      ),
-      trailing: const Icon(Icons.edit, color: Colors.blue),
-      onTap: () async {
-        // Log it needs permission
-        final settingsBloc = context.read<SettingsBloc>();
-        settingsBloc.add(ResetSuperAdminAuth());
-        
-        final authorized = await showDialog<bool>(
-          context: context,
-          builder: (_) => SuperAdminPasswordDialog(bloc: settingsBloc),
-        );
-        
-        if (authorized == true) {
-          final ImagePicker picker = ImagePicker();
-          final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-          
-          if (image != null) {
-            final bytes = await image.readAsBytes();
-            onSave(bytes);
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Logo updated successfully!')));
-          }
-        }
-      },
-    );
-  }
-
   Widget _buildReadOnlyTile(String label, String value, IconData icon) {
     return ListTile(
       leading: Icon(icon, color: Colors.grey),
@@ -416,37 +367,127 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildReadOnlyLogoTile(BuildContext context, Uint8List? logo) {
+  Widget _buildReadOnlyLogoTile(BuildContext context, AppSettings settings) {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            if (logo != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.memory(logo, width: 60, height: 60, fit: BoxFit.cover),
-              )
-            else
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
+      child: InkWell(
+        onTap: () => _pickLogo(context, settings),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              if (settings.logo != null)
+                ClipRRect(
                   borderRadius: BorderRadius.circular(8),
+                  child: Image.memory(settings.logo!, width: 60, height: 60, fit: BoxFit.cover),
+                )
+              else
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.add_a_photo, size: 30, color: Colors.grey),
                 ),
-                child: const Icon(Icons.business, size: 30, color: Colors.grey),
+              const SizedBox(width: 16),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Company Logo',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    ),
+                    Text(
+                      'Tap to change logo',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Text(
-                'Company Logo',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              ),
-            ),
+              const Icon(Icons.edit, size: 20, color: Colors.grey),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickLogo(BuildContext context, AppSettings settings) async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final bytes = await image.readAsBytes();
+      _update(context, settings.copyWith(logo: bytes));
+    }
+  }
+
+  Widget _buildActivationHistoryTile(BuildContext context) {
+    return ListTile(
+      title: const Text('Activation History'),
+      subtitle: const Text('View previously activated licenses on this device'),
+      leading: const Icon(Icons.history_edu, color: Colors.blue),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _showActivationHistoryDialog(context),
+    );
+  }
+
+  void _showActivationHistoryDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: const [
+            Icon(Icons.history, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('Subscription History'),
           ],
         ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: FutureBuilder<List<LicenseHistoryData>>(
+            future: LicenseService.getActivationHistory(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text('No activation history found.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                itemCount: snapshot.data!.length,
+                separatorBuilder: (_, __) => const Divider(),
+                itemBuilder: (context, index) {
+                  final item = snapshot.data![index];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(item.businessName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Plan: ${item.plan.toUpperCase()}'),
+                        Text('Expires: ${DateFormat('MMM dd, yyyy').format(item.expiryDate)}'),
+                        Text('Activated: ${DateFormat('MMM dd, HH:mm').format(item.createdAt)}', style: const TextStyle(fontSize: 11)),
+                      ],
+                    ),
+                    isThreeLine: true,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE')),
+        ],
       ),
     );
   }

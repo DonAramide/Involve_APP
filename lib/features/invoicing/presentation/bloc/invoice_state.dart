@@ -34,6 +34,14 @@ class SaveInvoice extends InvoiceEvent {}
 
 class ResetInvoice extends InvoiceEvent {}
 
+class UpdateInvoiceSettings extends InvoiceEvent {
+  final double taxRate;
+  final bool taxEnabled;
+  UpdateInvoiceSettings({required this.taxRate, required this.taxEnabled});
+  @override
+  List<Object?> get props => [taxRate, taxEnabled];
+}
+
 // State
 class InvoiceState extends Equatable {
   final List<InvoiceItem> items;
@@ -44,6 +52,8 @@ class InvoiceState extends Equatable {
   final bool isSaving;
   final bool isSaved;
   final String? error;
+  final double taxRate;
+  final bool taxEnabled;
 
   const InvoiceState({
     this.items = const [],
@@ -54,6 +64,8 @@ class InvoiceState extends Equatable {
     this.isSaving = false,
     this.isSaved = false,
     this.error,
+    this.taxRate = 0.15,
+    this.taxEnabled = true,
   });
 
   InvoiceState copyWith({
@@ -65,6 +77,8 @@ class InvoiceState extends Equatable {
     bool? isSaving,
     bool? isSaved,
     String? error,
+    double? taxRate,
+    bool? taxEnabled,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -75,9 +89,22 @@ class InvoiceState extends Equatable {
       isSaving: isSaving ?? this.isSaving,
       isSaved: isSaved ?? this.isSaved,
       error: error ?? this.error,
+      taxRate: taxRate ?? this.taxRate,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
     );
   }
 
   @override
-  List<Object?> get props => [items, subtotal, tax, discount, total, isSaving, isSaved, error];
+  List<Object?> get props => [
+        items,
+        subtotal,
+        tax,
+        discount,
+        total,
+        isSaving,
+        isSaved,
+        error,
+        taxRate,
+        taxEnabled,
+      ];
 }

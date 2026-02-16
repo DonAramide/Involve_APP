@@ -20,8 +20,24 @@ import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'dart:async';
 
-class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+class DashboardPage extends StatefulWidget {
+  final bool autoOpenSettings;
+  const DashboardPage({super.key, this.autoOpenSettings = false});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoOpenSettings) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _verifyAndNavigateToSettings(context);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -157,8 +173,9 @@ class DashboardPage extends StatelessWidget {
               ),
               const SizedBox(width: 8),
             ],
-      ),
-      body: GridView.count(
+          ),
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          body: GridView.count(
         padding: const EdgeInsets.all(24),
         crossAxisCount: 2,
         mainAxisSpacing: 16,
@@ -209,7 +226,7 @@ class DashboardPage extends StatelessWidget {
         ],
       ),
       bottomNavigationBar: FutureBuilder<bool>(
-            future: LicenseService.isActivated(),
+            future: LicenseService.isActivated(settings?.organizationName),
             builder: (context, snapshot) {
               if (snapshot.data == true) return const SizedBox.shrink();
               
@@ -300,75 +317,69 @@ class DashboardPage extends StatelessWidget {
     Color? indicatorColor,
     String? indicatorTooltip,
   }) {
-    return Container(
-      decoration: BoxDecoration(
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Card(
+      elevation: 4,
+      shadowColor: color.withOpacity(0.3),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: isDark ? theme.colorScheme.surface : Colors.white,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.15),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(icon, size: 40, color: color),
+        child: Stack(
+          children: [
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.12),
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800, 
-                        fontSize: 14, 
-                        color: Colors.grey[800],
-                        letterSpacing: 0.8,
-                      ),
+                    child: Icon(icon, size: 40, color: color),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900, 
+                      fontSize: 14, 
+                      color: isDark ? Colors.white.withOpacity(0.9) : Colors.grey[800],
+                      letterSpacing: 1.0,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              if (indicatorColor != null)
-                Positioned(
-                  top: 16,
-                  right: 16,
-                  child: Tooltip(
-                    message: indicatorTooltip ?? '',
-                    child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: indicatorColor,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: indicatorColor.withOpacity(0.5),
-                            blurRadius: 6,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
+            ),
+            if (indicatorColor != null)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Tooltip(
+                  message: indicatorTooltip ?? '',
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: indicatorColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: indicatorColor.withOpacity(0.4),
+                          blurRadius: 6,
+                          spreadRadius: 2,
+                        ),
+                      ],
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );

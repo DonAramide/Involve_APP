@@ -1,13 +1,12 @@
 import '../entities/invoice.dart';
 
 class InvoiceCalculationService {
-  static const double taxRate = 0.15; // Example 15% tax
-
   double calculateSubtotal(List<InvoiceItem> items) {
     return items.fold(0, (sum, item) => sum + item.total);
   }
 
-  double calculateTax(double subtotal) {
+  double calculateTax(double subtotal, double taxRate, bool taxEnabled) {
+    if (!taxEnabled) return 0.0;
     return subtotal * taxRate;
   }
 

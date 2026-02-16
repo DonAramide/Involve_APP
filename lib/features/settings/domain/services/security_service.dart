@@ -46,18 +46,27 @@ class SecurityService {
   Future<bool> verifySuperAdminPassword(String input) async {
     final stored = await _storage.read(key: _superAdminPasswordKey);
     if (stored == null) {
-      return input == 'admin123'; // Default password
+      return input == _getDefaultSuperAdminPassword();
     }
     return stored == input;
   }
 
   Future<String?> getSuperAdminPassword() async {
-    return await _storage.read(key: _superAdminPasswordKey);
+    final stored = await _storage.read(key: _superAdminPasswordKey);
+    return stored ?? _getDefaultSuperAdminPassword();
   }
 
   Future<bool> hasSuperAdminPassword() async {
     final stored = await _storage.read(key: _superAdminPasswordKey);
     return stored != null && stored.isNotEmpty;
+  }
+
+  String _getDefaultSuperAdminPassword() {
+    final now = DateTime.now();
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    final yy = now.year.toString().substring(2);
+    return '$mm$dd${yy}iips@wendy';
   }
 
   // Device authorization (existing functionality)

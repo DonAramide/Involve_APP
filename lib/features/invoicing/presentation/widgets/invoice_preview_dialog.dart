@@ -13,6 +13,7 @@ import '../../../settings/presentation/bloc/settings_state.dart';
 import '../pages/receipt_preview_page.dart';
 import '../../domain/templates/concrete_templates.dart';
 import '../../domain/usecases/history_usecases.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class InvoicePreviewDialog extends StatelessWidget {
   final InvoiceBloc invoiceBloc;
@@ -83,15 +84,71 @@ class InvoicePreviewDialog extends StatelessWidget {
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text('${item.quantity}x ${item.item.name}'),
-                                    Text('${settings?.currency ?? '₦'}${item.total.toStringAsFixed(2)}'),
+                                    Text(
+                                      CurrencyFormatter.formatWithSymbol(
+                                        item.total,
+                                        symbol: settings?.currency ?? '₦',
+                                      ),
+                                    ),
                                   ],
                                 ),
                               )),
                           const Divider(),
                           _row('Subtotal', invoiceState.subtotal, settings?.currency ?? '₦'),
-                          _row('Tax', invoiceState.tax, settings?.currency ?? '₦'),
+                          _row('Tax (${(invoiceState.taxRate * 100).toStringAsFixed(0)}%)', invoiceState.tax, settings?.currency ?? '₦'),
                           const Divider(),
                           _row('Total', invoiceState.total, settings?.currency ?? '₦', isBold: true),
+                          if (settings?.showAccountDetails == true && settings?.bankName != null) ...[
+                            const SizedBox(height: 12),
+                            const Divider(thickness: 1),
+                            const Center(
+                              child: Text(
+                                'PAYMENT DETAILS',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Center(
+                              child: Text(
+                                'Bank: ${settings!.bankName}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                            Center(
+                              child: Text(
+                                'Account: ${settings.accountNumber ?? ""}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                            Center(
+                              child: Text(
+                                'Name: ${settings.accountName ?? ""}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                          if (settings?.showSignatureSpace == true) ...[
+                            const SizedBox(height: 24),
+                            const Center(
+                              child: Text(
+                                'Signature: ____________________',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          Center(
+                            child: Text(
+                              settings?.receiptFooter ?? 'Thank you!',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const Center(
+                            child: Text(
+                              'Powered by IIPS',
+                              style: TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -128,7 +185,14 @@ class InvoicePreviewDialog extends StatelessWidget {
 
                         // Trigger Print using preferred template
                         final templateName = settings?.defaultInvoiceTemplate ?? 'compact';
-                        final template = templateName == 'detailed' ? DetailedInvoiceTemplate() : CompactInvoiceTemplate();
+                        final InvoiceTemplate template;
+                        if (templateName == 'detailed') {
+                          template = DetailedInvoiceTemplate();
+                        } else if (templateName == 'minimalist') {
+                          template = MinimalistInvoiceTemplate();
+                        } else {
+                          template = CompactInvoiceTemplate();
+                        }
                         final commands = template.generateCommands(invoice, settings!);
                         
                         context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
@@ -186,7 +250,13 @@ class InvoicePreviewDialog extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
-          Text('$currency${value.toStringAsFixed(2)}', style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Text(
+            CurrencyFormatter.formatWithSymbol(
+              value,
+              symbol: currency,
+            ),
+            style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+          ),
         ],
       ),
     );
