@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
-import 'package:involve_app/features/invoicing/presentation/bloc/invoice_state.dart';
-import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
-import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
-import 'package:involve_app/features/stock/domain/entities/item.dart';
-import 'package:involve_app/features/invoicing/presentation/widgets/invoice_preview_dialog.dart';
-import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
-import 'package:involve_app/features/settings/domain/entities/settings.dart';
-import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:invify/features/invoicing/presentation/bloc/invoice_bloc.dart';
+import 'package:invify/features/invoicing/presentation/bloc/invoice_state.dart';
+import 'package:invify/features/stock/presentation/bloc/stock_bloc.dart';
+import 'package:invify/features/stock/presentation/bloc/stock_state.dart';
+import 'package:invify/features/stock/domain/entities/item.dart';
+import 'package:invify/features/invoicing/presentation/widgets/invoice_preview_dialog.dart';
+import 'package:invify/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:invify/features/settings/presentation/bloc/settings_state.dart';
+import 'package:invify/features/settings/domain/entities/settings.dart';
+import 'package:invify/core/utils/currency_formatter.dart';
 
 class CreateInvoicePage extends StatelessWidget {
   const CreateInvoicePage({super.key});

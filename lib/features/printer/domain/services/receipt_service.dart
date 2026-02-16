@@ -6,7 +6,7 @@ import 'package:printing/printing.dart';
 import '../../../invoicing/domain/entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
 import 'package:intl/intl.dart';
-import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:invify/core/utils/currency_formatter.dart';
 
 class ReceiptService {
   Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings) async {

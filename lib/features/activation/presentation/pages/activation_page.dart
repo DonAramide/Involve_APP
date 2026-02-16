@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:involve_app/core/license/license_service.dart';
-import 'package:involve_app/features/settings/presentation/pages/settings_page.dart';
-import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:invify/core/license/license_service.dart';
+import 'package:invify/features/settings/presentation/pages/settings_page.dart';
+import 'package:invify/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:intl/intl.dart';
-import 'package:involve_app/core/license/license_model.dart';
+import 'package:invify/core/license/license_model.dart';
 
 class ActivationPage extends StatefulWidget {
   final bool isExpired;
@@ -173,7 +173,7 @@ class _ActivationPageState extends State<ActivationPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.lock_person, size: 80, color: Colors.blue),
+                      Image.asset('assets/images/logo.png', height: 120),
                       const SizedBox(height: 24),
                       Text(
                         widget.isExpired ? 'Subscription Expired' : 'App Activation',

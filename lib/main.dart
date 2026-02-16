@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:involve_app/core/license/landing_page.dart';
+import 'package:invify/core/license/landing_page.dart';
 import 'core/utils/bloc_observer.dart';
 import 'features/stock/data/datasources/app_database.dart';
 import 'features/stock/data/repositories/item_repository_impl.dart';
@@ -26,7 +26,7 @@ import 'features/settings/presentation/bloc/settings_state.dart';
 import 'features/dashboard/presentation/pages/dashboard_page.dart';
 import 'core/services/backup_service.dart';
 
-import 'package:involve_app/core/license/license_service.dart';
+import 'package:invify/core/license/license_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -196,8 +196,8 @@ class MyApp extends StatelessWidget {
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {
           final themeMode = state.settings?.themeMode ?? 'system';
-          return MaterialApp(
-            title: 'MyInvoice',
+            return MaterialApp(
+              title: 'Invify',
             debugShowCheckedModeBanner: false,
             themeMode: themeMode == 'light' 
                 ? ThemeMode.light 

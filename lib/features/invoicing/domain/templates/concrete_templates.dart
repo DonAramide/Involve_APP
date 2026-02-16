@@ -1,7 +1,7 @@
 import 'invoice_template.dart';
 import '../entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
-import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:invify/core/utils/currency_formatter.dart';
 
 class CompactInvoiceTemplate extends InvoiceTemplate {
   @override

@@ -1,9 +1,9 @@
-import 'package:involve_app/core/license/license_model.dart';
-import 'package:involve_app/core/license/storage_service.dart';
-import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:invify/core/license/license_model.dart';
+import 'package:invify/core/license/storage_service.dart';
+import 'package:invify/features/stock/data/datasources/app_database.dart';
 import 'package:drift/drift.dart';
-import 'package:involve_app/core/license/license_validator.dart';
-import 'package:involve_app/core/license/license_generator.dart';
+import 'package:invify/core/license/license_validator.dart';
+import 'package:invify/core/license/license_generator.dart';
 
 class LicenseService {
   static AppDatabase? _db;

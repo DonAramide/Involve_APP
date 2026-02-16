@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:involve_app/core/license/license_service.dart';
-import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
-import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:invify/core/license/license_service.dart';
+import 'package:invify/features/activation/presentation/pages/activation_page.dart';
+import 'package:invify/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:invify/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:invify/features/settings/presentation/bloc/settings_state.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});

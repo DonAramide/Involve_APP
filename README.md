@@ -1,16 +1,18 @@
-# involve_app
+# Invify
 
-A new Flutter project.
+Invify - Smart Invoicing & Receipt Management.
 
-## Getting Started
+A comprehensive Point of Sale (POS) system designed for bars, hotels, and retail businesses. Manage inventory, create invoices, track sales, and print receipts with ease.
 
-This project is a starting point for a Flutter application.
+## Features
+- **Smart Invoicing**: Create professional invoices with PDF support and custom templates.
+- **Stock Management**: Track and manage your inventory efficiently.
+- **Thermal Printing**: Support for Bluetooth and Network thermal receipt printers.
+- **License System**: Secure offline activation and trial management.
+- **Configurable Receipts**: Custom footer, signature space, and bank details.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Technlogies
+- Flutter / Dart
+- BLoC for State Management
+- Drift (SQLite) for Local Storage
+- ESC/POS for Thermal Printing

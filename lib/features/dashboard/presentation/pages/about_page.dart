@@ -17,24 +17,20 @@ class AboutPage extends StatelessWidget {
           children: [
             const SizedBox(height: 20),
             // App Icon/Logo
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.point_of_sale,
-                size: 60,
-                color: Colors.white,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: Image.asset(
+                'assets/images/logo.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(height: 24),
             
             // App Name
             const Text(
-              'Involve App',
+              'Invify',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,

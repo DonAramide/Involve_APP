@@ -9,7 +9,7 @@ import '../../../domain/templates/template_registry.dart';
 import '../../../domain/templates/invoice_template.dart';
 import '../../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../pages/receipt_preview_page.dart';
-import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:invify/core/utils/currency_formatter.dart';
 
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});

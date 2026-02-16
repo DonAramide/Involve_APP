@@ -9,7 +9,7 @@ import '../widgets/password_dialog.dart';
 import '../widgets/super_admin_dialog.dart';
 import '../widgets/super_admin_password_dialog.dart';
 import '../../../../core/license/license_service.dart';
-import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:invify/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/settings.dart';
 

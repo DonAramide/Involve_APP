@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
-import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
-import 'package:involve_app/features/stock/domain/entities/item.dart';
-import 'package:involve_app/features/stock/presentation/widgets/item_form_dialog.dart';
-import 'package:involve_app/features/stock/presentation/pages/manage_categories_page.dart';
-import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
-import 'package:involve_app/features/settings/domain/entities/settings.dart';
-import 'package:involve_app/features/settings/presentation/widgets/password_dialog.dart';
-import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:invify/features/stock/presentation/bloc/stock_bloc.dart';
+import 'package:invify/features/stock/presentation/bloc/stock_state.dart';
+import 'package:invify/features/stock/domain/entities/item.dart';
+import 'package:invify/features/stock/presentation/widgets/item_form_dialog.dart';
+import 'package:invify/features/stock/presentation/pages/manage_categories_page.dart';
+import 'package:invify/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:invify/features/settings/presentation/bloc/settings_state.dart';
+import 'package:invify/features/settings/domain/entities/settings.dart';
+import 'package:invify/features/settings/presentation/widgets/password_dialog.dart';
+import 'package:invify/core/utils/currency_formatter.dart';
 
 class StockManagementPage extends StatelessWidget {
   const StockManagementPage({super.key});

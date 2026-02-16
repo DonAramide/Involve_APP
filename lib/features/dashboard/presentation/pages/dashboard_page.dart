@@ -13,11 +13,11 @@ import '../../../../core/widgets/live_datetime_widget.dart';
 import '../../../help/presentation/pages/help_page.dart';
 import 'about_page.dart';
 import 'contact_page.dart';
-import 'package:involve_app/features/printer/presentation/pages/printer_settings_page.dart';
-import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
-import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
-import 'package:involve_app/core/license/license_service.dart';
-import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
+import 'package:invify/features/printer/presentation/pages/printer_settings_page.dart';
+import 'package:invify/features/printer/presentation/bloc/printer_bloc.dart';
+import 'package:invify/features/printer/presentation/bloc/printer_state.dart';
+import 'package:invify/core/license/license_service.dart';
+import 'package:invify/features/activation/presentation/pages/activation_page.dart';
 import 'dart:async';
 
 class DashboardPage extends StatefulWidget {

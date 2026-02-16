@@ -13,7 +13,7 @@ import '../../../settings/presentation/bloc/settings_state.dart';
 import '../pages/receipt_preview_page.dart';
 import '../../domain/templates/concrete_templates.dart';
 import '../../domain/usecases/history_usecases.dart';
-import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:invify/core/utils/currency_formatter.dart';
 
 class InvoicePreviewDialog extends StatelessWidget {
   final InvoiceBloc invoiceBloc;

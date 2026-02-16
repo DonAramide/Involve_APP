@@ -10,7 +10,7 @@ import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
 import '../../../../core/license/license_service.dart';
 import '../../../../core/license/license_generator.dart';
-import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:invify/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 
