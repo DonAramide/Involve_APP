@@ -37,9 +37,14 @@ class ResetInvoice extends InvoiceEvent {}
 class UpdateInvoiceSettings extends InvoiceEvent {
   final double taxRate;
   final bool taxEnabled;
-  UpdateInvoiceSettings({required this.taxRate, required this.taxEnabled});
+  final bool discountEnabled;
+  UpdateInvoiceSettings({
+    required this.taxRate,
+    required this.taxEnabled,
+    required this.discountEnabled,
+  });
   @override
-  List<Object?> get props => [taxRate, taxEnabled];
+  List<Object?> get props => [taxRate, taxEnabled, discountEnabled];
 }
 
 // State
@@ -54,6 +59,7 @@ class InvoiceState extends Equatable {
   final String? error;
   final double taxRate;
   final bool taxEnabled;
+  final bool discountEnabled;
 
   const InvoiceState({
     this.items = const [],
@@ -66,6 +72,7 @@ class InvoiceState extends Equatable {
     this.error,
     this.taxRate = 0.15,
     this.taxEnabled = true,
+    this.discountEnabled = true,
   });
 
   InvoiceState copyWith({
@@ -79,6 +86,7 @@ class InvoiceState extends Equatable {
     String? error,
     double? taxRate,
     bool? taxEnabled,
+    bool? discountEnabled,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -91,6 +99,7 @@ class InvoiceState extends Equatable {
       error: error ?? this.error,
       taxRate: taxRate ?? this.taxRate,
       taxEnabled: taxEnabled ?? this.taxEnabled,
+      discountEnabled: discountEnabled ?? this.discountEnabled,
     );
   }
 
@@ -106,5 +115,6 @@ class InvoiceState extends Equatable {
         error,
         taxRate,
         taxEnabled,
+        discountEnabled,
       ];
 }

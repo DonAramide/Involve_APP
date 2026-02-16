@@ -96,8 +96,10 @@ class InvoicePreviewDialog extends StatelessWidget {
                           const Divider(),
                           _row('Subtotal', invoiceState.subtotal, settings?.currency ?? '₦'),
                           _row('Tax (${(invoiceState.taxRate * 100).toStringAsFixed(0)}%)', invoiceState.tax, settings?.currency ?? '₦'),
+                          if (invoiceState.discount > 0)
+                            _row('Discount', -invoiceState.discount, settings?.currency ?? '₦'),
                           const Divider(),
-                          _row('Total', invoiceState.total, settings?.currency ?? '₦', isBold: true),
+                          _row('Total', invoiceState.total, settings?.currency ?? '₦', isTotal: true),
                           if (settings?.showAccountDetails == true && settings?.bankName != null) ...[
                             const SizedBox(height: 12),
                             const Divider(thickness: 1),

@@ -71,15 +71,22 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   }
 
   void _onReset(ResetInvoice event, Emitter<InvoiceState> emit) {
-    emit(InvoiceState(taxRate: state.taxRate, taxEnabled: state.taxEnabled));
+    emit(InvoiceState(
+      taxRate: state.taxRate,
+      taxEnabled: state.taxEnabled,
+      discountEnabled: state.discountEnabled,
+    ));
   }
 
   void _onUpdateSettings(UpdateInvoiceSettings event, Emitter<InvoiceState> emit) {
     emit(state.copyWith(
       taxRate: event.taxRate,
       taxEnabled: event.taxEnabled,
+      discountEnabled: event.discountEnabled,
     ));
-    _emitUpdatedState(state.items, state.discount, emit);
+    // If discount is disabled, reset any existing discount
+    final currentDiscount = event.discountEnabled ? state.discount : 0.0;
+    _emitUpdatedState(state.items, currentDiscount, emit);
   }
 
   void _emitUpdatedState(List<InvoiceItem> items, double discount, Emitter<InvoiceState> emit) {

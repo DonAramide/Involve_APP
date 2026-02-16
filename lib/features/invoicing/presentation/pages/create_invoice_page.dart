@@ -37,6 +37,7 @@ class CreateInvoicePage extends StatelessWidget {
             context.read<InvoiceBloc>().add(UpdateInvoiceSettings(
               taxRate: settings.taxRate,
               taxEnabled: settings.taxEnabled,
+              discountEnabled: settings.discountEnabled,
             ));
           }
         },
@@ -526,6 +527,21 @@ class _CartSummary extends StatelessWidget {
                       padding: EdgeInsets.symmetric(vertical: 8.0),
                       child: Divider(),
                     ),
+                    if (settings?.discountEnabled == true) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton.icon(
+                          onPressed: () => _showDiscountDialog(context, state.discount),
+                          icon: const Icon(Icons.add_circle_outline, size: 18),
+                          label: Text(state.discount > 0 ? 'CHANGE DISCOUNT' : 'ADD DISCOUNT'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.blue[700],
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     _buildSummaryRow('Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -590,6 +606,55 @@ class _CartSummary extends StatelessWidget {
     showDialog(
       context: context,
       builder: (_) => InvoicePreviewDialog(invoiceBloc: context.read<InvoiceBloc>()),
+    );
+  }
+
+  void _showDiscountDialog(BuildContext context, double currentDiscount) {
+    final controller = TextEditingController(text: currentDiscount > 0 ? currentDiscount.toString() : '');
+    final invoiceBloc = context.read<InvoiceBloc>();
+    final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Apply Discount'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Enter fixed discount amount to apply to total.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Discount Amount ($currency)',
+                border: const OutlineInputBorder(),
+                prefixText: currency,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          if (currentDiscount > 0)
+            TextButton(
+              onPressed: () {
+                invoiceBloc.add(UpdateDiscount(0));
+                Navigator.pop(ctx);
+              },
+              child: const Text('REMOVE', style: TextStyle(color: Colors.red)),
+            ),
+          ElevatedButton(
+            onPressed: () {
+              final discount = double.tryParse(controller.text) ?? 0;
+              invoiceBloc.add(UpdateDiscount(discount));
+              Navigator.pop(ctx);
+            },
+            child: const Text('APPLY'),
+          ),
+        ],
+      ),
     );
   }
 }
