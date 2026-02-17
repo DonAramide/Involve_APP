@@ -79,7 +79,10 @@ class _HelpPageState extends State<HelpPage> {
           Center(
             child: Column(
               children: [
-                const Icon(Icons.point_of_sale, size: 64, color: Colors.blue),
+                Image.asset(
+                  'assets/images/logo.png',
+                  height: 80,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Invify',
@@ -155,6 +158,28 @@ class _HelpPageState extends State<HelpPage> {
               subtitle: Text('+234 8023552282, +234 9027033748'),
             ),
           ),
+          const SizedBox(height: 32),
+          
+          // Powered by
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  'Powered by',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Image.asset(
+                  'assets/images/iips_logo.png',
+                  height: 100,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );
