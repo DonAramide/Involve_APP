@@ -16,21 +16,11 @@ class AboutPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const SizedBox(height: 20),
-            // App Icon/Logo
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  fit: BoxFit.cover,
-                ),
-              ),
+            // App Icon/Logo (Directly on background)
+            Image.asset(
+              'assets/images/logo.png',
+              width: 150,
+              height: 150,
             ),
             const SizedBox(height: 24),
             
@@ -103,24 +93,10 @@ class AboutPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // IIPS Logo with clean background
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Image.asset(
-                'assets/images/iips_logo.png',
-                height: 80,
-              ),
+            // IIPS Logo without the rounded background (doubled size)
+            Image.asset(
+              'assets/images/iips_logo.png',
+              height: 200,
             ),
             const SizedBox(height: 16),
             const Text(
