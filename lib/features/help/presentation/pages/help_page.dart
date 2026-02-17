@@ -82,7 +82,7 @@ class _HelpPageState extends State<HelpPage> {
                 const Icon(Icons.point_of_sale, size: 64, color: Colors.blue),
                 const SizedBox(height: 16),
                 const Text(
-                  'Bar & Hotel POS',
+                  'Invify',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Text(
@@ -90,7 +90,7 @@ class _HelpPageState extends State<HelpPage> {
                   style: TextStyle(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 8),
-                const Text('© 2026 Involve App'),
+                const Text('© 2026 Invify'),
               ],
             ),
           ),
@@ -145,14 +145,14 @@ class _HelpPageState extends State<HelpPage> {
             child: ListTile(
               leading: Icon(Icons.email),
               title: Text('Email Support'),
-              subtitle: Text('support@involveapp.com'),
+              subtitle: Text('info.iips.ng@gmail.com'),
             ),
           ),
           const Card(
             child: ListTile(
               leading: Icon(Icons.phone),
               title: Text('Phone Support'),
-              subtitle: Text('+123 456 7890'),
+              subtitle: Text('+234 8023552282, +234 9027033748'),
             ),
           ),
         ],

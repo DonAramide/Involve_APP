@@ -69,7 +69,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 // Organization name
                 Expanded(
                   child: Text(
-                    settings?.organizationName ?? 'Bar & Hotel POS',
+                    settings?.organizationName ?? 'Invify',
                     style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
                     overflow: TextOverflow.ellipsis,
                   ),
