@@ -61,8 +61,14 @@ class ContactPage extends StatelessWidget {
               value: 'www.IIPS.app',
               onTap: () => _launchWebsite('https://www.IIPS.app'),
             ),
-            const SizedBox(height: 40),
-            
+            const SizedBox(height: 16),
+            _buildContactCard(
+              context,
+              icon: Icons.location_on,
+              title: 'Address',
+              value: 'Line 9 Office 8 Owode Onirin Market Ikorodu Road Owode Onirin Bus/Stop Lagos, Nigeria',
+              onTap: null,
+            ),
             const SizedBox(height: 40),
             
             // Support Hours
