@@ -102,18 +102,34 @@ class AboutPage extends StatelessWidget {
                 color: Colors.grey,
               ),
             ),
-            const SizedBox(height: 12),
-            Image.asset(
-              'assets/images/iips_logo.png',
-              height: 100,
+            const SizedBox(height: 16),
+            // IIPS Logo with clean background
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Image.asset(
+                'assets/images/iips_logo.png',
+                height: 80,
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             const Text(
-              'Innovative Integrated Payment Solutions',
+              'Integrated Independent Products & Services',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.blueGrey,
               ),
             ),
             const SizedBox(height: 40),
