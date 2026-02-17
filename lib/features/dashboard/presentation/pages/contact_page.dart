@@ -42,70 +42,27 @@ class ContactPage extends StatelessWidget {
               context,
               icon: Icons.email,
               title: 'Email',
-              value: 'support@iips.com',
-              onTap: () => _launchEmail('support@iips.com'),
+              value: 'info.iips.ng@gmail.com',
+              onTap: () => _launchEmail('info.iips.ng@gmail.com'),
             ),
             const SizedBox(height: 16),
             _buildContactCard(
               context,
               icon: Icons.phone,
               title: 'Phone',
-              value: '+1 (555) 123-4567',
-              onTap: () => _launchPhone('+15551234567'),
+              value: '+234 8023552282 or +234 9027033748',
+              onTap: () => _launchPhone('+2348023552282'),
             ),
             const SizedBox(height: 16),
             _buildContactCard(
               context,
               icon: Icons.language,
               title: 'Website',
-              value: 'www.iips.com',
-              onTap: () => _launchWebsite('https://www.iips.com'),
-            ),
-            const SizedBox(height: 16),
-            _buildContactCard(
-              context,
-              icon: Icons.location_on,
-              title: 'Address',
-              value: '123 Business Street\nCity, State 12345\nCountry',
-              onTap: null,
+              value: 'www.IIPS.app',
+              onTap: () => _launchWebsite('https://www.IIPS.app'),
             ),
             const SizedBox(height: 40),
             
-            // Social Media Section
-            const Text(
-              'Follow Us',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildSocialButton(
-                  context,
-                  icon: Icons.facebook,
-                  label: 'Facebook',
-                  onTap: () => _launchWebsite('https://facebook.com/iips'),
-                ),
-                const SizedBox(width: 16),
-                _buildSocialButton(
-                  context,
-                  icon: Icons.message,
-                  label: 'Twitter',
-                  onTap: () => _launchWebsite('https://twitter.com/iips'),
-                ),
-                const SizedBox(width: 16),
-                _buildSocialButton(
-                  context,
-                  icon: Icons.camera_alt,
-                  label: 'Instagram',
-                  onTap: () => _launchWebsite('https://instagram.com/iips'),
-                ),
-              ],
-            ),
             const SizedBox(height: 40),
             
             // Support Hours
