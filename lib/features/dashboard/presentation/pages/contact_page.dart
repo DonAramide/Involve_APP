@@ -16,6 +16,13 @@ class ContactPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 20),
+            Center(
+              child: Image.asset(
+                'assets/images/logo.png',
+                height: 120,
+              ),
+            ),
+            const SizedBox(height: 24),
             
             // Header
             const Text(
@@ -108,6 +115,26 @@ class ContactPage extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 40),
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    'Powered by',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Image.asset(
+                    'assets/images/iips_logo.png',
+                    height: 100,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 40),
           ],
         ),
       ),
