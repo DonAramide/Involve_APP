@@ -29,6 +29,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}', align: 'center'),
       TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
+      if (invoice.paymentMethod != null) TextCommand('Method: ${invoice.paymentMethod}', align: 'center'),
       DividerCommand(),
       ...invoice.items.map((item) {
         final name = item.item.name;
@@ -103,6 +104,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       TextCommand('INVOICE DETAIL', align: 'center', isBold: true),
       TextCommand('Number: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}'),
+      if (invoice.paymentMethod != null) TextCommand('Payment Method: ${invoice.paymentMethod}'),
       DividerCommand(),
       ...invoice.items.map((item) {
         // Detailed shows Name on one line, then Qty/Price on another

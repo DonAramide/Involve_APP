@@ -137,6 +137,13 @@ class InvoicePreviewDialog extends StatelessWidget {
                             ),
                           ],
                           const SizedBox(height: 12),
+                          if (settings?.paymentMethodsEnabled == true) ...[
+                            const Divider(),
+                            const Text('Select Payment Method:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            const SizedBox(height: 4),
+                            _buildPaymentMethodSelector(context, invoiceState),
+                            const Divider(),
+                          ],
                           Center(
                             child: Text(
                               settings?.receiptFooter ?? 'Thank you!',
@@ -160,7 +167,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: invoiceState.isSaving ? null : () async {
+                      onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                         // Capture data for printing
                         final items = List<InvoiceItem>.from(invoiceState.items);
                         final subtotal = invoiceState.subtotal;
@@ -212,7 +219,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                         : const Text('SAVE & PRINT'),
                     ),
                     ElevatedButton(
-                      onPressed: invoiceState.isSaving ? null : () async {
+                      onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                         context.read<InvoiceBloc>().add(SaveInvoice());
                         
                         // Wait for invoice to be saved and get the saved invoice
@@ -248,6 +255,42 @@ class InvoicePreviewDialog extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildPaymentMethodSelector(BuildContext context, InvoiceState state) {
+    return Column(
+      children: [
+        RadioListTile<String>(
+          title: const Text('Cash'),
+          value: 'Cash',
+          groupValue: state.paymentMethod,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          onChanged: (val) => context.read<InvoiceBloc>().add(UpdatePaymentMethod(val)),
+        ),
+        RadioListTile<String>(
+          title: const Text('POS'),
+          value: 'POS',
+          groupValue: state.paymentMethod,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          onChanged: (val) => context.read<InvoiceBloc>().add(UpdatePaymentMethod(val)),
+        ),
+        RadioListTile<String>(
+          title: const Text('Transfer'),
+          value: 'Transfer',
+          groupValue: state.paymentMethod,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          onChanged: (val) => context.read<InvoiceBloc>().add(UpdatePaymentMethod(val)),
+        ),
+        if (state.paymentMethod == null)
+          const Padding(
+            padding: EdgeInsets.only(left: 8.0),
+            child: Text('Please select a payment method', style: TextStyle(color: Colors.red, fontSize: 12)),
+          ),
+      ],
     );
   }
 

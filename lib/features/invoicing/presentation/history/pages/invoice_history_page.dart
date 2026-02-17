@@ -131,6 +131,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   end: _selectedRange?.end,
                   query: value,
                   amount: currentAmount,
+                  paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
                 ));
               },
             ),
@@ -155,9 +156,15 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   end: _selectedRange?.end,
                   query: currentQuery,
                   amount: amount,
+                  paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
                 ));
               },
             ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 1,
+            child: _buildPaymentMethodFilter(context, state),
           ),
         ],
       ),
@@ -169,7 +176,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ExpansionTile(
         title: Text('${invoice.invoiceNumber}'),
-        subtitle: Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
+        subtitle: Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • ${invoice.paymentMethod ?? "N/A"} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
         children: [
           ...invoice.items.map((item) => ListTile(
                 dense: true,
@@ -210,6 +217,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             DataColumn(label: Text('Invoice ID', style: TextStyle(fontWeight: FontWeight.bold))),
             DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
             DataColumn(label: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Method', style: TextStyle(fontWeight: FontWeight.bold))),
             DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
           ],
           rows: state.invoices.map((invoice) {
@@ -218,6 +226,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 DataCell(Text(invoice.invoiceNumber, style: const TextStyle(fontSize: 12))),
                 DataCell(Text(invoice.dateCreated.toString().split(' ')[0], style: const TextStyle(fontSize: 12))),
                 DataCell(Text(invoice.customerName ?? '-', style: const TextStyle(fontSize: 12))),
+                DataCell(Text(invoice.paymentMethod ?? '-', style: const TextStyle(fontSize: 12))),
                 DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
               ],
               onSelectChanged: (selected) {
@@ -334,6 +343,37 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         const SnackBar(content: Text('Please wait for data to load before exporting.')),
       );
     }
+  }
+
+  Widget _buildPaymentMethodFilter(BuildContext context, HistoryState state) {
+    String? currentMethod;
+    if (state is HistoryLoaded) {
+      currentMethod = state.paymentMethod;
+    }
+
+    return DropdownButtonFormField<String>(
+      value: currentMethod ?? 'All',
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+      ),
+      items: ['All', 'Cash', 'POS', 'Transfer'].map((method) {
+        return DropdownMenuItem(value: method, child: Text(method, style: const TextStyle(fontSize: 12)));
+      }).toList(),
+      onChanged: (value) {
+        if (state is HistoryLoaded) {
+          context.read<HistoryBloc>().add(LoadHistory(
+                start: _selectedRange?.start,
+                end: _selectedRange?.end,
+                query: state.query,
+                amount: state.amount,
+                paymentMethod: value,
+              ));
+        }
+      },
+    );
   }
 
   Widget _buildTotalSummary(BuildContext context, HistoryLoaded state) {

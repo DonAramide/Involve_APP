@@ -24,6 +24,7 @@ class AppSettings extends Equatable {
   final bool isLocked;
   final DateTime? lockedAt;
   final bool showSignatureSpace;
+  final bool paymentMethodsEnabled;
   
   // Account Details
   final String? bankName;
@@ -59,6 +60,7 @@ class AppSettings extends Equatable {
     this.lockedAt,
     this.receiptFooter = 'Thank you!',
     this.showSignatureSpace = false,
+    this.paymentMethodsEnabled = false,
   });
 
   AppSettings copyWith({
@@ -87,6 +89,7 @@ class AppSettings extends Equatable {
     DateTime? lockedAt,
     String? receiptFooter,
     bool? showSignatureSpace,
+    bool? paymentMethodsEnabled,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -114,6 +117,7 @@ class AppSettings extends Equatable {
       lockedAt: lockedAt ?? this.lockedAt,
       receiptFooter: receiptFooter ?? this.receiptFooter,
       showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
+      paymentMethodsEnabled: paymentMethodsEnabled ?? this.paymentMethodsEnabled,
     );
   }
 
@@ -144,5 +148,6 @@ class AppSettings extends Equatable {
         lockedAt,
         receiptFooter,
         showSignatureSpace,
+        paymentMethodsEnabled,
       ];
 }

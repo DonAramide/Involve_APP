@@ -23,6 +23,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               paymentStatus: invoice.paymentStatus,
               customerName: Value(invoice.customerName),
               customerAddress: Value(invoice.customerAddress),
+              paymentMethod: Value(invoice.paymentMethod),
             ),
           );
 
@@ -102,6 +103,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         paymentStatus: row.paymentStatus,
         customerName: row.customerName,
         customerAddress: row.customerAddress,
+        paymentMethod: row.paymentMethod,
       ));
     }
     return result;

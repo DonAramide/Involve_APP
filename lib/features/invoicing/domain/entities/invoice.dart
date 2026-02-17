@@ -46,6 +46,7 @@ class Invoice extends Equatable {
   final String paymentStatus;
   final String? customerName;
   final String? customerAddress;
+  final String? paymentMethod; // 'Cash', 'POS', 'Transfer'
 
   const Invoice({
     this.id,
@@ -59,6 +60,7 @@ class Invoice extends Equatable {
     required this.paymentStatus,
     this.customerName,
     this.customerAddress,
+    this.paymentMethod,
   });
 
   @override
@@ -74,5 +76,6 @@ class Invoice extends Equatable {
         paymentStatus,
         customerName,
         customerAddress,
+        paymentMethod,
       ];
 }

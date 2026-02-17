@@ -38,6 +38,13 @@ class UpdateCustomerInfo extends InvoiceEvent {
   List<Object?> get props => [name, address];
 }
 
+class UpdatePaymentMethod extends InvoiceEvent {
+  final String? paymentMethod;
+  UpdatePaymentMethod(this.paymentMethod);
+  @override
+  List<Object?> get props => [paymentMethod];
+}
+
 class SaveInvoice extends InvoiceEvent {}
 
 class ResetInvoice extends InvoiceEvent {}
@@ -70,6 +77,7 @@ class InvoiceState extends Equatable {
   final bool discountEnabled;
   final String? customerName;
   final String? customerAddress;
+  final String? paymentMethod;
 
   const InvoiceState({
     this.items = const [],
@@ -85,6 +93,7 @@ class InvoiceState extends Equatable {
     this.discountEnabled = true,
     this.customerName,
     this.customerAddress,
+    this.paymentMethod,
   });
 
   InvoiceState copyWith({
@@ -101,6 +110,7 @@ class InvoiceState extends Equatable {
     bool? discountEnabled,
     String? customerName,
     String? customerAddress,
+    String? paymentMethod,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -116,6 +126,7 @@ class InvoiceState extends Equatable {
       discountEnabled: discountEnabled ?? this.discountEnabled,
       customerName: customerName ?? this.customerName,
       customerAddress: customerAddress ?? this.customerAddress,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
     );
   }
 
@@ -134,5 +145,6 @@ class InvoiceState extends Equatable {
         discountEnabled,
         customerName,
         customerAddress,
+        paymentMethod,
       ];
 }

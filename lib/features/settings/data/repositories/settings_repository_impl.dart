@@ -56,6 +56,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
             lockedAt: Value(settings.lockedAt),
             receiptFooter: Value(settings.receiptFooter),
             showSignatureSpace: Value(settings.showSignatureSpace),
+            paymentMethodsEnabled: Value(settings.paymentMethodsEnabled),
           ),
         );
   }
@@ -87,6 +88,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       lockedAt: row.lockedAt,
       receiptFooter: row.receiptFooter,
       showSignatureSpace: row.showSignatureSpace,
+      paymentMethodsEnabled: row.paymentMethodsEnabled,
     );
   }
 }

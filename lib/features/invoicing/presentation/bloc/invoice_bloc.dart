@@ -19,6 +19,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<ResetInvoice>(_onReset);
     on<UpdateInvoiceSettings>(_onUpdateSettings);
     on<UpdateCustomerInfo>(_onUpdateCustomer);
+    on<UpdatePaymentMethod>(_onUpdatePaymentMethod);
   }
 
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
@@ -67,6 +68,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         paymentStatus: 'Paid',
         customerName: state.customerName,
         customerAddress: state.customerAddress,
+        paymentMethod: state.paymentMethod,
       );
 
       await repository.saveInvoice(invoice);
@@ -89,6 +91,10 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
       customerName: event.name,
       customerAddress: event.address,
     ));
+  }
+
+  void _onUpdatePaymentMethod(UpdatePaymentMethod event, Emitter<InvoiceState> emit) {
+    emit(state.copyWith(paymentMethod: event.paymentMethod));
   }
 
   void _onUpdateSettings(UpdateInvoiceSettings event, Emitter<InvoiceState> emit) {

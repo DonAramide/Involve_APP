@@ -32,9 +32,19 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         ).toList();
       }
 
+      if (event.paymentMethod != null && event.paymentMethod != 'All') {
+        invoices = invoices.where((inv) => inv.paymentMethod == event.paymentMethod).toList();
+      }
+      
       final totalSales = invoices.fold<double>(0, (sum, inv) => sum + inv.totalAmount);
 
-      emit(HistoryLoaded(invoices, totalSales: totalSales, query: event.query, amount: event.amount));
+      emit(HistoryLoaded(
+        invoices, 
+        totalSales: totalSales, 
+        query: event.query, 
+        amount: event.amount,
+        paymentMethod: event.paymentMethod,
+      ));
     } catch (e) {
       emit(HistoryError('Failed to load history: ${e.toString()}'));
     }

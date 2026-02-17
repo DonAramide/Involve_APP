@@ -636,6 +636,12 @@ class $InvoicesTable extends Invoices
   late final GeneratedColumn<String> customerAddress = GeneratedColumn<String>(
       'customer_address', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _paymentMethodMeta =
+      const VerificationMeta('paymentMethod');
+  @override
+  late final GeneratedColumn<String> paymentMethod = GeneratedColumn<String>(
+      'payment_method', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -647,7 +653,8 @@ class $InvoicesTable extends Invoices
         totalAmount,
         paymentStatus,
         customerName,
-        customerAddress
+        customerAddress,
+        paymentMethod
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -724,6 +731,12 @@ class $InvoicesTable extends Invoices
           customerAddress.isAcceptableOrUnknown(
               data['customer_address']!, _customerAddressMeta));
     }
+    if (data.containsKey('payment_method')) {
+      context.handle(
+          _paymentMethodMeta,
+          paymentMethod.isAcceptableOrUnknown(
+              data['payment_method']!, _paymentMethodMeta));
+    }
     return context;
   }
 
@@ -753,6 +766,8 @@ class $InvoicesTable extends Invoices
           .read(DriftSqlType.string, data['${effectivePrefix}customer_name']),
       customerAddress: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}customer_address']),
+      paymentMethod: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payment_method']),
     );
   }
 
@@ -773,6 +788,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
   final String paymentStatus;
   final String? customerName;
   final String? customerAddress;
+  final String? paymentMethod;
   const InvoiceTable(
       {required this.id,
       required this.invoiceNumber,
@@ -783,7 +799,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       required this.totalAmount,
       required this.paymentStatus,
       this.customerName,
-      this.customerAddress});
+      this.customerAddress,
+      this.paymentMethod});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -800,6 +817,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
     }
     if (!nullToAbsent || customerAddress != null) {
       map['customer_address'] = Variable<String>(customerAddress);
+    }
+    if (!nullToAbsent || paymentMethod != null) {
+      map['payment_method'] = Variable<String>(paymentMethod);
     }
     return map;
   }
@@ -820,6 +840,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       customerAddress: customerAddress == null && nullToAbsent
           ? const Value.absent()
           : Value(customerAddress),
+      paymentMethod: paymentMethod == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paymentMethod),
     );
   }
 
@@ -837,6 +860,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       paymentStatus: serializer.fromJson<String>(json['paymentStatus']),
       customerName: serializer.fromJson<String?>(json['customerName']),
       customerAddress: serializer.fromJson<String?>(json['customerAddress']),
+      paymentMethod: serializer.fromJson<String?>(json['paymentMethod']),
     );
   }
   @override
@@ -853,6 +877,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       'paymentStatus': serializer.toJson<String>(paymentStatus),
       'customerName': serializer.toJson<String?>(customerName),
       'customerAddress': serializer.toJson<String?>(customerAddress),
+      'paymentMethod': serializer.toJson<String?>(paymentMethod),
     };
   }
 
@@ -866,7 +891,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           double? totalAmount,
           String? paymentStatus,
           Value<String?> customerName = const Value.absent(),
-          Value<String?> customerAddress = const Value.absent()}) =>
+          Value<String?> customerAddress = const Value.absent(),
+          Value<String?> paymentMethod = const Value.absent()}) =>
       InvoiceTable(
         id: id ?? this.id,
         invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -881,6 +907,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         customerAddress: customerAddress.present
             ? customerAddress.value
             : this.customerAddress,
+        paymentMethod:
+            paymentMethod.present ? paymentMethod.value : this.paymentMethod,
       );
   InvoiceTable copyWithCompanion(InvoicesCompanion data) {
     return InvoiceTable(
@@ -906,6 +934,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       customerAddress: data.customerAddress.present
           ? data.customerAddress.value
           : this.customerAddress,
+      paymentMethod: data.paymentMethod.present
+          ? data.paymentMethod.value
+          : this.paymentMethod,
     );
   }
 
@@ -921,7 +952,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ..write('totalAmount: $totalAmount, ')
           ..write('paymentStatus: $paymentStatus, ')
           ..write('customerName: $customerName, ')
-          ..write('customerAddress: $customerAddress')
+          ..write('customerAddress: $customerAddress, ')
+          ..write('paymentMethod: $paymentMethod')
           ..write(')'))
         .toString();
   }
@@ -937,7 +969,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       totalAmount,
       paymentStatus,
       customerName,
-      customerAddress);
+      customerAddress,
+      paymentMethod);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -951,7 +984,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           other.totalAmount == this.totalAmount &&
           other.paymentStatus == this.paymentStatus &&
           other.customerName == this.customerName &&
-          other.customerAddress == this.customerAddress);
+          other.customerAddress == this.customerAddress &&
+          other.paymentMethod == this.paymentMethod);
 }
 
 class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
@@ -965,6 +999,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
   final Value<String> paymentStatus;
   final Value<String?> customerName;
   final Value<String?> customerAddress;
+  final Value<String?> paymentMethod;
   const InvoicesCompanion({
     this.id = const Value.absent(),
     this.invoiceNumber = const Value.absent(),
@@ -976,6 +1011,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.paymentStatus = const Value.absent(),
     this.customerName = const Value.absent(),
     this.customerAddress = const Value.absent(),
+    this.paymentMethod = const Value.absent(),
   });
   InvoicesCompanion.insert({
     this.id = const Value.absent(),
@@ -988,6 +1024,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     required String paymentStatus,
     this.customerName = const Value.absent(),
     this.customerAddress = const Value.absent(),
+    this.paymentMethod = const Value.absent(),
   })  : invoiceNumber = Value(invoiceNumber),
         subtotal = Value(subtotal),
         taxAmount = Value(taxAmount),
@@ -1005,6 +1042,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     Expression<String>? paymentStatus,
     Expression<String>? customerName,
     Expression<String>? customerAddress,
+    Expression<String>? paymentMethod,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1017,6 +1055,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       if (paymentStatus != null) 'payment_status': paymentStatus,
       if (customerName != null) 'customer_name': customerName,
       if (customerAddress != null) 'customer_address': customerAddress,
+      if (paymentMethod != null) 'payment_method': paymentMethod,
     });
   }
 
@@ -1030,7 +1069,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       Value<double>? totalAmount,
       Value<String>? paymentStatus,
       Value<String?>? customerName,
-      Value<String?>? customerAddress}) {
+      Value<String?>? customerAddress,
+      Value<String?>? paymentMethod}) {
     return InvoicesCompanion(
       id: id ?? this.id,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -1042,6 +1082,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       paymentStatus: paymentStatus ?? this.paymentStatus,
       customerName: customerName ?? this.customerName,
       customerAddress: customerAddress ?? this.customerAddress,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
     );
   }
 
@@ -1078,6 +1119,9 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     if (customerAddress.present) {
       map['customer_address'] = Variable<String>(customerAddress.value);
     }
+    if (paymentMethod.present) {
+      map['payment_method'] = Variable<String>(paymentMethod.value);
+    }
     return map;
   }
 
@@ -1093,7 +1137,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
           ..write('totalAmount: $totalAmount, ')
           ..write('paymentStatus: $paymentStatus, ')
           ..write('customerName: $customerName, ')
-          ..write('customerAddress: $customerAddress')
+          ..write('customerAddress: $customerAddress, ')
+          ..write('paymentMethod: $paymentMethod')
           ..write(')'))
         .toString();
   }
@@ -1579,6 +1624,16 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("show_signature_space" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _paymentMethodsEnabledMeta =
+      const VerificationMeta('paymentMethodsEnabled');
+  @override
+  late final GeneratedColumn<bool> paymentMethodsEnabled =
+      GeneratedColumn<bool>('payment_methods_enabled', aliasedName, false,
+          type: DriftSqlType.bool,
+          requiredDuringInsert: false,
+          defaultConstraints: GeneratedColumn.constraintIsAlways(
+              'CHECK ("payment_methods_enabled" IN (0, 1))'),
+          defaultValue: const Constant(false));
   static const VerificationMeta _failedAttemptsMeta =
       const VerificationMeta('failedAttempts');
   @override
@@ -1627,6 +1682,7 @@ class $SettingsTable extends Settings
         showAccountDetails,
         receiptFooter,
         showSignatureSpace,
+        paymentMethodsEnabled,
         failedAttempts,
         isLocked,
         lockedAt
@@ -1759,6 +1815,12 @@ class $SettingsTable extends Settings
           showSignatureSpace.isAcceptableOrUnknown(
               data['show_signature_space']!, _showSignatureSpaceMeta));
     }
+    if (data.containsKey('payment_methods_enabled')) {
+      context.handle(
+          _paymentMethodsEnabledMeta,
+          paymentMethodsEnabled.isAcceptableOrUnknown(
+              data['payment_methods_enabled']!, _paymentMethodsEnabledMeta));
+    }
     if (data.containsKey('failed_attempts')) {
       context.handle(
           _failedAttemptsMeta,
@@ -1828,6 +1890,9 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.string, data['${effectivePrefix}receipt_footer'])!,
       showSignatureSpace: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}show_signature_space'])!,
+      paymentMethodsEnabled: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool,
+          data['${effectivePrefix}payment_methods_enabled'])!,
       failedAttempts: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}failed_attempts'])!,
       isLocked: attachedDatabase.typeMapping
@@ -1866,6 +1931,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showAccountDetails;
   final String receiptFooter;
   final bool showSignatureSpace;
+  final bool paymentMethodsEnabled;
   final int failedAttempts;
   final bool isLocked;
   final DateTime? lockedAt;
@@ -1892,6 +1958,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.showAccountDetails,
       required this.receiptFooter,
       required this.showSignatureSpace,
+      required this.paymentMethodsEnabled,
       required this.failedAttempts,
       required this.isLocked,
       this.lockedAt});
@@ -1934,6 +2001,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['show_account_details'] = Variable<bool>(showAccountDetails);
     map['receipt_footer'] = Variable<String>(receiptFooter);
     map['show_signature_space'] = Variable<bool>(showSignatureSpace);
+    map['payment_methods_enabled'] = Variable<bool>(paymentMethodsEnabled);
     map['failed_attempts'] = Variable<int>(failedAttempts);
     map['is_locked'] = Variable<bool>(isLocked);
     if (!nullToAbsent || lockedAt != null) {
@@ -1977,6 +2045,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showAccountDetails: Value(showAccountDetails),
       receiptFooter: Value(receiptFooter),
       showSignatureSpace: Value(showSignatureSpace),
+      paymentMethodsEnabled: Value(paymentMethodsEnabled),
       failedAttempts: Value(failedAttempts),
       isLocked: Value(isLocked),
       lockedAt: lockedAt == null && nullToAbsent
@@ -2014,6 +2083,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showAccountDetails: serializer.fromJson<bool>(json['showAccountDetails']),
       receiptFooter: serializer.fromJson<String>(json['receiptFooter']),
       showSignatureSpace: serializer.fromJson<bool>(json['showSignatureSpace']),
+      paymentMethodsEnabled:
+          serializer.fromJson<bool>(json['paymentMethodsEnabled']),
       failedAttempts: serializer.fromJson<int>(json['failedAttempts']),
       isLocked: serializer.fromJson<bool>(json['isLocked']),
       lockedAt: serializer.fromJson<DateTime?>(json['lockedAt']),
@@ -2047,6 +2118,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'showAccountDetails': serializer.toJson<bool>(showAccountDetails),
       'receiptFooter': serializer.toJson<String>(receiptFooter),
       'showSignatureSpace': serializer.toJson<bool>(showSignatureSpace),
+      'paymentMethodsEnabled': serializer.toJson<bool>(paymentMethodsEnabled),
       'failedAttempts': serializer.toJson<int>(failedAttempts),
       'isLocked': serializer.toJson<bool>(isLocked),
       'lockedAt': serializer.toJson<DateTime?>(lockedAt),
@@ -2076,6 +2148,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? showAccountDetails,
           String? receiptFooter,
           bool? showSignatureSpace,
+          bool? paymentMethodsEnabled,
           int? failedAttempts,
           bool? isLocked,
           Value<DateTime?> lockedAt = const Value.absent()}) =>
@@ -2107,6 +2180,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showAccountDetails: showAccountDetails ?? this.showAccountDetails,
         receiptFooter: receiptFooter ?? this.receiptFooter,
         showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
+        paymentMethodsEnabled:
+            paymentMethodsEnabled ?? this.paymentMethodsEnabled,
         failedAttempts: failedAttempts ?? this.failedAttempts,
         isLocked: isLocked ?? this.isLocked,
         lockedAt: lockedAt.present ? lockedAt.value : this.lockedAt,
@@ -2157,6 +2232,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showSignatureSpace: data.showSignatureSpace.present
           ? data.showSignatureSpace.value
           : this.showSignatureSpace,
+      paymentMethodsEnabled: data.paymentMethodsEnabled.present
+          ? data.paymentMethodsEnabled.value
+          : this.paymentMethodsEnabled,
       failedAttempts: data.failedAttempts.present
           ? data.failedAttempts.value
           : this.failedAttempts,
@@ -2190,6 +2268,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('showAccountDetails: $showAccountDetails, ')
           ..write('receiptFooter: $receiptFooter, ')
           ..write('showSignatureSpace: $showSignatureSpace, ')
+          ..write('paymentMethodsEnabled: $paymentMethodsEnabled, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -2221,6 +2300,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showAccountDetails,
         receiptFooter,
         showSignatureSpace,
+        paymentMethodsEnabled,
         failedAttempts,
         isLocked,
         lockedAt
@@ -2251,6 +2331,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.showAccountDetails == this.showAccountDetails &&
           other.receiptFooter == this.receiptFooter &&
           other.showSignatureSpace == this.showSignatureSpace &&
+          other.paymentMethodsEnabled == this.paymentMethodsEnabled &&
           other.failedAttempts == this.failedAttempts &&
           other.isLocked == this.isLocked &&
           other.lockedAt == this.lockedAt);
@@ -2279,6 +2360,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showAccountDetails;
   final Value<String> receiptFooter;
   final Value<bool> showSignatureSpace;
+  final Value<bool> paymentMethodsEnabled;
   final Value<int> failedAttempts;
   final Value<bool> isLocked;
   final Value<DateTime?> lockedAt;
@@ -2305,6 +2387,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showAccountDetails = const Value.absent(),
     this.receiptFooter = const Value.absent(),
     this.showSignatureSpace = const Value.absent(),
+    this.paymentMethodsEnabled = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -2332,6 +2415,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showAccountDetails = const Value.absent(),
     this.receiptFooter = const Value.absent(),
     this.showSignatureSpace = const Value.absent(),
+    this.paymentMethodsEnabled = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -2361,6 +2445,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showAccountDetails,
     Expression<String>? receiptFooter,
     Expression<bool>? showSignatureSpace,
+    Expression<bool>? paymentMethodsEnabled,
     Expression<int>? failedAttempts,
     Expression<bool>? isLocked,
     Expression<DateTime>? lockedAt,
@@ -2393,6 +2478,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (receiptFooter != null) 'receipt_footer': receiptFooter,
       if (showSignatureSpace != null)
         'show_signature_space': showSignatureSpace,
+      if (paymentMethodsEnabled != null)
+        'payment_methods_enabled': paymentMethodsEnabled,
       if (failedAttempts != null) 'failed_attempts': failedAttempts,
       if (isLocked != null) 'is_locked': isLocked,
       if (lockedAt != null) 'locked_at': lockedAt,
@@ -2422,6 +2509,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? showAccountDetails,
       Value<String>? receiptFooter,
       Value<bool>? showSignatureSpace,
+      Value<bool>? paymentMethodsEnabled,
       Value<int>? failedAttempts,
       Value<bool>? isLocked,
       Value<DateTime?>? lockedAt}) {
@@ -2450,6 +2538,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       showAccountDetails: showAccountDetails ?? this.showAccountDetails,
       receiptFooter: receiptFooter ?? this.receiptFooter,
       showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
+      paymentMethodsEnabled:
+          paymentMethodsEnabled ?? this.paymentMethodsEnabled,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
@@ -2527,6 +2617,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (showSignatureSpace.present) {
       map['show_signature_space'] = Variable<bool>(showSignatureSpace.value);
     }
+    if (paymentMethodsEnabled.present) {
+      map['payment_methods_enabled'] =
+          Variable<bool>(paymentMethodsEnabled.value);
+    }
     if (failedAttempts.present) {
       map['failed_attempts'] = Variable<int>(failedAttempts.value);
     }
@@ -2564,6 +2658,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('showAccountDetails: $showAccountDetails, ')
           ..write('receiptFooter: $receiptFooter, ')
           ..write('showSignatureSpace: $showSignatureSpace, ')
+          ..write('paymentMethodsEnabled: $paymentMethodsEnabled, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -3595,6 +3690,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   required String paymentStatus,
   Value<String?> customerName,
   Value<String?> customerAddress,
+  Value<String?> paymentMethod,
 });
 typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<int> id,
@@ -3607,6 +3703,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String> paymentStatus,
   Value<String?> customerName,
   Value<String?> customerAddress,
+  Value<String?> paymentMethod,
 });
 
 final class $$InvoicesTableReferences
@@ -3669,6 +3766,9 @@ class $$InvoicesTableFilterComposer
   ColumnFilters<String> get customerAddress => $composableBuilder(
       column: $table.customerAddress,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get paymentMethod => $composableBuilder(
+      column: $table.paymentMethod, builder: (column) => ColumnFilters(column));
 
   Expression<bool> invoiceItemsRefs(
       Expression<bool> Function($$InvoiceItemsTableFilterComposer f) f) {
@@ -3735,6 +3835,10 @@ class $$InvoicesTableOrderingComposer
   ColumnOrderings<String> get customerAddress => $composableBuilder(
       column: $table.customerAddress,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get paymentMethod => $composableBuilder(
+      column: $table.paymentMethod,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$InvoicesTableAnnotationComposer
@@ -3775,6 +3879,9 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<String> get customerAddress => $composableBuilder(
       column: $table.customerAddress, builder: (column) => column);
+
+  GeneratedColumn<String> get paymentMethod => $composableBuilder(
+      column: $table.paymentMethod, builder: (column) => column);
 
   Expression<T> invoiceItemsRefs<T extends Object>(
       Expression<T> Function($$InvoiceItemsTableAnnotationComposer a) f) {
@@ -3831,6 +3938,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<String> paymentStatus = const Value.absent(),
             Value<String?> customerName = const Value.absent(),
             Value<String?> customerAddress = const Value.absent(),
+            Value<String?> paymentMethod = const Value.absent(),
           }) =>
               InvoicesCompanion(
             id: id,
@@ -3843,6 +3951,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             paymentStatus: paymentStatus,
             customerName: customerName,
             customerAddress: customerAddress,
+            paymentMethod: paymentMethod,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -3855,6 +3964,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             required String paymentStatus,
             Value<String?> customerName = const Value.absent(),
             Value<String?> customerAddress = const Value.absent(),
+            Value<String?> paymentMethod = const Value.absent(),
           }) =>
               InvoicesCompanion.insert(
             id: id,
@@ -3867,6 +3977,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             paymentStatus: paymentStatus,
             customerName: customerName,
             customerAddress: customerAddress,
+            paymentMethod: paymentMethod,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -4277,6 +4388,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showAccountDetails,
   Value<String> receiptFooter,
   Value<bool> showSignatureSpace,
+  Value<bool> paymentMethodsEnabled,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -4304,6 +4416,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showAccountDetails,
   Value<String> receiptFooter,
   Value<bool> showSignatureSpace,
+  Value<bool> paymentMethodsEnabled,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -4390,6 +4503,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get showSignatureSpace => $composableBuilder(
       column: $table.showSignatureSpace,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get paymentMethodsEnabled => $composableBuilder(
+      column: $table.paymentMethodsEnabled,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get failedAttempts => $composableBuilder(
@@ -4488,6 +4605,10 @@ class $$SettingsTableOrderingComposer
       column: $table.showSignatureSpace,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get paymentMethodsEnabled => $composableBuilder(
+      column: $table.paymentMethodsEnabled,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
       builder: (column) => ColumnOrderings(column));
@@ -4574,6 +4695,9 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<bool> get showSignatureSpace => $composableBuilder(
       column: $table.showSignatureSpace, builder: (column) => column);
 
+  GeneratedColumn<bool> get paymentMethodsEnabled => $composableBuilder(
+      column: $table.paymentMethodsEnabled, builder: (column) => column);
+
   GeneratedColumn<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts, builder: (column) => column);
 
@@ -4632,6 +4756,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showAccountDetails = const Value.absent(),
             Value<String> receiptFooter = const Value.absent(),
             Value<bool> showSignatureSpace = const Value.absent(),
+            Value<bool> paymentMethodsEnabled = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -4659,6 +4784,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             showAccountDetails: showAccountDetails,
             receiptFooter: receiptFooter,
             showSignatureSpace: showSignatureSpace,
+            paymentMethodsEnabled: paymentMethodsEnabled,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
@@ -4686,6 +4812,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showAccountDetails = const Value.absent(),
             Value<String> receiptFooter = const Value.absent(),
             Value<bool> showSignatureSpace = const Value.absent(),
+            Value<bool> paymentMethodsEnabled = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -4713,6 +4840,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             showAccountDetails: showAccountDetails,
             receiptFooter: receiptFooter,
             showSignatureSpace: showSignatureSpace,
+            paymentMethodsEnabled: paymentMethodsEnabled,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,

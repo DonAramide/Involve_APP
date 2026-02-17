@@ -13,6 +13,7 @@ class Invoices extends Table {
   TextColumn get paymentStatus => text()(); // e.g., 'Paid', 'Pending'
   TextColumn get customerName => text().nullable()();
   TextColumn get customerAddress => text().nullable()();
+  TextColumn get paymentMethod => text().nullable()(); // 'Cash', 'POS', 'Transfer'
 }
 
 @DataClassName('InvoiceItemTable')

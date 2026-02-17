@@ -26,6 +26,7 @@ class Settings extends Table {
   BoolColumn get showAccountDetails => boolean().withDefault(const Constant(false))();
   TextColumn get receiptFooter => text().withDefault(const Constant('Thank you!'))();
   BoolColumn get showSignatureSpace => boolean().withDefault(const Constant(false))();
+  BoolColumn get paymentMethodsEnabled => boolean().withDefault(const Constant(false))();
   
   // Security lockout columns
   IntColumn get failedAttempts => integer().withDefault(const Constant(0))();

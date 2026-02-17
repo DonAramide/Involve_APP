@@ -73,7 +73,8 @@ class ReportGenerator {
                 0: const pw.FlexColumnWidth(2), // Date
                 1: const pw.FlexColumnWidth(3), // Invoice #
                 2: const pw.FlexColumnWidth(3), // Customer
-                3: const pw.FlexColumnWidth(2), // Amount
+                3: const pw.FlexColumnWidth(2), // Method
+                4: const pw.FlexColumnWidth(2), // Amount
               },
               children: [
                 // Table Header
@@ -83,6 +84,7 @@ class ReportGenerator {
                     _tableHeader('Date'),
                     _tableHeader('Invoice ID'),
                     _tableHeader('Customer'),
+                    _tableHeader('Method'),
                     _tableHeader('Amount'),
                   ],
                 ),
@@ -93,6 +95,7 @@ class ReportGenerator {
                       _tableCell(DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated)),
                       _tableCell(invoice.invoiceNumber),
                       _tableCell(invoice.customerName ?? '-'),
+                      _tableCell(invoice.paymentMethod ?? '-'),
                       _tableCell(CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: settings.currency), align: pw.Alignment.centerRight),
                     ],
                   );
