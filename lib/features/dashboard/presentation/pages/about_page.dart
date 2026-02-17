@@ -26,7 +26,7 @@ class AboutPage extends StatelessWidget {
             
             // App Name
             const Text(
-              'Involve App',
+              'Invify',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
