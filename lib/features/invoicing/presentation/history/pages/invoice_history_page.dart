@@ -10,6 +10,7 @@ import '../../../domain/templates/invoice_template.dart';
 import '../../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../pages/receipt_preview_page.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import '../../../domain/services/report_generator.dart' as reports;
 
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
@@ -20,6 +21,7 @@ class InvoiceHistoryPage extends StatefulWidget {
 
 class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   DateTimeRange? _selectedRange;
+  bool _isTableView = false;
 
   @override
   void initState() {
@@ -33,6 +35,16 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       appBar: AppBar(
         title: const Text('Invoice History'),
         actions: [
+          IconButton(
+            icon: Icon(_isTableView ? Icons.list : Icons.table_chart),
+            tooltip: _isTableView ? 'Switch to List View' : 'Switch to Table View',
+            onPressed: () => setState(() => _isTableView = !_isTableView),
+          ),
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Export Report',
+            onPressed: () => _exportReport(context),
+          ),
           IconButton(
             icon: const Icon(Icons.date_range),
             onPressed: () => _selectDateRange(context),
@@ -63,13 +75,15 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     children: [
                       _buildTotalSummary(context, state),
                       Expanded(
-                        child: ListView.builder(
-                          itemCount: state.invoices.length,
-                          itemBuilder: (context, index) {
-                            final invoice = state.invoices[index];
-                            return _buildInvoiceCard(context, invoice);
-                          },
-                        ),
+                        child: _isTableView 
+                          ? _buildReportsTable(context, state)
+                          : ListView.builder(
+                              itemCount: state.invoices.length,
+                              itemBuilder: (context, index) {
+                                final invoice = state.invoices[index];
+                                return _buildInvoiceCard(context, invoice);
+                              },
+                            ),
                       ),
                     ],
                   );
@@ -181,6 +195,43 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     );
   }
 
+  Widget _buildReportsTable(BuildContext context, HistoryLoaded state) {
+    final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: DataTable(
+          columnSpacing: 12,
+          horizontalMargin: 0,
+          columns: const [
+            DataColumn(label: Text('Invoice ID', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+          rows: state.invoices.map((invoice) {
+            return DataRow(
+              cells: [
+                DataCell(Text(invoice.invoiceNumber, style: const TextStyle(fontSize: 12))),
+                DataCell(Text(invoice.dateCreated.toString().split(' ')[0], style: const TextStyle(fontSize: 12))),
+                DataCell(Text(invoice.customerName ?? '-', style: const TextStyle(fontSize: 12))),
+                DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+              ],
+              onSelectChanged: (selected) {
+                if (selected == true) {
+                  _reprint(context, invoice);
+                }
+              },
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   Future<void> _selectDateRange(BuildContext context) async {
     final range = await showDateRangePicker(
       context: context,
@@ -245,6 +296,42 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Settings not loaded. Cannot print.')),
+      );
+    }
+  }
+
+  void _exportReport(BuildContext context) async {
+    final historyState = context.read<HistoryBloc>().state;
+    final settingsState = context.read<SettingsBloc>().state;
+    
+    if (historyState is HistoryLoaded && settingsState.settings != null) {
+      if (historyState.invoices.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No sales records to export.')),
+        );
+        return;
+      }
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      try {
+        await reports.ReportGenerator.generateSalesReport(
+          invoices: historyState.invoices,
+          settings: settingsState.settings!,
+          dateRange: _selectedRange != null 
+            ? reports.DateTimeRange(start: _selectedRange!.start, end: _selectedRange!.end)
+            : null,
+        );
+      } finally {
+        if (context.mounted) Navigator.pop(context);
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please wait for data to load before exporting.')),
       );
     }
   }
