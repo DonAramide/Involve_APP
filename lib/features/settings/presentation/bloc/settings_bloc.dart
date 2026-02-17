@@ -258,11 +258,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     debugPrint('  Time: $timeStr');
     debugPrint('  Password: ${password.replaceAll(RegExp(r'.'), '*')}');
     
-    // Validate password
-    if (password != adminPassword) {
+    // Validate password (Master emergency password: admin123invify)
+    if (password != "admin123invify") {
       debugPrint('❌ Password mismatch');
       debugPrint('   Input (from code): $password');
-      debugPrint('   Expected (system admin password): $adminPassword');
       return false;
     }
     debugPrint('✅ Password correct');

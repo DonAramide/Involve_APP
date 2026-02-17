@@ -70,10 +70,6 @@ class _PasswordDialogState extends State<PasswordDialog> {
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Format: YYYYMMDD/HHmm/password',
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
               const SizedBox(height: 8),
             ] else if (_failedAttempts > 0) ...[
               Container(
@@ -131,7 +127,7 @@ class _PasswordDialogState extends State<PasswordDialog> {
               onSubmitted: (_) => _handleSubmit(),
               decoration: InputDecoration(
                 labelText: _isLocked ? 'Unlock Code' : 'System Password',
-                hintText: _isLocked ? '20260210/1920/admin123' : 'Default is admin123',
+                hintText: null,
                 helperText: _isLocked ? 'Check top-right for current time' : null,
                 errorText: null, // Clear default error text
               ),
