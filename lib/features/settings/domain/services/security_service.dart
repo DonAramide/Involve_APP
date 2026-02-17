@@ -23,7 +23,7 @@ class SecurityService {
   Future<bool> verifyPassword(String input) async {
     final stored = await _storage.read(key: _passwordKey);
     if (stored == null) {
-      return input == 'admin123'; // Default password
+      return input == 'admin123'; // Reverted to default
     }
     return stored == input;
   }

@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:invify/features/invoicing/presentation/bloc/invoice_bloc.dart';
-import 'package:invify/features/invoicing/presentation/bloc/invoice_state.dart';
-import 'package:invify/features/stock/presentation/bloc/stock_bloc.dart';
-import 'package:invify/features/stock/presentation/bloc/stock_state.dart';
-import 'package:invify/features/stock/domain/entities/item.dart';
-import 'package:invify/features/invoicing/presentation/widgets/invoice_preview_dialog.dart';
-import 'package:invify/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:invify/features/settings/presentation/bloc/settings_state.dart';
-import 'package:invify/features/settings/domain/entities/settings.dart';
-import 'package:invify/core/utils/currency_formatter.dart';
+import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
+import 'package:involve_app/features/invoicing/presentation/bloc/invoice_state.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
+import 'package:involve_app/features/stock/domain/entities/item.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/invoice_preview_dialog.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class CreateInvoicePage extends StatelessWidget {
   const CreateInvoicePage({super.key});
@@ -41,19 +41,36 @@ class CreateInvoicePage extends StatelessWidget {
             ));
           }
         },
-        child: Row(
-          children: [
-            // Left Side: Item Selection
-            Expanded(
-              flex: 3,
-              child: _ItemSelector(),
-            ),
-            // Right Side: Cart Summary
-            Expanded(
-              flex: 2,
-              child: _CartSummary(),
-            ),
-          ],
+        child: BlocBuilder<SettingsBloc, SettingsState>(
+          builder: (context, settingsState) {
+            // Dispatch update on initial build too
+            final settings = settingsState.settings;
+            if (settings != null) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (context.mounted) {
+                  context.read<InvoiceBloc>().add(UpdateInvoiceSettings(
+                        taxRate: settings.taxRate,
+                        taxEnabled: settings.taxEnabled,
+                        discountEnabled: settings.discountEnabled,
+                      ));
+                }
+              });
+            }
+            return Row(
+              children: [
+                // Left Side: Item Selection
+                Expanded(
+                  flex: 3,
+                  child: _ItemSelector(),
+                ),
+                // Right Side: Cart Summary
+                Expanded(
+                  flex: 2,
+                  child: _CartSummary(),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -490,18 +507,41 @@ class _CartSummary extends StatelessWidget {
                         child: const Icon(Icons.delete, color: Colors.white),
                       ),
                       onDismissed: (_) {
-                        context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -item.quantity));
+                        context.read<InvoiceBloc>().add(RemoveItemFromInvoice(item.item));
                       },
                       child: ListTile(
                         dense: true,
                         title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('${item.quantity} x ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: settings?.currency ?? '₦')}'),
-                        trailing: Text(
-                          CurrencyFormatter.formatWithSymbol(
-                            item.total,
-                            symbol: settings?.currency ?? '₦',
-                          ),
-                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        subtitle: Text(CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: settings?.currency ?? '₦')),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _QuickBtn(
+                              icon: Icons.remove_circle_outline,
+                              color: Colors.red,
+                              onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -1)),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                '${item.quantity}',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                            ),
+                            _QuickBtn(
+                              icon: Icons.add_circle_outline,
+                              color: Colors.green,
+                              onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, 1)),
+                            ),
+                            const SizedBox(width: 16),
+                            Text(
+                              CurrencyFormatter.formatWithSymbol(
+                                item.total,
+                                symbol: settings?.currency ?? '₦',
+                              ),
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -543,7 +583,18 @@ class _CartSummary extends StatelessWidget {
                       const SizedBox(height: 8),
                     ],
                     _buildSummaryRow('Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    const Divider(),
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(state.customerName ?? 'Add Customer', style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)),
+                      subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
+                      leading: Icon(Icons.person_outline, color: state.customerName != null ? Colors.blue : Colors.grey),
+                      trailing: const Icon(Icons.edit, size: 16),
+                      onTap: () => _showCustomerDialog(context, state.customerName, state.customerAddress),
+                    ),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       height: 54,
@@ -652,6 +703,48 @@ class _CartSummary extends StatelessWidget {
               Navigator.pop(ctx);
             },
             child: const Text('APPLY'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showCustomerDialog(BuildContext context, String? currentName, String? currentAddress) {
+    final nameController = TextEditingController(text: currentName);
+    final addrController = TextEditingController(text: currentAddress);
+    final invoiceBloc = context.read<InvoiceBloc>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Customer Information'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder()),
+              autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: addrController,
+              decoration: const InputDecoration(labelText: 'Customer Address', border: OutlineInputBorder()),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              invoiceBloc.add(UpdateCustomerInfo(
+                name: nameController.text.isEmpty ? null : nameController.text,
+                address: addrController.text.isEmpty ? null : addrController.text,
+              ));
+              Navigator.pop(ctx);
+            },
+            child: const Text('SAVE'),
           ),
         ],
       ),

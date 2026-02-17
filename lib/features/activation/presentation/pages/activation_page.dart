@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:invify/core/license/license_service.dart';
-import 'package:invify/features/settings/presentation/pages/settings_page.dart';
-import 'package:invify/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/features/settings/presentation/pages/settings_page.dart';
+import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:intl/intl.dart';
-import 'package:invify/core/license/license_model.dart';
+import 'package:involve_app/core/license/license_model.dart';
 
 class ActivationPage extends StatefulWidget {
   final bool isExpired;

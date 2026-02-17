@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
-import 'package:invify/features/settings/presentation/pages/super_admin_settings_page.dart';
-import 'package:invify/features/admin/presentation/widgets/admin_login_dialog.dart';
+import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
+import 'package:involve_app/features/admin/presentation/widgets/admin_login_dialog.dart';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key});

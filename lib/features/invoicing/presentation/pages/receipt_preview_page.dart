@@ -64,7 +64,16 @@ class ReceiptPreviewPage extends StatelessWidget {
     try {
       // Use preferred template
       final templateName = settings?.defaultInvoiceTemplate ?? 'compact';
-      final template = templateName == 'detailed' ? DetailedInvoiceTemplate() : CompactInvoiceTemplate();
+      final InvoiceTemplate template;
+      if (templateName == 'detailed') {
+        template = DetailedInvoiceTemplate();
+      } else if (templateName == 'professional') {
+        template = ProfessionalInvoiceTemplate();
+      } else if (templateName == 'modern') {
+        template = ModernProfessionalTemplate();
+      } else {
+        template = CompactInvoiceTemplate();
+      }
       
       final commands = template.generateCommands(invoice, settings!);
       

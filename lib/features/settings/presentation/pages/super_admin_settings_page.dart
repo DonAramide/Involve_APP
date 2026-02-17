@@ -10,7 +10,7 @@ import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
 import '../../../../core/license/license_service.dart';
 import '../../../../core/license/license_generator.dart';
-import 'package:invify/features/stock/data/datasources/app_database.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
 
@@ -251,25 +251,6 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                   ),
                   const SizedBox(height: 32),
                   
-                  // Invoicing Controls Section
-                  _buildSectionHeader('Invoicing Controls'),
-                  const SizedBox(height: 16),
-                  Card(
-                    elevation: 1,
-                    child: SwitchListTile(
-                      title: const Text('Confirm Item Price on Selection'),
-                      subtitle: const Text('Ask user to confirm or edit price when adding items to invoice'),
-                      secondary: const Icon(Icons.price_check, color: Colors.deepPurple),
-                      value: _confirmPriceOnSelection,
-                      activeColor: Colors.deepPurple,
-                      onChanged: (val) {
-                        setState(() {
-                          _confirmPriceOnSelection = val;
-                          _hasChanges = true;
-                        });
-                      },
-                    ),
-                  ),
                   const SizedBox(height: 48),
 
                    // License Generator Section

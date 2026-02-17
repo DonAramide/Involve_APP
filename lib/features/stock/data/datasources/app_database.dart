@@ -13,7 +13,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration {
@@ -78,6 +78,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 13) {
           // Signature space migration
           await m.addColumn(settings, settings.showSignatureSpace as GeneratedColumn<Object>);
+        }
+        if (from < 14) {
+          // Customer details migration
+          await m.addColumn(invoices, invoices.customerName as GeneratedColumn<Object>);
+          await m.addColumn(invoices, invoices.customerAddress as GeneratedColumn<Object>);
         }
       },
       beforeOpen: (details) async {

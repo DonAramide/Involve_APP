@@ -24,10 +24,12 @@ class AboutPage extends StatelessWidget {
                 color: Theme.of(context).primaryColor,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Icon(
-                Icons.point_of_sale,
-                size: 60,
-                color: Colors.white,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -100,14 +102,10 @@ class AboutPage extends StatelessWidget {
                 color: Colors.grey,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'IIPS',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue,
-              ),
+            const SizedBox(height: 12),
+            Image.asset(
+              'assets/images/iips_logo.png',
+              height: 100,
             ),
             const SizedBox(height: 8),
             const Text(

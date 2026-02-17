@@ -1,7 +1,7 @@
 import 'invoice_template.dart';
 import '../entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
-import 'package:invify/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class CompactInvoiceTemplate extends InvoiceTemplate {
   @override
@@ -133,7 +133,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
   }
 
   String _formatRow(String left, String right, int width) {
-    final spacesCount = (width - left.length - right.length).clamp(1, width);
+    final spacesCount = (width - left.length - right.length).clamp(2, width);
     return left + (' ' * spacesCount) + right;
   }
 }
@@ -180,7 +180,7 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
 
 class ProfessionalInvoiceTemplate extends InvoiceTemplate {
   @override
-  String get name => 'Professional';
+  String get name => 'Professional (Green)';
   @override
   TemplateType get type => TemplateType.professional;
   @override
@@ -198,41 +198,44 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
     return [
       if (settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
-      if (settings.businessDescription != null && settings.businessDescription!.isNotEmpty)
-        TextCommand(settings.businessDescription!, align: 'center'),
-      TextCommand(settings.address, align: 'center'),
-      TextCommand('Tel: ${settings.phone}', align: 'center'),
+      if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
+      if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
       DividerCommand(),
-      TextCommand('INVOICE: ${invoice.invoiceNumber}', isBold: true),
-      TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}'),
+      TextCommand('BILL TO:', isBold: true),
+      TextCommand(invoice.customerName ?? 'Cash Customer'),
+      if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),
+      SizedBoxCommand(height: 1),
+      TextCommand('INVOICE #: ${invoice.invoiceNumber}', align: 'right'),
+      TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'right'),
       DividerCommand(),
-      // Column widths: Qty(3), Item(12), Price(8), Total(9) = 32
-      TextCommand('QTY ITEM        PRICE    TOTAL', isBold: true),
+      // 4-Column Layout: ITEM(10), PRICE(7), QTY(5), TOTAL(10) = 32
+      TextCommand('ITEM      PRICE  QTY    TOTAL', isBold: true),
       DividerCommand(),
       ...invoice.items.map((item) {
-        final qty = item.quantity.toString().padRight(3).substring(0, 3);
-        final name = item.item.name.padRight(12).substring(0, 12);
-        final price = CurrencyFormatter.format(item.unitPrice).padLeft(8).substring(0, 8);
-        final total = CurrencyFormatter.format(item.total).padLeft(9).substring(0, 9);
-        return TextCommand('$qty$name$price$total');
+        final name = item.item.name.padRight(10).substring(0, 10);
+        final price = CurrencyFormatter.format(item.unitPrice).padLeft(7).substring(0, 7);
+        final qty = item.quantity.toString().padLeft(5).substring(0, 5);
+        final total = CurrencyFormatter.format(item.total).padLeft(10).substring(0, 10);
+        return TextCommand('$name$price$qty$total');
       }),
       DividerCommand(),
-      TextCommand(_formatSummaryRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal), width)),
+      TextCommand(_formatSummaryRow('SUBTOTAL:', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0)
-        TextCommand(_formatSummaryRow('TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%)', CurrencyFormatter.format(invoice.taxAmount), width)),
+        TextCommand(_formatSummaryRow('TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%):', CurrencyFormatter.format(invoice.taxAmount), width)),
       if (invoice.discountAmount > 0)
-        TextCommand(_formatSummaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
-      TextCommand(_formatSummaryRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', width), isBold: true),
+        TextCommand(_formatSummaryRow('DISCOUNT:', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
+      DividerCommand(),
+      TextCommand(_formatSummaryRow('TOTAL:', '${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', width), isBold: true),
       if (settings.showAccountDetails && settings.bankName != null) ...[
         DividerCommand(),
-        TextCommand('PAYMENT DETAILS', align: 'center', isBold: true),
-        TextCommand('Bank: ${settings.bankName}', align: 'center'),
-        if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
-        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+        TextCommand('PAYMENT METHODS:', isBold: true),
+        TextCommand('Bank: ${settings.bankName}'),
+        if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}'),
       ],
       if (settings.showSignatureSpace) ...[
-        SizedBoxCommand(height: 1),
-        TextCommand('Signature: .................', align: 'center'),
+        SizedBoxCommand(height: 2),
+        TextCommand('--------------------------', align: 'right'),
+        TextCommand('Signature', align: 'right'),
       ],
       DividerCommand(),
       TextCommand(settings.receiptFooter, align: 'center'),
@@ -241,10 +244,64 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
   }
 
   String _formatSummaryRow(String label, String value, int width) {
-    if (label.length + value.length >= width) {
-      return '$label $value';
-    }
+    if (label.length + value.length >= width) return '$label $value';
     final spaces = ' ' * (width - label.length - value.length);
     return label + spaces + value;
+  }
+}
+
+class ModernProfessionalTemplate extends InvoiceTemplate {
+  @override
+  String get name => 'Modern Pro (Shadow)';
+  @override
+  TemplateType get type => TemplateType.modern; 
+  @override
+  LogoPlacement get logoPlacement => LogoPlacement.topCenter;
+  @override
+  bool get useBoldHeaders => true;
+  @override
+  double get columnSpacing => 1.0;
+
+  @override
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final settings = orgSettings as AppSettings;
+    const int width = 32;
+
+    return [
+      TextCommand('INVOICE', align: 'center', isBold: true),
+      SizedBoxCommand(height: 1),
+      TextCommand(settings.organizationName.toUpperCase(), isBold: true),
+      if (settings.businessDescription != null) TextCommand(settings.businessDescription!),
+      DividerCommand(),
+      TextCommand('TO: ${invoice.customerName ?? "Client"}'),
+      TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}'),
+      DividerCommand(),
+      // 3-Column: QTY(5), ITEM(15), TOTAL(12) = 32
+      TextCommand('QTY   ITEM           TOTAL', isBold: true),
+      DividerCommand(),
+      ...invoice.items.map((item) {
+        final qty = item.quantity.toString().padRight(5).substring(0, 5);
+        final name = item.item.name.padRight(15).substring(0, 15);
+        final total = CurrencyFormatter.format(item.total).padLeft(12).substring(0, 12);
+        return TextCommand('$qty$name$total');
+      }),
+      DividerCommand(),
+      TextCommand(_formatRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal), width)),
+      if (invoice.taxAmount > 0)
+        TextCommand(_formatRow('SALES TAX', CurrencyFormatter.format(invoice.taxAmount), width)),
+      if (invoice.discountAmount > 0)
+        TextCommand(_formatRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
+      SizedBoxCommand(height: 1),
+      TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', width), isBold: true),
+      SizedBoxCommand(height: 2),
+      TextCommand('THANK YOU FOR YOUR BUSINESS', align: 'center', isBold: true),
+      DividerCommand(),
+      TextCommand('Powered by IIPS', align: 'center'),
+    ];
+  }
+
+  String _formatRow(String left, String right, int width) {
+    final spaces = ' ' * (width - left.length - right.length).clamp(1, width);
+    return left + spaces + right;
   }
 }

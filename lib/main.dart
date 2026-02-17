@@ -197,7 +197,7 @@ class MyApp extends StatelessWidget {
         builder: (context, state) {
           final themeMode = state.settings?.themeMode ?? 'system';
           return MaterialApp(
-            title: 'MyInvoice',
+            title: 'Invify',
             debugShowCheckedModeBanner: false,
             themeMode: themeMode == 'light' 
                 ? ThemeMode.light 

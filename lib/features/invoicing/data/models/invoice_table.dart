@@ -11,6 +11,8 @@ class Invoices extends Table {
   RealColumn get discountAmount => real()();
   RealColumn get totalAmount => real()();
   TextColumn get paymentStatus => text()(); // e.g., 'Paid', 'Pending'
+  TextColumn get customerName => text().nullable()();
+  TextColumn get customerAddress => text().nullable()();
 }
 
 @DataClassName('InvoiceItemTable')

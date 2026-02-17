@@ -18,6 +18,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<SaveInvoice>(_onSaveInvoice);
     on<ResetInvoice>(_onReset);
     on<UpdateInvoiceSettings>(_onUpdateSettings);
+    on<UpdateCustomerInfo>(_onUpdateCustomer);
   }
 
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
@@ -26,10 +27,13 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
 
     if (existingIndex >= 0) {
       final existingItem = updatedItems[existingIndex];
-      updatedItems[existingIndex] = existingItem.copyWith(
-        quantity: existingItem.quantity + event.quantity,
-      );
-    } else {
+      final newQuantity = existingItem.quantity + event.quantity;
+      if (newQuantity <= 0) {
+        updatedItems.removeAt(existingIndex);
+      } else {
+        updatedItems[existingIndex] = existingItem.copyWith(quantity: newQuantity);
+      }
+    } else if (event.quantity > 0) {
       updatedItems.add(InvoiceItem(
         item: event.item,
         quantity: event.quantity,
@@ -61,6 +65,8 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         discountAmount: state.discount,
         totalAmount: state.total,
         paymentStatus: 'Paid',
+        customerName: state.customerName,
+        customerAddress: state.customerAddress,
       );
 
       await repository.saveInvoice(invoice);
@@ -75,6 +81,13 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
       taxRate: state.taxRate,
       taxEnabled: state.taxEnabled,
       discountEnabled: state.discountEnabled,
+    ));
+  }
+
+  void _onUpdateCustomer(UpdateCustomerInfo event, Emitter<InvoiceState> emit) {
+    emit(state.copyWith(
+      customerName: event.name,
+      customerAddress: event.address,
     ));
   }
 

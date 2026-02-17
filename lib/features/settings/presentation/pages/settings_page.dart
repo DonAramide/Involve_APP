@@ -9,7 +9,7 @@ import '../widgets/password_dialog.dart';
 import '../widgets/super_admin_dialog.dart';
 import '../widgets/super_admin_password_dialog.dart';
 import '../../../../core/license/license_service.dart';
-import 'package:invify/features/stock/data/datasources/app_database.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/settings.dart';
 
@@ -77,6 +77,7 @@ class SettingsPage extends StatelessWidget {
                   ),
                 _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
                 _buildSwitchTile('Allow Price Updates', settings.allowPriceUpdates, (val) => _update(context, settings.copyWith(allowPriceUpdates: val))),
+                _buildSwitchTile('Confirm Item Price on Selection', settings.confirmPriceOnSelection, (val) => _update(context, settings.copyWith(confirmPriceOnSelection: val))),
                 _buildDropdownTile(
                   context, 
                   'Currency', 
@@ -88,7 +89,7 @@ class SettingsPage extends StatelessWidget {
                   context, 
                   'Invoice Template', 
                   settings.defaultInvoiceTemplate, 
-                  ['compact', 'detailed', 'minimalist', 'professional'], 
+                  ['compact', 'detailed', 'minimalist', 'professional', 'modern'], 
                   (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
                 ),
                 _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),

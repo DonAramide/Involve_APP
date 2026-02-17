@@ -2,18 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/invoice_bloc.dart';
 import '../bloc/invoice_state.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../printer/presentation/bloc/printer_bloc.dart';
 import '../../../printer/presentation/bloc/printer_state.dart';
-import '../../../printer/domain/usecases/printer_usecases.dart';
-import '../../domain/templates/template_registry.dart';
 import '../../domain/templates/invoice_template.dart';
-import '../../domain/entities/invoice.dart';
-import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import '../pages/receipt_preview_page.dart';
 import '../../domain/templates/concrete_templates.dart';
-import '../../domain/usecases/history_usecases.dart';
-import 'package:invify/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
+import '../../../settings/domain/entities/settings.dart';
+import '../../domain/entities/invoice.dart';
 
 class InvoicePreviewDialog extends StatelessWidget {
   final InvoiceBloc invoiceBloc;
@@ -99,7 +97,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                           if (invoiceState.discount > 0)
                             _row('Discount', -invoiceState.discount, settings?.currency ?? '₦'),
                           const Divider(),
-                          _row('Total', invoiceState.total, settings?.currency ?? '₦', isTotal: true),
+                          _row('Total', invoiceState.total, settings?.currency ?? '₦', isBold: true),
                           if (settings?.showAccountDetails == true && settings?.bankName != null) ...[
                             const SizedBox(height: 12),
                             const Divider(thickness: 1),
@@ -183,6 +181,8 @@ class InvoicePreviewDialog extends StatelessWidget {
                           discountAmount: 0,
                           totalAmount: total,
                           paymentStatus: 'Paid',
+                          customerName: invoiceState.customerName,
+                          customerAddress: invoiceState.customerAddress,
                         );
 
                         // Trigger Print using preferred template
@@ -194,6 +194,8 @@ class InvoicePreviewDialog extends StatelessWidget {
                           template = MinimalistInvoiceTemplate();
                         } else if (templateName == 'professional') {
                           template = ProfessionalInvoiceTemplate();
+                        } else if (templateName == 'modern') {
+                          template = ModernProfessionalTemplate();
                         } else {
                           template = CompactInvoiceTemplate();
                         }
@@ -226,6 +228,8 @@ class InvoicePreviewDialog extends StatelessWidget {
                           discountAmount: 0,
                           totalAmount: invoiceState.total,
                           paymentStatus: 'Paid',
+                          customerName: invoiceState.customerName,
+                          customerAddress: invoiceState.customerAddress,
                         );
 
                         Navigator.push(

@@ -9,7 +9,14 @@ class AdminLoginDialog extends StatefulWidget {
 
 class _AdminLoginDialogState extends State<AdminLoginDialog> {
   final _passwordController = TextEditingController();
-  final _adminPassword = "admin123"; // Default admin password
+  
+  String _getDynamicPassword() {
+    final now = DateTime.now();
+    final mm = now.month.toString().padLeft(2, '0');
+    final dd = now.day.toString().padLeft(2, '0');
+    final yy = now.year.toString().substring(2);
+    return '$mm$dd${yy}iips@wendy';
+  }
 
   @override
   void dispose() {
@@ -43,7 +50,7 @@ class _AdminLoginDialogState extends State<AdminLoginDialog> {
         ),
         ElevatedButton(
           onPressed: () {
-            if (_passwordController.text == _adminPassword) {
+            if (_passwordController.text == _getDynamicPassword()) {
               Navigator.pop(context, true);
             } else {
               ScaffoldMessenger.of(context).showSnackBar(

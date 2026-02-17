@@ -21,6 +21,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               discountAmount: invoice.discountAmount,
               totalAmount: invoice.totalAmount,
               paymentStatus: invoice.paymentStatus,
+              customerName: Value(invoice.customerName),
+              customerAddress: Value(invoice.customerAddress),
             ),
           );
 
@@ -98,6 +100,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         discountAmount: row.discountAmount,
         totalAmount: row.totalAmount,
         paymentStatus: row.paymentStatus,
+        customerName: row.customerName,
+        customerAddress: row.customerAddress,
       ));
     }
     return result;
