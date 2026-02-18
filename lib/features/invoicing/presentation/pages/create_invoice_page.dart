@@ -43,7 +43,6 @@ class CreateInvoicePage extends StatelessWidget {
         },
         child: BlocBuilder<SettingsBloc, SettingsState>(
           builder: (context, settingsState) {
-            // Dispatch update on initial build too
             final settings = settingsState.settings;
             if (settings != null) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -56,19 +55,36 @@ class CreateInvoicePage extends StatelessWidget {
                 }
               });
             }
-            return Row(
-              children: [
-                // Left Side: Item Selection
-                Expanded(
-                  flex: 3,
-                  child: _ItemSelector(),
-                ),
-                // Right Side: Cart Summary
-                Expanded(
-                  flex: 2,
-                  child: _CartSummary(),
-                ),
-              ],
+
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final isMobile = constraints.maxWidth < 800;
+                
+                if (isMobile) {
+                  return Stack(
+                    children: [
+                      _ItemSelector(isMobile: true),
+                      Positioned(
+                        bottom: 16,
+                        right: 16,
+                        child: _MobileCartButton(),
+                      ),
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    // Left Side: Item Selection
+                    Expanded(
+                      flex: 3,
+                      child: _ItemSelector(isMobile: false),
+                    ),
+                    // Right Side: Cart Summary
+                    _CartSummary(isSidePanel: true),
+                  ],
+                );
+              },
             );
           },
         ),
@@ -77,7 +93,63 @@ class CreateInvoicePage extends StatelessWidget {
   }
 }
 
+class _MobileCartButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<InvoiceBloc, InvoiceState>(
+      builder: (context, state) {
+        if (state.items.isEmpty) return const SizedBox.shrink();
+
+        return FloatingActionButton.extended(
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => DraggableScrollableSheet(
+                initialChildSize: 0.85,
+                minChildSize: 0.5,
+                maxChildSize: 1.0,
+                builder: (_, controller) => Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: _CartSummary(isSidePanel: false, scrollController: controller),
+                ),
+              ),
+            );
+          },
+          label: Row(
+            children: [
+              Text(
+                'VIEW CART (${state.items.length})',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 12),
+              const Text('|', style: TextStyle(color: Colors.white54)),
+              const SizedBox(width: 12),
+              Text(
+                CurrencyFormatter.formatWithSymbol(
+                  state.total,
+                  symbol: context.watch<SettingsBloc>().state.settings?.currency ?? '₦',
+                ),
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ],
+          ),
+          icon: const Icon(Icons.shopping_cart),
+          backgroundColor: Colors.blue[700],
+        );
+      },
+    );
+  }
+}
+
 class _ItemSelector extends StatefulWidget {
+  final bool isMobile;
+  const _ItemSelector({required this.isMobile});
+
   @override
   State<_ItemSelector> createState() => _ItemSelectorState();
 }
@@ -188,9 +260,9 @@ class _ItemSelectorState extends State<_ItemSelector> {
                       )
                     : GridView.builder(
                         padding: const EdgeInsets.all(16),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          childAspectRatio: 0.8, // Adjusted for image
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: widget.isMobile ? 2 : 3,
+                          childAspectRatio: 0.85, 
                           mainAxisSpacing: 10,
                           crossAxisSpacing: 10,
                         ),
@@ -370,7 +442,7 @@ class _POSItemCard extends StatelessWidget {
                           Text(
                             item.name.toUpperCase(),
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
@@ -444,18 +516,23 @@ class _QuickBtn extends StatelessWidget {
 }
 
 class _CartSummary extends StatelessWidget {
+  final bool isSidePanel;
+  final ScrollController? scrollController;
+
+  const _CartSummary({required this.isSidePanel, this.scrollController});
+
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsBloc>().state.settings;
     
     return Container(
-      width: 350, // Fixed width for cart summary on tablets/desktop
+      width: isSidePanel ? 400 : double.infinity, 
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(left: BorderSide(color: Colors.grey[200]!)),
-        boxShadow: [
+        border: isSidePanel ? Border(left: BorderSide(color: Colors.grey[200]!)) : null,
+        boxShadow: isSidePanel ? [
           BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(-5, 0)),
-        ],
+        ] : null,
       ),
       child: BlocBuilder<InvoiceBloc, InvoiceState>(
         builder: (context, state) {
@@ -494,6 +571,7 @@ class _CartSummary extends StatelessWidget {
               // Cart Items List
               Expanded(
                 child: ListView.builder(
+                  controller: scrollController,
                   itemCount: state.items.length,
                   itemBuilder: (context, index) {
                     final item = state.items[index];
