@@ -36,6 +36,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
                 unitPrice: item.unitPrice,
               ),
             );
+
+        // Deduct stock
+        await db.customUpdate(
+          'UPDATE items SET stock_qty = stock_qty - ? WHERE id = ?',
+          variables: [Variable.withInt(item.quantity), Variable.withInt(item.item.id!)],
+          updates: {db.items},
+        );
       }
     });
   }

@@ -11,6 +11,8 @@ import '../pages/receipt_preview_page.dart';
 import '../../domain/templates/concrete_templates.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import '../../../settings/domain/entities/settings.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import '../../domain/entities/invoice.dart';
 
 class InvoicePreviewDialog extends StatelessWidget {
@@ -25,6 +27,9 @@ class InvoicePreviewDialog extends StatelessWidget {
       child: BlocListener<InvoiceBloc, InvoiceState>(
         listener: (context, state) {
           if (state.isSaved) {
+            // Signal StockBloc to reload items
+            context.read<StockBloc>().add(LoadItems());
+            
             Navigator.pop(context); // Close preview
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Invoice saved successfully!')),
