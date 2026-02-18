@@ -77,9 +77,12 @@ class _DashboardPageState extends State<DashboardPage> {
               ],
             ),
             flexibleSpace: Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.blue, Colors.indigo],
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Color.lerp(Theme.of(context).colorScheme.primary, Colors.black, 0.2)!,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -149,7 +152,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       title: Text('About'),
                       contentPadding: EdgeInsets.zero,
                       visualDensity: VisualDensity.compact,
-                    ),
+                      ),
                   ),
                   const PopupMenuItem(
                     value: 'contact',
@@ -185,7 +188,7 @@ class _DashboardPageState extends State<DashboardPage> {
             context,
             'NEW INVOICE',
             Icons.add_shopping_cart,
-            Colors.blue,
+            Theme.of(context).colorScheme.primary,
             () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateInvoicePage())),
           ),
           BlocBuilder<PrinterBloc, PrinterState>(

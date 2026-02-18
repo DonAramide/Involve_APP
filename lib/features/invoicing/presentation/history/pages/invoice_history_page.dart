@@ -383,9 +383,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
+        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+        border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
       ),
       child: Column(
         children: [
@@ -404,10 +404,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               state.totalSales,
               symbol: currency,
             ),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: Colors.blue,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           const SizedBox(height: 4),

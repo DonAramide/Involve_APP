@@ -1634,6 +1634,14 @@ class $SettingsTable extends Settings
           defaultConstraints: GeneratedColumn.constraintIsAlways(
               'CHECK ("payment_methods_enabled" IN (0, 1))'),
           defaultValue: const Constant(false));
+  static const VerificationMeta _primaryColorMeta =
+      const VerificationMeta('primaryColor');
+  @override
+  late final GeneratedColumn<int> primaryColor = GeneratedColumn<int>(
+      'primary_color', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0xFF2196F3));
   static const VerificationMeta _failedAttemptsMeta =
       const VerificationMeta('failedAttempts');
   @override
@@ -1683,6 +1691,7 @@ class $SettingsTable extends Settings
         receiptFooter,
         showSignatureSpace,
         paymentMethodsEnabled,
+        primaryColor,
         failedAttempts,
         isLocked,
         lockedAt
@@ -1821,6 +1830,12 @@ class $SettingsTable extends Settings
           paymentMethodsEnabled.isAcceptableOrUnknown(
               data['payment_methods_enabled']!, _paymentMethodsEnabledMeta));
     }
+    if (data.containsKey('primary_color')) {
+      context.handle(
+          _primaryColorMeta,
+          primaryColor.isAcceptableOrUnknown(
+              data['primary_color']!, _primaryColorMeta));
+    }
     if (data.containsKey('failed_attempts')) {
       context.handle(
           _failedAttemptsMeta,
@@ -1893,6 +1908,8 @@ class $SettingsTable extends Settings
       paymentMethodsEnabled: attachedDatabase.typeMapping.read(
           DriftSqlType.bool,
           data['${effectivePrefix}payment_methods_enabled'])!,
+      primaryColor: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}primary_color'])!,
       failedAttempts: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}failed_attempts'])!,
       isLocked: attachedDatabase.typeMapping
@@ -1932,6 +1949,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final String receiptFooter;
   final bool showSignatureSpace;
   final bool paymentMethodsEnabled;
+  final int primaryColor;
   final int failedAttempts;
   final bool isLocked;
   final DateTime? lockedAt;
@@ -1959,6 +1977,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.receiptFooter,
       required this.showSignatureSpace,
       required this.paymentMethodsEnabled,
+      required this.primaryColor,
       required this.failedAttempts,
       required this.isLocked,
       this.lockedAt});
@@ -2002,6 +2021,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['receipt_footer'] = Variable<String>(receiptFooter);
     map['show_signature_space'] = Variable<bool>(showSignatureSpace);
     map['payment_methods_enabled'] = Variable<bool>(paymentMethodsEnabled);
+    map['primary_color'] = Variable<int>(primaryColor);
     map['failed_attempts'] = Variable<int>(failedAttempts);
     map['is_locked'] = Variable<bool>(isLocked);
     if (!nullToAbsent || lockedAt != null) {
@@ -2046,6 +2066,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       receiptFooter: Value(receiptFooter),
       showSignatureSpace: Value(showSignatureSpace),
       paymentMethodsEnabled: Value(paymentMethodsEnabled),
+      primaryColor: Value(primaryColor),
       failedAttempts: Value(failedAttempts),
       isLocked: Value(isLocked),
       lockedAt: lockedAt == null && nullToAbsent
@@ -2085,6 +2106,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showSignatureSpace: serializer.fromJson<bool>(json['showSignatureSpace']),
       paymentMethodsEnabled:
           serializer.fromJson<bool>(json['paymentMethodsEnabled']),
+      primaryColor: serializer.fromJson<int>(json['primaryColor']),
       failedAttempts: serializer.fromJson<int>(json['failedAttempts']),
       isLocked: serializer.fromJson<bool>(json['isLocked']),
       lockedAt: serializer.fromJson<DateTime?>(json['lockedAt']),
@@ -2119,6 +2141,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'receiptFooter': serializer.toJson<String>(receiptFooter),
       'showSignatureSpace': serializer.toJson<bool>(showSignatureSpace),
       'paymentMethodsEnabled': serializer.toJson<bool>(paymentMethodsEnabled),
+      'primaryColor': serializer.toJson<int>(primaryColor),
       'failedAttempts': serializer.toJson<int>(failedAttempts),
       'isLocked': serializer.toJson<bool>(isLocked),
       'lockedAt': serializer.toJson<DateTime?>(lockedAt),
@@ -2149,6 +2172,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           String? receiptFooter,
           bool? showSignatureSpace,
           bool? paymentMethodsEnabled,
+          int? primaryColor,
           int? failedAttempts,
           bool? isLocked,
           Value<DateTime?> lockedAt = const Value.absent()}) =>
@@ -2182,6 +2206,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
         paymentMethodsEnabled:
             paymentMethodsEnabled ?? this.paymentMethodsEnabled,
+        primaryColor: primaryColor ?? this.primaryColor,
         failedAttempts: failedAttempts ?? this.failedAttempts,
         isLocked: isLocked ?? this.isLocked,
         lockedAt: lockedAt.present ? lockedAt.value : this.lockedAt,
@@ -2235,6 +2260,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       paymentMethodsEnabled: data.paymentMethodsEnabled.present
           ? data.paymentMethodsEnabled.value
           : this.paymentMethodsEnabled,
+      primaryColor: data.primaryColor.present
+          ? data.primaryColor.value
+          : this.primaryColor,
       failedAttempts: data.failedAttempts.present
           ? data.failedAttempts.value
           : this.failedAttempts,
@@ -2269,6 +2297,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('receiptFooter: $receiptFooter, ')
           ..write('showSignatureSpace: $showSignatureSpace, ')
           ..write('paymentMethodsEnabled: $paymentMethodsEnabled, ')
+          ..write('primaryColor: $primaryColor, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -2301,6 +2330,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         receiptFooter,
         showSignatureSpace,
         paymentMethodsEnabled,
+        primaryColor,
         failedAttempts,
         isLocked,
         lockedAt
@@ -2332,6 +2362,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.receiptFooter == this.receiptFooter &&
           other.showSignatureSpace == this.showSignatureSpace &&
           other.paymentMethodsEnabled == this.paymentMethodsEnabled &&
+          other.primaryColor == this.primaryColor &&
           other.failedAttempts == this.failedAttempts &&
           other.isLocked == this.isLocked &&
           other.lockedAt == this.lockedAt);
@@ -2361,6 +2392,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<String> receiptFooter;
   final Value<bool> showSignatureSpace;
   final Value<bool> paymentMethodsEnabled;
+  final Value<int> primaryColor;
   final Value<int> failedAttempts;
   final Value<bool> isLocked;
   final Value<DateTime?> lockedAt;
@@ -2388,6 +2420,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.receiptFooter = const Value.absent(),
     this.showSignatureSpace = const Value.absent(),
     this.paymentMethodsEnabled = const Value.absent(),
+    this.primaryColor = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -2416,6 +2449,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.receiptFooter = const Value.absent(),
     this.showSignatureSpace = const Value.absent(),
     this.paymentMethodsEnabled = const Value.absent(),
+    this.primaryColor = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -2446,6 +2480,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<String>? receiptFooter,
     Expression<bool>? showSignatureSpace,
     Expression<bool>? paymentMethodsEnabled,
+    Expression<int>? primaryColor,
     Expression<int>? failedAttempts,
     Expression<bool>? isLocked,
     Expression<DateTime>? lockedAt,
@@ -2480,6 +2515,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
         'show_signature_space': showSignatureSpace,
       if (paymentMethodsEnabled != null)
         'payment_methods_enabled': paymentMethodsEnabled,
+      if (primaryColor != null) 'primary_color': primaryColor,
       if (failedAttempts != null) 'failed_attempts': failedAttempts,
       if (isLocked != null) 'is_locked': isLocked,
       if (lockedAt != null) 'locked_at': lockedAt,
@@ -2510,6 +2546,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String>? receiptFooter,
       Value<bool>? showSignatureSpace,
       Value<bool>? paymentMethodsEnabled,
+      Value<int>? primaryColor,
       Value<int>? failedAttempts,
       Value<bool>? isLocked,
       Value<DateTime?>? lockedAt}) {
@@ -2540,6 +2577,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
       paymentMethodsEnabled:
           paymentMethodsEnabled ?? this.paymentMethodsEnabled,
+      primaryColor: primaryColor ?? this.primaryColor,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
@@ -2621,6 +2659,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       map['payment_methods_enabled'] =
           Variable<bool>(paymentMethodsEnabled.value);
     }
+    if (primaryColor.present) {
+      map['primary_color'] = Variable<int>(primaryColor.value);
+    }
     if (failedAttempts.present) {
       map['failed_attempts'] = Variable<int>(failedAttempts.value);
     }
@@ -2659,6 +2700,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('receiptFooter: $receiptFooter, ')
           ..write('showSignatureSpace: $showSignatureSpace, ')
           ..write('paymentMethodsEnabled: $paymentMethodsEnabled, ')
+          ..write('primaryColor: $primaryColor, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt')
@@ -4389,6 +4431,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<String> receiptFooter,
   Value<bool> showSignatureSpace,
   Value<bool> paymentMethodsEnabled,
+  Value<int> primaryColor,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -4417,6 +4460,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String> receiptFooter,
   Value<bool> showSignatureSpace,
   Value<bool> paymentMethodsEnabled,
+  Value<int> primaryColor,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -4508,6 +4552,9 @@ class $$SettingsTableFilterComposer
   ColumnFilters<bool> get paymentMethodsEnabled => $composableBuilder(
       column: $table.paymentMethodsEnabled,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get primaryColor => $composableBuilder(
+      column: $table.primaryColor, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
@@ -4609,6 +4656,10 @@ class $$SettingsTableOrderingComposer
       column: $table.paymentMethodsEnabled,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get primaryColor => $composableBuilder(
+      column: $table.primaryColor,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
       builder: (column) => ColumnOrderings(column));
@@ -4698,6 +4749,9 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<bool> get paymentMethodsEnabled => $composableBuilder(
       column: $table.paymentMethodsEnabled, builder: (column) => column);
 
+  GeneratedColumn<int> get primaryColor => $composableBuilder(
+      column: $table.primaryColor, builder: (column) => column);
+
   GeneratedColumn<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts, builder: (column) => column);
 
@@ -4757,6 +4811,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String> receiptFooter = const Value.absent(),
             Value<bool> showSignatureSpace = const Value.absent(),
             Value<bool> paymentMethodsEnabled = const Value.absent(),
+            Value<int> primaryColor = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -4785,6 +4840,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             receiptFooter: receiptFooter,
             showSignatureSpace: showSignatureSpace,
             paymentMethodsEnabled: paymentMethodsEnabled,
+            primaryColor: primaryColor,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
@@ -4813,6 +4869,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String> receiptFooter = const Value.absent(),
             Value<bool> showSignatureSpace = const Value.absent(),
             Value<bool> paymentMethodsEnabled = const Value.absent(),
+            Value<int> primaryColor = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -4841,6 +4898,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             receiptFooter: receiptFooter,
             showSignatureSpace: showSignatureSpace,
             paymentMethodsEnabled: paymentMethodsEnabled,
+            primaryColor: primaryColor,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,

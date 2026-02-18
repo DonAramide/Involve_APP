@@ -85,10 +85,10 @@ class ContactPage extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.access_time,
                       size: 40,
-                      color: Colors.blue,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(height: 12),
                     const Text(

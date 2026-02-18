@@ -58,7 +58,11 @@ class ReportGenerator {
             pw.Center(
               child: pw.Text(
                 'SALES INVOLVE REPORT',
-                style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.blue),
+                style: pw.TextStyle(
+                  fontSize: 22, 
+                  fontWeight: pw.FontWeight.bold, 
+                  color: settings.primaryColor != null ? PdfColor.fromInt(settings.primaryColor!) : PdfColors.blue
+                ),
               ),
             ),
             pw.Center(
@@ -112,7 +116,11 @@ class ReportGenerator {
                 pw.Text('Total Invoices: ${invoices.length}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                 pw.Text(
                   'GRAND TOTAL: ${settings.currency} ${CurrencyFormatter.format(totalAmount)}',
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.blue),
+                  style: pw.TextStyle(
+                    fontSize: 16, 
+                    fontWeight: pw.FontWeight.bold, 
+                    color: settings.primaryColor != null ? PdfColor.fromInt(settings.primaryColor!) : PdfColors.blue
+                  ),
                 ),
               ],
             ),

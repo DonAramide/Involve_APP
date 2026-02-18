@@ -44,10 +44,10 @@ class SettingsPage extends StatelessWidget {
                 const SizedBox(height: 10),
                 _buildActivationHistoryTile(context),
                 const SizedBox(height: 10),
-                _buildSectionHeader('Branding'),
+                _buildSectionHeader(context, 'Branding'),
                 _buildReadOnlyLogoTile(context, settings),
                 const SizedBox(height: 10),
-                _buildSectionHeader('Organization Detail'),
+                _buildSectionHeader(context, 'Organization Detail'),
                 state.isBusinessLocked 
                   ? _buildReadOnlyTile('Name', settings.organizationName, Icons.business)
                   : _buildTextTile(context, 'Name', settings.organizationName, (val) => _update(context, settings.copyWith(organizationName: val))),
@@ -56,7 +56,7 @@ class SettingsPage extends StatelessWidget {
                 _buildTextTile(context, 'Description', settings.businessDescription ?? '', (val) => _update(context, settings.copyWith(businessDescription: val))),
                 _buildTextTile(context, 'Tax ID (VAT/GST)', settings.taxId ?? '', (val) => _update(context, settings.copyWith(taxId: val))),
                 const Divider(),
-                _buildSectionHeader('Preferences'),
+                _buildSectionHeader(context, 'Preferences'),
                 _buildSwitchTile('Enable Tax', settings.taxEnabled, (val) => _update(context, settings.copyWith(taxEnabled: val))),
                 if (settings.taxEnabled)
                   _buildTextTile(
@@ -97,7 +97,7 @@ class SettingsPage extends StatelessWidget {
                 _buildThemeColorSection(context, settings),
                 _buildTextTile(context, 'Receipt Footer', settings.receiptFooter, (val) => _update(context, settings.copyWith(receiptFooter: val))),
                 const Divider(),
-                _buildSectionHeader('Account Details'),
+                _buildSectionHeader(context, 'Account Details'),
                 _buildSwitchTile('Show Account Details on Invoice', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
                 _buildSwitchTile('Show Signature Space on Receipt', settings.showSignatureSpace, (val) => _update(context, settings.copyWith(showSignatureSpace: val))),
                 if (settings.showAccountDetails) ...[
@@ -106,7 +106,7 @@ class SettingsPage extends StatelessWidget {
                   _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
                 ],
                 const Divider(),
-                _buildSectionHeader('Maintenance'),
+                _buildSectionHeader(context, 'Maintenance'),
                 ListTile(
                   title: const Text('Local Backup'),
                   subtitle: const Text('Export database to storage'),
@@ -120,7 +120,7 @@ class SettingsPage extends StatelessWidget {
                   onTap: () => _showRestoreDialog(context),
                 ),
                 const Divider(),
-                _buildSectionHeader('Security'),
+                _buildSectionHeader(context, 'Security'),
               ListTile(
                 title: const Text('Change System Password'),
                 trailing: const Icon(Icons.lock_outline),
@@ -198,10 +198,10 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Text(title, style: const TextStyle(fontSize: 14, color: Colors.blue, fontWeight: FontWeight.bold)),
+      child: Text(title, style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -493,6 +493,8 @@ class SettingsPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
   Widget _buildThemeColorSection(BuildContext context, AppSettings settings) {
     final themeColors = [
       Colors.blue,

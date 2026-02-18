@@ -40,7 +40,7 @@ class PrinterSettingsPage extends StatelessWidget {
                             icon: const Icon(Icons.wifi),
                             label: const Text('WiFi Printer'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue,
+                              backgroundColor: Theme.of(context).colorScheme.primary,
                               foregroundColor: Colors.white,
                             ),
                           ),

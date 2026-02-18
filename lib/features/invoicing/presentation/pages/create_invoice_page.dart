@@ -20,9 +20,12 @@ class CreateInvoicePage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('NEW INVOICE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.blue, Colors.indigo],
+              colors: [
+                Theme.of(context).colorScheme.primary,
+                Color.lerp(Theme.of(context).colorScheme.primary, Colors.black, 0.2)!,
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -139,7 +142,7 @@ class _MobileCartButton extends StatelessWidget {
             ],
           ),
           icon: const Icon(Icons.shopping_cart),
-          backgroundColor: Colors.blue[700],
+          backgroundColor: Theme.of(context).colorScheme.primary,
         );
       },
     );
@@ -181,6 +184,8 @@ class _ItemSelectorState extends State<_ItemSelector> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
         final settings = settingsState.settings;
@@ -221,7 +226,7 @@ class _ItemSelectorState extends State<_ItemSelector> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     filled: true,
-                    fillColor: Colors.grey[100],
+                    fillColor: isDark ? theme.colorScheme.surface : Colors.grey[100],
                   ),
                 ),
               ),
@@ -382,22 +387,24 @@ class _POSItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final currency = settings?.currency ?? '₦';
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: quantity > 0 ? Colors.blue.withOpacity(0.05) : Colors.white,
+        color: quantity > 0 ? Theme.of(context).colorScheme.primary.withOpacity(0.05) : (isDark ? theme.colorScheme.surface : Colors.white),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: quantity > 0 ? Colors.blue : Colors.grey[200]!,
+          color: quantity > 0 ? Theme.of(context).colorScheme.primary : (isDark ? theme.colorScheme.outline : Colors.grey[200]!),
           width: quantity > 0 ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
             color: quantity > 0 
-                ? Colors.blue.withOpacity(0.2) 
+                ? Theme.of(context).colorScheme.primary.withOpacity(0.2) 
                 : Colors.black.withOpacity(0.05),
             blurRadius: 8,
             offset: const Offset(0, 4),
@@ -427,7 +434,7 @@ class _POSItemCard extends StatelessWidget {
                       ),
                       child: item.image != null
                           ? Image.memory(item.image!, fit: BoxFit.cover)
-                          : Icon(Icons.inventory_2_outlined, size: 40, color: Colors.blue.withOpacity(0.3)),
+                          : Icon(Icons.inventory_2_outlined, size: 40, color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
                     ),
                   ),
                   // Info Area
@@ -452,7 +459,7 @@ class _POSItemCard extends StatelessWidget {
                               symbol: currency,
                             ),
                             style: TextStyle(
-                              color: Colors.blue[700],
+                              color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.w600,
                               fontSize: 12,
                             ),
@@ -472,10 +479,10 @@ class _POSItemCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.blue,
+                    color: Theme.of(context).colorScheme.primary,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
-                      BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 4, spreadRadius: 1),
+                      BoxShadow(color: Theme.of(context).colorScheme.primary.withOpacity(0.3), blurRadius: 4, spreadRadius: 1),
                     ],
                   ),
                   child: Text(
@@ -524,12 +531,14 @@ class _CartSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsBloc>().state.settings;
-    
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
       width: isSidePanel ? 400 : double.infinity, 
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: isSidePanel ? Border(left: BorderSide(color: Colors.grey[200]!)) : null,
+        color: isDark ? theme.colorScheme.surface : Colors.white,
+        border: isSidePanel ? Border(left: BorderSide(color: isDark ? theme.colorScheme.outline.withOpacity(0.2) : Colors.grey[200]!)) : null,
         boxShadow: isSidePanel ? [
           BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(-5, 0)),
         ] : null,
@@ -559,7 +568,7 @@ class _CartSummary extends StatelessWidget {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: Colors.blue, borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(12)),
                       child: Text(
                         '${state.items.length}',
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -637,10 +646,10 @@ class _CartSummary extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildSummaryRow('Subtotal', state.subtotal, settings?.currency ?? '₦'),
-                    _buildSummaryRow('Tax (${(state.taxRate * 100).toStringAsFixed(0)}%)', state.tax, settings?.currency ?? '₦'),
+                    _buildSummaryRow(context, 'Subtotal', state.subtotal, settings?.currency ?? '₦'),
+                    _buildSummaryRow(context, 'Tax (${(state.taxRate * 100).toStringAsFixed(0)}%)', state.tax, settings?.currency ?? '₦'),
                     if (state.discount > 0)
-                      _buildSummaryRow('Discount', -state.discount, settings?.currency ?? '₦'),
+                      _buildSummaryRow(context, 'Discount', -state.discount, settings?.currency ?? '₦'),
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8.0),
                       child: Divider(),
@@ -653,14 +662,14 @@ class _CartSummary extends StatelessWidget {
                           icon: const Icon(Icons.add_circle_outline, size: 18),
                           label: Text(state.discount > 0 ? 'CHANGE DISCOUNT' : 'ADD DISCOUNT'),
                           style: TextButton.styleFrom(
-                            foregroundColor: Colors.blue[700],
+                            foregroundColor: Theme.of(context).colorScheme.primary,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       ),
                       const SizedBox(height: 8),
                     ],
-                    _buildSummaryRow('Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
+                    _buildSummaryRow(context, 'Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
                     const SizedBox(height: 12),
                     const Divider(),
                     ListTile(
@@ -668,7 +677,7 @@ class _CartSummary extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                       title: Text(state.customerName ?? 'Add Customer', style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)),
                       subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
-                      leading: Icon(Icons.person_outline, color: state.customerName != null ? Colors.blue : Colors.grey),
+                      leading: Icon(Icons.person_outline, color: state.customerName != null ? Theme.of(context).colorScheme.primary : Colors.grey),
                       trailing: const Icon(Icons.edit, size: 16),
                       onTap: () => _showCustomerDialog(context, state.customerName, state.customerAddress),
                     ),
@@ -679,7 +688,7 @@ class _CartSummary extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: state.items.isEmpty ? null : () => _showPreview(context),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[700],
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -697,7 +706,7 @@ class _CartSummary extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryRow(String label, double amount, String currency, {bool isTotal = false}) {
+  Widget _buildSummaryRow(BuildContext context, String label, double amount, String currency, {bool isTotal = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -723,7 +732,7 @@ class _CartSummary extends StatelessWidget {
             style: TextStyle(
               fontSize: isTotal ? 20 : 15,
               fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
-              color: isTotal ? Colors.blue[800] : Colors.black,
+              color: isTotal ? Theme.of(context).colorScheme.primary : Colors.black,
             ),
           ),
         ],

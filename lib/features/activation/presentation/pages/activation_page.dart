@@ -5,6 +5,7 @@ import 'package:involve_app/features/settings/presentation/pages/settings_page.d
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/license/license_model.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ActivationPage extends StatefulWidget {
   final bool isExpired;
@@ -71,7 +72,7 @@ class _ActivationPageState extends State<ActivationPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -101,7 +102,7 @@ class _ActivationPageState extends State<ActivationPage> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('Duration:', style: TextStyle(color: Colors.grey)),
-                      Text('$daysLeft Days', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                      Text('$daysLeft Days', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ],
@@ -136,7 +137,7 @@ class _ActivationPageState extends State<ActivationPage> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -173,7 +174,7 @@ class _ActivationPageState extends State<ActivationPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.lock_person, size: 80, color: Colors.blue),
+                      Icon(Icons.lock_person, size: 80, color: Theme.of(context).colorScheme.primary),
                       const SizedBox(height: 24),
                       Text(
                         widget.isExpired ? 'Subscription Expired' : 'App Activation',
@@ -215,7 +216,7 @@ class _ActivationPageState extends State<ActivationPage> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _activate,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -223,6 +224,37 @@ class _ActivationPageState extends State<ActivationPage> {
                             ? const CircularProgressIndicator(color: Colors.white)
                             : const Text('ACTIVATE NOW', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
+                      ),
+                      const SizedBox(height: 32),
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'DON\'T HAVE A CODE?',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[600],
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildContactIcon(
+                            context,
+                            icon: Icons.phone,
+                            label: 'Call / WhatsApp',
+                            onTap: () => _launchUrl('tel:+2348023552282'),
+                          ),
+                          const SizedBox(width: 32),
+                          _buildContactIcon(
+                            context,
+                            icon: Icons.email,
+                            label: 'Email Support',
+                            onTap: () => _launchUrl('mailto:info.iips.ng@gmail.com'),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -239,9 +271,9 @@ class _ActivationPageState extends State<ActivationPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Activation Code',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Theme.of(context).colorScheme.primary),
         ),
         const SizedBox(height: 8),
         Row(
@@ -310,6 +342,40 @@ class _ActivationPageState extends State<ActivationPage> {
     _segmentControllers[targetIdx].selection = TextSelection.fromPosition(
       TextPosition(offset: _segmentControllers[targetIdx].text.length),
     );
+  }
+
+  Widget _buildContactIcon(BuildContext context, {required IconData icon, required String label, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 
   @override
