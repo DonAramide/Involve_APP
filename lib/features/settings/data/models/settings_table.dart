@@ -27,6 +27,7 @@ class Settings extends Table {
   TextColumn get receiptFooter => text().withDefault(const Constant('Thank you!'))();
   BoolColumn get showSignatureSpace => boolean().withDefault(const Constant(false))();
   BoolColumn get paymentMethodsEnabled => boolean().withDefault(const Constant(false))();
+  IntColumn get primaryColor => integer().withDefault(const Constant(0xFF2196F3))(); // Colors.blue.value
   
   // Security lockout columns
   IntColumn get failedAttempts => integer().withDefault(const Constant(0))();

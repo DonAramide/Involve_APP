@@ -94,6 +94,7 @@ class SettingsPage extends StatelessWidget {
                   (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
                 ),
                 _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
+                _buildThemeColorSection(context, settings),
                 _buildTextTile(context, 'Receipt Footer', settings.receiptFooter, (val) => _update(context, settings.copyWith(receiptFooter: val))),
                 const Divider(),
                 _buildSectionHeader('Account Details'),
@@ -489,6 +490,63 @@ class SettingsPage extends StatelessWidget {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE')),
+        ],
+      ),
+    );
+  Widget _buildThemeColorSection(BuildContext context, AppSettings settings) {
+    final themeColors = [
+      Colors.blue,
+      Colors.indigo,
+      Colors.teal,
+      Colors.green,
+      Colors.orange,
+      Colors.deepPurple,
+      Colors.pink,
+      Colors.red,
+      Colors.blueGrey,
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Theme Color', style: TextStyle(fontSize: 16)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: themeColors.map((color) {
+              final isSelected = settings.primaryColor == color.value;
+              return InkWell(
+                onTap: () => _update(context, settings.copyWith(primaryColor: color.value)),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? Colors.white : Colors.transparent,
+                      width: 2,
+                    ),
+                    boxShadow: [
+                      if (isSelected)
+                        BoxShadow(
+                          color: color.withOpacity(0.4),
+                          blurRadius: 8,
+                          spreadRadius: 2,
+                        ),
+                    ],
+                  ),
+                  child: isSelected 
+                      ? const Icon(Icons.check, color: Colors.white, size: 20) 
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );

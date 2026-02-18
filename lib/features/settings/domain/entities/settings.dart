@@ -25,6 +25,7 @@ class AppSettings extends Equatable {
   final DateTime? lockedAt;
   final bool showSignatureSpace;
   final bool paymentMethodsEnabled;
+  final int primaryColor;
   
   // Account Details
   final String? bankName;
@@ -61,6 +62,7 @@ class AppSettings extends Equatable {
     this.receiptFooter = 'Thank you!',
     this.showSignatureSpace = false,
     this.paymentMethodsEnabled = false,
+    this.primaryColor = 0xFF2196F3, // Colors.blue.value
   });
 
   AppSettings copyWith({
@@ -90,6 +92,7 @@ class AppSettings extends Equatable {
     String? receiptFooter,
     bool? showSignatureSpace,
     bool? paymentMethodsEnabled,
+    int? primaryColor,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -118,6 +121,7 @@ class AppSettings extends Equatable {
       receiptFooter: receiptFooter ?? this.receiptFooter,
       showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
       paymentMethodsEnabled: paymentMethodsEnabled ?? this.paymentMethodsEnabled,
+      primaryColor: primaryColor ?? this.primaryColor,
     );
   }
 
@@ -149,5 +153,6 @@ class AppSettings extends Equatable {
         receiptFooter,
         showSignatureSpace,
         paymentMethodsEnabled,
+        primaryColor,
       ];
 }

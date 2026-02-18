@@ -13,7 +13,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration {
@@ -83,6 +83,10 @@ class AppDatabase extends _$AppDatabase {
           // Customer details migration
           await m.addColumn(invoices, invoices.customerName as GeneratedColumn<Object>);
           await m.addColumn(invoices, invoices.customerAddress as GeneratedColumn<Object>);
+        }
+        if (from < 15) {
+          // Theme color migration
+          await m.addColumn(settings, settings.primaryColor as GeneratedColumn<Object>);
         }
       },
       beforeOpen: (details) async {

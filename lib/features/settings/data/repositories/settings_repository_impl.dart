@@ -57,6 +57,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
             receiptFooter: Value(settings.receiptFooter),
             showSignatureSpace: Value(settings.showSignatureSpace),
             paymentMethodsEnabled: Value(settings.paymentMethodsEnabled),
+            primaryColor: Value(settings.primaryColor),
           ),
         );
   }
@@ -89,6 +90,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       receiptFooter: row.receiptFooter,
       showSignatureSpace: row.showSignatureSpace,
       paymentMethodsEnabled: row.paymentMethodsEnabled,
+      primaryColor: row.primaryColor,
     );
   }
 }

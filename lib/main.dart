@@ -205,20 +205,20 @@ class MyApp extends StatelessWidget {
                     ? ThemeMode.dark 
                     : ThemeMode.system,
             theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+              colorScheme: ColorScheme.fromSeed(seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3)),
               useMaterial3: true,
-              textSelectionTheme: const TextSelectionThemeData(
-                cursorColor: Colors.blue,
+              textSelectionTheme: TextSelectionThemeData(
+                cursorColor: Color(state.settings?.primaryColor ?? 0xFF2196F3),
               ),
             ),
             darkTheme: ThemeData(
               colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.blue, 
+                seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3), 
                 brightness: Brightness.dark,
               ),
               useMaterial3: true,
-              textSelectionTheme: const TextSelectionThemeData(
-                cursorColor: Colors.blue,
+              textSelectionTheme: TextSelectionThemeData(
+                cursorColor: Color(state.settings?.primaryColor ?? 0xFF2196F3),
               ),
             ),
             home: const LandingPage(),
