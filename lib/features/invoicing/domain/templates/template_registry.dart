@@ -5,11 +5,9 @@ class TemplateRegistry {
   static final Map<TemplateType, InvoiceTemplate> _templates = {
     TemplateType.compact: CompactInvoiceTemplate(),
     TemplateType.detailed: DetailedInvoiceTemplate(),
-    // Placeholder for future templates
-    // TemplateType.modern: ModernInvoiceTemplate(),
-    // TemplateType.classic: ClassicInvoiceTemplate(),
-    // TemplateType.elegant: ElegantInvoiceTemplate(),
-    // TemplateType.bold: BoldInvoiceTemplate(),
+    TemplateType.professional: ProfessionalInvoiceTemplate(),
+    TemplateType.modern: ModernProfessionalTemplate(),
+    TemplateType.classic: ClassicBusinessTemplate(),
   };
 
   static List<InvoiceTemplate> get availableTemplates => _templates.values.toList();

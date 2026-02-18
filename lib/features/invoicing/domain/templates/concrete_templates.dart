@@ -307,3 +307,63 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
     return left + spaces + right;
   }
 }
+
+class ClassicBusinessTemplate extends InvoiceTemplate {
+  @override
+  String get name => 'Classic Business (A4/Detailed)';
+  @override
+  TemplateType get type => TemplateType.classic;
+  @override
+  LogoPlacement get logoPlacement => LogoPlacement.topRight;
+  @override
+  bool get useBoldHeaders => true;
+  @override
+  double get columnSpacing => 1.0;
+
+  @override
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final settings = orgSettings as AppSettings;
+    const int width = 32;
+
+    return [
+      TextCommand('INVOICE', align: 'center', isBold: true),
+      if (settings.logo != null) ImageCommand(bytes: settings.logo!, align: 'right'),
+      TextCommand(settings.organizationName.toUpperCase(), isBold: true),
+      if (settings.businessDescription != null) TextCommand(settings.businessDescription!, align: 'left'),
+      if (settings.address.isNotEmpty) TextCommand(settings.address),
+      DividerCommand(),
+      TextCommand('BILL TO:', isBold: true),
+      TextCommand(invoice.customerName ?? 'Valued Customer'),
+      if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),
+      SizedBoxCommand(height: 1),
+      TextCommand('INV NO: ${invoice.invoiceNumber}'),
+      TextCommand('DATE:   ${invoice.dateCreated.toString().split(' ')[0]}'),
+      DividerCommand(),
+      // 4-column: QTY(4), ITEM(12), PRICE(7), TOTAL(9) = 32
+      TextCommand('QTY ITEM        PRICE   TOTAL', isBold: true),
+      DividerCommand(),
+      ...invoice.items.map((item) {
+        final qty = item.quantity.toString().padRight(4).substring(0, 4);
+        final name = item.item.name.padRight(12).substring(0, 12);
+        final price = CurrencyFormatter.format(item.unitPrice).padLeft(7).substring(0, 7);
+        final total = CurrencyFormatter.format(item.total).padLeft(9).substring(0, 9);
+        return TextCommand('$qty$name$price$total');
+      }),
+      DividerCommand(),
+      TextCommand(_formatRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal), width)),
+      if (invoice.taxAmount > 0)
+        TextCommand(_formatRow('TAX', CurrencyFormatter.format(invoice.taxAmount), width)),
+      if (invoice.discountAmount > 0)
+        TextCommand(_formatRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
+      TextCommand(_formatRow('TOTAL DUE', '${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', width), isBold: true),
+      DividerCommand(),
+      TextCommand('THANK YOU FOR YOUR BUSINESS!', align: 'center'),
+      TextCommand('Powered by IIPS', align: 'center'),
+    ];
+  }
+
+  String _formatRow(String left, String right, int width) {
+    final spaces = ' ' * (width - left.length - right.length).clamp(1, width);
+    return left + spaces + right;
+  }
+}
