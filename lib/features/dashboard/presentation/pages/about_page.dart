@@ -18,7 +18,7 @@ class AboutPage extends StatelessWidget {
             const SizedBox(height: 20),
             // App Icon/Logo (Directly on background)
             Image.asset(
-              'assets/images/logo.png',
+              'assets/images/logo_transparent.png',
               width: 150,
               height: 150,
             ),

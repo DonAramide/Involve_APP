@@ -80,7 +80,7 @@ class _HelpPageState extends State<HelpPage> {
             child: Column(
               children: [
                 Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/logo_transparent.png',
                   height: 80,
                 ),
                 const SizedBox(height: 16),

@@ -18,7 +18,7 @@ class ContactPage extends StatelessWidget {
             const SizedBox(height: 20),
             Center(
               child: Image.asset(
-                'assets/images/logo.png',
+                'assets/images/logo_transparent.png',
                 height: 120,
               ),
             ),
