@@ -7,11 +7,16 @@ class InvoiceItem extends Equatable {
   final int quantity;
   final double unitPrice;
 
+  final String type; // 'product' | 'service'
+  final String? serviceMeta; // JSON snapshot
+
   const InvoiceItem({
     this.id,
     required this.item,
     required this.quantity,
     required this.unitPrice,
+    this.type = 'product',
+    this.serviceMeta,
   });
 
   double get total => quantity * unitPrice;
@@ -21,17 +26,21 @@ class InvoiceItem extends Equatable {
     Item? item,
     int? quantity,
     double? unitPrice,
+    String? type,
+    String? serviceMeta,
   }) {
     return InvoiceItem(
       id: id ?? this.id,
       item: item ?? this.item,
       quantity: quantity ?? this.quantity,
       unitPrice: unitPrice ?? this.unitPrice,
+      type: type ?? this.type,
+      serviceMeta: serviceMeta ?? this.serviceMeta,
     );
   }
 
   @override
-  List<Object?> get props => [id, item, quantity, unitPrice];
+  List<Object?> get props => [id, item, quantity, unitPrice, type, serviceMeta];
 }
 
 class Invoice extends Equatable {

@@ -9,6 +9,8 @@ import '../../domain/entities/item.dart';
 import '../../domain/entities/category.dart';
 import '../bloc/stock_bloc.dart';
 import '../bloc/stock_state.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
+import '../../../settings/presentation/bloc/settings_state.dart';
 
 class ItemFormDialog extends StatefulWidget {
   final Item? item;
@@ -28,6 +30,11 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   ItemCategory _legacyCategory = ItemCategory.drink; // Fallback
   int? _selectedCategoryId;
   Uint8List? _imageBytes;
+  
+  // Phase 3: Service Billing
+  String _type = 'product';
+  String? _billingType;
+  String? _serviceCategory; 
 
   @override
   void initState() {
@@ -38,6 +45,13 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     _legacyCategory = widget.item?.category ?? ItemCategory.drink;
     _selectedCategoryId = widget.item?.categoryId;
     _imageBytes = widget.item?.image;
+    
+    // Initialize Phase 3 fields
+    if (widget.item != null) {
+      _type = widget.item!.type;
+      _billingType = widget.item!.billingType;
+      _serviceCategory = widget.item!.serviceCategory;
+    }
     
     // Ensure categories are loaded
     widget.stockBloc.add(LoadCategories());
@@ -109,6 +123,11 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // Access settings for Service Billing config
+    final settingsState = context.read<SettingsBloc>().state;
+    final isServiceBillingEnabled = settingsState.settings?.serviceBillingEnabled ?? false;
+    final serviceTypes = settingsState.settings?.serviceTypes ?? [];
+
     return AlertDialog(
       title: Text(widget.item == null ? 'Add New Item' : 'Edit Item'),
       content: SingleChildScrollView(
@@ -138,6 +157,28 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
               ),
               const SizedBox(height: 10),
               
+              if (isServiceBillingEnabled) ...[
+                DropdownButtonFormField<String>(
+                  value: _type,
+                  decoration: const InputDecoration(labelText: 'Item Type'),
+                  items: const [
+                    DropdownMenuItem(value: 'product', child: Text('Product')),
+                    DropdownMenuItem(value: 'service', child: Text('Service')),
+                  ],
+                  onChanged: (val) {
+                    setState(() {
+                      _type = val!;
+                      // Reset service fields if switched to product
+                      if (_type == 'product') {
+                        _billingType = null;
+                        _serviceCategory = null;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(height: 10),
+              ],
+
               TextFormField(
                 initialValue: _name,
                 decoration: const InputDecoration(labelText: 'Item Name'),
@@ -145,53 +186,75 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                 validator: (val) => InputValidator.validateNotEmpty(val, 'Item Name'),
               ),
               
-              // Dynamic Category Dropdown
-              BlocBuilder<StockBloc, StockState>(
-                bloc: widget.stockBloc,
-                builder: (context, state) {
-                  List<Category> categories = [];
-                  if (state is StockLoaded) {
-                    categories = state.categories;
-                  }
-                  
-                  // If we have categories, prefer them
-                  if (categories.isNotEmpty) {
-                    return DropdownButtonFormField<int>(
-                      value: _selectedCategoryId,
-                      decoration: const InputDecoration(labelText: 'Category'),
-                      items: categories.map((cat) {
-                        return DropdownMenuItem(value: cat.id, child: Text(cat.name));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _selectedCategoryId = val),
-                      validator: (val) => val == null ? 'Please select a category' : null,
-                    );
-                  } else {
-                    // Fallback to legacy enum if no categories defined
-                    return DropdownButtonFormField<ItemCategory>(
-                      value: _legacyCategory,
-                      decoration: const InputDecoration(labelText: 'Category (Legacy)'),
-                      items: ItemCategory.values.map((cat) {
-                        return DropdownMenuItem(value: cat, child: Text(cat.name.toUpperCase()));
-                      }).toList(),
-                      onChanged: (val) => setState(() => _legacyCategory = val!),
-                    );
-                  }
-                },
-              ),
+              // Conditional Fields based on Type
+              if (_type == 'product') ...[
+                 // Dynamic Category Dropdown (Existing Logic)
+                BlocBuilder<StockBloc, StockState>(
+                  bloc: widget.stockBloc,
+                  builder: (context, state) {
+                    List<Category> categories = [];
+                    if (state is StockLoaded) {
+                      categories = state.categories;
+                    }
+                    
+                    if (categories.isNotEmpty) {
+                      return DropdownButtonFormField<int>(
+                        value: _selectedCategoryId,
+                        decoration: const InputDecoration(labelText: 'Category'),
+                        items: categories.map((cat) {
+                          return DropdownMenuItem(value: cat.id, child: Text(cat.name));
+                        }).toList(),
+                        onChanged: (val) => setState(() => _selectedCategoryId = val),
+                        validator: (val) => val == null ? 'Please select a category' : null,
+                      );
+                    } else {
+                      return DropdownButtonFormField<ItemCategory>(
+                        value: _legacyCategory,
+                        decoration: const InputDecoration(labelText: 'Category (Legacy)'),
+                        items: ItemCategory.values.map((cat) {
+                          return DropdownMenuItem(value: cat, child: Text(cat.name.toUpperCase()));
+                        }).toList(),
+                        onChanged: (val) => setState(() => _legacyCategory = val!),
+                      );
+                    }
+                  },
+                ),
+                
+                TextFormField(
+                  initialValue: _stockQty.toString(),
+                  decoration: const InputDecoration(labelText: 'Stock Quantity'),
+                  keyboardType: TextInputType.number,
+                  onSaved: (val) => _stockQty = int.tryParse(val ?? '0') ?? 0,
+                  validator: (val) => InputValidator.validateNumber(val, 'Stock', allowDecimal: false),
+                ),
+              ] else ...[
+                // Service Fields
+                DropdownButtonFormField<String>(
+                  value: _serviceCategory,
+                  decoration: const InputDecoration(labelText: 'Service Category'),
+                  items: serviceTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                  onChanged: (val) => setState(() => _serviceCategory = val),
+                  validator: (val) => val == null ? 'Select service category' : null,
+                ),
+                DropdownButtonFormField<String>(
+                  value: _billingType,
+                  decoration: const InputDecoration(labelText: 'Billing Type'),
+                  items: const [
+                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Price')),
+                    DropdownMenuItem(value: 'per_day', child: Text('Per Day (e.g. Hotel)')),
+                    DropdownMenuItem(value: 'per_hour', child: Text('Per Hour (e.g. Lounge)')),
+                  ],
+                  onChanged: (val) => setState(() => _billingType = val),
+                  validator: (val) => val == null ? 'Select billing type' : null,
+                ),
+              ],
               
               TextFormField(
                 initialValue: _price.toString(),
-                decoration: const InputDecoration(labelText: 'Price'),
+                decoration: const InputDecoration(labelText: 'Price / Rate'),
                 keyboardType: TextInputType.number,
                 onSaved: (val) => _price = double.tryParse(val ?? '0') ?? 0.0,
                 validator: (val) => InputValidator.validateNumber(val, 'Price'),
-              ),
-              TextFormField(
-                initialValue: _stockQty.toString(),
-                decoration: const InputDecoration(labelText: 'Stock Quantity'),
-                keyboardType: TextInputType.number,
-                onSaved: (val) => _stockQty = int.tryParse(val ?? '0') ?? 0,
-                validator: (val) => InputValidator.validateNumber(val, 'Stock', allowDecimal: false),
               ),
             ],
           ),
@@ -210,14 +273,19 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   void _submit() {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
+      
       final newItem = Item(
         id: widget.item?.id,
         name: _name,
-        category: _legacyCategory, // Maintain for compatibility
+        category: _legacyCategory, 
         categoryId: _selectedCategoryId,
         price: _price,
-        stockQty: _stockQty,
+        stockQty: _type == 'service' ? 999999 : _stockQty, // Services effectively have infinite stock or managed elsewhere
         image: _imageBytes,
+        type: _type,
+        billingType: _billingType,
+        serviceCategory: _serviceCategory,
+        requiresTimeTracking: _billingType == 'per_day' || _billingType == 'per_hour',
       );
 
       if (widget.item == null) {

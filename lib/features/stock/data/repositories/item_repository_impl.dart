@@ -25,6 +25,10 @@ class ItemRepositoryImpl implements ItemRepository {
             price: item.price,
             stockQty: Value(item.stockQty),
             image: Value(item.image),
+            type: Value(item.type),
+            billingType: Value(item.billingType),
+            serviceCategory: Value(item.serviceCategory),
+            requiresTimeTracking: Value(item.requiresTimeTracking),
           ),
         );
   }
@@ -39,6 +43,10 @@ class ItemRepositoryImpl implements ItemRepository {
             price: Value(item.price),
             stockQty: Value(item.stockQty),
             image: Value(item.image),
+            type: Value(item.type),
+            billingType: Value(item.billingType),
+            serviceCategory: Value(item.serviceCategory),
+            requiresTimeTracking: Value(item.requiresTimeTracking),
           ),
         );
   }
@@ -57,6 +65,10 @@ class ItemRepositoryImpl implements ItemRepository {
       price: row.price,
       stockQty: row.stockQty,
       image: row.image,
+      type: row.type,
+      billingType: row.billingType,
+      serviceCategory: row.serviceCategory,
+      requiresTimeTracking: row.requiresTimeTracking,
     );
   }
 }

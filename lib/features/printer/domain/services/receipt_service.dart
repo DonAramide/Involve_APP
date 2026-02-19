@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -80,9 +81,13 @@ class ReceiptService {
                      ]
                    ),
                    ...invoice.items.map((item) {
+                     String itemName = item.item.name;
+                     if (item.type == 'service' && item.serviceMeta != null) {
+                       itemName += '\n${_getServiceDateRange(item.serviceMeta)}';
+                     }
                      return pw.TableRow(
                        children: [
-                         pw.Text(item.item.name),
+                         pw.Text(itemName),
                          pw.Text('${item.quantity} x ${CurrencyFormatter.format(item.unitPrice)}', textAlign: pw.TextAlign.center),
                          pw.Text(CurrencyFormatter.format(item.quantity * item.unitPrice), textAlign: pw.TextAlign.right),
                        ]
@@ -219,10 +224,14 @@ class ReceiptService {
                     ],
                   ),
                   ...invoice.items.map((item) {
+                    String itemName = item.item.name;
+                    if (item.type == 'service' && item.serviceMeta != null) {
+                      itemName += '\n${_getServiceDateRange(item.serviceMeta)}';
+                    }
                     return pw.TableRow(
                       children: [
                         _tableCell(item.quantity.toString(), align: pw.Alignment.center),
-                        _tableCell(item.item.name),
+                        _tableCell(itemName),
                         _tableCell(CurrencyFormatter.format(item.unitPrice), align: pw.Alignment.centerRight),
                         _tableCell(CurrencyFormatter.format(item.total), align: pw.Alignment.centerRight),
                       ],
@@ -310,5 +319,18 @@ class ReceiptService {
         ),
       ],
     );
+  }
+
+  String _getServiceDateRange(String? metaStr) {
+    if (metaStr == null) return '';
+    try {
+      final meta = jsonDecode(metaStr);
+      final start = DateTime.parse(meta['startDate']);
+      final end = DateTime.parse(meta['endDate']);
+      final fmt = DateFormat('MM/dd HH:mm');
+      return '${fmt.format(start)} - ${fmt.format(end)}';
+    } catch (e) {
+      return '';
+    }
   }
 }

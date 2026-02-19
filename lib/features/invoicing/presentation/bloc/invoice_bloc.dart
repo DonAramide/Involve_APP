@@ -24,10 +24,17 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
 
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
     final updatedItems = List<InvoiceItem>.from(state.items);
-    final existingIndex = updatedItems.indexWhere((i) => i.item.id == event.item.id);
+    
+    // Find existing item with same ID AND same service metadata
+    final existingIndex = updatedItems.indexWhere((i) => 
+      i.item.id == event.item.id && i.serviceMeta == event.serviceMeta
+    );
 
     if (existingIndex >= 0) {
       final existingItem = updatedItems[existingIndex];
+      // For services, we might not want to just increase quantity if it's a booking logic
+      // But if the meta is identical, it's the same booking slot, so increasing quantity is valid 
+      // (e.g. 2 rooms for same dates).
       final newQuantity = existingItem.quantity + event.quantity;
       if (newQuantity <= 0) {
         updatedItems.removeAt(existingIndex);
@@ -39,6 +46,8 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         item: event.item,
         quantity: event.quantity,
         unitPrice: event.item.price,
+        type: event.item.type,
+        serviceMeta: event.serviceMeta,
       ));
     }
 

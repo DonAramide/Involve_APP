@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'dart:convert';
 import '../../../stock/data/datasources/app_database.dart';
 import '../../domain/entities/invoice.dart';
 import '../../../stock/domain/entities/item.dart';
@@ -34,15 +35,19 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
                 itemId: item.item.id!,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
+                type: Value(item.type),
+                serviceMeta: Value(item.serviceMeta),
               ),
             );
 
-        // Deduct stock
-        await db.customUpdate(
-          'UPDATE items SET stock_qty = stock_qty - ? WHERE id = ?',
-          variables: [Variable.withInt(item.quantity), Variable.withInt(item.item.id!)],
-          updates: {db.items},
-        );
+        // Deduct stock only for products
+        if (item.type == 'product') {
+          await db.customUpdate(
+            'UPDATE items SET stock_qty = stock_qty - ? WHERE id = ?',
+            variables: [Variable.withInt(item.quantity), Variable.withInt(item.item.id!)],
+            updates: {db.items},
+          );
+        }
       }
     });
   }
@@ -92,9 +97,15 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
             price: itemData.price,
             stockQty: itemData.stockQty,
             image: itemData.image,
+            type: itemData.type,
+            billingType: itemData.billingType,
+            serviceCategory: itemData.serviceCategory,
+            requiresTimeTracking: itemData.requiresTimeTracking,
           ),
           quantity: invoiceItemData.quantity,
           unitPrice: invoiceItemData.unitPrice,
+          type: invoiceItemData.type,
+          serviceMeta: invoiceItemData.serviceMeta,
         );
       }).toList();
 
@@ -114,5 +125,33 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       ));
     }
     return result;
+  }
+
+  @override
+  Future<bool> checkServiceAvailability(int itemId, DateTime start, DateTime end) async {
+    final query = db.select(db.invoiceItems)..where((t) => t.itemId.equals(itemId) & t.type.equals('service'));
+    final items = await query.get();
+
+    for (final item in items) {
+      if (item.serviceMeta != null) {
+        try {
+          final meta = jsonDecode(item.serviceMeta!) as Map<String, dynamic>;
+          final bookedStartStr = meta['startDate'];
+          final bookedEndStr = meta['endDate'];
+          
+          if (bookedStartStr != null && bookedEndStr != null) {
+            final bookedStart = DateTime.parse(bookedStartStr);
+            final bookedEnd = DateTime.parse(bookedEndStr);
+            
+            if (start.isBefore(bookedEnd) && end.isAfter(bookedStart)) {
+              return false;
+            }
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+    }
+    return true;
   }
 }

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/settings.dart';
+import '../../domain/entities/user_plan.dart';
 
 abstract class SettingsEvent extends Equatable {
   @override
@@ -80,6 +81,13 @@ class LoadBusinessLock extends SettingsEvent {}
 
 class LockBusinessName extends SettingsEvent {}
 
+class UpgradeProPlan extends SettingsEvent {
+  final int durationDays;
+  UpgradeProPlan({this.durationDays = 30});
+  @override
+  List<Object?> get props => [durationDays];
+}
+
 class SettingsState extends Equatable {
   final AppSettings? settings;
   final bool isLoading;
@@ -93,6 +101,7 @@ class SettingsState extends Equatable {
   final String? error;
   final String? successMessage;
   final String? backupPath;
+  final UserPlan? userPlan;
 
   const SettingsState({
     this.settings,
@@ -107,6 +116,7 @@ class SettingsState extends Equatable {
     this.error,
     this.successMessage,
     this.backupPath,
+    this.userPlan,
   });
 
   SettingsState copyWith({
@@ -122,6 +132,7 @@ class SettingsState extends Equatable {
     String? error,
     String? successMessage,
     String? backupPath,
+    UserPlan? userPlan,
   }) {
     return SettingsState(
       settings: settings ?? this.settings,
@@ -136,6 +147,7 @@ class SettingsState extends Equatable {
       error: error,
       successMessage: successMessage,
       backupPath: backupPath ?? this.backupPath,
+      userPlan: userPlan ?? this.userPlan,
     );
   }
 
@@ -153,5 +165,6 @@ class SettingsState extends Equatable {
         error,
         successMessage,
         backupPath,
+        userPlan,
       ];
 }

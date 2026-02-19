@@ -36,4 +36,8 @@ class Settings extends Table {
   
   // Display Options
   BoolColumn get showDateTime => boolean().withDefault(const Constant(true))();
+  
+  // Phase 3: Service Billing
+  BoolColumn get serviceBillingEnabled => boolean().withDefault(const Constant(false))();
+  TextColumn get serviceTypes => text().nullable()(); // JSON list of service categories
 }

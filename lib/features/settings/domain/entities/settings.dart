@@ -19,22 +19,24 @@ class AppSettings extends Equatable {
   final bool confirmPriceOnSelection;
   final double taxRate;
   
-  // Security lockout fields
-  final int failedAttempts;
-  final bool isLocked;
-  final DateTime? lockedAt;
-  final bool showSignatureSpace;
-  final bool paymentMethodsEnabled;
-  final int primaryColor;
-  final bool showDateTime; // New field
-  
-  // Account Details
   final String? bankName;
   final String? accountNumber;
   final String? accountName;
   final bool showAccountDetails;
+  
+  // Security lockout fields
+  final int failedAttempts;
+  final bool isLocked;
+  final DateTime? lockedAt;
   final String receiptFooter;
-
+  final bool showSignatureSpace;
+  final bool paymentMethodsEnabled;
+  final int primaryColor;
+  final bool showDateTime;
+  
+  // Service Billing
+  final bool serviceBillingEnabled;
+  final List<String> serviceTypes;
 
   const AppSettings({
     this.id,
@@ -65,6 +67,8 @@ class AppSettings extends Equatable {
     this.paymentMethodsEnabled = false,
     this.primaryColor = 0xFF2196F3, // Colors.blue.value
     this.showDateTime = true,
+    this.serviceBillingEnabled = false,
+    this.serviceTypes = const [],
   });
 
   AppSettings copyWith({
@@ -96,6 +100,8 @@ class AppSettings extends Equatable {
     bool? paymentMethodsEnabled,
     int? primaryColor,
     bool? showDateTime,
+    bool? serviceBillingEnabled,
+    List<String>? serviceTypes,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -126,6 +132,8 @@ class AppSettings extends Equatable {
       paymentMethodsEnabled: paymentMethodsEnabled ?? this.paymentMethodsEnabled,
       primaryColor: primaryColor ?? this.primaryColor,
       showDateTime: showDateTime ?? this.showDateTime,
+      serviceBillingEnabled: serviceBillingEnabled ?? this.serviceBillingEnabled,
+      serviceTypes: serviceTypes ?? this.serviceTypes,
     );
   }
 
@@ -159,5 +167,7 @@ class AppSettings extends Equatable {
         paymentMethodsEnabled,
         primaryColor,
         showDateTime,
+        serviceBillingEnabled,
+        serviceTypes,
       ];
 }

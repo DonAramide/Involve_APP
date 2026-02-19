@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:drift/drift.dart';
 import '../../../stock/data/datasources/app_database.dart';
 import '../../domain/entities/settings.dart';
@@ -59,11 +60,23 @@ class SettingsRepositoryImpl implements SettingsRepository {
             paymentMethodsEnabled: Value(settings.paymentMethodsEnabled),
             primaryColor: Value(settings.primaryColor),
             showDateTime: Value(settings.showDateTime),
+            serviceBillingEnabled: Value(settings.serviceBillingEnabled),
+            serviceTypes: Value(jsonEncode(settings.serviceTypes)),
           ),
         );
   }
 
   AppSettings _toEntity(SettingsTable row) {
+    List<String> serviceTypes = [];
+    if (row.serviceTypes != null && row.serviceTypes!.isNotEmpty) {
+      try {
+        serviceTypes = (jsonDecode(row.serviceTypes!) as List).cast<String>();
+      } catch (e) {
+        // Handle decode error or fallback
+        serviceTypes = [];
+      }
+    }
+
     return AppSettings(
       id: row.id,
       organizationName: row.organizationName,
@@ -93,6 +106,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       paymentMethodsEnabled: row.paymentMethodsEnabled,
       primaryColor: row.primaryColor,
       showDateTime: row.showDateTime,
+      serviceBillingEnabled: row.serviceBillingEnabled,
+      serviceTypes: serviceTypes,
     );
   }
 }

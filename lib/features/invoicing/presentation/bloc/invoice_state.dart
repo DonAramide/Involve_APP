@@ -11,9 +11,10 @@ abstract class InvoiceEvent extends Equatable {
 class AddItemToInvoice extends InvoiceEvent {
   final Item item;
   final int quantity;
-  AddItemToInvoice(this.item, this.quantity);
+  final String? serviceMeta;
+  AddItemToInvoice(this.item, this.quantity, {this.serviceMeta});
   @override
-  List<Object?> get props => [item, quantity];
+  List<Object?> get props => [item, quantity, serviceMeta];
 }
 
 class RemoveItemFromInvoice extends InvoiceEvent {

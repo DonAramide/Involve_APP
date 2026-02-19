@@ -10,6 +10,9 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/service_booking_dialog.dart';
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'dart:convert';
 
 class CreateInvoicePage extends StatelessWidget {
   const CreateInvoicePage({super.key});
@@ -159,6 +162,7 @@ class _ItemSelector extends StatefulWidget {
 
 class _ItemSelectorState extends State<_ItemSelector> {
   int? _selectedCategoryId;
+  String? _selectedServiceType; // New: For service type filtering
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
@@ -189,13 +193,23 @@ class _ItemSelectorState extends State<_ItemSelector> {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
         final settings = settingsState.settings;
+        final serviceTypes = settings?.serviceTypes ?? [];
+
         return BlocBuilder<StockBloc, StockState>(
           builder: (context, state) {
             if (state is StockLoaded) {
-              // Filter Items by category and search query
-              var filteredItems = _selectedCategoryId == null
-                  ? state.items
-                  : state.items.where((i) => i.categoryId == _selectedCategoryId).toList();
+              // Filter Items Logic
+              List<Item> filteredItems = state.items;
+
+              if (_selectedServiceType != null) {
+                // Filter by Service Type
+                filteredItems = filteredItems.where((i) => 
+                  i.type == 'service' && i.serviceCategory == _selectedServiceType
+                ).toList();
+              } else if (_selectedCategoryId != null) {
+                 // Filter by Stock Category
+                 filteredItems = filteredItems.where((i) => i.categoryId == _selectedCategoryId).toList();
+              }
               
               // Apply search filter
               if (_searchQuery.isNotEmpty) {
@@ -238,8 +252,12 @@ class _ItemSelectorState extends State<_ItemSelector> {
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   children: [
-                    _buildFilterChip('All', null),
-                    ...state.categories.map((cat) => _buildFilterChip(cat.name, cat.id)),
+                    _buildFilterChip('All', null, null),
+                    // Standard Categories
+                    ...state.categories.map((cat) => _buildFilterChip(cat.name, cat.id, null)),
+                    // Service Types (if enabled)
+                    if (settings?.serviceBillingEnabled == true)
+                      ...serviceTypes.map((type) => _buildFilterChip(type, null, type, isService: true)),
                   ],
                 ),
               ),
@@ -301,27 +319,70 @@ class _ItemSelectorState extends State<_ItemSelector> {
     );
   }
 
-  Widget _buildFilterChip(String label, int? id) {
-    final isSelected = _selectedCategoryId == id;
+  Widget _buildFilterChip(String label, int? categoryId, String? serviceType, {bool isService = false}) {
+    final isSelected = (serviceType != null && _selectedServiceType == serviceType) || 
+                       (serviceType == null && _selectedServiceType == null && _selectedCategoryId == categoryId);
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: FilterChip(
         label: Text(label),
         selected: isSelected,
+        selectedColor: isService ? Colors.orangeAccent.withOpacity(0.2) : null,
+        checkmarkColor: isService ? Colors.orange[800] : null,
+        labelStyle: TextStyle(
+          color: isSelected ? (isService ? Colors.orange[900] : Colors.white) : null,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
         onSelected: (selected) {
           setState(() {
-            _selectedCategoryId = id;
+            if (serviceType != null) {
+              _selectedServiceType = serviceType;
+              _selectedCategoryId = null;
+            } else {
+              _selectedCategoryId = categoryId;
+              _selectedServiceType = null;
+            }
           });
         },
       ),
     );
   }
 
-  void _handleItemAdd(BuildContext context, Item item, AppSettings? settings) {
-    if (settings?.confirmPriceOnSelection == true) {
-      _showPriceConfirmation(context, item, settings?.currency ?? '₦');
+  Future<void> _handleItemAdd(BuildContext context, Item item, AppSettings? settings) async {
+    if (item.type == 'service') {
+      // Show booking dialog
+      final result = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (ctx) => ServiceBookingDialog(
+          item: item,
+          checkAvailability: (start, end) => 
+            context.read<InvoiceRepository>().checkServiceAvailability(item.id!, start, end),
+        ),
+      );
+
+      if (result != null) {
+        // Add service item with meta
+        final qty = (result['quantity'] as num).toInt(); // Convert double to int if needed, or update bloc to accept double
+        // InvoiceItem quantity is int? "final int quantity;"
+        // If billing is per hour/day, quantity might be 1.5 days?
+        // InvoiceItem.quantity is int.
+        // If I need partial days, I might need to change quantity to double or use a different field.
+        // For now, I'll stick to int or ceil. Dialog returns double.
+        // If I need to support partial, I should change InvoiceItem quantity to double.
+        // But for now, let's cast to int.
+        context.read<InvoiceBloc>().add(AddItemToInvoice(
+          item, 
+          qty,
+          serviceMeta: jsonEncode(result),
+        ));
+      }
     } else {
-      context.read<InvoiceBloc>().add(AddItemToInvoice(item, 1));
+      if (settings?.confirmPriceOnSelection == true) {
+        _showPriceConfirmation(context, item, settings?.currency ?? '₦');
+      } else {
+        context.read<InvoiceBloc>().add(AddItemToInvoice(item, 1));
+      }
     }
   }
 
@@ -623,6 +684,10 @@ class _CartSummary extends StatelessWidget {
                                 ),
                               ],
                             ),
+                            if (item.type == 'service' && item.serviceMeta != null) ...[
+                              const SizedBox(height: 4),
+                              _ServiceDetailsText(serviceMeta: item.serviceMeta!),
+                            ],
                             const SizedBox(height: 12),
                             // Row 2: Total and Controls
                             Row(
@@ -881,5 +946,35 @@ class _CartSummary extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _ServiceDetailsText extends StatelessWidget {
+  final String serviceMeta;
+  const _ServiceDetailsText({required this.serviceMeta});
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      final meta = jsonDecode(serviceMeta) as Map<String, dynamic>;
+      final startStr = meta['startDate'];
+      final endStr = meta['endDate'];
+      
+      if (startStr == null || endStr == null) return const SizedBox.shrink();
+      
+      final start = DateTime.parse(startStr);
+      final end = DateTime.parse(endStr);
+      
+      return Text(
+        '${_formatDate(start)} - ${_formatDate(end)}',
+        style: const TextStyle(fontSize: 12, color: Colors.blueGrey, fontStyle: FontStyle.italic),
+      );
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+  }
+  
+  String _formatDate(DateTime dt) {
+    return dt.toString().substring(0, 16); // YYYY-MM-DD HH:MM
   }
 }

@@ -23,4 +23,8 @@ class InvoiceItems extends Table {
   IntColumn get itemId => integer().references(Items, #id)();
   IntColumn get quantity => integer()();
   RealColumn get unitPrice => real()();
+  
+  // Phase 3: Service Billing
+  TextColumn get type => text().withDefault(const Constant('product'))(); // 'product' or 'service'
+  TextColumn get serviceMeta => text().nullable()(); // JSON snapshot: billingType, timeIn, timeOut, rate, etc.
 }

@@ -12,4 +12,10 @@ class Items extends Table {
   // Phase 2: New Columns
   BlobColumn get image => blob().nullable()();
   IntColumn get categoryId => integer().nullable().references(Categories, #id)(); // Optional FK
+  
+  // Phase 3: Service Billing
+  TextColumn get type => text().withDefault(const Constant('product'))(); // 'product' or 'service'
+  TextColumn get billingType => text().nullable()(); // 'fixed', 'per_day', 'per_hour'
+  TextColumn get serviceCategory => text().nullable()(); // 'Hotel', 'Lounge', etc.
+  BoolColumn get requiresTimeTracking => boolean().withDefault(const Constant(false))();
 }

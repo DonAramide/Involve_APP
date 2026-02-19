@@ -12,6 +12,7 @@ import '../../../../core/license/license_service.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/settings.dart';
+import '../widgets/upgrade_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -106,6 +107,11 @@ class SettingsPage extends StatelessWidget {
                   _buildTextTile(context, 'Account Number', settings.accountNumber ?? '', (val) => _update(context, settings.copyWith(accountNumber: val))),
                   _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
                 ],
+                const Divider(),
+                _buildSectionHeader(context, 'Service Billing'),
+                _buildServiceBillingTile(context, settings, state),
+                if (settings.serviceBillingEnabled)
+                  _buildServiceTypesSection(context, settings),
                 const Divider(),
                 _buildSectionHeader(context, 'Maintenance'),
                 ListTile(
@@ -581,5 +587,116 @@ class SettingsPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildServiceTypesSection(BuildContext context, AppSettings settings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Service Categories', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
+                onPressed: () => _addServiceType(context, settings),
+                tooltip: 'Add Category',
+              ),
+            ],
+          ),
+        ),
+        if (settings.serviceTypes.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text('No service categories defined. Add one (e.g., Hotel, Lounge).', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 8,
+              children: settings.serviceTypes.map((type) {
+                return Chip(
+                  label: Text(type),
+                  deleteIcon: const Icon(Icons.close, size: 18),
+                  onDeleted: () => _removeServiceType(context, settings, type),
+                );
+              }).toList(),
+            ),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Future<void> _addServiceType(BuildContext context, AppSettings settings) async {
+    final controller = TextEditingController();
+    final newType = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add Service Category'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Category Name', hintText: 'e.g., Hotel, Event Hall'),
+          textCapitalization: TextCapitalization.words,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          TextButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                Navigator.pop(ctx, controller.text.trim());
+              }
+            },
+            child: const Text('ADD'),
+          ),
+        ],
+      ),
+    );
+
+    if (newType != null && newType.isNotEmpty) {
+      if (settings.serviceTypes.contains(newType)) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Category already exists!')));
+        return;
+      }
+      final updatedList = List<String>.from(settings.serviceTypes)..add(newType);
+      _update(context, settings.copyWith(serviceTypes: updatedList));
+    }
+  }
+
+  Widget _buildServiceBillingTile(BuildContext context, AppSettings settings, SettingsState state) {
+    final plan = state.userPlan;
+    final isLocked = plan == null || !plan.isValid;
+
+    return ListTile(
+      title: Row(
+        children: [
+          const Text('Enable Service Billing (Hotels/Lounges)'),
+          if (isLocked) ...[
+            const SizedBox(width: 8),
+            const Icon(Icons.lock, size: 16, color: Colors.orange),
+          ],
+        ],
+      ),
+      subtitle: isLocked 
+          ? const Text('Available on Pro & Lifetime plans', style: TextStyle(color: Colors.orange))
+          : null,
+      trailing: Switch(
+        value: settings.serviceBillingEnabled,
+        onChanged: isLocked 
+            ? (val) => showDialog(context: context, builder: (_) => const UpgradeDialog()) // Show upgrade if locked
+            : (val) => _update(context, settings.copyWith(serviceBillingEnabled: val)),
+      ),
+      onTap: isLocked 
+          ? () => showDialog(context: context, builder: (_) => const UpgradeDialog())
+          : null, // Let Switch handle tap if unlocked
+    );
+  }
+
+  void _removeServiceType(BuildContext context, AppSettings settings, String type) {
+    final updatedList = List<String>.from(settings.serviceTypes)..remove(type);
+    _update(context, settings.copyWith(serviceTypes: updatedList));
   }
 }

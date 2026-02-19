@@ -10,6 +10,8 @@ import '../../domain/repositories/settings_repository.dart';
 import '../../domain/services/security_service.dart';
 import '../../../../core/services/backup_service.dart';
 import '../../../../core/license/storage_service.dart';
+import '../../domain/entities/user_plan.dart';
+import '../../domain/entities/settings.dart';
 
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   final SettingsRepository repository;
@@ -36,11 +38,19 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<SetSuperAdminPassword>(_onSetSuperAdminPassword);
     on<LoadBusinessLock>(_onLoadBusinessLock);
     on<LockBusinessName>(_onLockBusinessName);
+    on<UpgradeProPlan>(_onUpgradeProPlan);
     on<ResetSuperAdminAuth>((event, emit) => emit(state.copyWith(isSuperAdminAuthorized: false)));
     on<ResetSystemAuth>((event, emit) {
       debugPrint('SettingsBloc: Resetting system auth');
       emit(state.copyWith(isAuthorized: false, error: null));
     });
+  }
+
+  Future<void> _onUpgradeProPlan(UpgradeProPlan event, Emitter<SettingsState> emit) async {
+    final expiry = DateTime.now().add(Duration(days: event.durationDays));
+    await StorageService.saveProExpiryDate(expiry);
+    add(LoadSettings()); // Reloads plan
+    emit(state.copyWith(successMessage: 'Upgraded to Pro until ${expiry.toString().split(' ')[0]}'));
   }
 
   Future<void> _onBackup(CreateBackup event, Emitter<SettingsState> emit) async {
@@ -114,12 +124,44 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(state.copyWith(isLoading: true));
     try {
       final settings = await repository.getSettings();
+      final plan = await _loadUserPlan();
+      
       debugPrint('SettingsBloc: Settings loaded: ${settings?.organizationName}');
-      emit(state.copyWith(settings: settings, isLoading: false));
+      debugPrint('SettingsBloc: Plan loaded: ${plan.planType}, Expiry: ${plan.expiryDate}');
+
+      // Auto-disable if plan is not eligible
+      AppSettings? finalSettings = settings;
+      if (settings != null && settings.serviceBillingEnabled && !plan.isValid) {
+        if (!plan.isLifetime && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
+           debugPrint('SettingsBloc: Auto-disabling service billing due to plan downgrade');
+           finalSettings = settings.copyWith(serviceBillingEnabled: false);
+           await repository.updateSettings(finalSettings);
+        }
+      }
+
+      emit(state.copyWith(
+        settings: finalSettings, 
+        userPlan: plan,
+        isLoading: false
+      ));
     } catch (e) {
       debugPrint('SettingsBloc: Error loading settings: $e');
       emit(state.copyWith(error: e.toString(), isLoading: false));
     }
+  }
+
+  Future<UserPlan> _loadUserPlan() async {
+    final isLifetime = await securityService.isDeviceAuthorized();
+    if (isLifetime) {
+      return const UserPlan(planType: 'lifetime');
+    }
+    
+    final proExpiry = await StorageService.getProExpiryDate();
+    if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
+      return UserPlan(planType: 'pro', expiryDate: proExpiry);
+    }
+    
+    return const UserPlan(planType: 'basic');
   }
 
   Future<void> _onUpdateSettings(UpdateAppSettings event, Emitter<SettingsState> emit) async {
@@ -129,6 +171,20 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     if (state.isBusinessLocked && state.settings?.organizationName != event.settings.organizationName) {
       emit(state.copyWith(error: 'Business name is permanently locked.'));
       return;
+    }
+
+    // subscription validation for service billing
+    if (event.settings.serviceBillingEnabled && !(state.settings?.serviceBillingEnabled ?? false)) {
+      // User is trying to ENABLE service billing
+      final plan = state.userPlan;
+      if (plan == null || !plan.isValid) {
+         // Double check fresh plan to be safe
+         final freshPlan = await _loadUserPlan();
+         if (!freshPlan.isValid) {
+            emit(state.copyWith(error: 'Service Billing is available on Pro & Lifetime plans'));
+            return;
+         }
+      }
     }
 
     emit(state.copyWith(isSaving: true, successMessage: null, error: null));

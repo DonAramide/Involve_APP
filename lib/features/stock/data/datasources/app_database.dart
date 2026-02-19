@@ -13,7 +13,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration {
@@ -91,6 +91,22 @@ class AppDatabase extends _$AppDatabase {
         if (from < 16) {
           // Date/Time toggle migration
           await m.addColumn(settings, settings.showDateTime as GeneratedColumn<Object>);
+        }
+        if (from < 17) {
+          // Phase 3: Service Billing Migration
+          // Settings
+          await m.addColumn(settings, settings.serviceBillingEnabled);
+          await m.addColumn(settings, settings.serviceTypes);
+          
+          // Items
+          await m.addColumn(items, items.type);
+          await m.addColumn(items, items.billingType);
+          await m.addColumn(items, items.serviceCategory);
+          await m.addColumn(items, items.requiresTimeTracking);
+          
+          // InvoiceItems
+          await m.addColumn(invoiceItems, invoiceItems.type);
+          await m.addColumn(invoiceItems, invoiceItems.serviceMeta);
         }
       },
       beforeOpen: (details) async {

@@ -5,4 +5,5 @@ abstract class InvoiceRepository {
   Future<List<Invoice>> getAllInvoices();
   Future<Invoice?> getInvoiceById(int id);
   Future<List<Invoice>> getInvoicesByDateRange(DateTime start, DateTime end);
+  Future<bool> checkServiceAvailability(int itemId, DateTime start, DateTime end);
 }

@@ -2,6 +2,8 @@ import 'invoice_template.dart';
 import '../entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'dart:convert';
+import 'package:intl/intl.dart';
 
 class CompactInvoiceTemplate extends InvoiceTemplate {
   @override
@@ -45,8 +47,17 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
             : leftPart;
             
         final spaces = ' ' * (width - truncatedLeft.length - priceLine.length);
-        return TextCommand(truncatedLeft + spaces + priceLine);
-      }),
+        
+        List<PrintCommand> commands = [TextCommand(truncatedLeft + spaces + priceLine)];
+        
+        if (item.type == 'service' && item.serviceMeta != null) {
+           final dates = _formatServiceDates(item.serviceMeta);
+           if (dates.isNotEmpty) {
+             commands.add(TextCommand(dates, align: 'left'));
+           }
+        }
+        return commands;
+      }).expand((x) => x),
       DividerCommand(),
       if (invoice.taxAmount > 0) 
         TextCommand(_formatRow('Subtotal', CurrencyFormatter.format(invoice.subtotal), width)),
@@ -109,8 +120,17 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       ...invoice.items.map((item) {
         // Detailed shows Name on one line, then Qty/Price on another
         // OR we can try to fit them if short
-        return TextCommand(_formatRow('${item.item.name} x${item.quantity}', CurrencyFormatter.format(item.total), width));
-      }),
+        List<PrintCommand> commands = [
+          TextCommand(_formatRow('${item.item.name} x${item.quantity}', CurrencyFormatter.format(item.total), width))
+        ];
+        if (item.type == 'service' && item.serviceMeta != null) {
+          final dates = _formatServiceDates(item.serviceMeta);
+          if (dates.isNotEmpty) {
+            commands.add(TextCommand(dates));
+          }
+        }
+        return commands;
+      }).expand((x) => x),
       DividerCommand(),
       TextCommand(_formatRow('Subtotal', CurrencyFormatter.format(invoice.subtotal), width)),
       TextCommand(_formatRow('Tax', CurrencyFormatter.format(invoice.taxAmount), width)),
@@ -218,8 +238,16 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
         final price = CurrencyFormatter.format(item.unitPrice).padLeft(7).substring(0, 7);
         final qty = item.quantity.toString().padLeft(5).substring(0, 5);
         final total = CurrencyFormatter.format(item.total).padLeft(10).substring(0, 10);
-        return TextCommand('$name$price$qty$total');
-      }),
+        
+        List<PrintCommand> commands = [TextCommand('$name$price$qty$total')];
+        if (item.type == 'service' && item.serviceMeta != null) {
+          final dates = _formatServiceDates(item.serviceMeta);
+          if (dates.isNotEmpty) {
+            commands.add(TextCommand(dates));
+          }
+        }
+        return commands;
+      }).expand((x) => x),
       DividerCommand(),
       TextCommand(_formatSummaryRow('SUBTOTAL:', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0)
@@ -285,8 +313,16 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
         final qty = item.quantity.toString().padRight(5).substring(0, 5);
         final name = item.item.name.padRight(15).substring(0, 15);
         final total = CurrencyFormatter.format(item.total).padLeft(12).substring(0, 12);
-        return TextCommand('$qty$name$total');
-      }),
+        
+        List<PrintCommand> commands = [TextCommand('$qty$name$total')];
+        if (item.type == 'service' && item.serviceMeta != null) {
+          final dates = _formatServiceDates(item.serviceMeta);
+          if (dates.isNotEmpty) {
+            commands.add(TextCommand(dates));
+          }
+        }
+        return commands;
+      }).expand((x) => x),
       DividerCommand(),
       TextCommand(_formatRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0)
@@ -365,5 +401,18 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
   String _formatRow(String left, String right, int width) {
     final spaces = ' ' * (width - left.length - right.length).clamp(1, width);
     return left + spaces + right;
+  }
+}
+
+String _formatServiceDates(String? metaStr) {
+  if (metaStr == null) return '';
+  try {
+    final meta = jsonDecode(metaStr);
+    final start = DateTime.parse(meta['startDate']);
+    final end = DateTime.parse(meta['endDate']);
+    final fmt = DateFormat('MM/dd HH:mm');
+    return '${fmt.format(start)} - ${fmt.format(end)}';
+  } catch (e) {
+    return '';
   }
 }

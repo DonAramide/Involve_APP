@@ -12,6 +12,7 @@ class StorageService {
   static const _trialStartKey = 'trial_start_date';
   static const _businessLockedKey = 'is_business_locked';
   static const _lastPrinterIpKey = 'last_printer_ip';
+  static const _proExpiryKey = 'pro_plan_expiry';
   static const _licenseFileName = 'license.dat';
 
   // Desktop simple encryption key (could be improved)
@@ -184,5 +185,34 @@ class StorageService {
   static String _encryptDecryptRaw(List<int> bytes) {
     final decrypted = bytes.map((b) => b ^ _encryptionKey).toList();
     return utf8.decode(decrypted);
+  }
+
+  static Future<void> saveProExpiryDate(DateTime date) async {
+    final dateStr = date.toIso8601String();
+    if (kIsWeb) {
+      await _secureStorage.write(key: _proExpiryKey, value: dateStr);
+      return;
+    }
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _proExpiryKey, value: dateStr);
+    } else {
+      final file = await _getDesktopFile('pro_expiry.dat');
+      await file.writeAsString(dateStr);
+    }
+  }
+
+  static Future<DateTime?> getProExpiryDate() async {
+    String? dateStr;
+    if (kIsWeb) {
+      dateStr = await _secureStorage.read(key: _proExpiryKey);
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      dateStr = await _secureStorage.read(key: _proExpiryKey);
+    } else {
+      final file = await _getDesktopFile('pro_expiry.dat');
+      if (await file.exists()) {
+        dateStr = await file.readAsString();
+      }
+    }
+    return dateStr != null ? DateTime.tryParse(dateStr) : null;
   }
 }

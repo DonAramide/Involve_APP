@@ -241,9 +241,49 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('REFERENCES categories (id)'));
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, name, category, price, stockQty, image, categoryId];
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+      'type', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('product'));
+  static const VerificationMeta _billingTypeMeta =
+      const VerificationMeta('billingType');
+  @override
+  late final GeneratedColumn<String> billingType = GeneratedColumn<String>(
+      'billing_type', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _serviceCategoryMeta =
+      const VerificationMeta('serviceCategory');
+  @override
+  late final GeneratedColumn<String> serviceCategory = GeneratedColumn<String>(
+      'service_category', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _requiresTimeTrackingMeta =
+      const VerificationMeta('requiresTimeTracking');
+  @override
+  late final GeneratedColumn<bool> requiresTimeTracking = GeneratedColumn<bool>(
+      'requires_time_tracking', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("requires_time_tracking" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        name,
+        category,
+        price,
+        stockQty,
+        image,
+        categoryId,
+        type,
+        billingType,
+        serviceCategory,
+        requiresTimeTracking
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -289,6 +329,28 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
           categoryId.isAcceptableOrUnknown(
               data['category_id']!, _categoryIdMeta));
     }
+    if (data.containsKey('type')) {
+      context.handle(
+          _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
+    }
+    if (data.containsKey('billing_type')) {
+      context.handle(
+          _billingTypeMeta,
+          billingType.isAcceptableOrUnknown(
+              data['billing_type']!, _billingTypeMeta));
+    }
+    if (data.containsKey('service_category')) {
+      context.handle(
+          _serviceCategoryMeta,
+          serviceCategory.isAcceptableOrUnknown(
+              data['service_category']!, _serviceCategoryMeta));
+    }
+    if (data.containsKey('requires_time_tracking')) {
+      context.handle(
+          _requiresTimeTrackingMeta,
+          requiresTimeTracking.isAcceptableOrUnknown(
+              data['requires_time_tracking']!, _requiresTimeTrackingMeta));
+    }
     return context;
   }
 
@@ -312,6 +374,14 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
           .read(DriftSqlType.blob, data['${effectivePrefix}image']),
       categoryId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}category_id']),
+      type: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      billingType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}billing_type']),
+      serviceCategory: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}service_category']),
+      requiresTimeTracking: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}requires_time_tracking'])!,
     );
   }
 
@@ -329,6 +399,10 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
   final int stockQty;
   final Uint8List? image;
   final int? categoryId;
+  final String type;
+  final String? billingType;
+  final String? serviceCategory;
+  final bool requiresTimeTracking;
   const ItemTable(
       {required this.id,
       required this.name,
@@ -336,7 +410,11 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       required this.price,
       required this.stockQty,
       this.image,
-      this.categoryId});
+      this.categoryId,
+      required this.type,
+      this.billingType,
+      this.serviceCategory,
+      required this.requiresTimeTracking});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -351,6 +429,14 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
     if (!nullToAbsent || categoryId != null) {
       map['category_id'] = Variable<int>(categoryId);
     }
+    map['type'] = Variable<String>(type);
+    if (!nullToAbsent || billingType != null) {
+      map['billing_type'] = Variable<String>(billingType);
+    }
+    if (!nullToAbsent || serviceCategory != null) {
+      map['service_category'] = Variable<String>(serviceCategory);
+    }
+    map['requires_time_tracking'] = Variable<bool>(requiresTimeTracking);
     return map;
   }
 
@@ -366,6 +452,14 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       categoryId: categoryId == null && nullToAbsent
           ? const Value.absent()
           : Value(categoryId),
+      type: Value(type),
+      billingType: billingType == null && nullToAbsent
+          ? const Value.absent()
+          : Value(billingType),
+      serviceCategory: serviceCategory == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serviceCategory),
+      requiresTimeTracking: Value(requiresTimeTracking),
     );
   }
 
@@ -380,6 +474,11 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       stockQty: serializer.fromJson<int>(json['stockQty']),
       image: serializer.fromJson<Uint8List?>(json['image']),
       categoryId: serializer.fromJson<int?>(json['categoryId']),
+      type: serializer.fromJson<String>(json['type']),
+      billingType: serializer.fromJson<String?>(json['billingType']),
+      serviceCategory: serializer.fromJson<String?>(json['serviceCategory']),
+      requiresTimeTracking:
+          serializer.fromJson<bool>(json['requiresTimeTracking']),
     );
   }
   @override
@@ -393,6 +492,10 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       'stockQty': serializer.toJson<int>(stockQty),
       'image': serializer.toJson<Uint8List?>(image),
       'categoryId': serializer.toJson<int?>(categoryId),
+      'type': serializer.toJson<String>(type),
+      'billingType': serializer.toJson<String?>(billingType),
+      'serviceCategory': serializer.toJson<String?>(serviceCategory),
+      'requiresTimeTracking': serializer.toJson<bool>(requiresTimeTracking),
     };
   }
 
@@ -403,7 +506,11 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           double? price,
           int? stockQty,
           Value<Uint8List?> image = const Value.absent(),
-          Value<int?> categoryId = const Value.absent()}) =>
+          Value<int?> categoryId = const Value.absent(),
+          String? type,
+          Value<String?> billingType = const Value.absent(),
+          Value<String?> serviceCategory = const Value.absent(),
+          bool? requiresTimeTracking}) =>
       ItemTable(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -412,6 +519,12 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
         stockQty: stockQty ?? this.stockQty,
         image: image.present ? image.value : this.image,
         categoryId: categoryId.present ? categoryId.value : this.categoryId,
+        type: type ?? this.type,
+        billingType: billingType.present ? billingType.value : this.billingType,
+        serviceCategory: serviceCategory.present
+            ? serviceCategory.value
+            : this.serviceCategory,
+        requiresTimeTracking: requiresTimeTracking ?? this.requiresTimeTracking,
       );
   ItemTable copyWithCompanion(ItemsCompanion data) {
     return ItemTable(
@@ -423,6 +536,15 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       image: data.image.present ? data.image.value : this.image,
       categoryId:
           data.categoryId.present ? data.categoryId.value : this.categoryId,
+      type: data.type.present ? data.type.value : this.type,
+      billingType:
+          data.billingType.present ? data.billingType.value : this.billingType,
+      serviceCategory: data.serviceCategory.present
+          ? data.serviceCategory.value
+          : this.serviceCategory,
+      requiresTimeTracking: data.requiresTimeTracking.present
+          ? data.requiresTimeTracking.value
+          : this.requiresTimeTracking,
     );
   }
 
@@ -435,14 +557,28 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           ..write('price: $price, ')
           ..write('stockQty: $stockQty, ')
           ..write('image: $image, ')
-          ..write('categoryId: $categoryId')
+          ..write('categoryId: $categoryId, ')
+          ..write('type: $type, ')
+          ..write('billingType: $billingType, ')
+          ..write('serviceCategory: $serviceCategory, ')
+          ..write('requiresTimeTracking: $requiresTimeTracking')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, category, price, stockQty,
-      $driftBlobEquality.hash(image), categoryId);
+  int get hashCode => Object.hash(
+      id,
+      name,
+      category,
+      price,
+      stockQty,
+      $driftBlobEquality.hash(image),
+      categoryId,
+      type,
+      billingType,
+      serviceCategory,
+      requiresTimeTracking);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -453,7 +589,11 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           other.price == this.price &&
           other.stockQty == this.stockQty &&
           $driftBlobEquality.equals(other.image, this.image) &&
-          other.categoryId == this.categoryId);
+          other.categoryId == this.categoryId &&
+          other.type == this.type &&
+          other.billingType == this.billingType &&
+          other.serviceCategory == this.serviceCategory &&
+          other.requiresTimeTracking == this.requiresTimeTracking);
 }
 
 class ItemsCompanion extends UpdateCompanion<ItemTable> {
@@ -464,6 +604,10 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
   final Value<int> stockQty;
   final Value<Uint8List?> image;
   final Value<int?> categoryId;
+  final Value<String> type;
+  final Value<String?> billingType;
+  final Value<String?> serviceCategory;
+  final Value<bool> requiresTimeTracking;
   const ItemsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -472,6 +616,10 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     this.stockQty = const Value.absent(),
     this.image = const Value.absent(),
     this.categoryId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.billingType = const Value.absent(),
+    this.serviceCategory = const Value.absent(),
+    this.requiresTimeTracking = const Value.absent(),
   });
   ItemsCompanion.insert({
     this.id = const Value.absent(),
@@ -481,6 +629,10 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     this.stockQty = const Value.absent(),
     this.image = const Value.absent(),
     this.categoryId = const Value.absent(),
+    this.type = const Value.absent(),
+    this.billingType = const Value.absent(),
+    this.serviceCategory = const Value.absent(),
+    this.requiresTimeTracking = const Value.absent(),
   })  : name = Value(name),
         category = Value(category),
         price = Value(price);
@@ -492,6 +644,10 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     Expression<int>? stockQty,
     Expression<Uint8List>? image,
     Expression<int>? categoryId,
+    Expression<String>? type,
+    Expression<String>? billingType,
+    Expression<String>? serviceCategory,
+    Expression<bool>? requiresTimeTracking,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -501,6 +657,11 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       if (stockQty != null) 'stock_qty': stockQty,
       if (image != null) 'image': image,
       if (categoryId != null) 'category_id': categoryId,
+      if (type != null) 'type': type,
+      if (billingType != null) 'billing_type': billingType,
+      if (serviceCategory != null) 'service_category': serviceCategory,
+      if (requiresTimeTracking != null)
+        'requires_time_tracking': requiresTimeTracking,
     });
   }
 
@@ -511,7 +672,11 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       Value<double>? price,
       Value<int>? stockQty,
       Value<Uint8List?>? image,
-      Value<int?>? categoryId}) {
+      Value<int?>? categoryId,
+      Value<String>? type,
+      Value<String?>? billingType,
+      Value<String?>? serviceCategory,
+      Value<bool>? requiresTimeTracking}) {
     return ItemsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -520,6 +685,10 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       stockQty: stockQty ?? this.stockQty,
       image: image ?? this.image,
       categoryId: categoryId ?? this.categoryId,
+      type: type ?? this.type,
+      billingType: billingType ?? this.billingType,
+      serviceCategory: serviceCategory ?? this.serviceCategory,
+      requiresTimeTracking: requiresTimeTracking ?? this.requiresTimeTracking,
     );
   }
 
@@ -547,6 +716,19 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     if (categoryId.present) {
       map['category_id'] = Variable<int>(categoryId.value);
     }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (billingType.present) {
+      map['billing_type'] = Variable<String>(billingType.value);
+    }
+    if (serviceCategory.present) {
+      map['service_category'] = Variable<String>(serviceCategory.value);
+    }
+    if (requiresTimeTracking.present) {
+      map['requires_time_tracking'] =
+          Variable<bool>(requiresTimeTracking.value);
+    }
     return map;
   }
 
@@ -559,7 +741,11 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
           ..write('price: $price, ')
           ..write('stockQty: $stockQty, ')
           ..write('image: $image, ')
-          ..write('categoryId: $categoryId')
+          ..write('categoryId: $categoryId, ')
+          ..write('type: $type, ')
+          ..write('billingType: $billingType, ')
+          ..write('serviceCategory: $serviceCategory, ')
+          ..write('requiresTimeTracking: $requiresTimeTracking')
           ..write(')'))
         .toString();
   }
@@ -1188,9 +1374,22 @@ class $InvoiceItemsTable extends InvoiceItems
   late final GeneratedColumn<double> unitPrice = GeneratedColumn<double>(
       'unit_price', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+      'type', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('product'));
+  static const VerificationMeta _serviceMetaMeta =
+      const VerificationMeta('serviceMeta');
+  @override
+  late final GeneratedColumn<String> serviceMeta = GeneratedColumn<String>(
+      'service_meta', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, invoiceId, itemId, quantity, unitPrice];
+      [id, invoiceId, itemId, quantity, unitPrice, type, serviceMeta];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1228,6 +1427,16 @@ class $InvoiceItemsTable extends InvoiceItems
     } else if (isInserting) {
       context.missing(_unitPriceMeta);
     }
+    if (data.containsKey('type')) {
+      context.handle(
+          _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
+    }
+    if (data.containsKey('service_meta')) {
+      context.handle(
+          _serviceMetaMeta,
+          serviceMeta.isAcceptableOrUnknown(
+              data['service_meta']!, _serviceMetaMeta));
+    }
     return context;
   }
 
@@ -1247,6 +1456,10 @@ class $InvoiceItemsTable extends InvoiceItems
           .read(DriftSqlType.int, data['${effectivePrefix}quantity'])!,
       unitPrice: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}unit_price'])!,
+      type: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      serviceMeta: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}service_meta']),
     );
   }
 
@@ -1263,12 +1476,16 @@ class InvoiceItemTable extends DataClass
   final int itemId;
   final int quantity;
   final double unitPrice;
+  final String type;
+  final String? serviceMeta;
   const InvoiceItemTable(
       {required this.id,
       required this.invoiceId,
       required this.itemId,
       required this.quantity,
-      required this.unitPrice});
+      required this.unitPrice,
+      required this.type,
+      this.serviceMeta});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1277,6 +1494,10 @@ class InvoiceItemTable extends DataClass
     map['item_id'] = Variable<int>(itemId);
     map['quantity'] = Variable<int>(quantity);
     map['unit_price'] = Variable<double>(unitPrice);
+    map['type'] = Variable<String>(type);
+    if (!nullToAbsent || serviceMeta != null) {
+      map['service_meta'] = Variable<String>(serviceMeta);
+    }
     return map;
   }
 
@@ -1287,6 +1508,10 @@ class InvoiceItemTable extends DataClass
       itemId: Value(itemId),
       quantity: Value(quantity),
       unitPrice: Value(unitPrice),
+      type: Value(type),
+      serviceMeta: serviceMeta == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serviceMeta),
     );
   }
 
@@ -1299,6 +1524,8 @@ class InvoiceItemTable extends DataClass
       itemId: serializer.fromJson<int>(json['itemId']),
       quantity: serializer.fromJson<int>(json['quantity']),
       unitPrice: serializer.fromJson<double>(json['unitPrice']),
+      type: serializer.fromJson<String>(json['type']),
+      serviceMeta: serializer.fromJson<String?>(json['serviceMeta']),
     );
   }
   @override
@@ -1310,6 +1537,8 @@ class InvoiceItemTable extends DataClass
       'itemId': serializer.toJson<int>(itemId),
       'quantity': serializer.toJson<int>(quantity),
       'unitPrice': serializer.toJson<double>(unitPrice),
+      'type': serializer.toJson<String>(type),
+      'serviceMeta': serializer.toJson<String?>(serviceMeta),
     };
   }
 
@@ -1318,13 +1547,17 @@ class InvoiceItemTable extends DataClass
           int? invoiceId,
           int? itemId,
           int? quantity,
-          double? unitPrice}) =>
+          double? unitPrice,
+          String? type,
+          Value<String?> serviceMeta = const Value.absent()}) =>
       InvoiceItemTable(
         id: id ?? this.id,
         invoiceId: invoiceId ?? this.invoiceId,
         itemId: itemId ?? this.itemId,
         quantity: quantity ?? this.quantity,
         unitPrice: unitPrice ?? this.unitPrice,
+        type: type ?? this.type,
+        serviceMeta: serviceMeta.present ? serviceMeta.value : this.serviceMeta,
       );
   InvoiceItemTable copyWithCompanion(InvoiceItemsCompanion data) {
     return InvoiceItemTable(
@@ -1333,6 +1566,9 @@ class InvoiceItemTable extends DataClass
       itemId: data.itemId.present ? data.itemId.value : this.itemId,
       quantity: data.quantity.present ? data.quantity.value : this.quantity,
       unitPrice: data.unitPrice.present ? data.unitPrice.value : this.unitPrice,
+      type: data.type.present ? data.type.value : this.type,
+      serviceMeta:
+          data.serviceMeta.present ? data.serviceMeta.value : this.serviceMeta,
     );
   }
 
@@ -1343,13 +1579,16 @@ class InvoiceItemTable extends DataClass
           ..write('invoiceId: $invoiceId, ')
           ..write('itemId: $itemId, ')
           ..write('quantity: $quantity, ')
-          ..write('unitPrice: $unitPrice')
+          ..write('unitPrice: $unitPrice, ')
+          ..write('type: $type, ')
+          ..write('serviceMeta: $serviceMeta')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, invoiceId, itemId, quantity, unitPrice);
+  int get hashCode => Object.hash(
+      id, invoiceId, itemId, quantity, unitPrice, type, serviceMeta);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1358,7 +1597,9 @@ class InvoiceItemTable extends DataClass
           other.invoiceId == this.invoiceId &&
           other.itemId == this.itemId &&
           other.quantity == this.quantity &&
-          other.unitPrice == this.unitPrice);
+          other.unitPrice == this.unitPrice &&
+          other.type == this.type &&
+          other.serviceMeta == this.serviceMeta);
 }
 
 class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
@@ -1367,12 +1608,16 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
   final Value<int> itemId;
   final Value<int> quantity;
   final Value<double> unitPrice;
+  final Value<String> type;
+  final Value<String?> serviceMeta;
   const InvoiceItemsCompanion({
     this.id = const Value.absent(),
     this.invoiceId = const Value.absent(),
     this.itemId = const Value.absent(),
     this.quantity = const Value.absent(),
     this.unitPrice = const Value.absent(),
+    this.type = const Value.absent(),
+    this.serviceMeta = const Value.absent(),
   });
   InvoiceItemsCompanion.insert({
     this.id = const Value.absent(),
@@ -1380,6 +1625,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     required int itemId,
     required int quantity,
     required double unitPrice,
+    this.type = const Value.absent(),
+    this.serviceMeta = const Value.absent(),
   })  : invoiceId = Value(invoiceId),
         itemId = Value(itemId),
         quantity = Value(quantity),
@@ -1390,6 +1637,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     Expression<int>? itemId,
     Expression<int>? quantity,
     Expression<double>? unitPrice,
+    Expression<String>? type,
+    Expression<String>? serviceMeta,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1397,6 +1646,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
       if (itemId != null) 'item_id': itemId,
       if (quantity != null) 'quantity': quantity,
       if (unitPrice != null) 'unit_price': unitPrice,
+      if (type != null) 'type': type,
+      if (serviceMeta != null) 'service_meta': serviceMeta,
     });
   }
 
@@ -1405,13 +1656,17 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
       Value<int>? invoiceId,
       Value<int>? itemId,
       Value<int>? quantity,
-      Value<double>? unitPrice}) {
+      Value<double>? unitPrice,
+      Value<String>? type,
+      Value<String?>? serviceMeta}) {
     return InvoiceItemsCompanion(
       id: id ?? this.id,
       invoiceId: invoiceId ?? this.invoiceId,
       itemId: itemId ?? this.itemId,
       quantity: quantity ?? this.quantity,
       unitPrice: unitPrice ?? this.unitPrice,
+      type: type ?? this.type,
+      serviceMeta: serviceMeta ?? this.serviceMeta,
     );
   }
 
@@ -1433,6 +1688,12 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     if (unitPrice.present) {
       map['unit_price'] = Variable<double>(unitPrice.value);
     }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (serviceMeta.present) {
+      map['service_meta'] = Variable<String>(serviceMeta.value);
+    }
     return map;
   }
 
@@ -1443,7 +1704,9 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
           ..write('invoiceId: $invoiceId, ')
           ..write('itemId: $itemId, ')
           ..write('quantity: $quantity, ')
-          ..write('unitPrice: $unitPrice')
+          ..write('unitPrice: $unitPrice, ')
+          ..write('type: $type, ')
+          ..write('serviceMeta: $serviceMeta')
           ..write(')'))
         .toString();
   }
@@ -1676,6 +1939,22 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("show_date_time" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _serviceBillingEnabledMeta =
+      const VerificationMeta('serviceBillingEnabled');
+  @override
+  late final GeneratedColumn<bool> serviceBillingEnabled =
+      GeneratedColumn<bool>('service_billing_enabled', aliasedName, false,
+          type: DriftSqlType.bool,
+          requiredDuringInsert: false,
+          defaultConstraints: GeneratedColumn.constraintIsAlways(
+              'CHECK ("service_billing_enabled" IN (0, 1))'),
+          defaultValue: const Constant(false));
+  static const VerificationMeta _serviceTypesMeta =
+      const VerificationMeta('serviceTypes');
+  @override
+  late final GeneratedColumn<String> serviceTypes = GeneratedColumn<String>(
+      'service_types', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1705,7 +1984,9 @@ class $SettingsTable extends Settings
         failedAttempts,
         isLocked,
         lockedAt,
-        showDateTime
+        showDateTime,
+        serviceBillingEnabled,
+        serviceTypes
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1867,6 +2148,18 @@ class $SettingsTable extends Settings
           showDateTime.isAcceptableOrUnknown(
               data['show_date_time']!, _showDateTimeMeta));
     }
+    if (data.containsKey('service_billing_enabled')) {
+      context.handle(
+          _serviceBillingEnabledMeta,
+          serviceBillingEnabled.isAcceptableOrUnknown(
+              data['service_billing_enabled']!, _serviceBillingEnabledMeta));
+    }
+    if (data.containsKey('service_types')) {
+      context.handle(
+          _serviceTypesMeta,
+          serviceTypes.isAcceptableOrUnknown(
+              data['service_types']!, _serviceTypesMeta));
+    }
     return context;
   }
 
@@ -1935,6 +2228,11 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.dateTime, data['${effectivePrefix}locked_at']),
       showDateTime: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}show_date_time'])!,
+      serviceBillingEnabled: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool,
+          data['${effectivePrefix}service_billing_enabled'])!,
+      serviceTypes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}service_types']),
     );
   }
 
@@ -1973,6 +2271,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool isLocked;
   final DateTime? lockedAt;
   final bool showDateTime;
+  final bool serviceBillingEnabled;
+  final String? serviceTypes;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -2001,7 +2301,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.failedAttempts,
       required this.isLocked,
       this.lockedAt,
-      required this.showDateTime});
+      required this.showDateTime,
+      required this.serviceBillingEnabled,
+      this.serviceTypes});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2049,6 +2351,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       map['locked_at'] = Variable<DateTime>(lockedAt);
     }
     map['show_date_time'] = Variable<bool>(showDateTime);
+    map['service_billing_enabled'] = Variable<bool>(serviceBillingEnabled);
+    if (!nullToAbsent || serviceTypes != null) {
+      map['service_types'] = Variable<String>(serviceTypes);
+    }
     return map;
   }
 
@@ -2095,6 +2401,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ? const Value.absent()
           : Value(lockedAt),
       showDateTime: Value(showDateTime),
+      serviceBillingEnabled: Value(serviceBillingEnabled),
+      serviceTypes: serviceTypes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serviceTypes),
     );
   }
 
@@ -2134,6 +2444,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       isLocked: serializer.fromJson<bool>(json['isLocked']),
       lockedAt: serializer.fromJson<DateTime?>(json['lockedAt']),
       showDateTime: serializer.fromJson<bool>(json['showDateTime']),
+      serviceBillingEnabled:
+          serializer.fromJson<bool>(json['serviceBillingEnabled']),
+      serviceTypes: serializer.fromJson<String?>(json['serviceTypes']),
     );
   }
   @override
@@ -2170,6 +2483,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'isLocked': serializer.toJson<bool>(isLocked),
       'lockedAt': serializer.toJson<DateTime?>(lockedAt),
       'showDateTime': serializer.toJson<bool>(showDateTime),
+      'serviceBillingEnabled': serializer.toJson<bool>(serviceBillingEnabled),
+      'serviceTypes': serializer.toJson<String?>(serviceTypes),
     };
   }
 
@@ -2201,7 +2516,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           int? failedAttempts,
           bool? isLocked,
           Value<DateTime?> lockedAt = const Value.absent(),
-          bool? showDateTime}) =>
+          bool? showDateTime,
+          bool? serviceBillingEnabled,
+          Value<String?> serviceTypes = const Value.absent()}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -2237,6 +2554,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         isLocked: isLocked ?? this.isLocked,
         lockedAt: lockedAt.present ? lockedAt.value : this.lockedAt,
         showDateTime: showDateTime ?? this.showDateTime,
+        serviceBillingEnabled:
+            serviceBillingEnabled ?? this.serviceBillingEnabled,
+        serviceTypes:
+            serviceTypes.present ? serviceTypes.value : this.serviceTypes,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -2298,6 +2619,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showDateTime: data.showDateTime.present
           ? data.showDateTime.value
           : this.showDateTime,
+      serviceBillingEnabled: data.serviceBillingEnabled.present
+          ? data.serviceBillingEnabled.value
+          : this.serviceBillingEnabled,
+      serviceTypes: data.serviceTypes.present
+          ? data.serviceTypes.value
+          : this.serviceTypes,
     );
   }
 
@@ -2331,7 +2658,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt, ')
-          ..write('showDateTime: $showDateTime')
+          ..write('showDateTime: $showDateTime, ')
+          ..write('serviceBillingEnabled: $serviceBillingEnabled, ')
+          ..write('serviceTypes: $serviceTypes')
           ..write(')'))
         .toString();
   }
@@ -2365,7 +2694,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         failedAttempts,
         isLocked,
         lockedAt,
-        showDateTime
+        showDateTime,
+        serviceBillingEnabled,
+        serviceTypes
       ]);
   @override
   bool operator ==(Object other) =>
@@ -2398,7 +2729,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.failedAttempts == this.failedAttempts &&
           other.isLocked == this.isLocked &&
           other.lockedAt == this.lockedAt &&
-          other.showDateTime == this.showDateTime);
+          other.showDateTime == this.showDateTime &&
+          other.serviceBillingEnabled == this.serviceBillingEnabled &&
+          other.serviceTypes == this.serviceTypes);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -2430,6 +2763,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> isLocked;
   final Value<DateTime?> lockedAt;
   final Value<bool> showDateTime;
+  final Value<bool> serviceBillingEnabled;
+  final Value<String?> serviceTypes;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -2459,6 +2794,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
     this.showDateTime = const Value.absent(),
+    this.serviceBillingEnabled = const Value.absent(),
+    this.serviceTypes = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -2489,6 +2826,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
     this.showDateTime = const Value.absent(),
+    this.serviceBillingEnabled = const Value.absent(),
+    this.serviceTypes = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -2521,6 +2860,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? isLocked,
     Expression<DateTime>? lockedAt,
     Expression<bool>? showDateTime,
+    Expression<bool>? serviceBillingEnabled,
+    Expression<String>? serviceTypes,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2557,6 +2898,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (isLocked != null) 'is_locked': isLocked,
       if (lockedAt != null) 'locked_at': lockedAt,
       if (showDateTime != null) 'show_date_time': showDateTime,
+      if (serviceBillingEnabled != null)
+        'service_billing_enabled': serviceBillingEnabled,
+      if (serviceTypes != null) 'service_types': serviceTypes,
     });
   }
 
@@ -2588,7 +2932,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<int>? failedAttempts,
       Value<bool>? isLocked,
       Value<DateTime?>? lockedAt,
-      Value<bool>? showDateTime}) {
+      Value<bool>? showDateTime,
+      Value<bool>? serviceBillingEnabled,
+      Value<String?>? serviceTypes}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -2621,6 +2967,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
       showDateTime: showDateTime ?? this.showDateTime,
+      serviceBillingEnabled:
+          serviceBillingEnabled ?? this.serviceBillingEnabled,
+      serviceTypes: serviceTypes ?? this.serviceTypes,
     );
   }
 
@@ -2714,6 +3063,13 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (showDateTime.present) {
       map['show_date_time'] = Variable<bool>(showDateTime.value);
     }
+    if (serviceBillingEnabled.present) {
+      map['service_billing_enabled'] =
+          Variable<bool>(serviceBillingEnabled.value);
+    }
+    if (serviceTypes.present) {
+      map['service_types'] = Variable<String>(serviceTypes.value);
+    }
     return map;
   }
 
@@ -2747,7 +3103,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt, ')
-          ..write('showDateTime: $showDateTime')
+          ..write('showDateTime: $showDateTime, ')
+          ..write('serviceBillingEnabled: $serviceBillingEnabled, ')
+          ..write('serviceTypes: $serviceTypes')
           ..write(')'))
         .toString();
   }
@@ -3409,6 +3767,10 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   Value<int> stockQty,
   Value<Uint8List?> image,
   Value<int?> categoryId,
+  Value<String> type,
+  Value<String?> billingType,
+  Value<String?> serviceCategory,
+  Value<bool> requiresTimeTracking,
 });
 typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<int> id,
@@ -3418,6 +3780,10 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<int> stockQty,
   Value<Uint8List?> image,
   Value<int?> categoryId,
+  Value<String> type,
+  Value<String?> billingType,
+  Value<String?> serviceCategory,
+  Value<bool> requiresTimeTracking,
 });
 
 final class $$ItemsTableReferences
@@ -3478,6 +3844,20 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get billingType => $composableBuilder(
+      column: $table.billingType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get serviceCategory => $composableBuilder(
+      column: $table.serviceCategory,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get requiresTimeTracking => $composableBuilder(
+      column: $table.requiresTimeTracking,
+      builder: (column) => ColumnFilters(column));
 
   $$CategoriesTableFilterComposer get categoryId {
     final $$CategoriesTableFilterComposer composer = $composerBuilder(
@@ -3548,6 +3928,20 @@ class $$ItemsTableOrderingComposer
   ColumnOrderings<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get billingType => $composableBuilder(
+      column: $table.billingType, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get serviceCategory => $composableBuilder(
+      column: $table.serviceCategory,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get requiresTimeTracking => $composableBuilder(
+      column: $table.requiresTimeTracking,
+      builder: (column) => ColumnOrderings(column));
+
   $$CategoriesTableOrderingComposer get categoryId {
     final $$CategoriesTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -3595,6 +3989,18 @@ class $$ItemsTableAnnotationComposer
 
   GeneratedColumn<Uint8List> get image =>
       $composableBuilder(column: $table.image, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get billingType => $composableBuilder(
+      column: $table.billingType, builder: (column) => column);
+
+  GeneratedColumn<String> get serviceCategory => $composableBuilder(
+      column: $table.serviceCategory, builder: (column) => column);
+
+  GeneratedColumn<bool> get requiresTimeTracking => $composableBuilder(
+      column: $table.requiresTimeTracking, builder: (column) => column);
 
   $$CategoriesTableAnnotationComposer get categoryId {
     final $$CategoriesTableAnnotationComposer composer = $composerBuilder(
@@ -3668,6 +4074,10 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<int> stockQty = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<int?> categoryId = const Value.absent(),
+            Value<String> type = const Value.absent(),
+            Value<String?> billingType = const Value.absent(),
+            Value<String?> serviceCategory = const Value.absent(),
+            Value<bool> requiresTimeTracking = const Value.absent(),
           }) =>
               ItemsCompanion(
             id: id,
@@ -3677,6 +4087,10 @@ class $$ItemsTableTableManager extends RootTableManager<
             stockQty: stockQty,
             image: image,
             categoryId: categoryId,
+            type: type,
+            billingType: billingType,
+            serviceCategory: serviceCategory,
+            requiresTimeTracking: requiresTimeTracking,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -3686,6 +4100,10 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<int> stockQty = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<int?> categoryId = const Value.absent(),
+            Value<String> type = const Value.absent(),
+            Value<String?> billingType = const Value.absent(),
+            Value<String?> serviceCategory = const Value.absent(),
+            Value<bool> requiresTimeTracking = const Value.absent(),
           }) =>
               ItemsCompanion.insert(
             id: id,
@@ -3695,6 +4113,10 @@ class $$ItemsTableTableManager extends RootTableManager<
             stockQty: stockQty,
             image: image,
             categoryId: categoryId,
+            type: type,
+            billingType: billingType,
+            serviceCategory: serviceCategory,
+            requiresTimeTracking: requiresTimeTracking,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -4114,6 +4536,8 @@ typedef $$InvoiceItemsTableCreateCompanionBuilder = InvoiceItemsCompanion
   required int itemId,
   required int quantity,
   required double unitPrice,
+  Value<String> type,
+  Value<String?> serviceMeta,
 });
 typedef $$InvoiceItemsTableUpdateCompanionBuilder = InvoiceItemsCompanion
     Function({
@@ -4122,6 +4546,8 @@ typedef $$InvoiceItemsTableUpdateCompanionBuilder = InvoiceItemsCompanion
   Value<int> itemId,
   Value<int> quantity,
   Value<double> unitPrice,
+  Value<String> type,
+  Value<String?> serviceMeta,
 });
 
 final class $$InvoiceItemsTableReferences extends BaseReferences<_$AppDatabase,
@@ -4175,6 +4601,12 @@ class $$InvoiceItemsTableFilterComposer
 
   ColumnFilters<double> get unitPrice => $composableBuilder(
       column: $table.unitPrice, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get serviceMeta => $composableBuilder(
+      column: $table.serviceMeta, builder: (column) => ColumnFilters(column));
 
   $$InvoicesTableFilterComposer get invoiceId {
     final $$InvoicesTableFilterComposer composer = $composerBuilder(
@@ -4235,6 +4667,12 @@ class $$InvoiceItemsTableOrderingComposer
   ColumnOrderings<double> get unitPrice => $composableBuilder(
       column: $table.unitPrice, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get serviceMeta => $composableBuilder(
+      column: $table.serviceMeta, builder: (column) => ColumnOrderings(column));
+
   $$InvoicesTableOrderingComposer get invoiceId {
     final $$InvoicesTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -4293,6 +4731,12 @@ class $$InvoiceItemsTableAnnotationComposer
 
   GeneratedColumn<double> get unitPrice =>
       $composableBuilder(column: $table.unitPrice, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get serviceMeta => $composableBuilder(
+      column: $table.serviceMeta, builder: (column) => column);
 
   $$InvoicesTableAnnotationComposer get invoiceId {
     final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
@@ -4363,6 +4807,8 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             Value<int> itemId = const Value.absent(),
             Value<int> quantity = const Value.absent(),
             Value<double> unitPrice = const Value.absent(),
+            Value<String> type = const Value.absent(),
+            Value<String?> serviceMeta = const Value.absent(),
           }) =>
               InvoiceItemsCompanion(
             id: id,
@@ -4370,6 +4816,8 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             itemId: itemId,
             quantity: quantity,
             unitPrice: unitPrice,
+            type: type,
+            serviceMeta: serviceMeta,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -4377,6 +4825,8 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             required int itemId,
             required int quantity,
             required double unitPrice,
+            Value<String> type = const Value.absent(),
+            Value<String?> serviceMeta = const Value.absent(),
           }) =>
               InvoiceItemsCompanion.insert(
             id: id,
@@ -4384,6 +4834,8 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             itemId: itemId,
             quantity: quantity,
             unitPrice: unitPrice,
+            type: type,
+            serviceMeta: serviceMeta,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (
@@ -4480,6 +4932,8 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
   Value<bool> showDateTime,
+  Value<bool> serviceBillingEnabled,
+  Value<String?> serviceTypes,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -4510,6 +4964,8 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
   Value<bool> showDateTime,
+  Value<bool> serviceBillingEnabled,
+  Value<String?> serviceTypes,
 });
 
 class $$SettingsTableFilterComposer
@@ -4614,6 +5070,13 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get showDateTime => $composableBuilder(
       column: $table.showDateTime, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get serviceBillingEnabled => $composableBuilder(
+      column: $table.serviceBillingEnabled,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get serviceTypes => $composableBuilder(
+      column: $table.serviceTypes, builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -4722,6 +5185,14 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get showDateTime => $composableBuilder(
       column: $table.showDateTime,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get serviceBillingEnabled => $composableBuilder(
+      column: $table.serviceBillingEnabled,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get serviceTypes => $composableBuilder(
+      column: $table.serviceTypes,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -4816,6 +5287,12 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get showDateTime => $composableBuilder(
       column: $table.showDateTime, builder: (column) => column);
+
+  GeneratedColumn<bool> get serviceBillingEnabled => $composableBuilder(
+      column: $table.serviceBillingEnabled, builder: (column) => column);
+
+  GeneratedColumn<String> get serviceTypes => $composableBuilder(
+      column: $table.serviceTypes, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -4872,6 +5349,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
             Value<bool> showDateTime = const Value.absent(),
+            Value<bool> serviceBillingEnabled = const Value.absent(),
+            Value<String?> serviceTypes = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -4902,6 +5381,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             isLocked: isLocked,
             lockedAt: lockedAt,
             showDateTime: showDateTime,
+            serviceBillingEnabled: serviceBillingEnabled,
+            serviceTypes: serviceTypes,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -4932,6 +5413,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
             Value<bool> showDateTime = const Value.absent(),
+            Value<bool> serviceBillingEnabled = const Value.absent(),
+            Value<String?> serviceTypes = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -4962,6 +5445,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             isLocked: isLocked,
             lockedAt: lockedAt,
             showDateTime: showDateTime,
+            serviceBillingEnabled: serviceBillingEnabled,
+            serviceTypes: serviceTypes,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
