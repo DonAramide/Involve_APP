@@ -45,8 +45,6 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
 
   Future<void> _pickImage() async {
     try {
-      Uint8List? bytes;
-      
       if (kIsWeb) {
         // Use file_picker for web - better browser support
         FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -55,29 +53,49 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         );
         
         if (result != null && result.files.isNotEmpty) {
-          bytes = result.files.first.bytes;
+          setState(() {
+            _imageBytes = result.files.first.bytes;
+          });
         }
-      } else {
-        // Use image_picker for mobile - better image handling
+        return;
+      }
+
+      // Show selection dialog for mobile
+      final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (ctx) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      );
+
+      if (source != null) {
         final picker = ImagePicker();
         final XFile? image = await picker.pickImage(
-          source: ImageSource.gallery,
+          source: source,
           maxWidth: 600,
           imageQuality: 85,
         );
         
         if (image != null) {
-          bytes = await image.readAsBytes();
+          final bytes = await image.readAsBytes();
+          setState(() {
+            _imageBytes = bytes;
+          });
         }
       }
-      
-      if (bytes != null) {
-        setState(() {
-          _imageBytes = bytes;
-        });
-      }
     } catch (e) {
-      // Show error if image picking fails
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

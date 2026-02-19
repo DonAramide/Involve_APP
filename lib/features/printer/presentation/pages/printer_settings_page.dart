@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/printer_bloc.dart';
 import '../bloc/printer_state.dart';
@@ -7,8 +8,22 @@ import '../../../invoicing/domain/templates/invoice_template.dart';
 import '../../domain/repositories/printer_service.dart';
 import '../../data/repositories/network_printer_service.dart';
 
-class PrinterSettingsPage extends StatelessWidget {
+class PrinterSettingsPage extends StatefulWidget {
   const PrinterSettingsPage({super.key});
+
+  @override
+  State<PrinterSettingsPage> createState() => _PrinterSettingsPageState();
+}
+
+class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Check connection status when entering the page
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<PrinterBloc>().add(CheckConnectionStatus());
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -16,6 +31,15 @@ class PrinterSettingsPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Printer Configuration')),
       body: BlocBuilder<PrinterBloc, PrinterState>(
         builder: (context, state) {
+          if (state.error != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
+              );
+              // We should probably clear the error in the Bloc too, but for now just show it
+            });
+          }
+
           return Column(
             children: [
               _buildConnectionStatus(context, state),
@@ -48,19 +72,21 @@ class PrinterSettingsPage extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: state.isScanning 
+                            onPressed: (kIsWeb || state.isScanning) 
                                 ? null 
                                 : () => context.read<PrinterBloc>().add(ScanForDevices()),
                             icon: const Icon(Icons.bluetooth),
-                            label: const Text('Bluetooth'),
+                            label: Text(kIsWeb ? 'Bluetooth (Native)' : 'Bluetooth'),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Note: USB printers are auto-detected when connected',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    Text(
+                      kIsWeb 
+                        ? 'Note: Bluetooth and USB printers are not supported in browsers.' 
+                        : 'Note: USB printers are auto-detected when connected',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),
@@ -171,7 +197,7 @@ class PrinterSettingsPage extends StatelessWidget {
                     TextCommand('Printer Connected Successfully', align: 'center'),
                     DividerCommand(),
                     TextCommand('Date: ${DateTime.now().toString().split('.')[0]}', align: 'center'),
-                    TextCommand('Thank you for choosing Involve APP', align: 'center'),
+                    TextCommand('Thank you for choosing Invify', align: 'center'),
                     DividerCommand(),
                   ], 58)
                 );

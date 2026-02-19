@@ -12,6 +12,7 @@ import '../../../../core/license/license_service.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/settings.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -113,6 +114,15 @@ class SettingsPage extends StatelessWidget {
                   trailing: state.isExporting ? const CircularProgressIndicator() : const Icon(Icons.backup),
                   onTap: () => context.read<SettingsBloc>().add(CreateBackup()),
                 ),
+                const Divider(),
+                SwitchListTile(
+                  title: const Text('Show Date & Time'),
+                  subtitle: const Text('Display live date and time in the dashboard app bar'),
+                  value: settings.showDateTime,
+                  onChanged: (value) => 
+                    context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showDateTime: value))),
+                ),
+                const Divider(),
                 ListTile(
                   title: const Text('Restore Backup'),
                   subtitle: const Text('Import database file (Requires path)'),
@@ -515,39 +525,58 @@ class SettingsPage extends StatelessWidget {
         children: [
           const Text('Theme Color', style: TextStyle(fontSize: 16)),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: themeColors.map((color) {
-              final isSelected = settings.primaryColor == color.value;
-              return InkWell(
-                onTap: () => _update(context, settings.copyWith(primaryColor: color.value)),
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? Colors.white : Colors.transparent,
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      if (isSelected)
-                        BoxShadow(
-                          color: color.withOpacity(0.4),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                    ],
-                  ),
-                  child: isSelected 
-                      ? const Icon(Icons.check, color: Colors.white, size: 20) 
-                      : null,
-                ),
-              );
-            }).toList(),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Color(settings.primaryColor),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey[300]!, width: 2),
+              ),
+            ),
+            title: Text(
+              '#${Color(settings.primaryColor).value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: const Text('Tap to pick a custom color'),
+            trailing: const Icon(Icons.colorize),
+            onTap: () => _showColorPickerDialog(context, settings),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showColorPickerDialog(BuildContext context, AppSettings settings) {
+    Color pickerColor = Color(settings.primaryColor);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Pick a Theme Color'),
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: pickerColor,
+            onColorChanged: (color) => pickerColor = color,
+            pickerAreaHeightPercent: 0.8,
+            enableAlpha: false,
+            displayThumbColor: true,
+            showLabel: true,
+            paletteType: PaletteType.hsvWithHue,
+          ),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('CANCEL'),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+          ElevatedButton(
+            child: const Text('SELECT'),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _update(context, settings.copyWith(primaryColor: pickerColor.value));
+            },
           ),
         ],
       ),

@@ -13,6 +13,7 @@ import '../../../../core/license/license_generator.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import 'dart:math';
+import '../../../../core/utils/device_info_service.dart';
 
 class SuperAdminSettingsPage extends StatefulWidget {
   const SuperAdminSettingsPage({super.key});
@@ -31,6 +32,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   
   // License Generator State
   final _licenseBusinessNameController = TextEditingController();
+  final _deviceSuffixController = TextEditingController();
   final _uuid = const Uuid();
   String _selectedDuration = '1 month';
   PlanType _selectedPlan = PlanType.basic;
@@ -88,6 +90,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     _descriptionController.dispose();
     _taxIdController.dispose();
     _licenseBusinessNameController.dispose();
+    _deviceSuffixController.dispose();
     super.dispose();
   }
 
@@ -361,11 +364,13 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     String? Function(String?)? validator,
     bool obscureText = false,
     int maxLines = 1,
+    int? maxLength,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       maxLines: maxLines,
+      maxLength: maxLength,
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
@@ -467,6 +472,12 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
               items: PlanType.values.map((p) => DropdownMenuItem(value: p, child: Text(p.name.toUpperCase()))).toList(),
               onChanged: (val) => setState(() => _selectedPlan = val!),
             ),
+            _buildTextField(
+              controller: _deviceSuffixController,
+              label: 'Device Suffix (e.g. 7A2)',
+              icon: Icons.devices,
+              maxLength: 3,
+            ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: _generateLicense,
@@ -518,9 +529,9 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   }
 
   Future<void> _generateLicense() async {
-    if (_licenseBusinessNameController.text.isEmpty) {
+    if (_licenseBusinessNameController.text.isEmpty || _deviceSuffixController.text.length != 3) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter licensed business name')),
+        const SnackBar(content: Text('Please enter business name and 3-char device suffix')),
       );
       return;
     }
@@ -541,11 +552,13 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       default: expiryDate = DateTime(now.year, now.month + 1, now.day);
     }
 
+    final encodedSuffix = DeviceInfoService.encodeSuffix(_deviceSuffixController.text.toUpperCase());
+
     final license = LicenseModel(
       businessName: _licenseBusinessNameController.text.trim(),
       expiryDate: expiryDate,
       planType: _selectedPlan,
-      licenseId: Random().nextInt(65535), // 16-bit random ID
+      licenseId: encodedSuffix, // Use encoded suffix instead of random ID
     );
 
     setState(() {

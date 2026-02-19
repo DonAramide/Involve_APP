@@ -6,6 +6,7 @@ import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/license/license_model.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
 
 class ActivationPage extends StatefulWidget {
   final bool isExpired;
@@ -190,7 +191,34 @@ class _ActivationPageState extends State<ActivationPage> {
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey[600]),
                       ),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 24),
+                      // Device ID Display
+                      FutureBuilder<String>(
+                        future: DeviceInfoService.getDeviceSuffix(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) return const SizedBox.shrink();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.perm_device_information, size: 16, color: Colors.orange),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'DEVICE ID: ${snapshot.data}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange, letterSpacing: 1.2),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
                       TextField(
                         controller: _businessNameController,
                         decoration: InputDecoration(

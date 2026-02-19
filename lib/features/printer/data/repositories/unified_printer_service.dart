@@ -1,15 +1,18 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/repositories/printer_service.dart';
 import 'cross_platform_printer_service.dart';
+import 'blue_thermal_printer_service.dart';
 import 'network_printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 
 class UnifiedPrinterService implements IPrinterService {
-  final CrossPlatformPrinterService bluetoothService;
+  final CrossPlatformPrinterService bleService;
+  final BlueThermalPrinterService sppService;
   final NetworkPrinterService networkService;
 
   UnifiedPrinterService({
-    required this.bluetoothService,
+    required this.bleService,
+    required this.sppService,
     required this.networkService,
   });
 
@@ -20,40 +23,84 @@ class UnifiedPrinterService implements IPrinterService {
 
   @override
   Future<List<PrinterDevice>> scanDevices() async {
-    // Primarily scan for Bluetooth devices
-    return await bluetoothService.scanDevices();
+    final List<PrinterDevice> allDevices = [];
+    
+    if (kIsWeb) return allDevices; // Native plugins not supported on Web
+
+    // Get bonded (paired) devices from SPP service
+    try {
+      final sppDevices = await sppService.scanDevices();
+      allDevices.addAll(sppDevices);
+    } catch (e) {
+      debugPrint('SPP Scan Error: $e');
+    }
+    
+    // Get BLE devices from BLE service
+    try {
+      final bleDevices = await bleService.scanDevices();
+      // Avoid duplicates
+      for (final dev in bleDevices) {
+        if (!allDevices.any((d) => d.address == dev.address)) {
+          allDevices.add(dev);
+        }
+      }
+    } catch (e) {
+      debugPrint('BLE Scan Error: $e');
+    }
+    
+    return allDevices;
   }
 
   @override
   Future<bool> connect(PrinterDevice device) async {
+    await disconnect(); // Ensure clean state
+
     if (_isIpAddress(device.address)) {
-      // WiFi/Network printer
-      await bluetoothService.disconnect(); // Ensure Bluetooth is disconnected
       return await networkService.connect(device);
-    } else {
-      // Bluetooth printer
-      await networkService.disconnect(); // Ensure WiFi is disconnected
-      return await bluetoothService.connect(device);
-    }
+    } 
+    
+    if (kIsWeb) return false; // Native Bluetooth not supported on Web
+
+    // Try SPP first (more common for budget thermal printers)
+    final sppSuccess = await sppService.connect(device);
+    if (sppSuccess) return true;
+    
+    // If SPP fails, try BLE
+    return await bleService.connect(device);
   }
 
   @override
   Future<void> disconnect() async {
-    await bluetoothService.disconnect();
-    await networkService.disconnect();
+    try {
+      if (!kIsWeb) {
+        await sppService.disconnect();
+        await bleService.disconnect();
+      }
+      await networkService.disconnect();
+    } catch (e) {
+      debugPrint('Unified Disconnect Error: $e');
+    }
   }
 
   @override
   Future<bool> isConnected() async {
-    return await bluetoothService.isConnected() || await networkService.isConnected();
+    if (kIsWeb) return await networkService.isConnected();
+    
+    return await sppService.isConnected() || 
+           await bleService.isConnected() || 
+           await networkService.isConnected();
   }
 
   @override
   Future<void> printCommands(List<PrintCommand> commands, {int paperWidth = 58}) async {
     if (await networkService.isConnected()) {
       await networkService.printCommands(commands, paperWidth: paperWidth);
+    } else if (!kIsWeb && await sppService.isConnected()) {
+      await sppService.printCommands(commands, paperWidth: paperWidth);
+    } else if (!kIsWeb && await bleService.isConnected()) {
+      await bleService.printCommands(commands, paperWidth: paperWidth);
     } else {
-      await bluetoothService.printCommands(commands, paperWidth: paperWidth);
+      throw Exception('No printer connected');
     }
   }
 }

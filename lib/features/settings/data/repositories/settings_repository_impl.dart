@@ -58,6 +58,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
             showSignatureSpace: Value(settings.showSignatureSpace),
             paymentMethodsEnabled: Value(settings.paymentMethodsEnabled),
             primaryColor: Value(settings.primaryColor),
+            showDateTime: Value(settings.showDateTime),
           ),
         );
   }
@@ -91,6 +92,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showSignatureSpace: row.showSignatureSpace,
       paymentMethodsEnabled: row.paymentMethodsEnabled,
       primaryColor: row.primaryColor,
+      showDateTime: row.showDateTime,
     );
   }
 }

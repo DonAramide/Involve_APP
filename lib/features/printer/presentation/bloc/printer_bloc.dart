@@ -15,8 +15,16 @@ class PrinterBloc extends Bloc<PrinterEvent, PrinterState> {
   }) : super(const PrinterState()) {
     on<ScanForDevices>(_onScan);
     on<ConnectToDevice>(_onConnect);
+    on<CheckConnectionStatus>(_onCheckStatus);
     on<DisconnectPrinter>(_onDisconnect);
     on<PrintCommandsEvent>(_onPrint);
+  }
+
+  Future<void> _onCheckStatus(CheckConnectionStatus event, Emitter<PrinterState> emit) async {
+    final connected = await connectPrinter.service.isConnected();
+    if (!connected) {
+      emit(state.copyWith(connectedDevice: null));
+    }
   }
 
   // Helper method for easy UI access

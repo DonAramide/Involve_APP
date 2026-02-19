@@ -29,6 +29,10 @@ class PrintCommandsEvent extends PrinterEvent {
 }
 
 // States
+class CheckConnectionStatus extends PrinterEvent {}
+
+class ResetPrinterState extends PrinterEvent {}
+
 class PrinterState extends Equatable {
   final List<PrinterDevice> devices;
   final PrinterDevice? connectedDevice;

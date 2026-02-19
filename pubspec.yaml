@@ -32,7 +32,9 @@ dependencies:
   sqlite3_flutter_libs: any
   path_provider: ^2.1.5
   path: any
+  sqlite3: ^2.4.4
   flutter_blue_plus: ^1.32.0
+  blue_thermal_printer: ^1.2.3
   esc_pos_utils_plus: any
   flutter_secure_storage: any
   intl: any
@@ -49,6 +51,8 @@ dependencies:
   uuid: ^4.5.2
   encrypt: ^5.0.3
   base32: ^2.2.0
+  device_info_plus: ^12.3.0
+  flutter_colorpicker: ^1.1.0
 
 dev_dependencies:
   flutter_test:

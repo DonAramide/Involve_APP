@@ -1,35 +1,60 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart' as btp;
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
-import '../repositories/printer_service.dart';
-import '../../invoicing/domain/templates/invoice_template.dart';
+import '../../domain/repositories/printer_service.dart';
+import '../../../invoicing/domain/templates/invoice_template.dart';
 
 class BlueThermalPrinterService implements IPrinterService {
   final btp.BlueThermalPrinter bluetooth = btp.BlueThermalPrinter.instance;
 
   @override
-  Future<List<BluetoothDevice>> scanDevices() async {
-    final List<btp.BluetoothDevice> devices = await bluetooth.getBondedDevices();
-    return devices.map((d) => BluetoothDevice(name: d.name ?? 'Unknown', address: d.address!)).toList();
+  Future<List<PrinterDevice>> scanDevices() async {
+    if (kIsWeb) return []; // Supported only on Native
+    try {
+      final List<btp.BluetoothDevice> devices = await bluetooth.getBondedDevices();
+      return devices.map((d) => PrinterDevice(name: d.name ?? 'Unknown', address: d.address!)).toList();
+    } catch (e) {
+      debugPrint('SPP Scan Error: $e');
+      return [];
+    }
   }
 
   @override
-  Future<bool> connect(BluetoothDevice device) async {
-    final btpDevice = btp.BluetoothDevice(device.name, device.address);
-    if (await bluetooth.isConnected == true) return true;
+  Future<bool> connect(PrinterDevice device) async {
+    if (kIsWeb) return false;
     try {
+      final btpDevice = btp.BluetoothDevice(device.name, device.address);
+      if (await isConnected()) return true;
       await bluetooth.connect(btpDevice);
       return true;
     } catch (e) {
+      debugPrint('SPP Connect Error: $e');
       return false;
     }
   }
 
   @override
-  Future<void> disconnect() async => await bluetooth.disconnect();
+  Future<void> disconnect() async {
+    try {
+      if (await bluetooth.isConnected == true) {
+        await bluetooth.disconnect();
+      }
+    } catch (e) {
+      debugPrint('SPP Disconnect Error: $e');
+    }
+  }
 
   @override
-  Future<bool> isConnected() async => (await bluetooth.isConnected) ?? false;
+  Future<bool> isConnected() async {
+    if (kIsWeb) return false;
+    try {
+      return (await bluetooth.isConnected) ?? false;
+    } catch (e) {
+      debugPrint('SPP Status Error: $e');
+      return false;
+    }
+  }
 
   @override
   Future<void> printCommands(List<PrintCommand> commands, {int paperWidth = 58}) async {

@@ -33,4 +33,7 @@ class Settings extends Table {
   IntColumn get failedAttempts => integer().withDefault(const Constant(0))();
   BoolColumn get isLocked => boolean().withDefault(const Constant(false))();
   DateTimeColumn get lockedAt => dateTime().nullable()();
+  
+  // Display Options
+  BoolColumn get showDateTime => boolean().withDefault(const Constant(true))();
 }

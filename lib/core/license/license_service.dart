@@ -4,6 +4,8 @@ import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:drift/drift.dart';
 import 'package:involve_app/core/license/license_validator.dart';
 import 'package:involve_app/core/license/license_generator.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:flutter/foundation.dart';
 
 class LicenseService {
   static AppDatabase? _db;
@@ -21,20 +23,31 @@ class LicenseService {
       // 2. Check expiry date
       if (DateTime.now().isAfter(license.expiryDate)) return null;
 
-      // 3. Save license locally
+      // 3. Check Device ID Binding
+      final currentDeviceSuffix = await DeviceInfoService.getDeviceSuffix();
+      final expectedHash = DeviceInfoService.encodeSuffix(currentDeviceSuffix);
+      
+      // The licenseId in the license model actually holds the encoded device suffix hash
+      if (license.licenseId != expectedHash) {
+        debugPrint('Device Mismatch: License locked to hash ${license.licenseId}, but device is $expectedHash ($currentDeviceSuffix)');
+        return null; 
+      }
+
+      // 4. Save license locally
       await StorageService.saveLicense(activationCode);
       
-      // 4. Update last opened date on activation
+      // 5. Update last opened date on activation
       await StorageService.saveLastOpenedDate(DateTime.now());
 
-      // 5. Lock business name to this license
+      // 6. Lock business name to this license
       await StorageService.setBusinessNameLocked(true);
 
-      // 6. Save to local history as activated
+      // 7. Save to local history as activated
       await saveLicenseRecord(license, activationCode, isActivated: true);
 
       return license;
     } catch (e) {
+      debugPrint('Activation Error: $e');
       return null;
     }
   }

@@ -13,39 +13,49 @@ class CrossPlatformPrinterService implements IPrinterService {
 
   @override
   Future<List<PrinterDevice>> scanDevices() async {
+    if (kIsWeb) return [];
     final List<PrinterDevice> devices = [];
     
-    // Check Bluetooth state
-    if (await FlutterBluePlus.isSupported == false) {
-      throw Exception('Bluetooth not supported by this device');
-    }
+    try {
+      // Check Bluetooth state
+      if (await FlutterBluePlus.isSupported == false) {
+        return [];
+      }
 
-    // Turn on Bluetooth (if possible)
-    if (!kIsWeb && Platform.isAndroid) {
-      await FlutterBluePlus.turnOn();
-    }
+      // Turn on Bluetooth (if possible)
+      if (Platform.isAndroid) {
+        await FlutterBluePlus.turnOn();
+      }
 
-    // Start scanning
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
-    
-    // Listen to scan results
-    final scanResults = await FlutterBluePlus.scanResults.first;
-    
-    for (ScanResult r in scanResults) {
-      if (r.device.platformName.isNotEmpty) {
+      // Start scanning
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
+      
+      // Wait for scanning to complete
+      await FlutterBluePlus.isScanning.where((scanning) => !scanning).first;
+      
+      // Get results from last scan
+      final scanResults = FlutterBluePlus.lastScanResults;
+      
+      for (ScanResult r in scanResults) {
+        final name = r.device.platformName.isNotEmpty 
+            ? r.device.platformName 
+            : (r.advertisementData.advName.isNotEmpty ? r.advertisementData.advName : 'Unknown Device');
+        
         devices.add(PrinterDevice(
-          name: r.device.platformName,
+          name: name,
           address: r.device.remoteId.toString(),
         ));
       }
+    } catch (e) {
+      debugPrint('BLE Scan Error: $e');
     }
 
-    await FlutterBluePlus.stopScan();
     return devices;
   }
 
   @override
   Future<bool> connect(PrinterDevice device) async {
+    if (kIsWeb) return false;
     try {
       // Find the device
       final scanResults = await FlutterBluePlus.scanResults.first;
@@ -83,15 +93,21 @@ class CrossPlatformPrinterService implements IPrinterService {
 
       return _writeCharacteristic != null;
     } catch (e) {
-      print('Connection error: $e');
+      debugPrint('BLE Connection error: $e');
       return false;
     }
   }
 
   @override
   Future<void> disconnect() async {
-    if (_connectedDevice != null) {
-      await _connectedDevice!.disconnect();
+    if (kIsWeb) return;
+    try {
+      if (_connectedDevice != null) {
+        await _connectedDevice!.disconnect();
+      }
+    } catch (e) {
+      debugPrint('BLE Disconnect Error: $e');
+    } finally {
       _connectedDevice = null;
       _writeCharacteristic = null;
     }
@@ -99,8 +115,12 @@ class CrossPlatformPrinterService implements IPrinterService {
 
   @override
   Future<bool> isConnected() async {
-    if (_connectedDevice == null) return false;
-    return _connectedDevice!.isConnected;
+    if (kIsWeb || _connectedDevice == null) return false;
+    try {
+      return _connectedDevice!.isConnected;
+    } catch (e) {
+      return false;
+    }
   }
 
   @override

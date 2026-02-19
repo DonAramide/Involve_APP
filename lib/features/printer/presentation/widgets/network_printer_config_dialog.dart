@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../printer/data/repositories/network_printer_service.dart';
+import '../../../../core/license/storage_service.dart';
 
 /// Dialog for configuring WiFi/Network printer
 class NetworkPrinterConfigDialog extends StatefulWidget {
@@ -19,6 +20,19 @@ class _NetworkPrinterConfigDialogState extends State<NetworkPrinterConfigDialog>
   final _portController = TextEditingController(text: '9100');
   bool _isTesting = false;
   String? _testResult;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastIp();
+  }
+
+  Future<void> _loadLastIp() async {
+    final lastIp = await StorageService.getLastPrinterIp();
+    if (lastIp != null && mounted) {
+      _ipController.text = lastIp;
+    }
+  }
 
   @override
   void dispose() {
@@ -74,6 +88,7 @@ class _NetworkPrinterConfigDialogState extends State<NetworkPrinterConfigDialog>
       return;
     }
 
+    StorageService.saveLastPrinterIp(ip);
     widget.onConnect(ip);
     Navigator.of(context).pop();
   }

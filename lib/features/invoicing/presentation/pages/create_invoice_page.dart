@@ -596,37 +596,82 @@ class _CartSummary extends StatelessWidget {
                       onDismissed: (_) {
                         context.read<InvoiceBloc>().add(RemoveItemFromInvoice(item.item));
                       },
-                      child: ListTile(
-                        dense: true,
-                        title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: settings?.currency ?? '₦')),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _QuickBtn(
-                              icon: Icons.remove_circle_outline,
-                              color: Colors.red,
-                              onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -1)),
+                            // Row 1: Name and Unit Price
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.item.name, 
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: settings?.currency ?? '₦'),
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                ),
+                              ],
                             ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                '${item.quantity}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                              ),
-                            ),
-                            _QuickBtn(
-                              icon: Icons.add_circle_outline,
-                              color: Colors.green,
-                              onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, 1)),
-                            ),
-                            const SizedBox(width: 16),
-                            Text(
-                              CurrencyFormatter.formatWithSymbol(
-                                item.total,
-                                symbol: settings?.currency ?? '₦',
-                              ),
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            const SizedBox(height: 12),
+                            // Row 2: Total and Controls
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Total Price (Left)
+                                Text(
+                                  CurrencyFormatter.formatWithSymbol(
+                                    item.total,
+                                    symbol: settings?.currency ?? '₦',
+                                  ),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold, 
+                                    fontSize: 16, 
+                                    color: Theme.of(context).colorScheme.primary
+                                  ),
+                                ),
+                                // Controls (Right)
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _QuickBtn(
+                                        icon: Icons.remove,
+                                        color: Colors.red[700]!,
+                                        onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -1)),
+                                      ),
+                                      SizedBox(
+                                        width: 32,
+                                        child: Text(
+                                          '${item.quantity}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                      _QuickBtn(
+                                        icon: Icons.add,
+                                        color: Colors.green[700]!,
+                                        onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, 1)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),

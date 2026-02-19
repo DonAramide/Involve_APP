@@ -11,6 +11,7 @@ class StorageService {
   static const _lastOpenedKey = 'last_opened_date';
   static const _trialStartKey = 'trial_start_date';
   static const _businessLockedKey = 'is_business_locked';
+  static const _lastPrinterIpKey = 'last_printer_ip';
   static const _licenseFileName = 'license.dat';
 
   // Desktop simple encryption key (could be improved)
@@ -136,6 +137,34 @@ class StorageService {
       }
     }
     return value == 'true';
+  }
+
+  static Future<void> saveLastPrinterIp(String ip) async {
+    if (kIsWeb) {
+      await _secureStorage.write(key: _lastPrinterIpKey, value: ip);
+      return;
+    }
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _lastPrinterIpKey, value: ip);
+    } else {
+      final file = await _getDesktopFile('printer_ip.dat');
+      await file.writeAsString(ip);
+    }
+  }
+
+  static Future<String?> getLastPrinterIp() async {
+    if (kIsWeb) {
+      return await _secureStorage.read(key: _lastPrinterIpKey);
+    }
+    if (Platform.isAndroid || Platform.isIOS) {
+      return await _secureStorage.read(key: _lastPrinterIpKey);
+    } else {
+      final file = await _getDesktopFile('printer_ip.dat');
+      if (await file.exists()) {
+        return await file.readAsString();
+      }
+    }
+    return null;
   }
 
   static Future<File> _getDesktopFile(String fileName) async {

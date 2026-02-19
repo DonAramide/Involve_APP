@@ -1666,6 +1666,16 @@ class $SettingsTable extends Settings
   late final GeneratedColumn<DateTime> lockedAt = GeneratedColumn<DateTime>(
       'locked_at', aliasedName, true,
       type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _showDateTimeMeta =
+      const VerificationMeta('showDateTime');
+  @override
+  late final GeneratedColumn<bool> showDateTime = GeneratedColumn<bool>(
+      'show_date_time', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_date_time" IN (0, 1))'),
+      defaultValue: const Constant(true));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1694,7 +1704,8 @@ class $SettingsTable extends Settings
         primaryColor,
         failedAttempts,
         isLocked,
-        lockedAt
+        lockedAt,
+        showDateTime
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1850,6 +1861,12 @@ class $SettingsTable extends Settings
       context.handle(_lockedAtMeta,
           lockedAt.isAcceptableOrUnknown(data['locked_at']!, _lockedAtMeta));
     }
+    if (data.containsKey('show_date_time')) {
+      context.handle(
+          _showDateTimeMeta,
+          showDateTime.isAcceptableOrUnknown(
+              data['show_date_time']!, _showDateTimeMeta));
+    }
     return context;
   }
 
@@ -1916,6 +1933,8 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.bool, data['${effectivePrefix}is_locked'])!,
       lockedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}locked_at']),
+      showDateTime: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}show_date_time'])!,
     );
   }
 
@@ -1953,6 +1972,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final int failedAttempts;
   final bool isLocked;
   final DateTime? lockedAt;
+  final bool showDateTime;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -1980,7 +2000,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.primaryColor,
       required this.failedAttempts,
       required this.isLocked,
-      this.lockedAt});
+      this.lockedAt,
+      required this.showDateTime});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2027,6 +2048,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     if (!nullToAbsent || lockedAt != null) {
       map['locked_at'] = Variable<DateTime>(lockedAt);
     }
+    map['show_date_time'] = Variable<bool>(showDateTime);
     return map;
   }
 
@@ -2072,6 +2094,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       lockedAt: lockedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lockedAt),
+      showDateTime: Value(showDateTime),
     );
   }
 
@@ -2110,6 +2133,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       failedAttempts: serializer.fromJson<int>(json['failedAttempts']),
       isLocked: serializer.fromJson<bool>(json['isLocked']),
       lockedAt: serializer.fromJson<DateTime?>(json['lockedAt']),
+      showDateTime: serializer.fromJson<bool>(json['showDateTime']),
     );
   }
   @override
@@ -2145,6 +2169,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'failedAttempts': serializer.toJson<int>(failedAttempts),
       'isLocked': serializer.toJson<bool>(isLocked),
       'lockedAt': serializer.toJson<DateTime?>(lockedAt),
+      'showDateTime': serializer.toJson<bool>(showDateTime),
     };
   }
 
@@ -2175,7 +2200,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           int? primaryColor,
           int? failedAttempts,
           bool? isLocked,
-          Value<DateTime?> lockedAt = const Value.absent()}) =>
+          Value<DateTime?> lockedAt = const Value.absent(),
+          bool? showDateTime}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -2210,6 +2236,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         failedAttempts: failedAttempts ?? this.failedAttempts,
         isLocked: isLocked ?? this.isLocked,
         lockedAt: lockedAt.present ? lockedAt.value : this.lockedAt,
+        showDateTime: showDateTime ?? this.showDateTime,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -2268,6 +2295,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           : this.failedAttempts,
       isLocked: data.isLocked.present ? data.isLocked.value : this.isLocked,
       lockedAt: data.lockedAt.present ? data.lockedAt.value : this.lockedAt,
+      showDateTime: data.showDateTime.present
+          ? data.showDateTime.value
+          : this.showDateTime,
     );
   }
 
@@ -2300,7 +2330,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('primaryColor: $primaryColor, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
-          ..write('lockedAt: $lockedAt')
+          ..write('lockedAt: $lockedAt, ')
+          ..write('showDateTime: $showDateTime')
           ..write(')'))
         .toString();
   }
@@ -2333,7 +2364,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         primaryColor,
         failedAttempts,
         isLocked,
-        lockedAt
+        lockedAt,
+        showDateTime
       ]);
   @override
   bool operator ==(Object other) =>
@@ -2365,7 +2397,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.primaryColor == this.primaryColor &&
           other.failedAttempts == this.failedAttempts &&
           other.isLocked == this.isLocked &&
-          other.lockedAt == this.lockedAt);
+          other.lockedAt == this.lockedAt &&
+          other.showDateTime == this.showDateTime);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -2396,6 +2429,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<int> failedAttempts;
   final Value<bool> isLocked;
   final Value<DateTime?> lockedAt;
+  final Value<bool> showDateTime;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -2424,6 +2458,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
+    this.showDateTime = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -2453,6 +2488,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
+    this.showDateTime = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -2484,6 +2520,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<int>? failedAttempts,
     Expression<bool>? isLocked,
     Expression<DateTime>? lockedAt,
+    Expression<bool>? showDateTime,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2519,6 +2556,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (failedAttempts != null) 'failed_attempts': failedAttempts,
       if (isLocked != null) 'is_locked': isLocked,
       if (lockedAt != null) 'locked_at': lockedAt,
+      if (showDateTime != null) 'show_date_time': showDateTime,
     });
   }
 
@@ -2549,7 +2587,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<int>? primaryColor,
       Value<int>? failedAttempts,
       Value<bool>? isLocked,
-      Value<DateTime?>? lockedAt}) {
+      Value<DateTime?>? lockedAt,
+      Value<bool>? showDateTime}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -2581,6 +2620,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
+      showDateTime: showDateTime ?? this.showDateTime,
     );
   }
 
@@ -2671,6 +2711,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (lockedAt.present) {
       map['locked_at'] = Variable<DateTime>(lockedAt.value);
     }
+    if (showDateTime.present) {
+      map['show_date_time'] = Variable<bool>(showDateTime.value);
+    }
     return map;
   }
 
@@ -2703,7 +2746,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('primaryColor: $primaryColor, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
-          ..write('lockedAt: $lockedAt')
+          ..write('lockedAt: $lockedAt, ')
+          ..write('showDateTime: $showDateTime')
           ..write(')'))
         .toString();
   }
@@ -4435,6 +4479,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
+  Value<bool> showDateTime,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -4464,6 +4509,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
+  Value<bool> showDateTime,
 });
 
 class $$SettingsTableFilterComposer
@@ -4565,6 +4611,9 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<DateTime> get lockedAt => $composableBuilder(
       column: $table.lockedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showDateTime => $composableBuilder(
+      column: $table.showDateTime, builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -4669,6 +4718,10 @@ class $$SettingsTableOrderingComposer
 
   ColumnOrderings<DateTime> get lockedAt => $composableBuilder(
       column: $table.lockedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showDateTime => $composableBuilder(
+      column: $table.showDateTime,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -4760,6 +4813,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lockedAt =>
       $composableBuilder(column: $table.lockedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get showDateTime => $composableBuilder(
+      column: $table.showDateTime, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -4815,6 +4871,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
+            Value<bool> showDateTime = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -4844,6 +4901,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
+            showDateTime: showDateTime,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -4873,6 +4931,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
+            Value<bool> showDateTime = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -4902,6 +4961,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
+            showDateTime: showDateTime,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

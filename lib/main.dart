@@ -16,6 +16,7 @@ import 'features/settings/data/repositories/settings_repository_impl.dart';
 import 'features/settings/domain/services/security_service.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/printer/data/repositories/cross_platform_printer_service.dart';
+import 'features/printer/data/repositories/blue_thermal_printer_service.dart';
 import 'features/printer/data/repositories/network_printer_service.dart';
 import 'features/printer/data/repositories/unified_printer_service.dart';
 import 'features/printer/domain/repositories/printer_service.dart';
@@ -47,15 +48,17 @@ void main() async {
   final categoryRepository = CategoryRepositoryImpl(database);
   
   // Initialize services
-  final bluetoothService = CrossPlatformPrinterService();
+  final bleService = CrossPlatformPrinterService();
+  final sppService = BlueThermalPrinterService();
   final networkService = NetworkPrinterService();
   final printerService = UnifiedPrinterService(
-    bluetoothService: bluetoothService,
+    bleService: bleService,
+    sppService: sppService,
     networkService: networkService,
   );
   final securityService = SecurityService();
   final calculationService = InvoiceCalculationService();
-  final backupService = BackupService();
+  final backupService = BackupService(database: database);
   
   // Initialize use cases
   final getItems = GetItems(itemRepository);

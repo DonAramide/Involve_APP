@@ -134,9 +134,9 @@ class ReportGenerator {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Sales_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+    await Printing.sharePdf(
+      bytes: await pdf.save(),
+      filename: 'Sales_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
     );
   }
 

@@ -26,6 +26,7 @@ class AppSettings extends Equatable {
   final bool showSignatureSpace;
   final bool paymentMethodsEnabled;
   final int primaryColor;
+  final bool showDateTime; // New field
   
   // Account Details
   final String? bankName;
@@ -63,6 +64,7 @@ class AppSettings extends Equatable {
     this.showSignatureSpace = false,
     this.paymentMethodsEnabled = false,
     this.primaryColor = 0xFF2196F3, // Colors.blue.value
+    this.showDateTime = true,
   });
 
   AppSettings copyWith({
@@ -93,6 +95,7 @@ class AppSettings extends Equatable {
     bool? showSignatureSpace,
     bool? paymentMethodsEnabled,
     int? primaryColor,
+    bool? showDateTime,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -122,6 +125,7 @@ class AppSettings extends Equatable {
       showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
       paymentMethodsEnabled: paymentMethodsEnabled ?? this.paymentMethodsEnabled,
       primaryColor: primaryColor ?? this.primaryColor,
+      showDateTime: showDateTime ?? this.showDateTime,
     );
   }
 
@@ -154,5 +158,6 @@ class AppSettings extends Equatable {
         showSignatureSpace,
         paymentMethodsEnabled,
         primaryColor,
+        showDateTime,
       ];
 }

@@ -8,9 +8,11 @@ import '../../../../printer/domain/usecases/printer_usecases.dart';
 import '../../../domain/templates/template_registry.dart';
 import '../../../domain/templates/invoice_template.dart';
 import '../../../../settings/presentation/bloc/settings_bloc.dart';
+import '../../../../settings/presentation/bloc/settings_state.dart';
 import '../../pages/receipt_preview_page.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import '../../../domain/services/report_generator.dart' as reports;
+import 'package:file_picker/file_picker.dart';
 
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
@@ -46,6 +48,16 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             onPressed: () => _exportReport(context),
           ),
           IconButton(
+            icon: const Icon(Icons.cloud_download),
+            tooltip: 'Export All Data',
+            onPressed: () => context.read<SettingsBloc>().add(CreateBackup()),
+          ),
+          IconButton(
+            icon: const Icon(Icons.cloud_upload),
+            tooltip: 'Import All Data',
+            onPressed: () => _showRestoreDialog(context),
+          ),
+          IconButton(
             icon: const Icon(Icons.date_range),
             onPressed: () => _selectDateRange(context),
           ),
@@ -59,7 +71,33 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             ),
         ],
       ),
-      body: Column(
+      body: _buildBody(context),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    return BlocListener<SettingsBloc, SettingsState>(
+      listener: (context, state) {
+        if (state.isExporting) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(child: CircularProgressIndicator()),
+          );
+        } else if (state.successMessage != null && state.successMessage!.contains('Backup')) {
+          // Dismiss dialog if open (naive check, but safe enough for this flow)
+          Navigator.of(context, rootNavigator: true).popUntil((route) => route.settings.name != null); 
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.successMessage!), backgroundColor: Colors.green),
+          );
+        } else if (state.error != null && state.error!.contains('Backup')) {
+           Navigator.of(context, rootNavigator: true).popUntil((route) => route.settings.name != null);
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
+          );
+        }
+      },
+      child: Column(
         children: [
           _buildFilterHeader(context),
           Expanded(
@@ -143,7 +181,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 hintText: 'Amount',
-                prefixIcon: Icon(Icons.attach_money),
+                prefixIcon: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text('₦', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
                 border: OutlineInputBorder(),
                 filled: true,
                 fillColor: Colors.white,
@@ -335,6 +376,12 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             ? reports.DateTimeRange(start: _selectedRange!.start, end: _selectedRange!.end)
             : null,
         );
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Export failed: ${e.toString()}')),
+          );
+        }
       } finally {
         if (context.mounted) Navigator.pop(context);
       }
@@ -416,6 +463,51 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRestoreDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sync & Merge Data'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('This will safely merge the selected backup into your current data.', 
+              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            Text('• Existing invoices will NOT be duplicated.'),
+            Text('• New categories and items will be added.'),
+            Text('• Local data will NOT be deleted.'),
+            SizedBox(height: 16),
+            Text('Select a .sqlite file to sync from.'),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.sync),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final result = await FilePicker.platform.pickFiles(
+                type: FileType.any,
+              );
+              
+              if (result != null && result.files.single.path != null && context.mounted) {
+                final path = result.files.single.path!;
+                context.read<SettingsBloc>().add(RestoreFromPath(path));
+              }
+            },
+            label: const Text('PICK FILE & SYNC'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
             ),
           ),
         ],

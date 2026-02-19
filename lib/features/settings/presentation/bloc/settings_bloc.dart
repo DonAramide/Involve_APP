@@ -1,5 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'settings_state.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/services/security_service.dart';
@@ -40,22 +45,51 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   Future<void> _onBackup(CreateBackup event, Emitter<SettingsState> emit) async {
     emit(state.copyWith(isExporting: true, error: null, successMessage: null));
-    final file = await backupService.createBackup();
-    if (file != null) {
-      emit(state.copyWith(isExporting: false, successMessage: 'Backup successful: ${file.path}'));
-    } else {
-      emit(state.copyWith(isExporting: false, error: 'Backup failed'));
+    try {
+      final bytes = await backupService.createBackup();
+      if (bytes != null) {
+        if (!kIsWeb) {
+          // On Native, save to a temp file and share
+          final tempDir = await getTemporaryDirectory();
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final fileName = 'invify_backup_$timestamp.sqlite';
+          final tempFile = File(p.join(tempDir.path, fileName));
+          await tempFile.writeAsBytes(bytes);
+          
+          await Share.shareXFiles([XFile(tempFile.path)], text: 'Invify Database Backup');
+          emit(state.copyWith(isExporting: false, successMessage: 'Backup exported successfully'));
+        } else {
+          // Web download logic could go here, but for now just success
+          emit(state.copyWith(isExporting: false, successMessage: 'Backup data generated (Web)'));
+        }
+      } else {
+        emit(state.copyWith(isExporting: false, error: 'Backup failed: No data generated'));
+      }
+    } catch (e) {
+      emit(state.copyWith(isExporting: false, error: 'Backup failed: $e'));
     }
   }
 
   Future<void> _onRestore(RestoreFromPath event, Emitter<SettingsState> emit) async {
     emit(state.copyWith(isImporting: true, error: null, successMessage: null));
-    final success = await backupService.restoreBackup(event.path);
-    if (success) {
-      emit(state.copyWith(isImporting: false, successMessage: 'Restore successful. Please restart the app.'));
-      add(LoadSettings());
-    } else {
-      emit(state.copyWith(isImporting: false, error: 'Restore failed'));
+    try {
+      final file = File(event.path);
+      if (!await file.exists()) {
+        emit(state.copyWith(isImporting: false, error: 'Backup file not found'));
+        return;
+      }
+      
+      final bytes = await file.readAsBytes();
+      final success = await backupService.syncData(bytes);
+      
+      if (success) {
+        emit(state.copyWith(isImporting: false, successMessage: 'Data synchronized successfully!'));
+        add(LoadSettings());
+      } else {
+        emit(state.copyWith(isImporting: false, error: 'Synchronization failed'));
+      }
+    } catch (e) {
+      emit(state.copyWith(isImporting: false, error: 'Import failed: $e'));
     }
   }
 

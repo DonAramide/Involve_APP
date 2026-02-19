@@ -13,6 +13,7 @@ import '../../../../core/widgets/live_datetime_widget.dart';
 import '../../../help/presentation/pages/help_page.dart';
 import 'about_page.dart';
 import 'contact_page.dart';
+import 'calculator_page.dart';
 import 'package:involve_app/features/printer/presentation/pages/printer_settings_page.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
@@ -91,7 +92,7 @@ class _DashboardPageState extends State<DashboardPage> {
             foregroundColor: Colors.white,
             centerTitle: false,
             actions: [
-              const LiveDateTimeWidget(),
+              if (settings?.showDateTime == true) const LiveDateTimeWidget(),
               const SizedBox(width: 4),
               BlocBuilder<SettingsBloc, SettingsState>(
                 builder: (context, state) {
@@ -218,6 +219,13 @@ class _DashboardPageState extends State<DashboardPage> {
             Icons.assessment,
             Colors.green,
             () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvoiceHistoryPage())),
+          ),
+          _buildMenuCard(
+            context,
+            'CALCULATOR',
+            Icons.calculate,
+            Colors.teal,
+            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalculatorPage())),
           ),
           _buildMenuCard(
             context,

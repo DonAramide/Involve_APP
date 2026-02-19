@@ -70,7 +70,7 @@ class _LandingPageState extends State<LandingPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: 0.0, end: 1.0),
