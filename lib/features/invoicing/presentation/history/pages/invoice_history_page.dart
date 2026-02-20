@@ -55,7 +55,15 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           IconButton(
             icon: const Icon(Icons.cloud_download),
             tooltip: 'Export All Data',
-            onPressed: () => context.read<SettingsBloc>().add(CreateBackup()),
+            onPressed: () {
+              if (kIsWeb) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Database backup is not supported on Web. Use PDF Export instead.')),
+                );
+              } else {
+                context.read<SettingsBloc>().add(CreateBackup());
+              }
+            },
           ),
           IconButton(
             icon: const Icon(Icons.cloud_upload),
@@ -87,63 +95,68 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           showDialog(
             context: context,
             barrierDismissible: false,
-            builder: (context) => const Center(child: CircularProgressIndicator()),
+            builder: (context) => const PopScope(
+              canPop: false,
+              child: Center(child: CircularProgressIndicator()),
+            ),
           );
         } else if (state.successMessage != null && state.successMessage!.contains('Backup')) {
-          // Dismiss dialog if open
-          Navigator.of(context, rootNavigator: true).popUntil((route) => route.settings.name != null); 
-          
+          if (Navigator.canPop(context)) Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.successMessage!), backgroundColor: Colors.green),
           );
         } else if (state.error != null && state.error!.contains('Backup')) {
-           Navigator.of(context, rootNavigator: true).popUntil((route) => route.settings.name != null);
-           ScaffoldMessenger.of(context).showSnackBar(
+          if (Navigator.canPop(context)) Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
           );
         }
       },
-      child: Column(
-        children: [
-          _buildFilterHeader(context),
-          Expanded(
-            child: BlocBuilder<HistoryBloc, HistoryState>(
-              builder: (context, state) {
-                if (state is HistoryLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (state is HistoryLoaded) {
-                  if (state.invoices.isEmpty) {
-                    return const Center(child: Text('No invoices found.'));
-                  }
-                  return Column(
-                    children: [
-                      _buildTotalSummary(context, state),
-                      Expanded(
-                        child: _isTableView 
-                          ? _buildReportsTable(context, state)
-                          : ListView.builder(
-                              itemCount: state.invoices.length,
-                              itemBuilder: (context, index) {
-                                final invoice = state.invoices[index];
-                                return _buildInvoiceCard(context, invoice);
-                              },
-                            ),
-                      ),
-                    ],
-                  );
-                } else if (state is HistoryError) {
-                  return Center(child: Text(state.message));
-                }
-                return const Center(child: Text('Start searching!'));
-              },
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            children: [
+              _buildFilterHeader(context, constraints),
+              Expanded(
+                child: BlocBuilder<HistoryBloc, HistoryState>(
+                  builder: (context, state) {
+                    if (state is HistoryLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (state is HistoryLoaded) {
+                      if (state.invoices.isEmpty) {
+                        return const Center(child: Text('No invoices found.'));
+                      }
+                      return Column(
+                        children: [
+                          _buildTotalSummary(context, state),
+                          Expanded(
+                            child: _isTableView
+                                ? _buildReportsTable(context, state)
+                                : ListView.builder(
+                                    itemCount: state.invoices.length,
+                                    itemBuilder: (context, index) {
+                                      final invoice = state.invoices[index];
+                                      return _buildInvoiceCard(context, invoice);
+                                    },
+                                  ),
+                          ),
+                        ],
+                      );
+                    } else if (state is HistoryError) {
+                      return Center(child: Text(state.message));
+                    }
+                    return const Center(child: Text('Start searching!'));
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildFilterHeader(BuildContext context) {
+  Widget _buildFilterHeader(BuildContext context, BoxConstraints constraints) {
     final state = context.watch<HistoryBloc>().state;
     String currentQuery = '';
     double? currentAmount;
@@ -153,73 +166,106 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       currentAmount = state.amount;
     }
 
+    final bool isSmallScreen = constraints.maxWidth < 800;
+
     return Container(
       padding: const EdgeInsets.all(16),
       color: Colors.grey[100],
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search Invoice ID',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12),
-              ),
-              onChanged: (value) {
-                context.read<HistoryBloc>().add(LoadHistory(
-                  start: _selectedRange?.start,
-                  end: _selectedRange?.end,
-                  query: value,
-                  amount: currentAmount,
-                  paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
-                ));
-              },
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 1,
-            child: _buildStaffFilter(context, state),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 1,
-            child: TextField(
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                hintText: 'Amount',
-                prefixIcon: Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Text('₦', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+      child: isSmallScreen
+          ? Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                SizedBox(
+                  width: (constraints.maxWidth - 44) / 2, // 2 columns with spacing
+                  child: _buildSearchField(context, state, currentAmount),
                 ),
-                border: OutlineInputBorder(),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: EdgeInsets.symmetric(horizontal: 12),
-              ),
-              onChanged: (value) {
-                final amount = double.tryParse(value);
-                context.read<HistoryBloc>().add(LoadHistory(
-                  start: _selectedRange?.start,
-                  end: _selectedRange?.end,
-                  query: currentQuery,
-                  amount: amount,
-                  paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
-                ));
-              },
+                SizedBox(
+                  width: (constraints.maxWidth - 44) / 2,
+                  child: _buildStaffFilter(context, state),
+                ),
+                SizedBox(
+                  width: (constraints.maxWidth - 44) / 2,
+                  child: _buildAmountField(context, state, currentQuery),
+                ),
+                SizedBox(
+                  width: (constraints.maxWidth - 44) / 2,
+                  child: _buildPaymentMethodFilter(context, state),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: _buildSearchField(context, state, currentAmount),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: _buildStaffFilter(context, state),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: _buildAmountField(context, state, currentQuery),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: _buildPaymentMethodFilter(context, state),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 1,
-            child: _buildPaymentMethodFilter(context, state),
-          ),
-        ],
+    );
+  }
+
+  Widget _buildSearchField(BuildContext context, HistoryState state, double? currentAmount) {
+    return TextField(
+      decoration: const InputDecoration(
+        hintText: 'Search Invoice ID',
+        prefixIcon: Icon(Icons.search),
+        border: OutlineInputBorder(),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: EdgeInsets.symmetric(horizontal: 12),
       ),
+      onChanged: (value) {
+        context.read<HistoryBloc>().add(LoadHistory(
+          start: _selectedRange?.start,
+          end: _selectedRange?.end,
+          query: value,
+          amount: currentAmount,
+          paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
+        ));
+      },
+    );
+  }
+
+  Widget _buildAmountField(BuildContext context, HistoryState state, String currentQuery) {
+    return TextField(
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(
+        hintText: 'Amount',
+        prefixIcon: Padding(
+          padding: EdgeInsets.all(12),
+          child: Text('₦', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        border: OutlineInputBorder(),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+      ),
+      onChanged: (value) {
+        final amount = double.tryParse(value);
+        context.read<HistoryBloc>().add(LoadHistory(
+          start: _selectedRange?.start,
+          end: _selectedRange?.end,
+          query: currentQuery,
+          amount: amount,
+          paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
+        ));
+      },
     );
   }
 
@@ -268,32 +314,35 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: SingleChildScrollView(
         scrollDirection: Axis.vertical,
-        child: DataTable(
-          columnSpacing: 12,
-          horizontalMargin: 0,
-          columns: const [
-            DataColumn(label: Text('Invoice ID', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Method', style: TextStyle(fontWeight: FontWeight.bold))),
-            DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
-          ],
-          rows: state.invoices.map((invoice) {
-            return DataRow(
-              cells: [
-                DataCell(Text(invoice.invoiceNumber, style: const TextStyle(fontSize: 12))),
-                DataCell(Text(invoice.dateCreated.toString().split(' ')[0], style: const TextStyle(fontSize: 12))),
-                DataCell(Text(invoice.customerName ?? '-', style: const TextStyle(fontSize: 12))),
-                DataCell(Text(invoice.paymentMethod ?? '-', style: const TextStyle(fontSize: 12))),
-                DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
-              ],
-              onSelectChanged: (selected) {
-                if (selected == true) {
-                  _reprint(context, invoice);
-                }
-              },
-            );
-          }).toList(),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 24,
+            horizontalMargin: 8,
+            columns: const [
+              DataColumn(label: Text('Invoice ID', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Method', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+            ],
+            rows: state.invoices.map((invoice) {
+              return DataRow(
+                cells: [
+                  DataCell(Text(invoice.invoiceNumber, style: const TextStyle(fontSize: 12))),
+                  DataCell(Text(invoice.dateCreated.toString().split(' ')[0], style: const TextStyle(fontSize: 12))),
+                  DataCell(Text(invoice.customerName ?? '-', style: const TextStyle(fontSize: 12))),
+                  DataCell(Text(invoice.paymentMethod ?? '-', style: const TextStyle(fontSize: 12))),
+                  DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                ],
+                onSelectChanged: (selected) {
+                  if (selected == true) {
+                    _reprint(context, invoice);
+                  }
+                },
+              );
+            }).toList(),
+          ),
         ),
       ),
     );

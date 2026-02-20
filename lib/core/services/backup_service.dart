@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:drift/drift.dart';
+import 'package:sqflite/sqflite.dart' as sqflite;
 import 'sync_logic.dart' as sync_logic;
 
 class BackupService {
@@ -15,8 +16,14 @@ class BackupService {
 
   Future<String> getDatabasePath() async {
     if (kIsWeb) return dbName;
-    final docsDir = await getApplicationDocumentsDirectory();
-    return p.join(docsDir.path, dbName);
+    try {
+      final dbFolder = await sqflite.getDatabasesPath();
+      return p.join(dbFolder, dbName);
+    } catch (e) {
+      // Fallback to documents if sqflite fails
+      final docsDir = await getApplicationDocumentsDirectory();
+      return p.join(docsDir.path, dbName);
+    }
   }
 
   Future<Uint8List?> createBackup() async {
