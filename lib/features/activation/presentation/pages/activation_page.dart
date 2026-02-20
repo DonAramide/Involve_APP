@@ -272,7 +272,7 @@ class _ActivationPageState extends State<ActivationPage> {
                           _buildContactIcon(
                             context,
                             icon: Icons.phone,
-                            label: 'Call / WhatsApp',
+                            label: 'Support / WhatsApp',
                             onTap: () => _launchUrl('tel:+2348023552282'),
                           ),
                           const SizedBox(width: 32),

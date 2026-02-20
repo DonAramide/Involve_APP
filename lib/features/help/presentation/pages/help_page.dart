@@ -154,8 +154,8 @@ class _HelpPageState extends State<HelpPage> {
           const Card(
             child: ListTile(
               leading: Icon(Icons.phone),
-              title: Text('Phone Support'),
-              subtitle: Text('+234 8023552282, +234 9027033748'),
+              title: Text('Support (WhatsApp/Tel)'),
+              subtitle: Text('08023552282 | 09027033748'),
             ),
           ),
           const SizedBox(height: 32),

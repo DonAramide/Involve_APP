@@ -56,8 +56,8 @@ class ContactPage extends StatelessWidget {
             _buildContactCard(
               context,
               icon: Icons.phone,
-              title: 'Phone',
-              value: '+234 8023552282 or +234 9027033748',
+              title: 'Support',
+              value: 'WA: 08023552282 | Tel: 09027033748',
               onTap: () => _launchPhone('+2348023552282'),
             ),
             const SizedBox(height: 16),
