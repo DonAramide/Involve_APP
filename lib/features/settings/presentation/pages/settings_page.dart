@@ -14,6 +14,10 @@ import 'package:intl/intl.dart';
 import '../../domain/entities/settings.dart';
 import '../widgets/upgrade_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import '../bloc/staff_bloc.dart';
+import '../bloc/staff_state.dart';
+import '../../domain/entities/staff.dart';
+import '../../../../core/sync/presentation/pages/device_sync_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -98,6 +102,16 @@ class SettingsPage extends StatelessWidget {
                 _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
                 _buildThemeColorSection(context, settings),
                 _buildTextTile(context, 'Receipt Footer', settings.receiptFooter, (val) => _update(context, settings.copyWith(receiptFooter: val))),
+                _buildDropdownTile(
+                  context, 
+                  'Thermal Paper Width', 
+                  '${settings.paperWidth}mm', 
+                  ['58mm', '80mm', '88mm'], 
+                  (val) {
+                    final width = int.parse(val.replaceAll('mm', ''));
+                    _update(context, settings.copyWith(paperWidth: width));
+                  },
+                ),
                 const Divider(),
                 _buildSectionHeader(context, 'Account Details'),
                 _buildSwitchTile('Show Account Details on Invoice', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
@@ -108,10 +122,14 @@ class SettingsPage extends StatelessWidget {
                   _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
                 ],
                 const Divider(),
-                _buildSectionHeader(context, 'Service Billing'),
                 _buildServiceBillingTile(context, settings, state),
-                if (settings.serviceBillingEnabled)
+                if (settings.serviceBillingEnabled) ...[
                   _buildServiceTypesSection(context, settings),
+                  _buildHalfDayConfigSection(context, settings),
+                ],
+                const Divider(),
+                _buildSectionHeader(context, 'Staff Management'),
+                _buildStaffManagementSection(context, settings),
                 const Divider(),
                 _buildSectionHeader(context, 'Maintenance'),
                 ListTile(
@@ -120,6 +138,12 @@ class SettingsPage extends StatelessWidget {
                   trailing: state.isExporting ? const CircularProgressIndicator() : const Icon(Icons.backup),
                   onTap: () => context.read<SettingsBloc>().add(CreateBackup()),
                 ),
+                ListTile(
+                  title: const Text('Device Synchronization'),
+                  subtitle: const Text('Connect and sync data with other devices'),
+                  trailing: const Icon(Icons.sync_alt),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSyncPage())),
+                ),
                 const Divider(),
                 SwitchListTile(
                   title: const Text('Show Date & Time'),
@@ -127,6 +151,13 @@ class SettingsPage extends StatelessWidget {
                   value: settings.showDateTime,
                   onChanged: (value) => 
                     context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showDateTime: value))),
+                ),
+                SwitchListTile(
+                  title: const Text('Show Sync Status'),
+                  subtitle: const Text('Display synchronization status in the dashboard app bar'),
+                  value: settings.showSyncStatus,
+                  onChanged: (value) => 
+                    context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showSyncStatus: value))),
                 ),
                 const Divider(),
                 ListTile(
@@ -698,5 +729,136 @@ class SettingsPage extends StatelessWidget {
   void _removeServiceType(BuildContext context, AppSettings settings, String type) {
     final updatedList = List<String>.from(settings.serviceTypes)..remove(type);
     _update(context, settings.copyWith(serviceTypes: updatedList));
+  }
+
+  Widget _buildHalfDayConfigSection(BuildContext context, AppSettings settings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Text('Half-Day Billing Window', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDropdownTile(
+                context, 
+                'Start (AM)', 
+                '${settings.halfDayStartHour}:00', 
+                List.generate(12, (i) => '${i}:00'), 
+                (val) => _update(context, settings.copyWith(halfDayStartHour: int.parse(val.split(':')[0]))),
+              ),
+            ),
+            Expanded(
+              child: _buildDropdownTile(
+                context, 
+                'End (PM)', 
+                '${settings.halfDayEndHour}:00', 
+                List.generate(12, (i) => '${i + 12}:00'), 
+                (val) => _update(context, settings.copyWith(halfDayEndHour: int.parse(val.split(':')[0]))),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStaffManagementSection(BuildContext context, AppSettings settings) {
+    return Column(
+      children: [
+        _buildSwitchTile('Enable Staff Tracking (Sold By)', settings.staffManagementEnabled, (val) => _update(context, settings.copyWith(staffManagementEnabled: val))),
+        if (settings.staffManagementEnabled) ...[
+          BlocBuilder<StaffBloc, StaffState>(
+            builder: (context, state) {
+              if (state.isLoading) return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
+              
+              return Column(
+                children: [
+                  ...state.staffList.map((staff) => ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    title: Text(staff.name),
+                    subtitle: Text('Code: ****'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () => _showStaffDialog(context, staff: staff),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => context.read<StaffBloc>().add(DeleteStaff(staff.id!)),
+                        ),
+                      ],
+                    ),
+                  )),
+                  ListTile(
+                    leading: const Icon(Icons.add, color: Colors.blue),
+                    title: const Text('Add Staff', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+                    onTap: () => _showStaffDialog(context),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  void _showStaffDialog(BuildContext context, {Staff? staff}) {
+    final nameController = TextEditingController(text: staff?.name);
+    final codeController = TextEditingController(text: staff?.staffCode);
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(staff == null ? 'Add Staff' : 'Edit Staff'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Staff Name'),
+                validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+              ),
+              TextFormField(
+                controller: codeController,
+                decoration: const InputDecoration(labelText: 'Auth Code (4 characters)'),
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                validator: (val) => val?.length != 4 ? 'Must be 4 characters' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                final newStaff = Staff(
+                  id: staff?.id,
+                  name: nameController.text,
+                  staffCode: codeController.text,
+                );
+                if (staff == null) {
+                  context.read<StaffBloc>().add(AddStaff(newStaff));
+                } else {
+                  context.read<StaffBloc>().add(UpdateStaff(newStaff));
+                }
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
   }
 }

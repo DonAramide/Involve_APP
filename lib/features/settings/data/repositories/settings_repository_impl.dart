@@ -30,40 +30,50 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   @override
   Future<void> updateSettings(AppSettings settings) async {
-    await db.into(db.settings).insertOnConflictUpdate(
-          SettingsCompanion(
-            id: const Value(1), // Singleton approach
-            organizationName: Value(settings.organizationName),
-            address: Value(settings.address),
-            phone: Value(settings.phone),
-            businessDescription: Value(settings.businessDescription),
-            taxId: Value(settings.taxId),
-            logoPath: Value(settings.logoPath),
-            logo: Value(settings.logo),
-            themeMode: Value(settings.themeMode),
-            currency: Value(settings.currency),
-            taxEnabled: Value(settings.taxEnabled),
-            discountEnabled: Value(settings.discountEnabled),
-            defaultInvoiceTemplate: Value(settings.defaultInvoiceTemplate),
-            allowPriceUpdates: Value(settings.allowPriceUpdates),
-            confirmPriceOnSelection: Value(settings.confirmPriceOnSelection),
-            taxRate: Value(settings.taxRate),
-            bankName: Value(settings.bankName),
-            accountNumber: Value(settings.accountNumber),
-            accountName: Value(settings.accountName),
-            showAccountDetails: Value(settings.showAccountDetails),
-            failedAttempts: Value(settings.failedAttempts),
-            isLocked: Value(settings.isLocked),
-            lockedAt: Value(settings.lockedAt),
-            receiptFooter: Value(settings.receiptFooter),
-            showSignatureSpace: Value(settings.showSignatureSpace),
-            paymentMethodsEnabled: Value(settings.paymentMethodsEnabled),
-            primaryColor: Value(settings.primaryColor),
-            showDateTime: Value(settings.showDateTime),
-            serviceBillingEnabled: Value(settings.serviceBillingEnabled),
-            serviceTypes: Value(jsonEncode(settings.serviceTypes)),
-          ),
-        );
+    final existing = await db.select(db.settings).getSingleOrNull();
+    final companion = SettingsCompanion(
+      id: const Value(1),
+      organizationName: Value(settings.organizationName),
+      address: Value(settings.address),
+      phone: Value(settings.phone),
+      businessDescription: Value(settings.businessDescription),
+      taxId: Value(settings.taxId),
+      logoPath: Value(settings.logoPath),
+      logo: Value(settings.logo),
+      themeMode: Value(settings.themeMode),
+      currency: Value(settings.currency),
+      taxEnabled: Value(settings.taxEnabled),
+      discountEnabled: Value(settings.discountEnabled),
+      defaultInvoiceTemplate: Value(settings.defaultInvoiceTemplate),
+      allowPriceUpdates: Value(settings.allowPriceUpdates),
+      confirmPriceOnSelection: Value(settings.confirmPriceOnSelection),
+      taxRate: Value(settings.taxRate),
+      bankName: Value(settings.bankName),
+      accountNumber: Value(settings.accountNumber),
+      accountName: Value(settings.accountName),
+      showAccountDetails: Value(settings.showAccountDetails),
+      failedAttempts: Value(settings.failedAttempts),
+      isLocked: Value(settings.isLocked),
+      lockedAt: Value(settings.lockedAt),
+      receiptFooter: Value(settings.receiptFooter),
+      showSignatureSpace: Value(settings.showSignatureSpace),
+      paymentMethodsEnabled: Value(settings.paymentMethodsEnabled),
+      primaryColor: Value(settings.primaryColor),
+      showDateTime: Value(settings.showDateTime),
+      serviceBillingEnabled: Value(settings.serviceBillingEnabled),
+      serviceTypes: Value(jsonEncode(settings.serviceTypes)),
+      staffManagementEnabled: Value(settings.staffManagementEnabled),
+      paperWidth: Value(settings.paperWidth),
+      halfDayStartHour: Value(settings.halfDayStartHour),
+      halfDayEndHour: Value(settings.halfDayEndHour),
+      showSyncStatus: Value(settings.showSyncStatus),
+    );
+
+    if (existing == null) {
+      await db.into(db.settings).insert(companion);
+    } else {
+      await (db.update(db.settings)..where((t) => t.id.equals(1))).write(companion);
+    }
   }
 
   AppSettings _toEntity(SettingsTable row) {
@@ -108,6 +118,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showDateTime: row.showDateTime,
       serviceBillingEnabled: row.serviceBillingEnabled,
       serviceTypes: serviceTypes,
+      staffManagementEnabled: row.staffManagementEnabled,
+      paperWidth: row.paperWidth,
+      halfDayStartHour: row.halfDayStartHour,
+      halfDayEndHour: row.halfDayEndHour,
+      showSyncStatus: row.showSyncStatus,
     );
   }
 }

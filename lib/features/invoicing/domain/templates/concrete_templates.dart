@@ -20,7 +20,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
   @override
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
-    const int width = 32; // Default for 58mm
+    final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42); // Logic for 58, 80, 88
 
     return [
       if (settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -32,6 +32,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}', align: 'center'),
       TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
       if (invoice.paymentMethod != null) TextCommand('Method: ${invoice.paymentMethod}', align: 'center'),
+      TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'center'),
       DividerCommand(),
       ...invoice.items.map((item) {
         final name = item.item.name;
@@ -39,14 +40,13 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
         final priceLine = CurrencyFormatter.format(item.total);
         
         // Format: Name xQty ........ Price
-        // Truncate name if too long
         final leftPart = '$name $qtyLine';
         final availableWidth = width - priceLine.length - 1;
         final truncatedLeft = leftPart.length > availableWidth 
             ? leftPart.substring(0, availableWidth - 1) 
             : leftPart;
             
-        final spaces = ' ' * (width - truncatedLeft.length - priceLine.length);
+        final spaces = ' ' * (width - truncatedLeft.length - priceLine.length).clamp(1, width);
         
         List<PrintCommand> commands = [TextCommand(truncatedLeft + spaces + priceLine)];
         
@@ -102,7 +102,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
   @override
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
-    const int width = 32;
+    final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
     return [
       if (settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -116,10 +116,9 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       TextCommand('Number: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}'),
       if (invoice.paymentMethod != null) TextCommand('Payment Method: ${invoice.paymentMethod}'),
+      TextCommand('Sold By: ${invoice.staffName ?? "Admin"}'),
       DividerCommand(),
       ...invoice.items.map((item) {
-        // Detailed shows Name on one line, then Qty/Price on another
-        // OR we can try to fit them if short
         List<PrintCommand> commands = [
           TextCommand(_formatRow('${item.item.name} x${item.quantity}', CurrencyFormatter.format(item.total), width))
         ];
@@ -175,11 +174,12 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
   @override
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
-    const int width = 32;
+    final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
     return [
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Date: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'center'),
+      TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'center'),
       DividerCommand(),
       ...invoice.items.map((item) => 
         TextCommand('${item.item.name} x${item.quantity}  ${CurrencyFormatter.format(item.total)}')),
@@ -215,7 +215,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
   @override
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
-    const int width = 32;
+    final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
     return [
       if (settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -229,17 +229,14 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       SizedBoxCommand(height: 1),
       TextCommand('INVOICE #: ${invoice.invoiceNumber}', align: 'right'),
       TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'right'),
+      TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'right'),
       DividerCommand(),
-      // 4-Column Layout: ITEM(10), PRICE(7), QTY(5), TOTAL(10) = 32
-      TextCommand('ITEM      PRICE  QTY    TOTAL', isBold: true),
+      // Dynamic Table Header
+      TextCommand(_buildTableHeader(width), isBold: true),
       DividerCommand(),
       ...invoice.items.map((item) {
-        final name = item.item.name.padRight(10).substring(0, 10);
-        final price = CurrencyFormatter.format(item.unitPrice).padLeft(7).substring(0, 7);
-        final qty = item.quantity.toString().padLeft(5).substring(0, 5);
-        final total = CurrencyFormatter.format(item.total).padLeft(10).substring(0, 10);
-        
-        List<PrintCommand> commands = [TextCommand('$name$price$qty$total')];
+        final row = _buildTableRow(item, width);
+        List<PrintCommand> commands = [TextCommand(row)];
         if (item.type == 'service' && item.serviceMeta != null) {
           final dates = _formatServiceDates(item.serviceMeta);
           if (dates.isNotEmpty) {
@@ -271,6 +268,34 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       TextCommand(settings.receiptFooter, align: 'center'),
       TextCommand('Powered by IIPS', align: 'center'),
     ];
+  }
+
+  String _buildTableHeader(int width) {
+    if (width <= 32) return 'ITEM      PRICE  QTY    TOTAL';
+    if (width <= 42) return 'ITEM            PRICE    QTY     TOTAL';
+    return 'ITEM                    PRICE      QTY        TOTAL';
+  }
+
+  String _buildTableRow(InvoiceItem item, int width) {
+    if (width <= 32) {
+      final name = item.item.name.padRight(10).substring(0, 10);
+      final price = CurrencyFormatter.format(item.unitPrice).padLeft(7).substring(0, 7);
+      final qty = item.quantity.toString().padLeft(5).substring(0, 5);
+      final total = CurrencyFormatter.format(item.total).padLeft(10).substring(0, 10);
+      return '$name$price$qty$total';
+    } else if (width <= 42) {
+       final name = item.item.name.padRight(16).substring(0, 16);
+       final price = CurrencyFormatter.format(item.unitPrice).padLeft(9).substring(0, 9);
+       final qty = item.quantity.toString().padLeft(7).substring(0, 7);
+       final total = CurrencyFormatter.format(item.total).padLeft(10).substring(0, 10);
+       return '$name$price$qty$total';
+    } else {
+       final name = item.item.name.padRight(24).substring(0, 24);
+       final price = CurrencyFormatter.format(item.unitPrice).padLeft(11).substring(0, 11);
+       final qty = item.quantity.toString().padLeft(7).substring(0, 7);
+       final total = CurrencyFormatter.format(item.total).padLeft(10).substring(0, 10);
+       return '$name$price$qty$total';
+    }
   }
 
   String _formatSummaryRow(String label, String value, int width) {

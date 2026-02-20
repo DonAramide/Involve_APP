@@ -20,6 +20,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<UpdateInvoiceSettings>(_onUpdateSettings);
     on<UpdateCustomerInfo>(_onUpdateCustomer);
     on<UpdatePaymentMethod>(_onUpdatePaymentMethod);
+    on<UpdateStaffInfo>(_onUpdateStaff);
   }
 
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
@@ -67,7 +68,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     emit(state.copyWith(isSaving: true));
     try {
       final invoice = Invoice(
-        invoiceNumber: calculationService.generateInvoiceNumber(),
+        invoiceNumber: event.invoiceNumber ?? calculationService.generateInvoiceNumber(),
         dateCreated: DateTime.now(),
         items: state.items,
         subtotal: state.subtotal,
@@ -78,6 +79,8 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         customerName: state.customerName,
         customerAddress: state.customerAddress,
         paymentMethod: state.paymentMethod,
+        staffId: state.staffId,
+        staffName: state.staffName,
       );
 
       await repository.saveInvoice(invoice);
@@ -104,6 +107,13 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
 
   void _onUpdatePaymentMethod(UpdatePaymentMethod event, Emitter<InvoiceState> emit) {
     emit(state.copyWith(paymentMethod: event.paymentMethod));
+  }
+
+  void _onUpdateStaff(UpdateStaffInfo event, Emitter<InvoiceState> emit) {
+    emit(state.copyWith(
+      staffId: event.staffId,
+      staffName: event.staffName,
+    ));
   }
 
   void _onUpdateSettings(UpdateInvoiceSettings event, Emitter<InvoiceState> emit) {

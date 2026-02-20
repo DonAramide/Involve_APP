@@ -242,6 +242,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                   items: const [
                     DropdownMenuItem(value: 'fixed', child: Text('Fixed Price')),
                     DropdownMenuItem(value: 'per_day', child: Text('Per Day (e.g. Hotel)')),
+                    DropdownMenuItem(value: 'per_half_day', child: Text('Per Half Day')),
                     DropdownMenuItem(value: 'per_hour', child: Text('Per Hour (e.g. Lounge)')),
                   ],
                   onChanged: (val) => setState(() => _billingType = val),
@@ -285,7 +286,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         type: _type,
         billingType: _billingType,
         serviceCategory: _serviceCategory,
-        requiresTimeTracking: _billingType == 'per_day' || _billingType == 'per_hour',
+        requiresTimeTracking: _billingType == 'per_day' || _billingType == 'per_hour' || _billingType == 'per_half_day',
       );
 
       if (widget.item == null) {

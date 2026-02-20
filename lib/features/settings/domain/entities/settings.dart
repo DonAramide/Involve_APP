@@ -38,6 +38,13 @@ class AppSettings extends Equatable {
   final bool serviceBillingEnabled;
   final List<String> serviceTypes;
 
+  // Phase 4: Staff & Refinements
+  final bool staffManagementEnabled;
+  final int paperWidth;
+  final int halfDayStartHour;
+  final int halfDayEndHour;
+  final bool showSyncStatus;
+
   const AppSettings({
     this.id,
     required this.organizationName,
@@ -69,6 +76,11 @@ class AppSettings extends Equatable {
     this.showDateTime = true,
     this.serviceBillingEnabled = false,
     this.serviceTypes = const [],
+    this.staffManagementEnabled = false,
+    this.paperWidth = 80,
+    this.halfDayStartHour = 6,
+    this.halfDayEndHour = 18,
+    this.showSyncStatus = true,
   });
 
   AppSettings copyWith({
@@ -102,6 +114,11 @@ class AppSettings extends Equatable {
     bool? showDateTime,
     bool? serviceBillingEnabled,
     List<String>? serviceTypes,
+    bool? staffManagementEnabled,
+    int? paperWidth,
+    int? halfDayStartHour,
+    int? halfDayEndHour,
+    bool? showSyncStatus,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -134,6 +151,11 @@ class AppSettings extends Equatable {
       showDateTime: showDateTime ?? this.showDateTime,
       serviceBillingEnabled: serviceBillingEnabled ?? this.serviceBillingEnabled,
       serviceTypes: serviceTypes ?? this.serviceTypes,
+      staffManagementEnabled: staffManagementEnabled ?? this.staffManagementEnabled,
+      paperWidth: paperWidth ?? this.paperWidth,
+      halfDayStartHour: halfDayStartHour ?? this.halfDayStartHour,
+      halfDayEndHour: halfDayEndHour ?? this.halfDayEndHour,
+      showSyncStatus: showSyncStatus ?? this.showSyncStatus,
     );
   }
 
@@ -169,5 +191,10 @@ class AppSettings extends Equatable {
         showDateTime,
         serviceBillingEnabled,
         serviceTypes,
+        staffManagementEnabled,
+        paperWidth,
+        halfDayStartHour,
+        halfDayEndHour,
+        showSyncStatus,
       ];
 }

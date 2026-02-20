@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../../stock/domain/entities/item.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/stock/domain/entities/item.dart';
 
 class ServiceBookingDialog extends StatefulWidget {
   final Item item;
@@ -125,6 +127,23 @@ class _ServiceBookingDialogState extends State<ServiceBookingDialog> {
       } else {
         _quantity = days.toDouble();
       }
+    } else if (widget.item.billingType == 'per_half_day') {
+      final settings = context.read<SettingsBloc>().state.settings;
+      final startHour = settings?.halfDayStartHour ?? 6;
+      final endHour = settings?.halfDayEndHour ?? 18;
+
+      if (_startDate!.hour < startHour || _endDate!.hour > endHour || (_endDate!.day != _startDate!.day)) {
+        if (_endDate!.day != _startDate!.day || _endDate!.hour > endHour || _startDate!.hour < startHour) {
+             _error = 'Half-day is only available between ${startHour}:00 and ${endHour}:00 on the same day.';
+             _quantity = 0;
+             return;
+        }
+      }
+
+      final diff = _endDate!.difference(_startDate!);
+      final hours = diff.inMinutes / 60.0;
+      _quantity = (hours / 12.0).ceilToDouble(); // Each 12h is a half day
+      if (_quantity < 1) _quantity = 1;
     } else if (widget.item.billingType == 'per_hour') {
       final diff = _endDate!.difference(_startDate!);
       final hours = diff.inMinutes / 60.0;
@@ -244,6 +263,7 @@ class _ServiceBookingDialogState extends State<ServiceBookingDialog> {
   String _getUnitLabel() {
     switch (widget.item.billingType) {
       case 'per_day': return 'Night';
+      case 'per_half_day': return 'Half Day';
       case 'per_hour': return 'Hour';
       default: return 'Unit';
     }

@@ -20,6 +20,7 @@ class Item extends Equatable {
   final String? billingType;
   final String? serviceCategory;
   final bool requiresTimeTracking;
+  final String? syncId;
 
   const Item({
     this.id,
@@ -33,6 +34,7 @@ class Item extends Equatable {
     this.billingType,
     this.serviceCategory,
     this.requiresTimeTracking = false,
+    this.syncId,
   });
 
   Item copyWith({
@@ -47,6 +49,7 @@ class Item extends Equatable {
     String? billingType,
     String? serviceCategory,
     bool? requiresTimeTracking,
+    String? syncId,
   }) {
     return Item(
       id: id ?? this.id,
@@ -60,6 +63,7 @@ class Item extends Equatable {
       billingType: billingType ?? this.billingType,
       serviceCategory: serviceCategory ?? this.serviceCategory,
       requiresTimeTracking: requiresTimeTracking ?? this.requiresTimeTracking,
+      syncId: syncId ?? this.syncId,
     );
   }
 
@@ -75,6 +79,7 @@ class Item extends Equatable {
         type,
         billingType,
         serviceCategory,
-        requiresTimeTracking
+        requiresTimeTracking,
+        syncId,
       ];
 }

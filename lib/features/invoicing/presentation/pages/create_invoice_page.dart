@@ -12,22 +12,53 @@ import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/invoicing/presentation/widgets/service_booking_dialog.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/features/settings/domain/entities/staff.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_dialog.dart';
 import 'dart:convert';
 
-class CreateInvoicePage extends StatelessWidget {
+class CreateInvoicePage extends StatefulWidget {
   const CreateInvoicePage({super.key});
+
+  @override
+  State<CreateInvoicePage> createState() => _CreateInvoicePageState();
+}
+
+class _CreateInvoicePageState extends State<CreateInvoicePage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final settings = context.read<SettingsBloc>().state.settings;
+        if (settings != null) {
+          context.read<InvoiceBloc>().add(UpdateInvoiceSettings(
+                taxRate: settings.taxRate,
+                taxEnabled: settings.taxEnabled,
+                discountEnabled: settings.discountEnabled,
+              ));
+
+          if (settings.staffManagementEnabled &&
+              context.read<InvoiceBloc>().state.staffId == null) {
+            _showStaffAuth(context);
+          }
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NEW INVOICE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        title: const Text('NEW INVOICE',
+            style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
                 Theme.of(context).colorScheme.primary,
-                Color.lerp(Theme.of(context).colorScheme.primary, Colors.black, 0.2)!,
+                Color.lerp(
+                    Theme.of(context).colorScheme.primary, Colors.black, 0.2)!,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -41,31 +72,25 @@ class CreateInvoicePage extends StatelessWidget {
           final settings = settingsState.settings;
           if (settings != null) {
             context.read<InvoiceBloc>().add(UpdateInvoiceSettings(
-              taxRate: settings.taxRate,
-              taxEnabled: settings.taxEnabled,
-              discountEnabled: settings.discountEnabled,
-            ));
+                  taxRate: settings.taxRate,
+                  taxEnabled: settings.taxEnabled,
+                  discountEnabled: settings.discountEnabled,
+                ));
+
+            // Check for staff authentication if enabled
+            if (settings.staffManagementEnabled &&
+                context.read<InvoiceBloc>().state.staffId == null) {
+              _showStaffAuth(context);
+            }
           }
         },
         child: BlocBuilder<SettingsBloc, SettingsState>(
           builder: (context, settingsState) {
-            final settings = settingsState.settings;
-            if (settings != null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (context.mounted) {
-                  context.read<InvoiceBloc>().add(UpdateInvoiceSettings(
-                        taxRate: settings.taxRate,
-                        taxEnabled: settings.taxEnabled,
-                        discountEnabled: settings.discountEnabled,
-                      ));
-                }
-              });
-            }
-
+            // Already handled in initState and Listener
             return LayoutBuilder(
               builder: (context, constraints) {
                 final isMobile = constraints.maxWidth < 800;
-                
+
                 if (isMobile) {
                   return Stack(
                     children: [
@@ -96,6 +121,28 @@ class CreateInvoicePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _showStaffAuth(BuildContext context) async {
+    // We need to wait a bit for the UI to settle before showing dialog on load
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+
+    final staff = await showDialog<Staff>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const StaffAuthDialog(),
+    );
+
+    if (staff != null && mounted) {
+      context.read<InvoiceBloc>().add(UpdateStaffInfo(
+            staffId: staff.id,
+            staffName: staff.name,
+          ));
+    } else if (mounted) {
+      // If cancelled, exit the page
+      Navigator.pop(context);
+    }
   }
 }
 

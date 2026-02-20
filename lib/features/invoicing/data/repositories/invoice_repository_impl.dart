@@ -1,17 +1,24 @@
 import 'package:drift/drift.dart';
 import 'dart:convert';
-import '../../../stock/data/datasources/app_database.dart';
+import 'package:uuid/uuid.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import '../../domain/entities/invoice.dart';
 import '../../../stock/domain/entities/item.dart';
 import '../../domain/repositories/invoice_repository.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
 
 class InvoiceRepositoryImpl implements InvoiceRepository {
   final AppDatabase db;
+  final _uuid = const Uuid();
 
   InvoiceRepositoryImpl(this.db);
 
   @override
   Future<void> saveInvoice(Invoice invoice) async {
+    final now = DateTime.now();
+    final deviceId = await DeviceInfoService.getDeviceSuffix();
+    final invoiceSyncId = _uuid.v4();
+
     await db.transaction(() async {
       final invoiceId = await db.into(db.invoices).insert(
             InvoicesCompanion.insert(
@@ -25,6 +32,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               customerName: Value(invoice.customerName),
               customerAddress: Value(invoice.customerAddress),
               paymentMethod: Value(invoice.paymentMethod),
+              staffId: Value(invoice.staffId),
+              staffName: Value(invoice.staffName),
+              syncId: Value(invoice.syncId ?? invoiceSyncId),
+              updatedAt: Value(now),
+              createdAt: Value(invoice.dateCreated),
+              deviceId: Value(deviceId),
+              isDeleted: const Value(false),
             ),
           );
 
@@ -37,14 +51,23 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
                 unitPrice: item.unitPrice,
                 type: Value(item.type),
                 serviceMeta: Value(item.serviceMeta),
+                syncId: Value(item.syncId ?? _uuid.v4()),
+                updatedAt: Value(now),
+                createdAt: Value(now),
+                deviceId: Value(deviceId),
+                isDeleted: const Value(false),
               ),
             );
 
         // Deduct stock only for products
         if (item.type == 'product') {
           await db.customUpdate(
-            'UPDATE items SET stock_qty = stock_qty - ? WHERE id = ?',
-            variables: [Variable.withInt(item.quantity), Variable.withInt(item.item.id!)],
+            'UPDATE items SET stock_qty = stock_qty - ?, updated_at = ? WHERE id = ?',
+            variables: [
+              Variable.withInt(item.quantity),
+              Variable.withDateTime(now),
+              Variable.withInt(item.item.id!)
+            ],
             updates: {db.items},
           );
         }
@@ -72,8 +95,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     return _getInvoicesWithItems(query);
   }
 
-  Future<List<Invoice>> _getInvoicesWithItems(SimpleSelectStatement<dynamic, dynamic> query) async {
-    final invoiceRows = await query.get();
+  Future<List<Invoice>> _getInvoicesWithItems(SimpleSelectStatement<$InvoicesTable, InvoiceTable> query) async {
+    final invoiceRows = await (query..where((t) => t.isDeleted.equals(false))).get();
     final List<Invoice> result = [];
 
     for (final row in invoiceRows) {
@@ -101,11 +124,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
             billingType: itemData.billingType,
             serviceCategory: itemData.serviceCategory,
             requiresTimeTracking: itemData.requiresTimeTracking,
+            syncId: itemData.syncId,
           ),
           quantity: invoiceItemData.quantity,
           unitPrice: invoiceItemData.unitPrice,
           type: invoiceItemData.type,
           serviceMeta: invoiceItemData.serviceMeta,
+          syncId: invoiceItemData.syncId,
         );
       }).toList();
 
@@ -122,6 +147,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         customerName: row.customerName,
         customerAddress: row.customerAddress,
         paymentMethod: row.paymentMethod,
+        staffId: row.staffId,
+        staffName: row.staffName,
+        syncId: row.syncId,
       ));
     }
     return result;

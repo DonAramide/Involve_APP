@@ -3,15 +3,16 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
 class ReportGenerator {
-  static Future<void> generateSalesReport({
+  static Future<pw.Document> buildReport({
     required List<Invoice> invoices,
     required AppSettings settings,
-    DateTimeRange? dateRange,
+    ReportDateRange? dateRange,
   }) async {
     final pdf = pw.Document();
 
@@ -20,6 +21,19 @@ class ReportGenerator {
         : 'All Time';
 
     final totalAmount = invoices.fold<double>(0, (sum, item) => sum + item.totalAmount);
+
+    // Prepare table data
+    final headers = ['Date', 'Invoice ID', 'Customer', 'Method', 'Sold By', 'Amount'];
+    final data = invoices.map((invoice) {
+      return [
+        DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated),
+        invoice.invoiceNumber,
+        invoice.customerName ?? '-',
+        invoice.paymentMethod ?? '-',
+        invoice.staffName ?? 'Admin',
+        CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: settings.currency),
+      ];
+    }).toList();
 
     pdf.addPage(
       pw.MultiPage(
@@ -46,7 +60,7 @@ class ReportGenerator {
                   pw.Container(
                     width: 60,
                     height: 60,
-                    child: pw.Image(pw.MemoryImage(settings.logo!)),
+                    child: _safeImage(settings.logo!),
                   ),
               ],
             ),
@@ -61,7 +75,7 @@ class ReportGenerator {
                 style: pw.TextStyle(
                   fontSize: 22, 
                   fontWeight: pw.FontWeight.bold, 
-                  color: settings.primaryColor != null ? PdfColor.fromInt(settings.primaryColor!) : PdfColors.blue
+                  color: _getPrimaryColor(settings)
                 ),
               ),
             ),
@@ -70,42 +84,27 @@ class ReportGenerator {
             ),
             pw.SizedBox(height: 20),
 
-            // Table
-            pw.Table(
+            // Table using fromTextArray for better layout/performance
+            pw.Table.fromTextArray(
+              headers: headers,
+              data: data,
               border: pw.TableBorder.all(color: PdfColors.grey300),
-              columnWidths: {
-                0: const pw.FlexColumnWidth(2), // Date
-                1: const pw.FlexColumnWidth(3), // Invoice #
-                2: const pw.FlexColumnWidth(3), // Customer
-                3: const pw.FlexColumnWidth(2), // Method
-                4: const pw.FlexColumnWidth(2), // Amount
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellAlignments: {
+                5: pw.Alignment.centerRight,
               },
-              children: [
-                // Table Header
-                pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: PdfColors.grey100),
-                  children: [
-                    _tableHeader('Date'),
-                    _tableHeader('Invoice ID'),
-                    _tableHeader('Customer'),
-                    _tableHeader('Method'),
-                    _tableHeader('Amount'),
-                  ],
-                ),
-                // Table Rows
-                ...invoices.map((invoice) {
-                  return pw.TableRow(
-                    children: [
-                      _tableCell(DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated)),
-                      _tableCell(invoice.invoiceNumber),
-                      _tableCell(invoice.customerName ?? '-'),
-                      _tableCell(invoice.paymentMethod ?? '-'),
-                      _tableCell(CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: settings.currency), align: pw.Alignment.centerRight),
-                    ],
-                  );
-                }),
-              ],
+              columnWidths: {
+                0: const pw.FlexColumnWidth(2.2), // Date
+                1: const pw.FlexColumnWidth(1.8), // ID
+                2: const pw.FlexColumnWidth(2.5), // Customer
+                3: const pw.FlexColumnWidth(1.5), // Method
+                4: const pw.FlexColumnWidth(2.0), // Sold By
+                5: const pw.FlexColumnWidth(2.0), // Amount
+              },
             ),
+
             pw.SizedBox(height: 20),
 
             // Summary Footer
@@ -119,7 +118,7 @@ class ReportGenerator {
                   style: pw.TextStyle(
                     fontSize: 16, 
                     fontWeight: pw.FontWeight.bold, 
-                    color: settings.primaryColor != null ? PdfColor.fromInt(settings.primaryColor!) : PdfColors.blue
+                    color: _getPrimaryColor(settings)
                   ),
                 ),
               ],
@@ -134,10 +133,57 @@ class ReportGenerator {
       ),
     );
 
-    await Printing.sharePdf(
-      bytes: await pdf.save(),
-      filename: 'Sales_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
-    );
+    return pdf;
+  }
+
+  static Future<void> generateSalesReport({
+    required List<Invoice> invoices,
+    required AppSettings settings,
+    ReportDateRange? dateRange,
+  }) async {
+    try {
+      final pdf = await buildReport(
+        invoices: invoices,
+        settings: settings,
+        dateRange: dateRange,
+      );
+
+      final bytes = await pdf.save();
+
+      // Platform specific export logic
+      if (kIsWeb) {
+        // layoutPdf is the most reliable way to handle PDF preview/download on Web
+        await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => bytes,
+          name: 'Sales_Report_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf',
+        );
+      } else {
+        await Printing.sharePdf(
+          bytes: bytes,
+          filename: 'Sales_Report_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.pdf',
+        );
+      }
+    } catch (e) {
+      // Re-throw to be caught by the UI
+      rethrow;
+    }
+  }
+
+  static PdfColor _getPrimaryColor(AppSettings settings) {
+    try {
+      if (settings.primaryColor != null) {
+        return PdfColor.fromInt(settings.primaryColor!);
+      }
+    } catch (_) {}
+    return PdfColors.blue;
+  }
+
+  static pw.Widget _safeImage(Uint8List bytes) {
+    try {
+      return pw.Image(pw.MemoryImage(bytes));
+    } catch (e) {
+      return pw.SizedBox.shrink();
+    }
   }
 
   static pw.Widget _tableHeader(String text) {
@@ -158,8 +204,8 @@ class ReportGenerator {
   }
 }
 
-class DateTimeRange {
+class ReportDateRange {
   final DateTime start;
   final DateTime end;
-  DateTimeRange({required this.start, required this.end});
+  ReportDateRange({required this.start, required this.end});
 }

@@ -40,4 +40,11 @@ class Settings extends Table {
   // Phase 3: Service Billing
   BoolColumn get serviceBillingEnabled => boolean().withDefault(const Constant(false))();
   TextColumn get serviceTypes => text().nullable()(); // JSON list of service categories
+
+  // Phase 4: Staff & Refinements
+  BoolColumn get staffManagementEnabled => boolean().withDefault(const Constant(false))();
+  IntColumn get paperWidth => integer().withDefault(const Constant(80))(); // 58, 80, or 88
+  IntColumn get halfDayStartHour => integer().withDefault(const Constant(6))();
+  IntColumn get halfDayEndHour => integer().withDefault(const Constant(18))();
+  BoolColumn get showSyncStatus => boolean().withDefault(const Constant(true))();
 }

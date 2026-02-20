@@ -15,6 +15,9 @@ import 'features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'features/settings/data/repositories/settings_repository_impl.dart';
 import 'features/settings/domain/services/security_service.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
+import 'features/settings/presentation/bloc/staff_bloc.dart';
+import 'features/settings/presentation/bloc/staff_state.dart';
+import 'features/settings/data/repositories/staff_repository_impl.dart';
 import 'features/printer/data/repositories/cross_platform_printer_service.dart';
 import 'features/printer/data/repositories/blue_thermal_printer_service.dart';
 import 'features/printer/data/repositories/network_printer_service.dart';
@@ -26,6 +29,12 @@ import 'features/stock/presentation/bloc/stock_state.dart';
 import 'features/settings/presentation/bloc/settings_state.dart';
 import 'features/dashboard/presentation/pages/dashboard_page.dart';
 import 'core/services/backup_service.dart';
+import 'core/sync/data/repositories/sync_repository_impl.dart';
+import 'core/sync/domain/services/discovery_service.dart';
+import 'core/sync/domain/services/sync_server.dart';
+import 'core/sync/domain/services/sync_manager.dart';
+import 'core/sync/presentation/bloc/sync_bloc.dart';
+import 'core/utils/device_info_service.dart';
 
 import 'package:involve_app/core/license/license_service.dart';
 
@@ -46,6 +55,7 @@ void main() async {
   final invoiceRepository = InvoiceRepositoryImpl(database);
   final settingsRepository = SettingsRepositoryImpl(database);
   final categoryRepository = CategoryRepositoryImpl(database);
+  final staffRepository = StaffRepositoryImpl(database);
   
   // Initialize services
   final bleService = CrossPlatformPrinterService();
@@ -59,6 +69,26 @@ void main() async {
   final securityService = SecurityService();
   final calculationService = InvoiceCalculationService();
   final backupService = BackupService(database: database);
+  
+  // Initialize Sync Infrastructure
+  final syncRepository = SyncRepositoryImpl(database);
+  final discoveryService = DiscoveryService();
+  final deviceId = await DeviceInfoService.getDeviceSuffix();
+  final secretToken = 'PRO-TOKEN-123'; // TODO: Load from secure storage
+  
+  final syncServer = SyncServer(
+    database: database,
+    syncRepository: syncRepository,
+    secretToken: secretToken,
+  );
+  
+  final syncManager = SyncManager(
+    database: database,
+    discoveryService: discoveryService,
+    syncRepository: syncRepository,
+    deviceId: deviceId,
+    secretToken: secretToken,
+  );
   
   // Initialize use cases
   final getItems = GetItems(itemRepository);
@@ -100,6 +130,12 @@ void main() async {
     printInvoice: printInvoice,
     getInvoiceHistory: getInvoiceHistory,
     getInvoiceDetails: getInvoiceDetails,
+    staffRepository: staffRepository,
+    syncRepository: syncRepository,
+    discoveryService: discoveryService,
+    syncServer: syncServer,
+    syncManager: syncManager,
+    deviceId: deviceId,
   ));
 }
 
@@ -128,6 +164,12 @@ class MyApp extends StatelessWidget {
   final PrintInvoiceCommands printInvoice;
   final GetInvoiceHistory getInvoiceHistory;
   final GetInvoiceDetails getInvoiceDetails;
+  final StaffRepositoryImpl staffRepository;
+  final SyncRepository syncRepository;
+  final DiscoveryService discoveryService;
+  final SyncServer syncServer;
+  final SyncManager syncManager;
+  final String deviceId;
 
   const MyApp({
     super.key,
@@ -152,6 +194,12 @@ class MyApp extends StatelessWidget {
     required this.printInvoice,
     required this.getInvoiceHistory,
     required this.getInvoiceDetails,
+    required this.staffRepository,
+    required this.syncRepository,
+    required this.discoveryService,
+    required this.syncServer,
+    required this.syncManager,
+    required this.deviceId,
   });
 
   @override
@@ -194,6 +242,21 @@ class MyApp extends StatelessWidget {
             connectPrinter: connectPrinter,
             printInvoice: printInvoice,
           ),
+        ),
+        BlocProvider(
+          create: (_) => StaffBloc(
+            repository: staffRepository,
+          )..add(LoadStaffList()),
+        ),
+        BlocProvider(
+          create: (_) => SyncBloc(
+            discoveryService: discoveryService,
+            syncManager: syncManager,
+            syncServer: syncServer,
+            syncRepository: syncRepository,
+            db: database,
+            deviceId: deviceId,
+          )..add(InitializeSync()),
         ),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(

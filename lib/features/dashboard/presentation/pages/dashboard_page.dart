@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../stock/presentation/pages/stock_management_page.dart';
 import '../../../invoicing/presentation/pages/create_invoice_page.dart';
 import '../../../invoicing/presentation/history/pages/invoice_history_page.dart';
+import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
+import 'package:involve_app/features/invoicing/presentation/bloc/invoice_state.dart';
 import '../../../settings/presentation/pages/settings_page.dart';
 import '../../../settings/presentation/pages/super_admin_settings_page.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
@@ -20,6 +22,8 @@ import 'package:involve_app/features/printer/presentation/bloc/printer_state.dar
 import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'dart:async';
+import 'package:involve_app/core/sync/presentation/bloc/sync_bloc.dart';
+import '../../../../core/sync/presentation/pages/device_sync_page.dart';
 
 class DashboardPage extends StatefulWidget {
   final bool autoOpenSettings;
@@ -93,6 +97,41 @@ class _DashboardPageState extends State<DashboardPage> {
             centerTitle: false,
             actions: [
               if (settings?.showDateTime == true) const LiveDateTimeWidget(),
+              const SizedBox(width: 4),
+              if (settings?.showSyncStatus == true)
+                BlocBuilder<SyncBloc, SyncState>(
+                  builder: (context, syncState) {
+                    final isMaster = syncState.isMaster;
+                    final hasPeers = syncState.peers.isNotEmpty;
+                    
+                    IconData icon = Icons.sync;
+                    Color color = Colors.white54;
+                    String tooltip = 'Sync Status';
+
+                    if (isMaster) {
+                      icon = Icons.dns;
+                      color = Colors.white; // Active Master is solid white
+                      tooltip = 'Sync Master: Active';
+                    } else if (hasPeers) {
+                      icon = Icons.sync;
+                      color = Colors.white.withOpacity(0.7); // Client is semi-transparent
+                      tooltip = 'Sync Client: Connected';
+                    } else {
+                      icon = Icons.sync_disabled;
+                      color = Colors.white.withOpacity(0.3); // Searching is faint
+                      tooltip = 'Sync: Searching...';
+                    }
+
+                    return IconButton(
+                      icon: Icon(icon, size: 20, color: color),
+                      tooltip: tooltip,
+                      onPressed: () => Navigator.push(
+                        context, 
+                        MaterialPageRoute(builder: (_) => const DeviceSyncPage()),
+                      ),
+                    );
+                  },
+                ),
               const SizedBox(width: 4),
               BlocBuilder<SettingsBloc, SettingsState>(
                 builder: (context, state) {
@@ -190,7 +229,10 @@ class _DashboardPageState extends State<DashboardPage> {
             'NEW INVOICE',
             Icons.add_shopping_cart,
             Theme.of(context).colorScheme.primary,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateInvoicePage())),
+            () {
+              context.read<InvoiceBloc>().add(ResetInvoice());
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateInvoicePage()));
+            },
           ),
           BlocBuilder<PrinterBloc, PrinterState>(
             builder: (context, printerState) {
@@ -263,13 +305,16 @@ class _DashboardPageState extends State<DashboardPage> {
                       children: [
                         const Icon(Icons.timer_outlined, color: Colors.white, size: 18),
                         const SizedBox(width: 8),
-                        Text(
-                          'TRIAL VERSION: ${trialSnapshot.data} DAYS REMAINING',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                            letterSpacing: 1.1,
+                        Flexible(
+                          child: Text(
+                            'TRIAL VERSION: ${trialSnapshot.data} DAYS REMAINING',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              letterSpacing: 1.1,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 12),

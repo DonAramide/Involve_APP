@@ -179,13 +179,16 @@ class InvoicePreviewDialog extends StatelessWidget {
                         final tax = invoiceState.tax;
                         final total = invoiceState.total;
                         
-                        // Save invoice
-                        context.read<InvoiceBloc>().add(SaveInvoice());
+                        // Generate real ID for syncing printer and DB
+                        final invoiceNumber = invoiceBloc.calculationService.generateInvoiceNumber();
                         
-                        // Create temporary invoice object for printing
+                        // Save invoice with the generated number
+                        invoiceBloc.add(SaveInvoice(invoiceNumber: invoiceNumber));
+                        
+                        // Create temporary invoice object for printing with real ID
                         final invoice = Invoice(
                           id: 0, 
-                          invoiceNumber: 'TEMP',
+                          invoiceNumber: invoiceNumber,
                           dateCreated: DateTime.now(),
                           items: items,
                           subtotal: subtotal,
@@ -195,6 +198,9 @@ class InvoicePreviewDialog extends StatelessWidget {
                           paymentStatus: 'Paid',
                           customerName: invoiceState.customerName,
                           customerAddress: invoiceState.customerAddress,
+                          paymentMethod: invoiceState.paymentMethod,
+                          staffId: invoiceState.staffId,
+                          staffName: invoiceState.staffName,
                         );
 
                         // Trigger Print using preferred template
@@ -227,14 +233,15 @@ class InvoicePreviewDialog extends StatelessWidget {
                     ),
                     ElevatedButton(
                       onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
-                        context.read<InvoiceBloc>().add(SaveInvoice());
+                        final invoiceNumber = invoiceBloc.calculationService.generateInvoiceNumber();
+                        invoiceBloc.add(SaveInvoice(invoiceNumber: invoiceNumber));
                         
                         // Wait for invoice to be saved and get the saved invoice
                         await Future.delayed(const Duration(milliseconds: 500));
                         
                         final savedInvoice = Invoice(
                           id: 0, 
-                          invoiceNumber: 'INV-${DateTime.now().millisecondsSinceEpoch}',
+                          invoiceNumber: invoiceNumber,
                           dateCreated: DateTime.now(),
                           items: List.from(invoiceState.items),
                           subtotal: invoiceState.subtotal,
@@ -244,6 +251,9 @@ class InvoicePreviewDialog extends StatelessWidget {
                           paymentStatus: 'Paid',
                           customerName: invoiceState.customerName,
                           customerAddress: invoiceState.customerAddress,
+                          paymentMethod: invoiceState.paymentMethod,
+                          staffId: invoiceState.staffId,
+                          staffName: invoiceState.staffName,
                         );
 
                         Navigator.push(

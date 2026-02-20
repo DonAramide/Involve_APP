@@ -46,7 +46,20 @@ class UpdatePaymentMethod extends InvoiceEvent {
   List<Object?> get props => [paymentMethod];
 }
 
-class SaveInvoice extends InvoiceEvent {}
+class UpdateStaffInfo extends InvoiceEvent {
+  final int? staffId;
+  final String? staffName;
+  UpdateStaffInfo({this.staffId, this.staffName});
+  @override
+  List<Object?> get props => [staffId, staffName];
+}
+
+class SaveInvoice extends InvoiceEvent {
+  final String? invoiceNumber;
+  SaveInvoice({this.invoiceNumber});
+  @override
+  List<Object?> get props => [invoiceNumber];
+}
 
 class ResetInvoice extends InvoiceEvent {}
 
@@ -79,6 +92,8 @@ class InvoiceState extends Equatable {
   final String? customerName;
   final String? customerAddress;
   final String? paymentMethod;
+  final int? staffId;
+  final String? staffName;
 
   const InvoiceState({
     this.items = const [],
@@ -95,6 +110,8 @@ class InvoiceState extends Equatable {
     this.customerName,
     this.customerAddress,
     this.paymentMethod,
+    this.staffId,
+    this.staffName,
   });
 
   InvoiceState copyWith({
@@ -112,6 +129,8 @@ class InvoiceState extends Equatable {
     String? customerName,
     String? customerAddress,
     String? paymentMethod,
+    int? staffId,
+    String? staffName,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -128,6 +147,8 @@ class InvoiceState extends Equatable {
       customerName: customerName ?? this.customerName,
       customerAddress: customerAddress ?? this.customerAddress,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      staffId: staffId ?? this.staffId,
+      staffName: staffName ?? this.staffName,
     );
   }
 
@@ -147,5 +168,7 @@ class InvoiceState extends Equatable {
         customerName,
         customerAddress,
         paymentMethod,
+        staffId,
+        staffName,
       ];
 }

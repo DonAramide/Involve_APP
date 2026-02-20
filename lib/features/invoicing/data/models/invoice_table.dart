@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import '../../../stock/data/models/item_table.dart';
+import 'package:involve_app/features/stock/data/models/item_table.dart';
 
 @DataClassName('InvoiceTable')
 class Invoices extends Table {
@@ -14,6 +14,17 @@ class Invoices extends Table {
   TextColumn get customerName => text().nullable()();
   TextColumn get customerAddress => text().nullable()();
   TextColumn get paymentMethod => text().nullable()(); // 'Cash', 'POS', 'Transfer'
+  
+  // Phase 4: Staff Management
+  IntColumn get staffId => integer().nullable()();
+  TextColumn get staffName => text().nullable()();
+
+  // Sync Columns
+  TextColumn get syncId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get deviceId => text().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }
 
 @DataClassName('InvoiceItemTable')
@@ -27,4 +38,11 @@ class InvoiceItems extends Table {
   // Phase 3: Service Billing
   TextColumn get type => text().withDefault(const Constant('product'))(); // 'product' or 'service'
   TextColumn get serviceMeta => text().nullable()(); // JSON snapshot: billingType, timeIn, timeOut, rate, etc.
+
+  // Sync Columns
+  TextColumn get syncId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get deviceId => text().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }

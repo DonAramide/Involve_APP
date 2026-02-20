@@ -18,4 +18,11 @@ class Items extends Table {
   TextColumn get billingType => text().nullable()(); // 'fixed', 'per_day', 'per_hour'
   TextColumn get serviceCategory => text().nullable()(); // 'Hotel', 'Lounge', etc.
   BoolColumn get requiresTimeTracking => boolean().withDefault(const Constant(false))();
+
+  // Sync Columns
+  TextColumn get syncId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get deviceId => text().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }

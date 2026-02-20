@@ -79,7 +79,9 @@ class _ManageCategoriesPageState extends State<ManageCategoriesPage> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
           TextButton(
             onPressed: () {
-              context.read<StockBloc>().add(DeleteCategory(category.id));
+              if (category.id != null) {
+                context.read<StockBloc>().add(DeleteCategory(category.id!));
+              }
               Navigator.pop(ctx);
             },
             child: const Text('DELETE', style: TextStyle(color: Colors.red)),

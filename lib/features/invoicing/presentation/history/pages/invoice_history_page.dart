@@ -7,12 +7,17 @@ import '../../../../printer/presentation/bloc/printer_bloc.dart';
 import '../../../../printer/domain/usecases/printer_usecases.dart';
 import '../../../domain/templates/template_registry.dart';
 import '../../../domain/templates/invoice_template.dart';
-import '../../../../settings/presentation/bloc/settings_bloc.dart';
-import '../../../../settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart';
+import 'package:involve_app/features/settings/domain/entities/staff.dart';
 import '../../pages/receipt_preview_page.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
-import '../../../domain/services/report_generator.dart' as reports;
+import '../../../domain/services/report_generator.dart' as reports hide DateTimeRange;
+import 'report_preview_page.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
@@ -85,8 +90,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             builder: (context) => const Center(child: CircularProgressIndicator()),
           );
         } else if (state.successMessage != null && state.successMessage!.contains('Backup')) {
-          // Dismiss dialog if open (naive check, but safe enough for this flow)
+          // Dismiss dialog if open
           Navigator.of(context, rootNavigator: true).popUntil((route) => route.settings.name != null); 
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.successMessage!), backgroundColor: Colors.green),
           );
@@ -177,6 +183,11 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           const SizedBox(width: 12),
           Expanded(
             flex: 1,
+            child: _buildStaffFilter(context, state),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 1,
             child: TextField(
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
@@ -217,7 +228,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ExpansionTile(
         title: Text('${invoice.invoiceNumber}'),
-        subtitle: Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • ${invoice.paymentMethod ?? "N/A"} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • ${invoice.paymentMethod ?? "N/A"}'),
+            Text('Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} • Sold By: ${invoice.staffName ?? "N/A"}'),
+          ],
+        ),
         children: [
           ...invoice.items.map((item) => ListTile(
                 dense: true,
@@ -362,19 +379,21 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         return;
       }
 
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-
+      // Show overlay if not on web (Web handles downloads asynchronously well enough usually)
+      // or just be very careful with the context.
+      
       try {
-        await reports.ReportGenerator.generateSalesReport(
-          invoices: historyState.invoices,
-          settings: settingsState.settings!,
-          dateRange: _selectedRange != null 
-            ? reports.DateTimeRange(start: _selectedRange!.start, end: _selectedRange!.end)
-            : null,
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReportPreviewPage(
+              invoices: historyState.invoices,
+              settings: settingsState.settings!,
+              dateRange: _selectedRange != null 
+                ? reports.ReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
+                : null,
+            ),
+          ),
         );
       } catch (e) {
         if (context.mounted) {
@@ -382,8 +401,6 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             SnackBar(content: Text('Export failed: ${e.toString()}')),
           );
         }
-      } finally {
-        if (context.mounted) Navigator.pop(context);
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -419,6 +436,48 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 paymentMethod: value,
               ));
         }
+      },
+    );
+  }
+
+  Widget _buildStaffFilter(BuildContext context, HistoryState state) {
+    return BlocBuilder<StaffBloc, StaffState>(
+      builder: (context, staffState) {
+        int? currentStaffId;
+        if (state is HistoryLoaded) {
+          currentStaffId = state.staffId;
+        }
+
+        return DropdownButtonFormField<int?>(
+          value: currentStaffId,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            hintText: 'All Staff',
+            border: OutlineInputBorder(),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: EdgeInsets.symmetric(horizontal: 10),
+          ),
+          items: [
+            const DropdownMenuItem<int?>(value: null, child: Text('All Staff', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+            ...staffState.staffList.map((s) => DropdownMenuItem<int?>(
+              value: s.id,
+              child: Text(s.name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+            )),
+          ],
+          onChanged: (value) {
+            if (state is HistoryLoaded) {
+              context.read<HistoryBloc>().add(LoadHistory(
+                    start: _selectedRange?.start,
+                    end: _selectedRange?.end,
+                    query: state.query,
+                    amount: state.amount,
+                    paymentMethod: state.paymentMethod,
+                    staffId: value,
+                  ));
+            }
+          },
+        );
       },
     );
   }
