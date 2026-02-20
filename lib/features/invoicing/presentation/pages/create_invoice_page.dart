@@ -67,26 +67,53 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
         ),
         foregroundColor: Colors.white,
       ),
-      body: BlocListener<SettingsBloc, SettingsState>(
-        listener: (context, settingsState) {
-          final settings = settingsState.settings;
-          if (settings != null) {
-            context.read<InvoiceBloc>().add(UpdateInvoiceSettings(
-                  taxRate: settings.taxRate,
-                  taxEnabled: settings.taxEnabled,
-                  discountEnabled: settings.discountEnabled,
-                ));
+      body: MultiBlocListener(
+        listeners: [
+          BlocListener<SettingsBloc, SettingsState>(
+            listener: (context, settingsState) {
+              final settings = settingsState.settings;
+              if (settings != null) {
+                context.read<InvoiceBloc>().add(UpdateInvoiceSettings(
+                      taxRate: settings.taxRate,
+                      taxEnabled: settings.taxEnabled,
+                      discountEnabled: settings.discountEnabled,
+                    ));
 
-            // Check for staff authentication if enabled
-            if (settings.staffManagementEnabled &&
-                context.read<InvoiceBloc>().state.staffId == null) {
-              _showStaffAuth(context);
-            }
-          }
-        },
+                // Check for staff authentication if enabled
+                if (settings.staffManagementEnabled &&
+                    context.read<InvoiceBloc>().state.staffId == null) {
+                  _showStaffAuth(context);
+                }
+              }
+            },
+          ),
+          BlocListener<InvoiceBloc, InvoiceState>(
+            listenWhen: (prev, curr) => !prev.isSaved && curr.isSaved,
+            listener: (context, state) {
+              // 1. Reload stock (since items were sold)
+              context.read<StockBloc>().add(LoadItems());
+
+              // 2. Clear all modal overlays (Preview Dialog AND Cart Bottom Sheet)
+              // We pop until we are back at the main Scaffold of this page.
+              // Modal routes (dialogs/bottom sheets) will be dismissed.
+              Navigator.of(context).popUntil((route) => route.isFirst);
+
+              // 3. Show success feedback
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Invoice saved & printed successfully!'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+
+              // 4. Reset flow for next transaction
+              context.read<InvoiceBloc>().add(ResetInvoice());
+            },
+          ),
+        ],
         child: BlocBuilder<SettingsBloc, SettingsState>(
           builder: (context, settingsState) {
-            // Already handled in initState and Listener
             return LayoutBuilder(
               builder: (context, constraints) {
                 final isMobile = constraints.maxWidth < 800;
@@ -106,12 +133,10 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
 
                 return Row(
                   children: [
-                    // Left Side: Item Selection
                     Expanded(
                       flex: 3,
                       child: _ItemSelector(isMobile: false),
                     ),
-                    // Right Side: Cart Summary
                     _CartSummary(isSidePanel: true),
                   ],
                 );

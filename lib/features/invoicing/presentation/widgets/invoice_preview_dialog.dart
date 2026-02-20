@@ -24,20 +24,7 @@ class InvoicePreviewDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: invoiceBloc,
-      child: BlocListener<InvoiceBloc, InvoiceState>(
-        listener: (context, state) {
-          if (state.isSaved) {
-            // Signal StockBloc to reload items
-            context.read<StockBloc>().add(LoadItems());
-            
-            Navigator.pop(context); // Close preview
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Invoice saved successfully!')),
-            );
-            invoiceBloc.add(ResetInvoice());
-          }
-        },
-        child: BlocBuilder<InvoiceBloc, InvoiceState>(
+      child: BlocBuilder<InvoiceBloc, InvoiceState>(
           builder: (context, invoiceState) {
             return BlocBuilder<SettingsBloc, SettingsState>(
               builder: (context, settingsState) {
@@ -270,7 +257,6 @@ class InvoicePreviewDialog extends StatelessWidget {
               },
             );
           },
-        ),
       ),
     );
   }
