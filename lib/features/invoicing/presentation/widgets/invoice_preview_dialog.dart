@@ -170,7 +170,11 @@ class InvoicePreviewDialog extends StatelessWidget {
                         final invoiceNumber = invoiceBloc.calculationService.generateInvoiceNumber();
                         
                         // Save invoice with the generated number
-                        invoiceBloc.add(SaveInvoice(invoiceNumber: invoiceNumber));
+                        final isDeferred = invoiceState.paymentMethod == 'Deferred';
+                        invoiceBloc.add(SaveInvoice(
+                          invoiceNumber: invoiceNumber,
+                          paymentStatus: isDeferred ? 'Unpaid' : 'Paid',
+                        ));
                         
                         // Create temporary invoice object for printing with real ID
                         final invoice = Invoice(
@@ -182,7 +186,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                           taxAmount: tax,
                           discountAmount: 0,
                           totalAmount: total,
-                          paymentStatus: 'Paid',
+                          paymentStatus: isDeferred ? 'Unpaid' : 'Paid',
                           customerName: invoiceState.customerName,
                           customerAddress: invoiceState.customerAddress,
                           paymentMethod: invoiceState.paymentMethod,
@@ -221,7 +225,11 @@ class InvoicePreviewDialog extends StatelessWidget {
                     ElevatedButton(
                       onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                         final invoiceNumber = invoiceBloc.calculationService.generateInvoiceNumber();
-                        invoiceBloc.add(SaveInvoice(invoiceNumber: invoiceNumber));
+                        final isDeferred = invoiceState.paymentMethod == 'Deferred';
+                        invoiceBloc.add(SaveInvoice(
+                          invoiceNumber: invoiceNumber,
+                          paymentStatus: isDeferred ? 'Unpaid' : 'Paid',
+                        ));
                         
                         // Wait for invoice to be saved and get the saved invoice
                         await Future.delayed(const Duration(milliseconds: 500));
@@ -235,7 +243,7 @@ class InvoicePreviewDialog extends StatelessWidget {
                           taxAmount: invoiceState.tax,
                           discountAmount: 0,
                           totalAmount: invoiceState.total,
-                          paymentStatus: 'Paid',
+                          paymentStatus: isDeferred ? 'Unpaid' : 'Paid',
                           customerName: invoiceState.customerName,
                           customerAddress: invoiceState.customerAddress,
                           paymentMethod: invoiceState.paymentMethod,
@@ -283,6 +291,14 @@ class InvoicePreviewDialog extends StatelessWidget {
         RadioListTile<String>(
           title: const Text('Transfer'),
           value: 'Transfer',
+          groupValue: state.paymentMethod,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          onChanged: (val) => context.read<InvoiceBloc>().add(UpdatePaymentMethod(val)),
+        ),
+        RadioListTile<String>(
+          title: const Text('Pay Later (Deferred)', style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold)),
+          value: 'Deferred',
           groupValue: state.paymentMethod,
           dense: true,
           contentPadding: EdgeInsets.zero,

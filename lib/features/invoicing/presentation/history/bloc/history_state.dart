@@ -21,6 +21,21 @@ class LoadHistory extends HistoryEvent {
   List<Object?> get props => [start, end, query, amount, paymentMethod, staffId];
 }
 
+class UpdateInvoicePayment extends HistoryEvent {
+  final int invoiceId;
+  final String method;
+  final String status;
+
+  UpdateInvoicePayment({
+    required this.invoiceId,
+    required this.method,
+    required this.status,
+  });
+
+  @override
+  List<Object?> get props => [invoiceId, method, status];
+}
+
 // States
 abstract class HistoryState extends Equatable {
   @override

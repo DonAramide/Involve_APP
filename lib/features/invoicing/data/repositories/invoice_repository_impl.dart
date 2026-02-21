@@ -182,4 +182,16 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     }
     return true;
   }
+
+  @override
+  Future<void> updatePaymentInfo(int invoiceId, String method, String status) async {
+    final now = DateTime.now();
+    await (db.update(db.invoices)..where((t) => t.id.equals(invoiceId))).write(
+      InvoicesCompanion(
+        paymentMethod: Value(method),
+        paymentStatus: Value(status),
+        updatedAt: Value(now),
+      ),
+    );
+  }
 }
