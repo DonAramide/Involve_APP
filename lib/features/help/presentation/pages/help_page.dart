@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
 import 'package:involve_app/features/admin/presentation/widgets/admin_login_dialog.dart';
+import 'package:involve_app/core/license/storage_service.dart';
+import 'package:involve_app/features/admin/presentation/widgets/device_access_dialog.dart';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key});
@@ -47,7 +49,7 @@ class _HelpPageState extends State<HelpPage> {
       final bool? deviceAccess = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const DeviceAccessDialog(),
+        builder: (context) => DeviceAccessDialog(),
       );
       
       if (deviceAccess != true) return;
