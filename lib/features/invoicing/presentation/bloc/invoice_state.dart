@@ -56,9 +56,11 @@ class UpdateStaffInfo extends InvoiceEvent {
 
 class SaveInvoice extends InvoiceEvent {
   final String? invoiceNumber;
-  SaveInvoice({this.invoiceNumber});
+  final double? amountPaid;
+  final String? paymentStatus;
+  SaveInvoice({this.invoiceNumber, this.amountPaid, this.paymentStatus});
   @override
-  List<Object?> get props => [invoiceNumber];
+  List<Object?> get props => [invoiceNumber, amountPaid, paymentStatus];
 }
 
 class ResetInvoice extends InvoiceEvent {}

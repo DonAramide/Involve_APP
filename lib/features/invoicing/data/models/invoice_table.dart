@@ -10,7 +10,9 @@ class Invoices extends Table {
   RealColumn get taxAmount => real()();
   RealColumn get discountAmount => real()();
   RealColumn get totalAmount => real()();
-  TextColumn get paymentStatus => text()(); // e.g., 'Paid', 'Pending'
+  TextColumn get paymentStatus => text()(); // e.g., 'Paid', 'Unpaid', 'Partial'
+  RealColumn get amountPaid => real().withDefault(const Constant(0.0))();
+  RealColumn get balanceAmount => real().withDefault(const Constant(0.0))();
   TextColumn get customerName => text().nullable()();
   TextColumn get customerAddress => text().nullable()();
   TextColumn get paymentMethod => text().nullable()(); // 'Cash', 'POS', 'Transfer'

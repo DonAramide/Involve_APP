@@ -67,6 +67,22 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   Future<void> _onSaveInvoice(SaveInvoice event, Emitter<InvoiceState> emit) async {
     emit(state.copyWith(isSaving: true));
     try {
+      final amountPaid = event.amountPaid ?? (state.paymentMethod == 'Deferred' ? 0.0 : state.total);
+      final balance = state.total - amountPaid;
+      
+      final String status;
+      if (event.paymentStatus != null) {
+        status = event.paymentStatus!;
+      } else {
+        if (amountPaid <= 0) {
+          status = 'Unpaid';
+        } else if (amountPaid < state.total) {
+          status = 'Partial';
+        } else {
+          status = 'Paid';
+        }
+      }
+
       final invoice = Invoice(
         invoiceNumber: event.invoiceNumber ?? calculationService.generateInvoiceNumber(),
         dateCreated: DateTime.now(),
@@ -75,7 +91,9 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         taxAmount: state.tax,
         discountAmount: state.discount,
         totalAmount: state.total,
-        paymentStatus: 'Paid',
+        paymentStatus: status,
+        amountPaid: amountPaid,
+        balanceAmount: balance,
         customerName: state.customerName,
         customerAddress: state.customerAddress,
         paymentMethod: state.paymentMethod,

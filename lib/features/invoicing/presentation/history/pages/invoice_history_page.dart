@@ -280,15 +280,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • ${invoice.paymentMethod ?? "N/A"}'),
             Row(
               children: [
-                Text('Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} • Sold By: ${invoice.staffName ?? "N/A"}'),
-                if (invoice.paymentStatus == 'Unpaid') ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                    child: const Text('UNPAID', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                ],
+                Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
+                const SizedBox(width: 8),
+                _buildStatusBadge(invoice.paymentStatus),
               ],
             ),
           ],
@@ -305,13 +299,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                if (invoice.paymentStatus == 'Unpaid')
+                if (invoice.paymentStatus != 'Paid')
                   Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: ElevatedButton.icon(
-                      onPressed: () => _showUpdatePaymentDialog(context, invoice),
-                      icon: const Icon(Icons.payment),
-                      label: const Text('UPDATE PAYMENT'),
+                      onPressed: () => _showBalancePaymentDialog(context, invoice),
+                      icon: const Icon(Icons.account_balance_wallet_outlined),
+                      label: const Text('BALANCE PAYMENT'),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
                     ),
                   ),
@@ -353,24 +347,17 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 cells: [
                   DataCell(Text(invoice.invoiceNumber, style: const TextStyle(fontSize: 12))),
                   DataCell(Text(invoice.dateCreated.toString().split(' ')[0], style: const TextStyle(fontSize: 12))),
-                  DataCell(Text(invoice.customerName ?? '-', style: const TextStyle(fontSize: 12))),
                   DataCell(
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(invoice.paymentMethod ?? '-', style: const TextStyle(fontSize: 12)),
-                        if (invoice.paymentStatus == 'Unpaid') ...[
-                          const SizedBox(width: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                            child: const Text('!', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
+                        const SizedBox(width: 4),
+                        _buildStatusBadge(invoice.paymentStatus, isMini: true),
                       ],
                     ),
                   ),
-                  DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                  DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
                 ],
                 onSelectChanged: (selected) {
                   if (selected == true) {
@@ -658,18 +645,51 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         ],
       ),
     );
-  void _showUpdatePaymentDialog(BuildContext context, Invoice invoice) {
+  }
+
+  Widget _buildStatusBadge(String status, {bool isMini = false}) {
+    final Color color;
+    switch (status) {
+      case 'Paid': color = Colors.green; break;
+      case 'Partial': color = Colors.orange; break;
+      case 'Unpaid': color = Colors.red; break;
+      default: color = Colors.grey;
+    }
+    
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: isMini ? 4 : 6, vertical: isMini ? 1 : 2),
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+      child: Text(
+        isMini ? (status == 'Paid' ? '✓' : '!') : status.toUpperCase(), 
+        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)
+      ),
+    );
+  }
+
+  void _showBalancePaymentDialog(BuildContext context, Invoice invoice) {
+    final controller = TextEditingController(text: invoice.balanceAmount.toString());
     String selectedMethod = 'Cash';
+    final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Update Payment Method'),
+        title: const Text('Balance Payment'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Deferred payment found. Select actual payment method to confirm.'),
-            const SizedBox(height: 16),
+            Text('Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency)}'),
+            Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency)}'),
+            Text('Balance: ${CurrencyFormatter.formatWithSymbol(invoice.balanceAmount, symbol: currency)}', 
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+            const Divider(height: 24),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Amount to Pay', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: selectedMethod,
               items: ['Cash', 'POS', 'Transfer'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
@@ -682,14 +702,17 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
           ElevatedButton(
             onPressed: () {
-              context.read<HistoryBloc>().add(UpdateInvoicePayment(
+              final amount = double.tryParse(controller.text) ?? 0.0;
+              if (amount <= 0) return;
+              
+              context.read<HistoryBloc>().add(RecordPayment(
                 invoiceId: invoice.id!,
+                additionalAmount: amount,
                 method: selectedMethod,
-                status: 'Paid',
               ));
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Invoice ${invoice.invoiceNumber} updated to Paid via $selectedMethod'), backgroundColor: Colors.green),
+                SnackBar(content: Text('Payment of $currency$amount recorded via $selectedMethod'), backgroundColor: Colors.green),
               );
             },
             child: const Text('CONFIRM PAYMENT'),

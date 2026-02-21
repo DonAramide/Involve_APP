@@ -29,6 +29,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               discountAmount: invoice.discountAmount,
               totalAmount: invoice.totalAmount,
               paymentStatus: invoice.paymentStatus,
+              amountPaid: Value(invoice.amountPaid),
+              balanceAmount: Value(invoice.balanceAmount),
               customerName: Value(invoice.customerName),
               customerAddress: Value(invoice.customerAddress),
               paymentMethod: Value(invoice.paymentMethod),
@@ -144,6 +146,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         discountAmount: row.discountAmount,
         totalAmount: row.totalAmount,
         paymentStatus: row.paymentStatus,
+        amountPaid: row.amountPaid,
+        balanceAmount: row.balanceAmount,
         customerName: row.customerName,
         customerAddress: row.customerAddress,
         paymentMethod: row.paymentMethod,
@@ -185,11 +189,42 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
   @override
   Future<void> updatePaymentInfo(int invoiceId, String method, String status) async {
+    // This method is now replaced by the logic in history_bloc if we want to be more specific,
+    // but for backward compatibility and simple updates:
     final now = DateTime.now();
     await (db.update(db.invoices)..where((t) => t.id.equals(invoiceId))).write(
       InvoicesCompanion(
         paymentMethod: Value(method),
         paymentStatus: Value(status),
+        updatedAt: Value(now),
+      ),
+    );
+  }
+
+  // New method for partial payments
+  Future<void> recordPayment(int invoiceId, double additionalAmount, String method) async {
+    final now = DateTime.now();
+    final invoice = await getInvoiceById(invoiceId);
+    if (invoice == null) return;
+
+    final newAmountPaid = invoice.amountPaid + additionalAmount;
+    final newBalance = invoice.totalAmount - newAmountPaid;
+    final String newStatus;
+    
+    if (newAmountPaid <= 0) {
+      newStatus = 'Unpaid';
+    } else if (newAmountPaid < invoice.totalAmount) {
+      newStatus = 'Partial';
+    } else {
+      newStatus = 'Paid';
+    }
+
+    await (db.update(db.invoices)..where((t) => t.id.equals(invoiceId))).write(
+      InvoicesCompanion(
+        amountPaid: Value(newAmountPaid),
+        balanceAmount: Value(newBalance),
+        paymentStatus: Value(newStatus),
+        paymentMethod: Value(method),
         updatedAt: Value(now),
       ),
     );

@@ -11,12 +11,13 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
     required this.getInvoiceDetails,
   }) : super(HistoryInitial()) {
     on<LoadHistory>(_onLoadHistory);
-    on<UpdateInvoicePayment>(_onUpdatePayment);
+    on<RecordPayment>(_onRecordPayment);
   }
 
-  Future<void> _onUpdatePayment(UpdateInvoicePayment event, Emitter<HistoryState> emit) async {
+  Future<void> _onRecordPayment(RecordPayment event, Emitter<HistoryState> emit) async {
     try {
-      await getHistory.repository.updatePaymentInfo(event.invoiceId, event.method, event.status);
+      final repo = getHistory.repository as InvoiceRepositoryImpl;
+      await repo.recordPayment(event.invoiceId, event.additionalAmount, event.method);
       add(LoadHistory()); // Reload history after update
     } catch (e) {
       emit(HistoryError('Failed to update payment: ${e.toString()}'));
@@ -50,9 +51,7 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         invoices = invoices.where((inv) => inv.staffId == event.staffId).toList();
       }
       
-      final totalSales = invoices
-          .where((inv) => inv.paymentStatus == 'Paid')
-          .fold<double>(0, (sum, inv) => sum + inv.totalAmount);
+      final totalSales = invoices.fold<double>(0, (sum, inv) => sum + inv.amountPaid);
 
       emit(HistoryLoaded(
         invoices, 

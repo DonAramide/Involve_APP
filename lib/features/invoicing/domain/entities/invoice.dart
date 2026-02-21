@@ -57,6 +57,8 @@ class Invoice extends Equatable {
   final double discountAmount;
   final double totalAmount;
   final String paymentStatus;
+  final double amountPaid;
+  final double balanceAmount;
   final String? customerName;
   final String? customerAddress;
   final String? paymentMethod; // 'Cash', 'POS', 'Transfer'
@@ -74,6 +76,8 @@ class Invoice extends Equatable {
     required this.discountAmount,
     required this.totalAmount,
     required this.paymentStatus,
+    this.amountPaid = 0.0,
+    this.balanceAmount = 0.0,
     this.customerName,
     this.customerAddress,
     this.paymentMethod,
@@ -93,6 +97,8 @@ class Invoice extends Equatable {
         discountAmount,
         totalAmount,
         paymentStatus,
+        amountPaid,
+        balanceAmount,
         customerName,
         customerAddress,
         paymentMethod,

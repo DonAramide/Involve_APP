@@ -16,7 +16,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration {
@@ -154,6 +154,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 21) {
           // Sync Status Toggle
           await _safeAddColumn(m, settings, settings.showSyncStatus);
+        }
+        if (from < 22) {
+          // Partial Payments Architecture
+          await _safeAddColumn(m, invoices, invoices.amountPaid);
+          await _safeAddColumn(m, invoices, invoices.balanceAmount);
         }
       },
       beforeOpen: (details) async {
