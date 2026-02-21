@@ -13,12 +13,13 @@ class LoadHistory extends HistoryEvent {
   final String? query;
   final double? amount;
   final String? paymentMethod;
+  final String? paymentStatus;
   final int? staffId;
 
-  LoadHistory({this.start, this.end, this.query, this.amount, this.paymentMethod, this.staffId});
+  LoadHistory({this.start, this.end, this.query, this.amount, this.paymentMethod, this.paymentStatus, this.staffId});
 
   @override
-  List<Object?> get props => [start, end, query, amount, paymentMethod, staffId];
+  List<Object?> get props => [start, end, query, amount, paymentMethod, paymentStatus, staffId];
 }
 
 class RecordPayment extends HistoryEvent {
@@ -50,12 +51,13 @@ class HistoryLoaded extends HistoryState {
   final String? query;
   final double? amount;
   final String? paymentMethod;
+  final String? paymentStatus;
   final int? staffId;
 
-  HistoryLoaded(this.invoices, {this.totalSales = 0.0, this.query, this.amount, this.paymentMethod, this.staffId});
+  HistoryLoaded(this.invoices, {this.totalSales = 0.0, this.query, this.amount, this.paymentMethod, this.paymentStatus, this.staffId});
 
   @override
-  List<Object?> get props => [invoices, totalSales, query, amount, paymentMethod, staffId];
+  List<Object?> get props => [invoices, totalSales, query, amount, paymentMethod, paymentStatus, staffId];
 }
 class HistoryError extends HistoryState {
   final String message;

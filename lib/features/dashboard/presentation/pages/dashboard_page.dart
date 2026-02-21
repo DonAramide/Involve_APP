@@ -23,6 +23,7 @@ import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'dart:async';
 import 'package:involve_app/core/sync/presentation/bloc/sync_bloc.dart';
+import '../../../../core/sync/presentation/widgets/sync_indicator.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -103,27 +104,34 @@ class _DashboardPageState extends State<DashboardPage> {
                   builder: (context, syncState) {
                     final isMaster = syncState.isMaster;
                     final hasPeers = syncState.peers.isNotEmpty;
+                    final isSyncing = syncState.isSyncing;
                     
                     IconData icon = Icons.sync;
                     Color color = Colors.white54;
                     String tooltip = 'Sync Status';
 
-                    if (isMaster) {
+                    if (isSyncing) {
+                      icon = Icons.refresh;
+                      color = Colors.greenAccent;
+                      tooltip = 'Syncing...';
+                    } else if (isMaster) {
                       icon = Icons.dns;
-                      color = Colors.white; // Active Master is solid white
+                      color = Colors.white;
                       tooltip = 'Sync Master: Active';
                     } else if (hasPeers) {
-                      icon = Icons.sync;
-                      color = Colors.white.withOpacity(0.7); // Client is semi-transparent
+                      icon = Icons.check_circle_outline;
+                      color = Colors.white.withOpacity(0.9);
                       tooltip = 'Sync Client: Connected';
                     } else {
                       icon = Icons.sync_disabled;
-                      color = Colors.white.withOpacity(0.3); // Searching is faint
-                      tooltip = 'Sync: Searching...';
+                      color = Colors.white.withOpacity(0.3);
+                      tooltip = 'Sync: Offline';
                     }
 
-                    return IconButton(
-                      icon: Icon(icon, size: 20, color: color),
+                    return SyncIndicator(
+                      icon: icon,
+                      color: color,
+                      isSyncing: isSyncing,
                       tooltip: tooltip,
                       onPressed: () => Navigator.push(
                         context, 

@@ -260,7 +260,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     );
   }
 
-  void _printInvoice(BuildContext context, Invoice invoice, Settings settings) {
+  void _printInvoice(BuildContext context, Invoice invoice, AppSettings settings) {
     final templateName = settings.defaultInvoiceTemplate ?? 'compact';
     final InvoiceTemplate template;
     if (templateName == 'detailed') template = DetailedInvoiceTemplate();

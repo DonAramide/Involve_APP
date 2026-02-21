@@ -173,7 +173,7 @@ class AppDatabase extends _$AppDatabase {
   /// a prior debug build or partial upgrade.
   Future<void> _safeAddColumn(Migrator m, TableInfo table, GeneratedColumn col) async {
     try {
-      await m.addColumn(table, col);
+      await m.addColumn(table, col as GeneratedColumn<Object>);
     } catch (e) {
       // Ignore 'duplicate column name' errors
       debugPrint('Migration: Column ${col.name} already exists, skipping: $e');

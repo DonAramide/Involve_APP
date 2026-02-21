@@ -64,6 +64,11 @@ class DeviceSyncPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (state.isSyncing)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 16.0),
+                    child: LinearProgressIndicator(),
+                  ),
                 _buildRoleCard(context, state),
                 const SizedBox(height: 24),
                 _buildStatusCard(context, state),
@@ -215,11 +220,13 @@ class DeviceSyncPage extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: state.isDiscoveryRunning
+                onPressed: (state.isDiscoveryRunning && !state.isSyncing)
                     ? () => context.read<SyncBloc>().add(ManualSyncTriggered())
                     : null,
-                icon: const Icon(Icons.sync),
-                label: const Text('Auto Sync Now'),
+                icon: state.isSyncing 
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.sync),
+                label: Text(state.isSyncing ? 'Syncing...' : 'Auto Sync Now'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(

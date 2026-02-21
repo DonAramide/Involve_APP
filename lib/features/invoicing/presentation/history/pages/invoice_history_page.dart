@@ -192,6 +192,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   width: (constraints.maxWidth - 44) / 2,
                   child: _buildPaymentMethodFilter(context, state),
                 ),
+                SizedBox(
+                  width: (constraints.maxWidth - 44) / 2,
+                  child: _buildPaymentStatusFilter(context, state),
+                ),
               ],
             )
           : Row(
@@ -215,6 +219,11 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   flex: 1,
                   child: _buildPaymentMethodFilter(context, state),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: _buildPaymentStatusFilter(context, state),
+                ),
               ],
             ),
     );
@@ -237,6 +246,8 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           query: value,
           amount: currentAmount,
           paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
+          paymentStatus: state is HistoryLoaded ? state.paymentStatus : null,
+          staffId: state is HistoryLoaded ? state.staffId : null,
         ));
       },
     );
@@ -264,6 +275,8 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           query: currentQuery,
           amount: amount,
           paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
+          paymentStatus: state is HistoryLoaded ? state.paymentStatus : null,
+          staffId: state is HistoryLoaded ? state.staffId : null,
         ));
       },
     );
@@ -507,6 +520,41 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 query: state.query,
                 amount: state.amount,
                 paymentMethod: value,
+                paymentStatus: state.paymentStatus,
+                staffId: state.staffId,
+              ));
+        }
+      },
+    );
+  }
+
+  Widget _buildPaymentStatusFilter(BuildContext context, HistoryState state) {
+    String? currentStatus;
+    if (state is HistoryLoaded) {
+      currentStatus = state.paymentStatus;
+    }
+
+    return DropdownButtonFormField<String>(
+      value: currentStatus ?? 'All',
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: EdgeInsets.symmetric(horizontal: 10),
+      ),
+      items: ['All', 'Paid', 'Partial', 'Unpaid'].map((status) {
+        return DropdownMenuItem(value: status, child: Text(status, style: const TextStyle(fontSize: 12)));
+      }).toList(),
+      onChanged: (value) {
+        if (state is HistoryLoaded) {
+          context.read<HistoryBloc>().add(LoadHistory(
+                start: _selectedRange?.start,
+                end: _selectedRange?.end,
+                query: state.query,
+                amount: state.amount,
+                paymentMethod: state.paymentMethod,
+                paymentStatus: value,
+                staffId: state.staffId,
               ));
         }
       },
@@ -546,6 +594,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     query: state.query,
                     amount: state.amount,
                     paymentMethod: state.paymentMethod,
+                    paymentStatus: state.paymentStatus,
                     staffId: value,
                   ));
             }

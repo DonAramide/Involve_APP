@@ -16,7 +16,18 @@ class SyncManager {
   SyncHttpClient? _client;
   StreamSubscription? _discoverySubscription;
   Timer? _syncTimer;
+  final _statusController = StreamController<bool>.broadcast();
+  Stream<bool> get statusStream => _statusController.stream;
+  
   bool _isSyncing = false;
+  bool get isSyncing => _isSyncing;
+  
+  set isSyncing(bool value) {
+    if (_isSyncing != value) {
+      _isSyncing = value;
+      _statusController.add(value);
+    }
+  }
 
   SyncManager({
     required this.database,
@@ -48,9 +59,9 @@ class SyncManager {
   }
 
   Future<void> syncNow() async {
-    if (_client == null || _isSyncing) return;
+    if (_client == null || isSyncing) return;
 
-    _isSyncing = true;
+    isSyncing = true;
     try {
       debugPrint('Starting Sync cycle...');
       
@@ -80,7 +91,7 @@ class SyncManager {
     } catch (e) {
       debugPrint('Sync Error: $e');
     } finally {
-      _isSyncing = false;
+      isSyncing = false;
     }
   }
 
@@ -94,8 +105,8 @@ class SyncManager {
   /// This is used when the user manually selects a device to sync from
   /// in the Device Sync page.
   Future<void> syncWithPeer(String ip, int port) async {
-    if (_isSyncing) return;
-    _isSyncing = true;
+    if (isSyncing) return;
+    isSyncing = true;
     final client = SyncHttpClient(
       baseUrl: 'http://$ip:$port',
       authToken: secretToken,
@@ -132,7 +143,11 @@ class SyncManager {
       debugPrint('Manual peer sync error: $e');
       rethrow;
     } finally {
-      _isSyncing = false;
+      isSyncing = false;
     }
+  }
+
+  void dispose() {
+    _statusController.close();
   }
 }

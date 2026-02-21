@@ -44,7 +44,14 @@ class SyncWithPeerTriggered extends SyncEvent {
   final String peerName;
   SyncWithPeerTriggered({required this.ip, required this.port, required this.peerName});
   @override
-  List<Object?> get props => [ip, port];
+  List<Object?> get props => [ip, port, peerName];
+}
+
+class SyncStatusChanged extends SyncEvent {
+  final bool isSyncing;
+  SyncStatusChanged(this.isSyncing);
+  @override
+  List<Object?> get props => [isSyncing];
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -54,6 +61,7 @@ class SyncState extends Equatable {
   final bool isDiscoveryRunning;
   final bool isMaster;
   final bool isServerRunning;
+  final bool isSyncing;
   final DateTime? lastSyncTime;
   final String? statusMessage;
 
@@ -62,6 +70,7 @@ class SyncState extends Equatable {
     this.isDiscoveryRunning = false,
     this.isMaster = false,
     this.isServerRunning = false,
+    this.isSyncing = false,
     this.lastSyncTime,
     this.statusMessage,
   });
@@ -74,6 +83,7 @@ class SyncState extends Equatable {
     bool? isDiscoveryRunning,
     bool? isMaster,
     bool? isServerRunning,
+    bool? isSyncing,
     DateTime? lastSyncTime,
     Object? statusMessage = _keep,
   }) {
@@ -82,6 +92,7 @@ class SyncState extends Equatable {
       isDiscoveryRunning: isDiscoveryRunning ?? this.isDiscoveryRunning,
       isMaster: isMaster ?? this.isMaster,
       isServerRunning: isServerRunning ?? this.isServerRunning,
+      isSyncing: isSyncing ?? this.isSyncing,
       lastSyncTime: lastSyncTime ?? this.lastSyncTime,
       statusMessage: statusMessage == _keep ? this.statusMessage : statusMessage as String?,
     );
@@ -89,7 +100,7 @@ class SyncState extends Equatable {
 
   @override
   List<Object?> get props =>
-      [peers, isDiscoveryRunning, isMaster, isServerRunning, lastSyncTime, statusMessage];
+      [peers, isDiscoveryRunning, isMaster, isServerRunning, isSyncing, lastSyncTime, statusMessage];
 }
 
 // ─── Bloc ─────────────────────────────────────────────────────────────────────
@@ -104,6 +115,7 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
   final _uuid = const Uuid();
 
   StreamSubscription? _peerSubscription;
+  StreamSubscription? _statusSubscription;
 
   SyncBloc({
     required this.discoveryService,
@@ -120,6 +132,7 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     on<SyncPeersUpdated>(_onPeersUpdated);
     on<ManualSyncTriggered>(_onManualSync);
     on<SyncWithPeerTriggered>(_onSyncWithPeer);
+    on<SyncStatusChanged>(_onStatusChanged);
   }
 
   Future<void> _onInitialize(InitializeSync event, Emitter<SyncState> emit) async {
@@ -139,6 +152,11 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     if (isMaster) {
       await syncServer.start(8080);
     }
+
+    _statusSubscription?.cancel();
+    _statusSubscription = syncManager.statusStream.listen((isSyncing) {
+      add(SyncStatusChanged(isSyncing));
+    });
 
     add(StartDiscoveryRequested());
   }
@@ -281,9 +299,14 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     emit(state.copyWith(statusMessage: null));
   }
 
+  void _onStatusChanged(SyncStatusChanged event, Emitter<SyncState> emit) {
+    emit(state.copyWith(isSyncing: event.isSyncing));
+  }
+
   @override
   Future<void> close() {
     _peerSubscription?.cancel();
+    _statusSubscription?.cancel();
     return super.close();
   }
 }

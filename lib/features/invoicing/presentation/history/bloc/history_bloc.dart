@@ -1,6 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'history_state.dart';
 import '../../../domain/usecases/history_usecases.dart';
+import '../../../domain/repositories/invoice_repository.dart';
+import '../../../domain/entities/invoice.dart';
+import '../../../data/repositories/invoice_repository_impl.dart';
 
 class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
   final GetInvoiceHistory getHistory;
@@ -47,6 +50,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         invoices = invoices.where((inv) => inv.paymentMethod == event.paymentMethod).toList();
       }
 
+      if (event.paymentStatus != null && event.paymentStatus != 'All') {
+        invoices = invoices.where((inv) => inv.paymentStatus == event.paymentStatus).toList();
+      }
+
       if (event.staffId != null) {
         invoices = invoices.where((inv) => inv.staffId == event.staffId).toList();
       }
@@ -59,6 +66,7 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         query: event.query, 
         amount: event.amount,
         paymentMethod: event.paymentMethod,
+        paymentStatus: event.paymentStatus,
         staffId: event.staffId,
       ));
     } catch (e) {

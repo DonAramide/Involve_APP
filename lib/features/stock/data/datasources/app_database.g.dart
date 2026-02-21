@@ -1205,6 +1205,22 @@ class $InvoicesTable extends Invoices
   late final GeneratedColumn<String> paymentStatus = GeneratedColumn<String>(
       'payment_status', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _amountPaidMeta =
+      const VerificationMeta('amountPaid');
+  @override
+  late final GeneratedColumn<double> amountPaid = GeneratedColumn<double>(
+      'amount_paid', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _balanceAmountMeta =
+      const VerificationMeta('balanceAmount');
+  @override
+  late final GeneratedColumn<double> balanceAmount = GeneratedColumn<double>(
+      'balance_amount', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   static const VerificationMeta _customerNameMeta =
       const VerificationMeta('customerName');
   @override
@@ -1278,6 +1294,8 @@ class $InvoicesTable extends Invoices
         discountAmount,
         totalAmount,
         paymentStatus,
+        amountPaid,
+        balanceAmount,
         customerName,
         customerAddress,
         paymentMethod,
@@ -1352,6 +1370,18 @@ class $InvoicesTable extends Invoices
     } else if (isInserting) {
       context.missing(_paymentStatusMeta);
     }
+    if (data.containsKey('amount_paid')) {
+      context.handle(
+          _amountPaidMeta,
+          amountPaid.isAcceptableOrUnknown(
+              data['amount_paid']!, _amountPaidMeta));
+    }
+    if (data.containsKey('balance_amount')) {
+      context.handle(
+          _balanceAmountMeta,
+          balanceAmount.isAcceptableOrUnknown(
+              data['balance_amount']!, _balanceAmountMeta));
+    }
     if (data.containsKey('customer_name')) {
       context.handle(
           _customerNameMeta,
@@ -1423,6 +1453,10 @@ class $InvoicesTable extends Invoices
           .read(DriftSqlType.double, data['${effectivePrefix}total_amount'])!,
       paymentStatus: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}payment_status'])!,
+      amountPaid: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}amount_paid'])!,
+      balanceAmount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}balance_amount'])!,
       customerName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}customer_name']),
       customerAddress: attachedDatabase.typeMapping.read(
@@ -1461,6 +1495,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
   final double discountAmount;
   final double totalAmount;
   final String paymentStatus;
+  final double amountPaid;
+  final double balanceAmount;
   final String? customerName;
   final String? customerAddress;
   final String? paymentMethod;
@@ -1480,6 +1516,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       required this.discountAmount,
       required this.totalAmount,
       required this.paymentStatus,
+      required this.amountPaid,
+      required this.balanceAmount,
       this.customerName,
       this.customerAddress,
       this.paymentMethod,
@@ -1501,6 +1539,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
     map['discount_amount'] = Variable<double>(discountAmount);
     map['total_amount'] = Variable<double>(totalAmount);
     map['payment_status'] = Variable<String>(paymentStatus);
+    map['amount_paid'] = Variable<double>(amountPaid);
+    map['balance_amount'] = Variable<double>(balanceAmount);
     if (!nullToAbsent || customerName != null) {
       map['customer_name'] = Variable<String>(customerName);
     }
@@ -1542,6 +1582,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       discountAmount: Value(discountAmount),
       totalAmount: Value(totalAmount),
       paymentStatus: Value(paymentStatus),
+      amountPaid: Value(amountPaid),
+      balanceAmount: Value(balanceAmount),
       customerName: customerName == null && nullToAbsent
           ? const Value.absent()
           : Value(customerName),
@@ -1584,6 +1626,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       discountAmount: serializer.fromJson<double>(json['discountAmount']),
       totalAmount: serializer.fromJson<double>(json['totalAmount']),
       paymentStatus: serializer.fromJson<String>(json['paymentStatus']),
+      amountPaid: serializer.fromJson<double>(json['amountPaid']),
+      balanceAmount: serializer.fromJson<double>(json['balanceAmount']),
       customerName: serializer.fromJson<String?>(json['customerName']),
       customerAddress: serializer.fromJson<String?>(json['customerAddress']),
       paymentMethod: serializer.fromJson<String?>(json['paymentMethod']),
@@ -1608,6 +1652,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       'discountAmount': serializer.toJson<double>(discountAmount),
       'totalAmount': serializer.toJson<double>(totalAmount),
       'paymentStatus': serializer.toJson<String>(paymentStatus),
+      'amountPaid': serializer.toJson<double>(amountPaid),
+      'balanceAmount': serializer.toJson<double>(balanceAmount),
       'customerName': serializer.toJson<String?>(customerName),
       'customerAddress': serializer.toJson<String?>(customerAddress),
       'paymentMethod': serializer.toJson<String?>(paymentMethod),
@@ -1630,6 +1676,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           double? discountAmount,
           double? totalAmount,
           String? paymentStatus,
+          double? amountPaid,
+          double? balanceAmount,
           Value<String?> customerName = const Value.absent(),
           Value<String?> customerAddress = const Value.absent(),
           Value<String?> paymentMethod = const Value.absent(),
@@ -1649,6 +1697,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         discountAmount: discountAmount ?? this.discountAmount,
         totalAmount: totalAmount ?? this.totalAmount,
         paymentStatus: paymentStatus ?? this.paymentStatus,
+        amountPaid: amountPaid ?? this.amountPaid,
+        balanceAmount: balanceAmount ?? this.balanceAmount,
         customerName:
             customerName.present ? customerName.value : this.customerName,
         customerAddress: customerAddress.present
@@ -1682,6 +1732,11 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       paymentStatus: data.paymentStatus.present
           ? data.paymentStatus.value
           : this.paymentStatus,
+      amountPaid:
+          data.amountPaid.present ? data.amountPaid.value : this.amountPaid,
+      balanceAmount: data.balanceAmount.present
+          ? data.balanceAmount.value
+          : this.balanceAmount,
       customerName: data.customerName.present
           ? data.customerName.value
           : this.customerName,
@@ -1712,6 +1767,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ..write('discountAmount: $discountAmount, ')
           ..write('totalAmount: $totalAmount, ')
           ..write('paymentStatus: $paymentStatus, ')
+          ..write('amountPaid: $amountPaid, ')
+          ..write('balanceAmount: $balanceAmount, ')
           ..write('customerName: $customerName, ')
           ..write('customerAddress: $customerAddress, ')
           ..write('paymentMethod: $paymentMethod, ')
@@ -1736,6 +1793,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       discountAmount,
       totalAmount,
       paymentStatus,
+      amountPaid,
+      balanceAmount,
       customerName,
       customerAddress,
       paymentMethod,
@@ -1758,6 +1817,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           other.discountAmount == this.discountAmount &&
           other.totalAmount == this.totalAmount &&
           other.paymentStatus == this.paymentStatus &&
+          other.amountPaid == this.amountPaid &&
+          other.balanceAmount == this.balanceAmount &&
           other.customerName == this.customerName &&
           other.customerAddress == this.customerAddress &&
           other.paymentMethod == this.paymentMethod &&
@@ -1779,6 +1840,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
   final Value<double> discountAmount;
   final Value<double> totalAmount;
   final Value<String> paymentStatus;
+  final Value<double> amountPaid;
+  final Value<double> balanceAmount;
   final Value<String?> customerName;
   final Value<String?> customerAddress;
   final Value<String?> paymentMethod;
@@ -1798,6 +1861,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.discountAmount = const Value.absent(),
     this.totalAmount = const Value.absent(),
     this.paymentStatus = const Value.absent(),
+    this.amountPaid = const Value.absent(),
+    this.balanceAmount = const Value.absent(),
     this.customerName = const Value.absent(),
     this.customerAddress = const Value.absent(),
     this.paymentMethod = const Value.absent(),
@@ -1818,6 +1883,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     required double discountAmount,
     required double totalAmount,
     required String paymentStatus,
+    this.amountPaid = const Value.absent(),
+    this.balanceAmount = const Value.absent(),
     this.customerName = const Value.absent(),
     this.customerAddress = const Value.absent(),
     this.paymentMethod = const Value.absent(),
@@ -1843,6 +1910,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     Expression<double>? discountAmount,
     Expression<double>? totalAmount,
     Expression<String>? paymentStatus,
+    Expression<double>? amountPaid,
+    Expression<double>? balanceAmount,
     Expression<String>? customerName,
     Expression<String>? customerAddress,
     Expression<String>? paymentMethod,
@@ -1863,6 +1932,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       if (discountAmount != null) 'discount_amount': discountAmount,
       if (totalAmount != null) 'total_amount': totalAmount,
       if (paymentStatus != null) 'payment_status': paymentStatus,
+      if (amountPaid != null) 'amount_paid': amountPaid,
+      if (balanceAmount != null) 'balance_amount': balanceAmount,
       if (customerName != null) 'customer_name': customerName,
       if (customerAddress != null) 'customer_address': customerAddress,
       if (paymentMethod != null) 'payment_method': paymentMethod,
@@ -1885,6 +1956,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       Value<double>? discountAmount,
       Value<double>? totalAmount,
       Value<String>? paymentStatus,
+      Value<double>? amountPaid,
+      Value<double>? balanceAmount,
       Value<String?>? customerName,
       Value<String?>? customerAddress,
       Value<String?>? paymentMethod,
@@ -1904,6 +1977,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       discountAmount: discountAmount ?? this.discountAmount,
       totalAmount: totalAmount ?? this.totalAmount,
       paymentStatus: paymentStatus ?? this.paymentStatus,
+      amountPaid: amountPaid ?? this.amountPaid,
+      balanceAmount: balanceAmount ?? this.balanceAmount,
       customerName: customerName ?? this.customerName,
       customerAddress: customerAddress ?? this.customerAddress,
       paymentMethod: paymentMethod ?? this.paymentMethod,
@@ -1943,6 +2018,12 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     }
     if (paymentStatus.present) {
       map['payment_status'] = Variable<String>(paymentStatus.value);
+    }
+    if (amountPaid.present) {
+      map['amount_paid'] = Variable<double>(amountPaid.value);
+    }
+    if (balanceAmount.present) {
+      map['balance_amount'] = Variable<double>(balanceAmount.value);
     }
     if (customerName.present) {
       map['customer_name'] = Variable<String>(customerName.value);
@@ -1988,6 +2069,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
           ..write('discountAmount: $discountAmount, ')
           ..write('totalAmount: $totalAmount, ')
           ..write('paymentStatus: $paymentStatus, ')
+          ..write('amountPaid: $amountPaid, ')
+          ..write('balanceAmount: $balanceAmount, ')
           ..write('customerName: $customerName, ')
           ..write('customerAddress: $customerAddress, ')
           ..write('paymentMethod: $paymentMethod, ')
@@ -6264,6 +6347,8 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   required double discountAmount,
   required double totalAmount,
   required String paymentStatus,
+  Value<double> amountPaid,
+  Value<double> balanceAmount,
   Value<String?> customerName,
   Value<String?> customerAddress,
   Value<String?> paymentMethod,
@@ -6284,6 +6369,8 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<double> discountAmount,
   Value<double> totalAmount,
   Value<String> paymentStatus,
+  Value<double> amountPaid,
+  Value<double> balanceAmount,
   Value<String?> customerName,
   Value<String?> customerAddress,
   Value<String?> paymentMethod,
@@ -6349,6 +6436,12 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<String> get paymentStatus => $composableBuilder(
       column: $table.paymentStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get amountPaid => $composableBuilder(
+      column: $table.amountPaid, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get balanceAmount => $composableBuilder(
+      column: $table.balanceAmount, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get customerName => $composableBuilder(
       column: $table.customerName, builder: (column) => ColumnFilters(column));
@@ -6439,6 +6532,13 @@ class $$InvoicesTableOrderingComposer
       column: $table.paymentStatus,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get amountPaid => $composableBuilder(
+      column: $table.amountPaid, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get balanceAmount => $composableBuilder(
+      column: $table.balanceAmount,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get customerName => $composableBuilder(
       column: $table.customerName,
       builder: (column) => ColumnOrderings(column));
@@ -6505,6 +6605,12 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<String> get paymentStatus => $composableBuilder(
       column: $table.paymentStatus, builder: (column) => column);
+
+  GeneratedColumn<double> get amountPaid => $composableBuilder(
+      column: $table.amountPaid, builder: (column) => column);
+
+  GeneratedColumn<double> get balanceAmount => $composableBuilder(
+      column: $table.balanceAmount, builder: (column) => column);
 
   GeneratedColumn<String> get customerName => $composableBuilder(
       column: $table.customerName, builder: (column) => column);
@@ -6589,6 +6695,8 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<double> discountAmount = const Value.absent(),
             Value<double> totalAmount = const Value.absent(),
             Value<String> paymentStatus = const Value.absent(),
+            Value<double> amountPaid = const Value.absent(),
+            Value<double> balanceAmount = const Value.absent(),
             Value<String?> customerName = const Value.absent(),
             Value<String?> customerAddress = const Value.absent(),
             Value<String?> paymentMethod = const Value.absent(),
@@ -6609,6 +6717,8 @@ class $$InvoicesTableTableManager extends RootTableManager<
             discountAmount: discountAmount,
             totalAmount: totalAmount,
             paymentStatus: paymentStatus,
+            amountPaid: amountPaid,
+            balanceAmount: balanceAmount,
             customerName: customerName,
             customerAddress: customerAddress,
             paymentMethod: paymentMethod,
@@ -6629,6 +6739,8 @@ class $$InvoicesTableTableManager extends RootTableManager<
             required double discountAmount,
             required double totalAmount,
             required String paymentStatus,
+            Value<double> amountPaid = const Value.absent(),
+            Value<double> balanceAmount = const Value.absent(),
             Value<String?> customerName = const Value.absent(),
             Value<String?> customerAddress = const Value.absent(),
             Value<String?> paymentMethod = const Value.absent(),
@@ -6649,6 +6761,8 @@ class $$InvoicesTableTableManager extends RootTableManager<
             discountAmount: discountAmount,
             totalAmount: totalAmount,
             paymentStatus: paymentStatus,
+            amountPaid: amountPaid,
+            balanceAmount: balanceAmount,
             customerName: customerName,
             customerAddress: customerAddress,
             paymentMethod: paymentMethod,
