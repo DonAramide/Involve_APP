@@ -13,6 +13,7 @@ class StorageService {
   static const _businessLockedKey = 'is_business_locked';
   static const _lastPrinterIpKey = 'last_printer_ip';
   static const _proExpiryKey = 'pro_plan_expiry';
+  static const _deviceAccessKey = 'device_admin_access_granted';
   static const _licenseFileName = 'license.dat';
 
   // Desktop simple encryption key (could be improved)
@@ -214,5 +215,34 @@ class StorageService {
       }
     }
     return dateStr != null ? DateTime.tryParse(dateStr) : null;
+  }
+
+  static Future<void> setDeviceAccessGranted(bool granted) async {
+    final value = granted ? 'true' : 'false';
+    if (kIsWeb) {
+      await _secureStorage.write(key: _deviceAccessKey, value: value);
+      return;
+    }
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _deviceAccessKey, value: value);
+    } else {
+      final file = await _getDesktopFile('admin_access.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<bool> isDeviceAccessGranted() async {
+    String? value;
+    if (kIsWeb) {
+      value = await _secureStorage.read(key: _deviceAccessKey);
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _deviceAccessKey);
+    } else {
+      final file = await _getDesktopFile('admin_access.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    return value == 'true';
   }
 }

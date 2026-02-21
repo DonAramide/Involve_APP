@@ -40,7 +40,23 @@ class _HelpPageState extends State<HelpPage> {
     });
   }
 
-  void _showSuperAdminAccess() {
+  Future<void> _showSuperAdminAccess() async {
+    final bool alreadyGranted = await StorageService.isDeviceAccessGranted();
+    
+    if (!alreadyGranted && mounted) {
+      final bool? deviceAccess = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const DeviceAccessDialog(),
+      );
+      
+      if (deviceAccess != true) return;
+      
+      await StorageService.setDeviceAccessGranted(true);
+    }
+
+    if (!mounted) return;
+
     showDialog<bool>(
       context: context,
       barrierDismissible: false,
