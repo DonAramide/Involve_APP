@@ -107,7 +107,7 @@ class _HelpPageState extends State<HelpPage> {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Version 1.0.0',
+                  'Version 1.4.3',
                   style: TextStyle(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 8),
@@ -149,12 +149,20 @@ class _HelpPageState extends State<HelpPage> {
                 '• If connection fails, try restarting the printer.',
           ),
           _buildExpansionTile(
+            icon: Icons.people,
+            title: 'Staff & Accountability',
+            content: '• Setup staff members in Settings > Manage Staff.\n'
+                '• Protect your identity with a 4-digit Staff PIN.\n'
+                '• Accountability: Every sale is linked to the active staff.\n'
+                '• Auto-Lock: System locks after 6 failed PIN attempts.',
+          ),
+          _buildExpansionTile(
             icon: Icons.settings,
             title: 'Settings & Security',
             content: '• Default System Password: "admin123"\n'
-                '• Set a Super Admin password for critical changes.\n'
-                '• Customize your Company Logo and Currency.\n'
-                '• Toggle Dark/Light mode from the Dashboard.',
+                '• Super Admin: Advanced access for critical business changes.\n'
+                '• Device Security: One-time "Device Access" PIN required for new machines.\n'
+                '• Data Backup: Export all business records to device storage (Android/Desktop).',
           ),
           
           const SizedBox(height: 32),
