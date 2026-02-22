@@ -21,6 +21,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<UpdateCustomerInfo>(_onUpdateCustomer);
     on<UpdatePaymentMethod>(_onUpdatePaymentMethod);
     on<UpdateStaffInfo>(_onUpdateStaff);
+    on<UpdateItemPrintPrice>(_onUpdateItemPrintPrice);
   }
 
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
@@ -64,6 +65,16 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     _emitUpdatedState(state.items, event.discount, emit);
   }
 
+  void _onUpdateItemPrintPrice(UpdateItemPrintPrice event, Emitter<InvoiceState> emit) {
+    final updatedItems = state.items.map((item) {
+      if (item.item.id == event.itemId) {
+        return item.copyWith(printPrice: event.printPrice);
+      }
+      return item;
+    }).toList();
+    _emitUpdatedState(updatedItems, state.discount, emit);
+  }
+
   Future<void> _onSaveInvoice(SaveInvoice event, Emitter<InvoiceState> emit) async {
     emit(state.copyWith(isSaving: true));
     try {
@@ -83,6 +94,13 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         }
       }
 
+      final totalPrintAmount = calculationService.calculateTotalPrintAmount(
+        state.items, 
+        state.taxRate, 
+        state.taxEnabled, 
+        state.discount,
+      );
+
       final invoice = Invoice(
         invoiceNumber: event.invoiceNumber ?? calculationService.generateInvoiceNumber(),
         dateCreated: DateTime.now(),
@@ -99,6 +117,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         paymentMethod: state.paymentMethod,
         staffId: state.staffId,
         staffName: state.staffName,
+        totalPrintAmount: totalPrintAmount,
       );
 
       await repository.saveInvoice(invoice);

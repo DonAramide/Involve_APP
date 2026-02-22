@@ -24,6 +24,14 @@ class RemoveItemFromInvoice extends InvoiceEvent {
   List<Object?> get props => [item];
 }
 
+class UpdateItemPrintPrice extends InvoiceEvent {
+  final int itemId;
+  final double? printPrice;
+  UpdateItemPrintPrice(this.itemId, this.printPrice);
+  @override
+  List<Object?> get props => [itemId, printPrice];
+}
+
 class UpdateDiscount extends InvoiceEvent {
   final double discount;
   UpdateDiscount(this.discount);

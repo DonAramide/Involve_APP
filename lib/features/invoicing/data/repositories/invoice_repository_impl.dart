@@ -41,6 +41,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               createdAt: Value(invoice.dateCreated),
               deviceId: Value(deviceId),
               isDeleted: const Value(false),
+              totalPrintAmount: Value(invoice.totalPrintAmount),
             ),
           );
 
@@ -58,6 +59,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
                 createdAt: Value(now),
                 deviceId: Value(deviceId),
                 isDeleted: const Value(false),
+                printPrice: Value(item.printPrice),
               ),
             );
 
@@ -133,6 +135,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           type: invoiceItemData.type,
           serviceMeta: invoiceItemData.serviceMeta,
           syncId: invoiceItemData.syncId,
+          printPrice: invoiceItemData.printPrice,
         );
       }).toList();
 
@@ -154,6 +157,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         staffId: row.staffId,
         staffName: row.staffName,
         syncId: row.syncId,
+        totalPrintAmount: row.totalPrintAmount,
       ));
     }
     return result;

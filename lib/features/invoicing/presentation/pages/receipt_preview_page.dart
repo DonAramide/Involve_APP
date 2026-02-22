@@ -16,23 +16,37 @@ import '../../../settings/domain/entities/settings.dart';
 
 class ReceiptPreviewPage extends StatelessWidget {
   final Invoice invoice;
+  final bool? useCustomPrices;
 
-  const ReceiptPreviewPage({super.key, required this.invoice});
+  const ReceiptPreviewPage({super.key, required this.invoice, this.useCustomPrices});
 
   @override
   Widget build(BuildContext context) {
     final settings = context.read<SettingsBloc>().state.settings;
     if (settings == null) return const Scaffold(body: Center(child: Text('Settings not loaded')));
 
+    final bool actualUseCustom = useCustomPrices ?? settings.customReceiptPricingEnabled;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Receipt Preview'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Receipt Preview'),
+            if (actualUseCustom && invoice.totalPrintAmount != null)
+              Text(
+                'Using Custom Receipt Prices', 
+                style: TextStyle(fontSize: 12, color: Colors.blue[100]),
+              ),
+          ],
+        ),
         actions: [
           // Thermal Print Action
           IconButton(
             icon: const Icon(Icons.print),
             tooltip: 'Thermal Print',
-            onPressed: () => _printThermal(context, invoice),
+            onPressed: () => _printThermal(context, invoice, actualUseCustom),
           ),
         ],
       ),
@@ -40,6 +54,7 @@ class ReceiptPreviewPage extends StatelessWidget {
         build: (format) => ReceiptService().generateReceiptPdf(
           invoice, 
           settings,
+          useCustomPricesOverride: actualUseCustom,
         ),
         pdfFileName: 'Invoice-${invoice.id}.pdf',
       ),
@@ -50,7 +65,7 @@ class ReceiptPreviewPage extends StatelessWidget {
     await Printing.sharePdf(bytes: bytes, filename: 'Invoice-${invoice.id}.pdf');
   }
 
-  Future<void> _printThermal(BuildContext context, Invoice invoice) async {
+  Future<void> _printThermal(BuildContext context, Invoice invoice, bool useCustomPrices) async {
     final printerBloc = context.read<PrinterBloc>();
     final settings = context.read<SettingsBloc>().state.settings;
 
@@ -75,7 +90,12 @@ class ReceiptPreviewPage extends StatelessWidget {
         template = CompactInvoiceTemplate();
       }
       
-      final commands = template.generateCommands(invoice, settings!);
+      // We pass a modified settings object if we want to force a specific price mode
+      final printSettings = settings!.copyWith(
+        customReceiptPricingEnabled: useCustomPrices,
+      );
+      
+      final commands = template.generateCommands(invoice, printSettings);
       
       printerBloc.add(PrintCommandsEvent(commands, 58)); 
       

@@ -28,6 +28,24 @@ class DeleteItem {
   Future<void> call(int id) => repository.deleteItem(id);
 }
 
+class IncreaseStock {
+  final ItemRepository repository;
+  IncreaseStock(this.repository);
+  Future<void> call(int itemId, int quantity, String? remarks) => repository.increaseStock(itemId, quantity, remarks);
+}
+
+class GetStockHistory {
+  final ItemRepository repository;
+  GetStockHistory(this.repository);
+  Future<List<StockHistoryEntry>> call(int itemId) => repository.getStockHistory(itemId);
+}
+
+class GetInventoryReport {
+  final ItemRepository repository;
+  GetInventoryReport(this.repository);
+  Future<List<Map<String, dynamic>>> call({DateTime? start, DateTime? end}) => repository.getInventoryReport(start: start, end: end);
+}
+
 // Category Use Cases
 class GetCategories {
   final CategoryRepository repository;

@@ -14,7 +14,8 @@ import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart
 import 'package:involve_app/features/settings/domain/entities/staff.dart';
 import '../../pages/receipt_preview_page.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
-import '../../../domain/services/report_generator.dart' as reports hide DateTimeRange;
+import 'package:involve_app/features/invoicing/domain/services/report_generator.dart' as reports hide DateTimeRange;
+import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
 import 'report_preview_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -286,7 +287,22 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ExpansionTile(
-        title: Text('${invoice.invoiceNumber}'),
+        title: Row(
+          children: [
+            Text('${invoice.invoiceNumber}'),
+            if (invoice.customerName != null) ...[
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  invoice.customerName!,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+            ],
+          ],
+        ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -294,6 +310,11 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             Row(
               children: [
                 Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
+                if (context.read<SettingsBloc>().state.settings?.customReceiptPricingEnabled == true && invoice.totalPrintAmount != null)
+                  Text(
+                    'Printed Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalPrintAmount!, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}',
+                    style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
                 const SizedBox(width: 8),
                 _buildStatusBadge(invoice.paymentStatus),
               ],
@@ -304,6 +325,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           ...invoice.items.map((item) => ListTile(
                 dense: true,
                 title: Text(item.item.name),
+                subtitle: item.printPrice != null 
+                  ? Text('Receipt Price: ${CurrencyFormatter.formatWithSymbol(item.printPrice!, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}', 
+                    style: TextStyle(fontSize: 11, color: Colors.blue[700]))
+                  : null,
                 trailing: Text('${item.quantity} x ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
               )),
           const Divider(),
@@ -348,18 +373,21 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           child: DataTable(
             columnSpacing: 24,
             horizontalMargin: 8,
-            columns: const [
+            columns: [
               DataColumn(label: Text('Invoice ID', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Method', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+              if (context.read<SettingsBloc>().state.settings?.customReceiptPricingEnabled == true)
+                DataColumn(label: Text('Printed', style: TextStyle(fontWeight: FontWeight.bold))),
             ],
             rows: state.invoices.map((invoice) {
               return DataRow(
                 cells: [
                   DataCell(Text(invoice.invoiceNumber, style: const TextStyle(fontSize: 12))),
                   DataCell(Text(invoice.dateCreated.toString().split(' ')[0], style: const TextStyle(fontSize: 12))),
+                  DataCell(Text(invoice.customerName ?? '-', style: const TextStyle(fontSize: 12))),
                   DataCell(
                     Row(
                       mainAxisSize: MainAxisSize.min,
@@ -371,6 +399,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     ),
                   ),
                   DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                  if (context.read<SettingsBloc>().state.settings?.customReceiptPricingEnabled == true)
+                    DataCell(Text(
+                      invoice.totalPrintAmount != null 
+                        ? CurrencyFormatter.formatWithSymbol(invoice.totalPrintAmount!, symbol: currency)
+                        : '-',
+                      style: TextStyle(fontSize: 12, color: Colors.blue[700]),
+                    )),
                 ],
                 onSelectChanged: (selected) {
                   if (selected == true) {
@@ -439,18 +474,47 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     final settings = settingsState.settings;
     
     if (settings != null) {
-      // Logic to reprint using existing printer bloc and template engine
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ReceiptPreviewPage(invoice: invoice),
-        ),
-      );
+      if (settings.customReceiptPricingEnabled == true && invoice.totalPrintAmount != null) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Reprint Pricing'),
+            content: const Text('Which pricing would you like to use for this receipt?'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _navigateToPreview(context, invoice, useCustom: false);
+                },
+                child: const Text('ACTUAL PRICE'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _navigateToPreview(context, invoice, useCustom: true);
+                },
+                child: const Text('CUSTOM RECEIPT PRICE'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      _navigateToPreview(context, invoice);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Settings not loaded. Cannot print.')),
       );
     }
+  }
+
+  void _navigateToPreview(BuildContext context, Invoice invoice, {bool? useCustom}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReceiptPreviewPage(invoice: invoice, useCustomPrices: useCustom),
+      ),
+    );
   }
 
   void _exportReport(BuildContext context) async {
@@ -476,7 +540,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               invoices: historyState.invoices,
               settings: settingsState.settings!,
               dateRange: _selectedRange != null 
-                ? reports.ReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
+                ? InvReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
                 : null,
             ),
           ),

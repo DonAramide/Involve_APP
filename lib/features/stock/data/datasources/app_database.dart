@@ -11,12 +11,12 @@ import 'package:involve_app/core/license/license_history_table.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Items, Invoices, InvoiceItems, Settings, Categories, LicenseHistory, Staff, SyncMeta])
+@DriftDatabase(tables: [Items, Invoices, InvoiceItems, Settings, Categories, LicenseHistory, Staff, SyncMeta, StockIncrements])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration {
@@ -157,8 +157,23 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 22) {
           // Partial Payments Architecture
-          await _safeAddColumn(m, invoices, invoices.amountPaid);
           await _safeAddColumn(m, invoices, invoices.balanceAmount);
+        }
+        if (from < 23) {
+          // Stock Alerts & History
+          await _safeAddColumn(m, items, items.minStockQty);
+          await _safeCreateTable(m, stockIncrements);
+        }
+        if (from < 24) {
+          // Stock History Before/After
+          await _safeAddColumn(m, stockIncrements, stockIncrements.quantityBefore);
+          await _safeAddColumn(m, stockIncrements, stockIncrements.quantityAfter);
+        }
+        if (from < 25) {
+          // Custom Receipt Pricing Migration
+          await _safeAddColumn(m, settings, settings.customReceiptPricingEnabled);
+          await _safeAddColumn(m, invoices, invoices.totalPrintAmount);
+          await _safeAddColumn(m, invoiceItems, invoiceItems.printPrice);
         }
       },
       beforeOpen: (details) async {

@@ -13,6 +13,11 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   final AddNewCategory addCategory;
   final DeleteCategoryUseCase deleteCategory;
 
+  // Stock Management Use Cases
+  final IncreaseStock increaseStock;
+  final GetStockHistory getStockHistory;
+  final GetInventoryReport getInventoryReport;
+
   StockBloc({
     required this.getItems,
     required this.addItem,
@@ -21,11 +26,17 @@ class StockBloc extends Bloc<StockEvent, StockState> {
     required this.getCategories,
     required this.addCategory,
     required this.deleteCategory,
+    required this.increaseStock,
+    required this.getStockHistory,
+    required this.getInventoryReport,
   }) : super(StockInitial()) {
     on<LoadItems>(_onLoadItems);
     on<AddStockItem>(_onAddStockItem);
     on<UpdateStockItem>(_onUpdateStockItem);
     on<DeleteStockItem>(_onDeleteStockItem);
+    on<StockIncrementRequested>(_onStockIncrementRequested);
+    on<LoadStockHistoryRequested>(_onLoadStockHistoryRequested);
+    on<LoadInventoryReportRequested>(_onLoadInventoryReportRequested);
     
     // Category Handlers
     on<LoadCategories>(_onLoadCategories);
@@ -34,13 +45,13 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   }
 
   Future<void> _onLoadItems(LoadItems event, Emitter<StockState> emit) async {
-    emit(StockLoading());
+    emit(StockLoading(items: state.items, categories: state.categories));
     try {
       final items = await getItems();
-      final categories = await getCategories(); // Load categories too
+      final categories = await getCategories();
       emit(StockLoaded(items, categories: categories));
     } catch (e) {
-      emit(StockError('Failed to load data: ${e.toString()}'));
+      emit(StockError('Failed to load data: ${e.toString()}', items: state.items, categories: state.categories));
     }
   }
 
@@ -49,7 +60,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       await addItem(event.item);
       add(LoadItems());
     } catch (e) {
-      emit(StockError('Failed to add item: ${e.toString()}'));
+      emit(StockError('Failed to add item: ${e.toString()}', items: state.items, categories: state.categories));
     }
   }
 
@@ -58,7 +69,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       await updateItem(event.item);
       add(LoadItems());
     } catch (e) {
-      emit(StockError('Failed to update item: ${e.toString()}'));
+      emit(StockError('Failed to update item: ${e.toString()}', items: state.items, categories: state.categories));
     }
   }
 
@@ -67,22 +78,49 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       await deleteItem(event.id);
       add(LoadItems());
     } catch (e) {
-      emit(StockError('Failed to delete item: ${e.toString()}'));
+      emit(StockError('Failed to delete item: ${e.toString()}', items: state.items, categories: state.categories));
+    }
+  }
+
+  Future<void> _onStockIncrementRequested(StockIncrementRequested event, Emitter<StockState> emit) async {
+    try {
+      await increaseStock(event.itemId, event.quantity, event.remarks);
+      add(LoadItems());
+    } catch (e) {
+      emit(StockError('Failed to increase stock: ${e.toString()}', items: state.items, categories: state.categories));
+    }
+  }
+
+  Future<void> _onLoadStockHistoryRequested(LoadStockHistoryRequested event, Emitter<StockState> emit) async {
+    emit(StockLoading(items: state.items, categories: state.categories));
+    try {
+      final history = await getStockHistory(event.itemId);
+      emit(StockHistoryLoaded(history, items: state.items, categories: state.categories));
+    } catch (e) {
+      emit(StockError('Failed to load history: ${e.toString()}', items: state.items, categories: state.categories));
+    }
+  }
+
+  Future<void> _onLoadInventoryReportRequested(LoadInventoryReportRequested event, Emitter<StockState> emit) async {
+    emit(StockLoading(items: state.items, categories: state.categories));
+    try {
+      final report = await getInventoryReport(start: event.start, end: event.end);
+      emit(InventoryReportLoaded(report, items: state.items, categories: state.categories));
+    } catch (e) {
+      emit(StockError('Failed to load report: ${e.toString()}', items: state.items, categories: state.categories));
     }
   }
 
   Future<void> _onLoadCategories(LoadCategories event, Emitter<StockState> emit) async {
-    // Only reload categories if already loaded to avoid full screen loading flicker
-    if (state is StockLoaded) {
-      final currentItems = (state as StockLoaded).items;
-      try {
-        final categories = await getCategories();
-        emit(StockLoaded(currentItems, categories: categories));
-      } catch (e) {
-        // Silent fail or snackbar? For now keep state
+    try {
+      final categories = await getCategories();
+      if (state is StockLoaded) {
+        emit((state as StockLoaded).copyWith(categories: categories));
+      } else {
+        emit(StockLoaded(state.items, categories: categories));
       }
-    } else {
-      add(LoadItems()); // Fallback to full load
+    } catch (e) {
+      // Silent fail
     }
   }
 
@@ -91,7 +129,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       await addCategory(event.name);
       add(LoadCategories());
     } catch (e) {
-      emit(StockError('Failed to add category: ${e.toString()}'));
+      emit(StockError('Failed to add category: ${e.toString()}', items: state.items, categories: state.categories));
     }
   }
 
@@ -100,7 +138,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       await deleteCategory(event.id);
       add(LoadCategories());
     } catch (e) {
-      emit(StockError('Failed to delete category: ${e.toString()}'));
+      emit(StockError('Failed to delete category: ${e.toString()}', items: state.items, categories: state.categories));
     }
   }
 }

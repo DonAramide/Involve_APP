@@ -47,4 +47,5 @@ class Settings extends Table {
   IntColumn get halfDayStartHour => integer().withDefault(const Constant(6))();
   IntColumn get halfDayEndHour => integer().withDefault(const Constant(18))();
   BoolColumn get showSyncStatus => boolean().withDefault(const Constant(true))();
+  BoolColumn get customReceiptPricingEnabled => boolean().withDefault(const Constant(false))();
 }

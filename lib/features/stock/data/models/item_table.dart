@@ -8,7 +8,8 @@ class Items extends Table {
   TextColumn get category => text()(); // String representation of ItemCategory enum
   RealColumn get price => real()();
   IntColumn get stockQty => integer().withDefault(const Constant(0))();
-  
+  RealColumn get minStockQty => real().withDefault(const Constant(0.0))();
+
   // Phase 2: New Columns
   BlobColumn get image => blob().nullable()();
   IntColumn get categoryId => integer().nullable().references(Categories, #id)(); // Optional FK
@@ -19,6 +20,24 @@ class Items extends Table {
   TextColumn get serviceCategory => text().nullable()(); // 'Hotel', 'Lounge', etc.
   BoolColumn get requiresTimeTracking => boolean().withDefault(const Constant(false))();
 
+  // Sync Columns
+  TextColumn get syncId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get deviceId => text().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+}
+
+@DataClassName('StockIncrementTable')
+class StockIncrements extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get itemId => integer().references(Items, #id)();
+  IntColumn get quantityAdded => integer()();
+  IntColumn get quantityBefore => integer().withDefault(const Constant(0))();
+  IntColumn get quantityAfter => integer().withDefault(const Constant(0))();
+  DateTimeColumn get dateAdded => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get remarks => text().nullable()();
+  
   // Sync Columns
   TextColumn get syncId => text().nullable()();
   DateTimeColumn get updatedAt => dateTime().nullable()();

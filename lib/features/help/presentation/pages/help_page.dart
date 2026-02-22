@@ -138,7 +138,8 @@ class _HelpPageState extends State<HelpPage> {
                 '• Tap items to add them to the cart.\n'
                 '• Use the category chips to filter items.\n'
                 '• Swipe left on a cart item to remove it.\n'
-                '• Tap "Charge" to finalize and print.',
+                '• Tap "Charge" to finalize.\n'
+                '• Partial Payments: Enter "Amount Received" during checkout. The system will track the balance for later.',
           ),
           _buildExpansionTile(
             icon: Icons.print,
@@ -154,15 +155,15 @@ class _HelpPageState extends State<HelpPage> {
             content: '• Setup staff members in Settings > Manage Staff.\n'
                 '• Protect your identity with a 4-digit Staff PIN.\n'
                 '• Accountability: Every sale is linked to the active staff.\n'
-                '• Auto-Lock: System locks after 6 failed PIN attempts.',
+                '• Filters: Use the "Status" filter in History to isolate Paid, Partial, or Unpaid invoices.',
           ),
           _buildExpansionTile(
             icon: Icons.settings,
             title: 'Settings & Security',
-            content: '• Default System Password: "admin123"\n'
+            content: '• Device Sync: The App Bar icon spins green during active data exchange.\n'
+                '• Data Backup: Export all business records to device storage (Android/Desktop).\n'
                 '• Super Admin: Advanced access for critical business changes.\n'
-                '• Device Security: One-time "Device Access" PIN required for new machines.\n'
-                '• Data Backup: Export all business records to device storage (Android/Desktop).',
+                '• Security: One-time "Device Access" PIN required for new machines.',
           ),
           
           const SizedBox(height: 32),

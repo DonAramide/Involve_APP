@@ -10,9 +10,10 @@ import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class ReceiptService {
-  Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings) async {
+  Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride}) async {
     final pdf = pw.Document();
     final template = settings.defaultInvoiceTemplate;
+    final bool useCustomPrices = useCustomPricesOverride ?? settings.customReceiptPricingEnabled;
 
     // Decode logo if available
     pw.ImageProvider? logoImage;
@@ -25,13 +26,13 @@ class ReceiptService {
     }
 
     if (template == 'classic') {
-      return _generateClassicA4(pdf, invoice, settings, logoImage);
+      return _generateClassicA4(pdf, invoice, settings, logoImage, useCustomPrices);
     }
 
-    return _generateThermalRoll(pdf, invoice, settings, logoImage);
+    return _generateThermalRoll(pdf, invoice, settings, logoImage, useCustomPrices);
   }
 
-  Future<Uint8List> _generateThermalRoll(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage) async {
+  Future<Uint8List> _generateThermalRoll(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices) async {
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 
     pdf.addPage(
@@ -85,11 +86,15 @@ class ReceiptService {
                      if (item.type == 'service' && item.serviceMeta != null) {
                        itemName += '\n${_getServiceDateRange(item.serviceMeta)}';
                      }
+                     final usePrint = useCustomPrices && item.printPrice != null;
+                     final unitPrice = usePrint ? item.printPrice! : item.unitPrice;
+                     final total = usePrint ? item.totalPrint : item.total;
+
                      return pw.TableRow(
                        children: [
                          pw.Text(itemName),
-                         pw.Text('${item.quantity} x ${CurrencyFormatter.format(item.unitPrice)}', textAlign: pw.TextAlign.center),
-                         pw.Text(CurrencyFormatter.format(item.quantity * item.unitPrice), textAlign: pw.TextAlign.right),
+                         pw.Text('${item.quantity} x ${CurrencyFormatter.format(unitPrice)}', textAlign: pw.TextAlign.center),
+                         pw.Text(CurrencyFormatter.format(total), textAlign: pw.TextAlign.right),
                        ]
                      );
                    }).toList(),
@@ -125,7 +130,7 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text('TOTAL', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                  pw.Text('${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', 
+                  pw.Text('${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', 
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
               ),
@@ -142,7 +147,7 @@ class ReceiptService {
     return pdf.save();
   }
 
-  Future<Uint8List> _generateClassicA4(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage) async {
+  Future<Uint8List> _generateClassicA4(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices) async {
     final dateFormat = DateFormat('dd MMMM, yyyy');
 
     pdf.addPage(
@@ -228,12 +233,16 @@ class ReceiptService {
                     if (item.type == 'service' && item.serviceMeta != null) {
                       itemName += '\n${_getServiceDateRange(item.serviceMeta)}';
                     }
+                    final usePrint = useCustomPrices && item.printPrice != null;
+                    final unitPrice = usePrint ? item.printPrice! : item.unitPrice;
+                    final total = usePrint ? item.totalPrint : item.total;
+
                     return pw.TableRow(
                       children: [
                         _tableCell(item.quantity.toString(), align: pw.Alignment.center),
                         _tableCell(itemName),
-                        _tableCell(CurrencyFormatter.format(item.unitPrice), align: pw.Alignment.centerRight),
-                        _tableCell(CurrencyFormatter.format(item.total), align: pw.Alignment.centerRight),
+                        _tableCell(CurrencyFormatter.format(unitPrice), align: pw.Alignment.centerRight),
+                        _tableCell(CurrencyFormatter.format(total), align: pw.Alignment.centerRight),
                       ],
                     );
                   }).toList(),
@@ -254,7 +263,7 @@ class ReceiptService {
                           _summaryRow('SALES TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%)', CurrencyFormatter.format(invoice.taxAmount)),
                         if (invoice.discountAmount > 0)
                           _summaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}'),
-                        _summaryRow('TOTAL DUE', '${settings.currency} ${CurrencyFormatter.format(invoice.totalAmount)}', isBold: true),
+                        _summaryRow('TOTAL DUE', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
                       ],
                     ),
                   ),

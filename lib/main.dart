@@ -95,6 +95,9 @@ void main() async {
   final addItem = AddItem(itemRepository);
   final updateItem = UpdateItem(itemRepository);
   final deleteItem = DeleteItem(itemRepository);
+  final increaseStock = IncreaseStock(itemRepository);
+  final getStockHistory = GetStockHistory(itemRepository);
+  final getInventoryReport = GetInventoryReport(itemRepository);
 
   // Category Use Cases
   final getCategories = GetCategories(categoryRepository);
@@ -130,6 +133,9 @@ void main() async {
     printInvoice: printInvoice,
     getInvoiceHistory: getInvoiceHistory,
     getInvoiceDetails: getInvoiceDetails,
+    increaseStock: increaseStock,
+    getStockHistory: getStockHistory,
+    getInventoryReport: getInventoryReport,
     staffRepository: staffRepository,
     syncRepository: syncRepository,
     discoveryService: discoveryService,
@@ -164,6 +170,9 @@ class MyApp extends StatelessWidget {
   final PrintInvoiceCommands printInvoice;
   final GetInvoiceHistory getInvoiceHistory;
   final GetInvoiceDetails getInvoiceDetails;
+  final IncreaseStock increaseStock;
+  final GetStockHistory getStockHistory;
+  final GetInventoryReport getInventoryReport;
   final StaffRepositoryImpl staffRepository;
   final SyncRepository syncRepository;
   final DiscoveryService discoveryService;
@@ -194,6 +203,9 @@ class MyApp extends StatelessWidget {
     required this.printInvoice,
     required this.getInvoiceHistory,
     required this.getInvoiceDetails,
+    required this.increaseStock,
+    required this.getStockHistory,
+    required this.getInventoryReport,
     required this.staffRepository,
     required this.syncRepository,
     required this.discoveryService,
@@ -215,6 +227,9 @@ class MyApp extends StatelessWidget {
             getCategories: getCategories,
             addCategory: addCategory,
             deleteCategory: deleteCategory,
+            increaseStock: increaseStock,
+            getStockHistory: getStockHistory,
+            getInventoryReport: getInventoryReport,
           )..add(LoadItems()),
         ),
         BlocProvider(

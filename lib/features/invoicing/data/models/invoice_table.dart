@@ -27,6 +27,7 @@ class Invoices extends Table {
   DateTimeColumn get createdAt => dateTime().nullable()();
   TextColumn get deviceId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+  RealColumn get totalPrintAmount => real().nullable()();
 }
 
 @DataClassName('InvoiceItemTable')
@@ -47,4 +48,5 @@ class InvoiceItems extends Table {
   DateTimeColumn get createdAt => dateTime().nullable()();
   TextColumn get deviceId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+  RealColumn get printPrice => real().nullable()();
 }

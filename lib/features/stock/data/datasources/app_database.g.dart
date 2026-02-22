@@ -424,6 +424,14 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _minStockQtyMeta =
+      const VerificationMeta('minStockQty');
+  @override
+  late final GeneratedColumn<double> minStockQty = GeneratedColumn<double>(
+      'min_stock_qty', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   static const VerificationMeta _imageMeta = const VerificationMeta('image');
   @override
   late final GeneratedColumn<Uint8List> image = GeneratedColumn<Uint8List>(
@@ -507,6 +515,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
         category,
         price,
         stockQty,
+        minStockQty,
         image,
         categoryId,
         type,
@@ -553,6 +562,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
     if (data.containsKey('stock_qty')) {
       context.handle(_stockQtyMeta,
           stockQty.isAcceptableOrUnknown(data['stock_qty']!, _stockQtyMeta));
+    }
+    if (data.containsKey('min_stock_qty')) {
+      context.handle(
+          _minStockQtyMeta,
+          minStockQty.isAcceptableOrUnknown(
+              data['min_stock_qty']!, _minStockQtyMeta));
     }
     if (data.containsKey('image')) {
       context.handle(
@@ -625,6 +640,8 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
           .read(DriftSqlType.double, data['${effectivePrefix}price'])!,
       stockQty: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}stock_qty'])!,
+      minStockQty: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}min_stock_qty'])!,
       image: attachedDatabase.typeMapping
           .read(DriftSqlType.blob, data['${effectivePrefix}image']),
       categoryId: attachedDatabase.typeMapping
@@ -662,6 +679,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
   final String category;
   final double price;
   final int stockQty;
+  final double minStockQty;
   final Uint8List? image;
   final int? categoryId;
   final String type;
@@ -679,6 +697,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       required this.category,
       required this.price,
       required this.stockQty,
+      required this.minStockQty,
       this.image,
       this.categoryId,
       required this.type,
@@ -698,6 +717,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
     map['category'] = Variable<String>(category);
     map['price'] = Variable<double>(price);
     map['stock_qty'] = Variable<int>(stockQty);
+    map['min_stock_qty'] = Variable<double>(minStockQty);
     if (!nullToAbsent || image != null) {
       map['image'] = Variable<Uint8List>(image);
     }
@@ -735,6 +755,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       category: Value(category),
       price: Value(price),
       stockQty: Value(stockQty),
+      minStockQty: Value(minStockQty),
       image:
           image == null && nullToAbsent ? const Value.absent() : Value(image),
       categoryId: categoryId == null && nullToAbsent
@@ -772,6 +793,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       category: serializer.fromJson<String>(json['category']),
       price: serializer.fromJson<double>(json['price']),
       stockQty: serializer.fromJson<int>(json['stockQty']),
+      minStockQty: serializer.fromJson<double>(json['minStockQty']),
       image: serializer.fromJson<Uint8List?>(json['image']),
       categoryId: serializer.fromJson<int?>(json['categoryId']),
       type: serializer.fromJson<String>(json['type']),
@@ -795,6 +817,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       'category': serializer.toJson<String>(category),
       'price': serializer.toJson<double>(price),
       'stockQty': serializer.toJson<int>(stockQty),
+      'minStockQty': serializer.toJson<double>(minStockQty),
       'image': serializer.toJson<Uint8List?>(image),
       'categoryId': serializer.toJson<int?>(categoryId),
       'type': serializer.toJson<String>(type),
@@ -815,6 +838,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           String? category,
           double? price,
           int? stockQty,
+          double? minStockQty,
           Value<Uint8List?> image = const Value.absent(),
           Value<int?> categoryId = const Value.absent(),
           String? type,
@@ -832,6 +856,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
         category: category ?? this.category,
         price: price ?? this.price,
         stockQty: stockQty ?? this.stockQty,
+        minStockQty: minStockQty ?? this.minStockQty,
         image: image.present ? image.value : this.image,
         categoryId: categoryId.present ? categoryId.value : this.categoryId,
         type: type ?? this.type,
@@ -853,6 +878,8 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       category: data.category.present ? data.category.value : this.category,
       price: data.price.present ? data.price.value : this.price,
       stockQty: data.stockQty.present ? data.stockQty.value : this.stockQty,
+      minStockQty:
+          data.minStockQty.present ? data.minStockQty.value : this.minStockQty,
       image: data.image.present ? data.image.value : this.image,
       categoryId:
           data.categoryId.present ? data.categoryId.value : this.categoryId,
@@ -881,6 +908,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           ..write('category: $category, ')
           ..write('price: $price, ')
           ..write('stockQty: $stockQty, ')
+          ..write('minStockQty: $minStockQty, ')
           ..write('image: $image, ')
           ..write('categoryId: $categoryId, ')
           ..write('type: $type, ')
@@ -903,6 +931,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       category,
       price,
       stockQty,
+      minStockQty,
       $driftBlobEquality.hash(image),
       categoryId,
       type,
@@ -923,6 +952,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           other.category == this.category &&
           other.price == this.price &&
           other.stockQty == this.stockQty &&
+          other.minStockQty == this.minStockQty &&
           $driftBlobEquality.equals(other.image, this.image) &&
           other.categoryId == this.categoryId &&
           other.type == this.type &&
@@ -942,6 +972,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
   final Value<String> category;
   final Value<double> price;
   final Value<int> stockQty;
+  final Value<double> minStockQty;
   final Value<Uint8List?> image;
   final Value<int?> categoryId;
   final Value<String> type;
@@ -959,6 +990,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     this.category = const Value.absent(),
     this.price = const Value.absent(),
     this.stockQty = const Value.absent(),
+    this.minStockQty = const Value.absent(),
     this.image = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.type = const Value.absent(),
@@ -977,6 +1009,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     required String category,
     required double price,
     this.stockQty = const Value.absent(),
+    this.minStockQty = const Value.absent(),
     this.image = const Value.absent(),
     this.categoryId = const Value.absent(),
     this.type = const Value.absent(),
@@ -997,6 +1030,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     Expression<String>? category,
     Expression<double>? price,
     Expression<int>? stockQty,
+    Expression<double>? minStockQty,
     Expression<Uint8List>? image,
     Expression<int>? categoryId,
     Expression<String>? type,
@@ -1015,6 +1049,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       if (category != null) 'category': category,
       if (price != null) 'price': price,
       if (stockQty != null) 'stock_qty': stockQty,
+      if (minStockQty != null) 'min_stock_qty': minStockQty,
       if (image != null) 'image': image,
       if (categoryId != null) 'category_id': categoryId,
       if (type != null) 'type': type,
@@ -1036,6 +1071,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       Value<String>? category,
       Value<double>? price,
       Value<int>? stockQty,
+      Value<double>? minStockQty,
       Value<Uint8List?>? image,
       Value<int?>? categoryId,
       Value<String>? type,
@@ -1053,6 +1089,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       category: category ?? this.category,
       price: price ?? this.price,
       stockQty: stockQty ?? this.stockQty,
+      minStockQty: minStockQty ?? this.minStockQty,
       image: image ?? this.image,
       categoryId: categoryId ?? this.categoryId,
       type: type ?? this.type,
@@ -1084,6 +1121,9 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     }
     if (stockQty.present) {
       map['stock_qty'] = Variable<int>(stockQty.value);
+    }
+    if (minStockQty.present) {
+      map['min_stock_qty'] = Variable<double>(minStockQty.value);
     }
     if (image.present) {
       map['image'] = Variable<Uint8List>(image.value);
@@ -1130,6 +1170,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
           ..write('category: $category, ')
           ..write('price: $price, ')
           ..write('stockQty: $stockQty, ')
+          ..write('minStockQty: $minStockQty, ')
           ..write('image: $image, ')
           ..write('categoryId: $categoryId, ')
           ..write('type: $type, ')
@@ -1284,6 +1325,12 @@ class $InvoicesTable extends Invoices
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _totalPrintAmountMeta =
+      const VerificationMeta('totalPrintAmount');
+  @override
+  late final GeneratedColumn<double> totalPrintAmount = GeneratedColumn<double>(
+      'total_print_amount', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1305,7 +1352,8 @@ class $InvoicesTable extends Invoices
         updatedAt,
         createdAt,
         deviceId,
-        isDeleted
+        isDeleted,
+        totalPrintAmount
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1428,6 +1476,12 @@ class $InvoicesTable extends Invoices
       context.handle(_isDeletedMeta,
           isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
     }
+    if (data.containsKey('total_print_amount')) {
+      context.handle(
+          _totalPrintAmountMeta,
+          totalPrintAmount.isAcceptableOrUnknown(
+              data['total_print_amount']!, _totalPrintAmountMeta));
+    }
     return context;
   }
 
@@ -1477,6 +1531,8 @@ class $InvoicesTable extends Invoices
           .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
       isDeleted: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+      totalPrintAmount: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}total_print_amount']),
     );
   }
 
@@ -1507,6 +1563,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
   final DateTime? createdAt;
   final String? deviceId;
   final bool isDeleted;
+  final double? totalPrintAmount;
   const InvoiceTable(
       {required this.id,
       required this.invoiceNumber,
@@ -1527,7 +1584,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       this.updatedAt,
       this.createdAt,
       this.deviceId,
-      required this.isDeleted});
+      required this.isDeleted,
+      this.totalPrintAmount});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1569,6 +1627,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       map['device_id'] = Variable<String>(deviceId);
     }
     map['is_deleted'] = Variable<bool>(isDeleted);
+    if (!nullToAbsent || totalPrintAmount != null) {
+      map['total_print_amount'] = Variable<double>(totalPrintAmount);
+    }
     return map;
   }
 
@@ -1611,6 +1672,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ? const Value.absent()
           : Value(deviceId),
       isDeleted: Value(isDeleted),
+      totalPrintAmount: totalPrintAmount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(totalPrintAmount),
     );
   }
 
@@ -1638,6 +1702,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
       deviceId: serializer.fromJson<String?>(json['deviceId']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      totalPrintAmount: serializer.fromJson<double?>(json['totalPrintAmount']),
     );
   }
   @override
@@ -1664,6 +1729,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       'createdAt': serializer.toJson<DateTime?>(createdAt),
       'deviceId': serializer.toJson<String?>(deviceId),
       'isDeleted': serializer.toJson<bool>(isDeleted),
+      'totalPrintAmount': serializer.toJson<double?>(totalPrintAmount),
     };
   }
 
@@ -1687,7 +1753,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
           Value<String?> deviceId = const Value.absent(),
-          bool? isDeleted}) =>
+          bool? isDeleted,
+          Value<double?> totalPrintAmount = const Value.absent()}) =>
       InvoiceTable(
         id: id ?? this.id,
         invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -1713,6 +1780,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
         isDeleted: isDeleted ?? this.isDeleted,
+        totalPrintAmount: totalPrintAmount.present
+            ? totalPrintAmount.value
+            : this.totalPrintAmount,
       );
   InvoiceTable copyWithCompanion(InvoicesCompanion data) {
     return InvoiceTable(
@@ -1753,6 +1823,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      totalPrintAmount: data.totalPrintAmount.present
+          ? data.totalPrintAmount.value
+          : this.totalPrintAmount,
     );
   }
 
@@ -1778,33 +1851,36 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('totalPrintAmount: $totalPrintAmount')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      invoiceNumber,
-      dateCreated,
-      subtotal,
-      taxAmount,
-      discountAmount,
-      totalAmount,
-      paymentStatus,
-      amountPaid,
-      balanceAmount,
-      customerName,
-      customerAddress,
-      paymentMethod,
-      staffId,
-      staffName,
-      syncId,
-      updatedAt,
-      createdAt,
-      deviceId,
-      isDeleted);
+  int get hashCode => Object.hashAll([
+        id,
+        invoiceNumber,
+        dateCreated,
+        subtotal,
+        taxAmount,
+        discountAmount,
+        totalAmount,
+        paymentStatus,
+        amountPaid,
+        balanceAmount,
+        customerName,
+        customerAddress,
+        paymentMethod,
+        staffId,
+        staffName,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted,
+        totalPrintAmount
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1828,7 +1904,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
           other.deviceId == this.deviceId &&
-          other.isDeleted == this.isDeleted);
+          other.isDeleted == this.isDeleted &&
+          other.totalPrintAmount == this.totalPrintAmount);
 }
 
 class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
@@ -1852,6 +1929,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
   final Value<DateTime?> createdAt;
   final Value<String?> deviceId;
   final Value<bool> isDeleted;
+  final Value<double?> totalPrintAmount;
   const InvoicesCompanion({
     this.id = const Value.absent(),
     this.invoiceNumber = const Value.absent(),
@@ -1873,6 +1951,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.createdAt = const Value.absent(),
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.totalPrintAmount = const Value.absent(),
   });
   InvoicesCompanion.insert({
     this.id = const Value.absent(),
@@ -1895,6 +1974,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.createdAt = const Value.absent(),
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.totalPrintAmount = const Value.absent(),
   })  : invoiceNumber = Value(invoiceNumber),
         subtotal = Value(subtotal),
         taxAmount = Value(taxAmount),
@@ -1922,6 +2002,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     Expression<DateTime>? createdAt,
     Expression<String>? deviceId,
     Expression<bool>? isDeleted,
+    Expression<double>? totalPrintAmount,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1944,6 +2025,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       if (createdAt != null) 'created_at': createdAt,
       if (deviceId != null) 'device_id': deviceId,
       if (isDeleted != null) 'is_deleted': isDeleted,
+      if (totalPrintAmount != null) 'total_print_amount': totalPrintAmount,
     });
   }
 
@@ -1967,7 +2049,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
       Value<String?>? deviceId,
-      Value<bool>? isDeleted}) {
+      Value<bool>? isDeleted,
+      Value<double?>? totalPrintAmount}) {
     return InvoicesCompanion(
       id: id ?? this.id,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -1989,6 +2072,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       createdAt: createdAt ?? this.createdAt,
       deviceId: deviceId ?? this.deviceId,
       isDeleted: isDeleted ?? this.isDeleted,
+      totalPrintAmount: totalPrintAmount ?? this.totalPrintAmount,
     );
   }
 
@@ -2055,6 +2139,9 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
+    if (totalPrintAmount.present) {
+      map['total_print_amount'] = Variable<double>(totalPrintAmount.value);
+    }
     return map;
   }
 
@@ -2080,7 +2167,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('totalPrintAmount: $totalPrintAmount')
           ..write(')'))
         .toString();
   }
@@ -2176,6 +2264,12 @@ class $InvoiceItemsTable extends InvoiceItems
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _printPriceMeta =
+      const VerificationMeta('printPrice');
+  @override
+  late final GeneratedColumn<double> printPrice = GeneratedColumn<double>(
+      'print_price', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2189,7 +2283,8 @@ class $InvoiceItemsTable extends InvoiceItems
         updatedAt,
         createdAt,
         deviceId,
-        isDeleted
+        isDeleted,
+        printPrice
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2258,6 +2353,12 @@ class $InvoiceItemsTable extends InvoiceItems
       context.handle(_isDeletedMeta,
           isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
     }
+    if (data.containsKey('print_price')) {
+      context.handle(
+          _printPriceMeta,
+          printPrice.isAcceptableOrUnknown(
+              data['print_price']!, _printPriceMeta));
+    }
     return context;
   }
 
@@ -2291,6 +2392,8 @@ class $InvoiceItemsTable extends InvoiceItems
           .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
       isDeleted: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+      printPrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}print_price']),
     );
   }
 
@@ -2314,6 +2417,7 @@ class InvoiceItemTable extends DataClass
   final DateTime? createdAt;
   final String? deviceId;
   final bool isDeleted;
+  final double? printPrice;
   const InvoiceItemTable(
       {required this.id,
       required this.invoiceId,
@@ -2326,7 +2430,8 @@ class InvoiceItemTable extends DataClass
       this.updatedAt,
       this.createdAt,
       this.deviceId,
-      required this.isDeleted});
+      required this.isDeleted,
+      this.printPrice});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2352,6 +2457,9 @@ class InvoiceItemTable extends DataClass
       map['device_id'] = Variable<String>(deviceId);
     }
     map['is_deleted'] = Variable<bool>(isDeleted);
+    if (!nullToAbsent || printPrice != null) {
+      map['print_price'] = Variable<double>(printPrice);
+    }
     return map;
   }
 
@@ -2378,6 +2486,9 @@ class InvoiceItemTable extends DataClass
           ? const Value.absent()
           : Value(deviceId),
       isDeleted: Value(isDeleted),
+      printPrice: printPrice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(printPrice),
     );
   }
 
@@ -2397,6 +2508,7 @@ class InvoiceItemTable extends DataClass
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
       deviceId: serializer.fromJson<String?>(json['deviceId']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      printPrice: serializer.fromJson<double?>(json['printPrice']),
     );
   }
   @override
@@ -2415,6 +2527,7 @@ class InvoiceItemTable extends DataClass
       'createdAt': serializer.toJson<DateTime?>(createdAt),
       'deviceId': serializer.toJson<String?>(deviceId),
       'isDeleted': serializer.toJson<bool>(isDeleted),
+      'printPrice': serializer.toJson<double?>(printPrice),
     };
   }
 
@@ -2430,7 +2543,8 @@ class InvoiceItemTable extends DataClass
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
           Value<String?> deviceId = const Value.absent(),
-          bool? isDeleted}) =>
+          bool? isDeleted,
+          Value<double?> printPrice = const Value.absent()}) =>
       InvoiceItemTable(
         id: id ?? this.id,
         invoiceId: invoiceId ?? this.invoiceId,
@@ -2444,6 +2558,7 @@ class InvoiceItemTable extends DataClass
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
         isDeleted: isDeleted ?? this.isDeleted,
+        printPrice: printPrice.present ? printPrice.value : this.printPrice,
       );
   InvoiceItemTable copyWithCompanion(InvoiceItemsCompanion data) {
     return InvoiceItemTable(
@@ -2460,6 +2575,8 @@ class InvoiceItemTable extends DataClass
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      printPrice:
+          data.printPrice.present ? data.printPrice.value : this.printPrice,
     );
   }
 
@@ -2477,14 +2594,27 @@ class InvoiceItemTable extends DataClass
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('printPrice: $printPrice')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, invoiceId, itemId, quantity, unitPrice,
-      type, serviceMeta, syncId, updatedAt, createdAt, deviceId, isDeleted);
+  int get hashCode => Object.hash(
+      id,
+      invoiceId,
+      itemId,
+      quantity,
+      unitPrice,
+      type,
+      serviceMeta,
+      syncId,
+      updatedAt,
+      createdAt,
+      deviceId,
+      isDeleted,
+      printPrice);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2500,7 +2630,8 @@ class InvoiceItemTable extends DataClass
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
           other.deviceId == this.deviceId &&
-          other.isDeleted == this.isDeleted);
+          other.isDeleted == this.isDeleted &&
+          other.printPrice == this.printPrice);
 }
 
 class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
@@ -2516,6 +2647,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
   final Value<DateTime?> createdAt;
   final Value<String?> deviceId;
   final Value<bool> isDeleted;
+  final Value<double?> printPrice;
   const InvoiceItemsCompanion({
     this.id = const Value.absent(),
     this.invoiceId = const Value.absent(),
@@ -2529,6 +2661,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     this.createdAt = const Value.absent(),
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.printPrice = const Value.absent(),
   });
   InvoiceItemsCompanion.insert({
     this.id = const Value.absent(),
@@ -2543,6 +2676,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     this.createdAt = const Value.absent(),
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.printPrice = const Value.absent(),
   })  : invoiceId = Value(invoiceId),
         itemId = Value(itemId),
         quantity = Value(quantity),
@@ -2560,6 +2694,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     Expression<DateTime>? createdAt,
     Expression<String>? deviceId,
     Expression<bool>? isDeleted,
+    Expression<double>? printPrice,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2574,6 +2709,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
       if (createdAt != null) 'created_at': createdAt,
       if (deviceId != null) 'device_id': deviceId,
       if (isDeleted != null) 'is_deleted': isDeleted,
+      if (printPrice != null) 'print_price': printPrice,
     });
   }
 
@@ -2589,7 +2725,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
       Value<String?>? deviceId,
-      Value<bool>? isDeleted}) {
+      Value<bool>? isDeleted,
+      Value<double?>? printPrice}) {
     return InvoiceItemsCompanion(
       id: id ?? this.id,
       invoiceId: invoiceId ?? this.invoiceId,
@@ -2603,6 +2740,7 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
       createdAt: createdAt ?? this.createdAt,
       deviceId: deviceId ?? this.deviceId,
       isDeleted: isDeleted ?? this.isDeleted,
+      printPrice: printPrice ?? this.printPrice,
     );
   }
 
@@ -2645,6 +2783,9 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
+    if (printPrice.present) {
+      map['print_price'] = Variable<double>(printPrice.value);
+    }
     return map;
   }
 
@@ -2662,7 +2803,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('printPrice: $printPrice')
           ..write(')'))
         .toString();
   }
@@ -2955,6 +3097,17 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("show_sync_status" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _customReceiptPricingEnabledMeta =
+      const VerificationMeta('customReceiptPricingEnabled');
+  @override
+  late final GeneratedColumn<bool> customReceiptPricingEnabled =
+      GeneratedColumn<bool>(
+          'custom_receipt_pricing_enabled', aliasedName, false,
+          type: DriftSqlType.bool,
+          requiredDuringInsert: false,
+          defaultConstraints: GeneratedColumn.constraintIsAlways(
+              'CHECK ("custom_receipt_pricing_enabled" IN (0, 1))'),
+          defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2991,7 +3144,8 @@ class $SettingsTable extends Settings
         paperWidth,
         halfDayStartHour,
         halfDayEndHour,
-        showSyncStatus
+        showSyncStatus,
+        customReceiptPricingEnabled
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3195,6 +3349,13 @@ class $SettingsTable extends Settings
           showSyncStatus.isAcceptableOrUnknown(
               data['show_sync_status']!, _showSyncStatusMeta));
     }
+    if (data.containsKey('custom_receipt_pricing_enabled')) {
+      context.handle(
+          _customReceiptPricingEnabledMeta,
+          customReceiptPricingEnabled.isAcceptableOrUnknown(
+              data['custom_receipt_pricing_enabled']!,
+              _customReceiptPricingEnabledMeta));
+    }
     return context;
   }
 
@@ -3279,6 +3440,9 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.int, data['${effectivePrefix}half_day_end_hour'])!,
       showSyncStatus: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}show_sync_status'])!,
+      customReceiptPricingEnabled: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool,
+          data['${effectivePrefix}custom_receipt_pricing_enabled'])!,
     );
   }
 
@@ -3324,6 +3488,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final int halfDayStartHour;
   final int halfDayEndHour;
   final bool showSyncStatus;
+  final bool customReceiptPricingEnabled;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -3359,7 +3524,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.paperWidth,
       required this.halfDayStartHour,
       required this.halfDayEndHour,
-      required this.showSyncStatus});
+      required this.showSyncStatus,
+      required this.customReceiptPricingEnabled});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3416,6 +3582,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['half_day_start_hour'] = Variable<int>(halfDayStartHour);
     map['half_day_end_hour'] = Variable<int>(halfDayEndHour);
     map['show_sync_status'] = Variable<bool>(showSyncStatus);
+    map['custom_receipt_pricing_enabled'] =
+        Variable<bool>(customReceiptPricingEnabled);
     return map;
   }
 
@@ -3471,6 +3639,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       halfDayStartHour: Value(halfDayStartHour),
       halfDayEndHour: Value(halfDayEndHour),
       showSyncStatus: Value(showSyncStatus),
+      customReceiptPricingEnabled: Value(customReceiptPricingEnabled),
     );
   }
 
@@ -3519,6 +3688,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       halfDayStartHour: serializer.fromJson<int>(json['halfDayStartHour']),
       halfDayEndHour: serializer.fromJson<int>(json['halfDayEndHour']),
       showSyncStatus: serializer.fromJson<bool>(json['showSyncStatus']),
+      customReceiptPricingEnabled:
+          serializer.fromJson<bool>(json['customReceiptPricingEnabled']),
     );
   }
   @override
@@ -3562,6 +3733,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'halfDayStartHour': serializer.toJson<int>(halfDayStartHour),
       'halfDayEndHour': serializer.toJson<int>(halfDayEndHour),
       'showSyncStatus': serializer.toJson<bool>(showSyncStatus),
+      'customReceiptPricingEnabled':
+          serializer.toJson<bool>(customReceiptPricingEnabled),
     };
   }
 
@@ -3600,7 +3773,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           int? paperWidth,
           int? halfDayStartHour,
           int? halfDayEndHour,
-          bool? showSyncStatus}) =>
+          bool? showSyncStatus,
+          bool? customReceiptPricingEnabled}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -3646,6 +3820,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         halfDayStartHour: halfDayStartHour ?? this.halfDayStartHour,
         halfDayEndHour: halfDayEndHour ?? this.halfDayEndHour,
         showSyncStatus: showSyncStatus ?? this.showSyncStatus,
+        customReceiptPricingEnabled:
+            customReceiptPricingEnabled ?? this.customReceiptPricingEnabled,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -3727,6 +3903,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showSyncStatus: data.showSyncStatus.present
           ? data.showSyncStatus.value
           : this.showSyncStatus,
+      customReceiptPricingEnabled: data.customReceiptPricingEnabled.present
+          ? data.customReceiptPricingEnabled.value
+          : this.customReceiptPricingEnabled,
     );
   }
 
@@ -3767,7 +3946,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('paperWidth: $paperWidth, ')
           ..write('halfDayStartHour: $halfDayStartHour, ')
           ..write('halfDayEndHour: $halfDayEndHour, ')
-          ..write('showSyncStatus: $showSyncStatus')
+          ..write('showSyncStatus: $showSyncStatus, ')
+          ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled')
           ..write(')'))
         .toString();
   }
@@ -3808,7 +3988,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         paperWidth,
         halfDayStartHour,
         halfDayEndHour,
-        showSyncStatus
+        showSyncStatus,
+        customReceiptPricingEnabled
       ]);
   @override
   bool operator ==(Object other) =>
@@ -3848,7 +4029,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.paperWidth == this.paperWidth &&
           other.halfDayStartHour == this.halfDayStartHour &&
           other.halfDayEndHour == this.halfDayEndHour &&
-          other.showSyncStatus == this.showSyncStatus);
+          other.showSyncStatus == this.showSyncStatus &&
+          other.customReceiptPricingEnabled ==
+              this.customReceiptPricingEnabled);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -3887,6 +4070,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<int> halfDayStartHour;
   final Value<int> halfDayEndHour;
   final Value<bool> showSyncStatus;
+  final Value<bool> customReceiptPricingEnabled;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -3923,6 +4107,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.halfDayStartHour = const Value.absent(),
     this.halfDayEndHour = const Value.absent(),
     this.showSyncStatus = const Value.absent(),
+    this.customReceiptPricingEnabled = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -3960,6 +4145,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.halfDayStartHour = const Value.absent(),
     this.halfDayEndHour = const Value.absent(),
     this.showSyncStatus = const Value.absent(),
+    this.customReceiptPricingEnabled = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -3999,6 +4185,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<int>? halfDayStartHour,
     Expression<int>? halfDayEndHour,
     Expression<bool>? showSyncStatus,
+    Expression<bool>? customReceiptPricingEnabled,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4044,6 +4231,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (halfDayStartHour != null) 'half_day_start_hour': halfDayStartHour,
       if (halfDayEndHour != null) 'half_day_end_hour': halfDayEndHour,
       if (showSyncStatus != null) 'show_sync_status': showSyncStatus,
+      if (customReceiptPricingEnabled != null)
+        'custom_receipt_pricing_enabled': customReceiptPricingEnabled,
     });
   }
 
@@ -4082,7 +4271,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<int>? paperWidth,
       Value<int>? halfDayStartHour,
       Value<int>? halfDayEndHour,
-      Value<bool>? showSyncStatus}) {
+      Value<bool>? showSyncStatus,
+      Value<bool>? customReceiptPricingEnabled}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -4124,6 +4314,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       halfDayStartHour: halfDayStartHour ?? this.halfDayStartHour,
       halfDayEndHour: halfDayEndHour ?? this.halfDayEndHour,
       showSyncStatus: showSyncStatus ?? this.showSyncStatus,
+      customReceiptPricingEnabled:
+          customReceiptPricingEnabled ?? this.customReceiptPricingEnabled,
     );
   }
 
@@ -4240,6 +4432,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (showSyncStatus.present) {
       map['show_sync_status'] = Variable<bool>(showSyncStatus.value);
     }
+    if (customReceiptPricingEnabled.present) {
+      map['custom_receipt_pricing_enabled'] =
+          Variable<bool>(customReceiptPricingEnabled.value);
+    }
     return map;
   }
 
@@ -4280,7 +4476,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('paperWidth: $paperWidth, ')
           ..write('halfDayStartHour: $halfDayStartHour, ')
           ..write('halfDayEndHour: $halfDayEndHour, ')
-          ..write('showSyncStatus: $showSyncStatus')
+          ..write('showSyncStatus: $showSyncStatus, ')
+          ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled')
           ..write(')'))
         .toString();
   }
@@ -5531,6 +5728,605 @@ class SyncMetaCompanion extends UpdateCompanion<SyncMetaTable> {
   }
 }
 
+class $StockIncrementsTable extends StockIncrements
+    with TableInfo<$StockIncrementsTable, StockIncrementTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StockIncrementsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<int> itemId = GeneratedColumn<int>(
+      'item_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES items (id)'));
+  static const VerificationMeta _quantityAddedMeta =
+      const VerificationMeta('quantityAdded');
+  @override
+  late final GeneratedColumn<int> quantityAdded = GeneratedColumn<int>(
+      'quantity_added', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _quantityBeforeMeta =
+      const VerificationMeta('quantityBefore');
+  @override
+  late final GeneratedColumn<int> quantityBefore = GeneratedColumn<int>(
+      'quantity_before', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _quantityAfterMeta =
+      const VerificationMeta('quantityAfter');
+  @override
+  late final GeneratedColumn<int> quantityAfter = GeneratedColumn<int>(
+      'quantity_after', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _dateAddedMeta =
+      const VerificationMeta('dateAdded');
+  @override
+  late final GeneratedColumn<DateTime> dateAdded = GeneratedColumn<DateTime>(
+      'date_added', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _remarksMeta =
+      const VerificationMeta('remarks');
+  @override
+  late final GeneratedColumn<String> remarks = GeneratedColumn<String>(
+      'remarks', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        itemId,
+        quantityAdded,
+        quantityBefore,
+        quantityAfter,
+        dateAdded,
+        remarks,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'stock_increments';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<StockIncrementTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(_itemIdMeta,
+          itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta));
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('quantity_added')) {
+      context.handle(
+          _quantityAddedMeta,
+          quantityAdded.isAcceptableOrUnknown(
+              data['quantity_added']!, _quantityAddedMeta));
+    } else if (isInserting) {
+      context.missing(_quantityAddedMeta);
+    }
+    if (data.containsKey('quantity_before')) {
+      context.handle(
+          _quantityBeforeMeta,
+          quantityBefore.isAcceptableOrUnknown(
+              data['quantity_before']!, _quantityBeforeMeta));
+    }
+    if (data.containsKey('quantity_after')) {
+      context.handle(
+          _quantityAfterMeta,
+          quantityAfter.isAcceptableOrUnknown(
+              data['quantity_after']!, _quantityAfterMeta));
+    }
+    if (data.containsKey('date_added')) {
+      context.handle(_dateAddedMeta,
+          dateAdded.isAcceptableOrUnknown(data['date_added']!, _dateAddedMeta));
+    }
+    if (data.containsKey('remarks')) {
+      context.handle(_remarksMeta,
+          remarks.isAcceptableOrUnknown(data['remarks']!, _remarksMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StockIncrementTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StockIncrementTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      itemId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}item_id'])!,
+      quantityAdded: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}quantity_added'])!,
+      quantityBefore: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}quantity_before'])!,
+      quantityAfter: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}quantity_after'])!,
+      dateAdded: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}date_added'])!,
+      remarks: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}remarks']),
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+    );
+  }
+
+  @override
+  $StockIncrementsTable createAlias(String alias) {
+    return $StockIncrementsTable(attachedDatabase, alias);
+  }
+}
+
+class StockIncrementTable extends DataClass
+    implements Insertable<StockIncrementTable> {
+  final int id;
+  final int itemId;
+  final int quantityAdded;
+  final int quantityBefore;
+  final int quantityAfter;
+  final DateTime dateAdded;
+  final String? remarks;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  final String? deviceId;
+  final bool isDeleted;
+  const StockIncrementTable(
+      {required this.id,
+      required this.itemId,
+      required this.quantityAdded,
+      required this.quantityBefore,
+      required this.quantityAfter,
+      required this.dateAdded,
+      this.remarks,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt,
+      this.deviceId,
+      required this.isDeleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['item_id'] = Variable<int>(itemId);
+    map['quantity_added'] = Variable<int>(quantityAdded);
+    map['quantity_before'] = Variable<int>(quantityBefore);
+    map['quantity_after'] = Variable<int>(quantityAfter);
+    map['date_added'] = Variable<DateTime>(dateAdded);
+    if (!nullToAbsent || remarks != null) {
+      map['remarks'] = Variable<String>(remarks);
+    }
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    return map;
+  }
+
+  StockIncrementsCompanion toCompanion(bool nullToAbsent) {
+    return StockIncrementsCompanion(
+      id: Value(id),
+      itemId: Value(itemId),
+      quantityAdded: Value(quantityAdded),
+      quantityBefore: Value(quantityBefore),
+      quantityAfter: Value(quantityAfter),
+      dateAdded: Value(dateAdded),
+      remarks: remarks == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remarks),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      isDeleted: Value(isDeleted),
+    );
+  }
+
+  factory StockIncrementTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StockIncrementTable(
+      id: serializer.fromJson<int>(json['id']),
+      itemId: serializer.fromJson<int>(json['itemId']),
+      quantityAdded: serializer.fromJson<int>(json['quantityAdded']),
+      quantityBefore: serializer.fromJson<int>(json['quantityBefore']),
+      quantityAfter: serializer.fromJson<int>(json['quantityAfter']),
+      dateAdded: serializer.fromJson<DateTime>(json['dateAdded']),
+      remarks: serializer.fromJson<String?>(json['remarks']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'itemId': serializer.toJson<int>(itemId),
+      'quantityAdded': serializer.toJson<int>(quantityAdded),
+      'quantityBefore': serializer.toJson<int>(quantityBefore),
+      'quantityAfter': serializer.toJson<int>(quantityAfter),
+      'dateAdded': serializer.toJson<DateTime>(dateAdded),
+      'remarks': serializer.toJson<String?>(remarks),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+    };
+  }
+
+  StockIncrementTable copyWith(
+          {int? id,
+          int? itemId,
+          int? quantityAdded,
+          int? quantityBefore,
+          int? quantityAfter,
+          DateTime? dateAdded,
+          Value<String?> remarks = const Value.absent(),
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent(),
+          Value<String?> deviceId = const Value.absent(),
+          bool? isDeleted}) =>
+      StockIncrementTable(
+        id: id ?? this.id,
+        itemId: itemId ?? this.itemId,
+        quantityAdded: quantityAdded ?? this.quantityAdded,
+        quantityBefore: quantityBefore ?? this.quantityBefore,
+        quantityAfter: quantityAfter ?? this.quantityAfter,
+        dateAdded: dateAdded ?? this.dateAdded,
+        remarks: remarks.present ? remarks.value : this.remarks,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        isDeleted: isDeleted ?? this.isDeleted,
+      );
+  StockIncrementTable copyWithCompanion(StockIncrementsCompanion data) {
+    return StockIncrementTable(
+      id: data.id.present ? data.id.value : this.id,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      quantityAdded: data.quantityAdded.present
+          ? data.quantityAdded.value
+          : this.quantityAdded,
+      quantityBefore: data.quantityBefore.present
+          ? data.quantityBefore.value
+          : this.quantityBefore,
+      quantityAfter: data.quantityAfter.present
+          ? data.quantityAfter.value
+          : this.quantityAfter,
+      dateAdded: data.dateAdded.present ? data.dateAdded.value : this.dateAdded,
+      remarks: data.remarks.present ? data.remarks.value : this.remarks,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockIncrementTable(')
+          ..write('id: $id, ')
+          ..write('itemId: $itemId, ')
+          ..write('quantityAdded: $quantityAdded, ')
+          ..write('quantityBefore: $quantityBefore, ')
+          ..write('quantityAfter: $quantityAfter, ')
+          ..write('dateAdded: $dateAdded, ')
+          ..write('remarks: $remarks, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      itemId,
+      quantityAdded,
+      quantityBefore,
+      quantityAfter,
+      dateAdded,
+      remarks,
+      syncId,
+      updatedAt,
+      createdAt,
+      deviceId,
+      isDeleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StockIncrementTable &&
+          other.id == this.id &&
+          other.itemId == this.itemId &&
+          other.quantityAdded == this.quantityAdded &&
+          other.quantityBefore == this.quantityBefore &&
+          other.quantityAfter == this.quantityAfter &&
+          other.dateAdded == this.dateAdded &&
+          other.remarks == this.remarks &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.deviceId == this.deviceId &&
+          other.isDeleted == this.isDeleted);
+}
+
+class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
+  final Value<int> id;
+  final Value<int> itemId;
+  final Value<int> quantityAdded;
+  final Value<int> quantityBefore;
+  final Value<int> quantityAfter;
+  final Value<DateTime> dateAdded;
+  final Value<String?> remarks;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  final Value<String?> deviceId;
+  final Value<bool> isDeleted;
+  const StockIncrementsCompanion({
+    this.id = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.quantityAdded = const Value.absent(),
+    this.quantityBefore = const Value.absent(),
+    this.quantityAfter = const Value.absent(),
+    this.dateAdded = const Value.absent(),
+    this.remarks = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  });
+  StockIncrementsCompanion.insert({
+    this.id = const Value.absent(),
+    required int itemId,
+    required int quantityAdded,
+    this.quantityBefore = const Value.absent(),
+    this.quantityAfter = const Value.absent(),
+    this.dateAdded = const Value.absent(),
+    this.remarks = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  })  : itemId = Value(itemId),
+        quantityAdded = Value(quantityAdded);
+  static Insertable<StockIncrementTable> custom({
+    Expression<int>? id,
+    Expression<int>? itemId,
+    Expression<int>? quantityAdded,
+    Expression<int>? quantityBefore,
+    Expression<int>? quantityAfter,
+    Expression<DateTime>? dateAdded,
+    Expression<String>? remarks,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? deviceId,
+    Expression<bool>? isDeleted,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (itemId != null) 'item_id': itemId,
+      if (quantityAdded != null) 'quantity_added': quantityAdded,
+      if (quantityBefore != null) 'quantity_before': quantityBefore,
+      if (quantityAfter != null) 'quantity_after': quantityAfter,
+      if (dateAdded != null) 'date_added': dateAdded,
+      if (remarks != null) 'remarks': remarks,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+    });
+  }
+
+  StockIncrementsCompanion copyWith(
+      {Value<int>? id,
+      Value<int>? itemId,
+      Value<int>? quantityAdded,
+      Value<int>? quantityBefore,
+      Value<int>? quantityAfter,
+      Value<DateTime>? dateAdded,
+      Value<String?>? remarks,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt,
+      Value<String?>? deviceId,
+      Value<bool>? isDeleted}) {
+    return StockIncrementsCompanion(
+      id: id ?? this.id,
+      itemId: itemId ?? this.itemId,
+      quantityAdded: quantityAdded ?? this.quantityAdded,
+      quantityBefore: quantityBefore ?? this.quantityBefore,
+      quantityAfter: quantityAfter ?? this.quantityAfter,
+      dateAdded: dateAdded ?? this.dateAdded,
+      remarks: remarks ?? this.remarks,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      deviceId: deviceId ?? this.deviceId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<int>(itemId.value);
+    }
+    if (quantityAdded.present) {
+      map['quantity_added'] = Variable<int>(quantityAdded.value);
+    }
+    if (quantityBefore.present) {
+      map['quantity_before'] = Variable<int>(quantityBefore.value);
+    }
+    if (quantityAfter.present) {
+      map['quantity_after'] = Variable<int>(quantityAfter.value);
+    }
+    if (dateAdded.present) {
+      map['date_added'] = Variable<DateTime>(dateAdded.value);
+    }
+    if (remarks.present) {
+      map['remarks'] = Variable<String>(remarks.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockIncrementsCompanion(')
+          ..write('id: $id, ')
+          ..write('itemId: $itemId, ')
+          ..write('quantityAdded: $quantityAdded, ')
+          ..write('quantityBefore: $quantityBefore, ')
+          ..write('quantityAfter: $quantityAfter, ')
+          ..write('dateAdded: $dateAdded, ')
+          ..write('remarks: $remarks, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5542,6 +6338,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $LicenseHistoryTable licenseHistory = $LicenseHistoryTable(this);
   late final $StaffTable staff = $StaffTable(this);
   late final $SyncMetaTable syncMeta = $SyncMetaTable(this);
+  late final $StockIncrementsTable stockIncrements =
+      $StockIncrementsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5554,7 +6352,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         settings,
         licenseHistory,
         staff,
-        syncMeta
+        syncMeta,
+        stockIncrements
       ];
 }
 
@@ -5841,6 +6640,7 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   required String category,
   required double price,
   Value<int> stockQty,
+  Value<double> minStockQty,
   Value<Uint8List?> image,
   Value<int?> categoryId,
   Value<String> type,
@@ -5859,6 +6659,7 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<String> category,
   Value<double> price,
   Value<int> stockQty,
+  Value<double> minStockQty,
   Value<Uint8List?> image,
   Value<int?> categoryId,
   Value<String> type,
@@ -5903,6 +6704,23 @@ final class $$ItemsTableReferences
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: cache));
   }
+
+  static MultiTypedResultKey<$StockIncrementsTable, List<StockIncrementTable>>
+      _stockIncrementsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.stockIncrements,
+              aliasName:
+                  $_aliasNameGenerator(db.items.id, db.stockIncrements.itemId));
+
+  $$StockIncrementsTableProcessedTableManager get stockIncrementsRefs {
+    final manager =
+        $$StockIncrementsTableTableManager($_db, $_db.stockIncrements)
+            .filter((f) => f.itemId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_stockIncrementsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
 }
 
 class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
@@ -5927,6 +6745,9 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<int> get stockQty => $composableBuilder(
       column: $table.stockQty, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get minStockQty => $composableBuilder(
+      column: $table.minStockQty, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnFilters(column));
@@ -6000,6 +6821,27 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
             ));
     return f(composer);
   }
+
+  Expression<bool> stockIncrementsRefs(
+      Expression<bool> Function($$StockIncrementsTableFilterComposer f) f) {
+    final $$StockIncrementsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockIncrements,
+        getReferencedColumn: (t) => t.itemId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockIncrementsTableFilterComposer(
+              $db: $db,
+              $table: $db.stockIncrements,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$ItemsTableOrderingComposer
@@ -6025,6 +6867,9 @@ class $$ItemsTableOrderingComposer
 
   ColumnOrderings<int> get stockQty => $composableBuilder(
       column: $table.stockQty, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get minStockQty => $composableBuilder(
+      column: $table.minStockQty, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnOrderings(column));
@@ -6103,6 +6948,9 @@ class $$ItemsTableAnnotationComposer
   GeneratedColumn<int> get stockQty =>
       $composableBuilder(column: $table.stockQty, builder: (column) => column);
 
+  GeneratedColumn<double> get minStockQty => $composableBuilder(
+      column: $table.minStockQty, builder: (column) => column);
+
   GeneratedColumn<Uint8List> get image =>
       $composableBuilder(column: $table.image, builder: (column) => column);
 
@@ -6173,6 +7021,27 @@ class $$ItemsTableAnnotationComposer
             ));
     return f(composer);
   }
+
+  Expression<T> stockIncrementsRefs<T extends Object>(
+      Expression<T> Function($$StockIncrementsTableAnnotationComposer a) f) {
+    final $$StockIncrementsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockIncrements,
+        getReferencedColumn: (t) => t.itemId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockIncrementsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.stockIncrements,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$ItemsTableTableManager extends RootTableManager<
@@ -6186,7 +7055,8 @@ class $$ItemsTableTableManager extends RootTableManager<
     $$ItemsTableUpdateCompanionBuilder,
     (ItemTable, $$ItemsTableReferences),
     ItemTable,
-    PrefetchHooks Function({bool categoryId, bool invoiceItemsRefs})> {
+    PrefetchHooks Function(
+        {bool categoryId, bool invoiceItemsRefs, bool stockIncrementsRefs})> {
   $$ItemsTableTableManager(_$AppDatabase db, $ItemsTable table)
       : super(TableManagerState(
           db: db,
@@ -6203,6 +7073,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<String> category = const Value.absent(),
             Value<double> price = const Value.absent(),
             Value<int> stockQty = const Value.absent(),
+            Value<double> minStockQty = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<int?> categoryId = const Value.absent(),
             Value<String> type = const Value.absent(),
@@ -6221,6 +7092,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             category: category,
             price: price,
             stockQty: stockQty,
+            minStockQty: minStockQty,
             image: image,
             categoryId: categoryId,
             type: type,
@@ -6239,6 +7111,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             required String category,
             required double price,
             Value<int> stockQty = const Value.absent(),
+            Value<double> minStockQty = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<int?> categoryId = const Value.absent(),
             Value<String> type = const Value.absent(),
@@ -6257,6 +7130,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             category: category,
             price: price,
             stockQty: stockQty,
+            minStockQty: minStockQty,
             image: image,
             categoryId: categoryId,
             type: type,
@@ -6274,10 +7148,15 @@ class $$ItemsTableTableManager extends RootTableManager<
                   (e.readTable(table), $$ItemsTableReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: (
-              {categoryId = false, invoiceItemsRefs = false}) {
+              {categoryId = false,
+              invoiceItemsRefs = false,
+              stockIncrementsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (invoiceItemsRefs) db.invoiceItems],
+              explicitlyWatchedTables: [
+                if (invoiceItemsRefs) db.invoiceItems,
+                if (stockIncrementsRefs) db.stockIncrements
+              ],
               addJoins: <
                   T extends TableManagerState<
                       dynamic,
@@ -6318,6 +7197,19 @@ class $$ItemsTableTableManager extends RootTableManager<
                         referencedItemsForCurrentItem: (item,
                                 referencedItems) =>
                             referencedItems.where((e) => e.itemId == item.id),
+                        typedResults: items),
+                  if (stockIncrementsRefs)
+                    await $_getPrefetchedData<ItemTable, $ItemsTable,
+                            StockIncrementTable>(
+                        currentTable: table,
+                        referencedTable: $$ItemsTableReferences
+                            ._stockIncrementsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ItemsTableReferences(db, table, p0)
+                                .stockIncrementsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.itemId == item.id),
                         typedResults: items)
                 ];
               },
@@ -6337,7 +7229,8 @@ typedef $$ItemsTableProcessedTableManager = ProcessedTableManager<
     $$ItemsTableUpdateCompanionBuilder,
     (ItemTable, $$ItemsTableReferences),
     ItemTable,
-    PrefetchHooks Function({bool categoryId, bool invoiceItemsRefs})>;
+    PrefetchHooks Function(
+        {bool categoryId, bool invoiceItemsRefs, bool stockIncrementsRefs})>;
 typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<int> id,
   required String invoiceNumber,
@@ -6359,6 +7252,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<DateTime?> createdAt,
   Value<String?> deviceId,
   Value<bool> isDeleted,
+  Value<double?> totalPrintAmount,
 });
 typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<int> id,
@@ -6381,6 +7275,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<DateTime?> createdAt,
   Value<String?> deviceId,
   Value<bool> isDeleted,
+  Value<double?> totalPrintAmount,
 });
 
 final class $$InvoicesTableReferences
@@ -6473,6 +7368,10 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get totalPrintAmount => $composableBuilder(
+      column: $table.totalPrintAmount,
+      builder: (column) => ColumnFilters(column));
 
   Expression<bool> invoiceItemsRefs(
       Expression<bool> Function($$InvoiceItemsTableFilterComposer f) f) {
@@ -6571,6 +7470,10 @@ class $$InvoicesTableOrderingComposer
 
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get totalPrintAmount => $composableBuilder(
+      column: $table.totalPrintAmount,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$InvoicesTableAnnotationComposer
@@ -6642,6 +7545,9 @@ class $$InvoicesTableAnnotationComposer
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 
+  GeneratedColumn<double> get totalPrintAmount => $composableBuilder(
+      column: $table.totalPrintAmount, builder: (column) => column);
+
   Expression<T> invoiceItemsRefs<T extends Object>(
       Expression<T> Function($$InvoiceItemsTableAnnotationComposer a) f) {
     final $$InvoiceItemsTableAnnotationComposer composer = $composerBuilder(
@@ -6707,6 +7613,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<DateTime?> createdAt = const Value.absent(),
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<double?> totalPrintAmount = const Value.absent(),
           }) =>
               InvoicesCompanion(
             id: id,
@@ -6729,6 +7636,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             createdAt: createdAt,
             deviceId: deviceId,
             isDeleted: isDeleted,
+            totalPrintAmount: totalPrintAmount,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -6751,6 +7659,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<DateTime?> createdAt = const Value.absent(),
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<double?> totalPrintAmount = const Value.absent(),
           }) =>
               InvoicesCompanion.insert(
             id: id,
@@ -6773,6 +7682,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             createdAt: createdAt,
             deviceId: deviceId,
             isDeleted: isDeleted,
+            totalPrintAmount: totalPrintAmount,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -6830,6 +7740,7 @@ typedef $$InvoiceItemsTableCreateCompanionBuilder = InvoiceItemsCompanion
   Value<DateTime?> createdAt,
   Value<String?> deviceId,
   Value<bool> isDeleted,
+  Value<double?> printPrice,
 });
 typedef $$InvoiceItemsTableUpdateCompanionBuilder = InvoiceItemsCompanion
     Function({
@@ -6845,6 +7756,7 @@ typedef $$InvoiceItemsTableUpdateCompanionBuilder = InvoiceItemsCompanion
   Value<DateTime?> createdAt,
   Value<String?> deviceId,
   Value<bool> isDeleted,
+  Value<double?> printPrice,
 });
 
 final class $$InvoiceItemsTableReferences extends BaseReferences<_$AppDatabase,
@@ -6919,6 +7831,9 @@ class $$InvoiceItemsTableFilterComposer
 
   ColumnFilters<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get printPrice => $composableBuilder(
+      column: $table.printPrice, builder: (column) => ColumnFilters(column));
 
   $$InvoicesTableFilterComposer get invoiceId {
     final $$InvoicesTableFilterComposer composer = $composerBuilder(
@@ -7000,6 +7915,9 @@ class $$InvoiceItemsTableOrderingComposer
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get printPrice => $composableBuilder(
+      column: $table.printPrice, builder: (column) => ColumnOrderings(column));
+
   $$InvoicesTableOrderingComposer get invoiceId {
     final $$InvoicesTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -7080,6 +7998,9 @@ class $$InvoiceItemsTableAnnotationComposer
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 
+  GeneratedColumn<double> get printPrice => $composableBuilder(
+      column: $table.printPrice, builder: (column) => column);
+
   $$InvoicesTableAnnotationComposer get invoiceId {
     final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
         composer: this,
@@ -7156,6 +8077,7 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             Value<DateTime?> createdAt = const Value.absent(),
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<double?> printPrice = const Value.absent(),
           }) =>
               InvoiceItemsCompanion(
             id: id,
@@ -7170,6 +8092,7 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             createdAt: createdAt,
             deviceId: deviceId,
             isDeleted: isDeleted,
+            printPrice: printPrice,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -7184,6 +8107,7 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             Value<DateTime?> createdAt = const Value.absent(),
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<double?> printPrice = const Value.absent(),
           }) =>
               InvoiceItemsCompanion.insert(
             id: id,
@@ -7198,6 +8122,7 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             createdAt: createdAt,
             deviceId: deviceId,
             isDeleted: isDeleted,
+            printPrice: printPrice,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (
@@ -7301,6 +8226,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<int> halfDayStartHour,
   Value<int> halfDayEndHour,
   Value<bool> showSyncStatus,
+  Value<bool> customReceiptPricingEnabled,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -7338,6 +8264,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> halfDayStartHour,
   Value<int> halfDayEndHour,
   Value<bool> showSyncStatus,
+  Value<bool> customReceiptPricingEnabled,
 });
 
 class $$SettingsTableFilterComposer
@@ -7467,6 +8394,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get showSyncStatus => $composableBuilder(
       column: $table.showSyncStatus,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get customReceiptPricingEnabled => $composableBuilder(
+      column: $table.customReceiptPricingEnabled,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -7603,6 +8534,10 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get showSyncStatus => $composableBuilder(
       column: $table.showSyncStatus,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get customReceiptPricingEnabled => $composableBuilder(
+      column: $table.customReceiptPricingEnabled,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -7718,6 +8653,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get showSyncStatus => $composableBuilder(
       column: $table.showSyncStatus, builder: (column) => column);
+
+  GeneratedColumn<bool> get customReceiptPricingEnabled => $composableBuilder(
+      column: $table.customReceiptPricingEnabled, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -7781,6 +8719,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<int> halfDayStartHour = const Value.absent(),
             Value<int> halfDayEndHour = const Value.absent(),
             Value<bool> showSyncStatus = const Value.absent(),
+            Value<bool> customReceiptPricingEnabled = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -7818,6 +8757,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             halfDayStartHour: halfDayStartHour,
             halfDayEndHour: halfDayEndHour,
             showSyncStatus: showSyncStatus,
+            customReceiptPricingEnabled: customReceiptPricingEnabled,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -7855,6 +8795,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<int> halfDayStartHour = const Value.absent(),
             Value<int> halfDayEndHour = const Value.absent(),
             Value<bool> showSyncStatus = const Value.absent(),
+            Value<bool> customReceiptPricingEnabled = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -7892,6 +8833,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             halfDayStartHour: halfDayStartHour,
             halfDayEndHour: halfDayEndHour,
             showSyncStatus: showSyncStatus,
+            customReceiptPricingEnabled: customReceiptPricingEnabled,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -8528,6 +9470,385 @@ typedef $$SyncMetaTableProcessedTableManager = ProcessedTableManager<
     ),
     SyncMetaTable,
     PrefetchHooks Function()>;
+typedef $$StockIncrementsTableCreateCompanionBuilder = StockIncrementsCompanion
+    Function({
+  Value<int> id,
+  required int itemId,
+  required int quantityAdded,
+  Value<int> quantityBefore,
+  Value<int> quantityAfter,
+  Value<DateTime> dateAdded,
+  Value<String?> remarks,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+typedef $$StockIncrementsTableUpdateCompanionBuilder = StockIncrementsCompanion
+    Function({
+  Value<int> id,
+  Value<int> itemId,
+  Value<int> quantityAdded,
+  Value<int> quantityBefore,
+  Value<int> quantityAfter,
+  Value<DateTime> dateAdded,
+  Value<String?> remarks,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+
+final class $$StockIncrementsTableReferences extends BaseReferences<
+    _$AppDatabase, $StockIncrementsTable, StockIncrementTable> {
+  $$StockIncrementsTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $ItemsTable _itemIdTable(_$AppDatabase db) => db.items.createAlias(
+      $_aliasNameGenerator(db.stockIncrements.itemId, db.items.id));
+
+  $$ItemsTableProcessedTableManager get itemId {
+    final $_column = $_itemColumn<int>('item_id')!;
+
+    final manager = $$ItemsTableTableManager($_db, $_db.items)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_itemIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$StockIncrementsTableFilterComposer
+    extends Composer<_$AppDatabase, $StockIncrementsTable> {
+  $$StockIncrementsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get quantityAdded => $composableBuilder(
+      column: $table.quantityAdded, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get quantityBefore => $composableBuilder(
+      column: $table.quantityBefore,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get quantityAfter => $composableBuilder(
+      column: $table.quantityAfter, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get dateAdded => $composableBuilder(
+      column: $table.dateAdded, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remarks => $composableBuilder(
+      column: $table.remarks, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  $$ItemsTableFilterComposer get itemId {
+    final $$ItemsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.itemId,
+        referencedTable: $db.items,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ItemsTableFilterComposer(
+              $db: $db,
+              $table: $db.items,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$StockIncrementsTableOrderingComposer
+    extends Composer<_$AppDatabase, $StockIncrementsTable> {
+  $$StockIncrementsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get quantityAdded => $composableBuilder(
+      column: $table.quantityAdded,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get quantityBefore => $composableBuilder(
+      column: $table.quantityBefore,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get quantityAfter => $composableBuilder(
+      column: $table.quantityAfter,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get dateAdded => $composableBuilder(
+      column: $table.dateAdded, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get remarks => $composableBuilder(
+      column: $table.remarks, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+
+  $$ItemsTableOrderingComposer get itemId {
+    final $$ItemsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.itemId,
+        referencedTable: $db.items,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ItemsTableOrderingComposer(
+              $db: $db,
+              $table: $db.items,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$StockIncrementsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StockIncrementsTable> {
+  $$StockIncrementsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get quantityAdded => $composableBuilder(
+      column: $table.quantityAdded, builder: (column) => column);
+
+  GeneratedColumn<int> get quantityBefore => $composableBuilder(
+      column: $table.quantityBefore, builder: (column) => column);
+
+  GeneratedColumn<int> get quantityAfter => $composableBuilder(
+      column: $table.quantityAfter, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dateAdded =>
+      $composableBuilder(column: $table.dateAdded, builder: (column) => column);
+
+  GeneratedColumn<String> get remarks =>
+      $composableBuilder(column: $table.remarks, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  $$ItemsTableAnnotationComposer get itemId {
+    final $$ItemsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.itemId,
+        referencedTable: $db.items,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ItemsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.items,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$StockIncrementsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $StockIncrementsTable,
+    StockIncrementTable,
+    $$StockIncrementsTableFilterComposer,
+    $$StockIncrementsTableOrderingComposer,
+    $$StockIncrementsTableAnnotationComposer,
+    $$StockIncrementsTableCreateCompanionBuilder,
+    $$StockIncrementsTableUpdateCompanionBuilder,
+    (StockIncrementTable, $$StockIncrementsTableReferences),
+    StockIncrementTable,
+    PrefetchHooks Function({bool itemId})> {
+  $$StockIncrementsTableTableManager(
+      _$AppDatabase db, $StockIncrementsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StockIncrementsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StockIncrementsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StockIncrementsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<int> itemId = const Value.absent(),
+            Value<int> quantityAdded = const Value.absent(),
+            Value<int> quantityBefore = const Value.absent(),
+            Value<int> quantityAfter = const Value.absent(),
+            Value<DateTime> dateAdded = const Value.absent(),
+            Value<String?> remarks = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              StockIncrementsCompanion(
+            id: id,
+            itemId: itemId,
+            quantityAdded: quantityAdded,
+            quantityBefore: quantityBefore,
+            quantityAfter: quantityAfter,
+            dateAdded: dateAdded,
+            remarks: remarks,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required int itemId,
+            required int quantityAdded,
+            Value<int> quantityBefore = const Value.absent(),
+            Value<int> quantityAfter = const Value.absent(),
+            Value<DateTime> dateAdded = const Value.absent(),
+            Value<String?> remarks = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              StockIncrementsCompanion.insert(
+            id: id,
+            itemId: itemId,
+            quantityAdded: quantityAdded,
+            quantityBefore: quantityBefore,
+            quantityAfter: quantityAfter,
+            dateAdded: dateAdded,
+            remarks: remarks,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$StockIncrementsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: ({itemId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (itemId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.itemId,
+                    referencedTable:
+                        $$StockIncrementsTableReferences._itemIdTable(db),
+                    referencedColumn:
+                        $$StockIncrementsTableReferences._itemIdTable(db).id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$StockIncrementsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $StockIncrementsTable,
+    StockIncrementTable,
+    $$StockIncrementsTableFilterComposer,
+    $$StockIncrementsTableOrderingComposer,
+    $$StockIncrementsTableAnnotationComposer,
+    $$StockIncrementsTableCreateCompanionBuilder,
+    $$StockIncrementsTableUpdateCompanionBuilder,
+    (StockIncrementTable, $$StockIncrementsTableReferences),
+    StockIncrementTable,
+    PrefetchHooks Function({bool itemId})>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -8548,4 +9869,6 @@ class $AppDatabaseManager {
       $$StaffTableTableManager(_db, _db.staff);
   $$SyncMetaTableTableManager get syncMeta =>
       $$SyncMetaTableTableManager(_db, _db.syncMeta);
+  $$StockIncrementsTableTableManager get stockIncrements =>
+      $$StockIncrementsTableTableManager(_db, _db.stockIncrements);
 }

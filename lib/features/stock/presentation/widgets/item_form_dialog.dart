@@ -30,6 +30,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   ItemCategory _legacyCategory = ItemCategory.drink; // Fallback
   int? _selectedCategoryId;
   Uint8List? _imageBytes;
+  late double _minStockLevel;
   
   // Phase 3: Service Billing
   String _type = 'product';
@@ -45,6 +46,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     _legacyCategory = widget.item?.category ?? ItemCategory.drink;
     _selectedCategoryId = widget.item?.categoryId;
     _imageBytes = widget.item?.image;
+    _minStockLevel = widget.item?.minStockQty ?? 0;
     
     // Initialize Phase 3 fields
     if (widget.item != null) {
@@ -220,14 +222,21 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                   },
                 ),
                 
-                TextFormField(
-                  initialValue: _stockQty.toString(),
-                  decoration: const InputDecoration(labelText: 'Stock Quantity'),
-                  keyboardType: TextInputType.number,
-                  onSaved: (val) => _stockQty = int.tryParse(val ?? '0') ?? 0,
-                  validator: (val) => InputValidator.validateNumber(val, 'Stock', allowDecimal: false),
-                ),
-              ] else ...[
+                  TextFormField(
+                    initialValue: _stockQty.toString(),
+                    decoration: const InputDecoration(labelText: 'Stock Quantity'),
+                    keyboardType: TextInputType.number,
+                    onSaved: (val) => _stockQty = int.tryParse(val ?? '0') ?? 0,
+                    validator: (val) => InputValidator.validateNumber(val, 'Stock', allowDecimal: false),
+                  ),
+                  TextFormField(
+                    initialValue: _minStockLevel.toString(),
+                    decoration: const InputDecoration(labelText: 'Min Stock Alert Level'),
+                    keyboardType: TextInputType.number,
+                    onSaved: (val) => _minStockLevel = double.tryParse(val ?? '0') ?? 0,
+                    validator: (val) => InputValidator.validateNumber(val, 'Min Stock'),
+                  ),
+                ] else ...[
                 // Service Fields
                 DropdownButtonFormField<String>(
                   value: _serviceCategory,
@@ -281,7 +290,8 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         category: _legacyCategory, 
         categoryId: _selectedCategoryId,
         price: _price,
-        stockQty: _type == 'service' ? 999999 : _stockQty, // Services effectively have infinite stock or managed elsewhere
+        stockQty: _type == 'service' ? 999999 : _stockQty, 
+        minStockQty: _minStockLevel,
         image: _imageBytes,
         type: _type,
         billingType: _billingType,

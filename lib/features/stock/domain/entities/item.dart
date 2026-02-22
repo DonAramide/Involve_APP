@@ -15,6 +15,7 @@ class Item extends Equatable {
   final int? categoryId;
   final double price;
   final int stockQty;
+  final double minStockQty;
   final Uint8List? image;
   final String type; // 'product' | 'service'
   final String? billingType;
@@ -29,6 +30,7 @@ class Item extends Equatable {
     this.categoryId,
     required this.price,
     required this.stockQty,
+    this.minStockQty = 0,
     this.image,
     this.type = 'product',
     this.billingType,
@@ -44,6 +46,7 @@ class Item extends Equatable {
     int? categoryId,
     double? price,
     int? stockQty,
+    double? minStockQty,
     Uint8List? image,
     String? type,
     String? billingType,
@@ -58,6 +61,7 @@ class Item extends Equatable {
       categoryId: categoryId ?? this.categoryId,
       price: price ?? this.price,
       stockQty: stockQty ?? this.stockQty,
+      minStockQty: minStockQty ?? this.minStockQty,
       image: image ?? this.image,
       type: type ?? this.type,
       billingType: billingType ?? this.billingType,
@@ -75,6 +79,7 @@ class Item extends Equatable {
         categoryId,
         price,
         stockQty,
+        minStockQty,
         image,
         type,
         billingType,
@@ -82,4 +87,27 @@ class Item extends Equatable {
         requiresTimeTracking,
         syncId,
       ];
+}
+
+class StockHistoryEntry extends Equatable {
+  final int? id;
+  final int itemId;
+  final int quantityAdded;
+  final int quantityBefore;
+  final int quantityAfter;
+  final DateTime dateAdded;
+  final String? remarks;
+
+  const StockHistoryEntry({
+    this.id,
+    required this.itemId,
+    required this.quantityAdded,
+    required this.quantityBefore,
+    required this.quantityAfter,
+    required this.dateAdded,
+    this.remarks,
+  });
+
+  @override
+  List<Object?> get props => [id, itemId, quantityAdded, quantityBefore, quantityAfter, dateAdded, remarks];
 }

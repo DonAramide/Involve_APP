@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import '../../../domain/entities/invoice.dart';
-import '../../../domain/services/report_generator.dart' hide DateTimeRange;
-import '../../../../settings/domain/entities/settings.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/features/invoicing/domain/services/report_generator.dart' hide DateTimeRange;
+import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
 class ReportPreviewPage extends StatelessWidget {
   final List<Invoice> invoices;
   final AppSettings settings;
-  final ReportDateRange? dateRange;
+  final InvReportDateRange? dateRange;
 
   const ReportPreviewPage({
     super.key,

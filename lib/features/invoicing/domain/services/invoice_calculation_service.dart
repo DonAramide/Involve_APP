@@ -14,6 +14,12 @@ class InvoiceCalculationService {
     return (subtotal + tax) - discount;
   }
 
+  double calculateTotalPrintAmount(List<InvoiceItem> items, double taxRate, bool taxEnabled, double discount) {
+    final subtotal = items.fold(0.0, (sum, item) => sum + (item.quantity * (item.printPrice ?? item.unitPrice)));
+    final tax = calculateTax(subtotal, taxRate, taxEnabled);
+    return (subtotal + tax) - discount;
+  }
+
   String generateInvoiceNumber() {
     final now = DateTime.now();
     return 'INV-${now.year}${now.month}${now.day}-${now.millisecond}';

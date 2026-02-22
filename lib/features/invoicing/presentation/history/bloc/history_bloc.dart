@@ -34,8 +34,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       
       // Apply filters
       if (event.query != null && event.query!.isNotEmpty) {
+        final query = event.query!.toLowerCase();
         invoices = invoices.where((inv) => 
-          inv.invoiceNumber.toLowerCase().contains(event.query!.toLowerCase())
+          inv.invoiceNumber.toLowerCase().contains(query) ||
+          (inv.customerName?.toLowerCase().contains(query) ?? false)
         ).toList();
       }
       

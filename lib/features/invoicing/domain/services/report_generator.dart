@@ -4,15 +4,16 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import '../entities/invoice.dart';
-import '../../../settings/domain/entities/settings.dart';
-import '../../../../core/utils/currency_formatter.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
 
 class ReportGenerator {
   static Future<pw.Document> buildReport({
     required List<Invoice> invoices,
     required AppSettings settings,
-    ReportDateRange? dateRange,
+    InvReportDateRange? dateRange,
   }) async {
     final pdf = pw.Document();
 
@@ -139,7 +140,7 @@ class ReportGenerator {
   static Future<void> generateSalesReport({
     required List<Invoice> invoices,
     required AppSettings settings,
-    ReportDateRange? dateRange,
+    InvReportDateRange? dateRange,
   }) async {
     try {
       final pdf = await buildReport(
@@ -167,6 +168,42 @@ class ReportGenerator {
       // Re-throw to be caught by the UI
       rethrow;
     }
+  }
+
+  static Future<void> generateInventoryReport({
+    required List<Map<String, dynamic>> reportData,
+    required AppSettings settings,
+    InvReportDateRange? dateRange,
+  }) async {
+    try {
+      final csvContent = buildInventoryCSV(reportData, settings);
+      final bytes = Uint8List.fromList(csvContent.codeUnits);
+      
+      final dateStr = dateRange != null
+          ? '_${DateFormat('yyyyMMdd').format(dateRange.start)}'
+          : '';
+          
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'Inventory_Report$dateStr.csv',
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  static String buildInventoryCSV(List<Map<String, dynamic>> reportData, AppSettings settings) {
+    final buffer = StringBuffer();
+    // Headers
+    buffer.writeln('Product,Price (${settings.currency}),Current Stock,Total Units Sold,Revenue (${settings.currency})');
+    
+    // Rows
+    for (final item in reportData) {
+      final name = item['name'].toString().replaceAll(',', ''); // Simple escape
+      buffer.writeln('$name,${item['price']},${item['stockQty']},${item['totalSold']},${item['totalRevenue']}');
+    }
+    
+    return buffer.toString();
   }
 
   static PdfColor _getPrimaryColor(AppSettings settings) {
@@ -204,8 +241,3 @@ class ReportGenerator {
   }
 }
 
-class ReportDateRange {
-  final DateTime start;
-  final DateTime end;
-  ReportDateRange({required this.start, required this.end});
-}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/bloc/invoice_state.dart';
+import '../../domain/entities/invoice.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
@@ -750,9 +751,35 @@ class _CartSummary extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(
-                                  CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: settings?.currency ?? '₦'),
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: settings?.currency ?? '₦'),
+                                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                    ),
+                                    if (settings?.customReceiptPricingEnabled == true)
+                                      InkWell(
+                                        onTap: () => _showPrintPriceDialog(context, item, settings?.currency ?? '₦'),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.edit_note, size: 16, color: Colors.blue[300]),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              item.printPrice != null 
+                                                ? CurrencyFormatter.formatWithSymbol(item.printPrice!, symbol: settings?.currency ?? '₦')
+                                                : 'Set Receipt Price',
+                                              style: TextStyle(
+                                                fontSize: 11, 
+                                                color: item.printPrice != null ? Colors.blue[700] : Colors.grey[400],
+                                                fontWeight: item.printPrice != null ? FontWeight.bold : FontWeight.normal,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -857,7 +884,7 @@ class _CartSummary extends StatelessWidget {
                     ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(state.customerName ?? 'Add Customer', style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)),
+                      title: Text(state.customerName ?? 'Add Customer Name & Phone', style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)),
                       subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
                       leading: Icon(Icons.person_outline, color: state.customerName != null ? Theme.of(context).colorScheme.primary : Colors.grey),
                       trailing: const Icon(Icons.edit, size: 16),
@@ -992,7 +1019,7 @@ class _CartSummary extends StatelessWidget {
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: 'Customer Name & Phone', border: OutlineInputBorder()),
               autofocus: true,
             ),
             const SizedBox(height: 12),
@@ -1014,6 +1041,63 @@ class _CartSummary extends StatelessWidget {
               Navigator.pop(ctx);
             },
             child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
+  }
+  void _showPrintPriceDialog(BuildContext context, InvoiceItem item, String currency) {
+    final controller = TextEditingController(
+      text: item.printPrice != null ? item.printPrice.toString() : item.unitPrice.toString(),
+    );
+    final invoiceBloc = context.read<InvoiceBloc>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Custom Receipt Price'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter the price you want to show ON THE RECEIPT for this item.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Receipt Price ($currency)',
+                border: const OutlineInputBorder(),
+                prefixText: currency,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Real Price: ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: currency)}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          if (item.printPrice != null)
+            TextButton(
+              onPressed: () {
+                invoiceBloc.add(UpdateItemPrintPrice(item.item.id!, null));
+                Navigator.pop(ctx);
+              },
+              child: const Text('RESET', style: TextStyle(color: Colors.red)),
+            ),
+          ElevatedButton(
+            onPressed: () {
+              final newPrice = double.tryParse(controller.text);
+              if (newPrice != null) {
+                invoiceBloc.add(UpdateItemPrintPrice(item.item.id!, newPrice));
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('SET PRICE'),
           ),
         ],
       ),
