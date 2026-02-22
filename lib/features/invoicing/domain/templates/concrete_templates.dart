@@ -23,7 +23,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42); // Logic for 58, 80, 88
 
     return [
-      if (settings.logo != null) ImageCommand(bytes: settings.logo!),
+      if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       if (settings.businessDescription != null && settings.businessDescription!.isNotEmpty)
         TextCommand(settings.businessDescription!, align: 'center'),
@@ -106,7 +106,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
     return [
-      if (settings.logo != null) ImageCommand(bytes: settings.logo!),
+      if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName, align: 'center', isBold: true),
       if (settings.businessDescription != null && settings.businessDescription!.isNotEmpty)
         TextCommand(settings.businessDescription!, align: 'center'),
@@ -222,7 +222,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
     return [
-      if (settings.logo != null) ImageCommand(bytes: settings.logo!),
+      if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
       if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),

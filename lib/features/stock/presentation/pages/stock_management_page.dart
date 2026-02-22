@@ -165,7 +165,20 @@ class StockManagementPage extends StatelessWidget {
                 const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit), title: Text('Edit / Min Alert'))),
                 const PopupMenuItem(value: 'stock_up', child: ListTile(leading: Icon(Icons.add_box), title: Text('Stock Up'))),
                 const PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text('Adding History'))),
-                const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.red), title: Text('Delete', style: TextStyle(color: Colors.red)))),
+                PopupMenuItem(
+                  value: 'delete', 
+                  enabled: item.stockQty <= 0,
+                  child: ListTile(
+                    leading: Icon(Icons.delete, color: item.stockQty <= 0 ? Colors.red : Colors.grey), 
+                    title: Text(
+                      'Delete', 
+                      style: TextStyle(color: item.stockQty <= 0 ? Colors.red : Colors.grey),
+                    ),
+                    subtitle: item.stockQty > 0 
+                      ? Text('Sell all items in "${item.name}" first', style: const TextStyle(fontSize: 10))
+                      : null,
+                  ),
+                ),
               ],
             ),
           ],

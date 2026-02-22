@@ -7,6 +7,9 @@ import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/invoicing/domain/services/report_generator.dart';
 import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
 class InventoryReportPage extends StatefulWidget {
   const InventoryReportPage({super.key});
@@ -83,6 +86,66 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
             icon: const Icon(Icons.share),
             tooltip: 'Export CSV',
             onPressed: () => _exportReport(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.print_outlined),
+            tooltip: 'Thermal Print',
+            onPressed: () {
+              final state = context.read<StockBloc>().state;
+              final settingsState = context.read<SettingsBloc>().state;
+              
+              if (state is InventoryReportLoaded && settingsState.settings != null) {
+                final commands = ReportGenerator.buildInventoryThermalCommands(
+                  reportData: state.report,
+                  settings: settingsState.settings!,
+                  dateRange: _dateRange != null 
+                    ? InvReportDateRange(start: _dateRange!.start, end: _dateRange!.end)
+                    : null,
+                );
+                
+                context.read<PrinterBloc>().add(PrintCommandsEvent(
+                  commands, 
+                  settingsState.settings!.paperWidth
+                ));
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Sent to printer...')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please wait for data to load.')),
+                );
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.print),
+            tooltip: 'Print PDF',
+            onPressed: () async {
+              final state = context.read<StockBloc>().state;
+              final settingsState = context.read<SettingsBloc>().state;
+              if (state is InventoryReportLoaded && settingsState.settings != null) {
+                try {
+                  await ReportGenerator.generateInventoryReport(
+                    reportData: state.report,
+                    settings: settingsState.settings!,
+                    dateRange: _dateRange != null 
+                      ? InvReportDateRange(start: _dateRange!.start, end: _dateRange!.end)
+                      : null,
+                  );
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Print failed: ${e.toString()}')),
+                    );
+                  }
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please wait for data to load.')),
+                );
+              }
+            },
           ),
           IconButton(
             icon: const Icon(Icons.date_range),

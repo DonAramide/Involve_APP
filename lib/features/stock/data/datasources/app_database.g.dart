@@ -3108,6 +3108,16 @@ class $SettingsTable extends Settings
           defaultConstraints: GeneratedColumn.constraintIsAlways(
               'CHECK ("custom_receipt_pricing_enabled" IN (0, 1))'),
           defaultValue: const Constant(false));
+  static const VerificationMeta _showLogoMeta =
+      const VerificationMeta('showLogo');
+  @override
+  late final GeneratedColumn<bool> showLogo = GeneratedColumn<bool>(
+      'show_logo', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("show_logo" IN (0, 1))'),
+      defaultValue: const Constant(true));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -3145,7 +3155,8 @@ class $SettingsTable extends Settings
         halfDayStartHour,
         halfDayEndHour,
         showSyncStatus,
-        customReceiptPricingEnabled
+        customReceiptPricingEnabled,
+        showLogo
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3356,6 +3367,10 @@ class $SettingsTable extends Settings
               data['custom_receipt_pricing_enabled']!,
               _customReceiptPricingEnabledMeta));
     }
+    if (data.containsKey('show_logo')) {
+      context.handle(_showLogoMeta,
+          showLogo.isAcceptableOrUnknown(data['show_logo']!, _showLogoMeta));
+    }
     return context;
   }
 
@@ -3443,6 +3458,8 @@ class $SettingsTable extends Settings
       customReceiptPricingEnabled: attachedDatabase.typeMapping.read(
           DriftSqlType.bool,
           data['${effectivePrefix}custom_receipt_pricing_enabled'])!,
+      showLogo: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}show_logo'])!,
     );
   }
 
@@ -3489,6 +3506,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final int halfDayEndHour;
   final bool showSyncStatus;
   final bool customReceiptPricingEnabled;
+  final bool showLogo;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -3525,7 +3543,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.halfDayStartHour,
       required this.halfDayEndHour,
       required this.showSyncStatus,
-      required this.customReceiptPricingEnabled});
+      required this.customReceiptPricingEnabled,
+      required this.showLogo});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3584,6 +3603,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['show_sync_status'] = Variable<bool>(showSyncStatus);
     map['custom_receipt_pricing_enabled'] =
         Variable<bool>(customReceiptPricingEnabled);
+    map['show_logo'] = Variable<bool>(showLogo);
     return map;
   }
 
@@ -3640,6 +3660,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       halfDayEndHour: Value(halfDayEndHour),
       showSyncStatus: Value(showSyncStatus),
       customReceiptPricingEnabled: Value(customReceiptPricingEnabled),
+      showLogo: Value(showLogo),
     );
   }
 
@@ -3690,6 +3711,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showSyncStatus: serializer.fromJson<bool>(json['showSyncStatus']),
       customReceiptPricingEnabled:
           serializer.fromJson<bool>(json['customReceiptPricingEnabled']),
+      showLogo: serializer.fromJson<bool>(json['showLogo']),
     );
   }
   @override
@@ -3735,6 +3757,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'showSyncStatus': serializer.toJson<bool>(showSyncStatus),
       'customReceiptPricingEnabled':
           serializer.toJson<bool>(customReceiptPricingEnabled),
+      'showLogo': serializer.toJson<bool>(showLogo),
     };
   }
 
@@ -3774,7 +3797,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           int? halfDayStartHour,
           int? halfDayEndHour,
           bool? showSyncStatus,
-          bool? customReceiptPricingEnabled}) =>
+          bool? customReceiptPricingEnabled,
+          bool? showLogo}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -3822,6 +3846,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showSyncStatus: showSyncStatus ?? this.showSyncStatus,
         customReceiptPricingEnabled:
             customReceiptPricingEnabled ?? this.customReceiptPricingEnabled,
+        showLogo: showLogo ?? this.showLogo,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -3906,6 +3931,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       customReceiptPricingEnabled: data.customReceiptPricingEnabled.present
           ? data.customReceiptPricingEnabled.value
           : this.customReceiptPricingEnabled,
+      showLogo: data.showLogo.present ? data.showLogo.value : this.showLogo,
     );
   }
 
@@ -3947,7 +3973,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('halfDayStartHour: $halfDayStartHour, ')
           ..write('halfDayEndHour: $halfDayEndHour, ')
           ..write('showSyncStatus: $showSyncStatus, ')
-          ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled')
+          ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled, ')
+          ..write('showLogo: $showLogo')
           ..write(')'))
         .toString();
   }
@@ -3989,7 +4016,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         halfDayStartHour,
         halfDayEndHour,
         showSyncStatus,
-        customReceiptPricingEnabled
+        customReceiptPricingEnabled,
+        showLogo
       ]);
   @override
   bool operator ==(Object other) =>
@@ -4031,7 +4059,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.halfDayEndHour == this.halfDayEndHour &&
           other.showSyncStatus == this.showSyncStatus &&
           other.customReceiptPricingEnabled ==
-              this.customReceiptPricingEnabled);
+              this.customReceiptPricingEnabled &&
+          other.showLogo == this.showLogo);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -4071,6 +4100,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<int> halfDayEndHour;
   final Value<bool> showSyncStatus;
   final Value<bool> customReceiptPricingEnabled;
+  final Value<bool> showLogo;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -4108,6 +4138,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.halfDayEndHour = const Value.absent(),
     this.showSyncStatus = const Value.absent(),
     this.customReceiptPricingEnabled = const Value.absent(),
+    this.showLogo = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -4146,6 +4177,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.halfDayEndHour = const Value.absent(),
     this.showSyncStatus = const Value.absent(),
     this.customReceiptPricingEnabled = const Value.absent(),
+    this.showLogo = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -4186,6 +4218,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<int>? halfDayEndHour,
     Expression<bool>? showSyncStatus,
     Expression<bool>? customReceiptPricingEnabled,
+    Expression<bool>? showLogo,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4233,6 +4266,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (showSyncStatus != null) 'show_sync_status': showSyncStatus,
       if (customReceiptPricingEnabled != null)
         'custom_receipt_pricing_enabled': customReceiptPricingEnabled,
+      if (showLogo != null) 'show_logo': showLogo,
     });
   }
 
@@ -4272,7 +4306,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<int>? halfDayStartHour,
       Value<int>? halfDayEndHour,
       Value<bool>? showSyncStatus,
-      Value<bool>? customReceiptPricingEnabled}) {
+      Value<bool>? customReceiptPricingEnabled,
+      Value<bool>? showLogo}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -4316,6 +4351,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       showSyncStatus: showSyncStatus ?? this.showSyncStatus,
       customReceiptPricingEnabled:
           customReceiptPricingEnabled ?? this.customReceiptPricingEnabled,
+      showLogo: showLogo ?? this.showLogo,
     );
   }
 
@@ -4436,6 +4472,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       map['custom_receipt_pricing_enabled'] =
           Variable<bool>(customReceiptPricingEnabled.value);
     }
+    if (showLogo.present) {
+      map['show_logo'] = Variable<bool>(showLogo.value);
+    }
     return map;
   }
 
@@ -4477,7 +4516,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('halfDayStartHour: $halfDayStartHour, ')
           ..write('halfDayEndHour: $halfDayEndHour, ')
           ..write('showSyncStatus: $showSyncStatus, ')
-          ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled')
+          ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled, ')
+          ..write('showLogo: $showLogo')
           ..write(')'))
         .toString();
   }
@@ -8227,6 +8267,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<int> halfDayEndHour,
   Value<bool> showSyncStatus,
   Value<bool> customReceiptPricingEnabled,
+  Value<bool> showLogo,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -8265,6 +8306,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> halfDayEndHour,
   Value<bool> showSyncStatus,
   Value<bool> customReceiptPricingEnabled,
+  Value<bool> showLogo,
 });
 
 class $$SettingsTableFilterComposer
@@ -8399,6 +8441,9 @@ class $$SettingsTableFilterComposer
   ColumnFilters<bool> get customReceiptPricingEnabled => $composableBuilder(
       column: $table.customReceiptPricingEnabled,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showLogo => $composableBuilder(
+      column: $table.showLogo, builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -8538,6 +8583,9 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get customReceiptPricingEnabled => $composableBuilder(
       column: $table.customReceiptPricingEnabled,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showLogo => $composableBuilder(
+      column: $table.showLogo, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -8656,6 +8704,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get customReceiptPricingEnabled => $composableBuilder(
       column: $table.customReceiptPricingEnabled, builder: (column) => column);
+
+  GeneratedColumn<bool> get showLogo =>
+      $composableBuilder(column: $table.showLogo, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -8720,6 +8771,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<int> halfDayEndHour = const Value.absent(),
             Value<bool> showSyncStatus = const Value.absent(),
             Value<bool> customReceiptPricingEnabled = const Value.absent(),
+            Value<bool> showLogo = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -8758,6 +8810,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             halfDayEndHour: halfDayEndHour,
             showSyncStatus: showSyncStatus,
             customReceiptPricingEnabled: customReceiptPricingEnabled,
+            showLogo: showLogo,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -8796,6 +8849,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<int> halfDayEndHour = const Value.absent(),
             Value<bool> showSyncStatus = const Value.absent(),
             Value<bool> customReceiptPricingEnabled = const Value.absent(),
+            Value<bool> showLogo = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -8834,6 +8888,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             halfDayEndHour: halfDayEndHour,
             showSyncStatus: showSyncStatus,
             customReceiptPricingEnabled: customReceiptPricingEnabled,
+            showLogo: showLogo,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

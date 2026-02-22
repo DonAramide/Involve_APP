@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'printer_state.dart';
 import '../../domain/usecases/printer_usecases.dart';
@@ -39,19 +40,25 @@ class PrinterBloc extends Bloc<PrinterEvent, PrinterState> {
     }
 
     try {
+      debugPrint('PrinterBloc: Starting print with width=${event.paperWidth}...');
       await printInvoice(event.commands, event.paperWidth);
     } catch (e) {
+      debugPrint('PrinterBloc: Print failed: $e. Attempting auto-reconnect...');
       // Auto-reconnect attempt
       emit(state.copyWith(error: 'Lost connection. Retrying...'));
       final success = await connectPrinter(state.connectedDevice!);
       if (success) {
         try {
+          debugPrint('PrinterBloc: Reconnect successful. Retrying print...');
           await printInvoice(event.commands, event.paperWidth);
+          debugPrint('PrinterBloc: Retry print successful.');
           emit(state.copyWith(error: null)); // Clear error on retry success
         } catch (e2) {
+          debugPrint('PrinterBloc: Retry print failed: $e2');
           emit(state.copyWith(error: 'Retry failed: ${e2.toString()}'));
         }
       } else {
+        debugPrint('PrinterBloc: Reconnect failed.');
         emit(state.copyWith(error: 'Reconnect failed: Please check printer power/Bluetooth.'));
       }
     }

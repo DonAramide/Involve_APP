@@ -45,6 +45,7 @@ class AppSettings extends Equatable {
   final int halfDayEndHour;
   final bool showSyncStatus;
   final bool customReceiptPricingEnabled;
+  final bool showLogo;
 
   const AppSettings({
     this.id,
@@ -83,6 +84,7 @@ class AppSettings extends Equatable {
     this.halfDayEndHour = 18,
     this.showSyncStatus = true,
     this.customReceiptPricingEnabled = false,
+    this.showLogo = true,
   });
 
   AppSettings copyWith({
@@ -122,6 +124,7 @@ class AppSettings extends Equatable {
     int? halfDayEndHour,
     bool? showSyncStatus,
     bool? customReceiptPricingEnabled,
+    bool? showLogo,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -160,6 +163,7 @@ class AppSettings extends Equatable {
       halfDayEndHour: halfDayEndHour ?? this.halfDayEndHour,
       showSyncStatus: showSyncStatus ?? this.showSyncStatus,
       customReceiptPricingEnabled: customReceiptPricingEnabled ?? this.customReceiptPricingEnabled,
+      showLogo: showLogo ?? this.showLogo,
     );
   }
 
@@ -201,5 +205,6 @@ class AppSettings extends Equatable {
         halfDayEndHour,
         showSyncStatus,
         customReceiptPricingEnabled,
+        showLogo,
       ];
 }

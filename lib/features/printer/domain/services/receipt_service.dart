@@ -15,9 +15,9 @@ class ReceiptService {
     final template = settings.defaultInvoiceTemplate;
     final bool useCustomPrices = useCustomPricesOverride ?? settings.customReceiptPricingEnabled;
 
-    // Decode logo if available
+    // Decode logo if available and enabled
     pw.ImageProvider? logoImage;
-    if (settings.logo != null && settings.logo!.isNotEmpty) {
+    if (settings.showLogo && settings.logo != null && settings.logo!.isNotEmpty) {
       try {
         logoImage = pw.MemoryImage(settings.logo!);
       } catch (e) {

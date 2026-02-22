@@ -78,20 +78,43 @@ class CrossPlatformPrinterService implements IPrinterService {
       _connectedDevice = targetDevice;
 
       // Discover services
+      debugPrint('BLE: Discovering services...');
       List<BluetoothService> services = await targetDevice!.discoverServices();
       
-      // Find write characteristic (usually in Serial Port service)
+      // Try to create bond if on Android (helps with PIN loop/security)
+      if (Platform.isAndroid) {
+        final bondState = await targetDevice.bondState.first;
+        if (bondState == BluetoothBondState.none) {
+           debugPrint('BLE: Device not bonded. Attempting to create bond...');
+           try {
+             await targetDevice.createBond(timeout: 10);
+             debugPrint('BLE: Bond creation initiated.');
+           } catch (e) {
+             debugPrint('BLE: Bond request failed: $e');
+           }
+        }
+      }
+
+      // Find write characteristic
       for (BluetoothService service in services) {
         for (BluetoothCharacteristic characteristic in service.characteristics) {
           if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
             _writeCharacteristic = characteristic;
+            debugPrint('BLE: Found write characteristic: ${characteristic.uuid}');
             break;
           }
         }
         if (_writeCharacteristic != null) break;
       }
 
-      return _writeCharacteristic != null;
+      if (_writeCharacteristic != null) {
+        debugPrint('BLE: Connection ready. Waiting 500ms for stability...');
+        await Future.delayed(const Duration(milliseconds: 500));
+        return true;
+      }
+
+      debugPrint('BLE: No write characteristic found.');
+      return false;
     } catch (e) {
       debugPrint('BLE Connection error: $e');
       return false;
@@ -129,7 +152,9 @@ class CrossPlatformPrinterService implements IPrinterService {
       throw Exception('Printer not connected');
     }
 
+    debugPrint('BLE: Loading capability profile...');
     final profile = await CapabilityProfile.load();
+    debugPrint('BLE: Profile loaded. Generator initialized for ${paperWidth}mm.');
     final generator = Generator(
       paperWidth == 58 ? PaperSize.mm58 : PaperSize.mm80,
       profile,
@@ -137,34 +162,36 @@ class CrossPlatformPrinterService implements IPrinterService {
     List<int> bytes = [];
 
     for (final cmd in commands) {
-      if (cmd is TextCommand) {
-        bytes += generator.text(
-          cmd.text,
-          styles: PosStyles(
-            align: _getAlign(cmd.align),
-            bold: cmd.isBold,
-          ),
-        );
-      } else if (cmd is DividerCommand) {
-        bytes += generator.hr();
-      } else if (cmd is SizedBoxCommand) {
-        bytes += generator.feed(cmd.height);
-      } else if (cmd is ImageCommand) {
-        if (cmd.bytes != null) {
-          final img.Image? image = img.decodeImage(cmd.bytes!);
-          if (image != null) {
-             // Resize logic based on paper width
-             // 58mm = ~384 dots, 80mm = ~576 dots
-             final maxWidth = paperWidth == 58 ? 370 : 550;
-             img.Image resized = image;
-             if (image.width > maxWidth) {
-               resized = img.copyResize(image, width: maxWidth);
-             }
-             
-             // Use high density printing for better logo quality
-             bytes += generator.image(resized, align: _getAlign(cmd.align));
+      try {
+        if (cmd is TextCommand) {
+          final sanitized = cmd.text.replaceAll('₦', 'N');
+          bytes += generator.text(
+            sanitized,
+            styles: PosStyles(
+              align: _getAlign(cmd.align),
+              bold: cmd.isBold,
+            ),
+          );
+        } else if (cmd is DividerCommand) {
+          bytes += generator.hr();
+        } else if (cmd is SizedBoxCommand) {
+          bytes += generator.feed(cmd.height);
+        } else if (cmd is ImageCommand) {
+          if (cmd.bytes != null) {
+            debugPrint('BLE: Decoding image (${cmd.bytes!.length} bytes)...');
+            final img.Image? image = img.decodeImage(cmd.bytes!);
+            if (image != null) {
+               final maxWidth = paperWidth == 58 ? 370 : 550;
+               img.Image resized = image;
+               if (image.width > maxWidth) {
+                 resized = img.copyResize(image, width: maxWidth);
+               }
+               bytes += generator.image(resized, align: _getAlign(cmd.align));
+            }
           }
         }
+      } catch (e) {
+        debugPrint('BLE: Error generating command: $e');
       }
     }
 
@@ -173,9 +200,13 @@ class CrossPlatformPrinterService implements IPrinterService {
 
     // Send data in chunks (iOS has size limits)
     const int chunkSize = 512;
+    int chunkCount = 0;
     for (int i = 0; i < bytes.length; i += chunkSize) {
       final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
       final chunk = bytes.sublist(i, end);
+      chunkCount++;
+      
+      debugPrint('BLE: Sending chunk $chunkCount (${chunk.length} bytes)...');
       
       if (_writeCharacteristic!.properties.writeWithoutResponse) {
         await _writeCharacteristic!.write(chunk, withoutResponse: true);
@@ -186,6 +217,7 @@ class CrossPlatformPrinterService implements IPrinterService {
       // Small delay between chunks for stability
       await Future.delayed(const Duration(milliseconds: 50));
     }
+    debugPrint('BLE: Print commands sent successfully ($chunkCount chunks).');
   }
 
   PosAlign _getAlign(String align) {

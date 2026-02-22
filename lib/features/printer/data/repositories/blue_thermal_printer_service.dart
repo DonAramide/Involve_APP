@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart' as btp;
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:image/image.dart' as img; // Added image package
 import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 
@@ -66,8 +67,9 @@ class BlueThermalPrinterService implements IPrinterService {
 
     for (final cmd in commands) {
       if (cmd is TextCommand) {
+        final sanitized = cmd.text.replaceAll('₦', 'N');
         bytes += generator.text(
-          cmd.text,
+          sanitized,
           styles: PosStyles(
             align: _getAlign(cmd.align),
             bold: cmd.isBold,
@@ -75,9 +77,22 @@ class BlueThermalPrinterService implements IPrinterService {
         );
       } else if (cmd is DividerCommand) {
         bytes += generator.hr();
+      } else if (cmd is SizedBoxCommand) {
+        bytes += generator.feed(cmd.height);
       } else if (cmd is ImageCommand) {
-        // In a real app, you would load the byte data from the path
-        // bytes += generator.image(posImage);
+        if (cmd.bytes != null) {
+          final img.Image? image = img.decodeImage(cmd.bytes!);
+          if (image != null) {
+            // Resize logic based on paper width
+            // 58mm = ~384 dots, 80mm = ~576 dots
+            final maxWidth = paperWidth == 58 ? 370 : 550;
+            img.Image resized = image;
+            if (image.width > maxWidth) {
+              resized = img.copyResize(image, width: maxWidth);
+            }
+            bytes += generator.image(resized, align: _getAlign(cmd.align));
+          }
+        }
       }
     }
 

@@ -307,17 +307,23 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Date: ${invoice.dateCreated.toString().split('.')[0]} • ${invoice.paymentMethod ?? "N/A"}'),
-            Row(
-              children: [
-                Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
-                if (context.read<SettingsBloc>().state.settings?.customReceiptPricingEnabled == true && invoice.totalPrintAmount != null)
-                  Text(
-                    'Printed Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalPrintAmount!, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}',
-                    style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
-                const SizedBox(width: 8),
-                _buildStatusBadge(invoice.paymentStatus),
-              ],
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')} • Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
+                  if (context.read<SettingsBloc>().state.settings?.customReceiptPricingEnabled == true && invoice.totalPrintAmount != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Text(
+                        'Printed Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalPrintAmount!, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}',
+                        style: TextStyle(color: Colors.blue[700], fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  _buildStatusBadge(invoice.paymentStatus),
+                ],
+              ),
             ),
           ],
         ),
@@ -334,18 +340,17 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           const Divider(),
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8.0,
+              runSpacing: 4.0,
               children: [
                 if (invoice.paymentStatus != 'Paid')
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
-                    child: ElevatedButton.icon(
-                      onPressed: () => _showBalancePaymentDialog(context, invoice),
-                      icon: const Icon(Icons.account_balance_wallet_outlined),
-                      label: const Text('BALANCE PAYMENT'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
-                    ),
+                  ElevatedButton.icon(
+                    onPressed: () => _showBalancePaymentDialog(context, invoice),
+                    icon: const Icon(Icons.account_balance_wallet_outlined),
+                    label: const Text('BALANCE PAYMENT'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.orange, foregroundColor: Colors.white),
                   ),
                 ElevatedButton.icon(
                   onPressed: () => _reprint(context, invoice),

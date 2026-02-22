@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:usb_serial/usb_serial.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
+import 'package:image/image.dart' as img;
 import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 
@@ -112,23 +113,29 @@ class UsbPrinterService implements IPrinterService {
 
       for (var cmd in commands) {
         if (cmd is TextCommand) {
-          if (cmd.isBold) {
-            bytes += generator.setStyles(const PosStyles(bold: true));
-          }
-          
-          if (cmd.align == 'center') {
-            bytes += generator.text(cmd.text, styles: const PosStyles(align: PosAlign.center));
-          } else if (cmd.align == 'right') {
-            bytes += generator.text(cmd.text, styles: const PosStyles(align: PosAlign.right));
-          } else {
-            bytes += generator.text(cmd.text);
-          }
-          
-          if (cmd.isBold) {
-            bytes += generator.setStyles(const PosStyles(bold: false));
-          }
+          bytes += generator.text(
+            cmd.text,
+            styles: PosStyles(
+              align: _getAlign(cmd.align),
+              bold: cmd.isBold,
+            ),
+          );
         } else if (cmd is DividerCommand) {
-          bytes += generator.text('--------------------------------');
+          bytes += generator.hr();
+        } else if (cmd is SizedBoxCommand) {
+          bytes += generator.feed(cmd.height);
+        } else if (cmd is ImageCommand) {
+          if (cmd.bytes != null) {
+            final image = img.decodeImage(cmd.bytes!);
+            if (image != null) {
+              final maxWidth = paperWidth == 58 ? 370 : 550;
+              var resized = image;
+              if (image.width > maxWidth) {
+                resized = img.copyResize(image, width: maxWidth);
+              }
+              bytes += generator.image(resized, align: _getAlign(cmd.align));
+            }
+          }
         }
       }
 
@@ -155,12 +162,11 @@ class UsbPrinterService implements IPrinterService {
     return _port != null;
   }
 
-  Future<PrinterDevice?> getConnectedDevice() async {
-    if (_connectedDevice == null) return null;
-    
-    return PrinterDevice(
-      name: _connectedDevice!.productName ?? 'USB Printer',
-      address: '${_connectedDevice!.vid}:${_connectedDevice!.pid}',
-    );
+  PosAlign _getAlign(String align) {
+    switch (align) {
+      case 'center': return PosAlign.center;
+      case 'right': return PosAlign.right;
+      default: return PosAlign.left;
+    }
   }
 }

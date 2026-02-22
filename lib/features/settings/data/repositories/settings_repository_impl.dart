@@ -67,6 +67,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       halfDayStartHour: Value(settings.halfDayStartHour),
       halfDayEndHour: Value(settings.halfDayEndHour),
       showSyncStatus: Value(settings.showSyncStatus),
+      customReceiptPricingEnabled: Value(settings.customReceiptPricingEnabled),
+      showLogo: Value(settings.showLogo),
     );
 
     if (existing == null) {
@@ -123,6 +125,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       halfDayStartHour: row.halfDayStartHour,
       halfDayEndHour: row.halfDayEndHour,
       showSyncStatus: row.showSyncStatus,
+      customReceiptPricingEnabled: row.customReceiptPricingEnabled,
+      showLogo: row.showLogo,
     );
   }
 }

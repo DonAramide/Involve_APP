@@ -103,7 +103,7 @@ class NetworkPrinterService implements IPrinterService {
             bytes += generator.text(sanitizedText, styles: styles);
             debugPrint('NetworkPrinterService: Sent text: $sanitizedText');
           } else if (cmd is DividerCommand) {
-            bytes += generator.text('--------------------------------');
+            bytes += generator.hr();
             debugPrint('NetworkPrinterService: Sent divider');
           } else if (cmd is SizedBoxCommand) {
             bytes += generator.feed(cmd.height);

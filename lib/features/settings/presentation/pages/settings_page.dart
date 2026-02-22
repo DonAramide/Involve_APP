@@ -52,6 +52,7 @@ class SettingsPage extends StatelessWidget {
                 const SizedBox(height: 10),
                 _buildSectionHeader(context, 'Branding'),
                 _buildReadOnlyLogoTile(context, settings),
+                _buildSwitchTile('Print Company Logo on Receipt', settings.showLogo, (val) => _update(context, settings.copyWith(showLogo: val))),
                 const SizedBox(height: 10),
                 _buildSectionHeader(context, 'Organization Detail'),
                 state.isBusinessLocked 

@@ -97,7 +97,7 @@ class ReceiptPreviewPage extends StatelessWidget {
       
       final commands = template.generateCommands(invoice, printSettings);
       
-      printerBloc.add(PrintCommandsEvent(commands, 58)); 
+      printerBloc.add(PrintCommandsEvent(commands, settings.paperWidth)); 
       
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sending to printer...')),

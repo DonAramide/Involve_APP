@@ -61,12 +61,12 @@ class UnifiedPrinterService implements IPrinterService {
     
     if (kIsWeb) return false; // Native Bluetooth not supported on Web
 
-    // Try SPP first (more common for budget thermal printers)
-    final sppSuccess = await sppService.connect(device);
-    if (sppSuccess) return true;
-    
-    // If SPP fails, try BLE
-    return await bleService.connect(device);
+    // Try BLE first (more modern, usually doesn't prompt for PIN unnecessarily)
+    final bleSuccess = await bleService.connect(device);
+    if (bleSuccess) return true;
+
+    // If BLE fails, try SPP (Classic Bluetooth)
+    return await sppService.connect(device);
   }
 
   @override
@@ -77,6 +77,8 @@ class UnifiedPrinterService implements IPrinterService {
         await bleService.disconnect();
       }
       await networkService.disconnect();
+      // Small delay to allow hardware cleanup
+      await Future.delayed(const Duration(milliseconds: 300));
     } catch (e) {
       debugPrint('Unified Disconnect Error: $e');
     }

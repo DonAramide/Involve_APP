@@ -51,12 +51,27 @@ class _ManageCategoriesPageState extends State<ManageCategoriesPage> {
                         itemCount: categories.length,
                         itemBuilder: (context, index) {
                           final category = categories[index];
+                          final hasStock = state.items.any((item) => 
+                            (item.categoryId == category.id || item.category == category.name) && 
+                            item.stockQty > 0
+                          );
+
                           return ListTile(
                             leading: const Icon(Icons.category),
                             title: Text(category.name),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _confirmDelete(context, category),
+                              icon: Icon(Icons.delete, color: hasStock ? Colors.grey : Colors.red),
+                              onPressed: hasStock 
+                                ? () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('You have to sell all items in "${category.name}" before you can delete it.'),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                : () => _confirmDelete(context, category),
+                              tooltip: hasStock ? 'Cannot delete: items still in stock' : 'Delete Category',
                             ),
                           );
                         },

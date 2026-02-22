@@ -7,6 +7,7 @@ import '../widgets/network_printer_config_dialog.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 import '../../domain/repositories/printer_service.dart';
 import '../../data/repositories/network_printer_service.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
 
 class PrinterSettingsPage extends StatefulWidget {
   const PrinterSettingsPage({super.key});
@@ -199,7 +200,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                     TextCommand('Date: ${DateTime.now().toString().split('.')[0]}', align: 'center'),
                     TextCommand('Thank you for choosing Invify', align: 'center'),
                     DividerCommand(),
-                  ], 58)
+                  ], context.read<SettingsBloc>().state.settings?.paperWidth ?? 58)
                 );
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Test print sent!')),

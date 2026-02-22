@@ -8,6 +8,7 @@ import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
+import 'package:involve_app/features/invoicing/domain/templates/invoice_template.dart';
 
 class ReportGenerator {
   static Future<pw.Document> buildReport({
@@ -176,6 +177,143 @@ class ReportGenerator {
     InvReportDateRange? dateRange,
   }) async {
     try {
+      final pdf = await buildInventoryPDF(
+        reportData: reportData,
+        settings: settings,
+        dateRange: dateRange,
+      );
+
+      final bytes = await pdf.save();
+
+      if (kIsWeb) {
+        await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => bytes,
+          name: 'Inventory_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+        );
+      } else {
+        await Printing.sharePdf(
+          bytes: bytes,
+          filename: 'Inventory_Report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  static Future<pw.Document> buildInventoryPDF({
+    required List<Map<String, dynamic>> reportData,
+    required AppSettings settings,
+    InvReportDateRange? dateRange,
+  }) async {
+    final pdf = pw.Document();
+
+    final dateStr = dateRange != null
+        ? '${DateFormat('MMM dd, yyyy').format(dateRange.start)} - ${DateFormat('MMM dd, yyyy').format(dateRange.end)}'
+        : 'Current Status';
+
+    final headers = ['Product', 'Price', 'Stock', 'Sold', 'Revenue'];
+    final data = reportData.map((item) {
+      return [
+        item['name'].toString(),
+        CurrencyFormatter.formatWithSymbol(item['price'], symbol: settings.currency),
+        item['stockQty'].toString(),
+        item['totalSold'].toString(),
+        CurrencyFormatter.formatWithSymbol(item['totalRevenue'], symbol: settings.currency),
+      ];
+    }).toList();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          return [
+            // Header
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      settings.organizationName.toUpperCase(),
+                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+                    ),
+                    if (settings.address.isNotEmpty) pw.Text(settings.address),
+                    if (settings.phone.isNotEmpty) pw.Text('Tel: ${settings.phone}'),
+                  ],
+                ),
+                if (settings.logo != null)
+                  pw.Container(
+                    width: 60,
+                    height: 60,
+                    child: _safeImage(settings.logo!),
+                  ),
+              ],
+            ),
+            pw.SizedBox(height: 20),
+            pw.Divider(),
+            pw.SizedBox(height: 10),
+            
+            // Title
+            pw.Center(
+              child: pw.Text(
+                'INVENTORY STATUS REPORT',
+                style: pw.TextStyle(
+                  fontSize: 22, 
+                  fontWeight: pw.FontWeight.bold, 
+                  color: _getPrimaryColor(settings)
+                ),
+              ),
+            ),
+            pw.Center(
+              child: pw.Text('Period: $dateStr', style: const pw.TextStyle(fontSize: 12)),
+            ),
+            pw.SizedBox(height: 20),
+
+            // Table
+            pw.Table.fromTextArray(
+              headers: headers,
+              data: data,
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+              cellAlignment: pw.Alignment.centerLeft,
+              cellAlignments: {
+                1: pw.Alignment.centerRight,
+                2: pw.Alignment.centerRight,
+                3: pw.Alignment.centerRight,
+                4: pw.Alignment.centerRight,
+              },
+              columnWidths: {
+                0: const pw.FlexColumnWidth(3.0), // Product
+                1: const pw.FlexColumnWidth(1.5), // Price
+                2: const pw.FlexColumnWidth(1.2), // Stock
+                3: const pw.FlexColumnWidth(1.2), // Sold
+                4: const pw.FlexColumnWidth(2.0), // Revenue
+              },
+            ),
+
+            pw.SizedBox(height: 40),
+            pw.Center(
+              child: pw.Text('Generated on ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
+                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey500)),
+            ),
+          ];
+        },
+      ),
+    );
+
+    return pdf;
+  }
+
+  static Future<void> exportInventoryCSV({
+    required List<Map<String, dynamic>> reportData,
+    required AppSettings settings,
+    InvReportDateRange? dateRange,
+  }) async {
+    try {
       final csvContent = buildInventoryCSV(reportData, settings);
       final bytes = Uint8List.fromList(csvContent.codeUnits);
       
@@ -238,6 +376,61 @@ class ReportGenerator {
         child: pw.Text(text),
       ),
     );
+  }
+
+  static List<PrintCommand> buildInventoryThermalCommands({
+    required List<Map<String, dynamic>> reportData,
+    required AppSettings settings,
+    InvReportDateRange? dateRange,
+  }) {
+    final commands = <PrintCommand>[];
+
+    // Logo (if enabled)
+    if (settings.showLogo && settings.logo != null) {
+      commands.add(ImageCommand(bytes: settings.logo!));
+    }
+
+    // Header
+    commands.add(TextCommand(settings.organizationName.toUpperCase(), isBold: true, align: 'center'));
+    if (settings.address.isNotEmpty) commands.add(TextCommand(settings.address, align: 'center'));
+    commands.add(DividerCommand());
+    
+    commands.add(TextCommand('INVENTORY REPORT', isBold: true, align: 'center'));
+    if (dateRange != null) {
+      commands.add(TextCommand(
+        '${DateFormat('MMM dd').format(dateRange.start)} - ${DateFormat('MMM dd').format(dateRange.end)}',
+        align: 'center',
+      ));
+    } else {
+      commands.add(TextCommand('As of: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}', align: 'center'));
+    }
+    commands.add(DividerCommand());
+
+    // Table Header
+    // Column specs: ITEM(8), QTY(5), SOLD(7), REV(12) = 32 chars
+    commands.add(TextCommand('ITEM     QTY   SOLD     REV', isBold: true));
+    commands.add(DividerCommand());
+
+    // Rows
+    for (final item in reportData) {
+      final name = item['name'].toString();
+      final qty = item['stockQty'].toString();
+      final sold = item['totalSold'].toString();
+      final rev = CurrencyFormatter.format(item['totalRevenue']).split('.')[0]; 
+
+      final nameTrunc = name.length > 8 ? name.substring(0, 8) : name.padRight(8);
+      final qtyPad = qty.padLeft(5);
+      final soldPad = sold.padLeft(7);
+      final revPad = rev.padLeft(12);
+      
+      commands.add(TextCommand('$nameTrunc$qtyPad$soldPad$revPad'));
+    }
+
+    commands.add(DividerCommand());
+    commands.add(TextCommand('Generated by Sales Involve', align: 'center'));
+    commands.add(SizedBoxCommand(height: 3));
+
+    return commands;
   }
 }
 
