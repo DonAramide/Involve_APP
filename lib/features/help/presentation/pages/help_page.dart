@@ -107,7 +107,7 @@ class _HelpPageState extends State<HelpPage> {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  'Version 1.4.3',
+                  'Version 1.5.0',
                   style: TextStyle(color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 8),
@@ -126,10 +126,9 @@ class _HelpPageState extends State<HelpPage> {
           _buildExpansionTile(
             icon: Icons.inventory,
             title: 'Stock Management',
-            content: '• Go to "Stock / Items" to manage your inventory.\n'
+            content: '• Go to "Stock Management" to manage your inventory.\n'
                 '• Tap "+" to add new items with images and categories.\n'
-                '• Long press an item to delete or edit it.\n'
-                '• Use "Manage Categories" to organize your menu.',
+                '• **Safeguard**: You cannot delete a product or category if it still contains items in stock (> 0). This prevents accidental data loss.',
           ),
           _buildExpansionTile(
             icon: Icons.shopping_cart,
@@ -138,6 +137,7 @@ class _HelpPageState extends State<HelpPage> {
                 '• Tap items to add them to the cart.\n'
                 '• Use the category chips to filter items.\n'
                 '• Swipe left on a cart item to remove it.\n'
+                '• **Custom Pricing**: If enabled in Settings, you can tap "Set Receipt Price" on items to inflate the price shown on the customer\'s receipt while keeping your actual accounts accurate.\n'
                 '• Tap "Charge" to finalize.\n'
                 '• Partial Payments: Enter "Amount Received" during checkout. The system will track the balance for later.',
           ),
@@ -145,9 +145,9 @@ class _HelpPageState extends State<HelpPage> {
             icon: Icons.print,
             title: 'Printing',
             content: '• Configure printers in Settings > Printer Settings.\n'
-                '• Supports Bluetooth and USB thermal printers (58mm/80mm).\n'
-                '• Ensure Bluetooth is on and device is paired.\n'
-                '• If connection fails, try restarting the printer.',
+                '• Supports Bluetooth, USB, and Network thermal printers.\n'
+                '• **Inventory Reports**: You can print your complete stock status to your thermal printer via the "Print" icon in the Inventory Report page.\n'
+                '• If connection fails, check if the printer is on and within range.',
           ),
           _buildExpansionTile(
             icon: Icons.people,
