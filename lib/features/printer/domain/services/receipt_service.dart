@@ -11,7 +11,15 @@ import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class ReceiptService {
   Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride}) async {
-    final pdf = pw.Document();
+    final font = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: font,
+        bold: boldFont,
+      ),
+    );
     final template = settings.defaultInvoiceTemplate;
     final bool useCustomPrices = useCustomPricesOverride ?? settings.customReceiptPricingEnabled;
 
