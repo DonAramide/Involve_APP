@@ -16,7 +16,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 28;
+  int get schemaVersion => 29;
 
   @override
   MigrationStrategy get migration {
@@ -40,6 +40,10 @@ class AppDatabase extends _$AppDatabase {
           // CAC Number Migration
           await _safeAddColumn(m, settings, settings.cacNumber);
           await _safeAddColumn(m, settings, settings.showCacNumber);
+        }
+        if (from < 29) {
+          // Total Sales Card Toggle Migration
+          await _safeAddColumn(m, settings, settings.showTotalSalesCard);
         }
       },
       beforeOpen: (details) async {

@@ -129,7 +129,8 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       }
                       return Column(
                         children: [
-                          _buildTotalSummary(context, state),
+                          if (context.read<SettingsBloc>().state.settings?.showTotalSalesCard == true)
+                            _buildTotalSummary(context, state),
                           Expanded(
                             child: _isTableView
                                 ? _buildReportsTable(context, state)

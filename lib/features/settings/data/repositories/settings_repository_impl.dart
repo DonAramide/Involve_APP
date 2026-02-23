@@ -70,6 +70,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showLogo: Value(settings.showLogo),
       cacNumber: Value(settings.cacNumber),
       showCacNumber: Value(settings.showCacNumber),
+      showTotalSalesCard: Value(settings.showTotalSalesCard),
     );
 
     if (existing == null) {
@@ -129,6 +130,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showLogo: row.showLogo,
       cacNumber: row.cacNumber,
       showCacNumber: row.showCacNumber,
+      showTotalSalesCard: row.showTotalSalesCard,
     );
   }
 }

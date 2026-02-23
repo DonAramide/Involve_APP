@@ -163,6 +163,13 @@ class SettingsPage extends StatelessWidget {
                   onChanged: (value) => 
                     context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showSyncStatus: value))),
                 ),
+                SwitchListTile(
+                  title: const Text('Show Total Sales Card'),
+                  subtitle: const Text('Display the summary card at the top of Invoice History'),
+                  value: settings.showTotalSalesCard,
+                  onChanged: (value) => 
+                    context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showTotalSalesCard: value))),
+                ),
                 const Divider(),
                 ListTile(
                   title: const Text('Restore Backup'),

@@ -50,4 +50,5 @@ class Settings extends Table {
   BoolColumn get showLogo => boolean().withDefault(const Constant(true))();
   TextColumn get cacNumber => text().nullable()();
   BoolColumn get showCacNumber => boolean().withDefault(const Constant(false))();
+  BoolColumn get showTotalSalesCard => boolean().withDefault(const Constant(true))();
 }

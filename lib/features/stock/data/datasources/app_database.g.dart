@@ -3124,6 +3124,16 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("show_cac_number" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _showTotalSalesCardMeta =
+      const VerificationMeta('showTotalSalesCard');
+  @override
+  late final GeneratedColumn<bool> showTotalSalesCard = GeneratedColumn<bool>(
+      'show_total_sales_card', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_total_sales_card" IN (0, 1))'),
+      defaultValue: const Constant(true));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -3163,7 +3173,8 @@ class $SettingsTable extends Settings
         customReceiptPricingEnabled,
         showLogo,
         cacNumber,
-        showCacNumber
+        showCacNumber,
+        showTotalSalesCard
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3382,6 +3393,12 @@ class $SettingsTable extends Settings
           showCacNumber.isAcceptableOrUnknown(
               data['show_cac_number']!, _showCacNumberMeta));
     }
+    if (data.containsKey('show_total_sales_card')) {
+      context.handle(
+          _showTotalSalesCardMeta,
+          showTotalSalesCard.isAcceptableOrUnknown(
+              data['show_total_sales_card']!, _showTotalSalesCardMeta));
+    }
     return context;
   }
 
@@ -3473,6 +3490,8 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.string, data['${effectivePrefix}cac_number']),
       showCacNumber: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}show_cac_number'])!,
+      showTotalSalesCard: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_total_sales_card'])!,
     );
   }
 
@@ -3521,6 +3540,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showLogo;
   final String? cacNumber;
   final bool showCacNumber;
+  final bool showTotalSalesCard;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -3559,7 +3579,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.customReceiptPricingEnabled,
       required this.showLogo,
       this.cacNumber,
-      required this.showCacNumber});
+      required this.showCacNumber,
+      required this.showTotalSalesCard});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3622,6 +3643,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       map['cac_number'] = Variable<String>(cacNumber);
     }
     map['show_cac_number'] = Variable<bool>(showCacNumber);
+    map['show_total_sales_card'] = Variable<bool>(showTotalSalesCard);
     return map;
   }
 
@@ -3682,6 +3704,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ? const Value.absent()
           : Value(cacNumber),
       showCacNumber: Value(showCacNumber),
+      showTotalSalesCard: Value(showTotalSalesCard),
     );
   }
 
@@ -3734,6 +3757,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showLogo: serializer.fromJson<bool>(json['showLogo']),
       cacNumber: serializer.fromJson<String?>(json['cacNumber']),
       showCacNumber: serializer.fromJson<bool>(json['showCacNumber']),
+      showTotalSalesCard: serializer.fromJson<bool>(json['showTotalSalesCard']),
     );
   }
   @override
@@ -3781,6 +3805,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'showLogo': serializer.toJson<bool>(showLogo),
       'cacNumber': serializer.toJson<String?>(cacNumber),
       'showCacNumber': serializer.toJson<bool>(showCacNumber),
+      'showTotalSalesCard': serializer.toJson<bool>(showTotalSalesCard),
     };
   }
 
@@ -3822,7 +3847,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? customReceiptPricingEnabled,
           bool? showLogo,
           Value<String?> cacNumber = const Value.absent(),
-          bool? showCacNumber}) =>
+          bool? showCacNumber,
+          bool? showTotalSalesCard}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -3872,6 +3898,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showLogo: showLogo ?? this.showLogo,
         cacNumber: cacNumber.present ? cacNumber.value : this.cacNumber,
         showCacNumber: showCacNumber ?? this.showCacNumber,
+        showTotalSalesCard: showTotalSalesCard ?? this.showTotalSalesCard,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -3958,6 +3985,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showCacNumber: data.showCacNumber.present
           ? data.showCacNumber.value
           : this.showCacNumber,
+      showTotalSalesCard: data.showTotalSalesCard.present
+          ? data.showTotalSalesCard.value
+          : this.showTotalSalesCard,
     );
   }
 
@@ -4001,7 +4031,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled, ')
           ..write('showLogo: $showLogo, ')
           ..write('cacNumber: $cacNumber, ')
-          ..write('showCacNumber: $showCacNumber')
+          ..write('showCacNumber: $showCacNumber, ')
+          ..write('showTotalSalesCard: $showTotalSalesCard')
           ..write(')'))
         .toString();
   }
@@ -4045,7 +4076,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         customReceiptPricingEnabled,
         showLogo,
         cacNumber,
-        showCacNumber
+        showCacNumber,
+        showTotalSalesCard
       ]);
   @override
   bool operator ==(Object other) =>
@@ -4089,7 +4121,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
               this.customReceiptPricingEnabled &&
           other.showLogo == this.showLogo &&
           other.cacNumber == this.cacNumber &&
-          other.showCacNumber == this.showCacNumber);
+          other.showCacNumber == this.showCacNumber &&
+          other.showTotalSalesCard == this.showTotalSalesCard);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -4131,6 +4164,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showLogo;
   final Value<String?> cacNumber;
   final Value<bool> showCacNumber;
+  final Value<bool> showTotalSalesCard;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -4170,6 +4204,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showLogo = const Value.absent(),
     this.cacNumber = const Value.absent(),
     this.showCacNumber = const Value.absent(),
+    this.showTotalSalesCard = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -4210,6 +4245,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showLogo = const Value.absent(),
     this.cacNumber = const Value.absent(),
     this.showCacNumber = const Value.absent(),
+    this.showTotalSalesCard = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -4252,6 +4288,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showLogo,
     Expression<String>? cacNumber,
     Expression<bool>? showCacNumber,
+    Expression<bool>? showTotalSalesCard,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4301,6 +4338,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (showLogo != null) 'show_logo': showLogo,
       if (cacNumber != null) 'cac_number': cacNumber,
       if (showCacNumber != null) 'show_cac_number': showCacNumber,
+      if (showTotalSalesCard != null)
+        'show_total_sales_card': showTotalSalesCard,
     });
   }
 
@@ -4342,7 +4381,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? customReceiptPricingEnabled,
       Value<bool>? showLogo,
       Value<String?>? cacNumber,
-      Value<bool>? showCacNumber}) {
+      Value<bool>? showCacNumber,
+      Value<bool>? showTotalSalesCard}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -4388,6 +4428,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       showLogo: showLogo ?? this.showLogo,
       cacNumber: cacNumber ?? this.cacNumber,
       showCacNumber: showCacNumber ?? this.showCacNumber,
+      showTotalSalesCard: showTotalSalesCard ?? this.showTotalSalesCard,
     );
   }
 
@@ -4514,6 +4555,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (showCacNumber.present) {
       map['show_cac_number'] = Variable<bool>(showCacNumber.value);
     }
+    if (showTotalSalesCard.present) {
+      map['show_total_sales_card'] = Variable<bool>(showTotalSalesCard.value);
+    }
     return map;
   }
 
@@ -4557,7 +4601,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled, ')
           ..write('showLogo: $showLogo, ')
           ..write('cacNumber: $cacNumber, ')
-          ..write('showCacNumber: $showCacNumber')
+          ..write('showCacNumber: $showCacNumber, ')
+          ..write('showTotalSalesCard: $showTotalSalesCard')
           ..write(')'))
         .toString();
   }
@@ -8309,6 +8354,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showLogo,
   Value<String?> cacNumber,
   Value<bool> showCacNumber,
+  Value<bool> showTotalSalesCard,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -8349,6 +8395,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showLogo,
   Value<String?> cacNumber,
   Value<bool> showCacNumber,
+  Value<bool> showTotalSalesCard,
 });
 
 class $$SettingsTableFilterComposer
@@ -8488,6 +8535,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get showCacNumber => $composableBuilder(
       column: $table.showCacNumber, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showTotalSalesCard => $composableBuilder(
+      column: $table.showTotalSalesCard,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -8633,6 +8684,10 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get showCacNumber => $composableBuilder(
       column: $table.showCacNumber,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showTotalSalesCard => $composableBuilder(
+      column: $table.showTotalSalesCard,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -8757,6 +8812,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get showCacNumber => $composableBuilder(
       column: $table.showCacNumber, builder: (column) => column);
+
+  GeneratedColumn<bool> get showTotalSalesCard => $composableBuilder(
+      column: $table.showTotalSalesCard, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -8823,6 +8881,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showLogo = const Value.absent(),
             Value<String?> cacNumber = const Value.absent(),
             Value<bool> showCacNumber = const Value.absent(),
+            Value<bool> showTotalSalesCard = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -8863,6 +8922,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             showLogo: showLogo,
             cacNumber: cacNumber,
             showCacNumber: showCacNumber,
+            showTotalSalesCard: showTotalSalesCard,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -8903,6 +8963,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showLogo = const Value.absent(),
             Value<String?> cacNumber = const Value.absent(),
             Value<bool> showCacNumber = const Value.absent(),
+            Value<bool> showTotalSalesCard = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -8943,6 +9004,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             showLogo: showLogo,
             cacNumber: cacNumber,
             showCacNumber: showCacNumber,
+            showTotalSalesCard: showTotalSalesCard,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

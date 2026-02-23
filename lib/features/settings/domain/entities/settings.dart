@@ -47,6 +47,7 @@ class AppSettings extends Equatable {
   final bool showLogo;
   final String? cacNumber;
   final bool showCacNumber;
+  final bool showTotalSalesCard;
 
   const AppSettings({
     this.id,
@@ -87,6 +88,7 @@ class AppSettings extends Equatable {
     this.showLogo = true,
     this.cacNumber,
     this.showCacNumber = false,
+    this.showTotalSalesCard = true,
   });
 
   AppSettings copyWith({
@@ -128,6 +130,7 @@ class AppSettings extends Equatable {
     bool? showLogo,
     String? cacNumber,
     bool? showCacNumber,
+    bool? showTotalSalesCard,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -168,6 +171,7 @@ class AppSettings extends Equatable {
       showLogo: showLogo ?? this.showLogo,
       cacNumber: cacNumber ?? this.cacNumber,
       showCacNumber: showCacNumber ?? this.showCacNumber,
+      showTotalSalesCard: showTotalSalesCard ?? this.showTotalSalesCard,
     );
   }
 
@@ -211,5 +215,6 @@ class AppSettings extends Equatable {
         showLogo,
         cacNumber,
         showCacNumber,
+        showTotalSalesCard,
       ];
 }
