@@ -81,7 +81,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
   @override
   Future<List<Invoice>> getAllInvoices() async {
-    return _getInvoicesWithItems(db.select(db.invoices));
+    return _getInvoicesWithItems(db.select(db.invoices)
+      ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]));
   }
 
   @override
@@ -95,7 +96,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
   @override
   Future<List<Invoice>> getInvoicesByDateRange(DateTime start, DateTime end) async {
     final query = db.select(db.invoices)
-      ..where((t) => t.dateCreated.isBetweenValues(start, end));
+      ..where((t) => t.dateCreated.isBetweenValues(start, end))
+      ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]);
     return _getInvoicesWithItems(query);
   }
 
