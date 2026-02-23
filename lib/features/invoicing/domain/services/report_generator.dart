@@ -153,11 +153,12 @@ class ReportGenerator {
             pw.SizedBox(height: 30),
 
             // Payment Summary Section
-            pw.Container(
-              width: 250,
-              alignSelf: pw.Alignment.centerRight,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Container(
+                width: 250,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text('PAYMENT SUMMARY (RECEIVED)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
                   pw.SizedBox(height: 5),
@@ -189,6 +190,7 @@ class ReportGenerator {
                 ],
               ),
             ),
+          ),
             pw.SizedBox(height: 40),
             pw.Center(
               child: pw.Text('Generated on ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}',
