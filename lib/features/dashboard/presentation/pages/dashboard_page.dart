@@ -62,7 +62,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.memory(
-                        settings.logo!,
+                        settings!.logo!,
                         width: 40,
                         height: 40,
                         fit: BoxFit.cover,
