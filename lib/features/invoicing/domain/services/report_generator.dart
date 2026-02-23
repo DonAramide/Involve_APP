@@ -23,17 +23,30 @@ class ReportGenerator {
         : 'All Time';
 
     final totalAmount = invoices.fold<double>(0, (sum, item) => sum + item.totalAmount);
+    final totalPaid = invoices.fold<double>(0, (sum, item) => sum + item.amountPaid);
+    final totalBalance = invoices.fold<double>(0, (sum, item) => sum + item.balanceAmount);
+
+    // Summary by payment method
+    final methodSummary = <String, double>{
+      'Cash': 0.0,
+      'POS': 0.0,
+      'Transfer': 0.0,
+    };
+    for (final invoice in invoices) {
+      final method = invoice.paymentMethod ?? 'Other';
+      methodSummary[method] = (methodSummary[method] ?? 0.0) + invoice.amountPaid;
+    }
 
     // Prepare table data
-    final headers = ['Date', 'Invoice ID', 'Customer', 'Method', 'Sold By', 'Amount'];
+    final headers = ['Date', 'Invoice ID', 'Method', 'Total', 'Paid', 'Balance'];
     final data = invoices.map((invoice) {
       return [
-        DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated),
+        DateFormat('MM-dd HH:mm').format(invoice.dateCreated),
         invoice.invoiceNumber,
-        invoice.customerName ?? '-',
         invoice.paymentMethod ?? '-',
-        invoice.staffName ?? 'Admin',
-        CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: settings.currency),
+        CurrencyFormatter.format(invoice.totalAmount),
+        CurrencyFormatter.format(invoice.amountPaid),
+        CurrencyFormatter.format(invoice.balanceAmount),
       ];
     }).toList();
 
@@ -91,19 +104,22 @@ class ReportGenerator {
               headers: headers,
               data: data,
               border: pw.TableBorder.all(color: PdfColors.grey300),
-              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+              cellStyle: const pw.TextStyle(fontSize: 9),
               headerDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
               cellAlignment: pw.Alignment.centerLeft,
               cellAlignments: {
+                3: pw.Alignment.centerRight,
+                4: pw.Alignment.centerRight,
                 5: pw.Alignment.centerRight,
               },
               columnWidths: {
-                0: const pw.FlexColumnWidth(2.2), // Date
-                1: const pw.FlexColumnWidth(1.8), // ID
-                2: const pw.FlexColumnWidth(2.5), // Customer
-                3: const pw.FlexColumnWidth(1.5), // Method
-                4: const pw.FlexColumnWidth(2.0), // Sold By
-                5: const pw.FlexColumnWidth(2.0), // Amount
+                0: const pw.FlexColumnWidth(1.8), // Date
+                1: const pw.FlexColumnWidth(1.5), // ID
+                2: const pw.FlexColumnWidth(1.2), // Method
+                3: const pw.FlexColumnWidth(1.8), // Total
+                4: const pw.FlexColumnWidth(1.8), // Paid
+                5: const pw.FlexColumnWidth(1.8), // Balance
               },
             ),
 
@@ -115,15 +131,63 @@ class ReportGenerator {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text('Total Invoices: ${invoices.length}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                pw.Text(
-                  'GRAND TOTAL: ${settings.currency} ${CurrencyFormatter.format(totalAmount)}',
-                  style: pw.TextStyle(
-                    fontSize: 16, 
-                    fontWeight: pw.FontWeight.bold, 
-                    color: _getPrimaryColor(settings)
-                  ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      'PERIOD TOTAL: ${settings.currency} ${CurrencyFormatter.format(totalAmount)}',
+                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                    ),
+                    pw.Text(
+                      'TOTAL PAID: ${settings.currency} ${CurrencyFormatter.format(totalPaid)}',
+                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.green),
+                    ),
+                    pw.Text(
+                      'TOTAL BALANCE: ${settings.currency} ${CurrencyFormatter.format(totalBalance)}',
+                      style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.red),
+                    ),
+                  ],
                 ),
               ],
+            ),
+            pw.SizedBox(height: 30),
+
+            // Payment Summary Section
+            pw.Container(
+              width: 250,
+              alignSelf: pw.Alignment.centerRight,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('PAYMENT SUMMARY (RECEIVED)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                  pw.SizedBox(height: 5),
+                  pw.Divider(height: 1),
+                  ...methodSummary.entries.map((e) => pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text(e.key),
+                        pw.Text('${settings.currency} ${CurrencyFormatter.format(e.value)}'),
+                      ],
+                    ),
+                  )).toList(),
+                  pw.Divider(height: 1),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Text('CASH IN HAND', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                        pw.Text(
+                          '${settings.currency} ${CurrencyFormatter.format(totalPaid)}',
+                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: _getPrimaryColor(settings)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
             pw.SizedBox(height: 40),
             pw.Center(

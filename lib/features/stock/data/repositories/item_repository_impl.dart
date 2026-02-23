@@ -141,7 +141,8 @@ class ItemRepositoryImpl implements ItemRepository {
       query.where(db.invoices.dateCreated.isBiggerOrEqualValue(start));
     }
     if (end != null) {
-      query.where(db.invoices.dateCreated.isSmallerOrEqualValue(end));
+      final inclusiveEnd = DateTime(end.year, end.month, end.day, 23, 59, 59);
+      query.where(db.invoices.dateCreated.isSmallerOrEqualValue(inclusiveEnd));
     }
 
     query.addColumns([summedQuantity]);
