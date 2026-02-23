@@ -15,7 +15,6 @@ class AppSettings extends Equatable {
   final bool taxEnabled;
   final bool discountEnabled;
   final String defaultInvoiceTemplate;
-  final bool allowPriceUpdates;
   final bool confirmPriceOnSelection;
   final double taxRate;
   
@@ -46,6 +45,8 @@ class AppSettings extends Equatable {
   final bool showSyncStatus;
   final bool customReceiptPricingEnabled;
   final bool showLogo;
+  final String? cacNumber;
+  final bool showCacNumber;
 
   const AppSettings({
     this.id,
@@ -61,7 +62,6 @@ class AppSettings extends Equatable {
     this.taxEnabled = true,
     this.discountEnabled = true,
     this.defaultInvoiceTemplate = 'compact',
-    this.allowPriceUpdates = true,
     this.confirmPriceOnSelection = false,
     this.taxRate = 0.15,
     this.bankName,
@@ -85,6 +85,8 @@ class AppSettings extends Equatable {
     this.showSyncStatus = true,
     this.customReceiptPricingEnabled = false,
     this.showLogo = true,
+    this.cacNumber,
+    this.showCacNumber = false,
   });
 
   AppSettings copyWith({
@@ -101,7 +103,6 @@ class AppSettings extends Equatable {
     bool? taxEnabled,
     bool? discountEnabled,
     String? defaultInvoiceTemplate,
-    bool? allowPriceUpdates,
     bool? confirmPriceOnSelection,
     double? taxRate,
     String? bankName,
@@ -125,6 +126,8 @@ class AppSettings extends Equatable {
     bool? showSyncStatus,
     bool? customReceiptPricingEnabled,
     bool? showLogo,
+    String? cacNumber,
+    bool? showCacNumber,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -140,7 +143,6 @@ class AppSettings extends Equatable {
       taxEnabled: taxEnabled ?? this.taxEnabled,
       discountEnabled: discountEnabled ?? this.discountEnabled,
       defaultInvoiceTemplate: defaultInvoiceTemplate ?? this.defaultInvoiceTemplate,
-      allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
       confirmPriceOnSelection: confirmPriceOnSelection ?? this.confirmPriceOnSelection,
       taxRate: taxRate ?? this.taxRate,
       bankName: bankName ?? this.bankName,
@@ -164,6 +166,8 @@ class AppSettings extends Equatable {
       showSyncStatus: showSyncStatus ?? this.showSyncStatus,
       customReceiptPricingEnabled: customReceiptPricingEnabled ?? this.customReceiptPricingEnabled,
       showLogo: showLogo ?? this.showLogo,
+      cacNumber: cacNumber ?? this.cacNumber,
+      showCacNumber: showCacNumber ?? this.showCacNumber,
     );
   }
 
@@ -182,7 +186,6 @@ class AppSettings extends Equatable {
         taxEnabled,
         discountEnabled,
         defaultInvoiceTemplate,
-        allowPriceUpdates,
         confirmPriceOnSelection,
         taxRate,
         bankName,
@@ -206,5 +209,7 @@ class AppSettings extends Equatable {
         showSyncStatus,
         customReceiptPricingEnabled,
         showLogo,
+        cacNumber,
+        showCacNumber,
       ];
 }

@@ -45,7 +45,6 @@ class SettingsRepositoryImpl implements SettingsRepository {
       taxEnabled: Value(settings.taxEnabled),
       discountEnabled: Value(settings.discountEnabled),
       defaultInvoiceTemplate: Value(settings.defaultInvoiceTemplate),
-      allowPriceUpdates: Value(settings.allowPriceUpdates),
       confirmPriceOnSelection: Value(settings.confirmPriceOnSelection),
       taxRate: Value(settings.taxRate),
       bankName: Value(settings.bankName),
@@ -69,6 +68,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showSyncStatus: Value(settings.showSyncStatus),
       customReceiptPricingEnabled: Value(settings.customReceiptPricingEnabled),
       showLogo: Value(settings.showLogo),
+      cacNumber: Value(settings.cacNumber),
+      showCacNumber: Value(settings.showCacNumber),
     );
 
     if (existing == null) {
@@ -103,7 +104,6 @@ class SettingsRepositoryImpl implements SettingsRepository {
       taxEnabled: row.taxEnabled,
       discountEnabled: row.discountEnabled,
       defaultInvoiceTemplate: row.defaultInvoiceTemplate,
-      allowPriceUpdates: row.allowPriceUpdates,
       confirmPriceOnSelection: row.confirmPriceOnSelection,
       taxRate: row.taxRate,
       bankName: row.bankName,
@@ -127,6 +127,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showSyncStatus: row.showSyncStatus,
       customReceiptPricingEnabled: row.customReceiptPricingEnabled,
       showLogo: row.showLogo,
+      cacNumber: row.cacNumber,
+      showCacNumber: row.showCacNumber,
     );
   }
 }

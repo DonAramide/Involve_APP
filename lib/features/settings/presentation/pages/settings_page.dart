@@ -60,6 +60,8 @@ class SettingsPage extends StatelessWidget {
                   : _buildTextTile(context, 'Name', settings.organizationName, (val) => _update(context, settings.copyWith(organizationName: val))),
                 _buildTextTile(context, 'Address', settings.address, (val) => _update(context, settings.copyWith(address: val))),
                 _buildTextTile(context, 'Phone', settings.phone, (val) => _update(context, settings.copyWith(phone: val))),
+                _buildTextTile(context, 'CAC Number', settings.cacNumber ?? '', (val) => _update(context, settings.copyWith(cacNumber: val))),
+                _buildSwitchTile('Print CAC Number on Receipt', settings.showCacNumber, (val) => _update(context, settings.copyWith(showCacNumber: val))),
                 _buildTextTile(context, 'Description', settings.businessDescription ?? '', (val) => _update(context, settings.copyWith(businessDescription: val))),
                 _buildTextTile(context, 'Tax ID (VAT/GST)', settings.taxId ?? '', (val) => _update(context, settings.copyWith(taxId: val))),
                 const Divider(),
@@ -83,7 +85,7 @@ class SettingsPage extends StatelessWidget {
                     },
                   ),
                 _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
-                _buildSwitchTile('Allow Price Updates', settings.allowPriceUpdates, (val) => _update(context, settings.copyWith(allowPriceUpdates: val))),
+
                 _buildSwitchTile('Confirm Item Price on Selection', settings.confirmPriceOnSelection, (val) => _update(context, settings.copyWith(confirmPriceOnSelection: val))),
                 _buildSwitchTile('Enable Payment Methods (Cash/POS/Transfer)', settings.paymentMethodsEnabled, (val) => _update(context, settings.copyWith(paymentMethodsEnabled: val))),
                 _buildSwitchTile('Enable Custom Receipt Pricing (Inflated Prices)', settings.customReceiptPricingEnabled, (val) => _update(context, settings.copyWith(customReceiptPricingEnabled: val))),

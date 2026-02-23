@@ -28,12 +28,14 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       if (settings.businessDescription != null && settings.businessDescription!.isNotEmpty)
         TextCommand(settings.businessDescription!, align: 'center'),
       if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
+      if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
+        TextCommand('CAC: ${settings.cacNumber}', align: 'center'),
       if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}', align: 'center'),
       TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
       if (invoice.paymentMethod != null) TextCommand('Method: ${invoice.paymentMethod}', align: 'center'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'center'),
-      DividerCommand(),
+      TextCommand('-' * width),
       ...invoice.items.map((item) {
         final name = item.item.name;
         final qtyLine = 'x${item.quantity}';
@@ -59,14 +61,14 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
         }
         return commands;
       }).expand((x) => x),
-      DividerCommand(),
+      TextCommand('-' * width),
       if (invoice.taxAmount > 0) 
         TextCommand(_formatRow('Subtotal', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0) 
         TextCommand(_formatRow('Tax', CurrencyFormatter.format(invoice.taxAmount), width)),
       TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      TextCommand('-' * width),
       if (settings.showAccountDetails && settings.bankName != null) ...[
-        DividerCommand(),
         TextCommand('PAYMENT DETAILS', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}', align: 'center'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
@@ -76,7 +78,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
         SizedBoxCommand(height: 1),
         TextCommand('Signature: .................', align: 'center'),
       ],
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
       TextCommand('Powered by IIPS', align: 'center'),
     ];
@@ -111,14 +113,16 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       if (settings.businessDescription != null && settings.businessDescription!.isNotEmpty)
         TextCommand(settings.businessDescription!, align: 'center'),
       if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
+      if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
+        TextCommand('CAC: ${settings.cacNumber}', align: 'center'),
       if (settings.phone.isNotEmpty) TextCommand('Phone: ${settings.phone}', align: 'center'),
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand('INVOICE DETAIL', align: 'center', isBold: true),
       TextCommand('Number: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}'),
       if (invoice.paymentMethod != null) TextCommand('Payment Method: ${invoice.paymentMethod}'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}'),
-      DividerCommand(),
+      TextCommand('-' * width),
       ...invoice.items.map((item) {
         final usePrint = settings.customReceiptPricingEnabled && item.printPrice != null;
         List<PrintCommand> commands = [
@@ -132,14 +136,14 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
         }
         return commands;
       }).expand((x) => x),
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand(_formatRow('Subtotal', CurrencyFormatter.format(invoice.subtotal), width)),
       TextCommand(_formatRow('Tax', CurrencyFormatter.format(invoice.taxAmount), width)),
       if (invoice.discountAmount > 0) 
         TextCommand(_formatRow('Discount', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
       TextCommand(_formatRow('GRAND TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       if (settings.showAccountDetails && settings.bankName != null) ...[
-        DividerCommand(),
+        TextCommand('-' * width),
         TextCommand('ACCOUNT DETAILS', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}'),
         if (settings.accountNumber != null) TextCommand('Account: ${settings.accountNumber}'),
@@ -149,7 +153,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
         SizedBoxCommand(height: 1),
         TextCommand('Signature: .................'),
       ],
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
       TextCommand('Powered by IIPS', align: 'center'),
     ];
@@ -182,23 +186,23 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Date: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'center'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'center'),
-      DividerCommand(),
+      TextCommand('-' * width),
       ...invoice.items.map((item) {
         final usePrint = settings.customReceiptPricingEnabled && item.printPrice != null;
         return TextCommand('${item.item.name} x${item.quantity}  ${CurrencyFormatter.format(usePrint ? item.totalPrint : item.total)}');
       }),
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand('TOTAL: ${settings.currency}${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', align: 'right', isBold: true),
       if (settings.showAccountDetails && settings.bankName != null) ...[
-        DividerCommand(),
+        TextCommand('-' * width),
         TextCommand('PAYMENT: ${settings.bankName}', align: 'center'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
       ],
       if (settings.showSignatureSpace) ...[
         SizedBoxCommand(height: 1),
-        TextCommand('Sign: .................', align: 'center'),
+        TextCommand('Sign: .................', align: 'right'),
       ],
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
     ];
   }
@@ -225,8 +229,10 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
-      if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
-      DividerCommand(),
+      if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
+        TextCommand('CAC: ${settings.cacNumber}', align: 'center'),
+      TextCommand('Tel: ${settings.phone}', align: 'center'),
+      TextCommand('-' * width),
       TextCommand('BILL TO:', isBold: true),
       TextCommand(invoice.customerName ?? 'Cash Customer'),
       if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),
@@ -234,10 +240,10 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       TextCommand('INVOICE #: ${invoice.invoiceNumber}', align: 'right'),
       TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'right'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'right'),
-      DividerCommand(),
+      TextCommand('-' * width),
       // Dynamic Table Header
       TextCommand(_buildTableHeader(width), isBold: true),
-      DividerCommand(),
+      TextCommand('-' * width),
       ...invoice.items.map((item) {
         final row = _buildTableRow(item, width, settings.customReceiptPricingEnabled);
         List<PrintCommand> commands = [TextCommand(row)];
@@ -249,35 +255,42 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
         }
         return commands;
       }).expand((x) => x),
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand(_formatSummaryRow('SUBTOTAL:', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0)
         TextCommand(_formatSummaryRow('TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%):', CurrencyFormatter.format(invoice.taxAmount), width)),
       if (invoice.discountAmount > 0)
         TextCommand(_formatSummaryRow('DISCOUNT:', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand(_formatSummaryRow('TOTAL:', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       if (settings.showAccountDetails && settings.bankName != null) ...[
-        DividerCommand(),
+        TextCommand('-' * width),
         TextCommand('PAYMENT METHODS:', isBold: true),
         TextCommand('Bank: ${settings.bankName}'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}'),
       ],
       if (settings.showSignatureSpace) ...[
         SizedBoxCommand(height: 2),
-        TextCommand('--------------------------', align: 'right'),
+        TextCommand('-' * (width ~/ 2), align: 'right'),
         TextCommand('Signature', align: 'right'),
       ],
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
       TextCommand('Powered by IIPS', align: 'center'),
     ];
   }
 
   String _buildTableHeader(int width) {
-    if (width <= 32) return 'ITEM      PRICE  QTY    TOTAL';
-    if (width <= 42) return 'ITEM            PRICE    QTY     TOTAL';
-    return 'ITEM                    PRICE      QTY        TOTAL';
+    if (width <= 32) {
+      // 9 + 8 + 4 + 11 = 32
+      return 'ITEM     PRICE   QTY      TOTAL';
+    } else if (width <= 42) {
+      // 16 + 9 + 4 + 13 = 42 (Shifted Price +2, adjusted Total -2 to fit)
+      return 'ITEM            PRICE    QTY        TOTAL';
+    } else {
+      // 22 + 12 + 6 + 12 = 52 (Preserving user's manual alignment)
+      return 'ITEM                 PRICE       QTY          TOTAL';
+    }
   }
 
   String _buildTableRow(InvoiceItem item, int width, bool customPricingEnabled) {
@@ -286,23 +299,25 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
     final total = usePrint ? item.totalPrint : item.total;
 
     if (width <= 32) {
-      final name = item.item.name.padRight(10).substring(0, 10);
-      final price = CurrencyFormatter.format(unitPrice).padLeft(7).substring(0, 7);
-      final qty = item.quantity.toString().padLeft(5).substring(0, 5);
-      final totalStr = CurrencyFormatter.format(total).padLeft(10).substring(0, 10);
+      final name = item.item.name.padRight(9).substring(0, 9);
+      final price = CurrencyFormatter.format(unitPrice).padLeft(8).substring(0, 8);
+      final qty = item.quantity.toString().padLeft(4).substring(0, 4);
+      final totalStr = CurrencyFormatter.format(total).padLeft(11).substring(0, 11);
       return '$name$price$qty$totalStr';
     } else if (width <= 42) {
-       final name = item.item.name.padRight(16).substring(0, 16);
-       final price = CurrencyFormatter.format(unitPrice).padLeft(9).substring(0, 9);
-       final qty = item.quantity.toString().padLeft(7).substring(0, 7);
-       final totalStr = CurrencyFormatter.format(total).padLeft(10).substring(0, 10);
-       return '$name$price$qty$totalStr';
+      // 16 + 9 + 4 + 13 = 42
+      final name = item.item.name.padRight(16).substring(0, 16);
+      final price = CurrencyFormatter.format(unitPrice).padLeft(9).substring(0, 9);
+      final qty = item.quantity.toString().padLeft(4).substring(0, 4);
+      final totalStr = CurrencyFormatter.format(total).padLeft(13).substring(0, 13);
+      return '$name$price$qty$totalStr';
     } else {
-       final name = item.item.name.padRight(24).substring(0, 24);
-       final price = CurrencyFormatter.format(unitPrice).padLeft(11).substring(0, 11);
-       final qty = item.quantity.toString().padLeft(7).substring(0, 7);
-       final totalStr = CurrencyFormatter.format(total).padLeft(10).substring(0, 10);
-       return '$name$price$qty$totalStr';
+      // 22 + 12 + 6 + 12 = 52
+      final name = item.item.name.padRight(22).substring(0, 22);
+      final price = CurrencyFormatter.format(unitPrice).padLeft(12).substring(0, 12);
+      final qty = item.quantity.toString().padLeft(6).substring(0, 6);
+      final totalStr = CurrencyFormatter.format(total).padLeft(12).substring(0, 12);
+      return '$name$price$qty$totalStr';
     }
   }
 
@@ -335,13 +350,13 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
       SizedBoxCommand(height: 1),
       TextCommand(settings.organizationName.toUpperCase(), isBold: true),
       if (settings.businessDescription != null) TextCommand(settings.businessDescription!),
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand('TO: ${invoice.customerName ?? "Client"}'),
       TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}'),
-      DividerCommand(),
+      TextCommand('-' * width),
       // 3-Column: QTY(5), ITEM(15), TOTAL(12) = 32
       TextCommand('QTY   ITEM           TOTAL', isBold: true),
-      DividerCommand(),
+      TextCommand('-' * width),
       ...invoice.items.map((item) {
         final usePrint = settings.customReceiptPricingEnabled && item.printPrice != null;
         final qty = item.quantity.toString().padRight(5).substring(0, 5);
@@ -357,17 +372,18 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
         }
         return commands;
       }).expand((x) => x),
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand(_formatRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0)
         TextCommand(_formatRow('SALES TAX', CurrencyFormatter.format(invoice.taxAmount), width)),
       if (invoice.discountAmount > 0)
         TextCommand(_formatRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
+      TextCommand('-' * width),
       SizedBoxCommand(height: 1),
       TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       SizedBoxCommand(height: 2),
       TextCommand('THANK YOU FOR YOUR BUSINESS', align: 'center', isBold: true),
-      DividerCommand(),
+      TextCommand('-' * width),
       TextCommand('Powered by IIPS', align: 'center'),
     ];
   }
@@ -393,7 +409,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
   @override
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
-    const int width = 32;
+    final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
     return [
       TextCommand('INVOICE', align: 'center', isBold: true),
@@ -401,39 +417,71 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
       TextCommand(settings.organizationName.toUpperCase(), isBold: true),
       if (settings.businessDescription != null) TextCommand(settings.businessDescription!, align: 'left'),
       if (settings.address.isNotEmpty) TextCommand(settings.address),
-      DividerCommand(),
+      if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
+        TextCommand('CAC: ${settings.cacNumber}'),
+      TextCommand('-' * width),
       TextCommand('BILL TO:', isBold: true),
       TextCommand(invoice.customerName ?? 'Valued Customer'),
       if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),
-      SizedBoxCommand(height: 1),
+      if (invoice.staffName != null) TextCommand('SOLD BY: ${invoice.staffName!.toUpperCase()}'),
+      TextCommand('-' * width),
       TextCommand('INV NO: ${invoice.invoiceNumber}'),
       TextCommand('DATE:   ${invoice.dateCreated.toString().split(' ')[0]}'),
-      DividerCommand(),
-      // 4-column: QTY(4), ITEM(12), PRICE(7), TOTAL(9) = 32
-      TextCommand('QTY ITEM        PRICE   TOTAL', isBold: true),
-      DividerCommand(),
-      ...invoice.items.map((item) {
-        final usePrint = settings.customReceiptPricingEnabled && item.printPrice != null;
-        final unitPrice = usePrint ? item.printPrice! : item.unitPrice;
-        final total = usePrint ? item.totalPrint : item.total;
-        
-        final qty = item.quantity.toString().padRight(4).substring(0, 4);
-        final name = item.item.name.padRight(12).substring(0, 12);
-        final priceStr = CurrencyFormatter.format(unitPrice).padLeft(7).substring(0, 7);
-        final totalStr = CurrencyFormatter.format(total).padLeft(9).substring(0, 9);
-        return TextCommand('$qty$name$priceStr$totalStr');
-      }),
-      DividerCommand(),
-      TextCommand(_formatRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal), width)),
+      TextCommand('-' * width),
+      // Dynamic Table Header
+      TextCommand(_buildTableHeader(width), isBold: true),
+      TextCommand('-' * width),
+      ...invoice.items.map((item) => TextCommand(_buildTableRow(item, width, settings.customReceiptPricingEnabled))),
+      TextCommand('-' * width),
+      TextCommand(_formatRow('SUBTOTAL:', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0)
         TextCommand(_formatRow('TAX', CurrencyFormatter.format(invoice.taxAmount), width)),
       if (invoice.discountAmount > 0)
         TextCommand(_formatRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
-      TextCommand(_formatRow('TOTAL DUE', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
-      DividerCommand(),
+      TextCommand(_formatRow('TOTAL:', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      TextCommand('-' * width),
       TextCommand('THANK YOU FOR YOUR BUSINESS!', align: 'center'),
       TextCommand('Powered by IIPS', align: 'center'),
     ];
+  }
+
+  String _buildTableHeader(int width) {
+    if (width <= 32) {
+      // QTY(3), ITEM(10), PRICE(8), TOTAL(11) = 32
+      return 'QTY ITEM      PRICE      TOTAL';
+    } else if (width <= 42) {
+      // QTY(5), ITEM(14), PRICE(10), TOTAL(13) = 42
+      return 'QTY   ITEM          PRICE       TOTAL';
+    } else {
+      // QTY(6), ITEM(20), PRICE(12), TOTAL(14) = 52
+      return 'QTY    ITEM                PRICE       TOTAL';
+    }
+  }
+
+  String _buildTableRow(InvoiceItem item, int width, bool customPricingEnabled) {
+    final usePrint = customPricingEnabled && item.printPrice != null;
+    final unitPrice = usePrint ? item.printPrice! : item.unitPrice;
+    final total = usePrint ? item.totalPrint : item.total;
+
+    if (width <= 32) {
+      final qty = item.quantity.toString().padRight(3).substring(0, 3);
+      final name = item.item.name.padRight(10).substring(0, 10);
+      final priceStr = CurrencyFormatter.format(unitPrice).padLeft(8).substring(0, 8);
+      final totalStr = CurrencyFormatter.format(total).padLeft(11).substring(0, 11);
+      return '$qty$name$priceStr$totalStr';
+    } else if (width <= 42) {
+      final qty = item.quantity.toString().padRight(5).substring(0, 5);
+      final name = item.item.name.padRight(14).substring(0, 14);
+      final priceStr = CurrencyFormatter.format(unitPrice).padLeft(10).substring(0, 10);
+      final totalStr = CurrencyFormatter.format(total).padLeft(13).substring(0, 13);
+      return '$qty$name$priceStr$totalStr';
+    } else {
+      final qty = item.quantity.toString().padRight(6).substring(0, 6);
+      final name = item.item.name.padRight(20).substring(0, 20);
+      final priceStr = CurrencyFormatter.format(unitPrice).padLeft(12).substring(0, 12);
+      final totalStr = CurrencyFormatter.format(total).padLeft(14).substring(0, 14);
+      return '$qty$name$priceStr$totalStr';
+    }
   }
 
   String _formatRow(String left, String right, int width) {

@@ -15,7 +15,6 @@ class Settings extends Table {
   BoolColumn get taxEnabled => boolean().withDefault(const Constant(true))();
   BoolColumn get discountEnabled => boolean().withDefault(const Constant(true))();
   TextColumn get defaultInvoiceTemplate => text().withDefault(const Constant('compact'))();
-  BoolColumn get allowPriceUpdates => boolean().withDefault(const Constant(true))();
   BoolColumn get confirmPriceOnSelection => boolean().withDefault(const Constant(false))();
   RealColumn get taxRate => real().withDefault(const Constant(0.15))();
   
@@ -49,4 +48,6 @@ class Settings extends Table {
   BoolColumn get showSyncStatus => boolean().withDefault(const Constant(true))();
   BoolColumn get customReceiptPricingEnabled => boolean().withDefault(const Constant(false))();
   BoolColumn get showLogo => boolean().withDefault(const Constant(true))();
+  TextColumn get cacNumber => text().nullable()();
+  BoolColumn get showCacNumber => boolean().withDefault(const Constant(false))();
 }

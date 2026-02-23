@@ -2911,16 +2911,6 @@ class $SettingsTable extends Settings
           type: DriftSqlType.string,
           requiredDuringInsert: false,
           defaultValue: const Constant('compact'));
-  static const VerificationMeta _allowPriceUpdatesMeta =
-      const VerificationMeta('allowPriceUpdates');
-  @override
-  late final GeneratedColumn<bool> allowPriceUpdates = GeneratedColumn<bool>(
-      'allow_price_updates', aliasedName, false,
-      type: DriftSqlType.bool,
-      requiredDuringInsert: false,
-      defaultConstraints: GeneratedColumn.constraintIsAlways(
-          'CHECK ("allow_price_updates" IN (0, 1))'),
-      defaultValue: const Constant(true));
   static const VerificationMeta _confirmPriceOnSelectionMeta =
       const VerificationMeta('confirmPriceOnSelection');
   @override
@@ -3118,6 +3108,22 @@ class $SettingsTable extends Settings
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("show_logo" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _cacNumberMeta =
+      const VerificationMeta('cacNumber');
+  @override
+  late final GeneratedColumn<String> cacNumber = GeneratedColumn<String>(
+      'cac_number', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _showCacNumberMeta =
+      const VerificationMeta('showCacNumber');
+  @override
+  late final GeneratedColumn<bool> showCacNumber = GeneratedColumn<bool>(
+      'show_cac_number', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_cac_number" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -3133,7 +3139,6 @@ class $SettingsTable extends Settings
         taxEnabled,
         discountEnabled,
         defaultInvoiceTemplate,
-        allowPriceUpdates,
         confirmPriceOnSelection,
         taxRate,
         bankName,
@@ -3156,7 +3161,9 @@ class $SettingsTable extends Settings
         halfDayEndHour,
         showSyncStatus,
         customReceiptPricingEnabled,
-        showLogo
+        showLogo,
+        cacNumber,
+        showCacNumber
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3234,12 +3241,6 @@ class $SettingsTable extends Settings
           _defaultInvoiceTemplateMeta,
           defaultInvoiceTemplate.isAcceptableOrUnknown(
               data['default_invoice_template']!, _defaultInvoiceTemplateMeta));
-    }
-    if (data.containsKey('allow_price_updates')) {
-      context.handle(
-          _allowPriceUpdatesMeta,
-          allowPriceUpdates.isAcceptableOrUnknown(
-              data['allow_price_updates']!, _allowPriceUpdatesMeta));
     }
     if (data.containsKey('confirm_price_on_selection')) {
       context.handle(
@@ -3371,6 +3372,16 @@ class $SettingsTable extends Settings
       context.handle(_showLogoMeta,
           showLogo.isAcceptableOrUnknown(data['show_logo']!, _showLogoMeta));
     }
+    if (data.containsKey('cac_number')) {
+      context.handle(_cacNumberMeta,
+          cacNumber.isAcceptableOrUnknown(data['cac_number']!, _cacNumberMeta));
+    }
+    if (data.containsKey('show_cac_number')) {
+      context.handle(
+          _showCacNumberMeta,
+          showCacNumber.isAcceptableOrUnknown(
+              data['show_cac_number']!, _showCacNumberMeta));
+    }
     return context;
   }
 
@@ -3407,8 +3418,6 @@ class $SettingsTable extends Settings
       defaultInvoiceTemplate: attachedDatabase.typeMapping.read(
           DriftSqlType.string,
           data['${effectivePrefix}default_invoice_template'])!,
-      allowPriceUpdates: attachedDatabase.typeMapping.read(
-          DriftSqlType.bool, data['${effectivePrefix}allow_price_updates'])!,
       confirmPriceOnSelection: attachedDatabase.typeMapping.read(
           DriftSqlType.bool,
           data['${effectivePrefix}confirm_price_on_selection'])!,
@@ -3460,6 +3469,10 @@ class $SettingsTable extends Settings
           data['${effectivePrefix}custom_receipt_pricing_enabled'])!,
       showLogo: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}show_logo'])!,
+      cacNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cac_number']),
+      showCacNumber: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}show_cac_number'])!,
     );
   }
 
@@ -3483,7 +3496,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool taxEnabled;
   final bool discountEnabled;
   final String defaultInvoiceTemplate;
-  final bool allowPriceUpdates;
   final bool confirmPriceOnSelection;
   final double taxRate;
   final String? bankName;
@@ -3507,6 +3519,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showSyncStatus;
   final bool customReceiptPricingEnabled;
   final bool showLogo;
+  final String? cacNumber;
+  final bool showCacNumber;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -3521,7 +3535,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.taxEnabled,
       required this.discountEnabled,
       required this.defaultInvoiceTemplate,
-      required this.allowPriceUpdates,
       required this.confirmPriceOnSelection,
       required this.taxRate,
       this.bankName,
@@ -3544,7 +3557,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.halfDayEndHour,
       required this.showSyncStatus,
       required this.customReceiptPricingEnabled,
-      required this.showLogo});
+      required this.showLogo,
+      this.cacNumber,
+      required this.showCacNumber});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3569,7 +3584,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['tax_enabled'] = Variable<bool>(taxEnabled);
     map['discount_enabled'] = Variable<bool>(discountEnabled);
     map['default_invoice_template'] = Variable<String>(defaultInvoiceTemplate);
-    map['allow_price_updates'] = Variable<bool>(allowPriceUpdates);
     map['confirm_price_on_selection'] = Variable<bool>(confirmPriceOnSelection);
     map['tax_rate'] = Variable<double>(taxRate);
     if (!nullToAbsent || bankName != null) {
@@ -3604,6 +3618,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['custom_receipt_pricing_enabled'] =
         Variable<bool>(customReceiptPricingEnabled);
     map['show_logo'] = Variable<bool>(showLogo);
+    if (!nullToAbsent || cacNumber != null) {
+      map['cac_number'] = Variable<String>(cacNumber);
+    }
+    map['show_cac_number'] = Variable<bool>(showCacNumber);
     return map;
   }
 
@@ -3627,7 +3645,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       taxEnabled: Value(taxEnabled),
       discountEnabled: Value(discountEnabled),
       defaultInvoiceTemplate: Value(defaultInvoiceTemplate),
-      allowPriceUpdates: Value(allowPriceUpdates),
       confirmPriceOnSelection: Value(confirmPriceOnSelection),
       taxRate: Value(taxRate),
       bankName: bankName == null && nullToAbsent
@@ -3661,6 +3678,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showSyncStatus: Value(showSyncStatus),
       customReceiptPricingEnabled: Value(customReceiptPricingEnabled),
       showLogo: Value(showLogo),
+      cacNumber: cacNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cacNumber),
+      showCacNumber: Value(showCacNumber),
     );
   }
 
@@ -3683,7 +3704,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       discountEnabled: serializer.fromJson<bool>(json['discountEnabled']),
       defaultInvoiceTemplate:
           serializer.fromJson<String>(json['defaultInvoiceTemplate']),
-      allowPriceUpdates: serializer.fromJson<bool>(json['allowPriceUpdates']),
       confirmPriceOnSelection:
           serializer.fromJson<bool>(json['confirmPriceOnSelection']),
       taxRate: serializer.fromJson<double>(json['taxRate']),
@@ -3712,6 +3732,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       customReceiptPricingEnabled:
           serializer.fromJson<bool>(json['customReceiptPricingEnabled']),
       showLogo: serializer.fromJson<bool>(json['showLogo']),
+      cacNumber: serializer.fromJson<String?>(json['cacNumber']),
+      showCacNumber: serializer.fromJson<bool>(json['showCacNumber']),
     );
   }
   @override
@@ -3732,7 +3754,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'discountEnabled': serializer.toJson<bool>(discountEnabled),
       'defaultInvoiceTemplate':
           serializer.toJson<String>(defaultInvoiceTemplate),
-      'allowPriceUpdates': serializer.toJson<bool>(allowPriceUpdates),
       'confirmPriceOnSelection':
           serializer.toJson<bool>(confirmPriceOnSelection),
       'taxRate': serializer.toJson<double>(taxRate),
@@ -3758,6 +3779,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'customReceiptPricingEnabled':
           serializer.toJson<bool>(customReceiptPricingEnabled),
       'showLogo': serializer.toJson<bool>(showLogo),
+      'cacNumber': serializer.toJson<String?>(cacNumber),
+      'showCacNumber': serializer.toJson<bool>(showCacNumber),
     };
   }
 
@@ -3775,7 +3798,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? taxEnabled,
           bool? discountEnabled,
           String? defaultInvoiceTemplate,
-          bool? allowPriceUpdates,
           bool? confirmPriceOnSelection,
           double? taxRate,
           Value<String?> bankName = const Value.absent(),
@@ -3798,7 +3820,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           int? halfDayEndHour,
           bool? showSyncStatus,
           bool? customReceiptPricingEnabled,
-          bool? showLogo}) =>
+          bool? showLogo,
+          Value<String?> cacNumber = const Value.absent(),
+          bool? showCacNumber}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -3816,7 +3840,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         discountEnabled: discountEnabled ?? this.discountEnabled,
         defaultInvoiceTemplate:
             defaultInvoiceTemplate ?? this.defaultInvoiceTemplate,
-        allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
         confirmPriceOnSelection:
             confirmPriceOnSelection ?? this.confirmPriceOnSelection,
         taxRate: taxRate ?? this.taxRate,
@@ -3847,6 +3870,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         customReceiptPricingEnabled:
             customReceiptPricingEnabled ?? this.customReceiptPricingEnabled,
         showLogo: showLogo ?? this.showLogo,
+        cacNumber: cacNumber.present ? cacNumber.value : this.cacNumber,
+        showCacNumber: showCacNumber ?? this.showCacNumber,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -3872,9 +3897,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       defaultInvoiceTemplate: data.defaultInvoiceTemplate.present
           ? data.defaultInvoiceTemplate.value
           : this.defaultInvoiceTemplate,
-      allowPriceUpdates: data.allowPriceUpdates.present
-          ? data.allowPriceUpdates.value
-          : this.allowPriceUpdates,
       confirmPriceOnSelection: data.confirmPriceOnSelection.present
           ? data.confirmPriceOnSelection.value
           : this.confirmPriceOnSelection,
@@ -3932,6 +3954,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ? data.customReceiptPricingEnabled.value
           : this.customReceiptPricingEnabled,
       showLogo: data.showLogo.present ? data.showLogo.value : this.showLogo,
+      cacNumber: data.cacNumber.present ? data.cacNumber.value : this.cacNumber,
+      showCacNumber: data.showCacNumber.present
+          ? data.showCacNumber.value
+          : this.showCacNumber,
     );
   }
 
@@ -3951,7 +3977,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('taxEnabled: $taxEnabled, ')
           ..write('discountEnabled: $discountEnabled, ')
           ..write('defaultInvoiceTemplate: $defaultInvoiceTemplate, ')
-          ..write('allowPriceUpdates: $allowPriceUpdates, ')
           ..write('confirmPriceOnSelection: $confirmPriceOnSelection, ')
           ..write('taxRate: $taxRate, ')
           ..write('bankName: $bankName, ')
@@ -3974,7 +3999,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('halfDayEndHour: $halfDayEndHour, ')
           ..write('showSyncStatus: $showSyncStatus, ')
           ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled, ')
-          ..write('showLogo: $showLogo')
+          ..write('showLogo: $showLogo, ')
+          ..write('cacNumber: $cacNumber, ')
+          ..write('showCacNumber: $showCacNumber')
           ..write(')'))
         .toString();
   }
@@ -3994,7 +4021,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         taxEnabled,
         discountEnabled,
         defaultInvoiceTemplate,
-        allowPriceUpdates,
         confirmPriceOnSelection,
         taxRate,
         bankName,
@@ -4017,7 +4043,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         halfDayEndHour,
         showSyncStatus,
         customReceiptPricingEnabled,
-        showLogo
+        showLogo,
+        cacNumber,
+        showCacNumber
       ]);
   @override
   bool operator ==(Object other) =>
@@ -4036,7 +4064,6 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.taxEnabled == this.taxEnabled &&
           other.discountEnabled == this.discountEnabled &&
           other.defaultInvoiceTemplate == this.defaultInvoiceTemplate &&
-          other.allowPriceUpdates == this.allowPriceUpdates &&
           other.confirmPriceOnSelection == this.confirmPriceOnSelection &&
           other.taxRate == this.taxRate &&
           other.bankName == this.bankName &&
@@ -4060,7 +4087,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.showSyncStatus == this.showSyncStatus &&
           other.customReceiptPricingEnabled ==
               this.customReceiptPricingEnabled &&
-          other.showLogo == this.showLogo);
+          other.showLogo == this.showLogo &&
+          other.cacNumber == this.cacNumber &&
+          other.showCacNumber == this.showCacNumber);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -4077,7 +4106,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> taxEnabled;
   final Value<bool> discountEnabled;
   final Value<String> defaultInvoiceTemplate;
-  final Value<bool> allowPriceUpdates;
   final Value<bool> confirmPriceOnSelection;
   final Value<double> taxRate;
   final Value<String?> bankName;
@@ -4101,6 +4129,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showSyncStatus;
   final Value<bool> customReceiptPricingEnabled;
   final Value<bool> showLogo;
+  final Value<String?> cacNumber;
+  final Value<bool> showCacNumber;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -4115,7 +4145,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.taxEnabled = const Value.absent(),
     this.discountEnabled = const Value.absent(),
     this.defaultInvoiceTemplate = const Value.absent(),
-    this.allowPriceUpdates = const Value.absent(),
     this.confirmPriceOnSelection = const Value.absent(),
     this.taxRate = const Value.absent(),
     this.bankName = const Value.absent(),
@@ -4139,6 +4168,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showSyncStatus = const Value.absent(),
     this.customReceiptPricingEnabled = const Value.absent(),
     this.showLogo = const Value.absent(),
+    this.cacNumber = const Value.absent(),
+    this.showCacNumber = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -4154,7 +4185,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.taxEnabled = const Value.absent(),
     this.discountEnabled = const Value.absent(),
     this.defaultInvoiceTemplate = const Value.absent(),
-    this.allowPriceUpdates = const Value.absent(),
     this.confirmPriceOnSelection = const Value.absent(),
     this.taxRate = const Value.absent(),
     this.bankName = const Value.absent(),
@@ -4178,6 +4208,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showSyncStatus = const Value.absent(),
     this.customReceiptPricingEnabled = const Value.absent(),
     this.showLogo = const Value.absent(),
+    this.cacNumber = const Value.absent(),
+    this.showCacNumber = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -4195,7 +4227,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? taxEnabled,
     Expression<bool>? discountEnabled,
     Expression<String>? defaultInvoiceTemplate,
-    Expression<bool>? allowPriceUpdates,
     Expression<bool>? confirmPriceOnSelection,
     Expression<double>? taxRate,
     Expression<String>? bankName,
@@ -4219,6 +4250,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showSyncStatus,
     Expression<bool>? customReceiptPricingEnabled,
     Expression<bool>? showLogo,
+    Expression<String>? cacNumber,
+    Expression<bool>? showCacNumber,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4236,7 +4269,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (discountEnabled != null) 'discount_enabled': discountEnabled,
       if (defaultInvoiceTemplate != null)
         'default_invoice_template': defaultInvoiceTemplate,
-      if (allowPriceUpdates != null) 'allow_price_updates': allowPriceUpdates,
       if (confirmPriceOnSelection != null)
         'confirm_price_on_selection': confirmPriceOnSelection,
       if (taxRate != null) 'tax_rate': taxRate,
@@ -4267,6 +4299,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (customReceiptPricingEnabled != null)
         'custom_receipt_pricing_enabled': customReceiptPricingEnabled,
       if (showLogo != null) 'show_logo': showLogo,
+      if (cacNumber != null) 'cac_number': cacNumber,
+      if (showCacNumber != null) 'show_cac_number': showCacNumber,
     });
   }
 
@@ -4284,7 +4318,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? taxEnabled,
       Value<bool>? discountEnabled,
       Value<String>? defaultInvoiceTemplate,
-      Value<bool>? allowPriceUpdates,
       Value<bool>? confirmPriceOnSelection,
       Value<double>? taxRate,
       Value<String?>? bankName,
@@ -4307,7 +4340,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<int>? halfDayEndHour,
       Value<bool>? showSyncStatus,
       Value<bool>? customReceiptPricingEnabled,
-      Value<bool>? showLogo}) {
+      Value<bool>? showLogo,
+      Value<String?>? cacNumber,
+      Value<bool>? showCacNumber}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -4323,7 +4358,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       discountEnabled: discountEnabled ?? this.discountEnabled,
       defaultInvoiceTemplate:
           defaultInvoiceTemplate ?? this.defaultInvoiceTemplate,
-      allowPriceUpdates: allowPriceUpdates ?? this.allowPriceUpdates,
       confirmPriceOnSelection:
           confirmPriceOnSelection ?? this.confirmPriceOnSelection,
       taxRate: taxRate ?? this.taxRate,
@@ -4352,6 +4386,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       customReceiptPricingEnabled:
           customReceiptPricingEnabled ?? this.customReceiptPricingEnabled,
       showLogo: showLogo ?? this.showLogo,
+      cacNumber: cacNumber ?? this.cacNumber,
+      showCacNumber: showCacNumber ?? this.showCacNumber,
     );
   }
 
@@ -4397,9 +4433,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (defaultInvoiceTemplate.present) {
       map['default_invoice_template'] =
           Variable<String>(defaultInvoiceTemplate.value);
-    }
-    if (allowPriceUpdates.present) {
-      map['allow_price_updates'] = Variable<bool>(allowPriceUpdates.value);
     }
     if (confirmPriceOnSelection.present) {
       map['confirm_price_on_selection'] =
@@ -4475,6 +4508,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (showLogo.present) {
       map['show_logo'] = Variable<bool>(showLogo.value);
     }
+    if (cacNumber.present) {
+      map['cac_number'] = Variable<String>(cacNumber.value);
+    }
+    if (showCacNumber.present) {
+      map['show_cac_number'] = Variable<bool>(showCacNumber.value);
+    }
     return map;
   }
 
@@ -4494,7 +4533,6 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('taxEnabled: $taxEnabled, ')
           ..write('discountEnabled: $discountEnabled, ')
           ..write('defaultInvoiceTemplate: $defaultInvoiceTemplate, ')
-          ..write('allowPriceUpdates: $allowPriceUpdates, ')
           ..write('confirmPriceOnSelection: $confirmPriceOnSelection, ')
           ..write('taxRate: $taxRate, ')
           ..write('bankName: $bankName, ')
@@ -4517,7 +4555,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('halfDayEndHour: $halfDayEndHour, ')
           ..write('showSyncStatus: $showSyncStatus, ')
           ..write('customReceiptPricingEnabled: $customReceiptPricingEnabled, ')
-          ..write('showLogo: $showLogo')
+          ..write('showLogo: $showLogo, ')
+          ..write('cacNumber: $cacNumber, ')
+          ..write('showCacNumber: $showCacNumber')
           ..write(')'))
         .toString();
   }
@@ -8244,7 +8284,6 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> taxEnabled,
   Value<bool> discountEnabled,
   Value<String> defaultInvoiceTemplate,
-  Value<bool> allowPriceUpdates,
   Value<bool> confirmPriceOnSelection,
   Value<double> taxRate,
   Value<String?> bankName,
@@ -8268,6 +8307,8 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showSyncStatus,
   Value<bool> customReceiptPricingEnabled,
   Value<bool> showLogo,
+  Value<String?> cacNumber,
+  Value<bool> showCacNumber,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -8283,7 +8324,6 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> taxEnabled,
   Value<bool> discountEnabled,
   Value<String> defaultInvoiceTemplate,
-  Value<bool> allowPriceUpdates,
   Value<bool> confirmPriceOnSelection,
   Value<double> taxRate,
   Value<String?> bankName,
@@ -8307,6 +8347,8 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showSyncStatus,
   Value<bool> customReceiptPricingEnabled,
   Value<bool> showLogo,
+  Value<String?> cacNumber,
+  Value<bool> showCacNumber,
 });
 
 class $$SettingsTableFilterComposer
@@ -8359,10 +8401,6 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get defaultInvoiceTemplate => $composableBuilder(
       column: $table.defaultInvoiceTemplate,
-      builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<bool> get allowPriceUpdates => $composableBuilder(
-      column: $table.allowPriceUpdates,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get confirmPriceOnSelection => $composableBuilder(
@@ -8444,6 +8482,12 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get showLogo => $composableBuilder(
       column: $table.showLogo, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cacNumber => $composableBuilder(
+      column: $table.cacNumber, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showCacNumber => $composableBuilder(
+      column: $table.showCacNumber, builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -8496,10 +8540,6 @@ class $$SettingsTableOrderingComposer
 
   ColumnOrderings<String> get defaultInvoiceTemplate => $composableBuilder(
       column: $table.defaultInvoiceTemplate,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<bool> get allowPriceUpdates => $composableBuilder(
-      column: $table.allowPriceUpdates,
       builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get confirmPriceOnSelection => $composableBuilder(
@@ -8586,6 +8626,13 @@ class $$SettingsTableOrderingComposer
 
   ColumnOrderings<bool> get showLogo => $composableBuilder(
       column: $table.showLogo, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cacNumber => $composableBuilder(
+      column: $table.cacNumber, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showCacNumber => $composableBuilder(
+      column: $table.showCacNumber,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -8635,9 +8682,6 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<String> get defaultInvoiceTemplate => $composableBuilder(
       column: $table.defaultInvoiceTemplate, builder: (column) => column);
-
-  GeneratedColumn<bool> get allowPriceUpdates => $composableBuilder(
-      column: $table.allowPriceUpdates, builder: (column) => column);
 
   GeneratedColumn<bool> get confirmPriceOnSelection => $composableBuilder(
       column: $table.confirmPriceOnSelection, builder: (column) => column);
@@ -8707,6 +8751,12 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get showLogo =>
       $composableBuilder(column: $table.showLogo, builder: (column) => column);
+
+  GeneratedColumn<String> get cacNumber =>
+      $composableBuilder(column: $table.cacNumber, builder: (column) => column);
+
+  GeneratedColumn<bool> get showCacNumber => $composableBuilder(
+      column: $table.showCacNumber, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -8748,7 +8798,6 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> taxEnabled = const Value.absent(),
             Value<bool> discountEnabled = const Value.absent(),
             Value<String> defaultInvoiceTemplate = const Value.absent(),
-            Value<bool> allowPriceUpdates = const Value.absent(),
             Value<bool> confirmPriceOnSelection = const Value.absent(),
             Value<double> taxRate = const Value.absent(),
             Value<String?> bankName = const Value.absent(),
@@ -8772,6 +8821,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showSyncStatus = const Value.absent(),
             Value<bool> customReceiptPricingEnabled = const Value.absent(),
             Value<bool> showLogo = const Value.absent(),
+            Value<String?> cacNumber = const Value.absent(),
+            Value<bool> showCacNumber = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -8787,7 +8838,6 @@ class $$SettingsTableTableManager extends RootTableManager<
             taxEnabled: taxEnabled,
             discountEnabled: discountEnabled,
             defaultInvoiceTemplate: defaultInvoiceTemplate,
-            allowPriceUpdates: allowPriceUpdates,
             confirmPriceOnSelection: confirmPriceOnSelection,
             taxRate: taxRate,
             bankName: bankName,
@@ -8811,6 +8861,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             showSyncStatus: showSyncStatus,
             customReceiptPricingEnabled: customReceiptPricingEnabled,
             showLogo: showLogo,
+            cacNumber: cacNumber,
+            showCacNumber: showCacNumber,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -8826,7 +8878,6 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> taxEnabled = const Value.absent(),
             Value<bool> discountEnabled = const Value.absent(),
             Value<String> defaultInvoiceTemplate = const Value.absent(),
-            Value<bool> allowPriceUpdates = const Value.absent(),
             Value<bool> confirmPriceOnSelection = const Value.absent(),
             Value<double> taxRate = const Value.absent(),
             Value<String?> bankName = const Value.absent(),
@@ -8850,6 +8901,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showSyncStatus = const Value.absent(),
             Value<bool> customReceiptPricingEnabled = const Value.absent(),
             Value<bool> showLogo = const Value.absent(),
+            Value<String?> cacNumber = const Value.absent(),
+            Value<bool> showCacNumber = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -8865,7 +8918,6 @@ class $$SettingsTableTableManager extends RootTableManager<
             taxEnabled: taxEnabled,
             discountEnabled: discountEnabled,
             defaultInvoiceTemplate: defaultInvoiceTemplate,
-            allowPriceUpdates: allowPriceUpdates,
             confirmPriceOnSelection: confirmPriceOnSelection,
             taxRate: taxRate,
             bankName: bankName,
@@ -8889,6 +8941,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             showSyncStatus: showSyncStatus,
             customReceiptPricingEnabled: customReceiptPricingEnabled,
             showLogo: showLogo,
+            cacNumber: cacNumber,
+            showCacNumber: showCacNumber,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

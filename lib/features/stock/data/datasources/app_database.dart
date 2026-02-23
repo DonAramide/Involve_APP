@@ -16,7 +16,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 26;
+  int get schemaVersion => 28;
 
   @override
   MigrationStrategy get migration {
@@ -35,6 +35,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 26) {
           // Logo Printing Toggle Migration
           await _safeAddColumn(m, settings, settings.showLogo);
+        }
+        if (from < 28) {
+          // CAC Number Migration
+          await _safeAddColumn(m, settings, settings.cacNumber);
+          await _safeAddColumn(m, settings, settings.showCacNumber);
         }
       },
       beforeOpen: (details) async {
