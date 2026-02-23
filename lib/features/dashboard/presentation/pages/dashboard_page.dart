@@ -62,7 +62,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: Image.memory(
-                        settings!.logo!,
+                        settings.logo!,
                         width: 40,
                         height: 40,
                         fit: BoxFit.cover,
@@ -170,9 +170,11 @@ class _DashboardPageState extends State<DashboardPage> {
                       else if (currentTheme == 'light') nextTheme = 'dark';
                       else nextTheme = 'system';
                       
-                      context.read<SettingsBloc>().add(
-                        UpdateAppSettings(state.settings!.copyWith(themeMode: nextTheme)),
-                      );
+                      if (state.settings != null) {
+                        context.read<SettingsBloc>().add(
+                          UpdateAppSettings(state.settings!.copyWith(themeMode: nextTheme)),
+                        );
+                      }
                     },
                   );
                 },
