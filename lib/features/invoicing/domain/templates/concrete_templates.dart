@@ -285,11 +285,11 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       // 9 + 8 + 4 + 11 = 32
       return 'ITEM     PRICE   QTY      TOTAL';
     } else if (width <= 42) {
-      // 16 + 9 + 4 + 13 = 42 (Shifted Price +2, adjusted Total -2 to fit)
-      return 'ITEM            PRICE    QTY        TOTAL';
+      // 14 + 10 + 5 + 13 = 42
+      return 'ITEM          PRICE     QTY        TOTAL';
     } else {
-      // 22 + 12 + 6 + 12 = 52 (Preserving user's manual alignment)
-      return 'ITEM                 PRICE       QTY          TOTAL';
+      // 21 + 12 + 7 + 12 = 52
+      return 'ITEM                 PRICE       QTY      TOTAL';
     }
   }
 
@@ -305,19 +305,19 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       final totalStr = CurrencyFormatter.format(total).padLeft(11).substring(0, 11);
       return '$name$price$qty$totalStr';
     } else if (width <= 42) {
-      // 16 + 9 + 4 + 13 = 42
-      final name = item.item.name.padRight(16).substring(0, 16);
-      final price = CurrencyFormatter.format(unitPrice).padLeft(9).substring(0, 9);
-      final qty = item.quantity.toString().padLeft(4).substring(0, 4);
+      // 14 + 10 + 5 + 13 = 42
+      final name = item.item.name.padRight(14).substring(0, 14);
+      final price = CurrencyFormatter.format(unitPrice).padLeft(10).substring(0, 10);
+      final qty = item.quantity.toString().padLeft(5).substring(0, 5);
       final totalStr = CurrencyFormatter.format(total).padLeft(13).substring(0, 13);
       return '$name$price$qty$totalStr';
     } else {
-      // 22 + 12 + 6 + 12 = 52
-      final name = item.item.name.padRight(22).substring(0, 22);
-      final price = CurrencyFormatter.format(unitPrice).padLeft(12).substring(0, 12);
-      final qty = item.quantity.toString().padLeft(6).substring(0, 6);
-      final totalStr = CurrencyFormatter.format(total).padLeft(12).substring(0, 12);
-      return '$name$price$qty$totalStr';
+      // 21 + 12 + 7 + 12 = 52
+      final n = item.item.name.padRight(21).substring(0, 21);
+      final p = CurrencyFormatter.format(unitPrice).padLeft(12).substring(0, 12);
+      final q = item.quantity.toString().padLeft(7).substring(0, 7);
+      final t = CurrencyFormatter.format(total).padLeft(12).substring(0, 12);
+      return '$n$p$q$t';
     }
   }
 
