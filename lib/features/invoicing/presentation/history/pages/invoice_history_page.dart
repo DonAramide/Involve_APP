@@ -612,7 +612,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         fillColor: Colors.white,
         contentPadding: EdgeInsets.symmetric(horizontal: 10),
       ),
-      items: ['All', 'Paid', 'Partial', 'Unpaid'].map((status) {
+      items: ['All', 'Full Payment', 'Partial Payment', 'Unpaid', 'Outstanding'].map((status) {
         return DropdownMenuItem(value: status, child: Text(status, style: const TextStyle(fontSize: 12)));
       }).toList(),
       onChanged: (value) {

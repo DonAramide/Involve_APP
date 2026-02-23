@@ -53,7 +53,16 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       }
 
       if (event.paymentStatus != null && event.paymentStatus != 'All') {
-        invoices = invoices.where((inv) => inv.paymentStatus == event.paymentStatus).toList();
+        final status = event.paymentStatus;
+        if (status == 'Full Payment') {
+          invoices = invoices.where((inv) => inv.paymentStatus == 'Paid').toList();
+        } else if (status == 'Partial Payment') {
+          invoices = invoices.where((inv) => inv.paymentStatus == 'Partial').toList();
+        } else if (status == 'Unpaid') {
+          invoices = invoices.where((inv) => inv.paymentStatus == 'Unpaid').toList();
+        } else if (status == 'Outstanding') {
+          invoices = invoices.where((inv) => inv.balanceAmount > 0).toList();
+        }
       }
 
       if (event.staffId != null) {
