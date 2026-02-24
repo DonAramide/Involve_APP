@@ -49,4 +49,6 @@ class InvoiceItems extends Table {
   TextColumn get deviceId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
   RealColumn get printPrice => real().nullable()();
+  IntColumn get returnedQuantity => integer().withDefault(const Constant(0))();
+  BoolColumn get isReplacement => boolean().withDefault(const Constant(false))();
 }

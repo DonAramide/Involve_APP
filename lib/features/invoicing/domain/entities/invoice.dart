@@ -11,6 +11,8 @@ class InvoiceItem extends Equatable {
   final String? serviceMeta; // JSON snapshot
   final String? syncId;
   final double? printPrice;
+  final int returnedQuantity;
+  final bool isReplacement;
 
   const InvoiceItem({
     this.id,
@@ -21,6 +23,8 @@ class InvoiceItem extends Equatable {
     this.serviceMeta,
     this.syncId,
     this.printPrice,
+    this.returnedQuantity = 0,
+    this.isReplacement = false,
   });
 
   double get total => quantity * unitPrice;
@@ -35,6 +39,7 @@ class InvoiceItem extends Equatable {
     String? serviceMeta,
     String? syncId,
     double? printPrice,
+    int? returnedQuantity,
   }) {
     return InvoiceItem(
       id: id ?? this.id,
@@ -45,11 +50,13 @@ class InvoiceItem extends Equatable {
       serviceMeta: serviceMeta ?? this.serviceMeta,
       syncId: syncId ?? this.syncId,
       printPrice: printPrice ?? this.printPrice,
+      returnedQuantity: returnedQuantity ?? this.returnedQuantity,
+      isReplacement: isReplacement ?? this.isReplacement,
     );
   }
 
   @override
-  List<Object?> get props => [id, item, quantity, unitPrice, type, serviceMeta, syncId, printPrice];
+  List<Object?> get props => [id, item, quantity, unitPrice, type, serviceMeta, syncId, printPrice, returnedQuantity, isReplacement];
 }
 
 class Invoice extends Equatable {

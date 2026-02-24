@@ -9,15 +9,18 @@ import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
 import 'package:involve_app/features/invoicing/domain/templates/invoice_template.dart';
+import 'package:involve_app/features/invoicing/domain/entities/stock_return.dart';
 
 class ReportGenerator {
   static Future<pw.Document> buildReport({
     required List<Invoice> invoices,
     required AppSettings settings,
     InvReportDateRange? dateRange,
+    List<StockReturn>? stockReturns,
   }) async {
     final font = await PdfGoogleFonts.robotoRegular();
     final boldFont = await PdfGoogleFonts.robotoBold();
+    final List<StockReturn> returns = stockReturns ?? [];
 
     final pdf = pw.Document(
       theme: pw.ThemeData.withFont(
@@ -32,7 +35,9 @@ class ReportGenerator {
 
     final totalAmount = invoices.fold<double>(0, (sum, item) => sum + item.totalAmount);
     final totalPaid = invoices.fold<double>(0, (sum, item) => sum + item.amountPaid);
-    final totalBalance = invoices.fold<double>(0, (sum, item) => sum + item.balanceAmount);
+    final totalReturned = returns.fold<double>(0, (sum, item) => sum + item.amountReturned);
+    // Dynamic balance calculation based on net total in DB
+    final totalBalance = (totalAmount - totalPaid).clamp(0.0, double.infinity);
 
     // Summary by payment method
     final methodSummary = <String, double>{
@@ -46,15 +51,19 @@ class ReportGenerator {
     }
 
     // Prepare table data
-    final headers = ['Date', 'Invoice ID', 'Method', 'Total', 'Paid', 'Balance'];
+    final headers = ['Date', 'Invoice ID', 'Method', 'Total', 'Paid', 'Return', 'Balance'];
     final data = invoices.map((invoice) {
+      final invoiceReturns = returns.where((r) => r.invoiceId == invoice.id).fold<double>(0, (s, r) => s + r.amountReturned);
+      final dynamicBalance = (invoice.totalAmount - invoice.amountPaid).clamp(0.0, double.infinity);
+      
       return [
         DateFormat('MM-dd HH:mm').format(invoice.dateCreated),
         invoice.invoiceNumber,
         invoice.paymentMethod ?? '-',
         CurrencyFormatter.format(invoice.totalAmount),
         CurrencyFormatter.format(invoice.amountPaid),
-        CurrencyFormatter.format(invoice.balanceAmount),
+        invoiceReturns > 0 ? '(${CurrencyFormatter.format(invoiceReturns)})' : '-',
+        CurrencyFormatter.format(dynamicBalance),
       ];
     }).toList();
 
@@ -94,7 +103,7 @@ class ReportGenerator {
             // Title
             pw.Center(
               child: pw.Text(
-                'SALES INVOLVE REPORT',
+                'SALES INVOICE REPORT',
                 style: pw.TextStyle(
                   fontSize: 22, 
                   fontWeight: pw.FontWeight.bold, 
@@ -125,9 +134,10 @@ class ReportGenerator {
                 0: const pw.FlexColumnWidth(1.8), // Date
                 1: const pw.FlexColumnWidth(1.5), // ID
                 2: const pw.FlexColumnWidth(1.2), // Method
-                3: const pw.FlexColumnWidth(1.8), // Total
-                4: const pw.FlexColumnWidth(1.8), // Paid
-                5: const pw.FlexColumnWidth(1.8), // Balance
+                3: const pw.FlexColumnWidth(1.5), // Total
+                4: const pw.FlexColumnWidth(1.5), // Paid
+                5: const pw.FlexColumnWidth(1.5), // Return
+                6: const pw.FlexColumnWidth(1.5), // Balance
               },
             ),
 
@@ -149,6 +159,15 @@ class ReportGenerator {
                     pw.Text(
                       'TOTAL PAID: ${settings.currency} ${CurrencyFormatter.format(totalPaid)}',
                       style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.green),
+                    ),
+                    if (totalReturned > 0)
+                      pw.Text(
+                        'TOTAL RETURNED: ${settings.currency} ${CurrencyFormatter.format(totalReturned)}',
+                        style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.orange),
+                      ),
+                    pw.Text(
+                      'NET SALES: ${settings.currency} ${CurrencyFormatter.format(totalPaid - totalReturned)}',
+                      style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: _getPrimaryColor(settings)),
                     ),
                     pw.Text(
                       'TOTAL BALANCE: ${settings.currency} ${CurrencyFormatter.format(totalBalance)}',

@@ -24,12 +24,9 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
-      TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
-      if (settings.businessDescription != null && settings.businessDescription!.isNotEmpty)
-        TextCommand(settings.businessDescription!, align: 'center'),
-      if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
-        TextCommand('CAC: ${settings.cacNumber}', align: 'center'),
+        TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
+      TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}', align: 'center'),
       TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
@@ -114,12 +111,9 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
-      TextCommand(settings.organizationName, align: 'center', isBold: true),
-      if (settings.businessDescription != null && settings.businessDescription!.isNotEmpty)
-        TextCommand(settings.businessDescription!, align: 'center'),
-      if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
-        TextCommand('CAC: ${settings.cacNumber}', align: 'center'),
+        TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
+      TextCommand(settings.organizationName, align: 'center', isBold: true),
       if (settings.phone.isNotEmpty) TextCommand('Phone: ${settings.phone}', align: 'center'),
       TextCommand('-' * width),
       TextCommand('INVOICE DETAIL', align: 'center', isBold: true),
@@ -241,10 +235,9 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
-      TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
-      if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
-        TextCommand('CAC: ${settings.cacNumber}', align: 'center'),
+        TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
+      TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Tel: ${settings.phone}', align: 'center'),
       TextCommand('-' * width),
       TextCommand('BILL TO:', isBold: true),
@@ -365,8 +358,8 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
     const int width = 32;
 
     return [
-      TextCommand('INVOICE', align: 'center', isBold: true),
-      SizedBoxCommand(height: 1),
+      if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
+        TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
       TextCommand(settings.organizationName.toUpperCase(), isBold: true),
       if (settings.businessDescription != null) TextCommand(settings.businessDescription!),
       TextCommand('-' * width),
@@ -400,6 +393,11 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
       TextCommand('-' * width),
       SizedBoxCommand(height: 1),
       TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      if (invoice.balanceAmount > 0) ...[
+        TextCommand('-' * width),
+        TextCommand(_formatRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid), width)),
+        TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width), isBold: true),
+      ],
       SizedBoxCommand(height: 2),
       TextCommand('THANK YOU FOR YOUR BUSINESS', align: 'center', isBold: true),
       TextCommand('-' * width),
@@ -431,13 +429,9 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
     return [
-      TextCommand('INVOICE', align: 'center', isBold: true),
-      if (settings.logo != null) ImageCommand(bytes: settings.logo!, align: 'right'),
-      TextCommand(settings.organizationName.toUpperCase(), isBold: true),
-      if (settings.businessDescription != null) TextCommand(settings.businessDescription!, align: 'left'),
-      if (settings.address.isNotEmpty) TextCommand(settings.address),
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
-        TextCommand('CAC: ${settings.cacNumber}'),
+        TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
+      TextCommand(settings.organizationName.toUpperCase(), isBold: true),
       TextCommand('-' * width),
       TextCommand('BILL TO:', isBold: true),
       TextCommand(invoice.customerName ?? 'Valued Customer'),

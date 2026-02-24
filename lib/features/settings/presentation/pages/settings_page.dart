@@ -170,6 +170,13 @@ class SettingsPage extends StatelessWidget {
                   onChanged: (value) => 
                     context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showTotalSalesCard: value))),
                 ),
+                SwitchListTile(
+                  title: const Text('Enable Stock Return & Replace'),
+                  subtitle: const Text('Allow users to return or replace items from invoice history'),
+                  value: settings.stockReturnEnabled,
+                  onChanged: (value) => 
+                    context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(stockReturnEnabled: value))),
+                ),
                 const Divider(),
                 ListTile(
                   title: const Text('Restore Backup'),

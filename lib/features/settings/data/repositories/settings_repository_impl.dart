@@ -71,6 +71,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       cacNumber: Value(settings.cacNumber),
       showCacNumber: Value(settings.showCacNumber),
       showTotalSalesCard: Value(settings.showTotalSalesCard),
+      stockReturnEnabled: Value(settings.stockReturnEnabled),
     );
 
     if (existing == null) {
@@ -131,6 +132,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       cacNumber: row.cacNumber,
       showCacNumber: row.showCacNumber,
       showTotalSalesCard: row.showTotalSalesCard,
+      stockReturnEnabled: row.stockReturnEnabled,
     );
   }
 }

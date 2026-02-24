@@ -15,6 +15,22 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
   }) : super(HistoryInitial()) {
     on<LoadHistory>(_onLoadHistory);
     on<RecordPayment>(_onRecordPayment);
+    on<ReturnStock>(_onReturnStock);
+  }
+
+  Future<void> _onReturnStock(ReturnStock event, Emitter<HistoryState> emit) async {
+    try {
+      final repo = getHistory.repository;
+      await repo.returnItems(
+        invoiceId: event.invoiceId, 
+        items: event.items.cast<ReturnItem>(), 
+        staffId: event.staffId,
+        replacements: event.replacements,
+      );
+      add(LoadHistory()); // Refresh list
+    } catch (e) {
+      emit(HistoryError('Failed to return items: ${e.toString()}'));
+    }
   }
 
   Future<void> _onRecordPayment(RecordPayment event, Emitter<HistoryState> emit) async {
@@ -69,11 +85,13 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         invoices = invoices.where((inv) => inv.staffId == event.staffId).toList();
       }
       
-      final totalSales = invoices.fold<double>(0, (sum, inv) => sum + inv.amountPaid);
+      final totalCollected = invoices.fold<double>(0, (sum, inv) => sum + inv.amountPaid);
+      final totalInvoiced = invoices.fold<double>(0, (sum, inv) => sum + inv.totalAmount);
 
       emit(HistoryLoaded(
         invoices, 
-        totalSales: totalSales, 
+        totalSales: totalCollected,
+        totalInvoiced: totalInvoiced,
         query: event.query, 
         amount: event.amount,
         paymentMethod: event.paymentMethod,

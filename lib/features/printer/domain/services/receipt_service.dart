@@ -142,6 +142,23 @@ class ReceiptService {
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
               ),
+              if (invoice.balanceAmount > 0) ...[
+                pw.SizedBox(height: 4),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('AMOUNT PAID:'),
+                    pw.Text(CurrencyFormatter.format(invoice.amountPaid)),
+                  ],
+                ),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('BALANCE DUE:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    pw.Text(CurrencyFormatter.format(invoice.balanceAmount), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  ],
+                ),
+              ],
               
               pw.SizedBox(height: 10),
               pw.Text(settings.receiptFooter, style: const pw.TextStyle(fontSize: 10)),
@@ -189,6 +206,8 @@ class ReceiptService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
+                      if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
+                        pw.Text('CAC NO: ${settings.cacNumber}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                       pw.Text('INVOICE', style: pw.TextStyle(fontSize: 32, fontWeight: pw.FontWeight.bold, color: PdfColors.grey)),
                       pw.SizedBox(height: 20),
                       pw.Text('INVOICE No: ${invoice.invoiceNumber}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
@@ -272,6 +291,10 @@ class ReceiptService {
                         if (invoice.discountAmount > 0)
                           _summaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}'),
                         _summaryRow('TOTAL DUE', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
+                        if (invoice.balanceAmount > 0) ...[
+                          _summaryRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid)),
+                          _summaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), isBold: true),
+                        ],
                       ],
                     ),
                   ),

@@ -2270,6 +2270,24 @@ class $InvoiceItemsTable extends InvoiceItems
   late final GeneratedColumn<double> printPrice = GeneratedColumn<double>(
       'print_price', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _returnedQuantityMeta =
+      const VerificationMeta('returnedQuantity');
+  @override
+  late final GeneratedColumn<int> returnedQuantity = GeneratedColumn<int>(
+      'returned_quantity', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _isReplacementMeta =
+      const VerificationMeta('isReplacement');
+  @override
+  late final GeneratedColumn<bool> isReplacement = GeneratedColumn<bool>(
+      'is_replacement', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_replacement" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2284,7 +2302,9 @@ class $InvoiceItemsTable extends InvoiceItems
         createdAt,
         deviceId,
         isDeleted,
-        printPrice
+        printPrice,
+        returnedQuantity,
+        isReplacement
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2359,6 +2379,18 @@ class $InvoiceItemsTable extends InvoiceItems
           printPrice.isAcceptableOrUnknown(
               data['print_price']!, _printPriceMeta));
     }
+    if (data.containsKey('returned_quantity')) {
+      context.handle(
+          _returnedQuantityMeta,
+          returnedQuantity.isAcceptableOrUnknown(
+              data['returned_quantity']!, _returnedQuantityMeta));
+    }
+    if (data.containsKey('is_replacement')) {
+      context.handle(
+          _isReplacementMeta,
+          isReplacement.isAcceptableOrUnknown(
+              data['is_replacement']!, _isReplacementMeta));
+    }
     return context;
   }
 
@@ -2394,6 +2426,10 @@ class $InvoiceItemsTable extends InvoiceItems
           .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
       printPrice: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}print_price']),
+      returnedQuantity: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}returned_quantity'])!,
+      isReplacement: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_replacement'])!,
     );
   }
 
@@ -2418,6 +2454,8 @@ class InvoiceItemTable extends DataClass
   final String? deviceId;
   final bool isDeleted;
   final double? printPrice;
+  final int returnedQuantity;
+  final bool isReplacement;
   const InvoiceItemTable(
       {required this.id,
       required this.invoiceId,
@@ -2431,7 +2469,9 @@ class InvoiceItemTable extends DataClass
       this.createdAt,
       this.deviceId,
       required this.isDeleted,
-      this.printPrice});
+      this.printPrice,
+      required this.returnedQuantity,
+      required this.isReplacement});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2460,6 +2500,8 @@ class InvoiceItemTable extends DataClass
     if (!nullToAbsent || printPrice != null) {
       map['print_price'] = Variable<double>(printPrice);
     }
+    map['returned_quantity'] = Variable<int>(returnedQuantity);
+    map['is_replacement'] = Variable<bool>(isReplacement);
     return map;
   }
 
@@ -2489,6 +2531,8 @@ class InvoiceItemTable extends DataClass
       printPrice: printPrice == null && nullToAbsent
           ? const Value.absent()
           : Value(printPrice),
+      returnedQuantity: Value(returnedQuantity),
+      isReplacement: Value(isReplacement),
     );
   }
 
@@ -2509,6 +2553,8 @@ class InvoiceItemTable extends DataClass
       deviceId: serializer.fromJson<String?>(json['deviceId']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       printPrice: serializer.fromJson<double?>(json['printPrice']),
+      returnedQuantity: serializer.fromJson<int>(json['returnedQuantity']),
+      isReplacement: serializer.fromJson<bool>(json['isReplacement']),
     );
   }
   @override
@@ -2528,6 +2574,8 @@ class InvoiceItemTable extends DataClass
       'deviceId': serializer.toJson<String?>(deviceId),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'printPrice': serializer.toJson<double?>(printPrice),
+      'returnedQuantity': serializer.toJson<int>(returnedQuantity),
+      'isReplacement': serializer.toJson<bool>(isReplacement),
     };
   }
 
@@ -2544,7 +2592,9 @@ class InvoiceItemTable extends DataClass
           Value<DateTime?> createdAt = const Value.absent(),
           Value<String?> deviceId = const Value.absent(),
           bool? isDeleted,
-          Value<double?> printPrice = const Value.absent()}) =>
+          Value<double?> printPrice = const Value.absent(),
+          int? returnedQuantity,
+          bool? isReplacement}) =>
       InvoiceItemTable(
         id: id ?? this.id,
         invoiceId: invoiceId ?? this.invoiceId,
@@ -2559,6 +2609,8 @@ class InvoiceItemTable extends DataClass
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
         isDeleted: isDeleted ?? this.isDeleted,
         printPrice: printPrice.present ? printPrice.value : this.printPrice,
+        returnedQuantity: returnedQuantity ?? this.returnedQuantity,
+        isReplacement: isReplacement ?? this.isReplacement,
       );
   InvoiceItemTable copyWithCompanion(InvoiceItemsCompanion data) {
     return InvoiceItemTable(
@@ -2577,6 +2629,12 @@ class InvoiceItemTable extends DataClass
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
       printPrice:
           data.printPrice.present ? data.printPrice.value : this.printPrice,
+      returnedQuantity: data.returnedQuantity.present
+          ? data.returnedQuantity.value
+          : this.returnedQuantity,
+      isReplacement: data.isReplacement.present
+          ? data.isReplacement.value
+          : this.isReplacement,
     );
   }
 
@@ -2595,7 +2653,9 @@ class InvoiceItemTable extends DataClass
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
           ..write('isDeleted: $isDeleted, ')
-          ..write('printPrice: $printPrice')
+          ..write('printPrice: $printPrice, ')
+          ..write('returnedQuantity: $returnedQuantity, ')
+          ..write('isReplacement: $isReplacement')
           ..write(')'))
         .toString();
   }
@@ -2614,7 +2674,9 @@ class InvoiceItemTable extends DataClass
       createdAt,
       deviceId,
       isDeleted,
-      printPrice);
+      printPrice,
+      returnedQuantity,
+      isReplacement);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2631,7 +2693,9 @@ class InvoiceItemTable extends DataClass
           other.createdAt == this.createdAt &&
           other.deviceId == this.deviceId &&
           other.isDeleted == this.isDeleted &&
-          other.printPrice == this.printPrice);
+          other.printPrice == this.printPrice &&
+          other.returnedQuantity == this.returnedQuantity &&
+          other.isReplacement == this.isReplacement);
 }
 
 class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
@@ -2648,6 +2712,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
   final Value<String?> deviceId;
   final Value<bool> isDeleted;
   final Value<double?> printPrice;
+  final Value<int> returnedQuantity;
+  final Value<bool> isReplacement;
   const InvoiceItemsCompanion({
     this.id = const Value.absent(),
     this.invoiceId = const Value.absent(),
@@ -2662,6 +2728,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.printPrice = const Value.absent(),
+    this.returnedQuantity = const Value.absent(),
+    this.isReplacement = const Value.absent(),
   });
   InvoiceItemsCompanion.insert({
     this.id = const Value.absent(),
@@ -2677,6 +2745,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.printPrice = const Value.absent(),
+    this.returnedQuantity = const Value.absent(),
+    this.isReplacement = const Value.absent(),
   })  : invoiceId = Value(invoiceId),
         itemId = Value(itemId),
         quantity = Value(quantity),
@@ -2695,6 +2765,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     Expression<String>? deviceId,
     Expression<bool>? isDeleted,
     Expression<double>? printPrice,
+    Expression<int>? returnedQuantity,
+    Expression<bool>? isReplacement,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2710,6 +2782,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
       if (deviceId != null) 'device_id': deviceId,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (printPrice != null) 'print_price': printPrice,
+      if (returnedQuantity != null) 'returned_quantity': returnedQuantity,
+      if (isReplacement != null) 'is_replacement': isReplacement,
     });
   }
 
@@ -2726,7 +2800,9 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
       Value<DateTime?>? createdAt,
       Value<String?>? deviceId,
       Value<bool>? isDeleted,
-      Value<double?>? printPrice}) {
+      Value<double?>? printPrice,
+      Value<int>? returnedQuantity,
+      Value<bool>? isReplacement}) {
     return InvoiceItemsCompanion(
       id: id ?? this.id,
       invoiceId: invoiceId ?? this.invoiceId,
@@ -2741,6 +2817,8 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
       deviceId: deviceId ?? this.deviceId,
       isDeleted: isDeleted ?? this.isDeleted,
       printPrice: printPrice ?? this.printPrice,
+      returnedQuantity: returnedQuantity ?? this.returnedQuantity,
+      isReplacement: isReplacement ?? this.isReplacement,
     );
   }
 
@@ -2786,6 +2864,12 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
     if (printPrice.present) {
       map['print_price'] = Variable<double>(printPrice.value);
     }
+    if (returnedQuantity.present) {
+      map['returned_quantity'] = Variable<int>(returnedQuantity.value);
+    }
+    if (isReplacement.present) {
+      map['is_replacement'] = Variable<bool>(isReplacement.value);
+    }
     return map;
   }
 
@@ -2804,7 +2888,9 @@ class InvoiceItemsCompanion extends UpdateCompanion<InvoiceItemTable> {
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
           ..write('isDeleted: $isDeleted, ')
-          ..write('printPrice: $printPrice')
+          ..write('printPrice: $printPrice, ')
+          ..write('returnedQuantity: $returnedQuantity, ')
+          ..write('isReplacement: $isReplacement')
           ..write(')'))
         .toString();
   }
@@ -3134,6 +3220,16 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("show_total_sales_card" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _stockReturnEnabledMeta =
+      const VerificationMeta('stockReturnEnabled');
+  @override
+  late final GeneratedColumn<bool> stockReturnEnabled = GeneratedColumn<bool>(
+      'stock_return_enabled', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("stock_return_enabled" IN (0, 1))'),
+      defaultValue: const Constant(true));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -3174,7 +3270,8 @@ class $SettingsTable extends Settings
         showLogo,
         cacNumber,
         showCacNumber,
-        showTotalSalesCard
+        showTotalSalesCard,
+        stockReturnEnabled
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3399,6 +3496,12 @@ class $SettingsTable extends Settings
           showTotalSalesCard.isAcceptableOrUnknown(
               data['show_total_sales_card']!, _showTotalSalesCardMeta));
     }
+    if (data.containsKey('stock_return_enabled')) {
+      context.handle(
+          _stockReturnEnabledMeta,
+          stockReturnEnabled.isAcceptableOrUnknown(
+              data['stock_return_enabled']!, _stockReturnEnabledMeta));
+    }
     return context;
   }
 
@@ -3492,6 +3595,8 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.bool, data['${effectivePrefix}show_cac_number'])!,
       showTotalSalesCard: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}show_total_sales_card'])!,
+      stockReturnEnabled: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}stock_return_enabled'])!,
     );
   }
 
@@ -3541,6 +3646,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final String? cacNumber;
   final bool showCacNumber;
   final bool showTotalSalesCard;
+  final bool stockReturnEnabled;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -3580,7 +3686,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.showLogo,
       this.cacNumber,
       required this.showCacNumber,
-      required this.showTotalSalesCard});
+      required this.showTotalSalesCard,
+      required this.stockReturnEnabled});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3644,6 +3751,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     }
     map['show_cac_number'] = Variable<bool>(showCacNumber);
     map['show_total_sales_card'] = Variable<bool>(showTotalSalesCard);
+    map['stock_return_enabled'] = Variable<bool>(stockReturnEnabled);
     return map;
   }
 
@@ -3705,6 +3813,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           : Value(cacNumber),
       showCacNumber: Value(showCacNumber),
       showTotalSalesCard: Value(showTotalSalesCard),
+      stockReturnEnabled: Value(stockReturnEnabled),
     );
   }
 
@@ -3758,6 +3867,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       cacNumber: serializer.fromJson<String?>(json['cacNumber']),
       showCacNumber: serializer.fromJson<bool>(json['showCacNumber']),
       showTotalSalesCard: serializer.fromJson<bool>(json['showTotalSalesCard']),
+      stockReturnEnabled: serializer.fromJson<bool>(json['stockReturnEnabled']),
     );
   }
   @override
@@ -3806,6 +3916,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'cacNumber': serializer.toJson<String?>(cacNumber),
       'showCacNumber': serializer.toJson<bool>(showCacNumber),
       'showTotalSalesCard': serializer.toJson<bool>(showTotalSalesCard),
+      'stockReturnEnabled': serializer.toJson<bool>(stockReturnEnabled),
     };
   }
 
@@ -3848,7 +3959,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? showLogo,
           Value<String?> cacNumber = const Value.absent(),
           bool? showCacNumber,
-          bool? showTotalSalesCard}) =>
+          bool? showTotalSalesCard,
+          bool? stockReturnEnabled}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -3899,6 +4011,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         cacNumber: cacNumber.present ? cacNumber.value : this.cacNumber,
         showCacNumber: showCacNumber ?? this.showCacNumber,
         showTotalSalesCard: showTotalSalesCard ?? this.showTotalSalesCard,
+        stockReturnEnabled: stockReturnEnabled ?? this.stockReturnEnabled,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -3988,6 +4101,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showTotalSalesCard: data.showTotalSalesCard.present
           ? data.showTotalSalesCard.value
           : this.showTotalSalesCard,
+      stockReturnEnabled: data.stockReturnEnabled.present
+          ? data.stockReturnEnabled.value
+          : this.stockReturnEnabled,
     );
   }
 
@@ -4032,7 +4148,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('showLogo: $showLogo, ')
           ..write('cacNumber: $cacNumber, ')
           ..write('showCacNumber: $showCacNumber, ')
-          ..write('showTotalSalesCard: $showTotalSalesCard')
+          ..write('showTotalSalesCard: $showTotalSalesCard, ')
+          ..write('stockReturnEnabled: $stockReturnEnabled')
           ..write(')'))
         .toString();
   }
@@ -4077,7 +4194,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showLogo,
         cacNumber,
         showCacNumber,
-        showTotalSalesCard
+        showTotalSalesCard,
+        stockReturnEnabled
       ]);
   @override
   bool operator ==(Object other) =>
@@ -4122,7 +4240,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.showLogo == this.showLogo &&
           other.cacNumber == this.cacNumber &&
           other.showCacNumber == this.showCacNumber &&
-          other.showTotalSalesCard == this.showTotalSalesCard);
+          other.showTotalSalesCard == this.showTotalSalesCard &&
+          other.stockReturnEnabled == this.stockReturnEnabled);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -4165,6 +4284,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<String?> cacNumber;
   final Value<bool> showCacNumber;
   final Value<bool> showTotalSalesCard;
+  final Value<bool> stockReturnEnabled;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -4205,6 +4325,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.cacNumber = const Value.absent(),
     this.showCacNumber = const Value.absent(),
     this.showTotalSalesCard = const Value.absent(),
+    this.stockReturnEnabled = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -4246,6 +4367,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.cacNumber = const Value.absent(),
     this.showCacNumber = const Value.absent(),
     this.showTotalSalesCard = const Value.absent(),
+    this.stockReturnEnabled = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -4289,6 +4411,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<String>? cacNumber,
     Expression<bool>? showCacNumber,
     Expression<bool>? showTotalSalesCard,
+    Expression<bool>? stockReturnEnabled,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4340,6 +4463,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (showCacNumber != null) 'show_cac_number': showCacNumber,
       if (showTotalSalesCard != null)
         'show_total_sales_card': showTotalSalesCard,
+      if (stockReturnEnabled != null)
+        'stock_return_enabled': stockReturnEnabled,
     });
   }
 
@@ -4382,7 +4507,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? showLogo,
       Value<String?>? cacNumber,
       Value<bool>? showCacNumber,
-      Value<bool>? showTotalSalesCard}) {
+      Value<bool>? showTotalSalesCard,
+      Value<bool>? stockReturnEnabled}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -4429,6 +4555,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       cacNumber: cacNumber ?? this.cacNumber,
       showCacNumber: showCacNumber ?? this.showCacNumber,
       showTotalSalesCard: showTotalSalesCard ?? this.showTotalSalesCard,
+      stockReturnEnabled: stockReturnEnabled ?? this.stockReturnEnabled,
     );
   }
 
@@ -4558,6 +4685,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (showTotalSalesCard.present) {
       map['show_total_sales_card'] = Variable<bool>(showTotalSalesCard.value);
     }
+    if (stockReturnEnabled.present) {
+      map['stock_return_enabled'] = Variable<bool>(stockReturnEnabled.value);
+    }
     return map;
   }
 
@@ -4602,7 +4732,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('showLogo: $showLogo, ')
           ..write('cacNumber: $cacNumber, ')
           ..write('showCacNumber: $showCacNumber, ')
-          ..write('showTotalSalesCard: $showTotalSalesCard')
+          ..write('showTotalSalesCard: $showTotalSalesCard, ')
+          ..write('stockReturnEnabled: $stockReturnEnabled')
           ..write(')'))
         .toString();
   }
@@ -6452,6 +6583,607 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
   }
 }
 
+class $StockReturnsTable extends StockReturns
+    with TableInfo<$StockReturnsTable, StockReturnTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StockReturnsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _invoiceIdMeta =
+      const VerificationMeta('invoiceId');
+  @override
+  late final GeneratedColumn<int> invoiceId = GeneratedColumn<int>(
+      'invoice_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES invoices (id)'));
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<int> itemId = GeneratedColumn<int>(
+      'item_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES items (id)'));
+  static const VerificationMeta _quantityMeta =
+      const VerificationMeta('quantity');
+  @override
+  late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
+      'quantity', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _amountReturnedMeta =
+      const VerificationMeta('amountReturned');
+  @override
+  late final GeneratedColumn<double> amountReturned = GeneratedColumn<double>(
+      'amount_returned', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _staffIdMeta =
+      const VerificationMeta('staffId');
+  @override
+  late final GeneratedColumn<int> staffId = GeneratedColumn<int>(
+      'staff_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES staff (id)'));
+  static const VerificationMeta _dateReturnedMeta =
+      const VerificationMeta('dateReturned');
+  @override
+  late final GeneratedColumn<DateTime> dateReturned = GeneratedColumn<DateTime>(
+      'date_returned', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        invoiceId,
+        itemId,
+        quantity,
+        amountReturned,
+        staffId,
+        dateReturned,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'stock_returns';
+  @override
+  VerificationContext validateIntegrity(Insertable<StockReturnTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('invoice_id')) {
+      context.handle(_invoiceIdMeta,
+          invoiceId.isAcceptableOrUnknown(data['invoice_id']!, _invoiceIdMeta));
+    } else if (isInserting) {
+      context.missing(_invoiceIdMeta);
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(_itemIdMeta,
+          itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta));
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('quantity')) {
+      context.handle(_quantityMeta,
+          quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta));
+    } else if (isInserting) {
+      context.missing(_quantityMeta);
+    }
+    if (data.containsKey('amount_returned')) {
+      context.handle(
+          _amountReturnedMeta,
+          amountReturned.isAcceptableOrUnknown(
+              data['amount_returned']!, _amountReturnedMeta));
+    } else if (isInserting) {
+      context.missing(_amountReturnedMeta);
+    }
+    if (data.containsKey('staff_id')) {
+      context.handle(_staffIdMeta,
+          staffId.isAcceptableOrUnknown(data['staff_id']!, _staffIdMeta));
+    } else if (isInserting) {
+      context.missing(_staffIdMeta);
+    }
+    if (data.containsKey('date_returned')) {
+      context.handle(
+          _dateReturnedMeta,
+          dateReturned.isAcceptableOrUnknown(
+              data['date_returned']!, _dateReturnedMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StockReturnTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StockReturnTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      invoiceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}invoice_id'])!,
+      itemId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}item_id'])!,
+      quantity: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}quantity'])!,
+      amountReturned: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}amount_returned'])!,
+      staffId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}staff_id'])!,
+      dateReturned: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}date_returned'])!,
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+    );
+  }
+
+  @override
+  $StockReturnsTable createAlias(String alias) {
+    return $StockReturnsTable(attachedDatabase, alias);
+  }
+}
+
+class StockReturnTable extends DataClass
+    implements Insertable<StockReturnTable> {
+  final int id;
+  final int invoiceId;
+  final int itemId;
+  final int quantity;
+  final double amountReturned;
+  final int staffId;
+  final DateTime dateReturned;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  final String? deviceId;
+  final bool isDeleted;
+  const StockReturnTable(
+      {required this.id,
+      required this.invoiceId,
+      required this.itemId,
+      required this.quantity,
+      required this.amountReturned,
+      required this.staffId,
+      required this.dateReturned,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt,
+      this.deviceId,
+      required this.isDeleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['invoice_id'] = Variable<int>(invoiceId);
+    map['item_id'] = Variable<int>(itemId);
+    map['quantity'] = Variable<int>(quantity);
+    map['amount_returned'] = Variable<double>(amountReturned);
+    map['staff_id'] = Variable<int>(staffId);
+    map['date_returned'] = Variable<DateTime>(dateReturned);
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    return map;
+  }
+
+  StockReturnsCompanion toCompanion(bool nullToAbsent) {
+    return StockReturnsCompanion(
+      id: Value(id),
+      invoiceId: Value(invoiceId),
+      itemId: Value(itemId),
+      quantity: Value(quantity),
+      amountReturned: Value(amountReturned),
+      staffId: Value(staffId),
+      dateReturned: Value(dateReturned),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      isDeleted: Value(isDeleted),
+    );
+  }
+
+  factory StockReturnTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StockReturnTable(
+      id: serializer.fromJson<int>(json['id']),
+      invoiceId: serializer.fromJson<int>(json['invoiceId']),
+      itemId: serializer.fromJson<int>(json['itemId']),
+      quantity: serializer.fromJson<int>(json['quantity']),
+      amountReturned: serializer.fromJson<double>(json['amountReturned']),
+      staffId: serializer.fromJson<int>(json['staffId']),
+      dateReturned: serializer.fromJson<DateTime>(json['dateReturned']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'invoiceId': serializer.toJson<int>(invoiceId),
+      'itemId': serializer.toJson<int>(itemId),
+      'quantity': serializer.toJson<int>(quantity),
+      'amountReturned': serializer.toJson<double>(amountReturned),
+      'staffId': serializer.toJson<int>(staffId),
+      'dateReturned': serializer.toJson<DateTime>(dateReturned),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+    };
+  }
+
+  StockReturnTable copyWith(
+          {int? id,
+          int? invoiceId,
+          int? itemId,
+          int? quantity,
+          double? amountReturned,
+          int? staffId,
+          DateTime? dateReturned,
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent(),
+          Value<String?> deviceId = const Value.absent(),
+          bool? isDeleted}) =>
+      StockReturnTable(
+        id: id ?? this.id,
+        invoiceId: invoiceId ?? this.invoiceId,
+        itemId: itemId ?? this.itemId,
+        quantity: quantity ?? this.quantity,
+        amountReturned: amountReturned ?? this.amountReturned,
+        staffId: staffId ?? this.staffId,
+        dateReturned: dateReturned ?? this.dateReturned,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        isDeleted: isDeleted ?? this.isDeleted,
+      );
+  StockReturnTable copyWithCompanion(StockReturnsCompanion data) {
+    return StockReturnTable(
+      id: data.id.present ? data.id.value : this.id,
+      invoiceId: data.invoiceId.present ? data.invoiceId.value : this.invoiceId,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      amountReturned: data.amountReturned.present
+          ? data.amountReturned.value
+          : this.amountReturned,
+      staffId: data.staffId.present ? data.staffId.value : this.staffId,
+      dateReturned: data.dateReturned.present
+          ? data.dateReturned.value
+          : this.dateReturned,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockReturnTable(')
+          ..write('id: $id, ')
+          ..write('invoiceId: $invoiceId, ')
+          ..write('itemId: $itemId, ')
+          ..write('quantity: $quantity, ')
+          ..write('amountReturned: $amountReturned, ')
+          ..write('staffId: $staffId, ')
+          ..write('dateReturned: $dateReturned, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      invoiceId,
+      itemId,
+      quantity,
+      amountReturned,
+      staffId,
+      dateReturned,
+      syncId,
+      updatedAt,
+      createdAt,
+      deviceId,
+      isDeleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StockReturnTable &&
+          other.id == this.id &&
+          other.invoiceId == this.invoiceId &&
+          other.itemId == this.itemId &&
+          other.quantity == this.quantity &&
+          other.amountReturned == this.amountReturned &&
+          other.staffId == this.staffId &&
+          other.dateReturned == this.dateReturned &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.deviceId == this.deviceId &&
+          other.isDeleted == this.isDeleted);
+}
+
+class StockReturnsCompanion extends UpdateCompanion<StockReturnTable> {
+  final Value<int> id;
+  final Value<int> invoiceId;
+  final Value<int> itemId;
+  final Value<int> quantity;
+  final Value<double> amountReturned;
+  final Value<int> staffId;
+  final Value<DateTime> dateReturned;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  final Value<String?> deviceId;
+  final Value<bool> isDeleted;
+  const StockReturnsCompanion({
+    this.id = const Value.absent(),
+    this.invoiceId = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.quantity = const Value.absent(),
+    this.amountReturned = const Value.absent(),
+    this.staffId = const Value.absent(),
+    this.dateReturned = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  });
+  StockReturnsCompanion.insert({
+    this.id = const Value.absent(),
+    required int invoiceId,
+    required int itemId,
+    required int quantity,
+    required double amountReturned,
+    required int staffId,
+    this.dateReturned = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  })  : invoiceId = Value(invoiceId),
+        itemId = Value(itemId),
+        quantity = Value(quantity),
+        amountReturned = Value(amountReturned),
+        staffId = Value(staffId);
+  static Insertable<StockReturnTable> custom({
+    Expression<int>? id,
+    Expression<int>? invoiceId,
+    Expression<int>? itemId,
+    Expression<int>? quantity,
+    Expression<double>? amountReturned,
+    Expression<int>? staffId,
+    Expression<DateTime>? dateReturned,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? deviceId,
+    Expression<bool>? isDeleted,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (invoiceId != null) 'invoice_id': invoiceId,
+      if (itemId != null) 'item_id': itemId,
+      if (quantity != null) 'quantity': quantity,
+      if (amountReturned != null) 'amount_returned': amountReturned,
+      if (staffId != null) 'staff_id': staffId,
+      if (dateReturned != null) 'date_returned': dateReturned,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+    });
+  }
+
+  StockReturnsCompanion copyWith(
+      {Value<int>? id,
+      Value<int>? invoiceId,
+      Value<int>? itemId,
+      Value<int>? quantity,
+      Value<double>? amountReturned,
+      Value<int>? staffId,
+      Value<DateTime>? dateReturned,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt,
+      Value<String?>? deviceId,
+      Value<bool>? isDeleted}) {
+    return StockReturnsCompanion(
+      id: id ?? this.id,
+      invoiceId: invoiceId ?? this.invoiceId,
+      itemId: itemId ?? this.itemId,
+      quantity: quantity ?? this.quantity,
+      amountReturned: amountReturned ?? this.amountReturned,
+      staffId: staffId ?? this.staffId,
+      dateReturned: dateReturned ?? this.dateReturned,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      deviceId: deviceId ?? this.deviceId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (invoiceId.present) {
+      map['invoice_id'] = Variable<int>(invoiceId.value);
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<int>(itemId.value);
+    }
+    if (quantity.present) {
+      map['quantity'] = Variable<int>(quantity.value);
+    }
+    if (amountReturned.present) {
+      map['amount_returned'] = Variable<double>(amountReturned.value);
+    }
+    if (staffId.present) {
+      map['staff_id'] = Variable<int>(staffId.value);
+    }
+    if (dateReturned.present) {
+      map['date_returned'] = Variable<DateTime>(dateReturned.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockReturnsCompanion(')
+          ..write('id: $id, ')
+          ..write('invoiceId: $invoiceId, ')
+          ..write('itemId: $itemId, ')
+          ..write('quantity: $quantity, ')
+          ..write('amountReturned: $amountReturned, ')
+          ..write('staffId: $staffId, ')
+          ..write('dateReturned: $dateReturned, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6465,6 +7197,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SyncMetaTable syncMeta = $SyncMetaTable(this);
   late final $StockIncrementsTable stockIncrements =
       $StockIncrementsTable(this);
+  late final $StockReturnsTable stockReturns = $StockReturnsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6478,7 +7211,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         licenseHistory,
         staff,
         syncMeta,
-        stockIncrements
+        stockIncrements,
+        stockReturns
       ];
 }
 
@@ -6846,6 +7580,20 @@ final class $$ItemsTableReferences
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: cache));
   }
+
+  static MultiTypedResultKey<$StockReturnsTable, List<StockReturnTable>>
+      _stockReturnsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+          db.stockReturns,
+          aliasName: $_aliasNameGenerator(db.items.id, db.stockReturns.itemId));
+
+  $$StockReturnsTableProcessedTableManager get stockReturnsRefs {
+    final manager = $$StockReturnsTableTableManager($_db, $_db.stockReturns)
+        .filter((f) => f.itemId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_stockReturnsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
 }
 
 class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
@@ -6960,6 +7708,27 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
             $$StockIncrementsTableFilterComposer(
               $db: $db,
               $table: $db.stockIncrements,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> stockReturnsRefs(
+      Expression<bool> Function($$StockReturnsTableFilterComposer f) f) {
+    final $$StockReturnsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockReturns,
+        getReferencedColumn: (t) => t.itemId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockReturnsTableFilterComposer(
+              $db: $db,
+              $table: $db.stockReturns,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -7167,6 +7936,27 @@ class $$ItemsTableAnnotationComposer
             ));
     return f(composer);
   }
+
+  Expression<T> stockReturnsRefs<T extends Object>(
+      Expression<T> Function($$StockReturnsTableAnnotationComposer a) f) {
+    final $$StockReturnsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockReturns,
+        getReferencedColumn: (t) => t.itemId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockReturnsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.stockReturns,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$ItemsTableTableManager extends RootTableManager<
@@ -7181,7 +7971,10 @@ class $$ItemsTableTableManager extends RootTableManager<
     (ItemTable, $$ItemsTableReferences),
     ItemTable,
     PrefetchHooks Function(
-        {bool categoryId, bool invoiceItemsRefs, bool stockIncrementsRefs})> {
+        {bool categoryId,
+        bool invoiceItemsRefs,
+        bool stockIncrementsRefs,
+        bool stockReturnsRefs})> {
   $$ItemsTableTableManager(_$AppDatabase db, $ItemsTable table)
       : super(TableManagerState(
           db: db,
@@ -7275,12 +8068,14 @@ class $$ItemsTableTableManager extends RootTableManager<
           prefetchHooksCallback: (
               {categoryId = false,
               invoiceItemsRefs = false,
-              stockIncrementsRefs = false}) {
+              stockIncrementsRefs = false,
+              stockReturnsRefs = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [
                 if (invoiceItemsRefs) db.invoiceItems,
-                if (stockIncrementsRefs) db.stockIncrements
+                if (stockIncrementsRefs) db.stockIncrements,
+                if (stockReturnsRefs) db.stockReturns
               ],
               addJoins: <
                   T extends TableManagerState<
@@ -7335,6 +8130,19 @@ class $$ItemsTableTableManager extends RootTableManager<
                         referencedItemsForCurrentItem: (item,
                                 referencedItems) =>
                             referencedItems.where((e) => e.itemId == item.id),
+                        typedResults: items),
+                  if (stockReturnsRefs)
+                    await $_getPrefetchedData<ItemTable, $ItemsTable,
+                            StockReturnTable>(
+                        currentTable: table,
+                        referencedTable:
+                            $$ItemsTableReferences._stockReturnsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ItemsTableReferences(db, table, p0)
+                                .stockReturnsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.itemId == item.id),
                         typedResults: items)
                 ];
               },
@@ -7355,7 +8163,10 @@ typedef $$ItemsTableProcessedTableManager = ProcessedTableManager<
     (ItemTable, $$ItemsTableReferences),
     ItemTable,
     PrefetchHooks Function(
-        {bool categoryId, bool invoiceItemsRefs, bool stockIncrementsRefs})>;
+        {bool categoryId,
+        bool invoiceItemsRefs,
+        bool stockIncrementsRefs,
+        bool stockReturnsRefs})>;
 typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<int> id,
   required String invoiceNumber,
@@ -7418,6 +8229,21 @@ final class $$InvoicesTableReferences
         .filter((f) => f.invoiceId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_invoiceItemsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$StockReturnsTable, List<StockReturnTable>>
+      _stockReturnsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+          db.stockReturns,
+          aliasName:
+              $_aliasNameGenerator(db.invoices.id, db.stockReturns.invoiceId));
+
+  $$StockReturnsTableProcessedTableManager get stockReturnsRefs {
+    final manager = $$StockReturnsTableTableManager($_db, $_db.stockReturns)
+        .filter((f) => f.invoiceId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_stockReturnsRefsTable($_db));
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: cache));
   }
@@ -7511,6 +8337,27 @@ class $$InvoicesTableFilterComposer
             $$InvoiceItemsTableFilterComposer(
               $db: $db,
               $table: $db.invoiceItems,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> stockReturnsRefs(
+      Expression<bool> Function($$StockReturnsTableFilterComposer f) f) {
+    final $$StockReturnsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockReturns,
+        getReferencedColumn: (t) => t.invoiceId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockReturnsTableFilterComposer(
+              $db: $db,
+              $table: $db.stockReturns,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -7693,6 +8540,27 @@ class $$InvoicesTableAnnotationComposer
             ));
     return f(composer);
   }
+
+  Expression<T> stockReturnsRefs<T extends Object>(
+      Expression<T> Function($$StockReturnsTableAnnotationComposer a) f) {
+    final $$StockReturnsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockReturns,
+        getReferencedColumn: (t) => t.invoiceId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockReturnsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.stockReturns,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$InvoicesTableTableManager extends RootTableManager<
@@ -7706,7 +8574,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
     $$InvoicesTableUpdateCompanionBuilder,
     (InvoiceTable, $$InvoicesTableReferences),
     InvoiceTable,
-    PrefetchHooks Function({bool invoiceItemsRefs})> {
+    PrefetchHooks Function({bool invoiceItemsRefs, bool stockReturnsRefs})> {
   $$InvoicesTableTableManager(_$AppDatabase db, $InvoicesTable table)
       : super(TableManagerState(
           db: db,
@@ -7813,10 +8681,14 @@ class $$InvoicesTableTableManager extends RootTableManager<
               .map((e) =>
                   (e.readTable(table), $$InvoicesTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: ({invoiceItemsRefs = false}) {
+          prefetchHooksCallback: (
+              {invoiceItemsRefs = false, stockReturnsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (invoiceItemsRefs) db.invoiceItems],
+              explicitlyWatchedTables: [
+                if (invoiceItemsRefs) db.invoiceItems,
+                if (stockReturnsRefs) db.stockReturns
+              ],
               addJoins: null,
               getPrefetchedDataCallback: (items) async {
                 return [
@@ -7828,6 +8700,18 @@ class $$InvoicesTableTableManager extends RootTableManager<
                         managerFromTypedResult: (p0) =>
                             $$InvoicesTableReferences(db, table, p0)
                                 .invoiceItemsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.invoiceId == item.id),
+                        typedResults: items),
+                  if (stockReturnsRefs)
+                    await $_getPrefetchedData<InvoiceTable, $InvoicesTable, StockReturnTable>(
+                        currentTable: table,
+                        referencedTable: $$InvoicesTableReferences
+                            ._stockReturnsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$InvoicesTableReferences(db, table, p0)
+                                .stockReturnsRefs,
                         referencedItemsForCurrentItem:
                             (item, referencedItems) => referencedItems
                                 .where((e) => e.invoiceId == item.id),
@@ -7850,7 +8734,7 @@ typedef $$InvoicesTableProcessedTableManager = ProcessedTableManager<
     $$InvoicesTableUpdateCompanionBuilder,
     (InvoiceTable, $$InvoicesTableReferences),
     InvoiceTable,
-    PrefetchHooks Function({bool invoiceItemsRefs})>;
+    PrefetchHooks Function({bool invoiceItemsRefs, bool stockReturnsRefs})>;
 typedef $$InvoiceItemsTableCreateCompanionBuilder = InvoiceItemsCompanion
     Function({
   Value<int> id,
@@ -7866,6 +8750,8 @@ typedef $$InvoiceItemsTableCreateCompanionBuilder = InvoiceItemsCompanion
   Value<String?> deviceId,
   Value<bool> isDeleted,
   Value<double?> printPrice,
+  Value<int> returnedQuantity,
+  Value<bool> isReplacement,
 });
 typedef $$InvoiceItemsTableUpdateCompanionBuilder = InvoiceItemsCompanion
     Function({
@@ -7882,6 +8768,8 @@ typedef $$InvoiceItemsTableUpdateCompanionBuilder = InvoiceItemsCompanion
   Value<String?> deviceId,
   Value<bool> isDeleted,
   Value<double?> printPrice,
+  Value<int> returnedQuantity,
+  Value<bool> isReplacement,
 });
 
 final class $$InvoiceItemsTableReferences extends BaseReferences<_$AppDatabase,
@@ -7959,6 +8847,13 @@ class $$InvoiceItemsTableFilterComposer
 
   ColumnFilters<double> get printPrice => $composableBuilder(
       column: $table.printPrice, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get returnedQuantity => $composableBuilder(
+      column: $table.returnedQuantity,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isReplacement => $composableBuilder(
+      column: $table.isReplacement, builder: (column) => ColumnFilters(column));
 
   $$InvoicesTableFilterComposer get invoiceId {
     final $$InvoicesTableFilterComposer composer = $composerBuilder(
@@ -8043,6 +8938,14 @@ class $$InvoiceItemsTableOrderingComposer
   ColumnOrderings<double> get printPrice => $composableBuilder(
       column: $table.printPrice, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get returnedQuantity => $composableBuilder(
+      column: $table.returnedQuantity,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isReplacement => $composableBuilder(
+      column: $table.isReplacement,
+      builder: (column) => ColumnOrderings(column));
+
   $$InvoicesTableOrderingComposer get invoiceId {
     final $$InvoicesTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -8126,6 +9029,12 @@ class $$InvoiceItemsTableAnnotationComposer
   GeneratedColumn<double> get printPrice => $composableBuilder(
       column: $table.printPrice, builder: (column) => column);
 
+  GeneratedColumn<int> get returnedQuantity => $composableBuilder(
+      column: $table.returnedQuantity, builder: (column) => column);
+
+  GeneratedColumn<bool> get isReplacement => $composableBuilder(
+      column: $table.isReplacement, builder: (column) => column);
+
   $$InvoicesTableAnnotationComposer get invoiceId {
     final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
         composer: this,
@@ -8203,6 +9112,8 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
             Value<double?> printPrice = const Value.absent(),
+            Value<int> returnedQuantity = const Value.absent(),
+            Value<bool> isReplacement = const Value.absent(),
           }) =>
               InvoiceItemsCompanion(
             id: id,
@@ -8218,6 +9129,8 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             deviceId: deviceId,
             isDeleted: isDeleted,
             printPrice: printPrice,
+            returnedQuantity: returnedQuantity,
+            isReplacement: isReplacement,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -8233,6 +9146,8 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
             Value<double?> printPrice = const Value.absent(),
+            Value<int> returnedQuantity = const Value.absent(),
+            Value<bool> isReplacement = const Value.absent(),
           }) =>
               InvoiceItemsCompanion.insert(
             id: id,
@@ -8248,6 +9163,8 @@ class $$InvoiceItemsTableTableManager extends RootTableManager<
             deviceId: deviceId,
             isDeleted: isDeleted,
             printPrice: printPrice,
+            returnedQuantity: returnedQuantity,
+            isReplacement: isReplacement,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (
@@ -8355,6 +9272,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<String?> cacNumber,
   Value<bool> showCacNumber,
   Value<bool> showTotalSalesCard,
+  Value<bool> stockReturnEnabled,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -8396,6 +9314,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String?> cacNumber,
   Value<bool> showCacNumber,
   Value<bool> showTotalSalesCard,
+  Value<bool> stockReturnEnabled,
 });
 
 class $$SettingsTableFilterComposer
@@ -8538,6 +9457,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get showTotalSalesCard => $composableBuilder(
       column: $table.showTotalSalesCard,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get stockReturnEnabled => $composableBuilder(
+      column: $table.stockReturnEnabled,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -8688,6 +9611,10 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get showTotalSalesCard => $composableBuilder(
       column: $table.showTotalSalesCard,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get stockReturnEnabled => $composableBuilder(
+      column: $table.stockReturnEnabled,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -8815,6 +9742,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get showTotalSalesCard => $composableBuilder(
       column: $table.showTotalSalesCard, builder: (column) => column);
+
+  GeneratedColumn<bool> get stockReturnEnabled => $composableBuilder(
+      column: $table.stockReturnEnabled, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -8882,6 +9812,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String?> cacNumber = const Value.absent(),
             Value<bool> showCacNumber = const Value.absent(),
             Value<bool> showTotalSalesCard = const Value.absent(),
+            Value<bool> stockReturnEnabled = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -8923,6 +9854,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             cacNumber: cacNumber,
             showCacNumber: showCacNumber,
             showTotalSalesCard: showTotalSalesCard,
+            stockReturnEnabled: stockReturnEnabled,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -8964,6 +9896,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String?> cacNumber = const Value.absent(),
             Value<bool> showCacNumber = const Value.absent(),
             Value<bool> showTotalSalesCard = const Value.absent(),
+            Value<bool> stockReturnEnabled = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -9005,6 +9938,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             cacNumber: cacNumber,
             showCacNumber: showCacNumber,
             showTotalSalesCard: showTotalSalesCard,
+            stockReturnEnabled: stockReturnEnabled,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -9265,6 +10199,26 @@ typedef $$StaffTableUpdateCompanionBuilder = StaffCompanion Function({
   Value<bool> isDeleted,
 });
 
+final class $$StaffTableReferences
+    extends BaseReferences<_$AppDatabase, $StaffTable, StaffTable> {
+  $$StaffTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$StockReturnsTable, List<StockReturnTable>>
+      _stockReturnsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.stockReturns,
+              aliasName:
+                  $_aliasNameGenerator(db.staff.id, db.stockReturns.staffId));
+
+  $$StockReturnsTableProcessedTableManager get stockReturnsRefs {
+    final manager = $$StockReturnsTableTableManager($_db, $_db.stockReturns)
+        .filter((f) => f.staffId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_stockReturnsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
 class $$StaffTableFilterComposer extends Composer<_$AppDatabase, $StaffTable> {
   $$StaffTableFilterComposer({
     required super.$db,
@@ -9299,6 +10253,27 @@ class $$StaffTableFilterComposer extends Composer<_$AppDatabase, $StaffTable> {
 
   ColumnFilters<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> stockReturnsRefs(
+      Expression<bool> Function($$StockReturnsTableFilterComposer f) f) {
+    final $$StockReturnsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockReturns,
+        getReferencedColumn: (t) => t.staffId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockReturnsTableFilterComposer(
+              $db: $db,
+              $table: $db.stockReturns,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$StaffTableOrderingComposer
@@ -9373,6 +10348,27 @@ class $$StaffTableAnnotationComposer
 
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  Expression<T> stockReturnsRefs<T extends Object>(
+      Expression<T> Function($$StockReturnsTableAnnotationComposer a) f) {
+    final $$StockReturnsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockReturns,
+        getReferencedColumn: (t) => t.staffId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockReturnsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.stockReturns,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$StaffTableTableManager extends RootTableManager<
@@ -9384,9 +10380,9 @@ class $$StaffTableTableManager extends RootTableManager<
     $$StaffTableAnnotationComposer,
     $$StaffTableCreateCompanionBuilder,
     $$StaffTableUpdateCompanionBuilder,
-    (StaffTable, BaseReferences<_$AppDatabase, $StaffTable, StaffTable>),
+    (StaffTable, $$StaffTableReferences),
     StaffTable,
-    PrefetchHooks Function()> {
+    PrefetchHooks Function({bool stockReturnsRefs})> {
   $$StaffTableTableManager(_$AppDatabase db, $StaffTable table)
       : super(TableManagerState(
           db: db,
@@ -9442,9 +10438,33 @@ class $$StaffTableTableManager extends RootTableManager<
             isDeleted: isDeleted,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) =>
+                  (e.readTable(table), $$StaffTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({stockReturnsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (stockReturnsRefs) db.stockReturns],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (stockReturnsRefs)
+                    await $_getPrefetchedData<StaffTable, $StaffTable,
+                            StockReturnTable>(
+                        currentTable: table,
+                        referencedTable:
+                            $$StaffTableReferences._stockReturnsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$StaffTableReferences(db, table, p0)
+                                .stockReturnsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.staffId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
         ));
 }
 
@@ -9457,9 +10477,9 @@ typedef $$StaffTableProcessedTableManager = ProcessedTableManager<
     $$StaffTableAnnotationComposer,
     $$StaffTableCreateCompanionBuilder,
     $$StaffTableUpdateCompanionBuilder,
-    (StaffTable, BaseReferences<_$AppDatabase, $StaffTable, StaffTable>),
+    (StaffTable, $$StaffTableReferences),
     StaffTable,
-    PrefetchHooks Function()>;
+    PrefetchHooks Function({bool stockReturnsRefs})>;
 typedef $$SyncMetaTableCreateCompanionBuilder = SyncMetaCompanion Function({
   Value<int> id,
   required String deviceId,
@@ -10020,6 +11040,534 @@ typedef $$StockIncrementsTableProcessedTableManager = ProcessedTableManager<
     (StockIncrementTable, $$StockIncrementsTableReferences),
     StockIncrementTable,
     PrefetchHooks Function({bool itemId})>;
+typedef $$StockReturnsTableCreateCompanionBuilder = StockReturnsCompanion
+    Function({
+  Value<int> id,
+  required int invoiceId,
+  required int itemId,
+  required int quantity,
+  required double amountReturned,
+  required int staffId,
+  Value<DateTime> dateReturned,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+typedef $$StockReturnsTableUpdateCompanionBuilder = StockReturnsCompanion
+    Function({
+  Value<int> id,
+  Value<int> invoiceId,
+  Value<int> itemId,
+  Value<int> quantity,
+  Value<double> amountReturned,
+  Value<int> staffId,
+  Value<DateTime> dateReturned,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+
+final class $$StockReturnsTableReferences extends BaseReferences<_$AppDatabase,
+    $StockReturnsTable, StockReturnTable> {
+  $$StockReturnsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $InvoicesTable _invoiceIdTable(_$AppDatabase db) =>
+      db.invoices.createAlias(
+          $_aliasNameGenerator(db.stockReturns.invoiceId, db.invoices.id));
+
+  $$InvoicesTableProcessedTableManager get invoiceId {
+    final $_column = $_itemColumn<int>('invoice_id')!;
+
+    final manager = $$InvoicesTableTableManager($_db, $_db.invoices)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_invoiceIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $ItemsTable _itemIdTable(_$AppDatabase db) => db.items
+      .createAlias($_aliasNameGenerator(db.stockReturns.itemId, db.items.id));
+
+  $$ItemsTableProcessedTableManager get itemId {
+    final $_column = $_itemColumn<int>('item_id')!;
+
+    final manager = $$ItemsTableTableManager($_db, $_db.items)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_itemIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $StaffTable _staffIdTable(_$AppDatabase db) => db.staff
+      .createAlias($_aliasNameGenerator(db.stockReturns.staffId, db.staff.id));
+
+  $$StaffTableProcessedTableManager get staffId {
+    final $_column = $_itemColumn<int>('staff_id')!;
+
+    final manager = $$StaffTableTableManager($_db, $_db.staff)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_staffIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$StockReturnsTableFilterComposer
+    extends Composer<_$AppDatabase, $StockReturnsTable> {
+  $$StockReturnsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get amountReturned => $composableBuilder(
+      column: $table.amountReturned,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get dateReturned => $composableBuilder(
+      column: $table.dateReturned, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  $$InvoicesTableFilterComposer get invoiceId {
+    final $$InvoicesTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.invoiceId,
+        referencedTable: $db.invoices,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$InvoicesTableFilterComposer(
+              $db: $db,
+              $table: $db.invoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$ItemsTableFilterComposer get itemId {
+    final $$ItemsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.itemId,
+        referencedTable: $db.items,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ItemsTableFilterComposer(
+              $db: $db,
+              $table: $db.items,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$StaffTableFilterComposer get staffId {
+    final $$StaffTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.staffId,
+        referencedTable: $db.staff,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StaffTableFilterComposer(
+              $db: $db,
+              $table: $db.staff,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$StockReturnsTableOrderingComposer
+    extends Composer<_$AppDatabase, $StockReturnsTable> {
+  $$StockReturnsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get quantity => $composableBuilder(
+      column: $table.quantity, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get amountReturned => $composableBuilder(
+      column: $table.amountReturned,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get dateReturned => $composableBuilder(
+      column: $table.dateReturned,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+
+  $$InvoicesTableOrderingComposer get invoiceId {
+    final $$InvoicesTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.invoiceId,
+        referencedTable: $db.invoices,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$InvoicesTableOrderingComposer(
+              $db: $db,
+              $table: $db.invoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$ItemsTableOrderingComposer get itemId {
+    final $$ItemsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.itemId,
+        referencedTable: $db.items,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ItemsTableOrderingComposer(
+              $db: $db,
+              $table: $db.items,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$StaffTableOrderingComposer get staffId {
+    final $$StaffTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.staffId,
+        referencedTable: $db.staff,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StaffTableOrderingComposer(
+              $db: $db,
+              $table: $db.staff,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$StockReturnsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StockReturnsTable> {
+  $$StockReturnsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get quantity =>
+      $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<double> get amountReturned => $composableBuilder(
+      column: $table.amountReturned, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get dateReturned => $composableBuilder(
+      column: $table.dateReturned, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  $$InvoicesTableAnnotationComposer get invoiceId {
+    final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.invoiceId,
+        referencedTable: $db.invoices,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$InvoicesTableAnnotationComposer(
+              $db: $db,
+              $table: $db.invoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$ItemsTableAnnotationComposer get itemId {
+    final $$ItemsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.itemId,
+        referencedTable: $db.items,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ItemsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.items,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$StaffTableAnnotationComposer get staffId {
+    final $$StaffTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.staffId,
+        referencedTable: $db.staff,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StaffTableAnnotationComposer(
+              $db: $db,
+              $table: $db.staff,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$StockReturnsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $StockReturnsTable,
+    StockReturnTable,
+    $$StockReturnsTableFilterComposer,
+    $$StockReturnsTableOrderingComposer,
+    $$StockReturnsTableAnnotationComposer,
+    $$StockReturnsTableCreateCompanionBuilder,
+    $$StockReturnsTableUpdateCompanionBuilder,
+    (StockReturnTable, $$StockReturnsTableReferences),
+    StockReturnTable,
+    PrefetchHooks Function({bool invoiceId, bool itemId, bool staffId})> {
+  $$StockReturnsTableTableManager(_$AppDatabase db, $StockReturnsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StockReturnsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StockReturnsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StockReturnsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<int> invoiceId = const Value.absent(),
+            Value<int> itemId = const Value.absent(),
+            Value<int> quantity = const Value.absent(),
+            Value<double> amountReturned = const Value.absent(),
+            Value<int> staffId = const Value.absent(),
+            Value<DateTime> dateReturned = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              StockReturnsCompanion(
+            id: id,
+            invoiceId: invoiceId,
+            itemId: itemId,
+            quantity: quantity,
+            amountReturned: amountReturned,
+            staffId: staffId,
+            dateReturned: dateReturned,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required int invoiceId,
+            required int itemId,
+            required int quantity,
+            required double amountReturned,
+            required int staffId,
+            Value<DateTime> dateReturned = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              StockReturnsCompanion.insert(
+            id: id,
+            invoiceId: invoiceId,
+            itemId: itemId,
+            quantity: quantity,
+            amountReturned: amountReturned,
+            staffId: staffId,
+            dateReturned: dateReturned,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$StockReturnsTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: (
+              {invoiceId = false, itemId = false, staffId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (invoiceId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.invoiceId,
+                    referencedTable:
+                        $$StockReturnsTableReferences._invoiceIdTable(db),
+                    referencedColumn:
+                        $$StockReturnsTableReferences._invoiceIdTable(db).id,
+                  ) as T;
+                }
+                if (itemId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.itemId,
+                    referencedTable:
+                        $$StockReturnsTableReferences._itemIdTable(db),
+                    referencedColumn:
+                        $$StockReturnsTableReferences._itemIdTable(db).id,
+                  ) as T;
+                }
+                if (staffId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.staffId,
+                    referencedTable:
+                        $$StockReturnsTableReferences._staffIdTable(db),
+                    referencedColumn:
+                        $$StockReturnsTableReferences._staffIdTable(db).id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$StockReturnsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $StockReturnsTable,
+    StockReturnTable,
+    $$StockReturnsTableFilterComposer,
+    $$StockReturnsTableOrderingComposer,
+    $$StockReturnsTableAnnotationComposer,
+    $$StockReturnsTableCreateCompanionBuilder,
+    $$StockReturnsTableUpdateCompanionBuilder,
+    (StockReturnTable, $$StockReturnsTableReferences),
+    StockReturnTable,
+    PrefetchHooks Function({bool invoiceId, bool itemId, bool staffId})>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10042,4 +11590,6 @@ class $AppDatabaseManager {
       $$SyncMetaTableTableManager(_db, _db.syncMeta);
   $$StockIncrementsTableTableManager get stockIncrements =>
       $$StockIncrementsTableTableManager(_db, _db.stockIncrements);
+  $$StockReturnsTableTableManager get stockReturns =>
+      $$StockReturnsTableTableManager(_db, _db.stockReturns);
 }

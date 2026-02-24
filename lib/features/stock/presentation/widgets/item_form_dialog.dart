@@ -190,7 +190,6 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
               
               // Conditional Fields based on Type
               if (_type == 'product') ...[
-                 // Dynamic Category Dropdown (Existing Logic)
                 BlocBuilder<StockBloc, StockState>(
                   bloc: widget.stockBloc,
                   builder: (context, state) {
@@ -198,10 +197,14 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                     if (state is StockLoaded) {
                       categories = state.categories;
                     }
-                    
+
                     if (categories.isNotEmpty) {
+                      // Safety check: Ensure the selected ID exists in the loaded categories
+                      final bool isValidId = _selectedCategoryId != null && 
+                                           categories.any((c) => c.id == _selectedCategoryId);
+                      
                       return DropdownButtonFormField<int>(
-                        value: _selectedCategoryId,
+                        value: isValidId ? _selectedCategoryId : null,
                         decoration: const InputDecoration(labelText: 'Category'),
                         items: categories.map((cat) {
                           return DropdownMenuItem(value: cat.id, child: Text(cat.name));

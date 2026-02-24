@@ -9,14 +9,16 @@ import 'package:involve_app/features/stock/data/models/category_table.dart';
 import 'package:involve_app/core/sync/data/models/sync_meta_table.dart';
 import 'package:involve_app/core/license/license_history_table.dart';
 
+import 'package:involve_app/features/stock/data/models/stock_return_table.dart';
+
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Items, Invoices, InvoiceItems, Settings, Categories, LicenseHistory, Staff, SyncMeta, StockIncrements])
+@DriftDatabase(tables: [Items, Invoices, InvoiceItems, Settings, Categories, LicenseHistory, Staff, SyncMeta, StockIncrements, StockReturns])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 29;
+  int get schemaVersion => 31;
 
   @override
   MigrationStrategy get migration {
@@ -44,6 +46,14 @@ class AppDatabase extends _$AppDatabase {
         if (from < 29) {
           // Total Sales Card Toggle Migration
           await _safeAddColumn(m, settings, settings.showTotalSalesCard);
+        }
+        if (from < 30) {
+          // Stock Returns Migration
+          await _safeCreateTable(m, stockReturns);
+        }
+        if (from < 31) {
+          // Return & Replace Toggle Migration
+          await _safeAddColumn(m, settings, settings.stockReturnEnabled);
         }
       },
       beforeOpen: (details) async {

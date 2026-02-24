@@ -37,6 +37,23 @@ class RecordPayment extends HistoryEvent {
   List<Object?> get props => [invoiceId, additionalAmount, method];
 }
 
+class ReturnStock extends HistoryEvent {
+  final int invoiceId;
+  final List<dynamic> items; // List of ReturnItem
+  final int staffId;
+  final List<InvoiceItem>? replacements;
+
+  ReturnStock({
+    required this.invoiceId,
+    required this.items,
+    required this.staffId,
+    this.replacements,
+  });
+
+  @override
+  List<Object?> get props => [invoiceId, items, staffId, replacements];
+}
+
 // States
 abstract class HistoryState extends Equatable {
   @override
@@ -48,16 +65,17 @@ class HistoryLoading extends HistoryState {}
 class HistoryLoaded extends HistoryState {
   final List<Invoice> invoices;
   final double totalSales;
+  final double totalInvoiced;
   final String? query;
   final double? amount;
   final String? paymentMethod;
   final String? paymentStatus;
   final int? staffId;
 
-  HistoryLoaded(this.invoices, {this.totalSales = 0.0, this.query, this.amount, this.paymentMethod, this.paymentStatus, this.staffId});
+  HistoryLoaded(this.invoices, {this.totalSales = 0.0, this.totalInvoiced = 0.0, this.query, this.amount, this.paymentMethod, this.paymentStatus, this.staffId});
 
   @override
-  List<Object?> get props => [invoices, totalSales, query, amount, paymentMethod, paymentStatus, staffId];
+  List<Object?> get props => [invoices, totalSales, totalInvoiced, query, amount, paymentMethod, paymentStatus, staffId];
 }
 class HistoryError extends HistoryState {
   final String message;

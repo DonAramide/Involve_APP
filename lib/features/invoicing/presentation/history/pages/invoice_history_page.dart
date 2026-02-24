@@ -20,6 +20,13 @@ import 'report_preview_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+// Stock Return Features
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/features/invoicing/domain/entities/stock_return.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
+
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
 
@@ -329,15 +336,42 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           ],
         ),
         children: [
-          ...invoice.items.map((item) => ListTile(
+          ...invoice.items.map((item) {
+            final bool isFullyReturned = item.returnedQuantity >= item.quantity;
+            final bool isPartiallyReturned = item.returnedQuantity > 0 && item.returnedQuantity < item.quantity;
+            
+            return ListTile(
                 dense: true,
-                title: Text(item.item.name),
-                subtitle: item.printPrice != null 
-                  ? Text('Receipt Price: ${CurrencyFormatter.formatWithSymbol(item.printPrice!, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}', 
-                    style: TextStyle(fontSize: 11, color: Colors.blue[700]))
-                  : null,
-                trailing: Text('${item.quantity} x ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}'),
-              )),
+                title: Text(
+                  item.item.name,
+                  style: TextStyle(
+                    decoration: isFullyReturned ? TextDecoration.lineThrough : null,
+                    color: isFullyReturned ? Colors.grey : null,
+                  ),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (item.printPrice != null) 
+                      Text('Receipt Price: ${CurrencyFormatter.formatWithSymbol(item.printPrice!, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}', 
+                        style: TextStyle(fontSize: 11, color: Colors.blue[700])),
+                    if (isFullyReturned)
+                      const Text('FULLY RETURNED', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold))
+                    else if (isPartiallyReturned)
+                      Text('${item.returnedQuantity} Returned', style: const TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.bold)),
+                    if (item.isReplacement)
+                      const Text('(REPLACEMENT)', style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                trailing: Text(
+                  '${item.quantity} x ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦')}',
+                  style: TextStyle(
+                    decoration: isFullyReturned ? TextDecoration.lineThrough : null,
+                    color: isFullyReturned ? Colors.grey : null,
+                  ),
+                ),
+              );
+          }),
           const Divider(),
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -358,6 +392,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   icon: const Icon(Icons.print),
                   label: const Text('REPRINT'),
                 ),
+                if (context.read<SettingsBloc>().state.settings?.stockReturnEnabled == true)
+                  ElevatedButton.icon(
+                    onPressed: () => _showReturnDialog(context, invoice),
+                    icon: const Icon(Icons.assignment_return_outlined),
+                    label: const Text('RETURN STOCK'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700], foregroundColor: Colors.white),
+                  ),
               ],
             ),
           ),
@@ -539,6 +580,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       // or just be very careful with the context.
       
       try {
+        final repo = context.read<HistoryBloc>().getHistory.repository;
+        final start = _selectedRange?.start ?? DateTime(2020);
+        final end = _selectedRange?.end ?? DateTime.now();
+        final stockReturns = await repo.getStockReturnsByDateRange(start, end);
+
+        if (!context.mounted) return;
+
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -548,6 +596,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               dateRange: _selectedRange != null 
                 ? InvReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
                 : null,
+              stockReturns: stockReturns,
             ),
           ),
         );
@@ -688,7 +737,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       child: Column(
         children: [
           const Text(
-            'TOTAL SALES FOR PERIOD',
+            'SALES SUMMARY FOR PERIOD',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -696,19 +745,32 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            CurrencyFormatter.formatWithSymbol(
-              state.totalSales,
-              symbol: currency,
-            ),
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              Column(
+                children: [
+                  const Text('TOTAL INVOICED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                  Text(
+                    CurrencyFormatter.formatWithSymbol(state.totalInvoiced, symbol: currency),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                  ),
+                ],
+              ),
+              Container(height: 30, width: 1, color: Colors.grey[300]),
+              Column(
+                children: [
+                  const Text('TOTAL COLLECTED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                  Text(
+                    CurrencyFormatter.formatWithSymbol(state.totalSales, symbol: currency),
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+                  ),
+                ],
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
           Text(
             '${state.invoices.length} Invoices',
             style: TextStyle(
@@ -840,4 +902,392 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       ),
     );
   }
+
+  void _showReturnDialog(BuildContext context, Invoice invoice) {
+    if (invoice.staffId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This invoice has no associated staff. Return not possible.')),
+      );
+      return;
+    }
+
+    final codeController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Staff Authentication'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Processing return for Invoice #${invoice.invoiceNumber}'),
+            const SizedBox(height: 16),
+            Text('Authorized Staff: ${invoice.staffName ?? "Unknown"}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: codeController,
+              decoration: const InputDecoration(labelText: 'Enter Staff PIN', border: OutlineInputBorder()),
+              keyboardType: TextInputType.number,
+              obscureText: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              // Verify staff
+              final staffList = context.read<StaffBloc>().state.staffList;
+              final staff = staffList.where((s) => s.id == invoice.staffId).firstOrNull;
+              
+              if (staff == null) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Staff record not found.')));
+                return;
+              }
+              
+              if (staff.staffCode != codeController.text) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid Staff PIN.')));
+                return;
+              }
+              
+              Navigator.pop(ctx);
+              _showItemSelectionDialog(context, invoice);
+            },
+            child: const Text('AUTHORIZE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showItemSelectionDialog(BuildContext context, Invoice invoice) async {
+    final historyBloc = context.read<HistoryBloc>();
+    final repo = context.read<HistoryBloc>().getHistory.repository;
+    
+    // Fetch already returned items
+    final existingReturns = await repo.getStockReturnsByInvoiceId(invoice.id!);
+    
+    // Calculate remainders
+    final Map<int, int> returnedCounts = {};
+    for (final ret in existingReturns) {
+      returnedCounts[ret.itemId] = (returnedCounts[ret.itemId] ?? 0) + ret.quantity;
+    }
+
+    // State for the dialog
+    int step = 1; // 1: Return/Replace Select, 2: Pick Replacements (if needed), 3: Summary
+    final Map<int, int> returnQuantities = {};
+    final Map<int, int> replaceQuantities = {};
+    final List<InvoiceItem> replacements = [];
+    
+    for (final item in invoice.items) {
+      if (item.type == 'product') {
+        returnQuantities[item.item.id!] = 0;
+        replaceQuantities[item.item.id!] = 0;
+      }
+    }
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        String searchQuery = "";
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+          final productItems = invoice.items.where((i) => i.type == 'product').toList();
+          final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+          
+          if (productItems.isEmpty) {
+            return AlertDialog(
+              title: const Text('Return & Replace'),
+              content: const Text('No returnable products found in this invoice.'),
+              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE'))],
+            );
+          }
+
+          if (step == 1) {
+            return AlertDialog(
+              title: const Text('Step 1: Select Actions'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: productItems.length,
+                  itemBuilder: (context, index) {
+                    final item = productItems[index];
+                    final itemId = item.item.id!;
+                    final alreadyReturned = returnedCounts[itemId] ?? 0;
+                    final available = item.quantity - alreadyReturned;
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: item.item.image != null 
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Image.memory(item.item.image!, fit: BoxFit.cover),
+                                )
+                              : const Icon(Icons.image, color: Colors.grey),
+                          ),
+                          title: Text(item.item.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('Original: ${item.quantity} | Available: $available'),
+                        ),
+                        if (available > 0)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text('Return for Refund:'),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.remove),
+                                                onPressed: returnQuantities[itemId]! > 0 
+                                                  ? () => setDialogState(() => returnQuantities[itemId] = returnQuantities[itemId]! - 1)
+                                                  : null,
+                                              ),
+                                              SizedBox(width: 30, child: Center(child: Text('${returnQuantities[itemId]}'))),
+                                              IconButton(
+                                                icon: const Icon(Icons.add),
+                                                onPressed: (returnQuantities[itemId]! + replaceQuantities[itemId]!) < available 
+                                                  ? () => setDialogState(() => returnQuantities[itemId] = returnQuantities[itemId]! + 1)
+                                                  : null,
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text('Exchange with Another Product:'),
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.remove),
+                                                onPressed: replaceQuantities[itemId]! > 0 
+                                                  ? () => setDialogState(() => replaceQuantities[itemId] = replaceQuantities[itemId]! - 1)
+                                                  : null,
+                                              ),
+                                              SizedBox(width: 30, child: Center(child: Text('${replaceQuantities[itemId]}'))),
+                                              IconButton(
+                                                icon: const Icon(Icons.add),
+                                                onPressed: (returnQuantities[itemId]! + replaceQuantities[itemId]!) < available 
+                                                  ? () => setDialogState(() => replaceQuantities[itemId] = replaceQuantities[itemId]! + 1)
+                                                  : null,
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                        const Divider(),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+                ElevatedButton(
+                  onPressed: (returnQuantities.values.any((q) => q > 0) || replaceQuantities.values.any((q) => q > 0)) 
+                    ? () {
+                    final hasReplaces = replaceQuantities.values.any((q) => q > 0);
+                    if (hasReplaces) {
+                      setDialogState(() => step = 2);
+                    } else {
+                      setDialogState(() => step = 3);
+                    }
+                  } : null,
+                  child: const Text('NEXT'),
+                ),
+              ],
+            );
+          }
+
+          if (step == 2) {
+            // STEP 2: PICK REPLACEMENTS
+            return AlertDialog(
+              title: const Text('Step 2: Pick Replacements'),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: BlocBuilder<StockBloc, StockState>(
+                  builder: (context, stockState) {
+                    final filteredItems = stockState.items.where((item) => 
+                      item.name.toLowerCase().contains(searchQuery.toLowerCase())
+                    ).toList();
+                    
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          onChanged: (value) => setDialogState(() => searchQuery = value),
+                          decoration: const InputDecoration(
+                            labelText: 'Search items...',
+                            prefixIcon: Icon(Icons.search),
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text('Choose items to add as replacements.'),
+                        const SizedBox(height: 10),
+                        Expanded(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredItems.length,
+                            itemBuilder: (context, idx) {
+                              final item = filteredItems[idx];
+                              final selectedQty = replacements.where((r) => r.item.id == item.id).fold(0, (sum, r) => sum + r.quantity);
+                              
+                              return ListTile(
+                                leading: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: item.image != null 
+                                    ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: Image.memory(item.image!, fit: BoxFit.cover),
+                                      )
+                                    : const Icon(Icons.image, color: Colors.grey),
+                                ),
+                                title: Text(item.name),
+                                subtitle: Text(CurrencyFormatter.formatWithSymbol(item.price, symbol: currency)),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.remove_circle_outline),
+                                      onPressed: selectedQty > 0 ? () {
+                                        setDialogState(() {
+                                          final existingIdx = replacements.indexWhere((r) => r.item.id == item.id);
+                                          if (existingIdx != -1) {
+                                            if (replacements[existingIdx].quantity > 1) {
+                                              replacements[existingIdx] = replacements[existingIdx].copyWith(quantity: replacements[existingIdx].quantity - 1);
+                                            } else {
+                                              replacements.removeAt(existingIdx);
+                                            }
+                                          }
+                                        });
+                                      } : null,
+                                    ),
+                                    Text('$selectedQty'),
+                                    IconButton(
+                                      icon: const Icon(Icons.add_circle_outline),
+                                      onPressed: () {
+                                        setDialogState(() {
+                                          final existingIdx = replacements.indexWhere((r) => r.item.id == item.id);
+                                          if (existingIdx != -1) {
+                                            replacements[existingIdx] = replacements[existingIdx].copyWith(quantity: replacements[existingIdx].quantity + 1);
+                                          } else {
+                                            replacements.add(InvoiceItem(item: item, quantity: 1, unitPrice: item.price));
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => setDialogState(() => step = 1), child: const Text('BACK')),
+                ElevatedButton(
+                  onPressed: () => setDialogState(() => step = 3),
+                  child: const Text('REVIEW SUMMARY'),
+                ),
+              ],
+            );
+          }
+
+          // STEP 3: SUMMARY & CONFIRM
+          double returnTotalValue = 0;
+          final List<ReturnItem> itemsToProcess = [];
+          
+          for (final item in productItems) {
+            final retQty = returnQuantities[item.item.id!] ?? 0;
+            final repQty = replaceQuantities[item.item.id!] ?? 0;
+            final totalProcessQty = retQty + repQty;
+            
+            if (totalProcessQty > 0) {
+              returnTotalValue += totalProcessQty * item.unitPrice;
+              itemsToProcess.add(ReturnItem(
+                itemId: item.item.id!,
+                quantity: totalProcessQty,
+                amount: totalProcessQty * item.unitPrice,
+              ));
+            }
+          }
+          
+          final replacementTotalValue = replacements.fold<double>(0, (sum, r) => sum + r.total);
+          final netChange = replacementTotalValue - returnTotalValue;
+          final newInvoiceTotal = (invoice.totalAmount + netChange).clamp(0.0, double.infinity);
+          final newBalance = (invoice.balanceAmount + netChange).clamp(0.0, double.infinity);
+
+          return AlertDialog(
+            title: const Text('Step 3: Confirm Exchange'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Items Returned/Replaced: ${CurrencyFormatter.formatWithSymbol(returnTotalValue, symbol: currency)}', style: const TextStyle(color: Colors.red)),
+                Text('Replacement Items: ${CurrencyFormatter.formatWithSymbol(replacementTotalValue, symbol: currency)}', style: const TextStyle(color: Colors.green)),
+                const Divider(),
+                Text('Net Change: ${netChange >= 0 ? "+" : ""}${CurrencyFormatter.formatWithSymbol(netChange, symbol: currency)}', 
+                  style: TextStyle(fontWeight: FontWeight.bold, color: netChange >= 0 ? Colors.green : Colors.red)),
+                const SizedBox(height: 10),
+                Text('New Invoice Total: ${CurrencyFormatter.formatWithSymbol(newInvoiceTotal, symbol: currency)}'),
+                Text('New Outstanding Balance: ${CurrencyFormatter.formatWithSymbol(newBalance, symbol: currency)}', 
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => setDialogState(() => step = (replaceQuantities.values.any((q) => q > 0) ? 2 : 1)), child: const Text('BACK')),
+              ElevatedButton(
+                onPressed: () {
+                  historyBloc.add(ReturnStock(
+                    invoiceId: invoice.id!,
+                    items: itemsToProcess,
+                    staffId: invoice.staffId!,
+                    replacements: replacements,
+                  ));
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Stock exchange processed successfully.'), backgroundColor: Colors.green),
+                  );
+                },
+                child: const Text('CONFIRM & APPLY'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
 }

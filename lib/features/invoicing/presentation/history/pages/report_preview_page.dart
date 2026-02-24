@@ -5,16 +5,20 @@ import 'package:involve_app/features/invoicing/domain/services/report_generator.
 import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
+import 'package:involve_app/features/invoicing/domain/entities/stock_return.dart';
+
 class ReportPreviewPage extends StatelessWidget {
   final List<Invoice> invoices;
   final AppSettings settings;
   final InvReportDateRange? dateRange;
+  final List<StockReturn>? stockReturns;
 
   const ReportPreviewPage({
     super.key,
     required this.invoices,
     required this.settings,
     this.dateRange,
+    this.stockReturns,
   });
 
   @override
@@ -31,6 +35,7 @@ class ReportPreviewPage extends StatelessWidget {
             invoices: invoices,
             settings: settings,
             dateRange: dateRange,
+            stockReturns: stockReturns,
           );
           return doc.save();
         },

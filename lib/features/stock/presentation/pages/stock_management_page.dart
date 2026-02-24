@@ -14,8 +14,15 @@ import 'package:involve_app/features/stock/presentation/pages/stock_history_page
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
 import 'package:collection/collection.dart';
 
-class StockManagementPage extends StatelessWidget {
+class StockManagementPage extends StatefulWidget {
   const StockManagementPage({super.key});
+
+  @override
+  State<StockManagementPage> createState() => _StockManagementPageState();
+}
+
+class _StockManagementPageState extends State<StockManagementPage> {
+  bool _showLowStockOnly = false;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +30,18 @@ class StockManagementPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Stock Management'),
         actions: [
+          IconButton(
+            icon: Icon(
+              _showLowStockOnly ? Icons.filter_list_off : Icons.filter_list,
+              color: _showLowStockOnly ? Colors.orange : null,
+            ),
+            tooltip: _showLowStockOnly ? 'Show All Items' : 'Show Low Stock Only',
+            onPressed: () {
+              setState(() {
+                _showLowStockOnly = !_showLowStockOnly;
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.category, size: 28),
             tooltip: 'Manage Categories',
@@ -57,9 +76,16 @@ class StockManagementPage extends StatelessWidget {
             builder: (context, state) {
               // Always try to show the list if we have items, 
               // even if we are in a specialized state or loading.
-              if (state.items.isNotEmpty) {
+              var displayItems = state.items;
+              if (_showLowStockOnly) {
+                displayItems = displayItems.where((item) => 
+                  item.type != 'service' && item.stockQty <= item.minStockQty
+                ).toList();
+              }
+
+              if (displayItems.isNotEmpty) {
                 // Group items by category
-                final groupedItems = groupBy(state.items, (Item item) {
+                final groupedItems = groupBy(displayItems, (Item item) {
                   if (item.categoryId != null) {
                     final cat = state.categories.firstWhereOrNull((c) => c.id == item.categoryId);
                     return cat?.name ?? 'Uncategorized';
@@ -109,7 +135,11 @@ class StockManagementPage extends StatelessWidget {
                 return Center(child: Text(state.message));
               }
 
-              return const Center(child: Text('Add your first item!'));
+              return Center(
+                child: Text(_showLowStockOnly 
+                  ? 'No low stock items found!' 
+                  : 'Add your first item!'),
+              );
             },
           );
         },
