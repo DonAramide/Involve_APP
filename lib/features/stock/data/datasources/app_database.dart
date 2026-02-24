@@ -18,7 +18,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 31;
+  int get schemaVersion => 32;
 
   @override
   MigrationStrategy get migration {
@@ -54,6 +54,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 31) {
           // Return & Replace Toggle Migration
           await _safeAddColumn(m, settings, settings.stockReturnEnabled);
+        }
+        if (from < 32) {
+          // Fix missing Return Stock columns in InvoiceItems
+          await _safeAddColumn(m, invoiceItems, invoiceItems.returnedQuantity);
+          await _safeAddColumn(m, invoiceItems, invoiceItems.isReplacement);
         }
       },
       beforeOpen: (details) async {
