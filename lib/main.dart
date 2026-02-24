@@ -27,13 +27,18 @@ import 'features/printer/domain/usecases/printer_usecases.dart';
 import 'features/printer/presentation/bloc/printer_bloc.dart';
 import 'features/stock/presentation/bloc/stock_state.dart';
 import 'features/settings/presentation/bloc/settings_state.dart';
-import 'features/dashboard/presentation/pages/dashboard_page.dart';
+// import 'features/dashboard/presentation/pages/dashboard_page.dart';
 import 'core/services/backup_service.dart';
 import 'core/sync/data/repositories/sync_repository_impl.dart';
 import 'core/sync/domain/services/discovery_service.dart';
 import 'core/sync/domain/services/sync_server.dart';
 import 'core/sync/domain/services/sync_manager.dart';
 import 'core/sync/presentation/bloc/sync_bloc.dart';
+import 'core/sync/domain/services/bluetooth_discovery_service.dart';
+import 'core/sync/domain/services/bluetooth_sync_server.dart';
+import 'core/sync/domain/services/bluetooth_discovery_service_stub.dart'
+    if (dart.library.io) 'core/sync/domain/services/bluetooth_discovery_service_native.dart'
+    if (dart.library.html) 'core/sync/domain/services/bluetooth_discovery_service_web.dart';
 import 'core/utils/device_info_service.dart';
 
 import 'package:involve_app/core/license/license_service.dart';
@@ -80,6 +85,12 @@ void main() async {
     database: database,
     syncRepository: syncRepository,
     secretToken: secretToken,
+  );
+
+  final bluetoothDiscoveryService = createBluetoothDiscoveryService();
+  final bluetoothSyncServer = BluetoothSyncServer(
+    syncRepository: syncRepository,
+    deviceId: deviceId,
   );
   
   final syncManager = SyncManager(
@@ -141,6 +152,8 @@ void main() async {
     discoveryService: discoveryService,
     syncServer: syncServer,
     syncManager: syncManager,
+    bluetoothDiscoveryService: bluetoothDiscoveryService,
+    bluetoothSyncServer: bluetoothSyncServer,
     deviceId: deviceId,
   ));
 }
@@ -176,7 +189,9 @@ class MyApp extends StatelessWidget {
   final StaffRepositoryImpl staffRepository;
   final SyncRepository syncRepository;
   final DiscoveryService discoveryService;
+  final BluetoothDiscoveryService bluetoothDiscoveryService;
   final SyncServer syncServer;
+  final BluetoothSyncServer bluetoothSyncServer;
   final SyncManager syncManager;
   final String deviceId;
 
@@ -209,7 +224,9 @@ class MyApp extends StatelessWidget {
     required this.staffRepository,
     required this.syncRepository,
     required this.discoveryService,
+    required this.bluetoothDiscoveryService,
     required this.syncServer,
+    required this.bluetoothSyncServer,
     required this.syncManager,
     required this.deviceId,
   });
@@ -266,8 +283,10 @@ class MyApp extends StatelessWidget {
         BlocProvider(
           create: (_) => SyncBloc(
             discoveryService: discoveryService,
+            bluetoothDiscoveryService: bluetoothDiscoveryService,
             syncManager: syncManager,
             syncServer: syncServer,
+            bluetoothSyncServer: bluetoothSyncServer,
             syncRepository: syncRepository,
             db: database,
             deviceId: deviceId,

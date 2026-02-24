@@ -436,13 +436,17 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   DataCell(Text(invoice.dateCreated.toString().split(' ')[0], style: const TextStyle(fontSize: 12))),
                   DataCell(Text(invoice.customerName ?? '-', style: const TextStyle(fontSize: 12))),
                   DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(invoice.paymentMethod ?? '-', style: const TextStyle(fontSize: 12)),
-                        const SizedBox(width: 4),
-                        _buildStatusBadge(invoice.paymentStatus, isMini: true),
-                      ],
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(invoice.paymentMethod ?? '-', style: const TextStyle(fontSize: 12)),
+                          const SizedBox(width: 4),
+                          _buildStatusBadge(invoice.paymentStatus, isMini: true),
+                        ],
+                      ),
                     ),
                   ),
                   DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
@@ -576,9 +580,42 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         return;
       }
 
-      // Show overlay if not on web (Web handles downloads asynchronously well enough usually)
-      // or just be very careful with the context.
-      
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Export Report'),
+          content: const Text('Choose the type of report you want to generate:'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _generateReport(context, reports.ReportType.standard);
+              },
+              child: const Text('STANDARD SALES'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _generateReport(context, reports.ReportType.activity);
+              },
+              child: const Text('DETAILED ACTIVITY LOG'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please wait for data to load before exporting.')),
+      );
+    }
+  }
+
+  void _generateReport(BuildContext context, reports.ReportType type) async {
+    final historyState = context.read<HistoryBloc>().state;
+    final settingsState = context.read<SettingsBloc>().state;
+    final staffState = context.read<StaffBloc>().state;
+    
+    if (historyState is HistoryLoaded && settingsState.settings != null) {
       try {
         final repo = context.read<HistoryBloc>().getHistory.repository;
         final start = _selectedRange?.start ?? DateTime(2020);
@@ -597,6 +634,8 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 ? InvReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
                 : null,
               stockReturns: stockReturns,
+              staffList: staffState.staffList,
+              reportType: type,
             ),
           ),
         );
@@ -607,10 +646,6 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           );
         }
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please wait for data to load before exporting.')),
-      );
     }
   }
 

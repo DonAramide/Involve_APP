@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:involve_app/core/sync/domain/services/discovery_service.dart';
-import 'package:involve_app/core/sync/domain/services/sync_http_client.dart';
+import 'package:involve_app/core/sync/domain/services/sync_transport.dart';
+import 'package:involve_app/core/sync/domain/services/http_sync_transport.dart';
+import 'package:involve_app/core/sync/domain/services/bluetooth_sync_transport.dart';
 import 'package:involve_app/core/sync/data/repositories/sync_repository_impl.dart';
 
 class SyncManager {
@@ -13,7 +15,7 @@ class SyncManager {
   final String deviceId;
   final String secretToken;
   
-  SyncHttpClient? _client;
+  SyncTransport? _transport;
   StreamSubscription? _discoverySubscription;
   Timer? _syncTimer;
   final _statusController = StreamController<bool>.broadcast();
@@ -40,14 +42,21 @@ class SyncManager {
   void startAutoSync() {
     _discoverySubscription = discoveryService.peerStream.listen((peers) {
       final master = peers.where((p) => p.isMaster && p.isOnline).firstOrNull;
-      if (master != null && _client == null) {
-        _client = SyncHttpClient(
-          baseUrl: 'http://${master.ip}:${master.port}',
-          authToken: secretToken,
-        );
+      if (master != null && _transport == null) {
+        if (master.isBluetooth) {
+          _transport = BluetoothSyncTransport(
+            bluetoothId: master.bluetoothId!,
+            authToken: secretToken,
+          );
+        } else {
+          _transport = HttpSyncTransport(
+            baseUrl: 'http://${master.ip}:${master.port}',
+            authToken: secretToken,
+          );
+        }
         _startPeriodicSync();
       } else if (master == null) {
-        _client = null;
+        _transport = null;
         _syncTimer?.cancel();
       }
     });
@@ -59,7 +68,7 @@ class SyncManager {
   }
 
   Future<void> syncNow() async {
-    if (_client == null || isSyncing) return;
+    if (_transport == null || isSyncing) return;
 
     isSyncing = true;
     try {
@@ -71,11 +80,11 @@ class SyncManager {
       // 1. Gather Local Changes (Delta)
       final localBatch = await syncRepository.getDeltaBatch(lastSyncTime, deviceId);
       if (localBatch.records.isNotEmpty) {
-        await _client!.pushUpdates(localBatch);
+        await _transport!.pushUpdates(localBatch);
       }
 
       // 2. Pull Updates from Master
-      final remoteBatch = await _client!.pullUpdates(lastSyncTime);
+      final remoteBatch = await _transport!.pullUpdates(lastSyncTime);
       
       // 3. Process Remote Changes
       await syncRepository.applyBatch(remoteBatch);
@@ -98,21 +107,22 @@ class SyncManager {
   void stop() {
     _discoverySubscription?.cancel();
     _syncTimer?.cancel();
-    _client = null;
+    _transport = null;
   }
 
   /// Performs a one-shot sync with a specific peer device by IP:port.
   /// This is used when the user manually selects a device to sync from
   /// in the Device Sync page.
-  Future<void> syncWithPeer(String ip, int port) async {
+  Future<void> syncWithPeer(String? ip, int? port, {String? bluetoothId, bool isBluetooth = false}) async {
     if (isSyncing) return;
     isSyncing = true;
-    final client = SyncHttpClient(
-      baseUrl: 'http://$ip:$port',
-      authToken: secretToken,
-    );
+    
+    final SyncTransport transport = isBluetooth 
+      ? BluetoothSyncTransport(bluetoothId: bluetoothId!, authToken: secretToken)
+      : HttpSyncTransport(baseUrl: 'http://$ip:$port', authToken: secretToken);
+
     try {
-      debugPrint('Manual sync with peer $ip:$port...');
+      debugPrint('Manual sync with peer ${isBluetooth ? bluetoothId : ip}...');
 
       final meta = await syncRepository.getSyncMeta();
       // Use epoch 0 to pull ALL records from the selected peer,
@@ -125,11 +135,11 @@ class SyncManager {
         deviceId,
       );
       if (localBatch.records.isNotEmpty) {
-        await client.pushUpdates(localBatch);
+        await transport.pushUpdates(localBatch);
       }
 
       // 2. Pull all data from the selected peer
-      final remoteBatch = await client.pullUpdates(since);
+      final remoteBatch = await transport.pullUpdates(since);
       await syncRepository.applyBatch(remoteBatch);
 
       await syncRepository.saveSyncMeta(SyncMetaCompanion(
@@ -143,6 +153,7 @@ class SyncManager {
       debugPrint('Manual peer sync error: $e');
       rethrow;
     } finally {
+      transport.dispose();
       isSyncing = false;
     }
   }

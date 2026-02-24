@@ -216,12 +216,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     final invoice = await getInvoiceById(invoiceId);
     if (invoice == null) return;
 
-    // Fetch total returned for this invoice to accurately calculate remaining balance
-    final returns = await getStockReturnsByInvoiceId(invoiceId);
-    final totalReturned = returns.fold<double>(0, (sum, r) => sum + r.amountReturned);
-
     final newAmountPaid = invoice.amountPaid + additionalAmount;
-    final newBalance = (invoice.totalAmount - newAmountPaid - totalReturned).clamp(0.0, invoice.totalAmount);
+    final newBalance = (invoice.totalAmount - newAmountPaid).clamp(0.0, double.infinity);
     final String newStatus;
     
     if (newBalance <= 0) {
@@ -345,14 +341,25 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       
       final double netChange = totalReplacementAmount - totalReturnedAmount;
       final double newTotal = (invoiceRow.totalAmount + netChange).clamp(0.0, double.infinity);
-      final double newBalance = (invoiceRow.balanceAmount + netChange).clamp(0.0, double.infinity);
       
-      // Note: we don't change amountPaid, only balance and total.
-      final String newStatus = newBalance <= 0 ? 'Paid' : (invoiceRow.amountPaid > 0 ? 'Partial' : 'Unpaid');
+      // Calculate how much of the refund (if any) should come out of amountPaid
+      // If netChange is negative and |netChange| > balanceAmount, 
+      // the excess should reduce amountPaid.
+      double newAmountPaid = invoiceRow.amountPaid;
+      if (netChange < 0) {
+        final double surplusRefund = (-netChange) - invoiceRow.balanceAmount;
+        if (surplusRefund > 0) {
+          newAmountPaid = (invoiceRow.amountPaid - surplusRefund).clamp(0.0, double.infinity);
+        }
+      }
+      
+      final double newBalance = (newTotal - newAmountPaid).clamp(0.0, double.infinity);
+      final String newStatus = newBalance <= 0 ? 'Paid' : (newAmountPaid > 0 ? 'Partial' : 'Unpaid');
 
       await (db.update(db.invoices)..where((t) => t.id.equals(invoiceId))).write(
         InvoicesCompanion(
           totalAmount: Value(newTotal),
+          amountPaid: Value(newAmountPaid),
           balanceAmount: Value(newBalance),
           paymentStatus: Value(newStatus),
           updatedAt: Value(now),

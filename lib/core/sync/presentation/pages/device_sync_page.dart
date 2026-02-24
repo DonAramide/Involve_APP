@@ -10,34 +10,6 @@ class DeviceSyncPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Sync Status')),
-        body: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.cloud_off, size: 64, color: Colors.grey),
-              SizedBox(height: 16),
-              Text(
-                'LAN Sync not supported on Web',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Padding(
-                padding: EdgeInsets.all(24.0),
-                child: Text(
-                  'Browser security restrictions prevent local network discovery and serving. '
-                  'Please use the mobile or desktop app for Offline LAN Synchronization.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Device Synchronization'),
@@ -69,6 +41,28 @@ class DeviceSyncPage extends StatelessWidget {
                     padding: EdgeInsets.only(bottom: 16.0),
                     child: LinearProgressIndicator(),
                   ),
+                if (kIsWeb)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'WiFi sync is restricted on Web. Use Bluetooth Sync to connect to mobile devices.',
+                            style: TextStyle(fontSize: 13, color: Colors.orange),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 _buildRoleCard(context, state),
                 const SizedBox(height: 24),
                 _buildStatusCard(context, state),
@@ -77,7 +71,7 @@ class DeviceSyncPage extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Connected Devices',
+                      'Nearby Devices',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     if (state.peers.isNotEmpty)
@@ -89,18 +83,21 @@ class DeviceSyncPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 if (state.peers.isEmpty)
-                  const Center(
+                  Center(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 32.0),
+                      padding: const EdgeInsets.symmetric(vertical: 32.0),
                       child: Column(
                         children: [
-                          Icon(Icons.devices_other, size: 48, color: Colors.grey),
-                          SizedBox(height: 12),
-                          Text('No devices found on local network'),
-                          SizedBox(height: 4),
+                          const Icon(Icons.devices_other, size: 48, color: Colors.grey),
+                          const SizedBox(height: 12),
+                          const Text('No devices found'),
+                          const SizedBox(height: 4),
                           Text(
-                            'Make sure both devices are on the same WiFi',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                            kIsWeb 
+                              ? 'Make sure Bluetooth is enabled and devices are nearby'
+                              : 'Make sure both devices are on the same WiFi or have Bluetooth on',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.grey, fontSize: 12),
                           ),
                         ],
                       ),
@@ -275,7 +272,9 @@ class DeviceSyncPage extends StatelessWidget {
               ? Colors.green.withOpacity(0.15)
               : Colors.grey.withOpacity(0.15),
           child: Icon(
-            peer.isMaster ? Icons.dns : Icons.smartphone,
+            peer.isBluetooth 
+              ? Icons.bluetooth 
+              : (peer.isMaster ? Icons.dns : Icons.smartphone),
             color: peer.isOnline ? Colors.green : Colors.grey,
             size: 20,
           ),
@@ -285,7 +284,7 @@ class DeviceSyncPage extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          '${peer.ip} · ${peer.isMaster ? "Master" : "Client"} · '
+          '${peer.isBluetooth ? "Bluetooth" : peer.ip} · ${peer.isMaster ? "Master" : "Client"} · '
           '${peer.isOnline ? "Online" : "Offline"}',
           style: const TextStyle(fontSize: 12),
         ),
@@ -295,6 +294,8 @@ class DeviceSyncPage extends StatelessWidget {
                   context.read<SyncBloc>().add(SyncWithPeerTriggered(
                         ip: peer.ip,
                         port: peer.port,
+                        bluetoothId: peer.bluetoothId,
+                        isBluetooth: peer.isBluetooth,
                         peerName: peer.deviceName,
                       ));
                 },
@@ -333,7 +334,7 @@ class DeviceSyncPage extends StatelessWidget {
             child: Text(
               state.peers.any((p) => p.isMaster && p.isOnline)
                   ? 'Tap "Sync" on the Master device above to pull its full data.'
-                  : 'Discovery is running. Make sure the Master device is on the same WiFi.',
+                  : 'Discovery is running. Ensure devices have WiFi or Bluetooth enabled.',
               style: const TextStyle(fontSize: 13, color: Colors.blue),
             ),
           ),

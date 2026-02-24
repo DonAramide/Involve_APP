@@ -42,7 +42,7 @@ packages:
     source: hosted
     version: "1.6.5"
   async:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: async
       sha256: "758e6d74e971c3e5aceb4110bfd6698efc7f501675bcfe0c775459a8140750eb"
@@ -430,6 +430,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_ble_peripheral:
+    dependency: "direct main"
+    description:
+      name: flutter_ble_peripheral
+      sha256: ba329874b295e3751666e3aebbf951aa759a6e7009754f5d980f668befa92b9b
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.6"
   flutter_bloc:
     dependency: "direct main"
     description:
@@ -571,6 +579,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_web_bluetooth:
+    dependency: "direct main"
+    description:
+      name: flutter_web_bluetooth
+      sha256: ad26a1b3fef95b86ea5f63793b9a0cdc1a33490f35d754e4e711046cae3ebbf8
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter

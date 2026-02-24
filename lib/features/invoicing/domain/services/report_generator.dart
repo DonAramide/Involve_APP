@@ -10,6 +10,9 @@ import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
 import 'package:involve_app/features/invoicing/domain/templates/invoice_template.dart';
 import 'package:involve_app/features/invoicing/domain/entities/stock_return.dart';
+import 'package:involve_app/features/settings/domain/entities/staff.dart';
+
+enum ReportType { standard, activity }
 
 class ReportGenerator {
   static Future<pw.Document> buildReport({
@@ -533,5 +536,164 @@ class ReportGenerator {
 
     return commands;
   }
+
+  static Future<pw.Document> buildActivityReport({
+    required List<Invoice> invoices,
+    required List<StockReturn> stockReturns,
+    required AppSettings settings,
+    required List<Staff> staffList,
+    InvReportDateRange? dateRange,
+  }) async {
+    final font = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: font,
+        bold: boldFont,
+      ),
+    );
+
+    final dateStr = dateRange != null
+        ? '${DateFormat('MMM dd, yyyy').format(dateRange.start)} - ${DateFormat('MMM dd, yyyy').format(dateRange.end)}'
+        : 'All Time';
+
+    // 1. Prepare Activity Stream
+    final List<_ActivityEvent> events = [];
+
+    // Add Sales
+    for (final inv in invoices) {
+      final staff = staffList.cast<Staff?>().firstWhere((s) => s?.id == inv.staffId, orElse: () => null);
+      events.add(_ActivityEvent(
+        date: inv.dateCreated,
+        invoiceNumber: inv.invoiceNumber,
+        type: 'SALE',
+        details: inv.items.where((i) => !i.isReplacement).map((i) => '${i.item.name} (${i.quantity})').join(', '),
+        amount: inv.items.where((i) => !i.isReplacement).fold(0.0, (sum, i) => sum + i.total),
+        staff: staff?.name ?? 'ID: ${inv.staffId}',
+      ));
+
+      // Add Replacements separately if they exist
+      final replacements = inv.items.where((i) => i.isReplacement).toList();
+      if (replacements.isNotEmpty) {
+        final returnDates = stockReturns.where((r) => r.invoiceId == inv.id).map((r) => r.dateReturned).toSet().toList();
+        returnDates.sort((a, b) => b.compareTo(a));
+        
+        final repDate = returnDates.isNotEmpty ? returnDates.first : inv.dateCreated;
+
+        events.add(_ActivityEvent(
+          date: repDate,
+          invoiceNumber: inv.invoiceNumber,
+          type: 'EXCHANGE',
+          details: replacements.map((i) => '${i.item.name} (${i.quantity})').join(', '),
+          amount: replacements.fold(0.0, (sum, i) => sum + i.total),
+          staff: staff?.name ?? 'ID: ${inv.staffId}',
+        ));
+      }
+    }
+
+    // Add Returns
+    for (final ret in stockReturns) {
+      final inv = invoices.cast<Invoice?>().firstWhere((i) => i?.id == ret.invoiceId, orElse: () => null);
+      final staff = staffList.cast<Staff?>().firstWhere((s) => s?.id == ret.staffId, orElse: () => null);
+      
+      String itemName = 'Unknown Item';
+      if (inv != null) {
+        final item = inv.items.cast<InvoiceItem?>().firstWhere((i) => i?.item.id == ret.itemId, orElse: () => null);
+        if (item != null) itemName = item.item.name;
+      }
+
+      events.add(_ActivityEvent(
+        date: ret.dateReturned,
+        invoiceNumber: inv?.invoiceNumber ?? 'ID: ${ret.invoiceId}',
+        type: 'RETURN',
+        details: '$itemName (${ret.quantity})',
+        amount: -ret.amountReturned,
+        staff: staff?.name ?? 'ID: ${ret.staffId}',
+      ));
+    }
+
+    // Sort events chronologically
+    events.sort((a, b) => a.date.compareTo(b.date));
+
+    // 2. Format Table Data
+    final headers = ['Time', 'Invoice #', 'Action', 'Details', 'Amount', 'Staff'];
+    final data = events.map((e) => [
+      DateFormat('MM-dd HH:mm').format(e.date),
+      e.invoiceNumber,
+      e.type,
+      e.details,
+      CurrencyFormatter.format(e.amount),
+      e.staff,
+    ]).toList();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => pw.Column(
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(settings.organizationName.toUpperCase(), style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                pw.Text('DETAILED SALES ACTIVITY LOG', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: _getPrimaryColor(settings))),
+                pw.Text(dateStr, style: const pw.TextStyle(fontSize: 10)),
+              ],
+            ),
+            pw.SizedBox(height: 10),
+            pw.Divider(),
+            pw.SizedBox(height: 10),
+          ],
+        ),
+        build: (context) => [
+          pw.Table.fromTextArray(
+            headers: headers,
+            data: data,
+            border: pw.TableBorder.all(color: PdfColors.grey300),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+            cellStyle: const pw.TextStyle(fontSize: 9),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey100),
+            cellAlignment: pw.Alignment.centerLeft,
+            cellAlignments: {
+              4: pw.Alignment.centerRight,
+            },
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.2), // Time
+              1: const pw.FlexColumnWidth(1.2), // Invoice #
+              2: const pw.FlexColumnWidth(1.0), // Action
+              3: const pw.FlexColumnWidth(3.0), // Details
+              4: const pw.FlexColumnWidth(1.2), // Amount
+              5: const pw.FlexColumnWidth(1.2), // Staff
+            },
+          ),
+        ],
+        footer: (context) => pw.Align(
+          alignment: pw.Alignment.centerRight,
+          child: pw.Text('Page ${context.pageNumber} of ${context.pagesCount}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey500)),
+        ),
+      ),
+    );
+
+    return pdf;
+  }
+}
+
+class _ActivityEvent {
+  final DateTime date;
+  final String invoiceNumber;
+  final String type;
+  final String details;
+  final double amount;
+  final String staff;
+
+  _ActivityEvent({
+    required this.date,
+    required this.invoiceNumber,
+    required this.type,
+    required this.details,
+    required this.amount,
+    required this.staff,
+  });
 }
 

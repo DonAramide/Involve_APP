@@ -3,8 +3,10 @@ import 'package:equatable/equatable.dart';
 class PeerDevice extends Equatable {
   final String deviceId;
   final String deviceName;
-  final String ip;
-  final int port;
+  final String? ip;
+  final int? port;
+  final String? bluetoothId;
+  final bool isBluetooth;
   final bool isMaster;
   final String? authToken;
   final DateTime lastSeen;
@@ -12,20 +14,24 @@ class PeerDevice extends Equatable {
   const PeerDevice({
     required this.deviceId,
     required this.deviceName,
-    required this.ip,
-    required this.port,
+    this.ip,
+    this.port,
+    this.bluetoothId,
+    this.isBluetooth = false,
     required this.isMaster,
     this.authToken,
     required this.lastSeen,
   });
 
-  bool get isOnline => DateTime.now().difference(lastSeen).inSeconds < 10;
+  bool get isOnline => DateTime.now().difference(lastSeen).inSeconds < 15;
 
   PeerDevice copyWith({
     String? deviceId,
     String? deviceName,
     String? ip,
     int? port,
+    String? bluetoothId,
+    bool? isBluetooth,
     bool? isMaster,
     String? authToken,
     DateTime? lastSeen,
@@ -35,6 +41,8 @@ class PeerDevice extends Equatable {
       deviceName: deviceName ?? this.deviceName,
       ip: ip ?? this.ip,
       port: port ?? this.port,
+      bluetoothId: bluetoothId ?? this.bluetoothId,
+      isBluetooth: isBluetooth ?? this.isBluetooth,
       isMaster: isMaster ?? this.isMaster,
       authToken: authToken ?? this.authToken,
       lastSeen: lastSeen ?? this.lastSeen,
@@ -47,6 +55,8 @@ class PeerDevice extends Equatable {
       'deviceName': deviceName,
       'ip': ip,
       'port': port,
+      'bluetoothId': bluetoothId,
+      'isBluetooth': isBluetooth,
       'isMaster': isMaster,
       'authToken': authToken,
     };
@@ -58,6 +68,8 @@ class PeerDevice extends Equatable {
       deviceName: json['deviceName'],
       ip: json['ip'],
       port: json['port'],
+      bluetoothId: json['bluetoothId'],
+      isBluetooth: json['isBluetooth'] ?? false,
       isMaster: json['isMaster'],
       authToken: json['authToken'],
       lastSeen: DateTime.now(),
