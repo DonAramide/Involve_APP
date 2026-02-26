@@ -12,6 +12,8 @@ import 'package:involve_app/features/settings/presentation/widgets/password_dial
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/stock/presentation/pages/stock_history_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
+import 'package:involve_app/features/stock/presentation/pages/profit_report_page.dart';
+import 'package:involve_app/features/stock/presentation/widgets/log_expense_dialog.dart';
 import 'package:collection/collection.dart';
 
 class StockManagementPage extends StatefulWidget {
@@ -59,6 +61,25 @@ class _StockManagementPageState extends State<StockManagementPage> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const InventoryReportPage()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.show_chart),
+            tooltip: 'Profit Report',
+            onPressed: () => _verifyAndExecute(
+              context,
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfitReportPage()),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.payments_outlined),
+            tooltip: 'Log Expense',
+            onPressed: () => _verifyAndExecute(
+              context,
+              () => _showLogExpenseDialog(context),
             ),
           ),
           IconButton(
@@ -112,7 +133,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
                               letterSpacing: 1.2,
                             ),
                           ),
@@ -151,71 +172,100 @@ class _StockManagementPageState extends State<StockManagementPage> {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        leading: item.image != null
-            ? Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  image: DecorationImage(image: MemoryImage(item.image!), fit: BoxFit.cover),
-                ),
-              )
-            : Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.inventory_2, color: Colors.grey),
-              ),
-        title: Text(item.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Qty: ${item.stockQty}', style: TextStyle(color: item.stockQty <= item.minStockQty ? Colors.red : Colors.grey[600])),
-            if (item.stockQty <= item.minStockQty && item.type != 'service')
-              const Text('LOW STOCK', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              CurrencyFormatter.formatWithSymbol(
-                item.price,
-                symbol: settings?.currency ?? '₦',
-              ),
-              style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(width: 8),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) => _handleMenuSelection(context, value, item),
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit), title: Text('Edit / Min Alert'))),
-                const PopupMenuItem(value: 'stock_up', child: ListTile(leading: Icon(Icons.add_box), title: Text('Stock Up'))),
-                const PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text('Adding History'))),
-                PopupMenuItem(
-                  value: 'delete', 
-                  enabled: item.stockQty <= 0,
-                  child: ListTile(
-                    leading: Icon(Icons.delete, color: item.stockQty <= 0 ? Colors.red : Colors.grey), 
-                    title: Text(
-                      'Delete', 
-                      style: TextStyle(color: item.stockQty <= 0 ? Colors.red : Colors.grey),
-                    ),
-                    subtitle: item.stockQty > 0 
-                      ? Text('Sell all items in "${item.name}" first', style: const TextStyle(fontSize: 10))
-                      : null,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+      child: InkWell(
         onTap: () => _verifyAndExecute(
           context,
           () => _showItemDialog(context, item: item),
+        ),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              // Image/Icon
+              item.image != null
+                  ? Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(image: MemoryImage(item.image!), fit: BoxFit.cover),
+                      ),
+                    )
+                  : Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.inventory_2, color: Colors.grey),
+                    ),
+              const SizedBox(width: 16),
+              // Name and Qty (Flexible to take middle space)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.name,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Qty: ${item.stockQty}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: item.stockQty <= item.minStockQty ? Colors.red : Colors.grey[600],
+                        fontWeight: item.stockQty <= item.minStockQty ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                    if (item.stockQty <= item.minStockQty && item.type != 'service')
+                      const Text(
+                        'LOW STOCK',
+                        style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Price and Menu
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    CurrencyFormatter.formatWithSymbol(
+                      item.price,
+                      symbol: settings?.currency ?? '₦',
+                    ),
+                    style: const TextStyle(fontSize: 16, color: Colors.green, fontWeight: FontWeight.bold),
+                  ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    onSelected: (value) => _handleMenuSelection(context, value, item),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit), title: Text('Edit / Min Alert'))),
+                      const PopupMenuItem(value: 'stock_up', child: ListTile(leading: Icon(Icons.add_box), title: Text('Stock Up'))),
+                      const PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text('Adding History'))),
+                      PopupMenuItem(
+                        value: 'delete',
+                        enabled: item.stockQty <= 0,
+                        child: ListTile(
+                          leading: Icon(Icons.delete, color: item.stockQty <= 0 ? Colors.red : Colors.grey),
+                          title: Text(
+                            'Delete',
+                            style: TextStyle(color: item.stockQty <= 0 ? Colors.red : Colors.grey),
+                          ),
+                          subtitle: item.stockQty > 0 ? const Text('Empty stock first', style: TextStyle(fontSize: 10)) : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -334,6 +384,13 @@ class _StockManagementPageState extends State<StockManagementPage> {
     showDialog(
       context: context,
       builder: (_) => ItemFormDialog(item: item, stockBloc: context.read<StockBloc>()),
+    );
+  }
+
+  void _showLogExpenseDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => LogExpenseDialog(stockBloc: context.read<StockBloc>()),
     );
   }
 }

@@ -14,6 +14,7 @@ class Item extends Equatable {
   final ItemCategory category;
   final int? categoryId;
   final double price;
+  final double costPrice;
   final int stockQty;
   final double minStockQty;
   final Uint8List? image;
@@ -29,6 +30,7 @@ class Item extends Equatable {
     required this.category,
     this.categoryId,
     required this.price,
+    this.costPrice = 0.0,
     required this.stockQty,
     this.minStockQty = 0,
     this.image,
@@ -45,6 +47,7 @@ class Item extends Equatable {
     ItemCategory? category,
     int? categoryId,
     double? price,
+    double? costPrice,
     int? stockQty,
     double? minStockQty,
     Uint8List? image,
@@ -60,6 +63,7 @@ class Item extends Equatable {
       category: category ?? this.category,
       categoryId: categoryId ?? this.categoryId,
       price: price ?? this.price,
+      costPrice: costPrice ?? this.costPrice,
       stockQty: stockQty ?? this.stockQty,
       minStockQty: minStockQty ?? this.minStockQty,
       image: image ?? this.image,
@@ -78,6 +82,7 @@ class Item extends Equatable {
         category,
         categoryId,
         price,
+        costPrice,
         stockQty,
         minStockQty,
         image,

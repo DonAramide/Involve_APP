@@ -2,7 +2,9 @@ import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import '../models/item_table.dart';
-import '../../domain/entities/item.dart';
+import 'package:involve_app/features/stock/domain/entities/item.dart';
+import 'package:involve_app/features/stock/domain/entities/expense.dart';
+import '../models/expense_table.dart';
 import '../../domain/repositories/item_repository.dart';
 
 class ItemRepositoryImpl implements ItemRepository {
@@ -25,6 +27,7 @@ class ItemRepositoryImpl implements ItemRepository {
             category: item.category.name,
             categoryId: Value(item.categoryId),
             price: item.price,
+            costPrice: Value(item.costPrice),
             stockQty: Value(item.stockQty),
             image: Value(item.image),
             type: Value(item.type),
@@ -48,6 +51,7 @@ class ItemRepositoryImpl implements ItemRepository {
             category: Value(item.category.name),
             categoryId: Value(item.categoryId),
             price: Value(item.price),
+            costPrice: Value(item.costPrice),
             stockQty: Value(item.stockQty),
             minStockQty: Value(item.minStockQty),
             image: Value(item.image),
@@ -165,6 +169,111 @@ class ItemRepositoryImpl implements ItemRepository {
     }).toList();
   }
 
+  @override
+  Future<List<Map<String, dynamic>>> getProfitReport({DateTime? start, DateTime? end}) async {
+    final summedQuantity = db.invoiceItems.quantity.sum();
+    // Profit per item = (price - costPrice) * qty
+    final query = db.select(db.items).join([
+      leftOuterJoin(
+        db.invoiceItems,
+        db.invoiceItems.itemId.equalsExp(db.items.id),
+        useColumns: false,
+      ),
+      leftOuterJoin(
+        db.invoices,
+        db.invoices.id.equalsExp(db.invoiceItems.invoiceId),
+        useColumns: false,
+      ),
+    ]);
+
+    if (start != null) {
+      query.where(db.invoices.dateCreated.isBiggerOrEqualValue(start));
+    }
+    if (end != null) {
+      final inclusiveEnd = DateTime(end.year, end.month, end.day, 23, 59, 59);
+      query.where(db.invoices.dateCreated.isSmallerOrEqualValue(inclusiveEnd));
+    }
+
+    query.addColumns([summedQuantity]);
+    query.groupBy([db.items.id]);
+
+    final results = await query.get();
+
+    return results.map((row) {
+      final item = row.readTable(db.items);
+      final totalSold = row.read(summedQuantity) ?? 0;
+      final profitPerItem = item.price - item.costPrice;
+
+      return {
+        'id': item.id,
+        'name': item.name,
+        'price': item.price,
+        'costPrice': item.costPrice,
+        'stockQty': item.stockQty,
+        'totalSold': totalSold,
+        'totalProfit': totalSold * profitPerItem,
+      };
+    }).toList();
+  }
+
+  // --- Expenses ---
+
+  @override
+  Future<void> addExpense(Expense expense) async {
+    final now = DateTime.now();
+    await db.into(db.expenses).insert(
+          ExpensesCompanion.insert(
+            amount: expense.amount,
+            description: expense.description,
+            category: Value(expense.category),
+            date: Value(expense.date),
+            syncId: Value(expense.syncId ?? const Uuid().v4()),
+            updatedAt: Value(now),
+            createdAt: Value(now),
+          ),
+        );
+  }
+
+  @override
+  Future<List<Expense>> getExpenses({DateTime? start, DateTime? end}) async {
+    final query = db.select(db.expenses);
+    if (start != null) {
+      query.where((t) => t.date.isBiggerOrEqualValue(start));
+    }
+    if (end != null) {
+      final inclusiveEnd = DateTime(end.year, end.month, end.day, 23, 59, 59);
+      query.where((t) => t.date.isSmallerOrEqualValue(inclusiveEnd));
+    }
+    query.orderBy([(t) => OrderingTerm.desc(t.date)]);
+    
+    final results = await query.get();
+    return results.map((row) => Expense(
+      id: row.id,
+      amount: row.amount,
+      description: row.description,
+      category: row.category,
+      date: row.date,
+      syncId: row.syncId,
+    )).toList();
+  }
+
+  @override
+  Future<double> getTotalExpenses({DateTime? start, DateTime? end}) async {
+    final amountSum = db.expenses.amount.sum();
+    final query = db.selectOnly(db.expenses)..addColumns([amountSum]);
+    
+    if (start != null) {
+      query.where(db.expenses.date.isBiggerOrEqualValue(start));
+    }
+    if (end != null) {
+      final inclusiveEnd = DateTime(end.year, end.month, end.day, 23, 59, 59);
+      query.where(db.expenses.date.isSmallerOrEqualValue(inclusiveEnd));
+    }
+    
+    final result = await query.getSingle();
+    return result.read(amountSum) ?? 0.0;
+  }
+
   Item _toEntity(ItemTable row) {
     return Item(
       id: row.id,
@@ -172,6 +281,7 @@ class ItemRepositoryImpl implements ItemRepository {
       category: ItemCategory.values.byName(row.category),
       categoryId: row.categoryId,
       price: row.price,
+      costPrice: row.costPrice,
       stockQty: row.stockQty,
       minStockQty: row.minStockQty,
       image: row.image,

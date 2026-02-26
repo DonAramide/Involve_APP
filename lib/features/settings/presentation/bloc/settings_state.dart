@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'dart:typed_data';
 import '../../domain/entities/settings.dart';
 import '../../domain/entities/user_plan.dart';
 
@@ -46,6 +47,13 @@ class RestoreFromPath extends SettingsEvent {
   RestoreFromPath(this.path);
   @override
   List<Object?> get props => [path];
+}
+
+class RestoreFromBytes extends SettingsEvent {
+  final Uint8List bytes;
+  RestoreFromBytes(this.bytes);
+  @override
+  List<Object?> get props => [bytes];
 }
 
 class RecordFailedAttempt extends SettingsEvent {}

@@ -416,6 +416,14 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
   late final GeneratedColumn<double> price = GeneratedColumn<double>(
       'price', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _costPriceMeta =
+      const VerificationMeta('costPrice');
+  @override
+  late final GeneratedColumn<double> costPrice = GeneratedColumn<double>(
+      'cost_price', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   static const VerificationMeta _stockQtyMeta =
       const VerificationMeta('stockQty');
   @override
@@ -514,6 +522,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
         name,
         category,
         price,
+        costPrice,
         stockQty,
         minStockQty,
         image,
@@ -558,6 +567,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
           _priceMeta, price.isAcceptableOrUnknown(data['price']!, _priceMeta));
     } else if (isInserting) {
       context.missing(_priceMeta);
+    }
+    if (data.containsKey('cost_price')) {
+      context.handle(_costPriceMeta,
+          costPrice.isAcceptableOrUnknown(data['cost_price']!, _costPriceMeta));
     }
     if (data.containsKey('stock_qty')) {
       context.handle(_stockQtyMeta,
@@ -638,6 +651,8 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
           .read(DriftSqlType.string, data['${effectivePrefix}category'])!,
       price: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}price'])!,
+      costPrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}cost_price'])!,
       stockQty: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}stock_qty'])!,
       minStockQty: attachedDatabase.typeMapping
@@ -678,6 +693,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
   final String name;
   final String category;
   final double price;
+  final double costPrice;
   final int stockQty;
   final double minStockQty;
   final Uint8List? image;
@@ -696,6 +712,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       required this.name,
       required this.category,
       required this.price,
+      required this.costPrice,
       required this.stockQty,
       required this.minStockQty,
       this.image,
@@ -716,6 +733,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
     map['name'] = Variable<String>(name);
     map['category'] = Variable<String>(category);
     map['price'] = Variable<double>(price);
+    map['cost_price'] = Variable<double>(costPrice);
     map['stock_qty'] = Variable<int>(stockQty);
     map['min_stock_qty'] = Variable<double>(minStockQty);
     if (!nullToAbsent || image != null) {
@@ -754,6 +772,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       name: Value(name),
       category: Value(category),
       price: Value(price),
+      costPrice: Value(costPrice),
       stockQty: Value(stockQty),
       minStockQty: Value(minStockQty),
       image:
@@ -792,6 +811,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       name: serializer.fromJson<String>(json['name']),
       category: serializer.fromJson<String>(json['category']),
       price: serializer.fromJson<double>(json['price']),
+      costPrice: serializer.fromJson<double>(json['costPrice']),
       stockQty: serializer.fromJson<int>(json['stockQty']),
       minStockQty: serializer.fromJson<double>(json['minStockQty']),
       image: serializer.fromJson<Uint8List?>(json['image']),
@@ -816,6 +836,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       'name': serializer.toJson<String>(name),
       'category': serializer.toJson<String>(category),
       'price': serializer.toJson<double>(price),
+      'costPrice': serializer.toJson<double>(costPrice),
       'stockQty': serializer.toJson<int>(stockQty),
       'minStockQty': serializer.toJson<double>(minStockQty),
       'image': serializer.toJson<Uint8List?>(image),
@@ -837,6 +858,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           String? name,
           String? category,
           double? price,
+          double? costPrice,
           int? stockQty,
           double? minStockQty,
           Value<Uint8List?> image = const Value.absent(),
@@ -855,6 +877,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
         name: name ?? this.name,
         category: category ?? this.category,
         price: price ?? this.price,
+        costPrice: costPrice ?? this.costPrice,
         stockQty: stockQty ?? this.stockQty,
         minStockQty: minStockQty ?? this.minStockQty,
         image: image.present ? image.value : this.image,
@@ -877,6 +900,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       name: data.name.present ? data.name.value : this.name,
       category: data.category.present ? data.category.value : this.category,
       price: data.price.present ? data.price.value : this.price,
+      costPrice: data.costPrice.present ? data.costPrice.value : this.costPrice,
       stockQty: data.stockQty.present ? data.stockQty.value : this.stockQty,
       minStockQty:
           data.minStockQty.present ? data.minStockQty.value : this.minStockQty,
@@ -907,6 +931,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           ..write('name: $name, ')
           ..write('category: $category, ')
           ..write('price: $price, ')
+          ..write('costPrice: $costPrice, ')
           ..write('stockQty: $stockQty, ')
           ..write('minStockQty: $minStockQty, ')
           ..write('image: $image, ')
@@ -930,6 +955,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       name,
       category,
       price,
+      costPrice,
       stockQty,
       minStockQty,
       $driftBlobEquality.hash(image),
@@ -951,6 +977,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           other.name == this.name &&
           other.category == this.category &&
           other.price == this.price &&
+          other.costPrice == this.costPrice &&
           other.stockQty == this.stockQty &&
           other.minStockQty == this.minStockQty &&
           $driftBlobEquality.equals(other.image, this.image) &&
@@ -971,6 +998,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
   final Value<String> name;
   final Value<String> category;
   final Value<double> price;
+  final Value<double> costPrice;
   final Value<int> stockQty;
   final Value<double> minStockQty;
   final Value<Uint8List?> image;
@@ -989,6 +1017,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     this.name = const Value.absent(),
     this.category = const Value.absent(),
     this.price = const Value.absent(),
+    this.costPrice = const Value.absent(),
     this.stockQty = const Value.absent(),
     this.minStockQty = const Value.absent(),
     this.image = const Value.absent(),
@@ -1008,6 +1037,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     required String name,
     required String category,
     required double price,
+    this.costPrice = const Value.absent(),
     this.stockQty = const Value.absent(),
     this.minStockQty = const Value.absent(),
     this.image = const Value.absent(),
@@ -1029,6 +1059,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     Expression<String>? name,
     Expression<String>? category,
     Expression<double>? price,
+    Expression<double>? costPrice,
     Expression<int>? stockQty,
     Expression<double>? minStockQty,
     Expression<Uint8List>? image,
@@ -1048,6 +1079,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       if (name != null) 'name': name,
       if (category != null) 'category': category,
       if (price != null) 'price': price,
+      if (costPrice != null) 'cost_price': costPrice,
       if (stockQty != null) 'stock_qty': stockQty,
       if (minStockQty != null) 'min_stock_qty': minStockQty,
       if (image != null) 'image': image,
@@ -1070,6 +1102,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       Value<String>? name,
       Value<String>? category,
       Value<double>? price,
+      Value<double>? costPrice,
       Value<int>? stockQty,
       Value<double>? minStockQty,
       Value<Uint8List?>? image,
@@ -1088,6 +1121,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       name: name ?? this.name,
       category: category ?? this.category,
       price: price ?? this.price,
+      costPrice: costPrice ?? this.costPrice,
       stockQty: stockQty ?? this.stockQty,
       minStockQty: minStockQty ?? this.minStockQty,
       image: image ?? this.image,
@@ -1118,6 +1152,9 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     }
     if (price.present) {
       map['price'] = Variable<double>(price.value);
+    }
+    if (costPrice.present) {
+      map['cost_price'] = Variable<double>(costPrice.value);
     }
     if (stockQty.present) {
       map['stock_qty'] = Variable<int>(stockQty.value);
@@ -1169,6 +1206,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
           ..write('name: $name, ')
           ..write('category: $category, ')
           ..write('price: $price, ')
+          ..write('costPrice: $costPrice, ')
           ..write('stockQty: $stockQty, ')
           ..write('minStockQty: $minStockQty, ')
           ..write('image: $image, ')
@@ -3230,6 +3268,46 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("stock_return_enabled" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _showSalesTrendChartMeta =
+      const VerificationMeta('showSalesTrendChart');
+  @override
+  late final GeneratedColumn<bool> showSalesTrendChart = GeneratedColumn<bool>(
+      'show_sales_trend_chart', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_sales_trend_chart" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _showExpensePieChartMeta =
+      const VerificationMeta('showExpensePieChart');
+  @override
+  late final GeneratedColumn<bool> showExpensePieChart = GeneratedColumn<bool>(
+      'show_expense_pie_chart', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_expense_pie_chart" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _showTopSellingChartMeta =
+      const VerificationMeta('showTopSellingChart');
+  @override
+  late final GeneratedColumn<bool> showTopSellingChart = GeneratedColumn<bool>(
+      'show_top_selling_chart', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_top_selling_chart" IN (0, 1))'),
+      defaultValue: const Constant(true));
+  static const VerificationMeta _showStockValueChartMeta =
+      const VerificationMeta('showStockValueChart');
+  @override
+  late final GeneratedColumn<bool> showStockValueChart = GeneratedColumn<bool>(
+      'show_stock_value_chart', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_stock_value_chart" IN (0, 1))'),
+      defaultValue: const Constant(true));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -3271,7 +3349,11 @@ class $SettingsTable extends Settings
         cacNumber,
         showCacNumber,
         showTotalSalesCard,
-        stockReturnEnabled
+        stockReturnEnabled,
+        showSalesTrendChart,
+        showExpensePieChart,
+        showTopSellingChart,
+        showStockValueChart
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3502,6 +3584,30 @@ class $SettingsTable extends Settings
           stockReturnEnabled.isAcceptableOrUnknown(
               data['stock_return_enabled']!, _stockReturnEnabledMeta));
     }
+    if (data.containsKey('show_sales_trend_chart')) {
+      context.handle(
+          _showSalesTrendChartMeta,
+          showSalesTrendChart.isAcceptableOrUnknown(
+              data['show_sales_trend_chart']!, _showSalesTrendChartMeta));
+    }
+    if (data.containsKey('show_expense_pie_chart')) {
+      context.handle(
+          _showExpensePieChartMeta,
+          showExpensePieChart.isAcceptableOrUnknown(
+              data['show_expense_pie_chart']!, _showExpensePieChartMeta));
+    }
+    if (data.containsKey('show_top_selling_chart')) {
+      context.handle(
+          _showTopSellingChartMeta,
+          showTopSellingChart.isAcceptableOrUnknown(
+              data['show_top_selling_chart']!, _showTopSellingChartMeta));
+    }
+    if (data.containsKey('show_stock_value_chart')) {
+      context.handle(
+          _showStockValueChartMeta,
+          showStockValueChart.isAcceptableOrUnknown(
+              data['show_stock_value_chart']!, _showStockValueChartMeta));
+    }
     return context;
   }
 
@@ -3597,6 +3703,14 @@ class $SettingsTable extends Settings
           DriftSqlType.bool, data['${effectivePrefix}show_total_sales_card'])!,
       stockReturnEnabled: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}stock_return_enabled'])!,
+      showSalesTrendChart: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_sales_trend_chart'])!,
+      showExpensePieChart: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_expense_pie_chart'])!,
+      showTopSellingChart: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_top_selling_chart'])!,
+      showStockValueChart: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_stock_value_chart'])!,
     );
   }
 
@@ -3647,6 +3761,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showCacNumber;
   final bool showTotalSalesCard;
   final bool stockReturnEnabled;
+  final bool showSalesTrendChart;
+  final bool showExpensePieChart;
+  final bool showTopSellingChart;
+  final bool showStockValueChart;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -3687,7 +3805,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       this.cacNumber,
       required this.showCacNumber,
       required this.showTotalSalesCard,
-      required this.stockReturnEnabled});
+      required this.stockReturnEnabled,
+      required this.showSalesTrendChart,
+      required this.showExpensePieChart,
+      required this.showTopSellingChart,
+      required this.showStockValueChart});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -3752,6 +3874,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['show_cac_number'] = Variable<bool>(showCacNumber);
     map['show_total_sales_card'] = Variable<bool>(showTotalSalesCard);
     map['stock_return_enabled'] = Variable<bool>(stockReturnEnabled);
+    map['show_sales_trend_chart'] = Variable<bool>(showSalesTrendChart);
+    map['show_expense_pie_chart'] = Variable<bool>(showExpensePieChart);
+    map['show_top_selling_chart'] = Variable<bool>(showTopSellingChart);
+    map['show_stock_value_chart'] = Variable<bool>(showStockValueChart);
     return map;
   }
 
@@ -3814,6 +3940,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showCacNumber: Value(showCacNumber),
       showTotalSalesCard: Value(showTotalSalesCard),
       stockReturnEnabled: Value(stockReturnEnabled),
+      showSalesTrendChart: Value(showSalesTrendChart),
+      showExpensePieChart: Value(showExpensePieChart),
+      showTopSellingChart: Value(showTopSellingChart),
+      showStockValueChart: Value(showStockValueChart),
     );
   }
 
@@ -3868,6 +3998,14 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showCacNumber: serializer.fromJson<bool>(json['showCacNumber']),
       showTotalSalesCard: serializer.fromJson<bool>(json['showTotalSalesCard']),
       stockReturnEnabled: serializer.fromJson<bool>(json['stockReturnEnabled']),
+      showSalesTrendChart:
+          serializer.fromJson<bool>(json['showSalesTrendChart']),
+      showExpensePieChart:
+          serializer.fromJson<bool>(json['showExpensePieChart']),
+      showTopSellingChart:
+          serializer.fromJson<bool>(json['showTopSellingChart']),
+      showStockValueChart:
+          serializer.fromJson<bool>(json['showStockValueChart']),
     );
   }
   @override
@@ -3917,6 +4055,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'showCacNumber': serializer.toJson<bool>(showCacNumber),
       'showTotalSalesCard': serializer.toJson<bool>(showTotalSalesCard),
       'stockReturnEnabled': serializer.toJson<bool>(stockReturnEnabled),
+      'showSalesTrendChart': serializer.toJson<bool>(showSalesTrendChart),
+      'showExpensePieChart': serializer.toJson<bool>(showExpensePieChart),
+      'showTopSellingChart': serializer.toJson<bool>(showTopSellingChart),
+      'showStockValueChart': serializer.toJson<bool>(showStockValueChart),
     };
   }
 
@@ -3960,7 +4102,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           Value<String?> cacNumber = const Value.absent(),
           bool? showCacNumber,
           bool? showTotalSalesCard,
-          bool? stockReturnEnabled}) =>
+          bool? stockReturnEnabled,
+          bool? showSalesTrendChart,
+          bool? showExpensePieChart,
+          bool? showTopSellingChart,
+          bool? showStockValueChart}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -4012,6 +4158,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showCacNumber: showCacNumber ?? this.showCacNumber,
         showTotalSalesCard: showTotalSalesCard ?? this.showTotalSalesCard,
         stockReturnEnabled: stockReturnEnabled ?? this.stockReturnEnabled,
+        showSalesTrendChart: showSalesTrendChart ?? this.showSalesTrendChart,
+        showExpensePieChart: showExpensePieChart ?? this.showExpensePieChart,
+        showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
+        showStockValueChart: showStockValueChart ?? this.showStockValueChart,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -4104,6 +4254,18 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       stockReturnEnabled: data.stockReturnEnabled.present
           ? data.stockReturnEnabled.value
           : this.stockReturnEnabled,
+      showSalesTrendChart: data.showSalesTrendChart.present
+          ? data.showSalesTrendChart.value
+          : this.showSalesTrendChart,
+      showExpensePieChart: data.showExpensePieChart.present
+          ? data.showExpensePieChart.value
+          : this.showExpensePieChart,
+      showTopSellingChart: data.showTopSellingChart.present
+          ? data.showTopSellingChart.value
+          : this.showTopSellingChart,
+      showStockValueChart: data.showStockValueChart.present
+          ? data.showStockValueChart.value
+          : this.showStockValueChart,
     );
   }
 
@@ -4149,7 +4311,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('cacNumber: $cacNumber, ')
           ..write('showCacNumber: $showCacNumber, ')
           ..write('showTotalSalesCard: $showTotalSalesCard, ')
-          ..write('stockReturnEnabled: $stockReturnEnabled')
+          ..write('stockReturnEnabled: $stockReturnEnabled, ')
+          ..write('showSalesTrendChart: $showSalesTrendChart, ')
+          ..write('showExpensePieChart: $showExpensePieChart, ')
+          ..write('showTopSellingChart: $showTopSellingChart, ')
+          ..write('showStockValueChart: $showStockValueChart')
           ..write(')'))
         .toString();
   }
@@ -4195,7 +4361,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         cacNumber,
         showCacNumber,
         showTotalSalesCard,
-        stockReturnEnabled
+        stockReturnEnabled,
+        showSalesTrendChart,
+        showExpensePieChart,
+        showTopSellingChart,
+        showStockValueChart
       ]);
   @override
   bool operator ==(Object other) =>
@@ -4241,7 +4411,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.cacNumber == this.cacNumber &&
           other.showCacNumber == this.showCacNumber &&
           other.showTotalSalesCard == this.showTotalSalesCard &&
-          other.stockReturnEnabled == this.stockReturnEnabled);
+          other.stockReturnEnabled == this.stockReturnEnabled &&
+          other.showSalesTrendChart == this.showSalesTrendChart &&
+          other.showExpensePieChart == this.showExpensePieChart &&
+          other.showTopSellingChart == this.showTopSellingChart &&
+          other.showStockValueChart == this.showStockValueChart);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -4285,6 +4459,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showCacNumber;
   final Value<bool> showTotalSalesCard;
   final Value<bool> stockReturnEnabled;
+  final Value<bool> showSalesTrendChart;
+  final Value<bool> showExpensePieChart;
+  final Value<bool> showTopSellingChart;
+  final Value<bool> showStockValueChart;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -4326,6 +4504,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showCacNumber = const Value.absent(),
     this.showTotalSalesCard = const Value.absent(),
     this.stockReturnEnabled = const Value.absent(),
+    this.showSalesTrendChart = const Value.absent(),
+    this.showExpensePieChart = const Value.absent(),
+    this.showTopSellingChart = const Value.absent(),
+    this.showStockValueChart = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -4368,6 +4550,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showCacNumber = const Value.absent(),
     this.showTotalSalesCard = const Value.absent(),
     this.stockReturnEnabled = const Value.absent(),
+    this.showSalesTrendChart = const Value.absent(),
+    this.showExpensePieChart = const Value.absent(),
+    this.showTopSellingChart = const Value.absent(),
+    this.showStockValueChart = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -4412,6 +4598,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showCacNumber,
     Expression<bool>? showTotalSalesCard,
     Expression<bool>? stockReturnEnabled,
+    Expression<bool>? showSalesTrendChart,
+    Expression<bool>? showExpensePieChart,
+    Expression<bool>? showTopSellingChart,
+    Expression<bool>? showStockValueChart,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -4465,6 +4655,14 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
         'show_total_sales_card': showTotalSalesCard,
       if (stockReturnEnabled != null)
         'stock_return_enabled': stockReturnEnabled,
+      if (showSalesTrendChart != null)
+        'show_sales_trend_chart': showSalesTrendChart,
+      if (showExpensePieChart != null)
+        'show_expense_pie_chart': showExpensePieChart,
+      if (showTopSellingChart != null)
+        'show_top_selling_chart': showTopSellingChart,
+      if (showStockValueChart != null)
+        'show_stock_value_chart': showStockValueChart,
     });
   }
 
@@ -4508,7 +4706,11 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String?>? cacNumber,
       Value<bool>? showCacNumber,
       Value<bool>? showTotalSalesCard,
-      Value<bool>? stockReturnEnabled}) {
+      Value<bool>? stockReturnEnabled,
+      Value<bool>? showSalesTrendChart,
+      Value<bool>? showExpensePieChart,
+      Value<bool>? showTopSellingChart,
+      Value<bool>? showStockValueChart}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -4556,6 +4758,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       showCacNumber: showCacNumber ?? this.showCacNumber,
       showTotalSalesCard: showTotalSalesCard ?? this.showTotalSalesCard,
       stockReturnEnabled: stockReturnEnabled ?? this.stockReturnEnabled,
+      showSalesTrendChart: showSalesTrendChart ?? this.showSalesTrendChart,
+      showExpensePieChart: showExpensePieChart ?? this.showExpensePieChart,
+      showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
+      showStockValueChart: showStockValueChart ?? this.showStockValueChart,
     );
   }
 
@@ -4688,6 +4894,18 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (stockReturnEnabled.present) {
       map['stock_return_enabled'] = Variable<bool>(stockReturnEnabled.value);
     }
+    if (showSalesTrendChart.present) {
+      map['show_sales_trend_chart'] = Variable<bool>(showSalesTrendChart.value);
+    }
+    if (showExpensePieChart.present) {
+      map['show_expense_pie_chart'] = Variable<bool>(showExpensePieChart.value);
+    }
+    if (showTopSellingChart.present) {
+      map['show_top_selling_chart'] = Variable<bool>(showTopSellingChart.value);
+    }
+    if (showStockValueChart.present) {
+      map['show_stock_value_chart'] = Variable<bool>(showStockValueChart.value);
+    }
     return map;
   }
 
@@ -4733,7 +4951,11 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('cacNumber: $cacNumber, ')
           ..write('showCacNumber: $showCacNumber, ')
           ..write('showTotalSalesCard: $showTotalSalesCard, ')
-          ..write('stockReturnEnabled: $stockReturnEnabled')
+          ..write('stockReturnEnabled: $stockReturnEnabled, ')
+          ..write('showSalesTrendChart: $showSalesTrendChart, ')
+          ..write('showExpensePieChart: $showExpensePieChart, ')
+          ..write('showTopSellingChart: $showTopSellingChart, ')
+          ..write('showStockValueChart: $showStockValueChart')
           ..write(')'))
         .toString();
   }
@@ -5196,7 +5418,7 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
   late final GeneratedColumn<String> staffCode = GeneratedColumn<String>(
       'staff_code', aliasedName, false,
       additionalChecks:
-          GeneratedColumn.checkTextLength(minTextLength: 4, maxTextLength: 4),
+          GeneratedColumn.checkTextLength(minTextLength: 4, maxTextLength: 100),
       type: DriftSqlType.string,
       requiredDuringInsert: true);
   static const VerificationMeta _isActiveMeta =
@@ -7184,6 +7406,508 @@ class StockReturnsCompanion extends UpdateCompanion<StockReturnTable> {
   }
 }
 
+class $ExpensesTable extends Expenses
+    with TableInfo<$ExpensesTable, ExpenseTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExpensesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+      'amount', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+      'description', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 255),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _categoryMeta =
+      const VerificationMeta('category');
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+      'category', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+      'date', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        amount,
+        description,
+        category,
+        date,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'expenses';
+  @override
+  VerificationContext validateIntegrity(Insertable<ExpenseTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('amount')) {
+      context.handle(_amountMeta,
+          amount.isAcceptableOrUnknown(data['amount']!, _amountMeta));
+    } else if (isInserting) {
+      context.missing(_amountMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+          _descriptionMeta,
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
+    } else if (isInserting) {
+      context.missing(_descriptionMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(_categoryMeta,
+          category.isAcceptableOrUnknown(data['category']!, _categoryMeta));
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+          _dateMeta, date.isAcceptableOrUnknown(data['date']!, _dateMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ExpenseTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExpenseTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      amount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description'])!,
+      category: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}category']),
+      date: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}date'])!,
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+    );
+  }
+
+  @override
+  $ExpensesTable createAlias(String alias) {
+    return $ExpensesTable(attachedDatabase, alias);
+  }
+}
+
+class ExpenseTable extends DataClass implements Insertable<ExpenseTable> {
+  final int id;
+  final double amount;
+  final String description;
+  final String? category;
+  final DateTime date;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  final String? deviceId;
+  final bool isDeleted;
+  const ExpenseTable(
+      {required this.id,
+      required this.amount,
+      required this.description,
+      this.category,
+      required this.date,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt,
+      this.deviceId,
+      required this.isDeleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['amount'] = Variable<double>(amount);
+    map['description'] = Variable<String>(description);
+    if (!nullToAbsent || category != null) {
+      map['category'] = Variable<String>(category);
+    }
+    map['date'] = Variable<DateTime>(date);
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    return map;
+  }
+
+  ExpensesCompanion toCompanion(bool nullToAbsent) {
+    return ExpensesCompanion(
+      id: Value(id),
+      amount: Value(amount),
+      description: Value(description),
+      category: category == null && nullToAbsent
+          ? const Value.absent()
+          : Value(category),
+      date: Value(date),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      isDeleted: Value(isDeleted),
+    );
+  }
+
+  factory ExpenseTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExpenseTable(
+      id: serializer.fromJson<int>(json['id']),
+      amount: serializer.fromJson<double>(json['amount']),
+      description: serializer.fromJson<String>(json['description']),
+      category: serializer.fromJson<String?>(json['category']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'amount': serializer.toJson<double>(amount),
+      'description': serializer.toJson<String>(description),
+      'category': serializer.toJson<String?>(category),
+      'date': serializer.toJson<DateTime>(date),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+    };
+  }
+
+  ExpenseTable copyWith(
+          {int? id,
+          double? amount,
+          String? description,
+          Value<String?> category = const Value.absent(),
+          DateTime? date,
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent(),
+          Value<String?> deviceId = const Value.absent(),
+          bool? isDeleted}) =>
+      ExpenseTable(
+        id: id ?? this.id,
+        amount: amount ?? this.amount,
+        description: description ?? this.description,
+        category: category.present ? category.value : this.category,
+        date: date ?? this.date,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        isDeleted: isDeleted ?? this.isDeleted,
+      );
+  ExpenseTable copyWithCompanion(ExpensesCompanion data) {
+    return ExpenseTable(
+      id: data.id.present ? data.id.value : this.id,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      description:
+          data.description.present ? data.description.value : this.description,
+      category: data.category.present ? data.category.value : this.category,
+      date: data.date.present ? data.date.value : this.date,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExpenseTable(')
+          ..write('id: $id, ')
+          ..write('amount: $amount, ')
+          ..write('description: $description, ')
+          ..write('category: $category, ')
+          ..write('date: $date, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, amount, description, category, date,
+      syncId, updatedAt, createdAt, deviceId, isDeleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExpenseTable &&
+          other.id == this.id &&
+          other.amount == this.amount &&
+          other.description == this.description &&
+          other.category == this.category &&
+          other.date == this.date &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.deviceId == this.deviceId &&
+          other.isDeleted == this.isDeleted);
+}
+
+class ExpensesCompanion extends UpdateCompanion<ExpenseTable> {
+  final Value<int> id;
+  final Value<double> amount;
+  final Value<String> description;
+  final Value<String?> category;
+  final Value<DateTime> date;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  final Value<String?> deviceId;
+  final Value<bool> isDeleted;
+  const ExpensesCompanion({
+    this.id = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.description = const Value.absent(),
+    this.category = const Value.absent(),
+    this.date = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  });
+  ExpensesCompanion.insert({
+    this.id = const Value.absent(),
+    required double amount,
+    required String description,
+    this.category = const Value.absent(),
+    this.date = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  })  : amount = Value(amount),
+        description = Value(description);
+  static Insertable<ExpenseTable> custom({
+    Expression<int>? id,
+    Expression<double>? amount,
+    Expression<String>? description,
+    Expression<String>? category,
+    Expression<DateTime>? date,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? deviceId,
+    Expression<bool>? isDeleted,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (amount != null) 'amount': amount,
+      if (description != null) 'description': description,
+      if (category != null) 'category': category,
+      if (date != null) 'date': date,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+    });
+  }
+
+  ExpensesCompanion copyWith(
+      {Value<int>? id,
+      Value<double>? amount,
+      Value<String>? description,
+      Value<String?>? category,
+      Value<DateTime>? date,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt,
+      Value<String?>? deviceId,
+      Value<bool>? isDeleted}) {
+    return ExpensesCompanion(
+      id: id ?? this.id,
+      amount: amount ?? this.amount,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      date: date ?? this.date,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      deviceId: deviceId ?? this.deviceId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExpensesCompanion(')
+          ..write('id: $id, ')
+          ..write('amount: $amount, ')
+          ..write('description: $description, ')
+          ..write('category: $category, ')
+          ..write('date: $date, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7198,6 +7922,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $StockIncrementsTable stockIncrements =
       $StockIncrementsTable(this);
   late final $StockReturnsTable stockReturns = $StockReturnsTable(this);
+  late final $ExpensesTable expenses = $ExpensesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -7212,7 +7937,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         staff,
         syncMeta,
         stockIncrements,
-        stockReturns
+        stockReturns,
+        expenses
       ];
 }
 
@@ -7498,6 +8224,7 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   required String name,
   required String category,
   required double price,
+  Value<double> costPrice,
   Value<int> stockQty,
   Value<double> minStockQty,
   Value<Uint8List?> image,
@@ -7517,6 +8244,7 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<String> name,
   Value<String> category,
   Value<double> price,
+  Value<double> costPrice,
   Value<int> stockQty,
   Value<double> minStockQty,
   Value<Uint8List?> image,
@@ -7615,6 +8343,9 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<double> get price => $composableBuilder(
       column: $table.price, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get costPrice => $composableBuilder(
+      column: $table.costPrice, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get stockQty => $composableBuilder(
       column: $table.stockQty, builder: (column) => ColumnFilters(column));
@@ -7759,6 +8490,9 @@ class $$ItemsTableOrderingComposer
   ColumnOrderings<double> get price => $composableBuilder(
       column: $table.price, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get costPrice => $composableBuilder(
+      column: $table.costPrice, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get stockQty => $composableBuilder(
       column: $table.stockQty, builder: (column) => ColumnOrderings(column));
 
@@ -7838,6 +8572,9 @@ class $$ItemsTableAnnotationComposer
 
   GeneratedColumn<double> get price =>
       $composableBuilder(column: $table.price, builder: (column) => column);
+
+  GeneratedColumn<double> get costPrice =>
+      $composableBuilder(column: $table.costPrice, builder: (column) => column);
 
   GeneratedColumn<int> get stockQty =>
       $composableBuilder(column: $table.stockQty, builder: (column) => column);
@@ -7990,6 +8727,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<String> name = const Value.absent(),
             Value<String> category = const Value.absent(),
             Value<double> price = const Value.absent(),
+            Value<double> costPrice = const Value.absent(),
             Value<int> stockQty = const Value.absent(),
             Value<double> minStockQty = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
@@ -8009,6 +8747,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             name: name,
             category: category,
             price: price,
+            costPrice: costPrice,
             stockQty: stockQty,
             minStockQty: minStockQty,
             image: image,
@@ -8028,6 +8767,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             required String name,
             required String category,
             required double price,
+            Value<double> costPrice = const Value.absent(),
             Value<int> stockQty = const Value.absent(),
             Value<double> minStockQty = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
@@ -8047,6 +8787,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             name: name,
             category: category,
             price: price,
+            costPrice: costPrice,
             stockQty: stockQty,
             minStockQty: minStockQty,
             image: image,
@@ -9273,6 +10014,10 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showCacNumber,
   Value<bool> showTotalSalesCard,
   Value<bool> stockReturnEnabled,
+  Value<bool> showSalesTrendChart,
+  Value<bool> showExpensePieChart,
+  Value<bool> showTopSellingChart,
+  Value<bool> showStockValueChart,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -9315,6 +10060,10 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showCacNumber,
   Value<bool> showTotalSalesCard,
   Value<bool> stockReturnEnabled,
+  Value<bool> showSalesTrendChart,
+  Value<bool> showExpensePieChart,
+  Value<bool> showTopSellingChart,
+  Value<bool> showStockValueChart,
 });
 
 class $$SettingsTableFilterComposer
@@ -9461,6 +10210,22 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get stockReturnEnabled => $composableBuilder(
       column: $table.stockReturnEnabled,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showSalesTrendChart => $composableBuilder(
+      column: $table.showSalesTrendChart,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showExpensePieChart => $composableBuilder(
+      column: $table.showExpensePieChart,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showTopSellingChart => $composableBuilder(
+      column: $table.showTopSellingChart,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showStockValueChart => $composableBuilder(
+      column: $table.showStockValueChart,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -9615,6 +10380,22 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get stockReturnEnabled => $composableBuilder(
       column: $table.stockReturnEnabled,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showSalesTrendChart => $composableBuilder(
+      column: $table.showSalesTrendChart,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showExpensePieChart => $composableBuilder(
+      column: $table.showExpensePieChart,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showTopSellingChart => $composableBuilder(
+      column: $table.showTopSellingChart,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showStockValueChart => $composableBuilder(
+      column: $table.showStockValueChart,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -9745,6 +10526,18 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get stockReturnEnabled => $composableBuilder(
       column: $table.stockReturnEnabled, builder: (column) => column);
+
+  GeneratedColumn<bool> get showSalesTrendChart => $composableBuilder(
+      column: $table.showSalesTrendChart, builder: (column) => column);
+
+  GeneratedColumn<bool> get showExpensePieChart => $composableBuilder(
+      column: $table.showExpensePieChart, builder: (column) => column);
+
+  GeneratedColumn<bool> get showTopSellingChart => $composableBuilder(
+      column: $table.showTopSellingChart, builder: (column) => column);
+
+  GeneratedColumn<bool> get showStockValueChart => $composableBuilder(
+      column: $table.showStockValueChart, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -9813,6 +10606,10 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showCacNumber = const Value.absent(),
             Value<bool> showTotalSalesCard = const Value.absent(),
             Value<bool> stockReturnEnabled = const Value.absent(),
+            Value<bool> showSalesTrendChart = const Value.absent(),
+            Value<bool> showExpensePieChart = const Value.absent(),
+            Value<bool> showTopSellingChart = const Value.absent(),
+            Value<bool> showStockValueChart = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -9855,6 +10652,10 @@ class $$SettingsTableTableManager extends RootTableManager<
             showCacNumber: showCacNumber,
             showTotalSalesCard: showTotalSalesCard,
             stockReturnEnabled: stockReturnEnabled,
+            showSalesTrendChart: showSalesTrendChart,
+            showExpensePieChart: showExpensePieChart,
+            showTopSellingChart: showTopSellingChart,
+            showStockValueChart: showStockValueChart,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -9897,6 +10698,10 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showCacNumber = const Value.absent(),
             Value<bool> showTotalSalesCard = const Value.absent(),
             Value<bool> stockReturnEnabled = const Value.absent(),
+            Value<bool> showSalesTrendChart = const Value.absent(),
+            Value<bool> showExpensePieChart = const Value.absent(),
+            Value<bool> showTopSellingChart = const Value.absent(),
+            Value<bool> showStockValueChart = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -9939,6 +10744,10 @@ class $$SettingsTableTableManager extends RootTableManager<
             showCacNumber: showCacNumber,
             showTotalSalesCard: showTotalSalesCard,
             stockReturnEnabled: stockReturnEnabled,
+            showSalesTrendChart: showSalesTrendChart,
+            showExpensePieChart: showExpensePieChart,
+            showTopSellingChart: showTopSellingChart,
+            showStockValueChart: showStockValueChart,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -11568,6 +12377,240 @@ typedef $$StockReturnsTableProcessedTableManager = ProcessedTableManager<
     (StockReturnTable, $$StockReturnsTableReferences),
     StockReturnTable,
     PrefetchHooks Function({bool invoiceId, bool itemId, bool staffId})>;
+typedef $$ExpensesTableCreateCompanionBuilder = ExpensesCompanion Function({
+  Value<int> id,
+  required double amount,
+  required String description,
+  Value<String?> category,
+  Value<DateTime> date,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+typedef $$ExpensesTableUpdateCompanionBuilder = ExpensesCompanion Function({
+  Value<int> id,
+  Value<double> amount,
+  Value<String> description,
+  Value<String?> category,
+  Value<DateTime> date,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+
+class $$ExpensesTableFilterComposer
+    extends Composer<_$AppDatabase, $ExpensesTable> {
+  $$ExpensesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get category => $composableBuilder(
+      column: $table.category, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+      column: $table.date, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+}
+
+class $$ExpensesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExpensesTable> {
+  $$ExpensesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+      column: $table.amount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get category => $composableBuilder(
+      column: $table.category, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+      column: $table.date, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ExpensesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExpensesTable> {
+  $$ExpensesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => column);
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+}
+
+class $$ExpensesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ExpensesTable,
+    ExpenseTable,
+    $$ExpensesTableFilterComposer,
+    $$ExpensesTableOrderingComposer,
+    $$ExpensesTableAnnotationComposer,
+    $$ExpensesTableCreateCompanionBuilder,
+    $$ExpensesTableUpdateCompanionBuilder,
+    (ExpenseTable, BaseReferences<_$AppDatabase, $ExpensesTable, ExpenseTable>),
+    ExpenseTable,
+    PrefetchHooks Function()> {
+  $$ExpensesTableTableManager(_$AppDatabase db, $ExpensesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExpensesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExpensesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ExpensesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<double> amount = const Value.absent(),
+            Value<String> description = const Value.absent(),
+            Value<String?> category = const Value.absent(),
+            Value<DateTime> date = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              ExpensesCompanion(
+            id: id,
+            amount: amount,
+            description: description,
+            category: category,
+            date: date,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required double amount,
+            required String description,
+            Value<String?> category = const Value.absent(),
+            Value<DateTime> date = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              ExpensesCompanion.insert(
+            id: id,
+            amount: amount,
+            description: description,
+            category: category,
+            date: date,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ExpensesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ExpensesTable,
+    ExpenseTable,
+    $$ExpensesTableFilterComposer,
+    $$ExpensesTableOrderingComposer,
+    $$ExpensesTableAnnotationComposer,
+    $$ExpensesTableCreateCompanionBuilder,
+    $$ExpensesTableUpdateCompanionBuilder,
+    (ExpenseTable, BaseReferences<_$AppDatabase, $ExpensesTable, ExpenseTable>),
+    ExpenseTable,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11592,4 +12635,6 @@ class $AppDatabaseManager {
       $$StockIncrementsTableTableManager(_db, _db.stockIncrements);
   $$StockReturnsTableTableManager get stockReturns =>
       $$StockReturnsTableTableManager(_db, _db.stockReturns);
+  $$ExpensesTableTableManager get expenses =>
+      $$ExpensesTableTableManager(_db, _db.expenses);
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../features/settings/domain/entities/staff.dart';
 import '../../../../features/settings/presentation/bloc/staff_bloc.dart';
@@ -135,6 +137,13 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
     );
   }
 
+  String _hash(String input) {
+    if (input.isEmpty) return "";
+    const salt = "STAFF-PIN-INVIFY-2024-PROTECT";
+    final bytes = utf8.encode(input + salt);
+    return sha256.convert(bytes).toString();
+  }
+
   void _verify() async {
     final settingsBloc = context.read<SettingsBloc>();
     final settings = settingsBloc.state.settings;
@@ -148,7 +157,7 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
 
     if (_selectedStaff == null) return;
     
-    if (_codeController.text == _selectedStaff!.staffCode) {
+    if (_hash(_codeController.text) == _selectedStaff!.staffCode) {
       // Clear failed attempts on success
       settingsBloc.add(ResetFailedAttempts());
       Navigator.pop(context, _selectedStaff);

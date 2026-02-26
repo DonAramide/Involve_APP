@@ -109,6 +109,10 @@ void main() async {
   final increaseStock = IncreaseStock(itemRepository);
   final getStockHistory = GetStockHistory(itemRepository);
   final getInventoryReport = GetInventoryReport(itemRepository);
+  final getProfitReport = GetProfitReport(itemRepository);
+  final addExpense = AddExpense(itemRepository);
+  final getExpenses = GetExpenses(itemRepository);
+  final getTotalExpenses = GetTotalExpenses(itemRepository);
 
   // Category Use Cases
   final getCategories = GetCategories(categoryRepository);
@@ -147,6 +151,10 @@ void main() async {
     increaseStock: increaseStock,
     getStockHistory: getStockHistory,
     getInventoryReport: getInventoryReport,
+    getProfitReport: getProfitReport,
+    addExpense: addExpense,
+    getExpenses: getExpenses,
+    getTotalExpenses: getTotalExpenses,
     staffRepository: staffRepository,
     syncRepository: syncRepository,
     discoveryService: discoveryService,
@@ -186,6 +194,10 @@ class MyApp extends StatelessWidget {
   final IncreaseStock increaseStock;
   final GetStockHistory getStockHistory;
   final GetInventoryReport getInventoryReport;
+  final GetProfitReport getProfitReport;
+  final AddExpense addExpense;
+  final GetExpenses getExpenses;
+  final GetTotalExpenses getTotalExpenses;
   final StaffRepositoryImpl staffRepository;
   final SyncRepository syncRepository;
   final DiscoveryService discoveryService;
@@ -221,6 +233,10 @@ class MyApp extends StatelessWidget {
     required this.increaseStock,
     required this.getStockHistory,
     required this.getInventoryReport,
+    required this.getProfitReport,
+    required this.addExpense,
+    required this.getExpenses,
+    required this.getTotalExpenses,
     required this.staffRepository,
     required this.syncRepository,
     required this.discoveryService,
@@ -247,6 +263,10 @@ class MyApp extends StatelessWidget {
             increaseStock: increaseStock,
             getStockHistory: getStockHistory,
             getInventoryReport: getInventoryReport,
+            getProfitReport: getProfitReport,
+            addExpenseUC: addExpense,
+            getExpensesUC: getExpenses,
+            getTotalExpensesUC: getTotalExpenses,
           )..add(LoadItems()),
         ),
         BlocProvider(

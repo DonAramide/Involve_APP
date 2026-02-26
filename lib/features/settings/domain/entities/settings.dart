@@ -49,6 +49,12 @@ class AppSettings extends Equatable {
   final bool showCacNumber;
   final bool showTotalSalesCard;
   final bool stockReturnEnabled;
+  
+  // Graph Visibility
+  final bool showSalesTrendChart;
+  final bool showExpensePieChart;
+  final bool showTopSellingChart;
+  final bool showStockValueChart;
 
   const AppSettings({
     this.id,
@@ -91,6 +97,10 @@ class AppSettings extends Equatable {
     this.showCacNumber = false,
     this.showTotalSalesCard = true,
     this.stockReturnEnabled = true,
+    this.showSalesTrendChart = true,
+    this.showExpensePieChart = true,
+    this.showTopSellingChart = true,
+    this.showStockValueChart = true,
   });
 
   AppSettings copyWith({
@@ -134,6 +144,10 @@ class AppSettings extends Equatable {
     bool? showCacNumber,
     bool? showTotalSalesCard,
     bool? stockReturnEnabled,
+    bool? showSalesTrendChart,
+    bool? showExpensePieChart,
+    bool? showTopSellingChart,
+    bool? showStockValueChart,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -176,6 +190,10 @@ class AppSettings extends Equatable {
       showCacNumber: showCacNumber ?? this.showCacNumber,
       showTotalSalesCard: showTotalSalesCard ?? this.showTotalSalesCard,
       stockReturnEnabled: stockReturnEnabled ?? this.stockReturnEnabled,
+      showSalesTrendChart: showSalesTrendChart ?? this.showSalesTrendChart,
+      showExpensePieChart: showExpensePieChart ?? this.showExpensePieChart,
+      showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
+      showStockValueChart: showStockValueChart ?? this.showStockValueChart,
     );
   }
 
@@ -221,5 +239,9 @@ class AppSettings extends Equatable {
         showCacNumber,
         showTotalSalesCard,
         stockReturnEnabled,
+        showSalesTrendChart,
+        showExpensePieChart,
+        showTopSellingChart,
+        showStockValueChart,
       ];
 }

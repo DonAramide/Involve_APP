@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:involve_app/core/license/license_service.dart';
-import 'package:involve_app/features/settings/presentation/pages/settings_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/license/license_model.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 
 class ActivationPage extends StatefulWidget {
   final bool isExpired;
@@ -22,6 +24,16 @@ class _ActivationPageState extends State<ActivationPage> {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
   String? _errorMessage;
+  
+  @override
+  void initState() {
+    super.initState();
+    // Pre-populate business name if settings are already loaded
+    final settingsState = context.read<SettingsBloc>().state;
+    if (settingsState.settings != null) {
+      _businessNameController.text = settingsState.settings!.organizationName;
+    }
+  }
 
   Future<void> _activate() async {
     final businessName = _businessNameController.text.trim();
@@ -163,8 +175,16 @@ class _ActivationPageState extends State<ActivationPage> {
             ],
           ),
         ),
-        child: Center(
-          child: SingleChildScrollView(
+        child: BlocListener<SettingsBloc, SettingsState>(
+          listenWhen: (previous, current) => 
+            previous.settings?.organizationName != current.settings?.organizationName,
+          listener: (context, state) {
+            if (state.settings != null && _businessNameController.text.isEmpty) {
+              _businessNameController.text = state.settings!.organizationName;
+            }
+          },
+          child: Center(
+            child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
               child: Card(
@@ -302,7 +322,8 @@ class _ActivationPageState extends State<ActivationPage> {
           ),
         ),
       ),
-    );
+    ),
+   );
   }
 
   Widget _buildSegmentedInput() {

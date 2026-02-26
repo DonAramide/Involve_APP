@@ -9,6 +9,9 @@ import '../widgets/password_dialog.dart';
 import '../widgets/super_admin_dialog.dart';
 import '../widgets/super_admin_password_dialog.dart';
 import '../../../../core/license/license_service.dart';
+import '../../../../core/license/license_model.dart';
+import '../../../../core/license/license_history_table.dart';
+import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/settings.dart';
@@ -18,6 +21,7 @@ import '../bloc/staff_bloc.dart';
 import '../bloc/staff_state.dart';
 import '../../domain/entities/staff.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
+import 'package:file_picker/file_picker.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -135,12 +139,34 @@ class SettingsPage extends StatelessWidget {
                 _buildSectionHeader(context, 'Staff Management'),
                 _buildStaffManagementSection(context, settings),
                 const Divider(),
+                _buildSectionHeader(context, 'Graph Visibility (Admin)'),
+                _buildSwitchTile(
+                  'Show Sales Trend (Invoice History)', 
+                  settings.showSalesTrendChart, 
+                  (val) => _update(context, settings.copyWith(showSalesTrendChart: val))
+                ),
+                _buildSwitchTile(
+                  'Show Expense Pie Chart (Profit Report)', 
+                  settings.showExpensePieChart, 
+                  (val) => _update(context, settings.copyWith(showExpensePieChart: val))
+                ),
+                _buildSwitchTile(
+                  'Show Top Selling Bar Chart (Inventory Report)', 
+                  settings.showTopSellingChart, 
+                  (val) => _update(context, settings.copyWith(showTopSellingChart: val))
+                ),
+                _buildSwitchTile(
+                  'Show Stock Value Pie Chart (Inventory Report)', 
+                  settings.showStockValueChart, 
+                  (val) => _update(context, settings.copyWith(showStockValueChart: val))
+                ),
+                const Divider(),
                 _buildSectionHeader(context, 'Maintenance'),
                 ListTile(
-                  title: const Text('Local Backup'),
-                  subtitle: const Text('Export database to storage'),
+                  title: const Text('Export/Local Backup'),
+                  subtitle: const Text('Save or share database backup'),
                   trailing: state.isExporting ? const CircularProgressIndicator() : const Icon(Icons.backup),
-                  onTap: () => context.read<SettingsBloc>().add(CreateBackup()),
+                  onTap: () => _showBackupOptions(context, state),
                 ),
                 ListTile(
                   title: const Text('Device Synchronization'),
@@ -180,9 +206,9 @@ class SettingsPage extends StatelessWidget {
                 const Divider(),
                 ListTile(
                   title: const Text('Restore Backup'),
-                  subtitle: const Text('Import database file (Requires path)'),
+                  subtitle: const Text('Import database from a file'),
                   trailing: state.isImporting ? const CircularProgressIndicator() : const Icon(Icons.restore),
-                  onTap: () => _showRestoreDialog(context),
+                  onTap: () => _handleRestore(context),
                 ),
                 const Divider(),
                 _buildSectionHeader(context, 'Security'),
@@ -297,34 +323,95 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  void _showRestoreDialog(BuildContext context) {
-    final controller = TextEditingController();
-    showDialog(
+  void _showBackupOptions(BuildContext context, SettingsState state) {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restore Database'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('WARNING: This will overwrite your current data with the selected backup file.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            TextField(controller: controller, decoration: const InputDecoration(labelText: 'Full Path to Backup File')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          TextButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                context.read<SettingsBloc>().add(RestoreFromPath(controller.text));
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('RESTORE', style: TextStyle(color: Colors.red)),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(
+            title: Text('Backup Options', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
+          ListTile(
+            leading: const Icon(Icons.save, color: Colors.blue),
+            title: const Text('Save to Device'),
+            subtitle: const Text('Choose a folder to save your backup file'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              _handleSaveToDevice(context);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.share, color: Colors.green),
+            title: const Text('Share Backup'),
+            subtitle: const Text('Send backup via WhatsApp, Email, etc.'),
+            onTap: () {
+              Navigator.pop(ctx);
+              context.read<SettingsBloc>().add(CreateBackup());
+            },
+          ),
+          const SizedBox(height: 20),
         ],
       ),
     );
+  }
+
+  Future<void> _handleSaveToDevice(BuildContext context) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final settingsBloc = context.read<SettingsBloc>();
+    
+    try {
+      final bytes = await settingsBloc.backupService.createBackup();
+      if (bytes == null) throw Exception('No data generated');
+
+      final timestamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+      final fileName = 'invify_backup_$timestamp.sqlite';
+      
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Select where to save your backup',
+        fileName: fileName,
+        bytes: bytes,
+      );
+
+      if (result != null) {
+        scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Backup saved successfully'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to save backup: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _handleRestore(BuildContext context) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any, // .sqlite might not be in the default list
+      allowMultiple: false,
+      withData: true,
+    );
+
+    if (result != null && result.files.isNotEmpty) {
+      final file = result.files.first;
+      if (file.bytes == null) return;
+
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirm Restore'),
+          content: Text('Importing "${file.name}" will overwrite your current data. Proceed?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('RESTORE', style: TextStyle(color: Colors.red))),
+          ],
+        ),
+      );
+
+      if (proceed == true) {
+        context.read<SettingsBloc>().add(RestoreFromBytes(file.bytes!));
+      }
+    }
+  }
+
+  void _showRestoreDialog(BuildContext context) {
+    // Kept for backward compatibility if needed, but replaced by _handleRestore in the UI
   }
 
   void _update(BuildContext context, dynamic settings) {
@@ -503,6 +590,44 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
+  void _showExtendSubscriptionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Extend Subscription'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Enter a new activation code to extend your subscription.'),
+            const SizedBox(height: 16),
+            const Text(
+              'Your business name must match the one used during initial activation.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              // Navigate to ActivationPage to use its robust activation logic
+              // We pass the settings business name to pre-fill it
+              final settingsState = context.read<SettingsBloc>().state;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ActivationPage(isExpired: false),
+                ),
+              );
+            },
+            child: const Text('ENTER CODE'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showActivationHistoryDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -554,7 +679,27 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE')),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _showExtendSubscriptionDialog(context);
+                },
+                child: const Text('EXTEND'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  showDialog(context: context, builder: (_) => const UpgradeDialog());
+                },
+                child: const Text('UPGRADE'),
+              ),
+              const Spacer(),
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CLOSE')),
+            ],
+          ),
         ],
       ),
     );
@@ -717,30 +862,35 @@ class SettingsPage extends StatelessWidget {
 
   Widget _buildServiceBillingTile(BuildContext context, AppSettings settings, SettingsState state) {
     final plan = state.userPlan;
-    final isLocked = plan == null || !plan.isValid;
+    final isProOrLifetime = plan != null && plan.isValid && (plan.isPro || plan.isLifetime);
+    final isLocked = !isProOrLifetime; // Fixed: Locked for anyone not Pro/Lifetime
 
     return ListTile(
       title: Row(
         children: [
-          const Text('Enable Service Billing (Hotels/Lounges)'),
-          if (isLocked) ...[
+          const Expanded(child: Text('Enable Service Billing (Hotels/Lounges)')),
+          if (isLocked && (plan == null || !plan.isValid || plan.isBasic)) ...[
             const SizedBox(width: 8),
             const Icon(Icons.lock, size: 16, color: Colors.orange),
           ],
         ],
       ),
-      subtitle: isLocked 
-          ? const Text('Available on Pro & Lifetime plans', style: TextStyle(color: Colors.orange))
-          : null,
+      subtitle: isProOrLifetime
+          ? const Text('Standard feature on your plan', style: TextStyle(color: Colors.green, fontSize: 12))
+          : const Text('Available on Pro & Lifetime plans', style: TextStyle(color: Colors.orange, fontSize: 12)),
       trailing: Switch(
-        value: settings.serviceBillingEnabled,
-        onChanged: isLocked 
-            ? (val) => showDialog(context: context, builder: (_) => const UpgradeDialog()) // Show upgrade if locked
-            : (val) => _update(context, settings.copyWith(serviceBillingEnabled: val)),
+        value: isProOrLifetime ? true : settings.serviceBillingEnabled,
+        onChanged: isProOrLifetime 
+            ? null // Mandatory, cannot be changed
+            : (isLocked 
+                ? (val) => showDialog(context: context, builder: (_) => const UpgradeDialog())
+                : (val) => _update(context, settings.copyWith(serviceBillingEnabled: val))),
       ),
-      onTap: isLocked 
-          ? () => showDialog(context: context, builder: (_) => const UpgradeDialog())
-          : null, // Let Switch handle tap if unlocked
+      onTap: isProOrLifetime
+          ? null
+          : (isLocked 
+              ? () => showDialog(context: context, builder: (_) => const UpgradeDialog())
+              : null),
     );
   }
 
@@ -828,7 +978,10 @@ class SettingsPage extends StatelessWidget {
 
   void _showStaffDialog(BuildContext context, {Staff? staff}) {
     final nameController = TextEditingController(text: staff?.name);
-    final codeController = TextEditingController(text: staff?.staffCode);
+    // Don't pre-fill if it's a hash (length > 4)
+    final existingCode = staff?.staffCode;
+    final isCodeHashed = existingCode != null && existingCode.length > 4;
+    final codeController = TextEditingController(text: isCodeHashed ? '' : existingCode);
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -847,10 +1000,16 @@ class SettingsPage extends StatelessWidget {
               ),
               TextFormField(
                 controller: codeController,
-                decoration: const InputDecoration(labelText: 'Auth Code (4 characters)'),
+                decoration: InputDecoration(
+                  labelText: 'Auth Code (4 digits)',
+                  hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
+                ),
                 keyboardType: TextInputType.number,
                 maxLength: 4,
-                validator: (val) => val?.length != 4 ? 'Must be 4 characters' : null,
+                validator: (val) {
+                  if (staff != null && (val == null || val.isEmpty)) return null; // Optional on edit
+                  return (val?.length != 4) ? 'Must be 4 digits' : null;
+                },
               ),
             ],
           ),
@@ -863,7 +1022,9 @@ class SettingsPage extends StatelessWidget {
                 final newStaff = Staff(
                   id: staff?.id,
                   name: nameController.text,
-                  staffCode: codeController.text,
+                  staffCode: codeController.text.isEmpty && staff != null 
+                      ? staff.staffCode 
+                      : codeController.text,
                 );
                 if (staff == null) {
                   context.read<StaffBloc>().add(AddStaff(newStaff));

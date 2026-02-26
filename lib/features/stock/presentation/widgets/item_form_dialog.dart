@@ -25,7 +25,8 @@ class ItemFormDialog extends StatefulWidget {
 class _ItemFormDialogState extends State<ItemFormDialog> {
   final _formKey = GlobalKey<FormState>();
   late String _name;
-  late double _price;
+  final _priceController = TextEditingController();
+  final _costPriceController = TextEditingController();
   late int _stockQty;
   ItemCategory _legacyCategory = ItemCategory.drink; // Fallback
   int? _selectedCategoryId;
@@ -41,7 +42,8 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   void initState() {
     super.initState();
     _name = widget.item?.name ?? '';
-    _price = widget.item?.price ?? 0.0;
+    _priceController.text = (widget.item?.price ?? 0.0).toString();
+    _costPriceController.text = (widget.item?.costPrice ?? 0.0).toString();
     _stockQty = widget.item?.stockQty ?? 0;
     _legacyCategory = widget.item?.category ?? ItemCategory.drink;
     _selectedCategoryId = widget.item?.categoryId;
@@ -57,6 +59,13 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     
     // Ensure categories are loaded
     widget.stockBloc.add(LoadCategories());
+  }
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    _costPriceController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickImage() async {
@@ -263,12 +272,33 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
               ],
               
               TextFormField(
-                initialValue: _price.toString(),
+                controller: _priceController,
                 decoration: const InputDecoration(labelText: 'Price / Rate'),
                 keyboardType: TextInputType.number,
-                onSaved: (val) => _price = double.tryParse(val ?? '0') ?? 0.0,
                 validator: (val) => InputValidator.validateNumber(val, 'Price'),
               ),
+              if (_type == 'product') ...[
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _costPriceController,
+                  decoration: const InputDecoration(labelText: 'Cost Price (Optional)'),
+                  keyboardType: TextInputType.number,
+                  validator: (val) {
+                    if (val == null || val.isEmpty || val == '0' || val == '0.0') return null;
+                    
+                    final costErr = InputValidator.validateNumber(val, 'Cost Price');
+                    if (costErr != null) return costErr;
+
+                    final cost = double.tryParse(val) ?? 0.0;
+                    final price = double.tryParse(_priceController.text) ?? 0.0;
+
+                    if (cost > price) {
+                      return 'Cost Price cannot exceed Selling Price';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ],
           ),
         ),
@@ -287,12 +317,16 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
       
+      final price = double.tryParse(_priceController.text) ?? 0.0;
+      final costPrice = double.tryParse(_costPriceController.text) ?? 0.0;
+
       final newItem = Item(
         id: widget.item?.id,
         name: _name,
         category: _legacyCategory, 
         categoryId: _selectedCategoryId,
-        price: _price,
+        price: price,
+        costPrice: costPrice,
         stockQty: _type == 'service' ? 999999 : _stockQty, 
         minStockQty: _minStockLevel,
         image: _imageBytes,

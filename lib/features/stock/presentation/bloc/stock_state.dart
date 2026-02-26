@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/item.dart';
 import '../../domain/entities/category.dart';
+import '../../domain/entities/expense.dart';
 
 // Events
 abstract class StockEvent extends Equatable {
@@ -51,6 +52,29 @@ class LoadInventoryReportRequested extends StockEvent {
   final DateTime? start;
   final DateTime? end;
   LoadInventoryReportRequested({this.start, this.end});
+  @override
+  List<Object?> get props => [start, end];
+}
+
+class LoadProfitReportRequested extends StockEvent {
+  final DateTime? start;
+  final DateTime? end;
+  LoadProfitReportRequested({this.start, this.end});
+  @override
+  List<Object?> get props => [start, end];
+}
+
+class AddExpenseRequested extends StockEvent {
+  final Expense expense;
+  AddExpenseRequested(this.expense);
+  @override
+  List<Object?> get props => [expense];
+}
+
+class LoadExpensesRequested extends StockEvent {
+  final DateTime? start;
+  final DateTime? end;
+  LoadExpensesRequested({this.start, this.end});
   @override
   List<Object?> get props => [start, end];
 }
@@ -122,4 +146,20 @@ class InventoryReportLoaded extends StockState {
   const InventoryReportLoaded(this.report, {super.items, super.categories});
   @override
   List<Object?> get props => [report, items, categories];
+}
+
+class ProfitReportLoaded extends StockState {
+  final List<Map<String, dynamic>> report;
+  final double totalExpenses;
+  final List<Expense> expenses;
+  const ProfitReportLoaded(this.report, this.totalExpenses, {this.expenses = const [], super.items, super.categories});
+  @override
+  List<Object?> get props => [report, totalExpenses, expenses, items, categories];
+}
+
+class ExpensesLoaded extends StockState {
+  final List<Expense> expenses;
+  const ExpensesLoaded(this.expenses, {super.items, super.categories});
+  @override
+  List<Object?> get props => [expenses, items, categories];
 }

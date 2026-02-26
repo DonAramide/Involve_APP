@@ -72,6 +72,10 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showCacNumber: Value(settings.showCacNumber),
       showTotalSalesCard: Value(settings.showTotalSalesCard),
       stockReturnEnabled: Value(settings.stockReturnEnabled),
+      showSalesTrendChart: Value(settings.showSalesTrendChart),
+      showExpensePieChart: Value(settings.showExpensePieChart),
+      showTopSellingChart: Value(settings.showTopSellingChart),
+      showStockValueChart: Value(settings.showStockValueChart),
     );
 
     if (existing == null) {
@@ -133,6 +137,10 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showCacNumber: row.showCacNumber,
       showTotalSalesCard: row.showTotalSalesCard,
       stockReturnEnabled: row.stockReturnEnabled,
+      showSalesTrendChart: row.showSalesTrendChart,
+      showExpensePieChart: row.showExpensePieChart,
+      showTopSellingChart: row.showTopSellingChart,
+      showStockValueChart: row.showStockValueChart,
     );
   }
 }

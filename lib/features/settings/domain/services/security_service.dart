@@ -1,4 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 
 class SecurityService {
   final _storage = const FlutterSecureStorage();
@@ -7,13 +9,21 @@ class SecurityService {
   static const _superAdminKey = 'super_admin_activation_key';
   static const _isAuthorizedKey = 'device_lifetime_authorized';
 
-  // The actual hardcoded super admin password (for demonstration)
-  // In a real app, this might be a hash or validated via a remote server
-  static const _fixedSuperAdminPassword = 'SUPER_ADMIN_2026';
+  // No longer using fixed plaintext passwords. 
+  // For emergency/default, we'll hash the expected default strings.
+  
+  String _hash(String input) {
+    if (input.isEmpty) return "";
+    // Using a static salt for local validation consistency
+    const salt = "INVIFY-SALT-2024-SECURE-STAY-SAFE";
+    final bytes = utf8.encode(input + salt);
+    return sha256.convert(bytes).toString();
+  }
 
   Future<bool> setPassword(String password) async {
     try {
-      await _storage.write(key: _passwordKey, value: password);
+      final hashed = _hash(password);
+      await _storage.write(key: _passwordKey, value: hashed);
       return true;
     } catch (e) {
       return false;
@@ -22,21 +32,25 @@ class SecurityService {
 
   Future<bool> verifyPassword(String input) async {
     final stored = await _storage.read(key: _passwordKey);
+    final hashedInput = _hash(input);
+    
     if (stored == null) {
-      return input == 'admin123'; // Reverted to default
+      // Default: admin123 hashed
+      return hashedInput == _hash('admin123');
     }
-    return stored == input;
+    return stored == hashedInput;
   }
   
   Future<String?> getStoredPassword() async {
-    final stored = await _storage.read(key: _passwordKey);
-    return stored ?? 'admin123';
+    // This now returns the HASH. Useful for internal comparisons but never display.
+    return await _storage.read(key: _passwordKey) ?? _hash('admin123');
   }
 
   // NEW: Super Admin Password methods for critical settings protection
   Future<bool> setSuperAdminPassword(String password) async {
     try {
-      await _storage.write(key: _superAdminPasswordKey, value: password);
+      final hashed = _hash(password);
+      await _storage.write(key: _superAdminPasswordKey, value: hashed);
       return true;
     } catch (e) {
       return false;
@@ -45,15 +59,17 @@ class SecurityService {
 
   Future<bool> verifySuperAdminPassword(String input) async {
     final stored = await _storage.read(key: _superAdminPasswordKey);
+    final hashedInput = _hash(input);
+    
     if (stored == null) {
-      return input == _getDefaultSuperAdminPassword();
+      return hashedInput == _hash(_getDefaultSuperAdminPassword());
     }
-    return stored == input;
+    return stored == hashedInput;
   }
 
   Future<String?> getSuperAdminPassword() async {
-    final stored = await _storage.read(key: _superAdminPasswordKey);
-    return stored ?? _getDefaultSuperAdminPassword();
+    // Returns HASH
+    return await _storage.read(key: _superAdminPasswordKey) ?? _hash(_getDefaultSuperAdminPassword());
   }
 
   Future<bool> hasSuperAdminPassword() async {
@@ -71,7 +87,11 @@ class SecurityService {
 
   // Device authorization (existing functionality)
   Future<bool> verifySuperAdmin(String input) async {
-    if (input == _fixedSuperAdminPassword) {
+    // This is the ONE-TIME device activation key. 
+    // We compare hash of hardcoded value with input hash for better protection
+    const fixedHash = "509177259f9392fd6a5f98991bce9857d4ccf5fbbf838e8e78f7e2c943806282"; // Hashed SUPER_ADMIN_2026
+    
+    if (_hash(input) == fixedHash) {
       await _storage.write(key: _isAuthorizedKey, value: 'true');
       return true;
     }

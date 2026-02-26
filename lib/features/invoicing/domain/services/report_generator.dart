@@ -11,6 +11,8 @@ import 'package:involve_app/features/invoicing/domain/entities/report_date_range
 import 'package:involve_app/features/invoicing/domain/templates/invoice_template.dart';
 import 'package:involve_app/features/invoicing/domain/entities/stock_return.dart';
 import 'package:involve_app/features/settings/domain/entities/staff.dart';
+import 'package:involve_app/features/stock/domain/entities/expense.dart';
+import 'package:collection/collection.dart';
 
 enum ReportType { standard, activity }
 
@@ -676,6 +678,244 @@ class ReportGenerator {
     );
 
     return pdf;
+  }
+
+  static Future<pw.Document> buildProfitReportPDF({
+    required List<Map<String, dynamic>> report,
+    required double totalExpenses,
+    required List<Expense> expenses,
+    required AppSettings settings,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final font = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+    final currencySymbol = settings.currency;
+
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: font,
+        bold: boldFont,
+      ),
+    );
+
+    double totalGrossProfit = report.fold(0.0, (sum, item) => sum + (item['totalProfit'] as num).toDouble());
+    final netProfit = totalGrossProfit - totalExpenses;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) => [
+          pw.Header(
+            level: 0,
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Profit Report', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.Text('${DateFormat('dd/MM/yyyy').format(start)} - ${DateFormat('dd/MM/yyyy').format(end)}'),
+              ],
+            ),
+          ),
+          pw.Text(settings.organizationName, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 20),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+            child: pw.Column(
+              children: [
+                _buildPdfSummaryRow('Gross Profit:', totalGrossProfit, currencySymbol),
+                _buildPdfSummaryRow('Total Expenses:', -totalExpenses, currencySymbol),
+                pw.Divider(),
+                _buildPdfSummaryRow('Net Profit:', netProfit, currencySymbol, isBold: true),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Text('Item Breakdown', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.Divider(),
+          pw.Table.fromTextArray(
+            headers: ['Item', 'Qty', 'Price', 'Cost', 'Profit'],
+            data: report.map((item) => [
+              item['name'],
+              item['totalSold'].toString(),
+              CurrencyFormatter.formatWithSymbol(item['price'], symbol: currencySymbol),
+              CurrencyFormatter.formatWithSymbol(item['costPrice'], symbol: currencySymbol),
+              CurrencyFormatter.formatWithSymbol(item['totalProfit'], symbol: currencySymbol),
+            ]).toList(),
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            cellAlignment: pw.Alignment.centerLeft,
+            cellAlignments: {
+              2: pw.Alignment.centerRight,
+              3: pw.Alignment.centerRight,
+              4: pw.Alignment.centerRight,
+            },
+          ),
+        ],
+      ),
+    );
+
+    return pdf;
+  }
+
+  static pw.Widget _buildPdfSummaryRow(String label, double value, String currency, {bool isBold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: pw.TextStyle(fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.Text(CurrencyFormatter.formatWithSymbol(value, symbol: currency), style: pw.TextStyle(fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+        ],
+      ),
+    );
+  }
+
+  static List<PrintCommand> buildProfitThermalCommands({
+    required List<Map<String, dynamic>> report,
+    required double totalExpenses,
+    required AppSettings settings,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final commands = <PrintCommand>[];
+    final currencySymbol = settings.currency;
+
+    commands.add(TextCommand('PROFIT REPORT', isBold: true, align: 'center'));
+    commands.add(TextCommand('${DateFormat('dd/MM').format(start)} - ${DateFormat('dd/MM').format(end)}', align: 'center'));
+    commands.add(DividerCommand());
+    commands.add(TextCommand(settings.organizationName.toUpperCase(), align: 'center'));
+    commands.add(SizedBoxCommand(height: 1));
+
+    double gross = report.fold(0.0, (sum, i) => sum + (i['totalProfit'] as num).toDouble());
+    
+    commands.add(TextCommand('Gross: ${CurrencyFormatter.formatWithSymbol(gross, symbol: currencySymbol)}'));
+    commands.add(TextCommand('Exp:   ${CurrencyFormatter.formatWithSymbol(-totalExpenses, symbol: currencySymbol)}'));
+    commands.add(DividerCommand());
+    commands.add(TextCommand('Net:   ${CurrencyFormatter.formatWithSymbol(gross - totalExpenses, symbol: currencySymbol)}', isBold: true));
+    commands.add(SizedBoxCommand(height: 1));
+
+    commands.add(TextCommand('ITEMS:', isBold: true));
+    for (final i in report.where((item) => (item['totalSold'] ?? 0) > 0)) {
+      commands.add(TextCommand(i['name']));
+      commands.add(TextCommand('x${i['totalSold']}   ${CurrencyFormatter.formatWithSymbol(i['totalProfit'], symbol: currencySymbol)}', align: 'right'));
+    }
+
+    commands.add(DividerCommand());
+    commands.add(TextCommand('Generated by Sales Involve', align: 'center'));
+    commands.add(SizedBoxCommand(height: 3));
+
+    return commands;
+  }
+
+  static Future<pw.Document> buildExpenseLogsPDF({
+    required List<Expense> expenses,
+    required AppSettings settings,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final font = await PdfGoogleFonts.robotoRegular();
+    final boldFont = await PdfGoogleFonts.robotoBold();
+    final currencySymbol = settings.currency;
+
+    final pdf = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: font,
+        bold: boldFont,
+      ),
+    );
+
+    final grouped = groupBy(expenses, (Expense e) {
+      return DateTime(e.date.year, e.date.month, e.date.day);
+    });
+    final sortedDates = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) => [
+          pw.Header(
+            level: 0,
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Expense Logs', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+                pw.Text('${DateFormat('dd/MM/yyyy').format(start)} - ${DateFormat('dd/MM/yyyy').format(end)}'),
+              ],
+            ),
+          ),
+          pw.Text(settings.organizationName, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 20),
+          ...sortedDates.map((date) {
+            final dailyExpenses = grouped[date]!;
+            final dailyTotal = dailyExpenses.fold(0.0, (sum, e) => sum + e.amount);
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(5),
+                  color: PdfColors.grey300,
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(DateFormat('dd/MM/yyyy').format(date), style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Total: ${CurrencyFormatter.formatWithSymbol(dailyTotal, symbol: currencySymbol)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                pw.Table.fromTextArray(
+                  headers: ['Category', 'Description', 'Amount'],
+                  data: dailyExpenses.map((e) => [
+                    e.category ?? 'Other',
+                    e.description,
+                    CurrencyFormatter.formatWithSymbol(e.amount, symbol: currencySymbol),
+                  ]).toList(),
+                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  cellAlignments: {
+                    2: pw.Alignment.centerRight,
+                  },
+                ),
+                pw.SizedBox(height: 15),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+
+    return pdf;
+  }
+
+  static List<PrintCommand> buildExpenseLogsThermalCommands({
+    required List<Expense> expenses,
+    required AppSettings settings,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final commands = <PrintCommand>[];
+    final currencySymbol = settings.currency;
+
+    commands.add(TextCommand('EXPENSE LOGS', isBold: true, align: 'center'));
+    commands.add(TextCommand('${DateFormat('dd/MM').format(start)} - ${DateFormat('dd/MM').format(end)}', align: 'center'));
+    commands.add(DividerCommand());
+    commands.add(TextCommand(settings.organizationName.toUpperCase(), align: 'center'));
+    commands.add(SizedBoxCommand(height: 1));
+
+    for (final e in expenses) {
+      commands.add(TextCommand('${DateFormat('dd/MM').format(e.date)} - ${e.category ?? 'Other'}'));
+      commands.add(TextCommand(e.description));
+      commands.add(TextCommand(CurrencyFormatter.formatWithSymbol(e.amount, symbol: currencySymbol), align: 'right'));
+      commands.add(SizedBoxCommand(height: 1));
+    }
+
+    commands.add(DividerCommand());
+    commands.add(TextCommand('TOTAL: ${CurrencyFormatter.formatWithSymbol(expenses.fold(0.0, (sum, e) => sum + e.amount), symbol: currencySymbol)}', isBold: true, align: 'right'));
+    commands.add(SizedBoxCommand(height: 1));
+    commands.add(TextCommand('Generated by Sales Involve', align: 'center'));
+    commands.add(SizedBoxCommand(height: 3));
+
+    return commands;
   }
 }
 

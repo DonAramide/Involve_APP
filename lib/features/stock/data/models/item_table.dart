@@ -7,6 +7,7 @@ class Items extends Table {
   TextColumn get name => text().withLength(min: 1, max: 100)();
   TextColumn get category => text()(); // String representation of ItemCategory enum
   RealColumn get price => real()();
+  RealColumn get costPrice => real().withDefault(const Constant(0.0))();
   IntColumn get stockQty => integer().withDefault(const Constant(0))();
   RealColumn get minStockQty => real().withDefault(const Constant(0.0))();
 

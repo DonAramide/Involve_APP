@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_state.dart';
 import '../../../domain/entities/invoice.dart';
@@ -19,6 +20,8 @@ import 'package:involve_app/features/invoicing/domain/entities/report_date_range
 import 'report_preview_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:fl_chart/fl_chart.dart';
+import 'package:collection/collection.dart';
 
 // Stock Return Features
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
@@ -63,20 +66,12 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           IconButton(
             icon: const Icon(Icons.cloud_download),
             tooltip: 'Export All Data',
-            onPressed: () {
-              if (kIsWeb) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Database backup is not supported on Web. Use PDF Export instead.')),
-                );
-              } else {
-                context.read<SettingsBloc>().add(CreateBackup());
-              }
-            },
+            onPressed: () => _handleBackup(context),
           ),
           IconButton(
             icon: const Icon(Icons.cloud_upload),
             tooltip: 'Import All Data',
-            onPressed: () => _showRestoreDialog(context),
+            onPressed: () => _handleRestore(context),
           ),
           IconButton(
             icon: const Icon(Icons.date_range),
@@ -122,43 +117,63 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
-          return Column(
-            children: [
-              _buildFilterHeader(context, constraints),
-              Expanded(
-                child: BlocBuilder<HistoryBloc, HistoryState>(
-                  builder: (context, state) {
-                    if (state is HistoryLoading) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (state is HistoryLoaded) {
-                      if (state.invoices.isEmpty) {
-                        return const Center(child: Text('No invoices found.'));
-                      }
-                      return Column(
-                        children: [
-                          if (context.read<SettingsBloc>().state.settings?.showTotalSalesCard == true)
-                            _buildTotalSummary(context, state),
-                          Expanded(
-                            child: _isTableView
-                                ? _buildReportsTable(context, state)
-                                : ListView.builder(
-                                    itemCount: state.invoices.length,
-                                    itemBuilder: (context, index) {
-                                      final invoice = state.invoices[index];
-                                      return _buildInvoiceCard(context, invoice);
-                                    },
-                                  ),
-                          ),
-                        ],
-                      );
-                    } else if (state is HistoryError) {
-                      return Center(child: Text(state.message));
-                    }
-                    return const Center(child: Text('Start searching!'));
-                  },
-                ),
-              ),
-            ],
+          final isSmallScreen = constraints.maxWidth < 600;
+          return BlocBuilder<HistoryBloc, HistoryState>(
+            builder: (context, state) {
+              if (state is HistoryLoading) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (state is HistoryError) {
+                return Center(child: Text(state.message));
+              }
+
+              final settings = context.read<SettingsBloc>().state.settings;
+              final List<Invoice> invoices = state is HistoryLoaded ? state.invoices : [];
+              final bool showSummary = settings?.showTotalSalesCard == true && 
+                                      state is HistoryLoaded && invoices.isNotEmpty;
+
+              return CustomScrollView(
+                slivers: [
+                  // Filter Header (Sticky-ish or just scrolls)
+                  SliverToBoxAdapter(
+                    child: _buildFilterHeader(context, constraints),
+                  ),
+                  
+                  if (showSummary) ...[
+                    // Total Summary Card
+                    SliverToBoxAdapter(
+                      child: _buildTotalSummary(context, state as HistoryLoaded),
+                    ),
+                    // Revenue Trend Chart
+                    if (settings?.showSalesTrendChart == true)
+                      SliverToBoxAdapter(
+                        child: _buildSalesChart(context, state),
+                      ),
+                  ],
+
+                  // Invoice Content
+                  if (invoices.isEmpty)
+                    const SliverFillRemaining(
+                      child: Center(child: Text('No invoices found.')),
+                    )
+                  else if (_isTableView)
+                    SliverToBoxAdapter(
+                      child: _buildReportsTable(context, state as HistoryLoaded),
+                    )
+                  else
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          return _buildInvoiceCard(context, invoices[index]);
+                        },
+                        childCount: invoices.length,
+                      ),
+                    ),
+                  
+                  // Bottom Padding
+                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                ],
+              );
+            },
           );
         },
       ),
@@ -760,57 +775,139 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
 
   Widget _buildTotalSummary(BuildContext context, HistoryLoaded state) {
     final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'SALES SUMMARY FOR PERIOD',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Colors.blueGrey,
-              letterSpacing: 1.2,
-            ),
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)),
           ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          child: Column(
             children: [
-              Column(
+              const Text(
+                'SALES SUMMARY FOR PERIOD',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueGrey,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  const Text('TOTAL INVOICED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                  Text(
-                    CurrencyFormatter.formatWithSymbol(state.totalInvoiced, symbol: currency),
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                  Column(
+                    children: [
+                      const Text('TOTAL INVOICED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                      Text(
+                        CurrencyFormatter.formatWithSymbol(state.totalInvoiced, symbol: currency),
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                      ),
+                    ],
+                  ),
+                  Container(height: 30, width: 1, color: Colors.grey[300]),
+                  Column(
+                    children: [
+                      const Text('TOTAL COLLECTED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                      Text(
+                        CurrencyFormatter.formatWithSymbol(state.totalSales, symbol: currency),
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              Container(height: 30, width: 1, color: Colors.grey[300]),
-              Column(
-                children: [
-                  const Text('TOTAL COLLECTED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                  Text(
-                    CurrencyFormatter.formatWithSymbol(state.totalSales, symbol: currency),
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
-                  ),
-                ],
+              const SizedBox(height: 12),
+              Text(
+                '${state.invoices.length} Invoices',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            '${state.invoices.length} Invoices',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSalesChart(BuildContext context, HistoryLoaded state) {
+    if (state.invoices.isEmpty) return const SizedBox.shrink();
+
+    // Group sales by day
+    final dailySales = groupBy(state.invoices, (Invoice inv) {
+      return DateTime(inv.dateCreated.year, inv.dateCreated.month, inv.dateCreated.day);
+    }).map((date, invs) => MapEntry(date, invs.fold(0.0, (sum, inv) => sum + inv.totalAmount)));
+
+    final sortedDates = dailySales.keys.toList()..sort();
+    final spots = sortedDates.asMap().entries.map((e) {
+      return FlSpot(e.key.toDouble(), dailySales[e.value]!);
+    }).toList();
+
+    // If only one day, add a dummy point at index -1 or 1 to make it a line
+    if (spots.length == 1) {
+      spots.insert(0, FlSpot(-0.5, spots[0].y));
+      spots.add(FlSpot(0.5, spots[0].y));
+    }
+
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+      ),
+      child: Column(
+        children: [
+          const Text('REVENUE TREND', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blueGrey)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: LineChart(
+              LineChartData(
+                gridData: const FlGridData(show: false),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.round();
+                        if (idx < 0 || idx >= sortedDates.length) return const SizedBox.shrink();
+                        final date = sortedDates[idx];
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text('${date.day}/${date.month}', style: const TextStyle(fontSize: 10)),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: spots,
+                    isCurved: true,
+                    color: Theme.of(context).colorScheme.primary,
+                    barWidth: 4,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -818,50 +915,6 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     );
   }
 
-  void _showRestoreDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sync & Merge Data'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('This will safely merge the selected backup into your current data.', 
-              style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-            SizedBox(height: 16),
-            Text('• Existing invoices will NOT be duplicated.'),
-            Text('• New categories and items will be added.'),
-            Text('• Local data will NOT be deleted.'),
-            SizedBox(height: 16),
-            Text('Select a .sqlite file to sync from.'),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.sync),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final result = await FilePicker.platform.pickFiles(
-                type: FileType.any,
-              );
-              
-              if (result != null && result.files.single.path != null && context.mounted) {
-                final path = result.files.single.path!;
-                context.read<SettingsBloc>().add(RestoreFromPath(path));
-              }
-            },
-            label: const Text('PICK FILE & SYNC'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildStatusBadge(String status, {bool isMini = false}) {
     final Color color;
@@ -907,7 +960,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: selectedMethod,
+              initialValue: selectedMethod,
               items: ['Cash', 'POS', 'Transfer'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
               onChanged: (val) => selectedMethod = val!,
               decoration: const InputDecoration(labelText: 'Method', border: OutlineInputBorder()),
@@ -1325,4 +1378,91 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     },
   );
 }
+
+  void _handleBackup(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(
+            title: Text('Backup Options', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.save, color: Colors.blue),
+            title: const Text('Save to Device'),
+            subtitle: const Text('Choose a folder to save your backup file'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              _handleSaveToDevice(context);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.share, color: Colors.green),
+            title: const Text('Share Backup'),
+            subtitle: const Text('Send backup via WhatsApp, Email, etc.'),
+            onTap: () {
+              Navigator.pop(ctx);
+              context.read<SettingsBloc>().add(CreateBackup());
+            },
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleSaveToDevice(BuildContext context) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final settingsBloc = context.read<SettingsBloc>();
+
+    try {
+      final bytes = await settingsBloc.backupService.createBackup();
+      if (bytes == null) throw Exception('No data generated');
+
+      final timestamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+      final fileName = 'invify_backup_$timestamp.sqlite';
+
+      final result = await FilePicker.platform.saveFile(
+        dialogTitle: 'Select where to save your backup',
+        fileName: fileName,
+        bytes: bytes,
+      );
+
+      if (result != null) {
+        scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Backup saved successfully'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to save backup: $e'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _handleRestore(BuildContext context) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      allowMultiple: false,
+      withData: true,
+    );
+
+    if (result != null && result.files.isNotEmpty) {
+      final file = result.files.first;
+      if (file.bytes == null) return;
+
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirm Restore'),
+          content: Text('Importing "${file.name}" will overwrite your current data. Proceed?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('RESTORE', style: TextStyle(color: Colors.red))),
+          ],
+        ),
+      );
+
+      if (proceed == true) {
+        context.read<SettingsBloc>().add(RestoreFromBytes(file.bytes!));
+      }
+    }
+  }
 }

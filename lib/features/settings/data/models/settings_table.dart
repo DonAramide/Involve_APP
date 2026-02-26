@@ -52,4 +52,10 @@ class Settings extends Table {
   BoolColumn get showCacNumber => boolean().withDefault(const Constant(false))();
   BoolColumn get showTotalSalesCard => boolean().withDefault(const Constant(true))();
   BoolColumn get stockReturnEnabled => boolean().withDefault(const Constant(true))();
+  
+  // Graph Visibility Toggles
+  BoolColumn get showSalesTrendChart => boolean().withDefault(const Constant(true))();
+  BoolColumn get showExpensePieChart => boolean().withDefault(const Constant(true))();
+  BoolColumn get showTopSellingChart => boolean().withDefault(const Constant(true))();
+  BoolColumn get showStockValueChart => boolean().withDefault(const Constant(true))();
 }

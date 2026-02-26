@@ -8,6 +8,8 @@ import 'package:share_plus/share_plus.dart';
 import 'settings_state.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/services/security_service.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 import '../../../../core/services/backup_service.dart';
 import '../../../../core/license/storage_service.dart';
 import '../../domain/entities/user_plan.dart';
@@ -31,6 +33,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<CheckDeviceAuthorization>(_onCheckDeviceAuth);
     on<CreateBackup>(_onBackup);
     on<RestoreFromPath>(_onRestore);
+    on<RestoreFromBytes>(_onRestoreBytes);
     on<RecordFailedAttempt>(_onRecordFailedAttempt);
     on<UnlockSystem>(_onUnlockSystem);
     on<ResetFailedAttempts>(_onResetFailedAttempts);
@@ -91,6 +94,22 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       
       final bytes = await file.readAsBytes();
       final success = await backupService.syncData(bytes);
+      
+      if (success) {
+        emit(state.copyWith(isImporting: false, successMessage: 'Data synchronized successfully!'));
+        add(LoadSettings());
+      } else {
+        emit(state.copyWith(isImporting: false, error: 'Synchronization failed'));
+      }
+    } catch (e) {
+      emit(state.copyWith(isImporting: false, error: 'Import failed: $e'));
+    }
+  }
+
+  Future<void> _onRestoreBytes(RestoreFromBytes event, Emitter<SettingsState> emit) async {
+    emit(state.copyWith(isImporting: true, error: null, successMessage: null));
+    try {
+      final success = await backupService.syncData(event.bytes);
       
       if (success) {
         emit(state.copyWith(isImporting: false, successMessage: 'Data synchronized successfully!'));
@@ -296,15 +315,15 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     final currentSettings = state.settings;
     if (currentSettings == null) return;
 
-    // Get admin password from secure storage
-    final adminPassword = await securityService.getStoredPassword();
-    if (adminPassword == null) {
+    // Get admin password hash from secure storage
+    final adminPasswordHash = await securityService.getStoredPassword();
+    if (adminPasswordHash == null) {
       emit(state.copyWith(error: 'Admin password not set'));
       return;
     }
 
     // Validate unlock code
-    if (_validateUnlockCode(event.unlockCode, adminPassword)) {
+    if (_validateUnlockCode(event.unlockCode, adminPasswordHash)) {
       // Unlock system and reset failed attempts
       final unlockedSettings = currentSettings.copyWith(
         failedAttempts: 0,
@@ -332,7 +351,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(state.copyWith(settings: resetSettings));
   }
 
-  bool _validateUnlockCode(String unlockCode, String adminPassword) {
+  bool _validateUnlockCode(String unlockCode, String adminPasswordHash) {
     final parts = unlockCode.split('/');
     if (parts.length != 3) {
       debugPrint('❌ Unlock code format invalid. Expected 3 parts, got ${parts.length}');
@@ -343,18 +362,27 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     final timeStr = parts[1]; // HHmm
     final password = parts[2];
     
-    debugPrint('🔓 Validating unlock code:');
+    debugPrint('🔓 Validating unlock code (HASHED VERSION):');
     debugPrint('  Date: $dateStr');
     debugPrint('  Time: $timeStr');
-    debugPrint('  Password: ${password.replaceAll(RegExp(r'.'), '*')}');
     
-    // Validate password (Master emergency password: admin123invify)
-    if (password != "admin123invify") {
-      debugPrint('❌ Password mismatch');
-      debugPrint('   Input (from code): $password');
-      return false;
+    // The password part of the unlock code MUST match either:
+    // 1. The HASH of the current system password (adminPasswordHash)
+    // 2. The HASH of the emergency master key
+    
+    final hashedInput = sha256.convert(utf8.encode(password + "INVIFY-SALT-2024-SECURE-STAY-SAFE")).toString();
+    
+    if (hashedInput != adminPasswordHash) {
+        // Fallback to emergency master key with its own salt
+        final emergencyHashedInput = sha256.convert(utf8.encode(password + "EMERGENCY-SALT-2024")).toString();
+        const expectedEmergencyHash = "47fe409559c55f9e83f5087a32dbbe3e36e65b4c6883e1c6628b0561585c531d"; // Hashed 'admin123invify'
+        
+        if (emergencyHashedInput != expectedEmergencyHash) {
+             debugPrint('❌ Access Key mismatch');
+             return false;
+        }
     }
-    debugPrint('✅ Password correct');
+    debugPrint('✅ Access Key correct');
     
     // Validate date (current date)
     final now = DateTime.now();

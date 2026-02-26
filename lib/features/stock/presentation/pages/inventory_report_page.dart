@@ -10,6 +10,8 @@ import 'package:involve_app/features/invoicing/domain/entities/report_date_range
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:collection/collection.dart';
 
 class InventoryReportPage extends StatefulWidget {
   const InventoryReportPage({super.key});
@@ -76,7 +78,8 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    final currencySymbol = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    final settings = context.read<SettingsBloc>().state.settings;
+    final currencySymbol = settings?.currency ?? '₦';
 
     return Scaffold(
       appBar: AppBar(
@@ -180,31 +183,39 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
                 if (state is StockLoading) {
                   return const Center(child: CircularProgressIndicator());
                 } else if (state is InventoryReportLoaded) {
-                  if (state.report.isEmpty) {
-                    return const Center(child: Text('No products found.'));
-                  }
-
                   return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: SingleChildScrollView(
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('Product')),
-                          DataColumn(label: Text('Price'), numeric: true),
-                          DataColumn(label: Text('Stock'), numeric: true),
-                          DataColumn(label: Text('Sold'), numeric: true),
-                          DataColumn(label: Text('Revenue'), numeric: true),
+                    child: Column(
+                      children: [
+                        if (settings?.showTopSellingChart == true) ...[
+                          _buildTopSellingChart(context, state.report),
+                          const SizedBox(height: 16),
                         ],
-                        rows: state.report.map((item) {
-                          return DataRow(cells: [
-                            DataCell(Text(item['name'])),
-                            DataCell(Text(CurrencyFormatter.formatWithSymbol(item['price'], symbol: currencySymbol))),
-                            DataCell(Text(item['stockQty'].toString())),
-                            DataCell(Text(item['totalSold'].toString())),
-                            DataCell(Text(CurrencyFormatter.formatWithSymbol(item['totalRevenue'], symbol: currencySymbol))),
-                          ]);
-                        }).toList(),
-                      ),
+                        if (settings?.showStockValueChart == true) ...[
+                          _buildStockValueChart(context, state.report, currencySymbol),
+                          const SizedBox(height: 16),
+                        ],
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columns: const [
+                              DataColumn(label: Text('Product')),
+                              DataColumn(label: Text('Price'), numeric: true),
+                              DataColumn(label: Text('Stock'), numeric: true),
+                              DataColumn(label: Text('Sold'), numeric: true),
+                              DataColumn(label: Text('Revenue'), numeric: true),
+                            ],
+                            rows: state.report.map((item) {
+                              return DataRow(cells: [
+                                DataCell(Text(item['name'])),
+                                DataCell(Text(CurrencyFormatter.formatWithSymbol(item['price'], symbol: currencySymbol))),
+                                DataCell(Text(item['stockQty'].toString())),
+                                DataCell(Text(item['totalSold'].toString())),
+                                DataCell(Text(CurrencyFormatter.formatWithSymbol(item['totalRevenue'], symbol: currencySymbol))),
+                              ]);
+                            }).toList(),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 } else if (state is StockError) {
@@ -212,6 +223,173 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
                 }
                 return const SizedBox();
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopSellingChart(BuildContext context, List<Map<String, dynamic>> report) {
+    final topSelling = report.where((i) => i['totalSold'] > 0).toList()
+      ..sort((a, b) => (b['totalSold'] as num).compareTo(a['totalSold'] as num));
+    
+    final top5 = topSelling.take(5).toList();
+    if (top5.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      height: 250,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+      ),
+      child: Column(
+        children: [
+          const Text('Top Selling Items (Quantity)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 20),
+          Expanded(
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: (top5.map((e) => e['totalSold'] as num).reduce((a, b) => a > b ? a : b) * 1.3).toDouble(),
+                barTouchData: BarTouchData(
+                  enabled: false,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => Colors.transparent,
+                    tooltipPadding: EdgeInsets.zero,
+                    tooltipMargin: 4,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        rod.toY.round().toString(),
+                        const TextStyle(
+                          color: Colors.blueGrey,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final idx = value.toInt();
+                        if (idx < 0 || idx >= top5.length) return const SizedBox.shrink();
+                        final name = top5[idx]['name'] as String;
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: Text(name.length > 8 ? '${name.substring(0, 5)}...' : name, style: const TextStyle(fontSize: 10)),
+                        );
+                      },
+                    ),
+                  ),
+                  leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(show: false),
+                barGroups: top5.asMap().entries.map((e) {
+                  return BarChartGroupData(
+                    x: e.key,
+                    barRods: [
+                      BarChartRodData(
+                        toY: (e.value['totalSold'] as num).toDouble(),
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 16,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ],
+                    showingTooltipIndicators: [0],
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStockValueChart(BuildContext context, List<Map<String, dynamic>> report, String currencySymbol) {
+    // Top 5 by Value (Stock * Price)
+    final withValue = report.map((i) => {
+      ...i,
+      'stockValue': (i['stockQty'] as num) * (i['price'] as num)
+    }).toList()..sort((a, b) => (b['stockValue'] as num).compareTo(a['stockValue'] as num));
+
+    final top5 = withValue.take(5).toList();
+    if (top5.isEmpty) return const SizedBox.shrink();
+
+    final totalValue = top5.fold<double>(0, (sum, item) => sum + (item['stockValue'] as num).toDouble());
+
+    final colors = [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.red,
+    ];
+
+    return Container(
+      height: 250,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 2,
+                centerSpaceRadius: 30,
+                sections: top5.asMap().entries.map((e) {
+                  final val = (e.value['stockValue'] as num).toDouble();
+                  final percentage = val / totalValue * 100;
+                  return PieChartSectionData(
+                    value: val,
+                    color: colors[e.key % colors.length],
+                    radius: 50,
+                    showTitle: true,
+                    title: '${percentage.toStringAsFixed(0)}%',
+                    titleStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Stock Value Analysis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 10),
+                ...top5.asMap().entries.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Container(width: 8, height: 8, color: colors[e.key % colors.length]),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(e.value['name'], style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)),
+                      Text(
+                        CurrencyFormatter.formatWithSymbol(e.value['stockValue'], symbol: currencySymbol), 
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)
+                      ),
+                    ],
+                  ),
+                )),
+              ],
             ),
           ),
         ],
