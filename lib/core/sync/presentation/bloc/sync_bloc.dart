@@ -27,6 +27,7 @@ abstract class SyncEvent extends Equatable {
 class InitializeSync extends SyncEvent {}
 class StartDiscoveryRequested extends SyncEvent {}
 class StopDiscoveryRequested extends SyncEvent {}
+class RestartDiscovery extends SyncEvent {}
 
 class ToggleMasterRole extends SyncEvent {
   final bool isMaster;
@@ -153,6 +154,7 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     on<ManualSyncTriggered>(_onManualSync);
     on<SyncWithPeerTriggered>(_onSyncWithPeer);
     on<SyncStatusChanged>(_onStatusChanged);
+    on<RestartDiscovery>(_onRestartDiscovery);
   }
 
   Future<void> _onInitialize(InitializeSync event, Emitter<SyncState> emit) async {
@@ -268,6 +270,12 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     _peerSubscription?.cancel();
     syncManager.stop();
     emit(state.copyWith(isDiscoveryRunning: false, peers: []));
+  }
+
+  Future<void> _onRestartDiscovery(RestartDiscovery event, Emitter<SyncState> emit) async {
+    add(StopDiscoveryRequested());
+    await Future.delayed(const Duration(milliseconds: 500));
+    add(StartDiscoveryRequested());
   }
 
   Future<void> _onToggleRole(ToggleMasterRole event, Emitter<SyncState> emit) async {

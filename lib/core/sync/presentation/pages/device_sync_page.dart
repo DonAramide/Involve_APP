@@ -14,6 +14,20 @@ class DeviceSyncPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Device Synchronization'),
         centerTitle: true,
+        actions: [
+          BlocBuilder<SyncBloc, SyncState>(
+            builder: (context, state) {
+              return IconButton(
+                icon: state.isDiscoveryRunning && state.peers.isEmpty 
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.refresh),
+                onPressed: () => context.read<SyncBloc>().add(RestartDiscovery()),
+                tooltip: 'Refresh / Restart Discovery',
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: BlocConsumer<SyncBloc, SyncState>(
         // Only show toast when statusMessage actually changes to a non-null value
@@ -92,13 +106,21 @@ class DeviceSyncPage extends StatelessWidget {
                           const SizedBox(height: 12),
                           const Text('No devices found'),
                           const SizedBox(height: 4),
-                          Text(
                             kIsWeb 
                               ? 'Make sure Bluetooth is enabled and devices are nearby'
                               : 'Make sure both devices are on the same WiFi or have Bluetooth on',
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: Colors.grey, fontSize: 12),
                           ),
+                          if (state.isDiscoveryRunning) ...[
+                            const SizedBox(height: 24),
+                            const CircularProgressIndicator(strokeWidth: 3),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Scanning for nearby devices...',
+                              style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.w500),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -274,7 +296,7 @@ class DeviceSyncPage extends StatelessWidget {
           child: Icon(
             peer.isBluetooth 
               ? Icons.bluetooth 
-              : (peer.isMaster ? Icons.dns : Icons.smartphone),
+              : Icons.wifi,
             color: peer.isOnline ? Colors.green : Colors.grey,
             size: 20,
           ),

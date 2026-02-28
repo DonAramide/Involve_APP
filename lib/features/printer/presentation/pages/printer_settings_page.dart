@@ -113,6 +113,15 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                               'Tap WiFi or Bluetooth to connect',
                               style: TextStyle(color: Colors.grey, fontSize: 12),
                             ),
+                            if (state.isScanning) ...[
+                              const SizedBox(height: 24),
+                              const CircularProgressIndicator(strokeWidth: 3),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Scanning for printers...',
+                                style: TextStyle(fontSize: 12, color: Colors.purple, fontWeight: FontWeight.w500),
+                              ),
+                            ],
                           ],
                         ),
                       )

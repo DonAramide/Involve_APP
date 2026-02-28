@@ -53,6 +53,16 @@ class _ActivationPageState extends State<ActivationPage> {
 
     if (license != null) {
       if (mounted) {
+        // Sync the business name globally if activation was successful
+        final settingsBloc = context.read<SettingsBloc>();
+        final currentSettings = settingsBloc.state.settings;
+        if (currentSettings != null && currentSettings.organizationName != businessName) {
+           settingsBloc.add(UpdateAppSettings(currentSettings.copyWith(organizationName: businessName)));
+        }
+        
+        // Refresh entire state to update trial banner and Pro features
+        settingsBloc.add(LoadSettings());
+        
         _showSuccessDialog(license);
       }
     } else {
