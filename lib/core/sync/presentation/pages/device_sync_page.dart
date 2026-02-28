@@ -106,6 +106,7 @@ class DeviceSyncPage extends StatelessWidget {
                           const SizedBox(height: 12),
                           const Text('No devices found'),
                           const SizedBox(height: 4),
+                          Text(
                             kIsWeb 
                               ? 'Make sure Bluetooth is enabled and devices are nearby'
                               : 'Make sure both devices are on the same WiFi or have Bluetooth on',
