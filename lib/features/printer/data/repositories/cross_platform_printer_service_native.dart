@@ -198,8 +198,8 @@ class CrossPlatformPrinterService implements IPrinterService {
     bytes += generator.feed(2);
     bytes += generator.cut();
 
-    // Send data in chunks (iOS has size limits)
-    const int chunkSize = 512;
+    // Send data in chunks (iOS and some BLE printers have size limits)
+    const int chunkSize = 500;
     int chunkCount = 0;
     for (int i = 0; i < bytes.length; i += chunkSize) {
       final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;

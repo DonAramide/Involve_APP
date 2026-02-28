@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
 import '../../../stock/data/datasources/app_database.dart';
+import '../../../core/utils/logo_compressor.dart';
 import '../../domain/entities/settings.dart';
 import '../../domain/repositories/settings_repository.dart';
 
@@ -11,21 +12,33 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   @override
   Future<AppSettings> getSettings() async {
-    final result = await db.select(db.settings).getSingleOrNull();
-    if (result == null) {
+    try {
+      final result = await db.select(db.settings).getSingleOrNull();
+      if (result == null) {
+        return const AppSettings(
+          organizationName: 'My Business',
+          address: '123 Street',
+          phone: '000-000',
+          currency: '₦',
+        );
+      }
+      final entity = _toEntity(result);
+      // Auto-normalize legacy currency
+      if (entity.currency == 'NGN') {
+        return entity.copyWith(currency: '₦');
+      }
+      return entity;
+    } catch (e) {
+      // Handle "Row too big" or other DB errors gracefully
+      // by returning default settings. This allows the user
+      // to "fix" the DB by saving new (smaller) settings.
       return const AppSettings(
-        organizationName: 'My Business',
-        address: '123 Street',
+        organizationName: 'My Business (Reset)',
+        address: 'Please re-adjust settings',
         phone: '000-000',
         currency: '₦',
       );
     }
-    final entity = _toEntity(result);
-    // Auto-normalize legacy currency
-    if (entity.currency == 'NGN') {
-      return entity.copyWith(currency: '₦');
-    }
-    return entity;
   }
 
   @override
@@ -39,7 +52,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       businessDescription: Value(settings.businessDescription),
       taxId: Value(settings.taxId),
       logoPath: Value(settings.logoPath),
-      logo: Value(settings.logo),
+      logo: Value(LogoCompressor.compress(settings.logo)),
       themeMode: Value(settings.themeMode),
       currency: Value(settings.currency),
       taxEnabled: Value(settings.taxEnabled),
