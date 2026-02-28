@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
 import '../../../stock/data/datasources/app_database.dart';
-import '../../../core/utils/logo_compressor.dart';
+import 'package:involve_app/core/utils/logo_compressor.dart';
 import '../../domain/entities/settings.dart';
 import '../../domain/repositories/settings_repository.dart';
 
