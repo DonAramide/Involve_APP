@@ -30,6 +30,10 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}', align: 'center'),
       TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
+      if (invoice.customerName != null) 
+        TextCommand('Customer: ${invoice.customerName}', align: 'center'),
+      if (invoice.customerPhone != null)
+        TextCommand('Tel: ${invoice.customerPhone}', align: 'center'),
       if (invoice.paymentMethod != null) TextCommand('Method: ${invoice.paymentMethod}', align: 'center'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'center'),
       TextCommand('-' * width),
@@ -119,6 +123,10 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       TextCommand('INVOICE DETAIL', align: 'center', isBold: true),
       TextCommand('Number: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}'),
+      if (invoice.customerName != null)
+        TextCommand('Customer: ${invoice.customerName}'),
+      if (invoice.customerPhone != null)
+        TextCommand('Cust. Tel: ${invoice.customerPhone}'),
       if (invoice.paymentMethod != null) TextCommand('Payment Method: ${invoice.paymentMethod}'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}'),
       TextCommand('-' * width),
@@ -189,6 +197,8 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
     return [
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Date: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'center'),
+      if (invoice.customerName != null)
+        TextCommand('Cust: ${invoice.customerName}', align: 'center'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'center'),
       TextCommand('-' * width),
       ...invoice.items.map((item) {
@@ -242,6 +252,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       TextCommand('-' * width),
       TextCommand('BILL TO:', isBold: true),
       TextCommand(invoice.customerName ?? 'Cash Customer'),
+      if (invoice.customerPhone != null) TextCommand('Tel: ${invoice.customerPhone}'),
       if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),
       SizedBoxCommand(height: 1),
       TextCommand('INVOICE #: ${invoice.invoiceNumber}', align: 'right'),
@@ -364,6 +375,7 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
       if (settings.businessDescription != null) TextCommand(settings.businessDescription!),
       TextCommand('-' * width),
       TextCommand('TO: ${invoice.customerName ?? "Client"}'),
+      if (invoice.customerPhone != null) TextCommand('TEL: ${invoice.customerPhone}'),
       TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}'),
       TextCommand('-' * width),
       // 3-Column: QTY(5), ITEM(15), TOTAL(12) = 32
@@ -435,6 +447,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
       TextCommand('-' * width),
       TextCommand('BILL TO:', isBold: true),
       TextCommand(invoice.customerName ?? 'Valued Customer'),
+      if (invoice.customerPhone != null) TextCommand('TEL: ${invoice.customerPhone}'),
       if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),
       if (invoice.staffName != null) TextCommand('SOLD BY: ${invoice.staffName!.toUpperCase()}'),
       TextCommand('-' * width),

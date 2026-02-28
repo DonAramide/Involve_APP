@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 
@@ -14,16 +13,16 @@ class DeviceInfoService {
       if (kIsWeb) {
         final webInfo = await _deviceInfo.webBrowserInfo;
         deviceId = webInfo.userAgent ?? 'WEB-CLIENT';
-      } else if (Platform.isAndroid) {
+      } else if (defaultTargetPlatform == TargetPlatform.android) {
         final androidInfo = await _deviceInfo.androidInfo;
         deviceId = androidInfo.id; // unique ID
-      } else if (Platform.isIOS) {
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final iosInfo = await _deviceInfo.iosInfo;
         deviceId = iosInfo.identifierForVendor ?? 'IOS-DEVICE';
-      } else if (Platform.isWindows) {
+      } else if (defaultTargetPlatform == TargetPlatform.windows) {
         final windowsInfo = await _deviceInfo.windowsInfo;
         deviceId = windowsInfo.deviceId; // MachineGuid
-      } else if (Platform.isMacOS) {
+      } else if (defaultTargetPlatform == TargetPlatform.macOS) {
         // MacOS doesn't expose a serial easily without entitlement, fallback
         deviceId = 'MAC-OS-DEVICE';
       }

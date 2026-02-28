@@ -819,12 +819,15 @@ class _CartSummary extends StatelessWidget {
                                         color: Colors.red[700]!,
                                         onTap: () => context.read<InvoiceBloc>().add(AddItemToInvoice(item.item, -1)),
                                       ),
-                                      SizedBox(
-                                        width: 32,
-                                        child: Text(
-                                          '${item.quantity}',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                          textAlign: TextAlign.center,
+                                      GestureDetector(
+                                        onLongPress: () => _showQuantityDialog(context, item),
+                                        child: SizedBox(
+                                          width: 32,
+                                          child: Text(
+                                            '${item.quantity}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                            textAlign: TextAlign.center,
+                                          ),
                                         ),
                                       ),
                                       _QuickBtn(
@@ -884,11 +887,16 @@ class _CartSummary extends StatelessWidget {
                     ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(state.customerName ?? 'Add Customer Name & Phone', style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)),
+                      title: Text(
+                        state.customerName != null 
+                          ? '${state.customerName}${state.customerPhone != null ? " (${state.customerPhone})" : ""}'
+                          : 'Add Customer Name & Phone', 
+                        style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)
+                      ),
                       subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
                       leading: Icon(Icons.person_outline, color: state.customerName != null ? Theme.of(context).colorScheme.primary : Colors.grey),
                       trailing: const Icon(Icons.edit, size: 16),
-                      onTap: () => _showCustomerDialog(context, state.customerName, state.customerAddress),
+                      onTap: () => _showCustomerDialog(context, state.customerName, state.customerPhone, state.customerAddress),
                     ),
                     const SizedBox(height: 12),
                     SizedBox(
@@ -1005,8 +1013,9 @@ class _CartSummary extends StatelessWidget {
     );
   }
 
-  void _showCustomerDialog(BuildContext context, String? currentName, String? currentAddress) {
+  void _showCustomerDialog(BuildContext context, String? currentName, String? currentPhone, String? currentAddress) {
     final nameController = TextEditingController(text: currentName);
+    final phoneController = TextEditingController(text: currentPhone);
     final addrController = TextEditingController(text: currentAddress);
     final invoiceBloc = context.read<InvoiceBloc>();
 
@@ -1019,8 +1028,14 @@ class _CartSummary extends StatelessWidget {
           children: [
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(labelText: 'Customer Name & Phone', border: OutlineInputBorder()),
+              decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder()),
               autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(labelText: 'Customer Phone', border: OutlineInputBorder()),
+              keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 12),
             TextField(
@@ -1036,11 +1051,50 @@ class _CartSummary extends StatelessWidget {
             onPressed: () {
               invoiceBloc.add(UpdateCustomerInfo(
                 name: nameController.text.isEmpty ? null : nameController.text,
+                phone: phoneController.text.isEmpty ? null : phoneController.text,
                 address: addrController.text.isEmpty ? null : addrController.text,
               ));
               Navigator.pop(ctx);
             },
             child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showQuantityDialog(BuildContext context, InvoiceItem item) {
+    final controller = TextEditingController(text: item.quantity.toString());
+    final invoiceBloc = context.read<InvoiceBloc>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Update Quantity: ${item.item.name}'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Quantity',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              final newQty = int.tryParse(controller.text);
+              if (newQty != null && newQty > 0) {
+                // To set exact quantity, we calculate the difference
+                final diff = newQty - item.quantity;
+                invoiceBloc.add(AddItemToInvoice(item.item, diff, serviceMeta: item.serviceMeta));
+              } else if (newQty == 0) {
+                invoiceBloc.add(RemoveItemFromInvoice(item.item));
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('UPDATE'),
           ),
         ],
       ),

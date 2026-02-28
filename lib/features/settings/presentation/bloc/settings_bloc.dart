@@ -1,17 +1,15 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 import 'dart:typed_data';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import 'settings_state.dart';
 import '../../domain/repositories/settings_repository.dart';
 import '../../domain/services/security_service.dart';
-import 'package:crypto/crypto.dart';
-import 'dart:convert';
+import '../../../../core/utils/sharing_utils.dart';
 import '../../../../core/services/backup_service.dart';
 import '../../../../core/license/storage_service.dart';
+import '../../../../core/license/license_service.dart';
 import '../../domain/entities/user_plan.dart';
 import '../../domain/entities/settings.dart';
 
@@ -41,7 +39,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<SetSuperAdminPassword>(_onSetSuperAdminPassword);
     on<LoadBusinessLock>(_onLoadBusinessLock);
     on<LockBusinessName>(_onLockBusinessName);
-    on<UpgradeProPlan>(_onUpgradeProPlan);
     on<ResetSuperAdminAuth>((event, emit) => emit(state.copyWith(isSuperAdminAuthorized: false)));
     on<ResetSystemAuth>((event, emit) {
       debugPrint('SettingsBloc: Resetting system auth');
@@ -49,12 +46,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     });
   }
 
-  Future<void> _onUpgradeProPlan(UpgradeProPlan event, Emitter<SettingsState> emit) async {
-    final expiry = DateTime.now().add(Duration(days: event.durationDays));
-    await StorageService.saveProExpiryDate(expiry);
-    add(LoadSettings()); // Reloads plan
-    emit(state.copyWith(successMessage: 'Upgraded to Pro until ${expiry.toString().split(' ')[0]}'));
-  }
 
   Future<void> _onBackup(CreateBackup event, Emitter<SettingsState> emit) async {
     emit(state.copyWith(isExporting: true, error: null, successMessage: null));
@@ -62,17 +53,11 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       final bytes = await backupService.createBackup();
       if (bytes != null) {
         if (!kIsWeb) {
-          // On Native, save to a temp file and share
-          final tempDir = await getTemporaryDirectory();
           final timestamp = DateTime.now().millisecondsSinceEpoch;
           final fileName = 'invify_backup_$timestamp.sqlite';
-          final tempFile = File(p.join(tempDir.path, fileName));
-          await tempFile.writeAsBytes(bytes);
-          
-          await Share.shareXFiles([XFile(tempFile.path)], text: 'Invify Database Backup');
+          await SharingUtils.shareFile(bytes, fileName, text: 'Invify Database Backup');
           emit(state.copyWith(isExporting: false, successMessage: 'Backup exported successfully'));
         } else {
-          // Web download logic could go here, but for now just success
           emit(state.copyWith(isExporting: false, successMessage: 'Backup data generated (Web)'));
         }
       } else {
@@ -86,13 +71,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   Future<void> _onRestore(RestoreFromPath event, Emitter<SettingsState> emit) async {
     emit(state.copyWith(isImporting: true, error: null, successMessage: null));
     try {
-      final file = File(event.path);
-      if (!await file.exists()) {
-        emit(state.copyWith(isImporting: false, error: 'Backup file not found'));
+      final bytes = await SharingUtils.readFileBytes(event.path);
+      if (bytes == null) {
+        emit(state.copyWith(isImporting: false, error: 'Backup file not found or empty'));
         return;
       }
       
-      final bytes = await file.readAsBytes();
       final success = await backupService.syncData(bytes);
       
       if (success) {
@@ -170,14 +154,26 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   Future<UserPlan> _loadUserPlan() async {
+    // 1. Check for Lifetime status (Super Admin / Device Authorized)
     final isLifetime = await securityService.isDeviceAuthorized();
     if (isLifetime) {
       return const UserPlan(planType: 'lifetime');
     }
     
+    // 2. Check for Manual/Direct Pro status
     final proExpiry = await StorageService.getProExpiryDate();
     if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
       return UserPlan(planType: 'pro', expiryDate: proExpiry);
+    }
+
+    // 3. Check for Activation Code License
+    final settings = await repository.getSettings();
+    final license = await LicenseService.getActiveLicense(settings?.organizationName);
+    if (license != null && DateTime.now().isBefore(license.expiryDate)) {
+      return UserPlan(
+        planType: license.planType.name,
+        expiryDate: license.expiryDate,
+      );
     }
     
     return const UserPlan(planType: 'basic');

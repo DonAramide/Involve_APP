@@ -42,8 +42,8 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   void initState() {
     super.initState();
     _name = widget.item?.name ?? '';
-    _priceController.text = (widget.item?.price ?? 0.0).toString();
-    _costPriceController.text = (widget.item?.costPrice ?? 0.0).toString();
+    _priceController.text = widget.item == null ? '0' : (widget.item!.price % 1 == 0 ? widget.item!.price.toInt().toString() : widget.item!.price.toString());
+    _costPriceController.text = widget.item == null ? '0' : (widget.item!.costPrice % 1 == 0 ? widget.item!.costPrice.toInt().toString() : widget.item!.costPrice.toString());
     _stockQty = widget.item?.stockQty ?? 0;
     _legacyCategory = widget.item?.category ?? ItemCategory.drink;
     _selectedCategoryId = widget.item?.categoryId;
@@ -242,7 +242,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                     validator: (val) => InputValidator.validateNumber(val, 'Stock', allowDecimal: false),
                   ),
                   TextFormField(
-                    initialValue: _minStockLevel.toString(),
+                    initialValue: _minStockLevel % 1 == 0 ? _minStockLevel.toInt().toString() : _minStockLevel.toString(),
                     decoration: const InputDecoration(labelText: 'Min Stock Alert Level'),
                     keyboardType: TextInputType.number,
                     onSaved: (val) => _minStockLevel = double.tryParse(val ?? '0') ?? 0,

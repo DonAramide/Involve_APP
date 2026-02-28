@@ -41,10 +41,11 @@ class UpdateDiscount extends InvoiceEvent {
 
 class UpdateCustomerInfo extends InvoiceEvent {
   final String? name;
+  final String? phone;
   final String? address;
-  UpdateCustomerInfo({this.name, this.address});
+  UpdateCustomerInfo({this.name, this.phone, this.address});
   @override
-  List<Object?> get props => [name, address];
+  List<Object?> get props => [name, phone, address];
 }
 
 class UpdatePaymentMethod extends InvoiceEvent {
@@ -100,6 +101,7 @@ class InvoiceState extends Equatable {
   final bool taxEnabled;
   final bool discountEnabled;
   final String? customerName;
+  final String? customerPhone;
   final String? customerAddress;
   final String? paymentMethod;
   final int? staffId;
@@ -118,6 +120,7 @@ class InvoiceState extends Equatable {
     this.taxEnabled = true,
     this.discountEnabled = true,
     this.customerName,
+    this.customerPhone,
     this.customerAddress,
     this.paymentMethod,
     this.staffId,
@@ -137,6 +140,7 @@ class InvoiceState extends Equatable {
     bool? taxEnabled,
     bool? discountEnabled,
     String? customerName,
+    String? customerPhone,
     String? customerAddress,
     String? paymentMethod,
     int? staffId,
@@ -155,6 +159,7 @@ class InvoiceState extends Equatable {
       taxEnabled: taxEnabled ?? this.taxEnabled,
       discountEnabled: discountEnabled ?? this.discountEnabled,
       customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
       customerAddress: customerAddress ?? this.customerAddress,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       staffId: staffId ?? this.staffId,
@@ -176,6 +181,7 @@ class InvoiceState extends Equatable {
         taxEnabled,
         discountEnabled,
         customerName,
+        customerPhone,
         customerAddress,
         paymentMethod,
         staffId,

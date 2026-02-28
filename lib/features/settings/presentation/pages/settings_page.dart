@@ -212,12 +212,13 @@ class SettingsPage extends StatelessWidget {
                 ),
                 const Divider(),
                 _buildSectionHeader(context, 'Security'),
-              ListTile(
-                title: const Text('Change System Password'),
-                trailing: const Icon(Icons.lock_outline),
-                onTap: () => _showChangePassword(context),
-              ),
-            ],
+                ListTile(
+                  title: const Text('Change System Password'),
+                  trailing: const Icon(Icons.lock_outline),
+                  onTap: () => _showChangePassword(context),
+                ),
+                const SizedBox(height: 60), // Extra space at the bottom
+              ],
           );
         },
       ),
@@ -648,9 +649,11 @@ class SettingsPage extends StatelessWidget {
                 return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text('No activation history found.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Free Plan (Default)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('No active subscription found. Basic features enabled.'),
+                  leading: const Icon(Icons.stars_outlined, color: Colors.grey),
                 );
               }
 
@@ -863,13 +866,13 @@ class SettingsPage extends StatelessWidget {
   Widget _buildServiceBillingTile(BuildContext context, AppSettings settings, SettingsState state) {
     final plan = state.userPlan;
     final isProOrLifetime = plan != null && plan.isValid && (plan.isPro || plan.isLifetime);
-    final isLocked = !isProOrLifetime; // Fixed: Locked for anyone not Pro/Lifetime
+    final isLocked = !isProOrLifetime; 
 
     return ListTile(
       title: Row(
         children: [
           const Expanded(child: Text('Enable Service Billing (Hotels/Lounges)')),
-          if (isLocked && (plan == null || !plan.isValid || plan.isBasic)) ...[
+          if (isLocked) ...[
             const SizedBox(width: 8),
             const Icon(Icons.lock, size: 16, color: Colors.orange),
           ],
@@ -879,18 +882,14 @@ class SettingsPage extends StatelessWidget {
           ? const Text('Standard feature on your plan', style: TextStyle(color: Colors.green, fontSize: 12))
           : const Text('Available on Pro & Lifetime plans', style: TextStyle(color: Colors.orange, fontSize: 12)),
       trailing: Switch(
-        value: isProOrLifetime ? true : settings.serviceBillingEnabled,
-        onChanged: isProOrLifetime 
-            ? null // Mandatory, cannot be changed
-            : (isLocked 
-                ? (val) => showDialog(context: context, builder: (_) => const UpgradeDialog())
-                : (val) => _update(context, settings.copyWith(serviceBillingEnabled: val))),
+        value: settings.serviceBillingEnabled,
+        onChanged: isLocked 
+            ? (val) => showDialog(context: context, builder: (_) => const UpgradeDialog())
+            : (val) => _update(context, settings.copyWith(serviceBillingEnabled: val)),
       ),
-      onTap: isProOrLifetime
-          ? null
-          : (isLocked 
-              ? () => showDialog(context: context, builder: (_) => const UpgradeDialog())
-              : null),
+      onTap: isLocked 
+          ? () => showDialog(context: context, builder: (_) => const UpgradeDialog())
+          : null,
     );
   }
 

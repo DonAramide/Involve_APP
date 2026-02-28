@@ -288,65 +288,60 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
-      bottomNavigationBar: FutureBuilder<bool>(
-            future: LicenseService.isActivated(settings?.organizationName),
-            builder: (context, snapshot) {
-              if (snapshot.data == true) return const SizedBox.shrink();
-              
-              return FutureBuilder<int>(
-                future: LicenseService.getTrialDaysRemaining(),
-                builder: (context, trialSnapshot) {
-                  if (!trialSnapshot.hasData || trialSnapshot.data == 0) return const SizedBox.shrink();
-                  
-                  return Container(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Colors.orange, Colors.deepOrange],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+      bottomNavigationBar: (settingsState.userPlan?.isValid ?? false) 
+          ? const SizedBox.shrink()
+          : FutureBuilder<int>(
+              future: LicenseService.getTrialDaysRemaining(),
+              builder: (context, trialSnapshot) {
+                if (!trialSnapshot.hasData || trialSnapshot.data == 0) return const SizedBox.shrink();
+                
+                return Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Colors.orange, Colors.deepOrange],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, -2)),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.timer_outlined, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'TRIAL VERSION: ${trialSnapshot.data} DAYS REMAINING',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            letterSpacing: 1.1,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, -2)),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.timer_outlined, color: Colors.white, size: 18),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            'TRIAL VERSION: ${trialSnapshot.data} DAYS REMAINING',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              letterSpacing: 1.1,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ActivationPage())),
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                          minimumSize: const Size(0, 24),
                         ),
-                        const SizedBox(width: 12),
-                        TextButton(
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ActivationPage())),
-                          style: TextButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                            minimumSize: const Size(0, 24),
-                          ),
-                          child: const Text(
-                            'ACTIVATE',
-                            style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 10),
-                          ),
+                        child: const Text(
+                          'ACTIVATE',
+                          style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 10),
                         ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-          ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
         );
       },
     );

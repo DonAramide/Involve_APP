@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/settings_bloc.dart';
-import '../bloc/settings_state.dart';
+import '../../../activation/presentation/pages/activation_page.dart';
 
 class UpgradeDialog extends StatelessWidget {
   const UpgradeDialog({super.key});
@@ -41,11 +39,10 @@ class UpgradeDialog extends StatelessWidget {
             foregroundColor: Colors.black,
           ),
           onPressed: () {
-            // Simulate upgrade
-            context.read<SettingsBloc>().add(UpgradeProPlan(durationDays: 30));
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Welcome to Pro! Feature Unlocked.')),
+            Navigator.pop(context); // Close dialog
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ActivationPage()),
             );
           },
           child: const Text('UPGRADE NOW'),

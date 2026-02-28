@@ -89,12 +89,6 @@ class LoadBusinessLock extends SettingsEvent {}
 
 class LockBusinessName extends SettingsEvent {}
 
-class UpgradeProPlan extends SettingsEvent {
-  final int durationDays;
-  UpgradeProPlan({this.durationDays = 30});
-  @override
-  List<Object?> get props => [durationDays];
-}
 
 class SettingsState extends Equatable {
   final AppSettings? settings;

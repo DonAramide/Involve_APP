@@ -383,6 +383,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
   void _showItemDialog(BuildContext context, {Item? item}) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (_) => ItemFormDialog(item: item, stockBloc: context.read<StockBloc>()),
     );
   }

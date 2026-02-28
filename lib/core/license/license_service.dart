@@ -60,6 +60,17 @@ class LicenseService {
   }
 
   static Future<bool> isActivated(String? currentBusinessName) async {
+    // 1. Check for Manual/Direct Pro status
+    final proExpiry = await StorageService.getProExpiryDate();
+    if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
+      return true;
+    }
+
+    // 2. Check for Lifetime status
+    final isLifetime = await StorageService.isBusinessNameLocked(); // Simplistic check for now, can be improved
+    // Note: isDeviceAuthorized is better for lifetime, but it's in SecurityService
+
+    // 3. Check for Activation Code License
     final license = await getActiveLicense(currentBusinessName);
     if (license == null) return false;
     
