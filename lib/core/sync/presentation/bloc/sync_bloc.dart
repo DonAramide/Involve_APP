@@ -155,13 +155,6 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     on<SyncWithPeerTriggered>(_onSyncWithPeer);
     on<SyncStatusChanged>(_onStatusChanged);
     on<RestartDiscovery>(_onRestartDiscovery);
-    on<StopDiscoveryRequested>((event, emit) {
-      discoveryService.stopDiscovery();
-      bluetoothDiscoveryService.stopDiscovery();
-      _peerSubscription?.cancel();
-      syncManager.stop();
-      emit(state.copyWith(isDiscoveryRunning: false, peers: []));
-    });
   }
 
   Future<void> _onInitialize(InitializeSync event, Emitter<SyncState> emit) async {
@@ -279,8 +272,11 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
   }
 
   Future<void> _onStopDiscovery(StopDiscoveryRequested event, Emitter<SyncState> emit) async {
-    // Handled in constructor for better closure management if needed, 
-    // but keep this for backward compatibility if any other logic is added.
+    discoveryService.stopDiscovery();
+    bluetoothDiscoveryService.stopDiscovery();
+    _peerSubscription?.cancel();
+    syncManager.stop();
+    emit(state.copyWith(isDiscoveryRunning: false, peers: []));
   }
 
   Future<void> _onRestartDiscovery(RestartDiscovery event, Emitter<SyncState> emit) async {
