@@ -37,7 +37,6 @@ class BluetoothDiscoveryServiceNative implements BluetoothDiscoveryService {
           );
           _peers[peer.deviceId] = peer;
           _peerController.add(_peers.values.toList());
-        }
       }
     });
 
