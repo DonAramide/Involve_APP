@@ -354,6 +354,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       return false;
     }
     
+    final now = DateTime.now();
+    final expectedDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+
     final dateStr = parts[0]; // YYYYMMDD
     final timeStr = parts[1]; // HHmm
     final password = parts[2];
@@ -382,8 +385,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     debugPrint('✅ Access Key correct');
     
     // Validate date (current date)
-    final now = DateTime.now();
-    final expectedDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     if (dateStr != expectedDate) {
       debugPrint('❌ Date mismatch. Expected: $expectedDate, Got: $dateStr');
       _logRecommendedCode(now, expectedDate);
