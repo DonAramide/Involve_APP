@@ -128,9 +128,6 @@ class _PasswordDialogState extends State<PasswordDialog> {
               decoration: InputDecoration(
                 labelText: _isLocked ? 'Unlock Code' : 'System Password',
                 hintText: null,
-                helperText: _isLocked 
-                  ? 'Unlock Code: ${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}/${DateTime.now().hour.toString().padLeft(2, '0')}${DateTime.now().minute.toString().padLeft(2, '0')}/admin123invify' 
-                  : null,
                 errorText: null, // Clear default error text
               ),
             ),
