@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -40,11 +41,24 @@ class InvoiceHistoryPage extends StatefulWidget {
 class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   DateTimeRange? _selectedRange;
   bool _isTableView = false;
+  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() => setState(() {}));
+    _amountController.addListener(() => setState(() {}));
     context.read<HistoryBloc>().add(LoadHistory());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _amountController.dispose();
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 
   @override
@@ -255,55 +269,89 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
 
   Widget _buildSearchField(BuildContext context, HistoryState state, double? currentAmount) {
     return TextField(
-      decoration: const InputDecoration(
+      controller: _searchController,
+      decoration: InputDecoration(
         hintText: 'Search Invoice ID',
-        prefixIcon: Icon(Icons.search),
-        border: OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.search),
+        border: const OutlineInputBorder(),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        suffixIcon: _searchController.text.isNotEmpty 
+          ? IconButton(
+              icon: const Icon(Icons.clear, size: 18),
+              onPressed: () {
+                _searchController.clear();
+                _triggerSearch(context, state, currentAmount, '');
+              },
+            )
+          : null,
       ),
       onChanged: (value) {
-        context.read<HistoryBloc>().add(LoadHistory(
-          start: _selectedRange?.start,
-          end: _selectedRange?.end,
-          query: value,
-          amount: currentAmount,
-          paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
-          paymentStatus: state is HistoryLoaded ? state.paymentStatus : null,
-          staffId: state is HistoryLoaded ? state.staffId : null,
-        ));
+        if (_searchDebounce?.isActive ?? false) _searchDebounce?.cancel();
+        _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+          _triggerSearch(context, state, currentAmount, value);
+        });
       },
     );
   }
 
+  void _triggerSearch(BuildContext context, HistoryState state, double? currentAmount, String value) {
+    context.read<HistoryBloc>().add(LoadHistory(
+      start: _selectedRange?.start,
+      end: _selectedRange?.end,
+      query: value,
+      amount: currentAmount,
+      paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
+      paymentStatus: state is HistoryLoaded ? state.paymentStatus : null,
+      staffId: state is HistoryLoaded ? state.staffId : null,
+    ));
+  }
+
   Widget _buildAmountField(BuildContext context, HistoryState state, String currentQuery) {
     return TextField(
+      controller: _amountController,
       keyboardType: TextInputType.number,
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         hintText: 'Amount',
-        prefixIcon: Padding(
+        prefixIcon: const Padding(
           padding: EdgeInsets.all(12),
           child: Text('₦', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         ),
-        border: OutlineInputBorder(),
+        border: const OutlineInputBorder(),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: EdgeInsets.symmetric(horizontal: 12),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        suffixIcon: _amountController.text.isNotEmpty 
+          ? IconButton(
+              icon: const Icon(Icons.clear, size: 18),
+              onPressed: () {
+                _amountController.clear();
+                _triggerAmountFilter(context, state, currentQuery, null);
+              },
+            )
+          : null,
       ),
       onChanged: (value) {
-        final amount = double.tryParse(value);
-        context.read<HistoryBloc>().add(LoadHistory(
-          start: _selectedRange?.start,
-          end: _selectedRange?.end,
-          query: currentQuery,
-          amount: amount,
-          paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
-          paymentStatus: state is HistoryLoaded ? state.paymentStatus : null,
-          staffId: state is HistoryLoaded ? state.staffId : null,
-        ));
+        if (_searchDebounce?.isActive ?? false) _searchDebounce?.cancel();
+        _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+          final amount = double.tryParse(value);
+          _triggerAmountFilter(context, state, currentQuery, amount);
+        });
       },
     );
+  }
+
+  void _triggerAmountFilter(BuildContext context, HistoryState state, String currentQuery, double? amount) {
+    context.read<HistoryBloc>().add(LoadHistory(
+      start: _selectedRange?.start,
+      end: _selectedRange?.end,
+      query: currentQuery,
+      amount: amount,
+      paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
+      paymentStatus: state is HistoryLoaded ? state.paymentStatus : null,
+      staffId: state is HistoryLoaded ? state.staffId : null,
+    ));
   }
 
   Widget _buildInvoiceCard(BuildContext context, Invoice invoice) {

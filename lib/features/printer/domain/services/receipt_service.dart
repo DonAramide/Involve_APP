@@ -33,14 +33,14 @@ class ReceiptService {
       }
     }
 
-    if (template == 'classic') {
+    if (template == 'classic_a4') {
       return _generateClassicA4(pdf, invoice, settings, logoImage, useCustomPrices);
     }
 
-    return _generateThermalRoll(pdf, invoice, settings, logoImage, useCustomPrices);
+    return _generateThermalRoll(pdf, invoice, settings, logoImage, useCustomPrices, template: template);
   }
 
-  Future<Uint8List> _generateThermalRoll(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices) async {
+  Future<Uint8List> _generateThermalRoll(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? template}) async {
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 
     pdf.addPage(
@@ -66,13 +66,30 @@ class ReceiptService {
               if (settings.taxId != null && settings.taxId!.isNotEmpty) pw.Text('Tax ID: ${settings.taxId}'),
               pw.Divider(),
               
+              if (template == 'classic' || template == 'professional' || template == 'detailed') ...[
+                pw.Align(
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('BILL TO:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      pw.Text(invoice.customerName ?? 'Valued Customer'),
+                      if (invoice.customerPhone != null) pw.Text('Tel: ${invoice.customerPhone}'),
+                    ],
+                  ),
+                ),
+                pw.Divider(),
+              ],
+              
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('Invoice #${invoice.invoiceNumber}'),
+                  pw.Text('Invoice #${invoice.invoiceNumber}', style: pw.TextStyle(fontWeight: (template == 'classic' || template == 'professional') ? pw.FontWeight.bold : pw.FontWeight.normal)),
                   pw.Text(dateFormat.format(invoice.dateCreated)),
                 ],
               ),
+              if (invoice.staffName != null && (template == 'classic' || template == 'professional'))
+                pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Sold By: ${invoice.staffName!.toUpperCase()}')),
               pw.Divider(),
               
               pw.Table(

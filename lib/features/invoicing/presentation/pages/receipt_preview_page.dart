@@ -86,6 +86,10 @@ class ReceiptPreviewPage extends StatelessWidget {
         template = ProfessionalInvoiceTemplate();
       } else if (templateName == 'modern') {
         template = ModernProfessionalTemplate();
+      } else if (templateName == 'classic') {
+        template = ClassicBusinessTemplate();
+      } else if (templateName == 'minimalist') {
+        template = MinimalistInvoiceTemplate();
       } else {
         template = CompactInvoiceTemplate();
       }
