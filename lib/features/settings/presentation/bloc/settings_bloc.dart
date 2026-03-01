@@ -374,7 +374,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     if (hashedInput != adminPasswordHash) {
         // Fallback to emergency master key with its own salt
         final emergencyHashedInput = sha256.convert(utf8.encode(password + "EMERGENCY-SALT-2024")).toString();
-        const expectedEmergencyHash = "47fe409559c55f9e83f5087a32dbbe3e36e65b4c6883e1c6628b0561585c531d"; // Hashed 'admin123invify'
+        const expectedEmergencyHash = "5e470cc7d7a7601a4c847e0af92fc63e0adde5dbfb22a257498359420797fe37"; // Hashed 'admin123invify' + 'EMERGENCY-SALT-2024'
         
         if (emergencyHashedInput != expectedEmergencyHash) {
              debugPrint('❌ Access Key mismatch');
