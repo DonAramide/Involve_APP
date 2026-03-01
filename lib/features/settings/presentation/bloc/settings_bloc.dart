@@ -403,6 +403,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     
     if (timeDifference > 10) {
       debugPrint('❌ Time difference too large (>10 minutes)');
+      final expectedCode = '$expectedDate/${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}/admin123invify';
+      debugPrint('💡 Recommended Code: $expectedCode');
       return false;
     }
     
