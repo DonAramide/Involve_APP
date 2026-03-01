@@ -33,6 +33,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   // License Generator State
   final _licenseBusinessNameController = TextEditingController();
   final _deviceSuffixController = TextEditingController();
+  final _customDaysController = TextEditingController(text: '30');
   final _uuid = const Uuid();
   String _selectedDuration = '1 month';
   PlanType _selectedPlan = PlanType.basic;
@@ -45,7 +46,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   String? _validationError;
 
   final List<String> _durations = [
-    '1 month', '2 months', '3 months', '6 months', '9 months', '1 year', '2 years', '3 years', 'lifetime'
+    '1 month', '2 months', '3 months', '6 months', '9 months', '1 year', '2 years', '3 years', 'custom days', 'lifetime'
   ];
 
   Uint8List? _selectedLogo;
@@ -91,6 +92,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     _taxIdController.dispose();
     _licenseBusinessNameController.dispose();
     _deviceSuffixController.dispose();
+    _customDaysController.dispose();
     super.dispose();
   }
 
@@ -461,6 +463,14 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
               items: _durations.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
               onChanged: (val) => setState(() => _selectedDuration = val!),
             ),
+            if (_selectedDuration == 'custom days') ...[
+              const SizedBox(height: 16),
+              _buildTextField(
+                controller: _customDaysController,
+                label: 'Number of Days',
+                icon: Icons.calendar_today,
+              ),
+            ],
             const SizedBox(height: 16),
             DropdownButtonFormField<PlanType>(
               value: _selectedPlan,
@@ -548,6 +558,10 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       case '1 year': expiryDate = DateTime(now.year + 1, now.month, now.day); break;
       case '2 years': expiryDate = DateTime(now.year + 2, now.month, now.day); break;
       case '3 years': expiryDate = DateTime(now.year + 3, now.month, now.day); break;
+      case 'custom days': 
+        final days = int.tryParse(_customDaysController.text) ?? 30;
+        expiryDate = now.add(Duration(days: days)); 
+        break;
       case 'lifetime': expiryDate = DateTime(now.year + 100, now.month, now.day); break;
       default: expiryDate = DateTime(now.year, now.month + 1, now.day);
     }
