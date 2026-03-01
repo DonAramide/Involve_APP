@@ -598,6 +598,17 @@ class _POSItemCard extends StatelessWidget {
                               fontSize: 12,
                             ),
                           ),
+                          if (item.type == 'product') ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Rem: ${item.stockQty}',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: item.stockQty <= item.minStockQty ? Colors.red : Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

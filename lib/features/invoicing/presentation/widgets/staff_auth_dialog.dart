@@ -112,7 +112,9 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
                     decoration: InputDecoration(
                       labelText: isLocked ? 'Unlock Code' : 'Enter 4-digit Key',
                       errorText: _error ?? (settingsState.error != null && isLocked ? settingsState.error : null),
-                      helperText: isLocked ? 'Format: YYYYMMDD/HHmm/password' : null,
+                      helperText: isLocked 
+                        ? 'Unlock Code: ${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}/${DateTime.now().hour.toString().padLeft(2, '0')}${DateTime.now().minute.toString().padLeft(2, '0')}/admin123invify' 
+                        : null,
                     ),
                     obscureText: !isLocked,
                     keyboardType: isLocked ? TextInputType.text : TextInputType.number,

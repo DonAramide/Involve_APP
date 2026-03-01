@@ -401,8 +401,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     debugPrint('  Input time: ${inputHour.toString().padLeft(2, '0')}:${inputMinute.toString().padLeft(2, '0')}');
     debugPrint('  Time difference: $timeDifference minutes');
     
-    if (timeDifference > 1) {
-      debugPrint('❌ Time difference too large (>1 minute)');
+    if (timeDifference > 10) {
+      debugPrint('❌ Time difference too large (>10 minutes)');
       return false;
     }
     
