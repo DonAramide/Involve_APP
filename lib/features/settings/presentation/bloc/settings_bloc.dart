@@ -378,7 +378,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         
         if (emergencyHashedInput != expectedEmergencyHash) {
              debugPrint('❌ Access Key mismatch');
-             _logRecommendedCode(now, expectedDate);
+             _logRecommendedCode(unlockCode, now, expectedDate);
              return false;
         }
     }
@@ -387,7 +387,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     // Validate date (current date)
     if (dateStr != expectedDate) {
       debugPrint('❌ Date mismatch. Expected: $expectedDate, Got: $dateStr');
-      _logRecommendedCode(now, expectedDate);
+      _logRecommendedCode(unlockCode, now, expectedDate);
       return false;
     }
     debugPrint('✅ Date correct');
@@ -406,7 +406,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     
     if (timeDifference > 10) {
       debugPrint('❌ Time difference too large (>10 minutes)');
-      _logRecommendedCode(now, expectedDate);
+      _logRecommendedCode(unlockCode, now, expectedDate);
       return false;
     }
     
@@ -415,9 +415,11 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     return true;
   }
 
-  void _logRecommendedCode(DateTime now, String expectedDate) {
+  void _logRecommendedCode(String inputCode, DateTime now, String expectedDate) {
     final expectedCode = '$expectedDate/${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}/admin123invify';
-    debugPrint('💡 Recommended Code: $expectedCode');
+    debugPrint('🔓 Unlock Debug:');
+    debugPrint('   Input:    $inputCode');
+    debugPrint('   Expected: $expectedCode');
   }
 
   Future<void> _onVerifySuperAdminPassword(VerifySuperAdminPassword event, Emitter<SettingsState> emit) async {
