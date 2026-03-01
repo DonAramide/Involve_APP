@@ -154,6 +154,8 @@ class SyncRepositoryImpl implements SyncRepository {
         discountAmount: Value(remote.discountAmount),
         totalAmount: Value(remote.totalAmount),
         paymentStatus: Value(remote.paymentStatus),
+        amountPaid: Value(remote.amountPaid),
+        balanceAmount: Value(remote.balanceAmount),
         customerName: Value(remote.customerName),
         customerAddress: Value(remote.customerAddress),
         paymentMethod: Value(remote.paymentMethod),
@@ -164,6 +166,7 @@ class SyncRepositoryImpl implements SyncRepository {
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
+        totalPrintAmount: Value(remote.totalPrintAmount),
       ));
       return localId;
     } else if (remote.updatedAt?.isAfter(
@@ -180,6 +183,8 @@ class SyncRepositoryImpl implements SyncRepository {
         discountAmount: Value(remote.discountAmount),
         totalAmount: Value(remote.totalAmount),
         paymentStatus: Value(remote.paymentStatus),
+        amountPaid: Value(remote.amountPaid),
+        balanceAmount: Value(remote.balanceAmount),
         customerName: Value(remote.customerName),
         customerAddress: Value(remote.customerAddress),
         paymentMethod: Value(remote.paymentMethod),
@@ -190,6 +195,7 @@ class SyncRepositoryImpl implements SyncRepository {
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
+        totalPrintAmount: Value(remote.totalPrintAmount),
       ));
       return existing.id;
     }
