@@ -116,10 +116,19 @@ class DeviceSyncPage extends StatelessWidget {
                           if (state.isDiscoveryRunning) ...[
                             const SizedBox(height: 24),
                             const CircularProgressIndicator(strokeWidth: 3),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'Scanning for nearby devices...',
-                              style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.w500),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.wifi, size: 16, color: Colors.blue.withOpacity(0.7)),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Scanning via Wi-Fi & Bluetooth...',
+                                  style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(Icons.bluetooth, size: 16, color: Colors.blue.withOpacity(0.7)),
+                              ],
                             ),
                           ],
                         ],

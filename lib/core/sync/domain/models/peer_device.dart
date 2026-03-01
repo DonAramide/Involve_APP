@@ -77,5 +77,5 @@ class PeerDevice extends Equatable {
   }
 
   @override
-  List<Object?> get props => [deviceId, deviceName, ip, port, isMaster, authToken, lastSeen];
+  List<Object?> get props => [deviceId, deviceName, ip, port, isBluetooth, isMaster, authToken, lastSeen];
 }

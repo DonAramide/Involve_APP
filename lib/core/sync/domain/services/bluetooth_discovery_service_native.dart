@@ -26,8 +26,8 @@ class BluetoothDiscoveryServiceNative implements BluetoothDiscoveryService {
     // 2. Start Scanning
     _scanSubscription = FlutterBluePlus.onScanResults.listen((results) {
       for (ScanResult r in results) {
-        if (r.device.platformName.contains('Device')) { // Simple filtering for now
-          final peer = PeerDevice(
+        // Remove restrictive "Device" name filter to see all possible peers
+        final peer = PeerDevice(
             deviceId: r.device.remoteId.str,
             deviceName: r.device.platformName.isEmpty ? 'Unknown BLE' : r.device.platformName,
             bluetoothId: r.device.remoteId.str,

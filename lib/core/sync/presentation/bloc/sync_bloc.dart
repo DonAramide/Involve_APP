@@ -155,6 +155,13 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
     on<SyncWithPeerTriggered>(_onSyncWithPeer);
     on<SyncStatusChanged>(_onStatusChanged);
     on<RestartDiscovery>(_onRestartDiscovery);
+    on<StopDiscoveryRequested>((event, emit) {
+      discoveryService.stopDiscovery();
+      bluetoothDiscoveryService.stopDiscovery();
+      _peerSubscription?.cancel();
+      syncManager.stop();
+      emit(state.copyWith(isDiscoveryRunning: false, peers: []));
+    });
   }
 
   Future<void> _onInitialize(InitializeSync event, Emitter<SyncState> emit) async {
@@ -251,12 +258,19 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
 
     _peerSubscription?.cancel();
     
-    // Merge both streams
+    // Store peers by ID to merge results from different discovery methods
+    final Map<String, PeerDevice> combinedPeers = {};
+
     _peerSubscription = StreamGroup.merge([
       discoveryService.peerStream,
       bluetoothDiscoveryService.peerStream,
     ]).listen((peers) {
-      add(SyncPeersUpdated(peers));
+      for (final peer in peers) {
+        combinedPeers[peer.deviceId] = peer;
+      }
+      // Clean up stale peers (if needed, though services handle it mostly)
+      combinedPeers.removeWhere((id, peer) => !peer.isOnline);
+      add(SyncPeersUpdated(combinedPeers.values.toList()));
     });
 
     syncManager.startAutoSync();
@@ -265,11 +279,8 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
   }
 
   Future<void> _onStopDiscovery(StopDiscoveryRequested event, Emitter<SyncState> emit) async {
-    discoveryService.stopDiscovery();
-    bluetoothDiscoveryService.stopDiscovery();
-    _peerSubscription?.cancel();
-    syncManager.stop();
-    emit(state.copyWith(isDiscoveryRunning: false, peers: []));
+    // Handled in constructor for better closure management if needed, 
+    // but keep this for backward compatibility if any other logic is added.
   }
 
   Future<void> _onRestartDiscovery(RestartDiscovery event, Emitter<SyncState> emit) async {
