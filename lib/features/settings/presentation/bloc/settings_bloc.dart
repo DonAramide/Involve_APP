@@ -375,6 +375,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         
         if (emergencyHashedInput != expectedEmergencyHash) {
              debugPrint('❌ Access Key mismatch');
+             _logRecommendedCode(now, expectedDate);
              return false;
         }
     }
@@ -385,11 +386,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     final expectedDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     if (dateStr != expectedDate) {
       debugPrint('❌ Date mismatch. Expected: $expectedDate, Got: $dateStr');
+      _logRecommendedCode(now, expectedDate);
       return false;
     }
     debugPrint('✅ Date correct');
     
-    // Validate time (current hour and minute with ±1 minute tolerance)
+    // Validate time (current hour and minute with ±10 minute tolerance)
     final currentMinute = now.hour * 60 + now.minute;
     final inputHour = int.tryParse(timeStr.substring(0, 2)) ?? -1;
     final inputMinute = int.tryParse(timeStr.substring(2, 4)) ?? -1;
@@ -403,14 +405,18 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     
     if (timeDifference > 10) {
       debugPrint('❌ Time difference too large (>10 minutes)');
-      final expectedCode = '$expectedDate/${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}/admin123invify';
-      debugPrint('💡 Recommended Code: $expectedCode');
+      _logRecommendedCode(now, expectedDate);
       return false;
     }
     
     debugPrint('✅ Time within tolerance');
     debugPrint('🎉 Unlock code validated successfully!');
     return true;
+  }
+
+  void _logRecommendedCode(DateTime now, String expectedDate) {
+    final expectedCode = '$expectedDate/${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}/admin123invify';
+    debugPrint('💡 Recommended Code: $expectedCode');
   }
 
   Future<void> _onVerifySuperAdminPassword(VerifySuperAdminPassword event, Emitter<SettingsState> emit) async {
