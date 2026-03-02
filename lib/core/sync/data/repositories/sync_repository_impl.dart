@@ -167,6 +167,11 @@ class SyncRepositoryImpl implements SyncRepository {
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
         totalPrintAmount: Value(remote.totalPrintAmount),
+        businessMode: Value(remote.businessMode),
+        studentId: Value(remote.studentId),
+        classId: Value(remote.classId),
+        termId: Value(remote.termId),
+        academicYearId: Value(remote.academicYearId),
       ));
       return localId;
     } else if (remote.updatedAt?.isAfter(
@@ -196,6 +201,11 @@ class SyncRepositoryImpl implements SyncRepository {
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
         totalPrintAmount: Value(remote.totalPrintAmount),
+        businessMode: Value(remote.businessMode),
+        studentId: Value(remote.studentId),
+        classId: Value(remote.classId),
+        termId: Value(remote.termId),
+        academicYearId: Value(remote.academicYearId),
       ));
       return existing.id;
     }
@@ -273,6 +283,7 @@ class SyncRepositoryImpl implements SyncRepository {
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
+        businessMode: Value(remote.businessMode),
       ));
     } else if (remote.updatedAt?.isAfter(
             existing.updatedAt ??
@@ -295,6 +306,7 @@ class SyncRepositoryImpl implements SyncRepository {
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
+        businessMode: Value(remote.businessMode),
       ));
     }
   }
@@ -315,6 +327,7 @@ class SyncRepositoryImpl implements SyncRepository {
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
+        businessMode: Value(remote.businessMode ?? 'retail'),
       ));
     } else if (remote.updatedAt?.isAfter(
             existing.updatedAt ??
@@ -328,6 +341,7 @@ class SyncRepositoryImpl implements SyncRepository {
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
+        businessMode: Value(remote.businessMode ?? 'retail'),
       ));
     }
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/bloc/invoice_state.dart';
-import '../../domain/entities/invoice.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
@@ -16,6 +16,9 @@ import 'package:involve_app/features/invoicing/domain/repositories/invoice_repos
 import 'package:involve_app/features/settings/domain/entities/staff.dart';
 import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_dialog.dart';
 import 'dart:convert';
+import 'package:involve_app/core/utils/terminology.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 
 class CreateInvoicePage extends StatefulWidget {
   const CreateInvoicePage({super.key});
@@ -42,6 +45,9 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
               context.read<InvoiceBloc>().state.staffId == null) {
             _showStaffAuth(context);
           }
+
+          // Set business mode in bloc
+          context.read<InvoiceBloc>().add(UpdateBusinessMode(settings.businessMode));
         }
       }
     });
@@ -51,8 +57,12 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('NEW INVOICE',
-            style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        title: BlocBuilder<SettingsBloc, SettingsState>(
+          builder: (context, state) => Text(
+            state.settings?.newSaleLabel ?? 'NEW INVOICE',
+            style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+          ),
+        ),
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -171,7 +181,6 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
     }
   }
 }
-
 class _MobileCartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -299,7 +308,7 @@ class _ItemSelectorState extends State<_ItemSelector> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Search products...',
+                    hintText: settings?.searchItemsHint ?? 'Search products...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
@@ -347,7 +356,7 @@ class _ItemSelectorState extends State<_ItemSelector> {
                             const SizedBox(height: 16),
                             Text(
                               _searchQuery.isNotEmpty
-                                  ? 'No products found for "$_searchQuery"'
+                                  ? '${settings?.noItemsFound ?? 'No items found'} for "$_searchQuery"'
                                   : 'No items in this category.',
                               style: TextStyle(color: Colors.grey[600]),
                             ),
@@ -909,6 +918,10 @@ class _CartSummary extends StatelessWidget {
                       trailing: const Icon(Icons.edit, size: 16),
                       onTap: () => _showCustomerDialog(context, state.customerName, state.customerPhone, state.customerAddress),
                     ),
+                    if (settings?.businessMode == 'school') ...[
+                      const Divider(),
+                      _buildSchoolInfoTile(context, state),
+                    ],
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
@@ -975,6 +988,45 @@ class _CartSummary extends StatelessWidget {
     );
   }
 
+  Widget _buildSchoolInfoTile(BuildContext context, InvoiceState state) {
+    return BlocBuilder<SchoolBloc, SchoolState>(
+      builder: (context, schoolState) {
+        final activeYear = schoolState.activeYear;
+        final activeTerm = schoolState.terms.where((t) => t.isActive).firstOrNull ?? schoolState.terms.firstOrNull;
+        
+        // Auto-update bloc if not set
+        if (state.academicYearId == null && activeYear != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+             context.read<InvoiceBloc>().add(UpdateSchoolInfo(
+               academicYearId: activeYear.id,
+               termId: activeTerm?.id,
+             ));
+          });
+        }
+
+        return Column(
+          children: [
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(activeYear != null ? 'Year: ${activeYear.name}' : 'No Active Year'),
+              subtitle: Text(activeTerm != null ? 'Term: ${activeTerm.name}' : 'No Active Term'),
+              leading: const Icon(Icons.calendar_today, size: 20),
+              trailing: const Icon(Icons.settings, size: 16),
+              onTap: () => _showSchoolSetupWarning(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSchoolSetupWarning(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Change academic year/term in Academic Setup.')),
+    );
+  }
+
   void _showDiscountDialog(BuildContext context, double currentDiscount) {
     final controller = TextEditingController(text: currentDiscount > 0 ? currentDiscount.toString() : '');
     final invoiceBloc = context.read<InvoiceBloc>();
@@ -1023,152 +1075,8 @@ class _CartSummary extends StatelessWidget {
       ),
     );
   }
-
-  void _showCustomerDialog(BuildContext context, String? currentName, String? currentPhone, String? currentAddress) {
-    final nameController = TextEditingController(text: currentName);
-    final phoneController = TextEditingController(text: currentPhone);
-    final addrController = TextEditingController(text: currentAddress);
-    final invoiceBloc = context.read<InvoiceBloc>();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Customer Information'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder()),
-              autofocus: true,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneController,
-              decoration: const InputDecoration(labelText: 'Customer Phone', border: OutlineInputBorder()),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: addrController,
-              decoration: const InputDecoration(labelText: 'Customer Address', border: OutlineInputBorder()),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              invoiceBloc.add(UpdateCustomerInfo(
-                name: nameController.text.isEmpty ? null : nameController.text,
-                phone: phoneController.text.isEmpty ? null : phoneController.text,
-                address: addrController.text.isEmpty ? null : addrController.text,
-              ));
-              Navigator.pop(ctx);
-            },
-            child: const Text('SAVE'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showQuantityDialog(BuildContext context, InvoiceItem item) {
-    final controller = TextEditingController(text: item.quantity.toString());
-    final invoiceBloc = context.read<InvoiceBloc>();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Update Quantity: ${item.item.name}'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Quantity',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              final newQty = int.tryParse(controller.text);
-              if (newQty != null && newQty > 0) {
-                // To set exact quantity, we calculate the difference
-                final diff = newQty - item.quantity;
-                invoiceBloc.add(AddItemToInvoice(item.item, diff, serviceMeta: item.serviceMeta));
-              } else if (newQty == 0) {
-                invoiceBloc.add(RemoveItemFromInvoice(item.item));
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('UPDATE'),
-          ),
-        ],
-      ),
-    );
-  }
-  void _showPrintPriceDialog(BuildContext context, InvoiceItem item, String currency) {
-    final controller = TextEditingController(
-      text: item.printPrice != null ? item.printPrice.toString() : item.unitPrice.toString(),
-    );
-    final invoiceBloc = context.read<InvoiceBloc>();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Custom Receipt Price'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Enter the price you want to show ON THE RECEIPT for this item.'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Receipt Price ($currency)',
-                border: const OutlineInputBorder(),
-                prefixText: currency,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Real Price: ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: currency)}',
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          if (item.printPrice != null)
-            TextButton(
-              onPressed: () {
-                invoiceBloc.add(UpdateItemPrintPrice(item.item.id!, null));
-                Navigator.pop(ctx);
-              },
-              child: const Text('RESET', style: TextStyle(color: Colors.red)),
-            ),
-          ElevatedButton(
-            onPressed: () {
-              final newPrice = double.tryParse(controller.text);
-              if (newPrice != null) {
-                invoiceBloc.add(UpdateItemPrintPrice(item.item.id!, newPrice));
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('SET PRICE'),
-          ),
-        ],
-      ),
-    );
-  }
 }
+
 
 class _ServiceDetailsText extends StatelessWidget {
   final String serviceMeta;
@@ -1198,4 +1106,224 @@ class _ServiceDetailsText extends StatelessWidget {
   String _formatDate(DateTime dt) {
     return dt.toString().substring(0, 16); // YYYY-MM-DD HH:MM
   }
+}
+
+void _showCustomerDialog(BuildContext context, String? currentName, String? currentPhone, String? currentAddress) {
+  final settings = context.read<SettingsBloc>().state.settings;
+  if (settings?.businessMode == 'school') {
+    _showStudentPicker(context);
+    return;
+  }
+  
+  final nameController = TextEditingController(text: currentName);
+  final phoneController = TextEditingController(text: currentPhone);
+  final addrController = TextEditingController(text: currentAddress);
+  final invoiceBloc = context.read<InvoiceBloc>();
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Customer Information'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nameController,
+            decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder()),
+            autofocus: true,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: phoneController,
+            decoration: const InputDecoration(labelText: 'Customer Phone', border: OutlineInputBorder()),
+            keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: addrController,
+            decoration: const InputDecoration(labelText: 'Customer Address', border: OutlineInputBorder()),
+            maxLines: 2,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+        ElevatedButton(
+          onPressed: () {
+            invoiceBloc.add(UpdateCustomerInfo(
+              name: nameController.text.isEmpty ? null : nameController.text,
+              phone: phoneController.text.isEmpty ? null : phoneController.text,
+              address: addrController.text.isEmpty ? null : addrController.text,
+            ));
+            Navigator.pop(ctx);
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showStudentPicker(BuildContext context) {
+  final invoiceBloc = context.read<InvoiceBloc>();
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => Container(
+      padding: const EdgeInsets.all(16),
+      height: MediaQuery.of(context).size.height * 0.7,
+      child: Column(
+        children: [
+          const Text('Select Student', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: BlocBuilder<SchoolBloc, SchoolState>(
+              builder: (context, state) {
+                if (state.isLoading) return const Center(child: CircularProgressIndicator());
+                if (state.students.isEmpty) return const Center(child: Text('No students found. Add students first.'));
+                
+                return ListView.builder(
+                  itemCount: state.students.length,
+                  itemBuilder: (context, index) {
+                    final student = state.students[index];
+                    return ListTile(
+                      leading: const CircleAvatar(child: Icon(Icons.person)),
+                      title: Text(student.fullName),
+                      subtitle: Text('ID: ${student.admissionNumber ?? 'N/A'}'),
+                      onTap: () {
+                        invoiceBloc.add(UpdateCustomerInfo(
+                          name: student.fullName,
+                          phone: student.parentPhone,
+                        ));
+                        invoiceBloc.add(UpdateSchoolInfo(
+                          studentId: student.id,
+                          classId: student.classId,
+                        ));
+                        
+                        // Carry Forward Logic
+                        if (student.balance > 0) {
+                          // Check if already added
+                          final hasBalanceItem = invoiceBloc.state.items.any((i) => i.item.name == 'Previous Term Balance');
+                          if (!hasBalanceItem) {
+                            invoiceBloc.add(AddItemToInvoice(
+                              Item(
+                                id: -1, // Temporary ID for virtual item
+                                name: 'Previous Term Balance',
+                                price: student.balance,
+                                category: ItemCategory.service,
+                                type: 'service',
+                                stockQty: 0,
+                              ),
+                              1,
+                            ));
+                          }
+                        }
+                        Navigator.pop(ctx);
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+void _showQuantityDialog(BuildContext context, InvoiceItem item) {
+  final controller = TextEditingController(text: item.quantity.toString());
+  final invoiceBloc = context.read<InvoiceBloc>();
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text('Update Quantity: ${item.item.name}'),
+      content: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Quantity',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+        ElevatedButton(
+          onPressed: () {
+            final newQty = int.tryParse(controller.text);
+            if (newQty != null && newQty > 0) {
+              // To set exact quantity, we calculate the difference
+              final diff = newQty - item.quantity;
+              invoiceBloc.add(AddItemToInvoice(item.item, diff, serviceMeta: item.serviceMeta));
+            } else if (newQty == 0) {
+              invoiceBloc.add(RemoveItemFromInvoice(item.item));
+            }
+            Navigator.pop(ctx);
+          },
+          child: const Text('UPDATE'),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showPrintPriceDialog(BuildContext context, InvoiceItem item, String currency) {
+  final controller = TextEditingController(
+    text: item.printPrice != null ? item.printPrice.toString() : item.unitPrice.toString(),
+  );
+  final invoiceBloc = context.read<InvoiceBloc>();
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Custom Receipt Price'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Enter the price you want to show ON THE RECEIPT for this item.'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Receipt Price ($currency)',
+              border: const OutlineInputBorder(),
+              prefixText: currency,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Real Price: ${CurrencyFormatter.formatWithSymbol(item.unitPrice, symbol: currency)}',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+        if (item.printPrice != null)
+          TextButton(
+            onPressed: () {
+              invoiceBloc.add(UpdateItemPrintPrice(item.item.id!, null));
+              Navigator.pop(ctx);
+            },
+            child: const Text('RESET', style: TextStyle(color: Colors.red)),
+          ),
+        ElevatedButton(
+          onPressed: () {
+            final newPrice = double.tryParse(controller.text);
+            if (newPrice != null) {
+              invoiceBloc.add(UpdateItemPrintPrice(item.item.id!, newPrice));
+            }
+            Navigator.pop(ctx);
+          },
+          child: const Text('SET PRICE'),
+        ),
+      ],
+    ),
+  );
 }

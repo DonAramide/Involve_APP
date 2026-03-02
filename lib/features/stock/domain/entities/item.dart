@@ -22,6 +22,7 @@ class Item extends Equatable {
   final String? billingType;
   final String? serviceCategory;
   final bool requiresTimeTracking;
+  final String businessMode;
   final String? syncId;
 
   const Item({
@@ -38,6 +39,7 @@ class Item extends Equatable {
     this.billingType,
     this.serviceCategory,
     this.requiresTimeTracking = false,
+    this.businessMode = 'retail',
     this.syncId,
   });
 
@@ -55,6 +57,7 @@ class Item extends Equatable {
     String? billingType,
     String? serviceCategory,
     bool? requiresTimeTracking,
+    String? businessMode,
     String? syncId,
   }) {
     return Item(
@@ -71,6 +74,7 @@ class Item extends Equatable {
       billingType: billingType ?? this.billingType,
       serviceCategory: serviceCategory ?? this.serviceCategory,
       requiresTimeTracking: requiresTimeTracking ?? this.requiresTimeTracking,
+      businessMode: businessMode ?? this.businessMode,
       syncId: syncId ?? this.syncId,
     );
   }
@@ -90,6 +94,7 @@ class Item extends Equatable {
         billingType,
         serviceCategory,
         requiresTimeTracking,
+        businessMode,
         syncId,
       ];
 }

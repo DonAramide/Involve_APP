@@ -64,4 +64,40 @@ class BackupService {
     }
     return false;
   }
+
+  /// Exports the entire database file to a target location
+  Future<bool> exportDatabase(String targetPath) async {
+    try {
+      if (kIsWeb) return false;
+      final dbPath = await getDatabasePath();
+      final dbFile = File(dbPath);
+      if (await dbFile.exists()) {
+        await dbFile.copy(targetPath);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Export failed: $e');
+    }
+    return false;
+  }
+
+  /// Completely replaces the current database with a backup file
+  Future<bool> importDatabase(String sourcePath) async {
+    try {
+      if (kIsWeb) return false;
+      final dbPath = await getDatabasePath();
+      
+      // Close database before overwriting
+      await database?.close();
+      
+      final sourceFile = File(sourcePath);
+      if (await sourceFile.exists()) {
+        await sourceFile.copy(dbPath);
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Import failed: $e');
+    }
+    return false;
+  }
 }

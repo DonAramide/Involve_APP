@@ -55,6 +55,7 @@ class AppSettings extends Equatable {
   final bool showExpensePieChart;
   final bool showTopSellingChart;
   final bool showStockValueChart;
+  final String businessMode;
 
   const AppSettings({
     this.id,
@@ -101,6 +102,7 @@ class AppSettings extends Equatable {
     this.showExpensePieChart = true,
     this.showTopSellingChart = true,
     this.showStockValueChart = true,
+    this.businessMode = 'retail',
   });
 
   AppSettings copyWith({
@@ -148,6 +150,7 @@ class AppSettings extends Equatable {
     bool? showExpensePieChart,
     bool? showTopSellingChart,
     bool? showStockValueChart,
+    String? businessMode,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -194,6 +197,7 @@ class AppSettings extends Equatable {
       showExpensePieChart: showExpensePieChart ?? this.showExpensePieChart,
       showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
       showStockValueChart: showStockValueChart ?? this.showStockValueChart,
+      businessMode: businessMode ?? this.businessMode,
     );
   }
 
@@ -243,5 +247,6 @@ class AppSettings extends Equatable {
         showExpensePieChart,
         showTopSellingChart,
         showStockValueChart,
+        businessMode,
       ];
 }

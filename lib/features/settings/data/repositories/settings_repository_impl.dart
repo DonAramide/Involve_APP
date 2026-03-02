@@ -22,7 +22,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
           currency: '₦',
         );
       }
-      final entity = _toEntity(result);
+      final bSettings = await db.select(db.businessSettings).getSingleOrNull();
+      final entity = _toEntity(result, bSettings?.businessMode ?? 'retail');
       // Auto-normalize legacy currency
       if (entity.currency == 'NGN') {
         return entity.copyWith(currency: '₦');
@@ -89,6 +90,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showExpensePieChart: Value(settings.showExpensePieChart),
       showTopSellingChart: Value(settings.showTopSellingChart),
       showStockValueChart: Value(settings.showStockValueChart),
+      businessMode: Value(settings.businessMode),
     );
 
     if (existing == null) {
@@ -96,9 +98,24 @@ class SettingsRepositoryImpl implements SettingsRepository {
     } else {
       await (db.update(db.settings)..where((t) => t.id.equals(1))).write(companion);
     }
+
+    // Handle BusinessSettings separately
+    final bExisting = await db.select(db.businessSettings).getSingleOrNull();
+    if (bExisting == null) {
+      await db.into(db.businessSettings).insert(BusinessSettingsCompanion(
+        businessMode: Value(settings.businessMode),
+        updatedAt: Value(DateTime.now()),
+      ));
+    } else {
+      await (db.update(db.businessSettings)..where((t) => t.id.equals(bExisting.id)))
+        .write(BusinessSettingsCompanion(
+          businessMode: Value(settings.businessMode),
+          updatedAt: Value(DateTime.now()),
+        ));
+    }
   }
 
-  AppSettings _toEntity(SettingsTable row) {
+  AppSettings _toEntity(SettingsTable row, String businessMode) {
     List<String> serviceTypes = [];
     if (row.serviceTypes != null && row.serviceTypes!.isNotEmpty) {
       try {
@@ -154,6 +171,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showExpensePieChart: row.showExpensePieChart,
       showTopSellingChart: row.showTopSellingChart,
       showStockValueChart: row.showStockValueChart,
+      businessMode: businessMode,
     );
   }
 }

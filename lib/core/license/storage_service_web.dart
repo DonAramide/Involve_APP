@@ -7,6 +7,7 @@ class StorageService {
   static const _lastOpenedKey = 'last_opened_date';
   static const _trialStartKey = 'trial_start_date';
   static const _businessLockedKey = 'is_business_locked';
+  static const _modeLockedKey = 'is_mode_locked';
   static const _lastPrinterIpKey = 'last_printer_ip';
   static const _proExpiryKey = 'pro_plan_expiry';
   static const _deviceAccessKey = 'device_admin_access_granted';
@@ -43,6 +44,15 @@ class StorageService {
 
   static Future<bool> isBusinessNameLocked() async {
     final val = await _secureStorage.read(key: _businessLockedKey);
+    return val == 'true';
+  }
+
+  static Future<void> setBusinessModeLocked(bool locked) async {
+    await _secureStorage.write(key: _modeLockedKey, value: locked ? 'true' : 'false');
+  }
+
+  static Future<bool> isBusinessModeLocked() async {
+    final val = await _secureStorage.read(key: _modeLockedKey);
     return val == 'true';
   }
 

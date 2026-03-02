@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
@@ -13,15 +14,34 @@ import 'package:involve_app/core/license/license_history_table.dart';
 
 import 'package:involve_app/features/stock/data/models/stock_return_table.dart';
 import 'package:involve_app/features/stock/data/models/expense_table.dart';
+import 'package:involve_app/features/school/data/models/school_tables.dart';
 
 part 'app_database.g.dart';
 
-@DriftDatabase(tables: [Items, Invoices, InvoiceItems, Settings, Categories, LicenseHistory, Staff, SyncMeta, StockIncrements, StockReturns, Expenses])
+@DriftDatabase(tables: [
+  Items,
+  Invoices,
+  InvoiceItems,
+  Settings,
+  Categories,
+  LicenseHistory,
+  Staff,
+  SyncMeta,
+  StockIncrements,
+  StockReturns,
+  Expenses,
+  AcademicYears,
+  Terms,
+  Classes,
+  FeeTypes,
+  Students,
+  BusinessSettings
+])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 36;
+  int get schemaVersion => 45;
 
   @override
   MigrationStrategy get migration {
@@ -92,6 +112,76 @@ class AppDatabase extends _$AppDatabase {
           await _safeAddColumn(m, settings, settings.showTopSellingChart);
           await _safeAddColumn(m, settings, settings.showStockValueChart);
         }
+        if (from < 37) {
+          // School Mode Migration
+          await _safeAddColumn(m, settings, settings.businessMode);
+          await _safeCreateTable(m, academicYears);
+          await _safeCreateTable(m, terms);
+          await _safeCreateTable(m, classes);
+          await _safeCreateTable(m, feeTypes);
+          await _safeCreateTable(m, students);
+        }
+        if (from < 38) {
+          // Extension for School Mode Invoices
+          await _safeAddColumn(m, invoices, invoices.businessMode);
+          await _safeAddColumn(m, invoices, invoices.studentId);
+          await _safeAddColumn(m, invoices, invoices.classId);
+          await _safeAddColumn(m, invoices, invoices.termId);
+          await _safeAddColumn(m, invoices, invoices.academicYearId);
+          
+          // Separate Business Settings table
+          await _safeCreateTable(m, businessSettings);
+          
+          // Seed initial business settings if needed
+          await into(businessSettings).insert(BusinessSettingsCompanion(
+            businessMode: const Value('retail'),
+          ));
+        }
+        if (from < 39) {
+          // Student Passport Photo Migration
+          await _safeAddColumn(m, students, students.image);
+        }
+
+        if (from < 40) {
+          // Schema V40: Add new Student fields and Category business mode
+          await _safeAddColumn(m, students, students.dateOfBirth);
+          await _safeAddColumn(m, students, students.registrationDate);
+          await _safeAddColumn(m, categories, categories.businessMode);
+        }
+
+        if (from < 41) {
+          // Schema V41: Enforce unique constraints on existing academic tables
+          // AcademicYears: name unique
+          // Terms: {academicYearId, name} unique
+          // Students: admissionNumber unique
+          await m.alterTable(TableMigration(academicYears));
+          await m.alterTable(TableMigration(terms));
+          await m.alterTable(TableMigration(students));
+        }
+
+        if (from < 42) {
+          // Schema V42: Add businessMode to Items table
+          await _safeAddColumn(m, items, items.businessMode);
+        }
+
+        if (from < 43) {
+          // Schema V43: Enforce unique constraints on Classes and FeeTypes
+          await m.alterTable(TableMigration(classes));
+          await m.alterTable(TableMigration(feeTypes));
+        }
+        
+        if (from < 44) {
+          // Schema V44: Add school display fields to Invoices table
+          await _safeAddColumn(m, invoices, invoices.admissionNumber);
+          await _safeAddColumn(m, invoices, invoices.className);
+          await _safeAddColumn(m, invoices, invoices.termName);
+          await _safeAddColumn(m, invoices, invoices.academicYearName);
+        }
+
+        if (from < 45) {
+          // Schema V45: Add studentImage to Invoices table
+          await _safeAddColumn(m, invoices, invoices.studentImage);
+        }
       },
       beforeOpen: (details) async {
         // Enforce Foreign Keys (SQLite only, harmless on Web/IndexedDB)
@@ -105,7 +195,7 @@ class AppDatabase extends _$AppDatabase {
   /// a prior debug build or partial upgrade.
   Future<void> _safeAddColumn(Migrator m, TableInfo table, GeneratedColumn col) async {
     try {
-      await m.addColumn(table, col as GeneratedColumn<Object>);
+      await m.addColumn(table, col);
     } catch (e) {
       // Ignore 'duplicate column name' errors
       debugPrint('Migration: Column ${col.name} already exists, skipping: $e');

@@ -12,6 +12,7 @@ import 'package:involve_app/features/printer/presentation/bloc/printer_state.dar
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:collection/collection.dart';
+import 'package:involve_app/core/utils/terminology.dart';
 
 class InventoryReportPage extends StatefulWidget {
   const InventoryReportPage({super.key});
@@ -30,9 +31,11 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
   }
 
   void _loadReport() {
+    final mode = context.read<SettingsBloc>().state.settings?.businessMode;
     context.read<StockBloc>().add(LoadInventoryReportRequested(
       start: _dateRange?.start,
       end: _dateRange?.end,
+      businessMode: mode,
     ));
   }
 
@@ -194,27 +197,8 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
                           _buildStockValueChart(context, state.report, currencySymbol),
                           const SizedBox(height: 16),
                         ],
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columns: const [
-                              DataColumn(label: Text('Product')),
-                              DataColumn(label: Text('Price'), numeric: true),
-                              DataColumn(label: Text('Stock'), numeric: true),
-                              DataColumn(label: Text('Sold'), numeric: true),
-                              DataColumn(label: Text('Revenue'), numeric: true),
-                            ],
-                            rows: state.report.map((item) {
-                              return DataRow(cells: [
-                                DataCell(Text(item['name'])),
-                                DataCell(Text(CurrencyFormatter.formatWithSymbol(item['price'], symbol: currencySymbol))),
-                                DataCell(Text(item['stockQty'].toString())),
-                                DataCell(Text(item['totalSold'].toString())),
-                                DataCell(Text(CurrencyFormatter.formatWithSymbol(item['totalRevenue'], symbol: currencySymbol))),
-                              ]);
-                            }).toList(),
-                          ),
-                        ),
+                        const SizedBox(height: 16),
+                        _buildTable(state.report, currencySymbol, settings),
                       ],
                     ),
                   );
@@ -227,6 +211,49 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildTable(List<Map<String, dynamic>> report, String currency, AppSettings? settings) {
+    return Column(
+      children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            border: Border(bottom: BorderSide(color: Colors.grey[300]!, width: 1)),
+          ),
+          child: Row(
+            children: [
+              Expanded(flex: 3, child: Text(settings?.productLabel ?? 'Product', style: const TextStyle(fontWeight: FontWeight.bold))),
+              Expanded(flex: 2, child: Text('Price', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              Expanded(flex: 2, child: Text('Stock', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              Expanded(flex: 2, child: Text('Sold', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              Expanded(flex: 2, child: Text('Revenue', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+            ],
+          ),
+        ),
+        // Rows
+        ...report.mapIndexed((index, item) {
+          return Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              color: index % 2 == 0 ? Colors.white : Colors.grey[50],
+              border: Border(bottom: BorderSide(color: Colors.grey[100]!, width: 1)),
+            ),
+            child: Row(
+              children: [
+                Expanded(flex: 3, child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.w500))),
+                Expanded(flex: 2, child: Text(CurrencyFormatter.formatWithSymbol(item['price'], symbol: currency), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text(item['stockQty'].toString(), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text(item['totalSold'].toString(), textAlign: TextAlign.right)),
+                Expanded(flex: 2, child: Text(CurrencyFormatter.formatWithSymbol(item['totalRevenue'], symbol: currency), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold))),
+              ],
+            ),
+          );
+        }).toList(),
+      ],
     );
   }
 

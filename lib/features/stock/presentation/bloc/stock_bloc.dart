@@ -48,6 +48,13 @@ class StockBloc extends Bloc<StockEvent, StockState> {
     on<LoadProfitReportRequested>(_onLoadProfitReportRequested);
     on<AddExpenseRequested>(_onAddExpenseRequested);
     on<LoadExpensesRequested>(_onLoadExpensesRequested);
+    on<ResetStockStatus>((event, emit) {
+      if (state is StockLoaded) {
+        emit((state as StockLoaded).copyWith(status: StockStatus.initial, error: null));
+      } else {
+        emit(StockLoaded(state.items, categories: state.categories, businessMode: state.businessMode, status: StockStatus.initial));
+      }
+    });
     
     // Category Handlers
     on<LoadCategories>(_onLoadCategories);
@@ -58,36 +65,40 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   Future<void> _onLoadItems(LoadItems event, Emitter<StockState> emit) async {
     emit(StockLoading(items: state.items, categories: state.categories));
     try {
-      final items = await getItems();
-      final categories = await getCategories();
-      emit(StockLoaded(items, categories: categories));
+      final items = await getItems(businessMode: event.businessMode);
+      final categories = await getCategories(businessMode: event.businessMode);
+      emit(StockLoaded(items, categories: categories, businessMode: event.businessMode));
     } catch (e) {
       emit(StockError('Failed to load data: ${e.toString()}', items: state.items, categories: state.categories));
     }
   }
 
   Future<void> _onAddStockItem(AddStockItem event, Emitter<StockState> emit) async {
+    emit(StockLoading(items: state.items, categories: state.categories, businessMode: state.businessMode));
     try {
       await addItem(event.item);
-      add(LoadItems());
+      emit(StockLoaded(state.items, categories: state.categories, businessMode: state.businessMode, status: StockStatus.success));
+      add(LoadItems(businessMode: state.businessMode));
     } catch (e) {
-      emit(StockError('Failed to add item: ${e.toString()}', items: state.items, categories: state.categories));
+      emit(StockError('Failed to add item: ${e.toString()}', items: state.items, categories: state.categories, businessMode: state.businessMode));
     }
   }
 
   Future<void> _onUpdateStockItem(UpdateStockItem event, Emitter<StockState> emit) async {
+    emit(StockLoading(items: state.items, categories: state.categories, businessMode: state.businessMode));
     try {
       await updateItem(event.item);
-      add(LoadItems());
+      emit(StockLoaded(state.items, categories: state.categories, businessMode: state.businessMode, status: StockStatus.success));
+      add(LoadItems(businessMode: state.businessMode));
     } catch (e) {
-      emit(StockError('Failed to update item: ${e.toString()}', items: state.items, categories: state.categories));
+      emit(StockError('Failed to update item: ${e.toString()}', items: state.items, categories: state.categories, businessMode: state.businessMode));
     }
   }
 
   Future<void> _onDeleteStockItem(DeleteStockItem event, Emitter<StockState> emit) async {
     try {
       await deleteItem(event.id);
-      add(LoadItems());
+      add(LoadItems(businessMode: state.businessMode));
     } catch (e) {
       emit(StockError('Failed to delete item: ${e.toString()}', items: state.items, categories: state.categories));
     }
@@ -96,7 +107,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   Future<void> _onStockIncrementRequested(StockIncrementRequested event, Emitter<StockState> emit) async {
     try {
       await increaseStock(event.itemId, event.quantity, event.remarks);
-      add(LoadItems());
+      add(LoadItems(businessMode: state.businessMode));
     } catch (e) {
       emit(StockError('Failed to increase stock: ${e.toString()}', items: state.items, categories: state.categories));
     }
@@ -115,7 +126,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   Future<void> _onLoadInventoryReportRequested(LoadInventoryReportRequested event, Emitter<StockState> emit) async {
     emit(StockLoading(items: state.items, categories: state.categories));
     try {
-      final report = await getInventoryReport(start: event.start, end: event.end);
+      final report = await getInventoryReport(start: event.start, end: event.end, businessMode: event.businessMode);
       emit(InventoryReportLoaded(report, items: state.items, categories: state.categories));
     } catch (e) {
       emit(StockError('Failed to load report: ${e.toString()}', items: state.items, categories: state.categories));
@@ -125,9 +136,9 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   Future<void> _onLoadProfitReportRequested(LoadProfitReportRequested event, Emitter<StockState> emit) async {
     emit(StockLoading(items: state.items, categories: state.categories));
     try {
-      final report = await getProfitReport(start: event.start, end: event.end);
-      final totalExpenses = await getTotalExpensesUC(start: event.start, end: event.end);
-      final expenses = await getExpensesUC(start: event.start, end: event.end);
+      final report = await getProfitReport(start: event.start, end: event.end, businessMode: event.businessMode);
+      final totalExpenses = await getTotalExpensesUC(start: event.start, end: event.end, businessMode: event.businessMode);
+      final expenses = await getExpensesUC(start: event.start, end: event.end, businessMode: event.businessMode);
       emit(ProfitReportLoaded(report, totalExpenses, expenses: expenses, items: state.items, categories: state.categories));
     } catch (e) {
       emit(StockError('Failed to load profit report: ${e.toString()}', items: state.items, categories: state.categories));
@@ -145,7 +156,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   Future<void> _onLoadExpensesRequested(LoadExpensesRequested event, Emitter<StockState> emit) async {
     emit(StockLoading(items: state.items, categories: state.categories));
     try {
-      final expenses = await getExpensesUC(start: event.start, end: event.end);
+      final expenses = await getExpensesUC(start: event.start, end: event.end, businessMode: event.businessMode);
       emit(ExpensesLoaded(expenses, items: state.items, categories: state.categories));
     } catch (e) {
       emit(StockError('Failed to load expenses: ${e.toString()}', items: state.items, categories: state.categories));
@@ -154,11 +165,11 @@ class StockBloc extends Bloc<StockEvent, StockState> {
 
   Future<void> _onLoadCategories(LoadCategories event, Emitter<StockState> emit) async {
     try {
-      final categories = await getCategories();
+      final categories = await getCategories(businessMode: event.businessMode);
       if (state is StockLoaded) {
-        emit((state as StockLoaded).copyWith(categories: categories));
+        emit((state as StockLoaded).copyWith(categories: categories, businessMode: event.businessMode));
       } else {
-        emit(StockLoaded(state.items, categories: categories));
+        emit(StockLoaded(state.items, categories: categories, businessMode: event.businessMode));
       }
     } catch (e) {
       // Silent fail
@@ -167,8 +178,8 @@ class StockBloc extends Bloc<StockEvent, StockState> {
 
   Future<void> _onAddCategory(AddCategory event, Emitter<StockState> emit) async {
     try {
-      await addCategory(event.name);
-      add(LoadCategories());
+      await addCategory(event.name, businessMode: event.businessMode);
+      add(LoadCategories(businessMode: event.businessMode));
     } catch (e) {
       emit(StockError('Failed to add category: ${e.toString()}', items: state.items, categories: state.categories));
     }
@@ -177,7 +188,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
   Future<void> _onDeleteCategory(DeleteCategory event, Emitter<StockState> emit) async {
     try {
       await deleteCategory(event.id);
-      add(LoadCategories());
+      add(LoadCategories(businessMode: state.businessMode));
     } catch (e) {
       emit(StockError('Failed to delete category: ${e.toString()}', items: state.items, categories: state.categories));
     }

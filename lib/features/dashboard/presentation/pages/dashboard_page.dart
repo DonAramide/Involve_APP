@@ -25,6 +25,11 @@ import 'dart:async';
 import 'package:involve_app/core/sync/presentation/bloc/sync_bloc.dart';
 import '../../../../core/sync/presentation/widgets/sync_indicator.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
+import '../../../../core/utils/terminology.dart';
+import 'package:involve_app/features/stock/presentation/pages/manage_categories_page.dart';
+import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
+import 'package:involve_app/features/school/presentation/pages/fee_management_page.dart';
 
 class DashboardPage extends StatefulWidget {
   final bool autoOpenSettings;
@@ -228,15 +233,18 @@ class _DashboardPageState extends State<DashboardPage> {
             ],
           ),
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          body: GridView.count(
-        padding: const EdgeInsets.all(24),
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        children: [
+          body: GridView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 180,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.05,
+            ),
+            children: [
           _buildMenuCard(
             context,
-            'NEW INVOICE',
+            settings?.newSaleLabel.toUpperCase() ?? 'NEW SALE',
             Icons.add_shopping_cart,
             Theme.of(context).colorScheme.primary,
             () {
@@ -258,16 +266,17 @@ class _DashboardPageState extends State<DashboardPage> {
               );
             },
           ),
+          if (settings?.businessMode != 'school')
+            _buildMenuCard(
+              context,
+              settings?.stockLabel.toUpperCase() ?? 'STOCK / ITEMS',
+              Icons.inventory,
+              Colors.orange,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
+            ),
           _buildMenuCard(
             context,
-            'STOCK / ITEMS',
-            Icons.inventory,
-            Colors.orange,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
-          ),
-          _buildMenuCard(
-            context,
-            'SALES RECORDS',
+            settings?.salesLabel.toUpperCase() ?? 'SALES RECORDS',
             Icons.assessment,
             Colors.green,
             () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvoiceHistoryPage())),
@@ -286,6 +295,43 @@ class _DashboardPageState extends State<DashboardPage> {
             Colors.blueGrey,
             () => _verifyAndNavigateToSettings(context),
           ),
+          if (settings?.businessMode == 'school') ...[
+            _buildMenuCard(
+              context,
+              'STUDENTS',
+              Icons.people_alt,
+              Colors.indigo,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentListPage())),
+            ),
+            _buildMenuCard(
+              context,
+              'ACADEMIC SETUP',
+              Icons.school,
+              Colors.brown,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolSetupPage())),
+            ),
+            _buildMenuCard(
+              context,
+              'FEE MANAGEMENT',
+              Icons.payments,
+              Colors.cyan,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeManagementPage())),
+            ),
+            _buildMenuCard(
+              context,
+              settings?.productsLabel.toUpperCase() ?? 'CLASSES',
+              Icons.grid_view,
+              Colors.orange,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => StockManagementPage())),
+            ),
+            _buildMenuCard(
+              context,
+              settings?.categoriesLabel.toUpperCase() ?? 'FEE TYPES',
+              Icons.category,
+              Colors.teal,
+              () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageCategoriesPage())), // Categorires are managed here
+            ),
+          ],
         ],
       ),
       bottomNavigationBar: (settingsState.userPlan?.isValid ?? false) 
@@ -396,22 +442,27 @@ class _DashboardPageState extends State<DashboardPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: color.withOpacity(0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, size: 40, color: color),
+                    child: Icon(icon, size: 32, color: color),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w900, 
-                      fontSize: 14, 
-                      color: isDark ? Colors.white.withOpacity(0.9) : Colors.grey[800],
-                      letterSpacing: 1.0,
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold, 
+                        fontSize: 12, 
+                        color: isDark ? Colors.white.withOpacity(0.9) : Colors.grey[800],
+                        letterSpacing: 0.5,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

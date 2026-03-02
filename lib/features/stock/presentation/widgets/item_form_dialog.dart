@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:collection/collection.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/utils/validators.dart';
@@ -11,6 +12,7 @@ import '../bloc/stock_bloc.dart';
 import '../bloc/stock_state.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
+import '../../../../core/utils/terminology.dart';
 
 class ItemFormDialog extends StatefulWidget {
   final Item? item;
@@ -37,6 +39,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   String _type = 'product';
   String? _billingType;
   String? _serviceCategory; 
+  late String _businessMode;
 
   @override
   void initState() {
@@ -55,10 +58,21 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       _type = widget.item!.type;
       _billingType = widget.item!.billingType;
       _serviceCategory = widget.item!.serviceCategory;
+      _businessMode = widget.item!.businessMode;
+    } else {
+      final sState = context.read<SettingsBloc>().state;
+      _businessMode = sState.settings?.businessMode ?? 'retail';
+      if (_businessMode == 'school') {
+        // Default to service for Schools
+        _type = 'service';
+        _billingType = 'fixed';
+      }
     }
     
     // Ensure categories are loaded
-    widget.stockBloc.add(LoadCategories());
+    final businessMode = context.read<SettingsBloc>().state.settings?.businessMode;
+    widget.stockBloc.add(LoadCategories(businessMode: businessMode));
+    widget.stockBloc.add(ResetStockStatus());
   }
 
   @override
@@ -139,8 +153,26 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     final isServiceBillingEnabled = settingsState.settings?.serviceBillingEnabled ?? false;
     final serviceTypes = settingsState.settings?.serviceTypes ?? [];
 
-    return AlertDialog(
-      title: Text(widget.item == null ? 'Add New Item' : 'Edit Item'),
+    final term = settingsState.settings!;
+
+    return BlocListener<StockBloc, StockState>(
+      bloc: widget.stockBloc,
+      listenWhen: (previous, current) => previous.status != current.status,
+      listener: (context, state) {
+        if (state.status == StockStatus.success) {
+          Navigator.of(context).pop();
+        }
+        if (state.status == StockStatus.failure && state.error != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.error!),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+      child: AlertDialog(
+        title: Text(widget.item == null ? 'Add New ${term.productLabel}' : 'Edit ${term.productLabel}'),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -171,9 +203,9 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
               if (isServiceBillingEnabled) ...[
                 DropdownButtonFormField<String>(
                   value: _type,
-                  decoration: const InputDecoration(labelText: 'Item Type'),
-                  items: const [
-                    DropdownMenuItem(value: 'product', child: Text('Product')),
+                  decoration: InputDecoration(labelText: '${term.productLabel} Type'),
+                  items: [
+                    DropdownMenuItem(value: 'product', child: Text(term.productLabel)),
                     DropdownMenuItem(value: 'service', child: Text('Service')),
                   ],
                   onChanged: (val) {
@@ -214,7 +246,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                       
                       return DropdownButtonFormField<int>(
                         value: isValidId ? _selectedCategoryId : null,
-                        decoration: const InputDecoration(labelText: 'Category'),
+                        decoration: InputDecoration(labelText: term.categoryLabel),
                         items: categories.map((cat) {
                           return DropdownMenuItem(value: cat.id, child: Text(cat.name));
                         }).toList(),
@@ -224,7 +256,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                     } else {
                       return DropdownButtonFormField<ItemCategory>(
                         value: _legacyCategory,
-                        decoration: const InputDecoration(labelText: 'Category (Legacy)'),
+                        decoration: InputDecoration(labelText: '${term.categoryLabel} (Legacy)'),
                         items: ItemCategory.values.map((cat) {
                           return DropdownMenuItem(value: cat, child: Text(cat.name.toUpperCase()));
                         }).toList(),
@@ -234,6 +266,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                   },
                 ),
                 
+                if (_type == 'product') ...[
                   TextFormField(
                     initialValue: _stockQty.toString(),
                     decoration: const InputDecoration(labelText: 'Stock Quantity'),
@@ -248,15 +281,27 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                     onSaved: (val) => _minStockLevel = double.tryParse(val ?? '0') ?? 0,
                     validator: (val) => InputValidator.validateNumber(val, 'Min Stock'),
                   ),
+                ],
                 ] else ...[
                 // Service Fields
-                DropdownButtonFormField<String>(
-                  value: _serviceCategory,
-                  decoration: const InputDecoration(labelText: 'Service Category'),
-                  items: serviceTypes.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                  onChanged: (val) => setState(() => _serviceCategory = val),
-                  validator: (val) => val == null ? 'Select service category' : null,
+                BlocBuilder<StockBloc, StockState>(
+                  bloc: widget.stockBloc,
+                  builder: (context, state) {
+                    return DropdownButtonFormField<String>(
+                      value: _selectedCategoryId?.toString(),
+                      decoration: InputDecoration(labelText: term.categoryLabel),
+                      items: state.categories.map((c) => DropdownMenuItem(value: c.id.toString(), child: Text(c.name))).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCategoryId = int.tryParse(val ?? '');
+                          _serviceCategory = state.categories.firstWhereOrNull((c) => c.id == _selectedCategoryId)?.name;
+                        });
+                      },
+                      validator: (val) => val == null ? 'Select service category' : null,
+                    );
+                  },
                 ),
+                if (settingsState.settings?.businessMode != 'school')
                 DropdownButtonFormField<String>(
                   value: _billingType,
                   decoration: const InputDecoration(labelText: 'Billing Type'),
@@ -307,9 +352,22 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
         ElevatedButton(
           onPressed: _submit,
-          child: Text(widget.item == null ? 'ADD' : 'SAVE'),
+          child: BlocBuilder<StockBloc, StockState>(
+            bloc: widget.stockBloc,
+            builder: (context, state) {
+              if (state.status == StockStatus.loading) {
+                return const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                );
+              }
+              return Text(widget.item == null ? 'ADD' : 'SAVE');
+            },
+          ),
         ),
       ],
+    ),
     );
   }
 
@@ -334,6 +392,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         billingType: _billingType,
         serviceCategory: _serviceCategory,
         requiresTimeTracking: _billingType == 'per_day' || _billingType == 'per_hour' || _billingType == 'per_half_day',
+        businessMode: _businessMode,
       );
 
       if (widget.item == null) {
@@ -341,7 +400,6 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
       } else {
         widget.stockBloc.add(UpdateStockItem(newItem));
       }
-      Navigator.pop(context);
     }
   }
 }

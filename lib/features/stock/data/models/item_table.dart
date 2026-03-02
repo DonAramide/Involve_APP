@@ -20,6 +20,7 @@ class Items extends Table {
   TextColumn get billingType => text().nullable()(); // 'fixed', 'per_day', 'per_hour'
   TextColumn get serviceCategory => text().nullable()(); // 'Hotel', 'Lounge', etc.
   BoolColumn get requiresTimeTracking => boolean().withDefault(const Constant(false))();
+  TextColumn get businessMode => text().withDefault(const Constant('retail'))(); // 'retail' or 'school'
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

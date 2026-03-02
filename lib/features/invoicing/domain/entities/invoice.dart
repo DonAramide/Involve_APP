@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:equatable/equatable.dart';
 import '../../../stock/domain/entities/item.dart';
 
@@ -80,6 +81,18 @@ class Invoice extends Equatable {
   final String? syncId;
   final double? totalPrintAmount;
 
+  // School Mode Extensions
+  final String businessMode;
+  final int? studentId;
+  final int? classId;
+  final int? termId;
+  final int? academicYearId;
+  final String? admissionNumber;
+  final String? className;
+  final String? termName;
+  final String? academicYearName;
+  final Uint8List? studentImage;
+
   const Invoice({
     this.id,
     required this.invoiceNumber,
@@ -100,6 +113,16 @@ class Invoice extends Equatable {
     this.staffName,
     this.syncId,
     this.totalPrintAmount,
+    this.businessMode = 'retail',
+    this.studentId,
+    this.classId,
+    this.termId,
+    this.academicYearId,
+    this.admissionNumber,
+    this.className,
+    this.termName,
+    this.academicYearName,
+    this.studentImage,
   });
 
   @override
@@ -123,5 +146,15 @@ class Invoice extends Equatable {
         staffName,
         syncId,
         totalPrintAmount,
+        businessMode,
+        studentId,
+        classId,
+        termId,
+        academicYearId,
+        admissionNumber,
+        className,
+        termName,
+        academicYearName,
+        studentImage,
       ];
 }

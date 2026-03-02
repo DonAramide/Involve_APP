@@ -58,4 +58,5 @@ class Settings extends Table {
   BoolColumn get showExpensePieChart => boolean().withDefault(const Constant(true))();
   BoolColumn get showTopSellingChart => boolean().withDefault(const Constant(true))();
   BoolColumn get showStockValueChart => boolean().withDefault(const Constant(true))();
+  TextColumn get businessMode => text().withDefault(const Constant('retail'))();
 }

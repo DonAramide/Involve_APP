@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'features/school/data/repositories/school_repository_impl.dart';
+import 'features/school/presentation/bloc/school_bloc.dart';
+import 'features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/core/license/landing_page.dart';
 import 'core/utils/bloc_observer.dart';
 import 'features/stock/data/datasources/app_database.dart';
@@ -61,6 +65,7 @@ void main() async {
   final settingsRepository = SettingsRepositoryImpl(database);
   final categoryRepository = CategoryRepositoryImpl(database);
   final staffRepository = StaffRepositoryImpl(database);
+  final schoolRepository = SchoolRepositoryImpl(database);
   
   // Initialize services
   final bleService = CrossPlatformPrinterService();
@@ -163,6 +168,7 @@ void main() async {
     bluetoothDiscoveryService: bluetoothDiscoveryService,
     bluetoothSyncServer: bluetoothSyncServer,
     deviceId: deviceId,
+    schoolRepository: schoolRepository,
   ));
 }
 
@@ -206,6 +212,7 @@ class MyApp extends StatelessWidget {
   final BluetoothSyncServer bluetoothSyncServer;
   final SyncManager syncManager;
   final String deviceId;
+  final SchoolRepositoryImpl schoolRepository;
 
   const MyApp({
     super.key,
@@ -245,6 +252,7 @@ class MyApp extends StatelessWidget {
     required this.bluetoothSyncServer,
     required this.syncManager,
     required this.deviceId,
+    required this.schoolRepository,
   });
 
   @override
@@ -312,6 +320,13 @@ class MyApp extends StatelessWidget {
             deviceId: deviceId,
           )..add(InitializeSync()),
         ),
+        BlocProvider(
+          create: (_) => SchoolBloc(
+            repository: schoolRepository,
+            itemRepository: itemRepository,
+            invoiceRepository: invoiceRepository,
+          ),
+        ),
       ],
       child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {
@@ -325,6 +340,7 @@ class MyApp extends StatelessWidget {
                     ? ThemeMode.dark 
                     : ThemeMode.system,
             theme: ThemeData(
+              fontFamily: kIsWeb ? 'sans-serif' : null,
               colorScheme: ColorScheme.fromSeed(seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3)),
               useMaterial3: true,
               textSelectionTheme: TextSelectionThemeData(
@@ -332,6 +348,7 @@ class MyApp extends StatelessWidget {
               ),
             ),
             darkTheme: ThemeData(
+              fontFamily: kIsWeb ? 'sans-serif' : null,
               colorScheme: ColorScheme.fromSeed(
                 seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3), 
                 brightness: Brightness.dark,

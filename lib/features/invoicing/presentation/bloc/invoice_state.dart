@@ -63,6 +63,23 @@ class UpdateStaffInfo extends InvoiceEvent {
   List<Object?> get props => [staffId, staffName];
 }
 
+class UpdateSchoolInfo extends InvoiceEvent {
+  final int? studentId;
+  final int? classId;
+  final int? termId;
+  final int? academicYearId;
+  UpdateSchoolInfo({this.studentId, this.classId, this.termId, this.academicYearId});
+  @override
+  List<Object?> get props => [studentId, classId, termId, academicYearId];
+}
+
+class UpdateBusinessMode extends InvoiceEvent {
+  final String businessMode;
+  UpdateBusinessMode(this.businessMode);
+  @override
+  List<Object?> get props => [businessMode];
+}
+
 class SaveInvoice extends InvoiceEvent {
   final String? invoiceNumber;
   final double? amountPaid;
@@ -106,6 +123,11 @@ class InvoiceState extends Equatable {
   final String? paymentMethod;
   final int? staffId;
   final String? staffName;
+  final String businessMode;
+  final int? studentId;
+  final int? classId;
+  final int? termId;
+  final int? academicYearId;
 
   const InvoiceState({
     this.items = const [],
@@ -125,6 +147,11 @@ class InvoiceState extends Equatable {
     this.paymentMethod,
     this.staffId,
     this.staffName,
+    this.businessMode = 'retail',
+    this.studentId,
+    this.classId,
+    this.termId,
+    this.academicYearId,
   });
 
   InvoiceState copyWith({
@@ -145,6 +172,11 @@ class InvoiceState extends Equatable {
     String? paymentMethod,
     int? staffId,
     String? staffName,
+    String? businessMode,
+    int? studentId,
+    int? classId,
+    int? termId,
+    int? academicYearId,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -164,6 +196,11 @@ class InvoiceState extends Equatable {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       staffId: staffId ?? this.staffId,
       staffName: staffName ?? this.staffName,
+      businessMode: businessMode ?? this.businessMode,
+      studentId: studentId ?? this.studentId,
+      classId: classId ?? this.classId,
+      termId: termId ?? this.termId,
+      academicYearId: academicYearId ?? this.academicYearId,
     );
   }
 
@@ -186,5 +223,10 @@ class InvoiceState extends Equatable {
         paymentMethod,
         staffId,
         staffName,
+        businessMode,
+        studentId,
+        classId,
+        termId,
+        academicYearId,
       ];
 }
