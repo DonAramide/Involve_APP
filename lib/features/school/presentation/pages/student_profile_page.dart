@@ -379,11 +379,11 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.print, color: Colors.blueGrey, size: 20),
-                  onPressed: () => _openReceipt(context, inv),
+                  onPressed: () => _openReceipt(context, inv, "ACADEMIC BILL"),
                 ),
               ],
             ),
-            onTap: () => _openReceipt(context, inv),
+            onTap: () => _openReceipt(context, inv, "ACADEMIC BILL"),
           ),
         );
       },
@@ -414,21 +414,21 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
               const SizedBox(width: 8),
               IconButton(
                 icon: const Icon(Icons.print, color: Colors.blueGrey, size: 20),
-                onPressed: () => _openReceipt(context, inv),
+                onPressed: () => _openReceipt(context, inv, "PAYMENT RECEIPT"),
               ),
             ],
           ),
-          onTap: () => _openReceipt(context, inv),
+          onTap: () => _openReceipt(context, inv, "PAYMENT RECEIPT"),
         );
       },
     );
   }
 
-  void _openReceipt(BuildContext context, Invoice invoice) {
+  void _openReceipt(BuildContext context, Invoice invoice, String title) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ReceiptPreviewPage(invoice: invoice),
+        builder: (_) => ReceiptPreviewPage(invoice: invoice, receiptTitle: title),
       ),
     );
   }

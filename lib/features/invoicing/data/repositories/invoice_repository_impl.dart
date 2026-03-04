@@ -57,10 +57,35 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           );
 
       for (final item in invoice.items) {
+        int finalItemId = item.item.id ?? -1;
+
+        if (finalItemId < 0) {
+          final existingItem = await (db.select(db.items)..where((t) => t.name.equals(item.item.name))).getSingleOrNull();
+          if (existingItem != null) {
+            finalItemId = existingItem.id;
+          } else {
+            finalItemId = await db.into(db.items).insert(
+              ItemsCompanion.insert(
+                name: item.item.name,
+                category: item.item.category.name,
+                price: item.item.price,
+                stockQty: const Value(0),
+                type: Value(item.item.type),
+                syncId: Value(_uuid.v4()),
+                createdAt: Value(now),
+                updatedAt: Value(now),
+                deviceId: Value(deviceId),
+                isDeleted: const Value(false),
+                businessMode: Value(item.item.businessMode),
+              ),
+            );
+          }
+        }
+
         await db.into(db.invoiceItems).insert(
               InvoiceItemsCompanion.insert(
                 invoiceId: invoiceId,
-                itemId: item.item.id!,
+                itemId: finalItemId,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
                 type: Value(item.type),

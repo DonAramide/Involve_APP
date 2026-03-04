@@ -18,8 +18,9 @@ import '../../domain/templates/template_registry.dart';
 class ReceiptPreviewPage extends StatelessWidget {
   final Invoice invoice;
   final bool? useCustomPrices;
+  final String? receiptTitle;
 
-  const ReceiptPreviewPage({super.key, required this.invoice, this.useCustomPrices});
+  const ReceiptPreviewPage({super.key, required this.invoice, this.useCustomPrices, this.receiptTitle});
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +57,7 @@ class ReceiptPreviewPage extends StatelessWidget {
           invoice, 
           settings,
           useCustomPricesOverride: actualUseCustom,
+          receiptTitle: receiptTitle,
         ),
         pdfFileName: 'Invoice-${invoice.id}.pdf',
       ),

@@ -10,7 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class ReceiptService {
-  Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride}) async {
+  Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride, String? receiptTitle}) async {
     final font = await PdfGoogleFonts.robotoRegular();
     final boldFont = await PdfGoogleFonts.robotoBold();
 
@@ -38,16 +38,16 @@ class ReceiptService {
     }
     
     if (template == 'school_teal') {
-      return _generateSchoolTeal(pdf, invoice, settings, logoImage, useCustomPrices);
+      return _generateSchoolTeal(pdf, invoice, settings, logoImage, useCustomPrices, receiptTitle: receiptTitle);
     }
     if (template == 'school_purple') {
-      return _generateSchoolPurple(pdf, invoice, settings, logoImage, useCustomPrices);
+      return _generateSchoolPurple(pdf, invoice, settings, logoImage, useCustomPrices, receiptTitle: receiptTitle);
     }
     if (template == 'school_academic') {
-      return _generateSchoolAcademic(pdf, invoice, settings, logoImage, useCustomPrices);
+      return _generateSchoolAcademic(pdf, invoice, settings, logoImage, useCustomPrices, receiptTitle: receiptTitle);
     }
     if (template == 'school_traditional') {
-      return _generateSchoolTraditional(pdf, invoice, settings, logoImage, useCustomPrices);
+      return _generateSchoolTraditional(pdf, invoice, settings, logoImage, useCustomPrices, receiptTitle: receiptTitle);
     }
 
     return _generateThermalRoll(pdf, invoice, settings, logoImage, useCustomPrices, template: template);
@@ -391,7 +391,7 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolTeal(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices) async {
+  Future<Uint8List> _generateSchoolTeal(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? receiptTitle}) async {
     final dateFormat = DateFormat('dd-MM-yyyy');
     const primaryColor = PdfColor.fromInt(0xFF00796B); // Teal 700
     const secondaryColor = PdfColor.fromInt(0xFF455A64); // Blue Grey 700
@@ -444,7 +444,7 @@ class ReceiptService {
               pw.Center(
                 child: pw.Column(
                   children: [
-                    pw.Text('FEE RECEIPT', style: pw.TextStyle(fontSize: 32, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                    pw.Text(receiptTitle ?? 'FEE RECEIPT', style: pw.TextStyle(fontSize: 32, fontWeight: pw.FontWeight.bold, color: primaryColor)),
                     pw.Container(height: 4, width: 60, color: primaryColor, margin: const pw.EdgeInsets.symmetric(vertical: 5)),
                   ],
                 ),
@@ -629,7 +629,7 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolPurple(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices) async {
+  Future<Uint8List> _generateSchoolPurple(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? receiptTitle}) async {
     // Similar to teal but with purple theme
     final dateFormat = DateFormat('dd-MM-yyyy');
     const primaryColor = PdfColor.fromInt(0xFF7B1FA2); // Purple 700
@@ -692,7 +692,7 @@ class ReceiptService {
               ),
               pw.SizedBox(height: 40),
 
-              pw.Text('FEE RECEIPT', style: pw.TextStyle(fontSize: 42, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+              pw.Text(receiptTitle ?? 'FEE RECEIPT', style: pw.TextStyle(fontSize: 42, fontWeight: pw.FontWeight.bold, color: primaryColor)),
               pw.Container(height: 6, width: 80, color: primaryColor, margin: const pw.EdgeInsets.only(top: 5, bottom: 30)),
 
               // Student Box
@@ -834,7 +834,7 @@ class ReceiptService {
     return pdf.save();
   }
 
-  Future<Uint8List> _generateSchoolAcademic(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices) async {
+  Future<Uint8List> _generateSchoolAcademic(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? receiptTitle}) async {
     // Matches university style media__1772443499936.png
     final dateFormat = DateFormat('dd/MM/yyyy');
     
@@ -851,7 +851,7 @@ class ReceiptService {
               pw.SizedBox(height: 10),
               pw.Text(settings.organizationName.toUpperCase(), 
                   style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-              pw.Text('OFFICIAL FEE RECEIPT', 
+              pw.Text(receiptTitle ?? 'OFFICIAL FEE RECEIPT', 
                   style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 20),
               pw.Container( // This was missing in the original code
@@ -1002,7 +1002,7 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolTraditional(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices) async {
+  Future<Uint8List> _generateSchoolTraditional(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? receiptTitle}) async {
     // Matches horizontal voucher style media__1772443609175.png
     final dateFormat = DateFormat('dd/MM/yyyy');
     const greenTheme = PdfColor.fromInt(0xFF2E7D32); // Green 800
@@ -1037,7 +1037,7 @@ class ReceiptService {
                       pw.Spacer(),
                       pw.Transform.rotate(
                         angle: -1.57,
-                        child: pw.Text('Payment Receipt', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0x332E7D32))),
+                        child: pw.Text(receiptTitle ?? 'Payment Receipt', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0x332E7D32))),
                       ),
                     ],
                   ),
@@ -1056,7 +1056,7 @@ class ReceiptService {
                            pw.Container(
                              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                              decoration: const pw.BoxDecoration(color: greenTheme),
-                             child: pw.Text('Payment Receipt', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+                             child: pw.Text(receiptTitle ?? 'Payment Receipt', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
                            ),
                            pw.Row(
                              children: [
