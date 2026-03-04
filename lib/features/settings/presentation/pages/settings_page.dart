@@ -1048,7 +1048,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return ListTile(
       title: Row(
         children: [
-          const Expanded(child: Text('Enable Service Billing (Hotels/Lounges)')),
+          const Expanded(child: Text('Enable Service Billing (school Hostel and Hall)')),
           if (isLocked) ...[
             const SizedBox(width: 8),
             const Icon(Icons.lock, size: 16, color: Colors.orange),
