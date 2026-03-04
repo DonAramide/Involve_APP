@@ -468,7 +468,7 @@ class ReceiptService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text('Invoice No: ${invoice.invoiceNumber}', style: const pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text('Invoice No: ${invoice.invoiceNumber}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}'),
                       if (invoice.termName != null) pw.Text('Term: ${invoice.termName}'),
                       if (invoice.academicYearName != null) pw.Text('Session: ${invoice.academicYearName}'),
@@ -704,7 +704,7 @@ class ReceiptService {
                       children: [
                         pw.Text('Invoice To', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
                         pw.Text(invoice.customerName ?? 'STUDENT NAME', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                        pw.Text(invoice.className ?? 'CLASS NAME', style: const pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+                        pw.Text(invoice.className ?? 'CLASS NAME', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
                         if (invoice.customerPhone != null) pw.Text('Phone: ${invoice.customerPhone}'),
                       ],
                     ),

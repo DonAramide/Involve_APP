@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
+import '../../domain/entities/grading_rule.dart';
 
 class ResultEntryPage extends StatefulWidget {
   const ResultEntryPage({super.key});
@@ -105,7 +106,7 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
                       ? const Center(child: CircularProgressIndicator())
                       : classStudents.isEmpty
                           ? const Center(child: Text('No students in this class.'))
-                          : _buildResultGrid(classStudents),
+                          : _buildResultGrid(classStudents, state.gradingRules),
                 )
               else
                 const Expanded(
@@ -167,7 +168,7 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
     );
   }
 
-  Widget _buildResultGrid(List<Student> students) {
+  Widget _buildResultGrid(List<Student> students, List<GradingRule> rules) {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: students.length,
@@ -175,43 +176,66 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
       itemBuilder: (context, index) {
         final student = students[index];
         final controllers = _controllers[student.id]!;
+        
+        // Listeners for dynamic updates
+        return AnimatedBuilder(
+          animation: Listenable.merge([controllers['ca'], controllers['exam']]),
+          builder: (context, child) {
+            final ca = double.tryParse(controllers['ca']!.text) ?? 0.0;
+            final exam = double.tryParse(controllers['exam']!.text) ?? 0.0;
+            final total = ca + exam;
+            final gradeStr = _calculateGrade(total, rules);
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Row(
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: controllers['ca'],
-                      decoration: const InputDecoration(labelText: 'CA (40)', border: OutlineInputBorder()),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(
+                        'Total: $total | Grade: $gradeStr', 
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          color: total >= 50 ? Colors.green : Colors.red
+                        )
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: controllers['exam'],
-                      decoration: const InputDecoration(labelText: 'Exam (60)', border: OutlineInputBorder()),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: controllers['remarks'],
-                      decoration: const InputDecoration(labelText: 'Remarks', border: OutlineInputBorder()),
-                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controllers['ca'],
+                          decoration: const InputDecoration(labelText: 'CA', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: controllers['exam'],
+                          decoration: const InputDecoration(labelText: 'Exam', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: TextField(
+                          controller: controllers['remarks'],
+                          decoration: const InputDecoration(labelText: 'Remarks', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8)),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          }
         );
       },
     );
@@ -233,7 +257,7 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
         assessmentScore: ca,
         examScore: exam,
         totalScore: total,
-        grade: _calculateGrade(total),
+        grade: _calculateGrade(total, state.gradingRules).split(' ').first,
         remarks: studentControllers['remarks']!.text,
         dateEntered: DateTime.now(),
       ));
@@ -242,15 +266,18 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
     context.read<SchoolBloc>().add(SaveResultsEvent(results));
   }
 
-  String _calculateGrade(double total) {
-    if (total >= 75) return 'A1';
-    if (total >= 70) return 'B2';
-    if (total >= 65) return 'B3';
-    if (total >= 60) return 'C4';
-    if (total >= 55) return 'C5';
-    if (total >= 50) return 'C6';
-    if (total >= 45) return 'D7';
-    if (total >= 40) return 'E8';
-    return 'F9';
+  String _calculateGrade(double total, List<GradingRule> rules) {
+    if (rules.isEmpty) return 'N/A';
+    
+    // Sort rules descending by minScore
+    final sortedRules = List<GradingRule>.from(rules)
+      ..sort((a, b) => b.minScore.compareTo(a.minScore));
+
+    for (final rule in sortedRules) {
+      if (total >= rule.minScore) {
+        return '${rule.grade} (${rule.remarks})';
+      }
+    }
+    return 'F';
   }
 }

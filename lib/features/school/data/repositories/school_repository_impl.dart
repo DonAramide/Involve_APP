@@ -275,25 +275,49 @@ class SchoolRepositoryImpl implements SchoolRepository {
 
   @override
   Future<void> saveResults(List<AcademicResult> results) async {
-    await database.batch((batch) {
-      for (final res in results) {
-        batch.insert(
-          database.results,
+    for (final res in results) {
+      final existingResult = await (database.select(database.results)
+        ..where((t) => 
+          t.studentId.equals(res.studentId) &
+          t.subjectId.equals(res.subjectId) &
+          t.termId.equals(res.termId) &
+          t.academicYearId.equals(res.academicYearId)
+        )).getSingleOrNull();
+
+      if (existingResult != null) {
+        // Update existing
+        await (database.update(database.results)
+          ..where((t) => t.id.equals(existingResult.id)))
+        .write(
           db.ResultsCompanion(
-            studentId: Value(res.studentId),
-            subjectId: Value(res.subjectId),
-            termId: Value(res.termId),
-            academicYearId: Value(res.academicYearId),
             assessmentScore: Value(res.assessmentScore),
             examScore: Value(res.examScore),
             totalScore: Value(res.totalScore),
             grade: Value(res.grade),
             remarks: Value(res.remarks),
-            dateEntered: Value(res.dateEntered),
-          ),
-          mode: InsertMode.insertOrReplace,
+            dateEntered: Value(DateTime.now()),
+            updatedAt: Value(DateTime.now()),
+          )
+        );
+      } else {
+        // Insert new
+        await database.into(database.results).insert(
+          db.ResultsCompanion.insert(
+            studentId: res.studentId,
+            subjectId: res.subjectId,
+            termId: res.termId,
+            academicYearId: res.academicYearId,
+            assessmentScore: Value(res.assessmentScore),
+            examScore: Value(res.examScore),
+            totalScore: Value(res.totalScore),
+            grade: Value(res.grade),
+            remarks: Value(res.remarks),
+            dateEntered: Value(DateTime.now()),
+            createdAt: Value(DateTime.now()),
+            updatedAt: Value(DateTime.now()),
+          )
         );
       }
-    });
+    }
   }
 }

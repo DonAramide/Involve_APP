@@ -8,6 +8,8 @@ import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:collection/collection.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
 
 class StudentProfilePage extends StatefulWidget {
   final int studentId;
@@ -354,7 +356,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  Widget _buildRecordsTab(List<dynamic> invoices, String currency) {
+  Widget _buildRecordsTab(List<Invoice> invoices, String currency) {
     if (invoices.isEmpty) {
       return const Center(child: Text('No academic records found'));
     }
@@ -367,18 +369,29 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           child: ListTile(
             title: Text('Bill #${inv.invoiceNumber}'),
             subtitle: Text(DateFormat('dd MMM yyyy').format(inv.dateCreated)),
-            trailing: Text(
-              CurrencyFormatter.formatWithSymbol(inv.totalAmount, symbol: currency),
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  CurrencyFormatter.formatWithSymbol(inv.totalAmount, symbol: currency),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.print, color: Colors.blueGrey, size: 20),
+                  onPressed: () => _openReceipt(context, inv),
+                ),
+              ],
             ),
+            onTap: () => _openReceipt(context, inv),
           ),
         );
       },
     );
   }
 
-  Widget _buildPaymentsTab(List<dynamic> invoices, String currency) {
-    // For now, extract invoices with amountPaid > 0 as "Payments"
+  Widget _buildPaymentsTab(List<Invoice> invoices, String currency) {
+    // Extract invoices with amountPaid > 0 as "Payments"
     final paidInvoices = invoices.where((inv) => inv.amountPaid > 0).toList();
     if (paidInvoices.isEmpty) {
       return const Center(child: Text('No payment history found'));
@@ -390,13 +403,33 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         return ListTile(
           leading: const Icon(Icons.check_circle, color: Colors.green),
           title: Text('Payment for Bill #${inv.invoiceNumber}'),
-          subtitle: Text('Method: ${inv.paymentMethod} | ${DateFormat('dd MMM yyyy').format(inv.dateCreated)}'),
-          trailing: Text(
-            CurrencyFormatter.formatWithSymbol(inv.amountPaid, symbol: currency),
-            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+          subtitle: Text('Method: ${inv.paymentMethod ?? "Unknown"} | ${DateFormat('dd MMM yyyy').format(inv.dateCreated)}'),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                CurrencyFormatter.formatWithSymbol(inv.amountPaid, symbol: currency),
+                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.print, color: Colors.blueGrey, size: 20),
+                onPressed: () => _openReceipt(context, inv),
+              ),
+            ],
           ),
+          onTap: () => _openReceipt(context, inv),
         );
       },
+    );
+  }
+
+  void _openReceipt(BuildContext context, Invoice invoice) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReceiptPreviewPage(invoice: invoice),
+      ),
     );
   }
 }

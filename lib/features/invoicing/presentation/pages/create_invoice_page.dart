@@ -634,7 +634,7 @@ class _POSItemCard extends StatelessWidget {
                               fontSize: 12,
                             ),
                           ),
-                          if (item.type == 'product') ...[
+                          if (item.type != 'service') ...[
                             const SizedBox(height: 2),
                             Text(
                               'Rem: ${item.stockQty}',
