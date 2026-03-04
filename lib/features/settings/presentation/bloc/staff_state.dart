@@ -9,6 +9,16 @@ abstract class StaffEvent extends Equatable {
 
 class LoadStaffList extends StaffEvent {}
 
+class AuthenticateStaff extends StaffEvent {
+  final int staffId;
+  final String pin;
+  const AuthenticateStaff(this.staffId, this.pin);
+  @override
+  List<Object?> get props => [staffId, pin];
+}
+
+class LogoutStaff extends StaffEvent {}
+
 class AddStaff extends StaffEvent {
   final Staff staff;
   const AddStaff(this.staff);
@@ -32,12 +42,14 @@ class DeleteStaff extends StaffEvent {
 
 class StaffState extends Equatable {
   final List<Staff> staffList;
+  final Staff? currentUser;
   final bool isLoading;
   final String? error;
   final String? successMessage;
 
   const StaffState({
     this.staffList = const [],
+    this.currentUser,
     this.isLoading = false,
     this.error,
     this.successMessage,
@@ -45,12 +57,15 @@ class StaffState extends Equatable {
 
   StaffState copyWith({
     List<Staff>? staffList,
+    Staff? currentUser,
     bool? isLoading,
     String? error,
     String? successMessage,
+    bool clearCurrentUser = false,
   }) {
     return StaffState(
       staffList: staffList ?? this.staffList,
+      currentUser: clearCurrentUser ? null : (currentUser ?? this.currentUser),
       isLoading: isLoading ?? this.isLoading,
       error: error,
       successMessage: successMessage,
@@ -58,5 +73,5 @@ class StaffState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [staffList, isLoading, error, successMessage];
+  List<Object?> get props => [staffList, currentUser, isLoading, error, successMessage];
 }

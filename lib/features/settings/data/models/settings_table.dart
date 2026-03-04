@@ -63,4 +63,8 @@ class Settings extends Table {
   BoolColumn get skipSplash => boolean().withDefault(const Constant(false))();
   BoolColumn get restoreLastState => boolean().withDefault(const Constant(false))();
   TextColumn get lastRoute => text().nullable()();
+
+  // Phase 5: Advanced Invoicing
+  TextColumn get invoicePrefix => text().withDefault(const Constant('INV'))();
+  IntColumn get invoiceNumberPadding => integer().withDefault(const Constant(3))();
 }

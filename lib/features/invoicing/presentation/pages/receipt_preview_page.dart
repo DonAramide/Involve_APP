@@ -13,7 +13,6 @@ import '../../../printer/presentation/bloc/printer_state.dart';
 import '../../../printer/presentation/bloc/printer_bloc.dart';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import '../../../settings/domain/entities/settings.dart';
-import '../../domain/templates/template_registry.dart';
 
 class ReceiptPreviewPage extends StatelessWidget {
   final Invoice invoice;
@@ -80,23 +79,20 @@ class ReceiptPreviewPage extends StatelessWidget {
     try {
       // Use preferred template
       final templateName = settings?.defaultInvoiceTemplate ?? 'compact';
-      
-      // Use Registry to get the correct template instance
-      TemplateType type;
-      switch (templateName) {
-        case 'detailed': type = TemplateType.detailed; break;
-        case 'professional': type = TemplateType.professional; break;
-        case 'modern': type = TemplateType.modern; break;
-        case 'classic': type = TemplateType.classic; break;
-        case 'minimalist': type = TemplateType.minimalist; break;
-        case 'school_teal': type = TemplateType.schoolTeal; break;
-        case 'school_purple': type = TemplateType.schoolPurple; break;
-        case 'school_academic': type = TemplateType.schoolAcademic; break;
-        case 'school_traditional': type = TemplateType.schoolTraditional; break;
-        default: type = TemplateType.compact;
+      final InvoiceTemplate template;
+      if (templateName == 'detailed') {
+        template = DetailedInvoiceTemplate();
+      } else if (templateName == 'professional') {
+        template = ProfessionalInvoiceTemplate();
+      } else if (templateName == 'modern') {
+        template = ModernProfessionalTemplate();
+      } else if (templateName == 'classic') {
+        template = ClassicBusinessTemplate();
+      } else if (templateName == 'minimalist') {
+        template = MinimalistInvoiceTemplate();
+      } else {
+        template = CompactInvoiceTemplate();
       }
-      
-      final template = TemplateRegistry.getTemplate(type);
       
       // We pass a modified settings object if we want to force a specific price mode
       final printSettings = settings!.copyWith(

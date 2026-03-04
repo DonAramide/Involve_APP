@@ -4,8 +4,6 @@ import 'package:intl/intl.dart';
 import '../bloc/stock_bloc.dart';
 import '../bloc/stock_state.dart';
 import '../../domain/entities/item.dart';
-import '../../../../core/utils/terminology.dart';
-import '../../../settings/presentation/bloc/settings_bloc.dart';
 
 class StockHistoryPage extends StatefulWidget {
   final Item item;
@@ -22,13 +20,12 @@ class _StockHistoryPageState extends State<StockHistoryPage> {
     super.initState();
     context.read<StockBloc>().add(LoadStockHistoryRequested(widget.item.id!));
   }
+
   @override
   Widget build(BuildContext context) {
-    final settings = context.select((SettingsBloc bloc) => bloc.state.settings);
-    
     return Scaffold(
       appBar: AppBar(
-        title: Text('${settings?.stockHistoryLabel ?? 'Stock History'}: ${widget.item.name}'),
+        title: Text('Stock History: ${widget.item.name}'),
       ),
       body: BlocBuilder<StockBloc, StockState>(
         builder: (context, state) {
@@ -36,7 +33,7 @@ class _StockHistoryPageState extends State<StockHistoryPage> {
             return const Center(child: CircularProgressIndicator());
           } else if (state is StockHistoryLoaded) {
             if (state.history.isEmpty) {
-              return Center(child: Text(settings?.stockAdditionsLabel ?? 'No stock additions recorded yet.'));
+              return const Center(child: Text('No stock additions recorded yet.'));
             }
             return ListView.separated(
               padding: const EdgeInsets.all(16),

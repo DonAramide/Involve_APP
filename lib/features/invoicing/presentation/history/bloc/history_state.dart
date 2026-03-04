@@ -3,6 +3,7 @@ import '../../../domain/entities/invoice.dart';
 
 // Events
 abstract class HistoryEvent extends Equatable {
+  const HistoryEvent();
   @override
   List<Object?> get props => [];
 }
@@ -52,6 +53,13 @@ class ReturnStock extends HistoryEvent {
 
   @override
   List<Object?> get props => [invoiceId, items, staffId, replacements];
+}
+
+class DeleteInvoice extends HistoryEvent {
+  final int invoiceId;
+  const DeleteInvoice(this.invoiceId);
+  @override
+  List<Object?> get props => [invoiceId];
 }
 
 // States

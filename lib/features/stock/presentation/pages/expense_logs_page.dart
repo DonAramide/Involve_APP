@@ -38,11 +38,9 @@ class _ExpenseLogsPageState extends State<ExpenseLogsPage> {
   }
 
   void _loadExpenses() {
-    final mode = context.read<SettingsBloc>().state.settings?.businessMode;
     context.read<StockBloc>().add(LoadExpensesRequested(
       start: _startDate,
       end: _endDate,
-      businessMode: mode,
     ));
   }
 

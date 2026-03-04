@@ -462,8 +462,39 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     label: const Text('RETURN STOCK'),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700], foregroundColor: Colors.white),
                   ),
+                if (context.read<StaffBloc>().state.currentUser?.role == 'Admin')
+                  ElevatedButton.icon(
+                    onPressed: () => _confirmDeleteInvoice(context, invoice),
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text('DELETE'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black87, foregroundColor: Colors.white),
+                  ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteInvoice(BuildContext context, Invoice invoice) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Delete'),
+        content: Text('Are you sure you want to delete Invoice #${invoice.invoiceNumber}? This will restore stock for non-returned items and permanently hide this record.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              context.read<HistoryBloc>().add(DeleteInvoice(invoice.id!));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Invoice deleted successfully'), backgroundColor: Colors.red),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('DELETE'),
           ),
         ],
       ),

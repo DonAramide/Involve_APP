@@ -11,7 +11,6 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 
 class ActivationPage extends StatefulWidget {
-  static const routeName = '/activation';
   final bool isExpired;
   const ActivationPage({super.key, this.isExpired = false});
 

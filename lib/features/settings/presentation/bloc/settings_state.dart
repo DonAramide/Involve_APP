@@ -89,24 +89,6 @@ class LoadBusinessLock extends SettingsEvent {}
 
 class LockBusinessName extends SettingsEvent {}
 
-class LoadModeLock extends SettingsEvent {}
-
-class LockBusinessMode extends SettingsEvent {}
-
-class ExportDatabaseToFile extends SettingsEvent {
-  final String path;
-  ExportDatabaseToFile(this.path);
-  @override
-  List<Object?> get props => [path];
-}
-
-class ImportDatabaseFromFile extends SettingsEvent {
-  final String path;
-  ImportDatabaseFromFile(this.path);
-  @override
-  List<Object?> get props => [path];
-}
-
 
 class SettingsState extends Equatable {
   final AppSettings? settings;
@@ -118,7 +100,6 @@ class SettingsState extends Equatable {
   final bool isDeviceAuthorized; // For lifetime activation
   final bool isSuperAdminAuthorized;
   final bool isBusinessLocked;
-  final bool isModeLocked;
   final String? error;
   final String? successMessage;
   final String? backupPath;
@@ -134,7 +115,6 @@ class SettingsState extends Equatable {
     this.isDeviceAuthorized = false,
     this.isSuperAdminAuthorized = false,
     this.isBusinessLocked = false,
-    this.isModeLocked = false,
     this.error,
     this.successMessage,
     this.backupPath,
@@ -151,7 +131,6 @@ class SettingsState extends Equatable {
     bool? isDeviceAuthorized,
     bool? isSuperAdminAuthorized,
     bool? isBusinessLocked,
-    bool? isModeLocked,
     String? error,
     String? successMessage,
     String? backupPath,
@@ -167,7 +146,6 @@ class SettingsState extends Equatable {
       isDeviceAuthorized: isDeviceAuthorized ?? this.isDeviceAuthorized,
       isSuperAdminAuthorized: isSuperAdminAuthorized ?? this.isSuperAdminAuthorized,
       isBusinessLocked: isBusinessLocked ?? this.isBusinessLocked,
-      isModeLocked: isModeLocked ?? this.isModeLocked,
       error: error,
       successMessage: successMessage,
       backupPath: backupPath ?? this.backupPath,
@@ -186,7 +164,6 @@ class SettingsState extends Equatable {
         isDeviceAuthorized,
         isSuperAdminAuthorized,
         isBusinessLocked,
-        isModeLocked,
         error,
         successMessage,
         backupPath,

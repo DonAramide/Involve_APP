@@ -22,8 +22,6 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<UpdatePaymentMethod>(_onUpdatePaymentMethod);
     on<UpdateStaffInfo>(_onUpdateStaff);
     on<UpdateItemPrintPrice>(_onUpdateItemPrintPrice);
-    on<UpdateSchoolInfo>(_onUpdateSchool);
-    on<UpdateBusinessMode>(_onUpdateBusinessMode);
   }
 
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
@@ -121,11 +119,6 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         staffId: state.staffId,
         staffName: state.staffName,
         totalPrintAmount: totalPrintAmount,
-        businessMode: state.businessMode,
-        studentId: state.studentId,
-        classId: state.classId,
-        termId: state.termId,
-        academicYearId: state.academicYearId,
       );
 
       await repository.saveInvoice(invoice);
@@ -186,18 +179,5 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
       total: total,
       isSaved: false,
     ));
-  }
-
-  void _onUpdateSchool(UpdateSchoolInfo event, Emitter<InvoiceState> emit) {
-    emit(state.copyWith(
-      studentId: event.studentId,
-      classId: event.classId,
-      termId: event.termId,
-      academicYearId: event.academicYearId,
-    ));
-  }
-
-  void _onUpdateBusinessMode(UpdateBusinessMode event, Emitter<InvoiceState> emit) {
-    emit(state.copyWith(businessMode: event.businessMode));
   }
 }

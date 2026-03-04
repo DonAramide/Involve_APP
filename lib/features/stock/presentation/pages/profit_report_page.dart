@@ -37,11 +37,9 @@ class _ProfitReportPageState extends State<ProfitReportPage> {
   }
 
   void _loadReport() {
-    final mode = context.read<SettingsBloc>().state.settings?.businessMode;
     context.read<StockBloc>().add(LoadProfitReportRequested(
       start: _startDate,
       end: _endDate,
-      businessMode: mode,
     ));
   }
 

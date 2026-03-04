@@ -5,7 +5,6 @@ import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
-import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -32,32 +31,14 @@ class _LandingPageState extends State<LandingPage> {
     }
 
     final settingsState = context.read<SettingsBloc>().state;
-    final settings = settingsState.settings;
-    final businessName = settings?.organizationName;
+    final businessName = settingsState.settings?.organizationName;
 
     final hasAccess = await LicenseService.canAccess(businessName);
     if (hasAccess) {
       if (mounted) {
-        final destination = _getDestination(settings);
-        final routeName = (destination is DashboardPage) ? DashboardPage.routeName : (destination is ActivationPage ? ActivationPage.routeName : null);
-
-        if (settings?.skipSplash == true) {
-          Navigator.of(context).pushReplacement(
-            PageRouteBuilder(
-              settings: RouteSettings(name: routeName),
-              pageBuilder: (context, animation1, animation2) => destination,
-              transitionDuration: Duration.zero,
-              reverseTransitionDuration: Duration.zero,
-            ),
-          );
-        } else {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              settings: RouteSettings(name: routeName),
-              builder: (_) => destination,
-            ),
-          );
-        }
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const DashboardPage()),
+        );
       }
     } else {
       final isExpired = await LicenseService.isExpired(businessName);
@@ -67,16 +48,6 @@ class _LandingPageState extends State<LandingPage> {
         );
       }
     }
-  }
-
-  Widget _getDestination(AppSettings? settings) {
-    if (settings?.restoreLastState == true && settings?.lastRoute != null) {
-      final route = settings!.lastRoute;
-      if (route == DashboardPage.routeName) return const DashboardPage();
-      if (route == ActivationPage.routeName) return const ActivationPage();
-      // Add more routes as needed
-    }
-    return const DashboardPage();
   }
 
   void _showTamperDialog() {

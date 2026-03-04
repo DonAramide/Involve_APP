@@ -8,7 +8,6 @@ abstract class InvoiceRepository {
   Future<List<Invoice>> getInvoicesByDateRange(DateTime start, DateTime end);
   Future<bool> checkServiceAvailability(int itemId, DateTime start, DateTime end);
   Future<void> updatePaymentInfo(int invoiceId, String method, String status);
-  Future<List<Invoice>> getInvoicesByStudentId(int studentId);
   
   // Stock Returns & Replacements
   Future<void> returnItems({
@@ -19,6 +18,7 @@ abstract class InvoiceRepository {
   });
   Future<List<StockReturn>> getStockReturnsByDateRange(DateTime start, DateTime end);
   Future<List<StockReturn>> getStockReturnsByInvoiceId(int invoiceId);
+  Future<void> deleteInvoice(int invoiceId);
 }
 
 class ReturnItem {

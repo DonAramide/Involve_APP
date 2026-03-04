@@ -40,6 +40,7 @@ class StaffRepositoryImpl implements StaffRepository {
           StaffCompanion.insert(
             name: staff.name,
             staffCode: _hash(staff.staffCode),
+            role: Value(staff.role),
             isActive: Value(staff.isActive),
             syncId: Value(staff.syncId ?? const Uuid().v4()),
             updatedAt: Value(now),
@@ -64,6 +65,7 @@ class StaffRepositoryImpl implements StaffRepository {
           StaffCompanion(
             name: Value(staff.name),
             staffCode: Value(finalizedCode),
+            role: Value(staff.role),
             isActive: Value(staff.isActive),
             updatedAt: Value(DateTime.now()),
             isDeleted: const Value(false),
@@ -97,6 +99,7 @@ class StaffRepositoryImpl implements StaffRepository {
       id: row.id,
       name: row.name,
       staffCode: row.staffCode,
+      role: row.role,
       isActive: row.isActive,
     );
   }

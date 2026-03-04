@@ -10,6 +10,8 @@ class StaffBloc extends Bloc<StaffEvent, StaffState> {
     on<AddStaff>(_onAddStaff);
     on<UpdateStaff>(_onUpdateStaff);
     on<DeleteStaff>(_onDeleteStaff);
+    on<AuthenticateStaff>(_onAuthenticate);
+    on<LogoutStaff>(_onLogout);
   }
 
   Future<void> _onLoadStaff(LoadStaffList event, Emitter<StaffState> emit) async {
@@ -50,5 +52,23 @@ class StaffBloc extends Bloc<StaffEvent, StaffState> {
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
     }
+  }
+
+  Future<void> _onAuthenticate(AuthenticateStaff event, Emitter<StaffState> emit) async {
+    emit(state.copyWith(isLoading: true));
+    try {
+      final staff = await repository.authenticateStaff(event.staffId, event.pin);
+      if (staff != null) {
+        emit(state.copyWith(currentUser: staff, isLoading: false, successMessage: 'Login successful'));
+      } else {
+        emit(state.copyWith(error: 'Invalid pin', isLoading: false));
+      }
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), isLoading: false));
+    }
+  }
+
+  void _onLogout(LogoutStaff event, Emitter<StaffState> emit) {
+    emit(state.copyWith(clearCurrentUser: true));
   }
 }

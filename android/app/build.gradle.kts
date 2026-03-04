@@ -1,16 +1,8 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-}
-
-val keystorePropertiesFile = rootProject.file("key.properties")
-val keystoreProperties = Properties()
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
 android {
@@ -38,32 +30,11 @@ android {
         versionName = flutter.versionName
     }
 
-    signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties.getProperty("keyAlias")
-            keyPassword = keystoreProperties.getProperty("keyPassword")
-            storeFile = keystoreProperties.getProperty("storeFile")?.let { file(it) }
-            storePassword = keystoreProperties.getProperty("storePassword")
-        }
-    }
-
     buildTypes {
         release {
-            // Fallback: If key.properties exists AND we haven't explicitly requested an unsigned build, sign with release.
-            // Otherwise, if we requested 'unsigned' via Env Var, use no signingConfig (produces unsigned APK).
-            // Else, fall back to debug signing for local testing.
-            val buildUnsigned = System.getenv("BUILD_UNSIGNED") == "true"
-            signingConfig = if (keystorePropertiesFile.exists() && !buildUnsigned) {
-                signingConfigs.getByName("release")
-            } else if (buildUnsigned) {
-                null
-            } else {
-                signingConfigs.getByName("debug")
-            }
-            
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }

@@ -11,7 +11,6 @@ class StorageService {
   static const _lastOpenedKey = 'last_opened_date';
   static const _trialStartKey = 'trial_start_date';
   static const _businessLockedKey = 'is_business_locked';
-  static const _modeLockedKey = 'is_mode_locked';
   static const _lastPrinterIpKey = 'last_printer_ip';
   static const _proExpiryKey = 'pro_plan_expiry';
   static const _deviceAccessKey = 'device_admin_access_granted';
@@ -104,29 +103,6 @@ class StorageService {
       value = await _secureStorage.read(key: _businessLockedKey);
     } else {
       final file = await _getDesktopBusinessLockFile();
-      if (await file.exists()) {
-        value = await file.readAsString();
-      }
-    }
-    return value == 'true';
-  }
-
-  static Future<void> setBusinessModeLocked(bool locked) async {
-    final value = locked ? 'true' : 'false';
-    if (Platform.isAndroid || Platform.isIOS) {
-      await _secureStorage.write(key: _modeLockedKey, value: value);
-    } else {
-      final file = await _getDesktopFile('mode_lock.dat');
-      await file.writeAsString(value);
-    }
-  }
-
-  static Future<bool> isBusinessModeLocked() async {
-    String? value;
-    if (Platform.isAndroid || Platform.isIOS) {
-      value = await _secureStorage.read(key: _modeLockedKey);
-    } else {
-      final file = await _getDesktopFile('mode_lock.dat');
       if (await file.exists()) {
         value = await file.readAsString();
       }

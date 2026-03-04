@@ -209,7 +209,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                       );
 
                       _printInvoice(context, invoice, settings!);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Processing... please wait.')));
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saving and printing...')));
                     },
                     child: invoiceState.isSaving 
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))

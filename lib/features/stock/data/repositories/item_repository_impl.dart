@@ -13,27 +13,9 @@ class ItemRepositoryImpl implements ItemRepository {
   ItemRepositoryImpl(this.db);
 
   @override
-  Future<List<Item>> getAllItems({String? businessMode}) async {
-    final query = db.select(db.items).join([
-      leftOuterJoin(
-        db.categories,
-        db.categories.id.equalsExp(db.items.categoryId),
-      ),
-    ]);
-
-    query.where(db.items.isDeleted.equals(false));
-
-    if (businessMode != null) {
-      if (businessMode == 'school') {
-        query.where(db.items.businessMode.equals('school'));
-      } else {
-        // For retail, show explicitly retail or null (backward compatibility)
-        query.where(db.items.businessMode.equals('retail') | db.items.businessMode.isNull());
-      }
-    }
-
-    final results = await query.get();
-    return results.map((row) => _toEntity(row.readTable(db.items))).toList();
+  Future<List<Item>> getAllItems() async {
+    final results = await db.select(db.items).get();
+    return results.map((row) => _toEntity(row)).toList();
   }
 
   @override
@@ -52,7 +34,6 @@ class ItemRepositoryImpl implements ItemRepository {
             billingType: Value(item.billingType),
             serviceCategory: Value(item.serviceCategory),
             requiresTimeTracking: Value(item.requiresTimeTracking),
-            businessMode: Value(item.businessMode),
             minStockQty: Value(item.minStockQty),
             syncId: Value(item.syncId ?? const Uuid().v4()),
             updatedAt: Value(now),
@@ -78,7 +59,6 @@ class ItemRepositoryImpl implements ItemRepository {
             billingType: Value(item.billingType),
             serviceCategory: Value(item.serviceCategory),
             requiresTimeTracking: Value(item.requiresTimeTracking),
-            businessMode: Value(item.businessMode),
             updatedAt: Value(DateTime.now()),
             isDeleted: const Value(false),
           ),
@@ -146,14 +126,9 @@ class ItemRepositoryImpl implements ItemRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getInventoryReport({DateTime? start, DateTime? end, String? businessMode}) async {
+  Future<List<Map<String, dynamic>>> getInventoryReport({DateTime? start, DateTime? end}) async {
     final summedQuantity = db.invoiceItems.quantity.sum();
     final query = db.select(db.items).join([
-      leftOuterJoin(
-        db.categories,
-        db.categories.id.equalsExp(db.items.categoryId),
-        useColumns: false,
-      ),
       leftOuterJoin(
         db.invoiceItems,
         db.invoiceItems.itemId.equalsExp(db.items.id),
@@ -165,10 +140,6 @@ class ItemRepositoryImpl implements ItemRepository {
         useColumns: false,
       ),
     ]);
-
-    if (businessMode != null) {
-      query.where(db.categories.businessMode.equals(businessMode));
-    }
 
     if (start != null) {
       query.where(db.invoices.dateCreated.isBiggerOrEqualValue(start));
@@ -199,15 +170,10 @@ class ItemRepositoryImpl implements ItemRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getProfitReport({DateTime? start, DateTime? end, String? businessMode}) async {
+  Future<List<Map<String, dynamic>>> getProfitReport({DateTime? start, DateTime? end}) async {
     final summedQuantity = db.invoiceItems.quantity.sum();
     // Profit per item = (price - costPrice) * qty
     final query = db.select(db.items).join([
-      leftOuterJoin(
-        db.categories,
-        db.categories.id.equalsExp(db.items.categoryId),
-        useColumns: false,
-      ),
       leftOuterJoin(
         db.invoiceItems,
         db.invoiceItems.itemId.equalsExp(db.items.id),
@@ -219,10 +185,6 @@ class ItemRepositoryImpl implements ItemRepository {
         useColumns: false,
       ),
     ]);
-
-    if (businessMode != null) {
-      query.where(db.categories.businessMode.equals(businessMode));
-    }
 
     if (start != null) {
       query.where(db.invoices.dateCreated.isBiggerOrEqualValue(start));
@@ -273,7 +235,7 @@ class ItemRepositoryImpl implements ItemRepository {
   }
 
   @override
-  Future<List<Expense>> getExpenses({DateTime? start, DateTime? end, String? businessMode}) async {
+  Future<List<Expense>> getExpenses({DateTime? start, DateTime? end}) async {
     final query = db.select(db.expenses);
     if (start != null) {
       query.where((t) => t.date.isBiggerOrEqualValue(start));
@@ -296,7 +258,7 @@ class ItemRepositoryImpl implements ItemRepository {
   }
 
   @override
-  Future<double> getTotalExpenses({DateTime? start, DateTime? end, String? businessMode}) async {
+  Future<double> getTotalExpenses({DateTime? start, DateTime? end}) async {
     final amountSum = db.expenses.amount.sum();
     final query = db.selectOnly(db.expenses)..addColumns([amountSum]);
     
@@ -327,7 +289,6 @@ class ItemRepositoryImpl implements ItemRepository {
       billingType: row.billingType,
       serviceCategory: row.serviceCategory,
       requiresTimeTracking: row.requiresTimeTracking,
-      businessMode: row.businessMode,
       syncId: row.syncId,
     );
   }

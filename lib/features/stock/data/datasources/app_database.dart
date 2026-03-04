@@ -37,13 +37,14 @@ part 'app_database.g.dart';
   Students,
   BusinessSettings,
   Subjects,
-  Results
+  Results,
+  GradingRules
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 49;
+  int get schemaVersion => 51;
 
   @override
   MigrationStrategy get migration {
@@ -206,10 +207,22 @@ class AppDatabase extends _$AppDatabase {
         }
 
         if (from < 49) {
-          // Schema V49: Add skipSplash and state persistence toggles
-          await _safeAddColumn(m, settings, settings.skipSplash);
-          await _safeAddColumn(m, settings, settings.restoreLastState);
           await _safeAddColumn(m, settings, settings.lastRoute);
+        }
+
+        if (from < 50) {
+          // Schema V50: Advanced Invoicing and Security
+          await _safeAddColumn(m, invoices, invoices.dueDate);
+          await _safeAddColumn(m, settings, settings.invoicePrefix);
+          await _safeAddColumn(m, settings, settings.invoiceNumberPadding);
+          await _safeAddColumn(m, staff, staff.role);
+        }
+
+        if (from < 51) {
+          // Schema V51: Configurable Grading Rules
+          await _safeCreateTable(m, gradingRules);
+          
+          await _seedDefaultGradingRules();
         }
       },
       beforeOpen: (details) async {
@@ -237,6 +250,29 @@ class AppDatabase extends _$AppDatabase {
       await m.createTable(table);
     } catch (e) {
       debugPrint('Migration: Table ${table.actualTableName} already exists, skipping: $e');
+    }
+  }
+
+  Future<void> _seedDefaultGradingRules() async {
+    final defaults = [
+      {'grade': 'A1', 'min': 75.0, 'max': 100.0, 'remarks': 'Excellent'},
+      {'grade': 'B2', 'min': 70.0, 'max': 74.99, 'remarks': 'Very Good'},
+      {'grade': 'B3', 'min': 65.0, 'max': 69.99, 'remarks': 'Good'},
+      {'grade': 'C4', 'min': 60.0, 'max': 64.99, 'remarks': 'Credit'},
+      {'grade': 'C5', 'min': 55.0, 'max': 59.99, 'remarks': 'Credit'},
+      {'grade': 'C6', 'min': 50.0, 'max': 54.99, 'remarks': 'Credit'},
+      {'grade': 'D7', 'min': 45.0, 'max': 49.99, 'remarks': 'Pass'},
+      {'grade': 'E8', 'min': 40.0, 'max': 44.99, 'remarks': 'Pass'},
+      {'grade': 'F9', 'min': 0.0, 'max': 39.99, 'remarks': 'Fail'},
+    ];
+
+    for (final rule in defaults) {
+      await into(gradingRules).insert(GradingRulesCompanion.insert(
+        grade: rule['grade'] as String,
+        minScore: rule['min'] as double,
+        maxScore: rule['max'] as double,
+        remarks: Value(rule['remarks'] as String?),
+      ));
     }
   }
 

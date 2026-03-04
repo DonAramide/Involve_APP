@@ -22,344 +22,209 @@ import '../bloc/staff_state.dart';
 import '../../domain/entities/staff.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
 import 'package:file_picker/file_picker.dart';
-import '../widgets/business_mode_selector.dart';
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
-  State<SettingsPage> createState() => _SettingsPageState();
-}
-
-class _SettingsPageState extends State<SettingsPage> {
-  String _searchQuery = '';
-  bool _isSearching = false;
-  final TextEditingController _searchController = TextEditingController();
-
-  bool _matches(String title, [List<String>? keywords]) {
-    if (_searchQuery.isEmpty) return true;
-    final q = _searchQuery.toLowerCase();
-    if (title.toLowerCase().contains(q)) return true;
-    if (keywords != null) {
-      for (final k in keywords) {
-        if (k.toLowerCase().contains(q)) return true;
-      }
-    }
-    return false;
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SettingsBloc, SettingsState>(
-      builder: (context, state) {
-        final bool isAuthorized = state.isAuthorized;
-        return Scaffold(
-          appBar: AppBar(
-            title: _isSearching 
-              ? TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Search settings...',
-                    border: InputBorder.none,
-                    hintStyle: TextStyle(color: Colors.white70),
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  onChanged: (val) => setState(() => _searchQuery = val),
-                )
-              : const Text('System Settings'),
-            actions: [
-              if (isAuthorized)
-                IconButton(
-                  icon: Icon(_isSearching ? Icons.close : Icons.search),
-                  onPressed: () {
-                    setState(() {
-                      if (_isSearching) {
-                        _searchQuery = '';
-                        _searchController.clear();
+    return Scaffold(
+      appBar: AppBar(title: const Text('System Settings')),
+      body: BlocListener<SettingsBloc, SettingsState>(
+        listener: (context, state) {
+          if (state.error != null) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!), backgroundColor: Colors.red));
+          }
+          if (state.successMessage != null) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.successMessage!), backgroundColor: Colors.green));
+          }
+        },
+        child: BlocBuilder<SettingsBloc, SettingsState>(
+          builder: (context, state) {
+            if (state.isLoading) return const Center(child: CircularProgressIndicator());
+            if (!state.isAuthorized) return _buildAuthRequired(context);
+
+            final settings = state.settings!;
+            final isSuperAdmin = state.isDeviceAuthorized;
+
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildActivationBanner(context, state),
+                const SizedBox(height: 10),
+                _buildActivationHistoryTile(context),
+                const SizedBox(height: 10),
+                _buildSectionHeader(context, 'Branding'),
+                _buildReadOnlyLogoTile(context, settings),
+                _buildSwitchTile('Print Company Logo on Receipt', settings.showLogo, (val) => _update(context, settings.copyWith(showLogo: val))),
+                const SizedBox(height: 10),
+                _buildSectionHeader(context, 'Organization Detail'),
+                state.isBusinessLocked 
+                  ? _buildReadOnlyTile('Name', settings.organizationName, Icons.business)
+                  : _buildTextTile(context, 'Name', settings.organizationName, (val) => _update(context, settings.copyWith(organizationName: val))),
+                _buildTextTile(context, 'Address', settings.address, (val) => _update(context, settings.copyWith(address: val))),
+                _buildTextTile(context, 'Phone', settings.phone, (val) => _update(context, settings.copyWith(phone: val))),
+                _buildTextTile(context, 'CAC Number', settings.cacNumber ?? '', (val) => _update(context, settings.copyWith(cacNumber: val))),
+                _buildSwitchTile('Print CAC Number on Receipt', settings.showCacNumber, (val) => _update(context, settings.copyWith(showCacNumber: val))),
+                _buildTextTile(context, 'Description', settings.businessDescription ?? '', (val) => _update(context, settings.copyWith(businessDescription: val))),
+                _buildTextTile(context, 'Tax ID (VAT/GST)', settings.taxId ?? '', (val) => _update(context, settings.copyWith(taxId: val))),
+                const Divider(),
+                _buildSectionHeader(context, 'Preferences'),
+                _buildSwitchTile('Enable Tax', settings.taxEnabled, (val) => _update(context, settings.copyWith(taxEnabled: val))),
+                if (settings.taxEnabled)
+                  _buildTextTile(
+                    context, 
+                    'Tax Rate (%)', 
+                    (settings.taxRate * 100).toStringAsFixed(0), 
+                    (val) {
+                      final rate = double.tryParse(val);
+                      if (rate != null) {
+                        _update(context, settings.copyWith(taxRate: rate / 100));
                       }
-                      _isSearching = !_isSearching;
-                    });
+                    },
+                    validator: (val) {
+                      final n = double.tryParse(val ?? '');
+                      if (n == null || n < 0 || n > 100) return 'Enter 0-100';
+                      return null;
+                    },
+                  ),
+                _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
+
+                _buildSwitchTile('Confirm Item Price on Selection', settings.confirmPriceOnSelection, (val) => _update(context, settings.copyWith(confirmPriceOnSelection: val))),
+                _buildSwitchTile('Enable Payment Methods (Cash/POS/Transfer)', settings.paymentMethodsEnabled, (val) => _update(context, settings.copyWith(paymentMethodsEnabled: val))),
+                _buildSwitchTile('Enable Custom Receipt Pricing (Inflated Prices)', settings.customReceiptPricingEnabled, (val) => _update(context, settings.copyWith(customReceiptPricingEnabled: val))),
+                _buildDropdownTile(
+                  context, 
+                  'Currency', 
+                  ['₦', '\$', '€', '£', 'KSh'].contains(settings.currency) ? settings.currency : '₦', 
+                  ['₦', '\$', '€', '£', 'KSh'], 
+                  (val) => _update(context, settings.copyWith(currency: val)),
+                ),
+                _buildDropdownTile(
+                  context, 
+                  'Invoice Template', 
+                  settings.defaultInvoiceTemplate, 
+                  ['compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic'], 
+                  (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
+                ),
+                _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
+                _buildDropdownTile(context, 'Operational Mode', settings.businessMode, ['retail', 'school'], (val) => _update(context, settings.copyWith(businessMode: val))),
+                _buildThemeColorSection(context, settings),
+                _buildTextTile(context, 'Receipt Footer', settings.receiptFooter, (val) => _update(context, settings.copyWith(receiptFooter: val))),
+                _buildDropdownTile(
+                  context, 
+                  'Thermal Paper Width', 
+                  '${settings.paperWidth}mm', 
+                  ['58mm', '80mm', '88mm'], 
+                  (val) {
+                    final width = int.parse(val.replaceAll('mm', ''));
+                    _update(context, settings.copyWith(paperWidth: width));
                   },
                 ),
+                const Divider(),
+                _buildSectionHeader(context, 'Account Details'),
+                _buildSwitchTile('Show Account Details on Invoice', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
+                _buildSwitchTile('Show Signature Space on Receipt', settings.showSignatureSpace, (val) => _update(context, settings.copyWith(showSignatureSpace: val))),
+                if (settings.showAccountDetails) ...[
+                  _buildTextTile(context, 'Bank Name', settings.bankName ?? '', (val) => _update(context, settings.copyWith(bankName: val))),
+                  _buildTextTile(context, 'Account Number', settings.accountNumber ?? '', (val) => _update(context, settings.copyWith(accountNumber: val))),
+                  _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
+                ],
+                const Divider(),
+                _buildServiceBillingTile(context, settings, state),
+                if (settings.serviceBillingEnabled) ...[
+                  _buildServiceTypesSection(context, settings),
+                  _buildHalfDayConfigSection(context, settings),
+                ],
+                const Divider(),
+                _buildSectionHeader(context, 'Staff Management'),
+                _buildStaffManagementSection(context, settings),
+                const Divider(),
+                _buildSectionHeader(context, 'Graph Visibility (Admin)'),
+                _buildSwitchTile(
+                  'Show Sales Trend (Invoice History)', 
+                  settings.showSalesTrendChart, 
+                  (val) => _update(context, settings.copyWith(showSalesTrendChart: val))
+                ),
+                _buildSwitchTile(
+                  'Show Expense Pie Chart (Profit Report)', 
+                  settings.showExpensePieChart, 
+                  (val) => _update(context, settings.copyWith(showExpensePieChart: val))
+                ),
+                _buildSwitchTile(
+                  'Show Top Selling Bar Chart (Inventory Report)', 
+                  settings.showTopSellingChart, 
+                  (val) => _update(context, settings.copyWith(showTopSellingChart: val))
+                ),
+                _buildSwitchTile(
+                  'Show Stock Value Pie Chart (Inventory Report)', 
+                  settings.showStockValueChart, 
+                  (val) => _update(context, settings.copyWith(showStockValueChart: val))
+                ),
+                const Divider(),
+                _buildSectionHeader(context, 'Maintenance'),
+                ListTile(
+                  title: const Text('Export/Local Backup'),
+                  subtitle: const Text('Save or share database backup'),
+                  trailing: state.isExporting ? const CircularProgressIndicator() : const Icon(Icons.backup),
+                  onTap: () => _showBackupOptions(context, state),
+                ),
+                ListTile(
+                  title: const Text('Device Synchronization'),
+                  subtitle: const Text('Connect and sync data with other devices'),
+                  trailing: const Icon(Icons.sync_alt),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSyncPage())),
+                ),
+                const Divider(),
+                SwitchListTile(
+                  title: const Text('Show Date & Time'),
+                  subtitle: const Text('Display live date and time in the dashboard app bar'),
+                  value: settings.showDateTime,
+                  onChanged: (value) => 
+                    context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showDateTime: value))),
+                ),
+                SwitchListTile(
+                  title: const Text('Show Sync Status'),
+                  subtitle: const Text('Display synchronization status in the dashboard app bar'),
+                  value: settings.showSyncStatus,
+                  onChanged: (value) => 
+                    context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showSyncStatus: value))),
+                ),
+                SwitchListTile(
+                  title: const Text('Show Total Sales Card'),
+                  subtitle: const Text('Display the summary card at the top of Invoice History'),
+                  value: settings.showTotalSalesCard,
+                  onChanged: (value) => 
+                    context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(showTotalSalesCard: value))),
+                ),
+                SwitchListTile(
+                  title: const Text('Enable Stock Return & Replace'),
+                  subtitle: const Text('Allow users to return or replace items from invoice history'),
+                  value: settings.stockReturnEnabled,
+                  onChanged: (value) => 
+                    context.read<SettingsBloc>().add(UpdateAppSettings(settings.copyWith(stockReturnEnabled: value))),
+                ),
+                const Divider(),
+                ListTile(
+                  title: const Text('Restore Backup'),
+                  subtitle: const Text('Import database from a file'),
+                  trailing: state.isImporting ? const CircularProgressIndicator() : const Icon(Icons.restore),
+                  onTap: () => _handleRestore(context),
+                ),
+                const Divider(),
+                _buildSectionHeader(context, 'Security'),
+              ListTile(
+                title: const Text('Change System Password'),
+                trailing: const Icon(Icons.lock_outline),
+                onTap: () => _showChangePassword(context),
+              ),
             ],
-          ),
-          body: BlocListener<SettingsBloc, SettingsState>(
-            listener: (context, state) {
-              if (state.error != null) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!), backgroundColor: Colors.red));
-              }
-              if (state.successMessage != null) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.successMessage!), backgroundColor: Colors.green));
-              }
-            },
-            child: _buildBody(context, state),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildBody(BuildContext context, SettingsState state) {
-    if (state.isLoading) return const Center(child: CircularProgressIndicator());
-    if (!state.isAuthorized) return _buildAuthRequired(context);
-
-    final settings = state.settings!;
-    final isSuperAdmin = state.isDeviceAuthorized;
-
-    final List<Widget> listItems = [
-      if (_searchQuery.isEmpty) ...[
-        _buildActivationBanner(context, state),
-        const SizedBox(height: 10),
-      ],
-      if (_matches('Activation History', ['license', 'subscription'])) ...[
-        _buildActivationHistoryTile(context),
-        const SizedBox(height: 10),
-      ],
-      
-      // Branding Section
-      if (_matches('Branding', ['logo', 'name'])) ...[
-         _buildSectionHeader(context, 'Branding'),
-         _buildReadOnlyLogoTile(context, settings),
-         _buildSwitchTile('Print Company Logo on Receipt', settings.showLogo, (val) => _update(context, settings.copyWith(showLogo: val))),
-         const Divider(),
-      ],
-
-      // Business Mode
-      if (_matches('Business Mode', ['school', 'retail', 'operation'])) ...[
-        BusinessModeSelector(
-          settings: settings,
-          isLocked: state.isModeLocked,
-          onModeChanged: (val) => _handleModeChange(context, settings, val),
-        ),
-        const SizedBox(height: 10),
-      ],
-
-      // Organization Detail
-      if (_matches('Organization Detail', ['name', 'address', 'phone', 'cac', 'description', 'tax id'])) ...[
-        _buildSectionHeader(context, 'Organization Detail'),
-        if (_matches('Name', ['organization']))
-          state.isBusinessLocked 
-            ? _buildReadOnlyTile('Name', settings.organizationName, Icons.business)
-            : _buildTextTile(context, 'Name', settings.organizationName, (val) => _update(context, settings.copyWith(organizationName: val))),
-        if (_matches('Address'))
-          _buildTextTile(context, 'Address', settings.address, (val) => _update(context, settings.copyWith(address: val))),
-        if (_matches('Phone'))
-          _buildTextTile(context, 'Phone', settings.phone, (val) => _update(context, settings.copyWith(phone: val))),
-        if (_matches('CAC Number'))
-          _buildTextTile(context, 'CAC Number', settings.cacNumber ?? '', (val) => _update(context, settings.copyWith(cacNumber: val))),
-        if (_matches('Print CAC Number on Receipt'))
-          _buildSwitchTile('Print CAC Number on Receipt', settings.showCacNumber, (val) => _update(context, settings.copyWith(showCacNumber: val))),
-        if (_matches('Description'))
-          _buildTextTile(context, 'Description', settings.businessDescription ?? '', (val) => _update(context, settings.copyWith(businessDescription: val))),
-        if (_matches('Tax ID (VAT/GST)'))
-          _buildTextTile(context, 'Tax ID (VAT/GST)', settings.taxId ?? '', (val) => _update(context, settings.copyWith(taxId: val))),
-        const Divider(),
-      ],
-
-      // Preferences Section
-      if (_matches('Preferences', ['tax', 'discount', 'confirm price', 'payment', 'custom pricing', 'currency', 'template', 'theme', 'footer', 'paper'])) ...[
-        _buildSectionHeader(context, 'Preferences'),
-        if (_matches('Enable Tax', ['vat']))
-          _buildSwitchTile('Enable Tax', settings.taxEnabled, (val) => _update(context, settings.copyWith(taxEnabled: val))),
-        if (settings.taxEnabled && _matches('Tax Rate'))
-          _buildTextTile(
-            context, 
-            'Tax Rate (%)', 
-            (settings.taxRate * 100).toStringAsFixed(0), 
-            (val) {
-              final rate = double.tryParse(val);
-              if (rate != null) _update(context, settings.copyWith(taxRate: rate / 100));
-            },
-            validator: (val) {
-              final n = double.tryParse(val ?? '');
-              return (n == null || n < 0 || n > 100) ? 'Enter 0-100' : null;
-            },
-          ),
-        if (_matches('Enable Discounts'))
-          _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
-        if (_matches('Confirm Item Price on Selection'))
-          _buildSwitchTile('Confirm Item Price on Selection', settings.confirmPriceOnSelection, (val) => _update(context, settings.copyWith(confirmPriceOnSelection: val))),
-        if (_matches('Enable Payment Methods'))
-          _buildSwitchTile('Enable Payment Methods (Cash/POS/Transfer)', settings.paymentMethodsEnabled, (val) => _update(context, settings.copyWith(paymentMethodsEnabled: val))),
-        if (_matches('Enable Custom Receipt Pricing'))
-          _buildSwitchTile('Enable Custom Receipt Pricing (Inflated Prices)', settings.customReceiptPricingEnabled, (val) => _update(context, settings.copyWith(customReceiptPricingEnabled: val))),
-        if (_matches('Currency'))
-          _buildDropdownTile(
-            context, 
-            'Currency', 
-            ['₦', '\$', '€', '£', 'KSh'].contains(settings.currency) ? settings.currency : '₦', 
-            ['₦', '\$', '€', '£', 'KSh'], 
-            (val) => _update(context, settings.copyWith(currency: val)),
-          ),
-        if (_matches('Invoice Template'))
-          _buildDropdownTile(
-            context, 
-            'Invoice Template', 
-            settings.defaultInvoiceTemplate, 
-            [
-              'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
-              if (settings.businessMode == 'school') ...['school_teal', 'school_purple', 'school_academic', 'school_traditional']
-            ], 
-            (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
-          ),
-        if (_matches('Theme'))
-          _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
-        if (_matches('Theme Color'))
-          _buildThemeColorSection(context, settings),
-        if (_matches('Receipt Footer'))
-          _buildTextTile(context, 'Receipt Footer', settings.receiptFooter, (val) => _update(context, settings.copyWith(receiptFooter: val))),
-        if (_matches('Thermal Paper Width'))
-          _buildDropdownTile(
-            context, 
-            'Thermal Paper Width', 
-            '${settings.paperWidth}mm', 
-            ['58mm', '80mm', '88mm'], 
-            (val) {
-              final width = int.parse(val.replaceAll('mm', ''));
-              _update(context, settings.copyWith(paperWidth: width));
-            },
-          ),
-        const Divider(),
-      ],
-
-      // Account Details
-      if (_matches('Account Details', ['bank', 'number', 'signature'])) ...[
-        _buildSectionHeader(context, 'Account Details'),
-        if (_matches('Show Account Details on Invoice'))
-          _buildSwitchTile('Show Account Details on Invoice', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
-        if (_matches('Show Signature Space on Receipt'))
-          _buildSwitchTile('Show Signature Space on Receipt', settings.showSignatureSpace, (val) => _update(context, settings.copyWith(showSignatureSpace: val))),
-        if (settings.showAccountDetails) ...[
-          if (_matches('Bank Name'))
-            _buildTextTile(context, 'Bank Name', settings.bankName ?? '', (val) => _update(context, settings.copyWith(bankName: val))),
-          if (_matches('Account Number'))
-            _buildTextTile(context, 'Account Number', settings.accountNumber ?? '', (val) => _update(context, settings.copyWith(accountNumber: val))),
-          if (_matches('Account Name'))
-            _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
-        ],
-        const Divider(),
-      ],
-
-      // Service Billing
-      if (_matches('Service Billing', ['config', 'types', 'half day'])) ...[
-        _buildServiceBillingTile(context, settings, state),
-        if (settings.serviceBillingEnabled) ...[
-          _buildServiceTypesSection(context, settings),
-          _buildHalfDayConfigSection(context, settings),
-        ],
-        const Divider(),
-      ],
-
-      // Staff Management
-      if (_matches('Staff Management', ['users', 'roles'])) ...[
-        _buildSectionHeader(context, 'Staff Management'),
-        _buildStaffManagementSection(context, settings),
-        const Divider(),
-      ],
-
-      // Graph Visibility
-      if (_matches('Graph Visibility', ['charts', 'sales trend', 'expense', 'top selling', 'stock value'])) ...[
-        _buildSectionHeader(context, 'Graph Visibility (Admin)'),
-        if (_matches('Show Sales Trend'))
-          _buildSwitchTile('Show Sales Trend (Invoice History)', settings.showSalesTrendChart, (val) => _update(context, settings.copyWith(showSalesTrendChart: val))),
-        if (_matches('Show Expense Pie Chart'))
-          _buildSwitchTile('Show Expense Pie Chart (Profit Report)', settings.showExpensePieChart, (val) => _update(context, settings.copyWith(showExpensePieChart: val))),
-        if (_matches('Show Top Selling Bar Chart'))
-          _buildSwitchTile('Show Top Selling Bar Chart (Inventory Report)', settings.showTopSellingChart, (val) => _update(context, settings.copyWith(showTopSellingChart: val))),
-        if (_matches('Show Stock Value Pie Chart'))
-          _buildSwitchTile('Show Stock Value Pie Chart (Inventory Report)', settings.showStockValueChart, (val) => _update(context, settings.copyWith(showStockValueChart: val))),
-        const Divider(),
-      ],
-      // Startup & State Persistence
-      if (_matches('Startup & State Persistence', ['splash', 'last state', 'restore'])) ...[
-        _buildSectionHeader(context, 'Startup & State Persistence'),
-        _buildSwitchTile(
-          'Skip Splash Screen', 
-          settings.skipSplash, 
-          (val) => _update(context, settings.copyWith(skipSplash: val)),
-        ),
-        _buildSwitchTile(
-          'Always Restore Last State', 
-          settings.restoreLastState, 
-          (val) => _update(context, settings.copyWith(restoreLastState: val)),
-        ),
-        const Divider(),
-      ],
-
-      // Maintenance
-      if (_matches('Maintenance', ['backup', 'export', 'sync', 'restore', 'date', 'time', 'total sales'])) ...[
-        _buildSectionHeader(context, 'Maintenance'),
-        if (_matches('Export/Local Backup'))
-          ListTile(
-            title: const Text('Export/Local Backup'),
-            subtitle: const Text('Save or share database backup'),
-            trailing: state.isExporting ? const CircularProgressIndicator() : const Icon(Icons.backup),
-            onTap: () => _showBackupOptions(context, state),
-          ),
-        if (_matches('Device Synchronization'))
-          ListTile(
-            title: const Text('Device Synchronization'),
-            subtitle: const Text('Connect and sync data with other devices'),
-            trailing: const Icon(Icons.sync_alt),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSyncPage())),
-          ),
-        if (_matches('Show Date & Time'))
-          _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
-        if (_matches('Show Sync Status'))
-          _buildSwitchTile('Show Sync Status', settings.showSyncStatus, (val) => _update(context, settings.copyWith(showSyncStatus: val))),
-        if (_matches('Show Total Sales Card'))
-          _buildSwitchTile('Show Total Sales Card', settings.showTotalSalesCard, (val) => _update(context, settings.copyWith(showTotalSalesCard: val))),
-        if (_matches('Enable Stock Return & Replace'))
-          _buildSwitchTile('Enable Stock Return & Replace', settings.stockReturnEnabled, (val) => _update(context, settings.copyWith(stockReturnEnabled: val))),
-        if (_matches('Restore Backup'))
-          ListTile(
-            title: const Text('Restore Backup'),
-            subtitle: const Text('Import database from a file'),
-            trailing: state.isImporting ? const CircularProgressIndicator() : const Icon(Icons.restore),
-            onTap: () => _handleRestore(context),
-          ),
-        const Divider(),
-      ],
-
-      // Security
-      if (_matches('Security', ['password', 'lock'])) ...[
-        _buildSectionHeader(context, 'Security'),
-        if (_matches('Change System Password'))
-          ListTile(
-            title: const Text('Change System Password'),
-            trailing: const Icon(Icons.lock_outline),
-            onTap: () => _showChangePassword(context),
-          ),
-      ],
-
-      const SizedBox(height: 60),
-    ];
-
-    if (_searchQuery.isNotEmpty && listItems.length <= 1) {
-       return Center(
-         child: Column(
-           mainAxisAlignment: MainAxisAlignment.center,
-           children: [
-             const Icon(Icons.search_off, size: 64, color: Colors.grey),
-             const SizedBox(height: 16),
-             Text('No settings found matching "$_searchQuery"', style: const TextStyle(color: Colors.grey)),
-           ],
-         ),
-       );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: listItems,
-    );
-  }
+          );
+        },
+      ),
+    ),
+  );
+}
 
   Widget _buildAuthRequired(BuildContext context) {
     return Center(
@@ -413,8 +278,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 Text(
                   isLocked 
-                      ? 'Business identity and operation mode are permanently locked.' 
-                      : 'You can edit your business name and mode once. They will be locked after saving.',
+                      ? 'Business name is permanently locked for security.' 
+                      : 'You can edit your business name once. It will be locked after saving.',
                   style: const TextStyle(fontSize: 12),
                 ),
               ],
@@ -497,19 +362,23 @@ class _SettingsPageState extends State<SettingsPage> {
     final settingsBloc = context.read<SettingsBloc>();
     
     try {
+      final bytes = await settingsBloc.backupService.createBackup();
+      if (bytes == null) throw Exception('No data generated');
+
       final timestamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
       final fileName = 'invify_backup_$timestamp.sqlite';
       
       final result = await FilePicker.platform.saveFile(
         dialogTitle: 'Select where to save your backup',
         fileName: fileName,
+        bytes: bytes,
       );
 
       if (result != null) {
-        settingsBloc.add(ExportDatabaseToFile(result));
+        scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Backup saved successfully'), backgroundColor: Colors.green));
       }
     } catch (e) {
-      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to export: $e'), backgroundColor: Colors.red));
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to save backup: $e'), backgroundColor: Colors.red));
     }
   }
 
@@ -517,37 +386,27 @@ class _SettingsPageState extends State<SettingsPage> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.any, // .sqlite might not be in the default list
       allowMultiple: false,
+      withData: true,
     );
 
     if (result != null && result.files.isNotEmpty) {
-      final filePath = result.files.first.path;
-      if (filePath == null) return;
+      final file = result.files.first;
+      if (file.bytes == null) return;
 
       final proceed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Confirm FULL RESTORE'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Restoring "${result.files.first.name}" will REPLACE your current database.'),
-              const SizedBox(height: 8),
-              const Text('⚠️ WARNING: All current records will be lost!', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-            ],
-          ),
+          title: const Text('Confirm Restore'),
+          content: Text('Importing "${file.name}" will overwrite your current data. Proceed?'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true), 
-              child: const Text('RESTORE & OVERWRITE', style: TextStyle(color: Colors.red))
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('RESTORE', style: TextStyle(color: Colors.red))),
           ],
         ),
       );
 
       if (proceed == true) {
-        context.read<SettingsBloc>().add(ImportDatabaseFromFile(filePath));
+        context.read<SettingsBloc>().add(RestoreFromBytes(file.bytes!));
       }
     }
   }
@@ -558,42 +417,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _update(BuildContext context, dynamic settings) {
     context.read<SettingsBloc>().add(UpdateAppSettings(settings));
-  }
-
-  Future<void> _handleModeChange(BuildContext context, AppSettings settings, String newMode) async {
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Operational Mode'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Switching to ${newMode.toUpperCase()} mode will change UI labels and certain functionalities.'),
-            const SizedBox(height: 12),
-            const Text(
-              '⚠️ WARNING: This setting is PERMANENT and cannot be changed once confirmed.',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue, foregroundColor: Colors.white),
-            child: const Text('CONFIRM & LOCK'),
-          ),
-        ],
-      ),
-    );
-
-    if (proceed == true) {
-      // 1. Update the mode
-      _update(context, settings.copyWith(businessMode: newMode));
-      // 2. Lock it
-      context.read<SettingsBloc>().add(LockBusinessMode());
-    }
   }
 
   Future<String?> _showEditDialog(BuildContext context, String label, String value, String? Function(String?)? validator) {
@@ -826,11 +649,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Free Plan (Default)', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('No active subscription found. Basic features enabled.'),
-                  leading: const Icon(Icons.stars_outlined, color: Colors.grey),
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text('No activation history found.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
                 );
               }
 
@@ -982,9 +803,14 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         if (settings.serviceTypes.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text('No service categories defined. Add one (e.g., Hotel, Lounge).', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              settings.businessMode == 'school' 
+                ? 'No hostel or hall categories defined. Add one (e.g., Boys Hostel, Main Hall).'
+                : 'No service categories defined. Add one (e.g., Hotel, Lounge).', 
+              style: const TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)
+            ),
           )
         else
           Padding(
@@ -1010,10 +836,13 @@ class _SettingsPageState extends State<SettingsPage> {
     final newType = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add Service Category'),
+        title: Text(settings.businessMode == 'school' ? 'Add School Hall/Hostel' : 'Add Service Category'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(labelText: 'Category Name', hintText: 'e.g., Hotel, Event Hall'),
+          decoration: InputDecoration(
+            labelText: 'Category Name', 
+            hintText: settings.businessMode == 'school' ? 'e.g., Boys Hostel, Exam Hall' : 'e.g., Hotel, Event Hall'
+          ),
           textCapitalization: TextCapitalization.words,
         ),
         actions: [
@@ -1043,13 +872,13 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildServiceBillingTile(BuildContext context, AppSettings settings, SettingsState state) {
     final plan = state.userPlan;
     final isProOrLifetime = plan != null && plan.isValid && (plan.isPro || plan.isLifetime);
-    final isLocked = !isProOrLifetime; 
+    final isLocked = !isProOrLifetime; // Fixed: Locked for anyone not Pro/Lifetime
 
     return ListTile(
       title: Row(
         children: [
-          const Expanded(child: Text('Enable Service Billing (Hotels/Lounges)')),
-          if (isLocked) ...[
+          Expanded(child: Text(settings.businessMode == 'school' ? 'Enable Service Billing (School Hostel and Hall)' : 'Enable Service Billing (Hotels/Lounges)')),
+          if (isLocked && (plan == null || !plan.isValid || plan.isBasic)) ...[
             const SizedBox(width: 8),
             const Icon(Icons.lock, size: 16, color: Colors.orange),
           ],
@@ -1059,14 +888,18 @@ class _SettingsPageState extends State<SettingsPage> {
           ? const Text('Standard feature on your plan', style: TextStyle(color: Colors.green, fontSize: 12))
           : const Text('Available on Pro & Lifetime plans', style: TextStyle(color: Colors.orange, fontSize: 12)),
       trailing: Switch(
-        value: settings.serviceBillingEnabled,
-        onChanged: isLocked 
-            ? (val) => showDialog(context: context, builder: (_) => const UpgradeDialog())
-            : (val) => _update(context, settings.copyWith(serviceBillingEnabled: val)),
+        value: isProOrLifetime ? true : settings.serviceBillingEnabled,
+        onChanged: isProOrLifetime 
+            ? null // Mandatory, cannot be changed
+            : (isLocked 
+                ? (val) => showDialog(context: context, builder: (_) => const UpgradeDialog())
+                : (val) => _update(context, settings.copyWith(serviceBillingEnabled: val))),
       ),
-      onTap: isLocked 
-          ? () => showDialog(context: context, builder: (_) => const UpgradeDialog())
-          : null,
+      onTap: isProOrLifetime
+          ? null
+          : (isLocked 
+              ? () => showDialog(context: context, builder: (_) => const UpgradeDialog())
+              : null),
     );
   }
 
@@ -1123,7 +956,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ...state.staffList.map((staff) => ListTile(
                     leading: const CircleAvatar(child: Icon(Icons.person)),
                     title: Text(staff.name),
-                    subtitle: Text('Code: ****'),
+                    subtitle: Text('Role: ${staff.role} • Code: ****'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1158,6 +991,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final existingCode = staff?.staffCode;
     final isCodeHashed = existingCode != null && existingCode.length > 4;
     final codeController = TextEditingController(text: isCodeHashed ? '' : existingCode);
+    String selectedRole = staff?.role ?? 'Admin';
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -1187,6 +1021,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   return (val?.length != 4) ? 'Must be 4 digits' : null;
                 },
               ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedRole,
+                decoration: const InputDecoration(labelText: 'Role'),
+                items: ['Admin', 'Cashier', 'Accountant'].map((role) {
+                  return DropdownMenuItem(value: role, child: Text(role));
+                }).toList(),
+                onChanged: (val) => selectedRole = val ?? 'Admin',
+              ),
             ],
           ),
         ),
@@ -1198,6 +1041,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 final newStaff = Staff(
                   id: staff?.id,
                   name: nameController.text,
+                  role: selectedRole,
                   staffCode: codeController.text.isEmpty && staff != null 
                       ? staff.staffCode 
                       : codeController.text,

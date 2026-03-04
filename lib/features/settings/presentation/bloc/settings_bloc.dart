@@ -39,15 +39,11 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     on<SetSuperAdminPassword>(_onSetSuperAdminPassword);
     on<LoadBusinessLock>(_onLoadBusinessLock);
     on<LockBusinessName>(_onLockBusinessName);
-    on<LoadModeLock>(_onLoadModeLock);
-    on<LockBusinessMode>(_onLockBusinessMode);
     on<ResetSuperAdminAuth>((event, emit) => emit(state.copyWith(isSuperAdminAuthorized: false)));
     on<ResetSystemAuth>((event, emit) {
       debugPrint('SettingsBloc: Resetting system auth');
       emit(state.copyWith(isAuthorized: false, error: null));
     });
-    on<ExportDatabaseToFile>(_onExportToFile);
-    on<ImportDatabaseFromFile>(_onImportFromFile);
   }
 
 
@@ -110,35 +106,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     }
   }
 
-  Future<void> _onExportToFile(ExportDatabaseToFile event, Emitter<SettingsState> emit) async {
-    emit(state.copyWith(isExporting: true, error: null, successMessage: null));
-    try {
-      final success = await backupService.exportDatabase(event.path);
-      if (success) {
-        emit(state.copyWith(isExporting: false, successMessage: 'Database exported successfully to ${event.path}'));
-      } else {
-        emit(state.copyWith(isExporting: false, error: 'Export failed'));
-      }
-    } catch (e) {
-      emit(state.copyWith(isExporting: false, error: 'Export failed: $e'));
-    }
-  }
-
-  Future<void> _onImportFromFile(ImportDatabaseFromFile event, Emitter<SettingsState> emit) async {
-    emit(state.copyWith(isImporting: true, error: null, successMessage: null));
-    try {
-      final success = await backupService.importDatabase(event.path);
-      if (success) {
-        emit(state.copyWith(isImporting: false, successMessage: 'Database restored successfully! App may need restart.'));
-        add(LoadSettings());
-      } else {
-        emit(state.copyWith(isImporting: false, error: 'Restore failed'));
-      }
-    } catch (e) {
-      emit(state.copyWith(isImporting: false, error: 'Restore failed: $e'));
-    }
-  }
-
   Future<void> _onCheckDeviceAuth(CheckDeviceAuthorization event, Emitter<SettingsState> emit) async {
     final isDeviceAuthorized = await securityService.isDeviceAuthorized();
     emit(state.copyWith(isDeviceAuthorized: isDeviceAuthorized));
@@ -157,7 +124,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     debugPrint('SettingsBloc: LoadSettings called');
     add(CheckDeviceAuthorization()); // Check auth on load
     add(LoadBusinessLock());
-    add(LoadModeLock());
     emit(state.copyWith(isLoading: true));
     try {
       final settings = await repository.getSettings();
@@ -222,12 +188,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       return;
     }
 
-    // Check if business mode is being changed and if it is locked
-    if (state.isModeLocked && state.settings?.businessMode != event.settings.businessMode) {
-      emit(state.copyWith(error: 'Operational mode is permanently locked.'));
-      return;
-    }
-
     // subscription validation for service billing
     if (event.settings.serviceBillingEnabled && !(state.settings?.serviceBillingEnabled ?? false)) {
       // User is trying to ENABLE service billing
@@ -271,16 +231,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   Future<void> _onLockBusinessName(LockBusinessName event, Emitter<SettingsState> emit) async {
     await StorageService.setBusinessNameLocked(true);
     emit(state.copyWith(isBusinessLocked: true));
-  }
-
-  Future<void> _onLoadModeLock(LoadModeLock event, Emitter<SettingsState> emit) async {
-    final isLocked = await StorageService.isBusinessModeLocked();
-    emit(state.copyWith(isModeLocked: isLocked));
-  }
-
-  Future<void> _onLockBusinessMode(LockBusinessMode event, Emitter<SettingsState> emit) async {
-    await StorageService.setBusinessModeLocked(true);
-    emit(state.copyWith(isModeLocked: true));
   }
 
   Future<void> _onVerifyPassword(VerifySystemPassword event, Emitter<SettingsState> emit) async {
@@ -404,9 +354,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       return false;
     }
     
-    final now = DateTime.now();
-    final expectedDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-
     final dateStr = parts[0]; // YYYYMMDD
     final timeStr = parts[1]; // HHmm
     final password = parts[2];
@@ -424,25 +371,25 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     if (hashedInput != adminPasswordHash) {
         // Fallback to emergency master key with its own salt
         final emergencyHashedInput = sha256.convert(utf8.encode(password + "EMERGENCY-SALT-2024")).toString();
-        const expectedEmergencyHash = "5e470cc7d7a7601a4c847e0af92fc63e0adde5dbfb22a257498359420797fe37"; // Hashed 'admin123invify' + 'EMERGENCY-SALT-2024'
+        const expectedEmergencyHash = "47fe409559c55f9e83f5087a32dbbe3e36e65b4c6883e1c6628b0561585c531d"; // Hashed 'admin123invify'
         
         if (emergencyHashedInput != expectedEmergencyHash) {
              debugPrint('❌ Access Key mismatch');
-             _logRecommendedCode(unlockCode, now, expectedDate);
              return false;
         }
     }
     debugPrint('✅ Access Key correct');
     
     // Validate date (current date)
+    final now = DateTime.now();
+    final expectedDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
     if (dateStr != expectedDate) {
       debugPrint('❌ Date mismatch. Expected: $expectedDate, Got: $dateStr');
-      _logRecommendedCode(unlockCode, now, expectedDate);
       return false;
     }
     debugPrint('✅ Date correct');
     
-    // Validate time (current hour and minute with ±10 minute tolerance)
+    // Validate time (current hour and minute with ±1 minute tolerance)
     final currentMinute = now.hour * 60 + now.minute;
     final inputHour = int.tryParse(timeStr.substring(0, 2)) ?? -1;
     final inputMinute = int.tryParse(timeStr.substring(2, 4)) ?? -1;
@@ -456,20 +403,12 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     
     if (timeDifference > 10) {
       debugPrint('❌ Time difference too large (>10 minutes)');
-      _logRecommendedCode(unlockCode, now, expectedDate);
       return false;
     }
     
     debugPrint('✅ Time within tolerance');
     debugPrint('🎉 Unlock code validated successfully!');
     return true;
-  }
-
-  void _logRecommendedCode(String inputCode, DateTime now, String expectedDate) {
-    final expectedCode = '$expectedDate/${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}/admin123invify';
-    debugPrint('🔓 Unlock Debug:');
-    debugPrint('   Input:    $inputCode');
-    debugPrint('   Expected: $expectedCode');
   }
 
   Future<void> _onVerifySuperAdminPassword(VerifySuperAdminPassword event, Emitter<SettingsState> emit) async {

@@ -10,6 +10,7 @@ class Items extends Table {
   RealColumn get costPrice => real().withDefault(const Constant(0.0))();
   IntColumn get stockQty => integer().withDefault(const Constant(0))();
   RealColumn get minStockQty => real().withDefault(const Constant(0.0))();
+  TextColumn get businessMode => text().nullable()();
 
   // Phase 2: New Columns
   BlobColumn get image => blob().nullable()();
@@ -20,7 +21,6 @@ class Items extends Table {
   TextColumn get billingType => text().nullable()(); // 'fixed', 'per_day', 'per_hour'
   TextColumn get serviceCategory => text().nullable()(); // 'Hotel', 'Lounge', etc.
   BoolColumn get requiresTimeTracking => boolean().withDefault(const Constant(false))();
-  TextColumn get businessMode => text().withDefault(const Constant('retail'))(); // 'retail' or 'school'
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

@@ -108,7 +108,7 @@ class ReportGenerator {
             // Title
             pw.Center(
               child: pw.Text(
-                'SALES INVOICE REPORT',
+                invoices.any((i) => i.businessMode == 'school') ? 'SCHOOL REVENUE REPORT' : 'SALES INVOICE REPORT',
                 style: pw.TextStyle(
                   fontSize: 22, 
                   fontWeight: pw.FontWeight.bold, 

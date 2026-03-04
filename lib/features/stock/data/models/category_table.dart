@@ -4,7 +4,7 @@ import 'package:drift/drift.dart';
 class Categories extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 50).unique()();
-  TextColumn get businessMode => text().withDefault(const Constant('retail'))();
+  TextColumn get businessMode => text().nullable()();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

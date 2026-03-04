@@ -19,6 +19,12 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
   Staff? _selectedStaff;
   final _codeController = TextEditingController();
   String? _error;
+  
+  @override
+  void initState() {
+    super.initState();
+    _selectedStaff = context.read<StaffBloc>().state.currentUser;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,8 +34,21 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
         final isLocked = settings?.isLocked ?? false;
         final failedAttempts = settings?.failedAttempts ?? 0;
 
-        return BlocBuilder<StaffBloc, StaffState>(
-          builder: (context, state) {
+        return BlocListener<StaffBloc, StaffState>(
+          listener: (context, staffState) {
+            if (staffState.currentUser != null && staffState.successMessage == 'Login successful') {
+              context.read<SettingsBloc>().add(ResetFailedAttempts());
+              Navigator.pop(context, staffState.currentUser);
+            } else if (staffState.error == 'Invalid pin') {
+              context.read<SettingsBloc>().add(RecordFailedAttempt());
+              setState(() {
+                _error = 'Invalid Key';
+              });
+              _codeController.clear();
+            }
+          },
+          child: BlocBuilder<StaffBloc, StaffState>(
+            builder: (context, state) {
             if (state.staffList.isEmpty) {
               return AlertDialog(
                 title: const Text('Staff Authentication'),
@@ -101,7 +120,7 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
                       decoration: const InputDecoration(labelText: 'Select Staff'),
                       items: state.staffList.map((s) => DropdownMenuItem(
                         value: s,
-                        child: Text(s.name),
+                        child: Text('${s.name} (${s.role})'),
                       )).toList(),
                       onChanged: (val) => setState(() => _selectedStaff = val),
                     ),
@@ -131,17 +150,11 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
               ],
             );
           },
-        );
-      },
-    );
-  }
-
-  String _hash(String input) {
-    if (input.isEmpty) return "";
-    const salt = "STAFF-PIN-INVIFY-2024-PROTECT";
-    final bytes = utf8.encode(input + salt);
-    return sha256.convert(bytes).toString();
-  }
+        ),
+      );
+    },
+  );
+}
 
   void _verify() async {
     final settingsBloc = context.read<SettingsBloc>();
@@ -156,17 +169,11 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
 
     if (_selectedStaff == null) return;
     
-    if (_hash(_codeController.text) == _selectedStaff!.staffCode) {
-      // Clear failed attempts on success
-      settingsBloc.add(ResetFailedAttempts());
-      Navigator.pop(context, _selectedStaff);
-    } else {
-      // Record failed attempt in SettingsBloc
-      settingsBloc.add(RecordFailedAttempt());
-      setState(() {
-        _error = 'Invalid Key';
-      });
-      _codeController.clear();
-    }
+    // Use StaffBloc for authentication
+    final staffBloc = context.read<StaffBloc>();
+    staffBloc.add(AuthenticateStaff(_selectedStaff!.id!, _codeController.text));
+    
+    // Listen for the result (we could use a BlocListener, but inside a dialog, 
+    // it's sometimes easier to check state or use a local listener)
   }
 }

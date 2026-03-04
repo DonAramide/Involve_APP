@@ -15,8 +15,6 @@ import 'package:involve_app/features/stock/presentation/pages/inventory_report_p
 import 'package:involve_app/features/stock/presentation/pages/profit_report_page.dart';
 import 'package:involve_app/features/stock/presentation/widgets/log_expense_dialog.dart';
 import 'package:collection/collection.dart';
-import '../../../../core/utils/terminology.dart';
-import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
 
 class StockManagementPage extends StatefulWidget {
   const StockManagementPage({super.key});
@@ -29,47 +27,31 @@ class _StockManagementPageState extends State<StockManagementPage> {
   bool _showLowStockOnly = false;
 
   @override
-  void initState() {
-    super.initState();
-    final businessMode = context.read<SettingsBloc>().state.settings?.businessMode;
-    context.read<StockBloc>().add(LoadItems(businessMode: businessMode));
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: BlocBuilder<SettingsBloc, SettingsState>(
-          builder: (context, state) => Text(state.settings?.stockLabel ?? 'Stock Management'),
-        ),
+        title: const Text('Stock Management'),
         actions: [
-          BlocBuilder<SettingsBloc, SettingsState>(
-            builder: (context, state) {
-              if (state.settings?.businessMode == 'school') return const SizedBox.shrink();
-              return IconButton(
-                icon: Icon(
-                  _showLowStockOnly ? Icons.filter_list_off : Icons.filter_list,
-                  color: _showLowStockOnly ? Colors.orange : null,
-                ),
-                tooltip: _showLowStockOnly ? 'Show All Items' : 'Show Low Stock Only',
-                onPressed: () {
-                  setState(() {
-                    _showLowStockOnly = !_showLowStockOnly;
-                  });
-                },
-              );
+          IconButton(
+            icon: Icon(
+              _showLowStockOnly ? Icons.filter_list_off : Icons.filter_list,
+              color: _showLowStockOnly ? Colors.orange : null,
+            ),
+            tooltip: _showLowStockOnly ? 'Show All Items' : 'Show Low Stock Only',
+            onPressed: () {
+              setState(() {
+                _showLowStockOnly = !_showLowStockOnly;
+              });
             },
           ),
-          BlocBuilder<SettingsBloc, SettingsState>(
-            builder: (context, settingsState) => IconButton(
-              icon: const Icon(Icons.category, size: 28),
-              tooltip: 'Manage ${settingsState.settings?.categoryLabel ?? 'Categories'}',
-              onPressed: () => _verifyAndExecute(
+          IconButton(
+            icon: const Icon(Icons.category, size: 28),
+            tooltip: 'Manage Categories',
+            onPressed: () => _verifyAndExecute(
+              context,
+              () => Navigator.push(
                 context,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ManageCategoriesPage()),
-                ),
+                MaterialPageRoute(builder: (_) => const ManageCategoriesPage()),
               ),
             ),
           ),
@@ -107,27 +89,14 @@ class _StockManagementPageState extends State<StockManagementPage> {
               () => _showItemDialog(context),
             ),
           ),
-          BlocBuilder<SettingsBloc, SettingsState>(
-            builder: (context, state) {
-              if (state.settings?.businessMode != 'school') return const SizedBox.shrink();
-              return IconButton(
-                icon: const Icon(Icons.school_outlined),
-                tooltip: 'Academic Setup (Years/Terms/Classes)',
-                onPressed: () => _verifyAndExecute(
-                  context,
-                  () => _showSchoolSetup(context),
-                ),
-              );
-            },
-          ),
         ],
       ),
       body: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, settingsState) {
-          final businessMode = settingsState.settings?.businessMode;
           return BlocBuilder<StockBloc, StockState>(
             builder: (context, state) {
-              // Reload if needed or manually pass mode to events
+              // Always try to show the list if we have items, 
+              // even if we are in a specialized state or loading.
               var displayItems = state.items;
               if (_showLowStockOnly) {
                 displayItems = displayItems.where((item) => 
@@ -164,7 +133,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
                               letterSpacing: 1.2,
                             ),
                           ),
@@ -242,28 +211,20 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (item.type != 'service') ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Qty: ${item.stockQty}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: item.stockQty <= item.minStockQty ? Colors.red : Colors.grey[600],
-                          fontWeight: item.stockQty <= item.minStockQty ? FontWeight.bold : FontWeight.normal,
-                        ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Qty: ${item.stockQty}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: item.stockQty <= item.minStockQty ? Colors.red : Colors.grey[600],
+                        fontWeight: item.stockQty <= item.minStockQty ? FontWeight.bold : FontWeight.normal,
                       ),
-                      if (item.stockQty <= item.minStockQty)
-                        const Text(
-                          'LOW STOCK',
-                          style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                    ] else ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        settings?.businessMode == 'school' ? 'Fixed Fee' : 'Service',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    ),
+                    if (item.stockQty <= item.minStockQty && item.type != 'service')
+                      const Text(
+                        'LOW STOCK',
+                        style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
                       ),
-                    ],
                   ],
                 ),
               ),
@@ -284,21 +245,19 @@ class _StockManagementPageState extends State<StockManagementPage> {
                     icon: const Icon(Icons.more_vert),
                     onSelected: (value) => _handleMenuSelection(context, value, item),
                     itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit), title: Text('Edit'))),
-                      if (item.type != 'service') ...[
-                        const PopupMenuItem(value: 'stock_up', child: ListTile(leading: Icon(Icons.add_box), title: Text('Stock Up'))),
-                        PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text(settings?.stockHistoryLabel ?? 'Stock History'))),
-                      ],
+                      const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit), title: Text('Edit / Min Alert'))),
+                      const PopupMenuItem(value: 'stock_up', child: ListTile(leading: Icon(Icons.add_box), title: Text('Stock Up'))),
+                      const PopupMenuItem(value: 'history', child: ListTile(leading: Icon(Icons.history), title: Text('Adding History'))),
                       PopupMenuItem(
                         value: 'delete',
-                        enabled: item.type == 'service' || item.stockQty <= 0,
+                        enabled: item.stockQty <= 0,
                         child: ListTile(
-                          leading: Icon(Icons.delete, color: (item.type == 'service' || item.stockQty <= 0) ? Colors.red : Colors.grey),
+                          leading: Icon(Icons.delete, color: item.stockQty <= 0 ? Colors.red : Colors.grey),
                           title: Text(
                             'Delete',
-                            style: TextStyle(color: (item.type == 'service' || item.stockQty <= 0) ? Colors.red : Colors.grey),
+                            style: TextStyle(color: item.stockQty <= 0 ? Colors.red : Colors.grey),
                           ),
-                          subtitle: (item.type != 'service' && item.stockQty > 0) ? const Text('Empty stock first', style: TextStyle(fontSize: 10)) : null,
+                          subtitle: item.stockQty > 0 ? const Text('Empty stock first', style: TextStyle(fontSize: 10)) : null,
                         ),
                       ),
                     ],
@@ -433,13 +392,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
     showDialog(
       context: context,
       builder: (_) => LogExpenseDialog(stockBloc: context.read<StockBloc>()),
-    );
-  }
-
-  void _showSchoolSetup(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SchoolSetupPage()),
     );
   }
 }
