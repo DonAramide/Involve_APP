@@ -43,7 +43,6 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               deviceId: Value(deviceId),
               isDeleted: const Value(false),
               totalPrintAmount: Value(invoice.totalPrintAmount),
-              // school fields
               businessMode: Value(invoice.businessMode),
               studentId: Value(invoice.studentId),
               classId: Value(invoice.classId),
@@ -54,7 +53,6 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               termName: Value(invoice.termName),
               academicYearName: Value(invoice.academicYearName),
               studentImage: Value(invoice.studentImage),
-              dueDate: Value(invoice.dueDate),
             ),
           );
 
@@ -89,6 +87,19 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           );
         }
       }
+
+      // 3. Update Student Balance if in School Mode
+      if (invoice.businessMode == 'school' && invoice.studentId != null) {
+        await db.customUpdate(
+          'UPDATE students SET balance = balance + ?, updated_at = ? WHERE id = ?',
+          variables: [
+            Variable.withReal(invoice.balanceAmount),
+            Variable.withDateTime(now),
+            Variable.withInt(invoice.studentId!)
+          ],
+          updates: {db.students},
+        );
+      }
     });
   }
 
@@ -104,6 +115,14 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     final results = await _getInvoicesWithItems(query);
     if (results.isEmpty) return null;
     return results.first;
+  }
+
+  @override
+  Future<List<Invoice>> getInvoicesByStudentId(int studentId) async {
+    final query = db.select(db.invoices)
+      ..where((t) => t.studentId.equals(studentId))
+      ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]);
+    return _getInvoicesWithItems(query);
   }
 
   @override
@@ -126,8 +145,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       final itemRows = await itemsQuery.get();
       
       final invoiceItems = itemRows.map((itemRow) {
-        final itemData = itemRow.readTable(db.items);
-        final invoiceItemData = itemRow.readTable(db.invoiceItems);
+        final itemData = itemRow.readTable(this.db.items);
+        final invoiceItemData = itemRow.readTable(this.db.invoiceItems);
         
         return InvoiceItem(
           id: invoiceItemData.id,
@@ -143,6 +162,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
             billingType: itemData.billingType,
             serviceCategory: itemData.serviceCategory,
             requiresTimeTracking: itemData.requiresTimeTracking,
+            businessMode: itemData.businessMode,
             syncId: itemData.syncId,
           ),
           quantity: invoiceItemData.quantity,
@@ -175,8 +195,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         staffName: row.staffName,
         syncId: row.syncId,
         totalPrintAmount: row.totalPrintAmount,
-        // school fields
-        businessMode: row.businessMode ?? 'retail',
+        businessMode: row.businessMode,
         studentId: row.studentId,
         classId: row.classId,
         termId: row.termId,
@@ -186,7 +205,6 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         termName: row.termName,
         academicYearName: row.academicYearName,
         studentImage: row.studentImage,
-        dueDate: row.dueDate,
       ));
     }
     return result;
@@ -194,7 +212,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
   @override
   Future<bool> checkServiceAvailability(int itemId, DateTime start, DateTime end) async {
-    final query = db.select(db.invoiceItems)..where((t) => t.itemId.equals(itemId) & t.type.equals('service'));
+    final query = this.db.select(this.db.invoiceItems)..where((t) => t.itemId.equals(itemId) & t.type.equals('service'));
     final items = await query.get();
 
     for (final item in items) {
@@ -424,43 +442,5 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       dateReturned: row.dateReturned,
       syncId: row.syncId,
     )).toList();
-  }
-
-  @override
-  Future<void> deleteInvoice(int invoiceId) async {
-    final now = DateTime.now();
-    await db.transaction(() async {
-      // 1. Get invoice items to restore stock
-      final itemsQuery = db.select(db.invoiceItems)..where((t) => t.invoiceId.equals(invoiceId));
-      final items = await itemsQuery.get();
-
-      for (final item in items) {
-        if (item.type == 'product') {
-          // Restore stock (original quantity - returned quantity)
-          final netQty = item.quantity - item.returnedQuantity;
-          if (netQty > 0) {
-            await db.customUpdate(
-              'UPDATE items SET stock_qty = stock_qty + ?, updated_at = ? WHERE id = ?',
-              variables: [
-                Variable.withInt(netQty),
-                Variable.withDateTime(now),
-                Variable.withInt(item.itemId)
-              ],
-              updates: {db.items},
-            );
-          }
-        }
-
-        // Mark items as deleted
-        await (db.update(db.invoiceItems)..where((t) => t.id.equals(item.id))).write(
-          InvoiceItemsCompanion(isDeleted: const Value(true), updatedAt: Value(now)),
-        );
-      }
-
-      // 2. Mark invoice as deleted
-      await (db.update(db.invoices)..where((t) => t.id.equals(invoiceId))).write(
-        InvoicesCompanion(isDeleted: const Value(true), updatedAt: Value(now)),
-      );
-    });
   }
 }

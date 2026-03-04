@@ -14,9 +14,26 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   @override
   Future<List<Category>> getCategories({String? businessMode}) async {
-    final query = db.select(db.categories)..where((t) => t.isDeleted.equals(false));
+    final query = db.select(db.categories)
+      ..where((t) {
+        final filters = [t.isDeleted.equals(false)];
+        if (businessMode != null) {
+          if (businessMode == 'school') {
+            filters.add(t.businessMode.equals('school'));
+          } else {
+            // For retail, show explicitly retail or null
+            filters.add(t.businessMode.equals('retail') | t.businessMode.isNull());
+          }
+        }
+        return Expression.and(filters);
+      });
     final result = await query.get();
-    return result.map((row) => Category(id: row.id, name: row.name, syncId: row.syncId)).toList();
+    return result.map((row) => Category(
+      id: row.id, 
+      name: row.name, 
+      businessMode: row.businessMode,
+      syncId: row.syncId,
+    )).toList();
   }
 
   @override
@@ -26,6 +43,7 @@ class CategoryRepositoryImpl implements CategoryRepository {
     
     await db.into(db.categories).insert(CategoriesCompanion.insert(
       name: name,
+      businessMode: Value(businessMode ?? 'retail'),
       syncId: Value(_uuid.v4()),
       updatedAt: Value(now),
       createdAt: Value(now),

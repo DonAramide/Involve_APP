@@ -60,8 +60,6 @@ class AppSettings extends Equatable {
   final bool skipSplash;
   final bool restoreLastState;
   final String? lastRoute;
-  final String invoicePrefix;
-  final int invoiceNumberPadding;
 
   const AppSettings({
     this.id,
@@ -113,8 +111,6 @@ class AppSettings extends Equatable {
     this.skipSplash = false,
     this.restoreLastState = false,
     this.lastRoute,
-    this.invoicePrefix = 'INV',
-    this.invoiceNumberPadding = 3,
   });
 
   AppSettings copyWith({
@@ -167,8 +163,6 @@ class AppSettings extends Equatable {
     bool? skipSplash,
     bool? restoreLastState,
     String? lastRoute,
-    String? invoicePrefix,
-    int? invoiceNumberPadding,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -220,8 +214,6 @@ class AppSettings extends Equatable {
       skipSplash: skipSplash ?? this.skipSplash,
       restoreLastState: restoreLastState ?? this.restoreLastState,
       lastRoute: lastRoute ?? this.lastRoute,
-      invoicePrefix: invoicePrefix ?? this.invoicePrefix,
-      invoiceNumberPadding: invoiceNumberPadding ?? this.invoiceNumberPadding,
     );
   }
 
@@ -276,7 +268,5 @@ class AppSettings extends Equatable {
         skipSplash,
         restoreLastState,
         lastRoute,
-        invoicePrefix,
-        invoiceNumberPadding,
       ];
 }

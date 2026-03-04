@@ -16,7 +16,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
     on<LoadHistory>(_onLoadHistory);
     on<RecordPayment>(_onRecordPayment);
     on<ReturnStock>(_onReturnStock);
-    on<DeleteInvoice>(_onDeleteInvoice);
   }
 
   Future<void> _onReturnStock(ReturnStock event, Emitter<HistoryState> emit) async {
@@ -31,16 +30,6 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       add(LoadHistory()); // Refresh list
     } catch (e) {
       emit(HistoryError('Failed to return items: ${e.toString()}'));
-    }
-  }
-
-  Future<void> _onDeleteInvoice(DeleteInvoice event, Emitter<HistoryState> emit) async {
-    try {
-      final repo = getHistory.repository;
-      await repo.deleteInvoice(event.invoiceId);
-      add(LoadHistory()); // Refresh list
-    } catch (e) {
-      emit(HistoryError('Failed to delete invoice: ${e.toString()}'));
     }
   }
 

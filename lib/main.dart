@@ -1,26 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:involve_app/features/school/data/repositories/school_repository_impl.dart';
-import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
-import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'features/school/data/repositories/school_repository_impl.dart';
+import 'features/school/presentation/bloc/school_bloc.dart';
+import 'features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/core/license/landing_page.dart';
 import 'core/utils/bloc_observer.dart';
 import 'features/stock/data/datasources/app_database.dart';
 import 'features/stock/data/repositories/item_repository_impl.dart';
+import 'features/stock/domain/repositories/item_repository.dart';
 import 'features/stock/data/repositories/category_repository_impl.dart';
+import 'features/stock/domain/repositories/category_repository.dart';
 import 'features/stock/domain/usecases/stock_usecases.dart';
 import 'features/stock/presentation/bloc/stock_bloc.dart';
 import 'features/invoicing/data/repositories/invoice_repository_impl.dart';
+import 'features/invoicing/domain/repositories/invoice_repository.dart';
 import 'features/invoicing/domain/usecases/history_usecases.dart';
 import 'features/invoicing/domain/services/invoice_calculation_service.dart';
 import 'features/invoicing/presentation/bloc/invoice_bloc.dart';
 import 'features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'features/settings/data/repositories/settings_repository_impl.dart';
+import 'features/settings/domain/repositories/settings_repository.dart';
 import 'features/settings/domain/services/security_service.dart';
 import 'features/settings/presentation/bloc/settings_bloc.dart';
 import 'features/settings/presentation/bloc/staff_bloc.dart';
 import 'features/settings/presentation/bloc/staff_state.dart';
 import 'features/settings/data/repositories/staff_repository_impl.dart';
+import 'features/settings/domain/repositories/staff_repository.dart';
+import 'features/school/domain/repositories/school_repository.dart';
 import 'features/printer/data/repositories/cross_platform_printer_service.dart';
 import 'features/printer/data/repositories/blue_thermal_printer_service.dart';
 import 'features/printer/data/repositories/network_printer_service.dart';
@@ -43,7 +50,7 @@ import 'core/sync/domain/services/bluetooth_discovery_service_stub.dart'
     if (dart.library.io) 'core/sync/domain/services/bluetooth_discovery_service_native.dart'
     if (dart.library.html) 'core/sync/domain/services/bluetooth_discovery_service_web.dart';
 import 'core/utils/device_info_service.dart';
-
+import 'core/utils/route_observer.dart';
 import 'package:involve_app/core/license/license_service.dart';
 
 void main() async {
@@ -210,8 +217,8 @@ class MyApp extends StatelessWidget {
   final SyncServer syncServer;
   final BluetoothSyncServer bluetoothSyncServer;
   final SyncManager syncManager;
-  final SchoolRepository schoolRepository;
   final String deviceId;
+  final SchoolRepositoryImpl schoolRepository;
 
   const MyApp({
     super.key,
@@ -250,80 +257,94 @@ class MyApp extends StatelessWidget {
     required this.syncServer,
     required this.bluetoothSyncServer,
     required this.syncManager,
-    required this.schoolRepository,
     required this.deviceId,
+    required this.schoolRepository,
   });
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    return MultiRepositoryProvider(
       providers: [
-        BlocProvider(
-          create: (_) => StockBloc(
-            getItems: getItems,
-            addItem: addItem,
-            updateItem: updateItem,
-            deleteItem: deleteItem,
-            getCategories: getCategories,
-            addCategory: addCategory,
-            deleteCategory: deleteCategory,
-            increaseStock: increaseStock,
-            getStockHistory: getStockHistory,
-            getInventoryReport: getInventoryReport,
-            getProfitReport: getProfitReport,
-            addExpenseUC: addExpense,
-            getExpensesUC: getExpenses,
-            getTotalExpensesUC: getTotalExpenses,
-          )..add(LoadItems()),
-        ),
-        BlocProvider(
-          create: (_) => InvoiceBloc(
-            repository: invoiceRepository,
-            calculationService: calculationService,
-          ),
-        ),
-        BlocProvider(
-          create: (_) => HistoryBloc(
-            getHistory: getInvoiceHistory,
-            getInvoiceDetails: getInvoiceDetails,
-          ),
-        ),
-        BlocProvider(
-          create: (_) => SettingsBloc(
-            repository: settingsRepository,
-            securityService: securityService,
-            backupService: backupService,
-          )..add(LoadSettings()),
-        ),
-        BlocProvider(
-          create: (_) => PrinterBloc(
-            getDevices: getDevices,
-            connectPrinter: connectPrinter,
-            printInvoice: printInvoice,
-          ),
-        ),
-        BlocProvider(
-          create: (_) => StaffBloc(
-            repository: staffRepository,
-          )..add(LoadStaffList()),
-        ),
-        BlocProvider(
-          create: (_) => SyncBloc(
-            discoveryService: discoveryService,
-            bluetoothDiscoveryService: bluetoothDiscoveryService,
-            syncManager: syncManager,
-            syncServer: syncServer,
-            bluetoothSyncServer: bluetoothSyncServer,
-            syncRepository: syncRepository,
-            db: database,
-            deviceId: deviceId,
-          )..add(InitializeSync()),
-        ),
-        BlocProvider(
-          create: (_) => SchoolBloc(schoolRepository),
-        ),
+        RepositoryProvider<ItemRepository>(create: (_) => itemRepository),
+        RepositoryProvider<InvoiceRepository>(create: (_) => invoiceRepository),
+        RepositoryProvider<SettingsRepository>(create: (_) => settingsRepository),
+        RepositoryProvider<CategoryRepository>(create: (_) => categoryRepository),
+        RepositoryProvider<StaffRepository>(create: (_) => staffRepository),
+        RepositoryProvider<SchoolRepository>(create: (_) => schoolRepository),
+        RepositoryProvider<SyncRepository>(create: (_) => syncRepository),
       ],
-      child: BlocBuilder<SettingsBloc, SettingsState>(
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider(
+            create: (_) => StockBloc(
+              getItems: getItems,
+              addItem: addItem,
+              updateItem: updateItem,
+              deleteItem: deleteItem,
+              getCategories: getCategories,
+              addCategory: addCategory,
+              deleteCategory: deleteCategory,
+              increaseStock: increaseStock,
+              getStockHistory: getStockHistory,
+              getInventoryReport: getInventoryReport,
+              getProfitReport: getProfitReport,
+              addExpenseUC: addExpense,
+              getExpensesUC: getExpenses,
+              getTotalExpensesUC: getTotalExpenses,
+            )..add(LoadItems()),
+          ),
+          BlocProvider(
+            create: (_) => InvoiceBloc(
+              repository: invoiceRepository,
+              calculationService: calculationService,
+            ),
+          ),
+          BlocProvider(
+            create: (_) => HistoryBloc(
+              getHistory: getInvoiceHistory,
+              getInvoiceDetails: getInvoiceDetails,
+            ),
+          ),
+          BlocProvider(
+            create: (_) => SettingsBloc(
+              repository: settingsRepository,
+              securityService: securityService,
+              backupService: backupService,
+            )..add(LoadSettings()),
+          ),
+          BlocProvider(
+            create: (_) => PrinterBloc(
+              getDevices: getDevices,
+              connectPrinter: connectPrinter,
+              printInvoice: printInvoice,
+            ),
+          ),
+          BlocProvider(
+            create: (_) => StaffBloc(
+              repository: staffRepository,
+            )..add(LoadStaffList()),
+          ),
+          BlocProvider(
+            create: (_) => SyncBloc(
+              discoveryService: discoveryService,
+              bluetoothDiscoveryService: bluetoothDiscoveryService,
+              syncManager: syncManager,
+              syncServer: syncServer,
+              bluetoothSyncServer: bluetoothSyncServer,
+              syncRepository: syncRepository,
+              db: database,
+              deviceId: deviceId,
+            )..add(InitializeSync()),
+          ),
+          BlocProvider(
+            create: (_) => SchoolBloc(
+              repository: schoolRepository,
+              itemRepository: itemRepository,
+              invoiceRepository: invoiceRepository,
+            ),
+          ),
+        ],
+        child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {
           final themeMode = state.settings?.themeMode ?? 'system';
           return MaterialApp(
@@ -335,6 +356,7 @@ class MyApp extends StatelessWidget {
                     ? ThemeMode.dark 
                     : ThemeMode.system,
             theme: ThemeData(
+              fontFamily: kIsWeb ? 'sans-serif' : null,
               colorScheme: ColorScheme.fromSeed(seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3)),
               useMaterial3: true,
               textSelectionTheme: TextSelectionThemeData(
@@ -342,6 +364,7 @@ class MyApp extends StatelessWidget {
               ),
             ),
             darkTheme: ThemeData(
+              fontFamily: kIsWeb ? 'sans-serif' : null,
               colorScheme: ColorScheme.fromSeed(
                 seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3), 
                 brightness: Brightness.dark,
@@ -351,10 +374,12 @@ class MyApp extends StatelessWidget {
                 cursorColor: Color(state.settings?.primaryColor ?? 0xFF2196F3),
               ),
             ),
+            navigatorObservers: [AppRouteObserver(context)],
             home: const LandingPage(),
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }

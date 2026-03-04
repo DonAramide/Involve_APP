@@ -7,7 +7,7 @@ import '../repositories/category_repository.dart';
 class GetItems {
   final ItemRepository repository;
   GetItems(this.repository);
-  Future<List<Item>> call() => repository.getAllItems();
+  Future<List<Item>> call({String? businessMode}) => repository.getAllItems(businessMode: businessMode);
 }
 
 class AddItem {
@@ -43,13 +43,15 @@ class GetStockHistory {
 class GetInventoryReport {
   final ItemRepository repository;
   GetInventoryReport(this.repository);
-  Future<List<Map<String, dynamic>>> call({DateTime? start, DateTime? end}) => repository.getInventoryReport(start: start, end: end);
+  Future<List<Map<String, dynamic>>> call({DateTime? start, DateTime? end, String? businessMode}) => 
+    repository.getInventoryReport(start: start, end: end, businessMode: businessMode);
 }
 
 class GetProfitReport {
   final ItemRepository repository;
   GetProfitReport(this.repository);
-  Future<List<Map<String, dynamic>>> call({DateTime? start, DateTime? end}) => repository.getProfitReport(start: start, end: end);
+  Future<List<Map<String, dynamic>>> call({DateTime? start, DateTime? end, String? businessMode}) => 
+    repository.getProfitReport(start: start, end: end, businessMode: businessMode);
 }
 
 class AddExpense {
@@ -61,26 +63,28 @@ class AddExpense {
 class GetExpenses {
   final ItemRepository repository;
   GetExpenses(this.repository);
-  Future<List<Expense>> call({DateTime? start, DateTime? end}) => repository.getExpenses(start: start, end: end);
+  Future<List<Expense>> call({DateTime? start, DateTime? end, String? businessMode}) => 
+    repository.getExpenses(start: start, end: end, businessMode: businessMode);
 }
 
 class GetTotalExpenses {
   final ItemRepository repository;
   GetTotalExpenses(this.repository);
-  Future<double> call({DateTime? start, DateTime? end}) => repository.getTotalExpenses(start: start, end: end);
+  Future<double> call({DateTime? start, DateTime? end, String? businessMode}) => 
+    repository.getTotalExpenses(start: start, end: end, businessMode: businessMode);
 }
 
 // Category Use Cases
 class GetCategories {
   final CategoryRepository repository;
   GetCategories(this.repository);
-  Future<List<Category>> call() => repository.getCategories();
+  Future<List<Category>> call({String? businessMode}) => repository.getCategories(businessMode: businessMode);
 }
 
 class AddNewCategory {
   final CategoryRepository repository;
   AddNewCategory(this.repository);
-  Future<void> call(String name) => repository.addCategory(name);
+  Future<void> call(String name, {String? businessMode}) => repository.addCategory(name, businessMode: businessMode);
 }
 
 class DeleteCategoryUseCase {

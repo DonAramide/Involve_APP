@@ -29,18 +29,19 @@ class Invoices extends Table {
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
   RealColumn get totalPrintAmount => real().nullable()();
 
-  // School Mode Fields
-  TextColumn get businessMode => text().nullable()();
+  // School Mode Extensions
+  TextColumn get businessMode => text().withDefault(const Constant('retail'))(); // 'retail' or 'school'
   IntColumn get studentId => integer().nullable()();
   IntColumn get classId => integer().nullable()();
   IntColumn get termId => integer().nullable()();
   IntColumn get academicYearId => integer().nullable()();
+  
+  // School Display Fields
   TextColumn get admissionNumber => text().nullable()();
   TextColumn get className => text().nullable()();
   TextColumn get termName => text().nullable()();
   TextColumn get academicYearName => text().nullable()();
   BlobColumn get studentImage => blob().nullable()();
-  DateTimeColumn get dueDate => dateTime().nullable()();
 }
 
 @DataClassName('InvoiceItemTable')

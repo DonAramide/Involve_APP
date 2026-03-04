@@ -16,6 +16,24 @@ class AcademicYear extends Equatable {
     this.isCurrent = false,
   });
 
+  AcademicYear copyWith({
+    int? id,
+    String? name,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool? isCurrent,
+  }) {
+    return AcademicYear(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      isCurrent: isCurrent ?? this.isCurrent,
+    );
+  }
+
+  bool get isActive => isCurrent;
+
   @override
   List<Object?> get props => [id, name, startDate, endDate, isCurrent];
 }
@@ -37,18 +55,51 @@ class Term extends Equatable {
     this.isCurrent = false,
   });
 
+  Term copyWith({
+    int? id,
+    int? academicYearId,
+    String? name,
+    DateTime? startDate,
+    DateTime? endDate,
+    bool? isCurrent,
+  }) {
+    return Term(
+      id: id ?? this.id,
+      academicYearId: academicYearId ?? this.academicYearId,
+      name: name ?? this.name,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      isCurrent: isCurrent ?? this.isCurrent,
+    );
+  }
+
+  bool get isActive => isCurrent;
+
   @override
   List<Object?> get props => [id, academicYearId, name, startDate, endDate, isCurrent];
 }
 
-class ClassEntity extends Equatable {
+class SchoolClass extends Equatable {
   final int? id;
   final String name;
+  final String? description;
 
-  const ClassEntity({this.id, required this.name});
+  const SchoolClass({this.id, required this.name, this.description});
+
+  SchoolClass copyWith({
+    int? id,
+    String? name,
+    String? description,
+  }) {
+    return SchoolClass(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+    );
+  }
 
   @override
-  List<Object?> get props => [id, name];
+  List<Object?> get props => [id, name, description];
 }
 
 class Student extends Equatable {
@@ -57,6 +108,9 @@ class Student extends Equatable {
   final String firstName;
   final String lastName;
   final int classId;
+  final String? parentName;
+  final String? parentPhone;
+  final double balance;
   final Uint8List? image;
   final DateTime? dateOfBirth;
   final DateTime registrationDate;
@@ -67,15 +121,46 @@ class Student extends Equatable {
     required this.firstName,
     required this.lastName,
     required this.classId,
+    this.parentName,
+    this.parentPhone,
+    this.balance = 0.0,
     this.image,
     this.dateOfBirth,
     required this.registrationDate,
   });
 
+  Student copyWith({
+    int? id,
+    String? admissionNumber,
+    String? firstName,
+    String? lastName,
+    int? classId,
+    String? parentName,
+    String? parentPhone,
+    double? balance,
+    Uint8List? image,
+    DateTime? dateOfBirth,
+    DateTime? registrationDate,
+  }) {
+    return Student(
+      id: id ?? this.id,
+      admissionNumber: admissionNumber ?? this.admissionNumber,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      classId: classId ?? this.classId,
+      parentName: parentName ?? this.parentName,
+      parentPhone: parentPhone ?? this.parentPhone,
+      balance: balance ?? this.balance,
+      image: image ?? this.image,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      registrationDate: registrationDate ?? this.registrationDate,
+    );
+  }
+
   String get fullName => '$firstName $lastName';
 
   @override
-  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, image, dateOfBirth, registrationDate];
+  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, parentName, parentPhone, balance, image, dateOfBirth, registrationDate];
 }
 
 class Subject extends Equatable {
@@ -85,29 +170,77 @@ class Subject extends Equatable {
 
   const Subject({this.id, required this.name, this.code});
 
+  Subject copyWith({
+    int? id,
+    String? name,
+    String? code,
+  }) {
+    return Subject(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      code: code ?? this.code,
+    );
+  }
+
   @override
   List<Object?> get props => [id, name, code];
 }
 
-class Result extends Equatable {
+class AcademicResult extends Equatable {
   final int? id;
   final int studentId;
   final int subjectId;
   final int termId;
   final int academicYearId;
-  final double score;
+  final double assessmentScore;
+  final double examScore;
+  final double totalScore;
+  final String? grade;
+  final String? remarks;
   final DateTime dateEntered;
 
-  const Result({
+  const AcademicResult({
     this.id,
     required this.studentId,
     required this.subjectId,
     required this.termId,
     required this.academicYearId,
-    required this.score,
+    this.assessmentScore = 0.0,
+    this.examScore = 0.0,
+    this.totalScore = 0.0,
+    this.grade,
+    this.remarks,
     required this.dateEntered,
   });
 
+  AcademicResult copyWith({
+    int? id,
+    int? studentId,
+    int? subjectId,
+    int? termId,
+    int? academicYearId,
+    double? assessmentScore,
+    double? examScore,
+    double? totalScore,
+    String? grade,
+    String? remarks,
+    DateTime? dateEntered,
+  }) {
+    return AcademicResult(
+      id: id ?? this.id,
+      studentId: studentId ?? this.studentId,
+      subjectId: subjectId ?? this.subjectId,
+      termId: termId ?? this.termId,
+      academicYearId: academicYearId ?? this.academicYearId,
+      assessmentScore: assessmentScore ?? this.assessmentScore,
+      examScore: examScore ?? this.examScore,
+      totalScore: totalScore ?? this.totalScore,
+      grade: grade ?? this.grade,
+      remarks: remarks ?? this.remarks,
+      dateEntered: dateEntered ?? this.dateEntered,
+    );
+  }
+
   @override
-  List<Object?> get props => [id, studentId, subjectId, termId, academicYearId, score, dateEntered];
+  List<Object?> get props => [id, studentId, subjectId, termId, academicYearId, assessmentScore, examScore, totalScore, grade, remarks, dateEntered];
 }

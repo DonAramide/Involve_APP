@@ -21,4 +21,12 @@ class BackupService {
   Future<bool> restoreBackup(String backupPath) async {
     return false;
   }
+
+  Future<bool> exportDatabase(String targetPath) async {
+    return false;
+  }
+
+  Future<bool> importDatabase(String sourcePath) async {
+    return false;
+  }
 }

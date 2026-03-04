@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/school_bloc.dart';
+import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
-import '../../domain/entities/grading_rule.dart';
 
 class ResultEntryPage extends StatefulWidget {
   const ResultEntryPage({super.key});
@@ -12,172 +12,203 @@ class ResultEntryPage extends StatefulWidget {
 }
 
 class _ResultEntryPageState extends State<ResultEntryPage> {
-  int? _selectedYearId;
-  int? _selectedTermId;
   int? _selectedClassId;
   int? _selectedSubjectId;
-  
-  final Map<int, TextEditingController> _scoreControllers = {};
+  final Map<int, Map<String, TextEditingController>> _controllers = {};
 
   @override
   void initState() {
     super.initState();
-    context.read<SchoolBloc>().add(LoadSchoolData());
+    context.read<SchoolBloc>().add(LoadSubjectsEvent());
+  }
+
+  void _loadExistingResults() {
+    if (_selectedClassId != null && _selectedSubjectId != null) {
+      final state = context.read<SchoolBloc>().state;
+      context.read<SchoolBloc>().add(LoadResultsEvent(
+            classId: _selectedClassId,
+            subjectId: _selectedSubjectId,
+            termId: state.activeTerm?.id,
+            academicYearId: state.activeYear?.id,
+          ));
+    }
+  }
+
+  void _initControllers(List<Student> classStudents, List<AcademicResult> existingResults) {
+    for (var student in classStudents) {
+      if (!_controllers.containsKey(student.id)) {
+        final result = existingResults.where((r) => r.studentId == student.id).firstOrNull;
+        
+        _controllers[student.id!] = {
+          'ca': TextEditingController(text: result?.assessmentScore.toString() ?? '0.0'),
+          'exam': TextEditingController(text: result?.examScore.toString() ?? '0.0'),
+          'remarks': TextEditingController(text: result?.remarks ?? ''),
+        };
+      }
+    }
   }
 
   @override
   void dispose() {
-    for (var controller in _scoreControllers.values) {
-      controller.dispose();
+    for (var studentMap in _controllers.values) {
+      for (var controller in studentMap.values) {
+        controller.dispose();
+      }
     }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Result Entry')),
-      body: BlocConsumer<SchoolBloc, SchoolState>(
-        listener: (context, state) {
-          if (state.error != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
-            );
-          }
-        },
-        builder: (context, state) {
-          return Column(
-            children: [
-              _buildFilters(context, state),
-              const Divider(),
-              Expanded(
-                child: _buildStudentList(context, state),
-              ),
-              if (_selectedClassId != null && _selectedSubjectId != null && state.students.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: state.isSaving ? null : () => _saveResults(state),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: Theme.of(context).primaryColor,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: state.isSaving 
-                        ? const CircularProgressIndicator(color: Colors.white) 
-                        : const Text('SAVE RESULTS', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
+    return BlocConsumer<SchoolBloc, SchoolState>(
+      listener: (context, state) {
+        if (state.status == SchoolStatus.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Results saved successfully!'), backgroundColor: Colors.green),
+          );
+          context.read<SchoolBloc>().add(ResetSchoolStatus());
+        }
+        if (state.error != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
+          );
+          context.read<SchoolBloc>().add(ResetSchoolStatus());
+        }
+      },
+      builder: (context, state) {
+        final classStudents = _selectedClassId == null
+            ? <Student>[]
+            : state.students.where((s) => s.classId == _selectedClassId).toList();
+
+        if (classStudents.isNotEmpty) {
+          _initControllers(classStudents, state.results);
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Enter Results'),
+            actions: [
+              if (classStudents.isNotEmpty && _selectedSubjectId != null)
+                TextButton.icon(
+                  onPressed: () => _saveResults(state),
+                  icon: const Icon(Icons.save, color: Colors.white),
+                  label: const Text('SAVE', style: TextStyle(color: Colors.white)),
                 ),
             ],
-          );
-        },
-      ),
+          ),
+          body: Column(
+            children: [
+              _buildFilters(state),
+              if (_selectedClassId != null && _selectedSubjectId != null)
+                Expanded(
+                  child: state.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : classStudents.isEmpty
+                          ? const Center(child: Text('No students in this class.'))
+                          : _buildResultGrid(classStudents),
+                )
+              else
+                const Expanded(
+                  child: Center(child: Text('Please select Class and Subject.')),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildFilters(BuildContext context, SchoolState state) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+  Widget _buildFilters(SchoolState state) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      color: Theme.of(context).primaryColor.withOpacity(0.05),
       child: Column(
         children: [
           Row(
             children: [
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: _selectedYearId,
-                  decoration: const InputDecoration(labelText: 'Academic Year'),
-                  items: state.academicYears.map((y) => DropdownMenuItem(value: y.id, child: Text(y.name))).toList(),
-                  onChanged: (val) => setState(() => _selectedYearId = val),
+                  value: _selectedClassId,
+                  decoration: const InputDecoration(labelText: 'Class', border: OutlineInputBorder()),
+                  items: state.classes.map((c) => DropdownMenuItem(value: c.id!, child: Text(c.name))).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedClassId = val;
+                      _controllers.clear();
+                    });
+                    _loadExistingResults();
+                  },
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: _selectedClassId,
-                  decoration: const InputDecoration(labelText: 'Class'),
-                  items: state.classes.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                  value: _selectedSubjectId,
+                  decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder()),
+                  items: state.subjects.map((s) => DropdownMenuItem(value: s.id!, child: Text(s.name))).toList(),
                   onChanged: (val) {
-                    setState(() => _selectedClassId = val);
-                    if (val != null) {
-                      context.read<SchoolBloc>().add(LoadStudentsEvent(val));
-                    }
+                    setState(() {
+                      _selectedSubjectId = val;
+                      _controllers.clear();
+                    });
+                    _loadExistingResults();
                   },
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<int>(
-                  value: _selectedSubjectId,
-                  decoration: const InputDecoration(labelText: 'Subject'),
-                  items: state.subjects.map((s) => DropdownMenuItem(value: s.id, child: Text(s.name))).toList(),
-                  onChanged: (val) => setState(() => _selectedSubjectId = val),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: DropdownButtonFormField<int>(
-                  value: _selectedTermId,
-                  decoration: const InputDecoration(labelText: 'Term'),
-                  items: state.academicYears.isEmpty ? [] : [
-                    const DropdownMenuItem(value: 1, child: Text('Term 1')),
-                    const DropdownMenuItem(value: 2, child: Text('Term 2')),
-                    const DropdownMenuItem(value: 3, child: Text('Term 3')),
-                  ],
-                  onChanged: (val) => setState(() => _selectedTermId = val),
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            'Term: ${state.activeTerm?.name ?? 'N/A'} | Year: ${state.activeYear?.name ?? 'N/A'}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStudentList(BuildContext context, SchoolState state) {
-    if (state.isLoading) return const Center(child: CircularProgressIndicator());
-    if (_selectedClassId == null) return const Center(child: Text('Please select a class.'));
-    if (state.students.isEmpty) return const Center(child: Text('No students found in this class.'));
-
+  Widget _buildResultGrid(List<Student> students) {
     return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: state.students.length,
+      padding: const EdgeInsets.all(16),
+      itemCount: students.length,
       separatorBuilder: (_, __) => const Divider(),
       itemBuilder: (context, index) {
-        final student = state.students[index];
-        _scoreControllers.putIfAbsent(student.id!, () => TextEditingController());
+        final student = students[index];
+        final controllers = _controllers[student.id]!;
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                flex: 2,
-                child: Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 1,
-                child: TextFormField(
-                  controller: _scoreControllers[student.id],
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Score',
-                    border: OutlineInputBorder(),
+              Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: controllers['ca'],
+                      decoration: const InputDecoration(labelText: 'CA (40)', border: OutlineInputBorder()),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
                   ),
-                  onChanged: (val) => setState(() {}), // Trigger grade recalc UI
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 1,
-                child: _buildGradeBadge(context, _scoreControllers[student.id]?.text, state),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: controllers['exam'],
+                      decoration: const InputDecoration(labelText: 'Exam (60)', border: OutlineInputBorder()),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: controllers['remarks'],
+                      decoration: const InputDecoration(labelText: 'Remarks', border: OutlineInputBorder()),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -186,74 +217,40 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
     );
   }
 
-  Widget _buildGradeBadge(BuildContext context, String? scoreText, SchoolState state) {
-    if (scoreText == null || scoreText.isEmpty) return const SizedBox.shrink();
-    final score = double.tryParse(scoreText);
-    if (score == null) return const Icon(Icons.error, color: Colors.red);
-
-    final rule = state.gradingRules.firstWhere(
-      (r) => score >= r.minScore && score <= r.maxScore,
-      orElse: () => GradingRule(grade: '?', minScore: 0, maxScore: 0),
-    );
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      decoration: BoxDecoration(
-        color: _getGradeColor(rule.grade),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Center(
-        child: Text(
-          rule.grade,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
-  Color _getGradeColor(String grade) {
-    if (grade.startsWith('A')) return Colors.green;
-    if (grade.startsWith('B')) return Colors.blue;
-    if (grade.startsWith('C')) return Colors.orange;
-    if (grade.startsWith('D')) return Colors.orangeAccent;
-    if (grade.startsWith('E')) return Colors.deepOrange;
-    if (grade.startsWith('F')) return Colors.red;
-    return Colors.grey;
-  }
-
   void _saveResults(SchoolState state) {
-    if (_selectedYearId == null || _selectedTermId == null || _selectedSubjectId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select year, term and subject'), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
-    final results = <Result>[];
-    for (final student in state.students) {
-      final scoreVal = _scoreControllers[student.id]?.text;
-      if (scoreVal != null && scoreVal.isNotEmpty) {
-        final score = double.tryParse(scoreVal);
-        if (score != null) {
-          results.add(Result(
-            studentId: student.id!,
-            subjectId: _selectedSubjectId!,
-            termId: _selectedTermId!,
-            academicYearId: _selectedYearId!,
-            score: score,
-            dateEntered: DateTime.now(),
-          ));
-        }
-      }
-    }
-
-    if (results.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No scores entered')),
-      );
-      return;
-    }
+    final results = <AcademicResult>[];
+    
+    _controllers.forEach((studentId, studentControllers) {
+      final ca = double.tryParse(studentControllers['ca']!.text) ?? 0.0;
+      final exam = double.tryParse(studentControllers['exam']!.text) ?? 0.0;
+      final total = ca + exam;
+      
+      results.add(AcademicResult(
+        studentId: studentId,
+        subjectId: _selectedSubjectId!,
+        termId: state.activeTerm!.id!,
+        academicYearId: state.activeYear!.id!,
+        assessmentScore: ca,
+        examScore: exam,
+        totalScore: total,
+        grade: _calculateGrade(total),
+        remarks: studentControllers['remarks']!.text,
+        dateEntered: DateTime.now(),
+      ));
+    });
 
     context.read<SchoolBloc>().add(SaveResultsEvent(results));
+  }
+
+  String _calculateGrade(double total) {
+    if (total >= 75) return 'A1';
+    if (total >= 70) return 'B2';
+    if (total >= 65) return 'B3';
+    if (total >= 60) return 'C4';
+    if (total >= 55) return 'C5';
+    if (total >= 50) return 'C6';
+    if (total >= 45) return 'D7';
+    if (total >= 40) return 'E8';
+    return 'F9';
   }
 }

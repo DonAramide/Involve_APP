@@ -95,8 +95,6 @@ class SettingsRepositoryImpl implements SettingsRepository {
       skipSplash: Value(settings.skipSplash),
       restoreLastState: Value(settings.restoreLastState),
       lastRoute: Value(settings.lastRoute),
-      invoicePrefix: Value(settings.invoicePrefix),
-      invoiceNumberPadding: Value(settings.invoiceNumberPadding),
     );
 
     if (existing == null) {
@@ -189,8 +187,6 @@ class SettingsRepositoryImpl implements SettingsRepository {
       skipSplash: row.skipSplash,
       restoreLastState: row.restoreLastState,
       lastRoute: row.lastRoute,
-      invoicePrefix: row.invoicePrefix,
-      invoiceNumberPadding: row.invoiceNumberPadding,
     );
   }
 }

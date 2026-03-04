@@ -1,61 +1,73 @@
-part of 'school_bloc.dart';
+import 'package:equatable/equatable.dart';
+import '../../domain/entities/school_entities.dart';
+import '../../domain/entities/grading_rule.dart';
+import '../../../stock/domain/entities/item.dart';
+import '../../../invoicing/domain/entities/invoice.dart';
+
+enum SchoolStatus { initial, loading, success, failure }
 
 class SchoolState extends Equatable {
-  final List<GradingRule> gradingRules;
   final List<AcademicYear> academicYears;
   final List<Term> terms;
-  final List<ClassEntity> classes;
+  final List<SchoolClass> classes;
+  final List<Student> students;
+  final List<Item> items;
+  final List<Invoice> studentInvoices;
   final List<Subject> subjects;
-  final List<Student> students; // Added students
+  final List<AcademicResult> results;
+  final List<GradingRule> gradingRules;
   final bool isLoading;
-  final bool isSaving; // Added isSaving
   final String? error;
+  final SchoolStatus status;
 
   const SchoolState({
-    this.gradingRules = const [],
     this.academicYears = const [],
     this.terms = const [],
     this.classes = const [],
+    this.students = const [],
+    this.items = const [],
+    this.studentInvoices = const [],
     this.subjects = const [],
-    this.students = const [], // Initialize students
+    this.results = const [],
+    this.gradingRules = const [],
     this.isLoading = false,
-    this.isSaving = false, // Initialize isSaving
     this.error,
+    this.status = SchoolStatus.initial,
   });
 
+  AcademicYear? get activeYear => academicYears.where((y) => y.isCurrent).firstOrNull ?? academicYears.firstOrNull;
+  Term? get activeTerm => terms.where((t) => t.isCurrent).firstOrNull ?? terms.firstOrNull;
+
   SchoolState copyWith({
-    List<GradingRule>? gradingRules,
     List<AcademicYear>? academicYears,
     List<Term>? terms,
-    List<ClassEntity>? classes,
+    List<SchoolClass>? classes,
+    List<Student>? students,
+    List<Item>? items,
+    List<Invoice>? studentInvoices,
     List<Subject>? subjects,
-    List<Student>? students, // Added students
+    List<AcademicResult>? results,
+    List<GradingRule>? gradingRules,
     bool? isLoading,
-    bool? isSaving, // Update isSaving
     String? error,
+    SchoolStatus? status,
   }) {
     return SchoolState(
-      gradingRules: gradingRules ?? this.gradingRules,
       academicYears: academicYears ?? this.academicYears,
       terms: terms ?? this.terms,
       classes: classes ?? this.classes,
+      students: students ?? this.students,
+      items: items ?? this.items,
+      studentInvoices: studentInvoices ?? this.studentInvoices,
       subjects: subjects ?? this.subjects,
-      students: students ?? this.students, // Map students
+      results: results ?? this.results,
+      gradingRules: gradingRules ?? this.gradingRules,
       isLoading: isLoading ?? this.isLoading,
-      isSaving: isSaving ?? this.isSaving, // Map isSaving
       error: error,
+      status: status ?? this.status,
     );
   }
 
   @override
-  List<Object?> get props => [
-    gradingRules,
-    academicYears,
-    terms,
-    classes,
-    subjects,
-    students, // Added students
-    isLoading,
-    error,
-  ];
+  List<Object?> get props => [academicYears, terms, classes, students, items, studentInvoices, subjects, results, gradingRules, isLoading, error, status];
 }

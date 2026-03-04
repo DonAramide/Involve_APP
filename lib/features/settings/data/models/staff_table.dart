@@ -12,6 +12,5 @@ class Staff extends Table {
   DateTimeColumn get updatedAt => dateTime().nullable()();
   DateTimeColumn get createdAt => dateTime().nullable()();
   TextColumn get deviceId => text().nullable()();
-  TextColumn get role => text().withDefault(const Constant('Admin'))(); // admin, cashier, accountant
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }

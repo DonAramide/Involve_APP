@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/category.dart';
 import '../bloc/stock_bloc.dart';
 import '../bloc/stock_state.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 
 class ManageCategoriesPage extends StatefulWidget {
   const ManageCategoriesPage({super.key});
@@ -15,8 +16,8 @@ class _ManageCategoriesPageState extends State<ManageCategoriesPage> {
   @override
   void initState() {
     super.initState();
-    // Trigger load only once
-    context.read<StockBloc>().add(LoadCategories());
+    final businessMode = context.read<SettingsBloc>().state.settings?.businessMode;
+    context.read<StockBloc>().add(LoadCategories(businessMode: businessMode));
   }
 
   @override
@@ -126,7 +127,8 @@ class _AddCategoryFormState extends State<_AddCategoryForm> {
   void _submit() {
     print('Submit called. Text: ${_controller.text}'); // Debug
     if (_controller.text.isNotEmpty) {
-      context.read<StockBloc>().add(AddCategory(_controller.text));
+      final businessMode = context.read<SettingsBloc>().state.settings?.businessMode;
+      context.read<StockBloc>().add(AddCategory(_controller.text, businessMode: businessMode));
       _controller.clear();
       // Keep focus for rapid entry
       _focusNode.requestFocus();
