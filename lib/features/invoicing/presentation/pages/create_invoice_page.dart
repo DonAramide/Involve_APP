@@ -120,12 +120,17 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
                 // 2. Format name for success message
                 final name = state.customerName ?? 'Transaction';
 
+                // Grab states before popping context
+                final nav = Navigator.of(context);
+                final messenger = ScaffoldMessenger.of(context);
+                final invoiceBloc = context.read<InvoiceBloc>();
+
                 // 3. Clear all modal overlays (Preview Dialog AND Cart Bottom Sheet)
                 // and return to the main menu (Dashboard)
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                nav.popUntil((route) => route.isFirst);
 
                 // 4. Show success feedback
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   SnackBar(
                     content: Text('$name has been saved and printed successfully!'),
                     backgroundColor: Colors.green,
@@ -135,8 +140,7 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
                       label: 'VIEW HISTORY',
                       textColor: Colors.white,
                       onPressed: () {
-                        Navigator.push(
-                          context,
+                        nav.push(
                           MaterialPageRoute(builder: (_) => InvoiceHistoryPage()),
                         );
                       },
@@ -145,7 +149,7 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
                 );
 
                 // 5. Reset flow for next transaction
-                context.read<InvoiceBloc>().add(ResetInvoice());
+                invoiceBloc.add(ResetInvoice());
               }
             },
           ),
