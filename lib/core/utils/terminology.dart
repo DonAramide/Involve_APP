@@ -18,4 +18,11 @@ extension BusinessTerminology on AppSettings {
   
   String get stockHistoryLabel => businessMode == 'school' ? 'Price History' : 'Stock History';
   String get stockAdditionsLabel => businessMode == 'school' ? 'No history recorded yet.' : 'No stock additions recorded yet.';
+  
+  String get assignToCustomerLabel => businessMode == 'school' ? 'Assign to Student' : 'Add Customer Name & Phone';
+  
+  String get customerInfoLabel => businessMode == 'school' ? 'Student Information' : 'Customer Information';
+  String get customerNameLabel => businessMode == 'school' ? 'Student Full Name' : 'Customer Name';
+  String get customerPhoneLabel => businessMode == 'school' ? 'Parent Phone Number' : 'Customer Phone';
+  String get customerAddressLabel => businessMode == 'school' ? 'Home Address' : 'Customer Address';
 }

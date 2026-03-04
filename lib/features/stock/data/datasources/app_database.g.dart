@@ -3828,6 +3828,38 @@ class $SettingsTable extends Settings
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant('retail'));
+  static const VerificationMeta _menuOrderMeta =
+      const VerificationMeta('menuOrder');
+  @override
+  late final GeneratedColumn<String> menuOrder = GeneratedColumn<String>(
+      'menu_order', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _skipSplashMeta =
+      const VerificationMeta('skipSplash');
+  @override
+  late final GeneratedColumn<bool> skipSplash = GeneratedColumn<bool>(
+      'skip_splash', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("skip_splash" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _restoreLastStateMeta =
+      const VerificationMeta('restoreLastState');
+  @override
+  late final GeneratedColumn<bool> restoreLastState = GeneratedColumn<bool>(
+      'restore_last_state', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("restore_last_state" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _lastRouteMeta =
+      const VerificationMeta('lastRoute');
+  @override
+  late final GeneratedColumn<String> lastRoute = GeneratedColumn<String>(
+      'last_route', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -3874,7 +3906,11 @@ class $SettingsTable extends Settings
         showExpensePieChart,
         showTopSellingChart,
         showStockValueChart,
-        businessMode
+        businessMode,
+        menuOrder,
+        skipSplash,
+        restoreLastState,
+        lastRoute
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4135,6 +4171,26 @@ class $SettingsTable extends Settings
           businessMode.isAcceptableOrUnknown(
               data['business_mode']!, _businessModeMeta));
     }
+    if (data.containsKey('menu_order')) {
+      context.handle(_menuOrderMeta,
+          menuOrder.isAcceptableOrUnknown(data['menu_order']!, _menuOrderMeta));
+    }
+    if (data.containsKey('skip_splash')) {
+      context.handle(
+          _skipSplashMeta,
+          skipSplash.isAcceptableOrUnknown(
+              data['skip_splash']!, _skipSplashMeta));
+    }
+    if (data.containsKey('restore_last_state')) {
+      context.handle(
+          _restoreLastStateMeta,
+          restoreLastState.isAcceptableOrUnknown(
+              data['restore_last_state']!, _restoreLastStateMeta));
+    }
+    if (data.containsKey('last_route')) {
+      context.handle(_lastRouteMeta,
+          lastRoute.isAcceptableOrUnknown(data['last_route']!, _lastRouteMeta));
+    }
     return context;
   }
 
@@ -4240,6 +4296,14 @@ class $SettingsTable extends Settings
           DriftSqlType.bool, data['${effectivePrefix}show_stock_value_chart'])!,
       businessMode: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}business_mode'])!,
+      menuOrder: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}menu_order']),
+      skipSplash: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}skip_splash'])!,
+      restoreLastState: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}restore_last_state'])!,
+      lastRoute: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}last_route']),
     );
   }
 
@@ -4295,6 +4359,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showTopSellingChart;
   final bool showStockValueChart;
   final String businessMode;
+  final String? menuOrder;
+  final bool skipSplash;
+  final bool restoreLastState;
+  final String? lastRoute;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -4340,7 +4408,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.showExpensePieChart,
       required this.showTopSellingChart,
       required this.showStockValueChart,
-      required this.businessMode});
+      required this.businessMode,
+      this.menuOrder,
+      required this.skipSplash,
+      required this.restoreLastState,
+      this.lastRoute});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4410,6 +4482,14 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['show_top_selling_chart'] = Variable<bool>(showTopSellingChart);
     map['show_stock_value_chart'] = Variable<bool>(showStockValueChart);
     map['business_mode'] = Variable<String>(businessMode);
+    if (!nullToAbsent || menuOrder != null) {
+      map['menu_order'] = Variable<String>(menuOrder);
+    }
+    map['skip_splash'] = Variable<bool>(skipSplash);
+    map['restore_last_state'] = Variable<bool>(restoreLastState);
+    if (!nullToAbsent || lastRoute != null) {
+      map['last_route'] = Variable<String>(lastRoute);
+    }
     return map;
   }
 
@@ -4477,6 +4557,14 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showTopSellingChart: Value(showTopSellingChart),
       showStockValueChart: Value(showStockValueChart),
       businessMode: Value(businessMode),
+      menuOrder: menuOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(menuOrder),
+      skipSplash: Value(skipSplash),
+      restoreLastState: Value(restoreLastState),
+      lastRoute: lastRoute == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastRoute),
     );
   }
 
@@ -4540,6 +4628,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showStockValueChart:
           serializer.fromJson<bool>(json['showStockValueChart']),
       businessMode: serializer.fromJson<String>(json['businessMode']),
+      menuOrder: serializer.fromJson<String?>(json['menuOrder']),
+      skipSplash: serializer.fromJson<bool>(json['skipSplash']),
+      restoreLastState: serializer.fromJson<bool>(json['restoreLastState']),
+      lastRoute: serializer.fromJson<String?>(json['lastRoute']),
     );
   }
   @override
@@ -4594,6 +4686,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'showTopSellingChart': serializer.toJson<bool>(showTopSellingChart),
       'showStockValueChart': serializer.toJson<bool>(showStockValueChart),
       'businessMode': serializer.toJson<String>(businessMode),
+      'menuOrder': serializer.toJson<String?>(menuOrder),
+      'skipSplash': serializer.toJson<bool>(skipSplash),
+      'restoreLastState': serializer.toJson<bool>(restoreLastState),
+      'lastRoute': serializer.toJson<String?>(lastRoute),
     };
   }
 
@@ -4642,7 +4738,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? showExpensePieChart,
           bool? showTopSellingChart,
           bool? showStockValueChart,
-          String? businessMode}) =>
+          String? businessMode,
+          Value<String?> menuOrder = const Value.absent(),
+          bool? skipSplash,
+          bool? restoreLastState,
+          Value<String?> lastRoute = const Value.absent()}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -4699,6 +4799,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
         showStockValueChart: showStockValueChart ?? this.showStockValueChart,
         businessMode: businessMode ?? this.businessMode,
+        menuOrder: menuOrder.present ? menuOrder.value : this.menuOrder,
+        skipSplash: skipSplash ?? this.skipSplash,
+        restoreLastState: restoreLastState ?? this.restoreLastState,
+        lastRoute: lastRoute.present ? lastRoute.value : this.lastRoute,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -4806,6 +4910,13 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       businessMode: data.businessMode.present
           ? data.businessMode.value
           : this.businessMode,
+      menuOrder: data.menuOrder.present ? data.menuOrder.value : this.menuOrder,
+      skipSplash:
+          data.skipSplash.present ? data.skipSplash.value : this.skipSplash,
+      restoreLastState: data.restoreLastState.present
+          ? data.restoreLastState.value
+          : this.restoreLastState,
+      lastRoute: data.lastRoute.present ? data.lastRoute.value : this.lastRoute,
     );
   }
 
@@ -4856,7 +4967,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('showExpensePieChart: $showExpensePieChart, ')
           ..write('showTopSellingChart: $showTopSellingChart, ')
           ..write('showStockValueChart: $showStockValueChart, ')
-          ..write('businessMode: $businessMode')
+          ..write('businessMode: $businessMode, ')
+          ..write('menuOrder: $menuOrder, ')
+          ..write('skipSplash: $skipSplash, ')
+          ..write('restoreLastState: $restoreLastState, ')
+          ..write('lastRoute: $lastRoute')
           ..write(')'))
         .toString();
   }
@@ -4907,7 +5022,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showExpensePieChart,
         showTopSellingChart,
         showStockValueChart,
-        businessMode
+        businessMode,
+        menuOrder,
+        skipSplash,
+        restoreLastState,
+        lastRoute
       ]);
   @override
   bool operator ==(Object other) =>
@@ -4958,7 +5077,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.showExpensePieChart == this.showExpensePieChart &&
           other.showTopSellingChart == this.showTopSellingChart &&
           other.showStockValueChart == this.showStockValueChart &&
-          other.businessMode == this.businessMode);
+          other.businessMode == this.businessMode &&
+          other.menuOrder == this.menuOrder &&
+          other.skipSplash == this.skipSplash &&
+          other.restoreLastState == this.restoreLastState &&
+          other.lastRoute == this.lastRoute);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -5007,6 +5130,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showTopSellingChart;
   final Value<bool> showStockValueChart;
   final Value<String> businessMode;
+  final Value<String?> menuOrder;
+  final Value<bool> skipSplash;
+  final Value<bool> restoreLastState;
+  final Value<String?> lastRoute;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -5053,6 +5180,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showTopSellingChart = const Value.absent(),
     this.showStockValueChart = const Value.absent(),
     this.businessMode = const Value.absent(),
+    this.menuOrder = const Value.absent(),
+    this.skipSplash = const Value.absent(),
+    this.restoreLastState = const Value.absent(),
+    this.lastRoute = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -5100,6 +5231,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showTopSellingChart = const Value.absent(),
     this.showStockValueChart = const Value.absent(),
     this.businessMode = const Value.absent(),
+    this.menuOrder = const Value.absent(),
+    this.skipSplash = const Value.absent(),
+    this.restoreLastState = const Value.absent(),
+    this.lastRoute = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -5149,6 +5284,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showTopSellingChart,
     Expression<bool>? showStockValueChart,
     Expression<String>? businessMode,
+    Expression<String>? menuOrder,
+    Expression<bool>? skipSplash,
+    Expression<bool>? restoreLastState,
+    Expression<String>? lastRoute,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -5211,6 +5350,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (showStockValueChart != null)
         'show_stock_value_chart': showStockValueChart,
       if (businessMode != null) 'business_mode': businessMode,
+      if (menuOrder != null) 'menu_order': menuOrder,
+      if (skipSplash != null) 'skip_splash': skipSplash,
+      if (restoreLastState != null) 'restore_last_state': restoreLastState,
+      if (lastRoute != null) 'last_route': lastRoute,
     });
   }
 
@@ -5259,7 +5402,11 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? showExpensePieChart,
       Value<bool>? showTopSellingChart,
       Value<bool>? showStockValueChart,
-      Value<String>? businessMode}) {
+      Value<String>? businessMode,
+      Value<String?>? menuOrder,
+      Value<bool>? skipSplash,
+      Value<bool>? restoreLastState,
+      Value<String?>? lastRoute}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -5312,6 +5459,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
       showStockValueChart: showStockValueChart ?? this.showStockValueChart,
       businessMode: businessMode ?? this.businessMode,
+      menuOrder: menuOrder ?? this.menuOrder,
+      skipSplash: skipSplash ?? this.skipSplash,
+      restoreLastState: restoreLastState ?? this.restoreLastState,
+      lastRoute: lastRoute ?? this.lastRoute,
     );
   }
 
@@ -5459,6 +5610,18 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (businessMode.present) {
       map['business_mode'] = Variable<String>(businessMode.value);
     }
+    if (menuOrder.present) {
+      map['menu_order'] = Variable<String>(menuOrder.value);
+    }
+    if (skipSplash.present) {
+      map['skip_splash'] = Variable<bool>(skipSplash.value);
+    }
+    if (restoreLastState.present) {
+      map['restore_last_state'] = Variable<bool>(restoreLastState.value);
+    }
+    if (lastRoute.present) {
+      map['last_route'] = Variable<String>(lastRoute.value);
+    }
     return map;
   }
 
@@ -5509,7 +5672,11 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('showExpensePieChart: $showExpensePieChart, ')
           ..write('showTopSellingChart: $showTopSellingChart, ')
           ..write('showStockValueChart: $showStockValueChart, ')
-          ..write('businessMode: $businessMode')
+          ..write('businessMode: $businessMode, ')
+          ..write('menuOrder: $menuOrder, ')
+          ..write('skipSplash: $skipSplash, ')
+          ..write('restoreLastState: $restoreLastState, ')
+          ..write('lastRoute: $lastRoute')
           ..write(')'))
         .toString();
   }
@@ -9480,6 +9647,39 @@ class $StudentsTable extends Students
   late final GeneratedColumn<Uint8List> image = GeneratedColumn<Uint8List>(
       'image', aliasedName, true,
       type: DriftSqlType.blob, requiredDuringInsert: false);
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -9492,7 +9692,12 @@ class $StudentsTable extends Students
         dateOfBirth,
         registrationDate,
         balance,
-        image
+        image,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -9561,6 +9766,26 @@ class $StudentsTable extends Students
       context.handle(
           _imageMeta, image.isAcceptableOrUnknown(data['image']!, _imageMeta));
     }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
     return context;
   }
 
@@ -9592,6 +9817,16 @@ class $StudentsTable extends Students
           .read(DriftSqlType.double, data['${effectivePrefix}balance'])!,
       image: attachedDatabase.typeMapping
           .read(DriftSqlType.blob, data['${effectivePrefix}image']),
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
     );
   }
 
@@ -9613,6 +9848,11 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   final DateTime registrationDate;
   final double balance;
   final Uint8List? image;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  final String? deviceId;
+  final bool isDeleted;
   const StudentTable(
       {required this.id,
       this.admissionNumber,
@@ -9624,7 +9864,12 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       this.dateOfBirth,
       required this.registrationDate,
       required this.balance,
-      this.image});
+      this.image,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt,
+      this.deviceId,
+      required this.isDeleted});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -9651,6 +9896,19 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
     if (!nullToAbsent || image != null) {
       map['image'] = Variable<Uint8List>(image);
     }
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -9678,6 +9936,18 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       balance: Value(balance),
       image:
           image == null && nullToAbsent ? const Value.absent() : Value(image),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -9696,6 +9966,11 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       registrationDate: serializer.fromJson<DateTime>(json['registrationDate']),
       balance: serializer.fromJson<double>(json['balance']),
       image: serializer.fromJson<Uint8List?>(json['image']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -9713,6 +9988,11 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'registrationDate': serializer.toJson<DateTime>(registrationDate),
       'balance': serializer.toJson<double>(balance),
       'image': serializer.toJson<Uint8List?>(image),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -9727,7 +10007,12 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           Value<DateTime?> dateOfBirth = const Value.absent(),
           DateTime? registrationDate,
           double? balance,
-          Value<Uint8List?> image = const Value.absent()}) =>
+          Value<Uint8List?> image = const Value.absent(),
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent(),
+          Value<String?> deviceId = const Value.absent(),
+          bool? isDeleted}) =>
       StudentTable(
         id: id ?? this.id,
         admissionNumber: admissionNumber.present
@@ -9742,6 +10027,11 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         registrationDate: registrationDate ?? this.registrationDate,
         balance: balance ?? this.balance,
         image: image.present ? image.value : this.image,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        isDeleted: isDeleted ?? this.isDeleted,
       );
   StudentTable copyWithCompanion(StudentsCompanion data) {
     return StudentTable(
@@ -9763,6 +10053,11 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           : this.registrationDate,
       balance: data.balance.present ? data.balance.value : this.balance,
       image: data.image.present ? data.image.value : this.image,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -9779,7 +10074,12 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('dateOfBirth: $dateOfBirth, ')
           ..write('registrationDate: $registrationDate, ')
           ..write('balance: $balance, ')
-          ..write('image: $image')
+          ..write('image: $image, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
@@ -9796,7 +10096,12 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       dateOfBirth,
       registrationDate,
       balance,
-      $driftBlobEquality.hash(image));
+      $driftBlobEquality.hash(image),
+      syncId,
+      updatedAt,
+      createdAt,
+      deviceId,
+      isDeleted);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -9811,7 +10116,12 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.dateOfBirth == this.dateOfBirth &&
           other.registrationDate == this.registrationDate &&
           other.balance == this.balance &&
-          $driftBlobEquality.equals(other.image, this.image));
+          $driftBlobEquality.equals(other.image, this.image) &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.deviceId == this.deviceId &&
+          other.isDeleted == this.isDeleted);
 }
 
 class StudentsCompanion extends UpdateCompanion<StudentTable> {
@@ -9826,6 +10136,11 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<DateTime> registrationDate;
   final Value<double> balance;
   final Value<Uint8List?> image;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  final Value<String?> deviceId;
+  final Value<bool> isDeleted;
   const StudentsCompanion({
     this.id = const Value.absent(),
     this.admissionNumber = const Value.absent(),
@@ -9838,6 +10153,11 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.registrationDate = const Value.absent(),
     this.balance = const Value.absent(),
     this.image = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
   });
   StudentsCompanion.insert({
     this.id = const Value.absent(),
@@ -9851,6 +10171,11 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.registrationDate = const Value.absent(),
     this.balance = const Value.absent(),
     this.image = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
   })  : firstName = Value(firstName),
         lastName = Value(lastName);
   static Insertable<StudentTable> custom({
@@ -9865,6 +10190,11 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<DateTime>? registrationDate,
     Expression<double>? balance,
     Expression<Uint8List>? image,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? deviceId,
+    Expression<bool>? isDeleted,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -9878,6 +10208,11 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       if (registrationDate != null) 'registration_date': registrationDate,
       if (balance != null) 'balance': balance,
       if (image != null) 'image': image,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
     });
   }
 
@@ -9892,7 +10227,12 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       Value<DateTime?>? dateOfBirth,
       Value<DateTime>? registrationDate,
       Value<double>? balance,
-      Value<Uint8List?>? image}) {
+      Value<Uint8List?>? image,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt,
+      Value<String?>? deviceId,
+      Value<bool>? isDeleted}) {
     return StudentsCompanion(
       id: id ?? this.id,
       admissionNumber: admissionNumber ?? this.admissionNumber,
@@ -9905,6 +10245,11 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       registrationDate: registrationDate ?? this.registrationDate,
       balance: balance ?? this.balance,
       image: image ?? this.image,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      deviceId: deviceId ?? this.deviceId,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 
@@ -9944,6 +10289,21 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     if (image.present) {
       map['image'] = Variable<Uint8List>(image.value);
     }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     return map;
   }
 
@@ -9960,7 +10320,12 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('dateOfBirth: $dateOfBirth, ')
           ..write('registrationDate: $registrationDate, ')
           ..write('balance: $balance, ')
-          ..write('image: $image')
+          ..write('image: $image, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
@@ -10234,6 +10599,1143 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSettingTable> {
   }
 }
 
+class $SubjectsTable extends Subjects
+    with TableInfo<$SubjectsTable, SubjectTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SubjectsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'));
+  static const VerificationMeta _codeMeta = const VerificationMeta('code');
+  @override
+  late final GeneratedColumn<String> code = GeneratedColumn<String>(
+      'code', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, name, code, syncId, updatedAt, createdAt, deviceId, isDeleted];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'subjects';
+  @override
+  VerificationContext validateIntegrity(Insertable<SubjectTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('code')) {
+      context.handle(
+          _codeMeta, code.isAcceptableOrUnknown(data['code']!, _codeMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SubjectTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SubjectTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      code: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}code']),
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+    );
+  }
+
+  @override
+  $SubjectsTable createAlias(String alias) {
+    return $SubjectsTable(attachedDatabase, alias);
+  }
+}
+
+class SubjectTable extends DataClass implements Insertable<SubjectTable> {
+  final int id;
+  final String name;
+  final String? code;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  final String? deviceId;
+  final bool isDeleted;
+  const SubjectTable(
+      {required this.id,
+      required this.name,
+      this.code,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt,
+      this.deviceId,
+      required this.isDeleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || code != null) {
+      map['code'] = Variable<String>(code);
+    }
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    return map;
+  }
+
+  SubjectsCompanion toCompanion(bool nullToAbsent) {
+    return SubjectsCompanion(
+      id: Value(id),
+      name: Value(name),
+      code: code == null && nullToAbsent ? const Value.absent() : Value(code),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      isDeleted: Value(isDeleted),
+    );
+  }
+
+  factory SubjectTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SubjectTable(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      code: serializer.fromJson<String?>(json['code']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'code': serializer.toJson<String?>(code),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+    };
+  }
+
+  SubjectTable copyWith(
+          {int? id,
+          String? name,
+          Value<String?> code = const Value.absent(),
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent(),
+          Value<String?> deviceId = const Value.absent(),
+          bool? isDeleted}) =>
+      SubjectTable(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        code: code.present ? code.value : this.code,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        isDeleted: isDeleted ?? this.isDeleted,
+      );
+  SubjectTable copyWithCompanion(SubjectsCompanion data) {
+    return SubjectTable(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      code: data.code.present ? data.code.value : this.code,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SubjectTable(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('code: $code, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id, name, code, syncId, updatedAt, createdAt, deviceId, isDeleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SubjectTable &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.code == this.code &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.deviceId == this.deviceId &&
+          other.isDeleted == this.isDeleted);
+}
+
+class SubjectsCompanion extends UpdateCompanion<SubjectTable> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<String?> code;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  final Value<String?> deviceId;
+  final Value<bool> isDeleted;
+  const SubjectsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.code = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  });
+  SubjectsCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.code = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<SubjectTable> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<String>? code,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? deviceId,
+    Expression<bool>? isDeleted,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (code != null) 'code': code,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+    });
+  }
+
+  SubjectsCompanion copyWith(
+      {Value<int>? id,
+      Value<String>? name,
+      Value<String?>? code,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt,
+      Value<String?>? deviceId,
+      Value<bool>? isDeleted}) {
+    return SubjectsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      code: code ?? this.code,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      deviceId: deviceId ?? this.deviceId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (code.present) {
+      map['code'] = Variable<String>(code.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SubjectsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('code: $code, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ResultsTable extends Results with TableInfo<$ResultsTable, ResultTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ResultsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _studentIdMeta =
+      const VerificationMeta('studentId');
+  @override
+  late final GeneratedColumn<int> studentId = GeneratedColumn<int>(
+      'student_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES students (id)'));
+  static const VerificationMeta _subjectIdMeta =
+      const VerificationMeta('subjectId');
+  @override
+  late final GeneratedColumn<int> subjectId = GeneratedColumn<int>(
+      'subject_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES subjects (id)'));
+  static const VerificationMeta _termIdMeta = const VerificationMeta('termId');
+  @override
+  late final GeneratedColumn<int> termId = GeneratedColumn<int>(
+      'term_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES terms (id)'));
+  static const VerificationMeta _academicYearIdMeta =
+      const VerificationMeta('academicYearId');
+  @override
+  late final GeneratedColumn<int> academicYearId = GeneratedColumn<int>(
+      'academic_year_id', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES academic_years (id)'));
+  static const VerificationMeta _assessmentScoreMeta =
+      const VerificationMeta('assessmentScore');
+  @override
+  late final GeneratedColumn<double> assessmentScore = GeneratedColumn<double>(
+      'assessment_score', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _examScoreMeta =
+      const VerificationMeta('examScore');
+  @override
+  late final GeneratedColumn<double> examScore = GeneratedColumn<double>(
+      'exam_score', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _totalScoreMeta =
+      const VerificationMeta('totalScore');
+  @override
+  late final GeneratedColumn<double> totalScore = GeneratedColumn<double>(
+      'total_score', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _gradeMeta = const VerificationMeta('grade');
+  @override
+  late final GeneratedColumn<String> grade = GeneratedColumn<String>(
+      'grade', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _remarksMeta =
+      const VerificationMeta('remarks');
+  @override
+  late final GeneratedColumn<String> remarks = GeneratedColumn<String>(
+      'remarks', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        studentId,
+        subjectId,
+        termId,
+        academicYearId,
+        assessmentScore,
+        examScore,
+        totalScore,
+        grade,
+        remarks,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'results';
+  @override
+  VerificationContext validateIntegrity(Insertable<ResultTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('student_id')) {
+      context.handle(_studentIdMeta,
+          studentId.isAcceptableOrUnknown(data['student_id']!, _studentIdMeta));
+    } else if (isInserting) {
+      context.missing(_studentIdMeta);
+    }
+    if (data.containsKey('subject_id')) {
+      context.handle(_subjectIdMeta,
+          subjectId.isAcceptableOrUnknown(data['subject_id']!, _subjectIdMeta));
+    } else if (isInserting) {
+      context.missing(_subjectIdMeta);
+    }
+    if (data.containsKey('term_id')) {
+      context.handle(_termIdMeta,
+          termId.isAcceptableOrUnknown(data['term_id']!, _termIdMeta));
+    } else if (isInserting) {
+      context.missing(_termIdMeta);
+    }
+    if (data.containsKey('academic_year_id')) {
+      context.handle(
+          _academicYearIdMeta,
+          academicYearId.isAcceptableOrUnknown(
+              data['academic_year_id']!, _academicYearIdMeta));
+    } else if (isInserting) {
+      context.missing(_academicYearIdMeta);
+    }
+    if (data.containsKey('assessment_score')) {
+      context.handle(
+          _assessmentScoreMeta,
+          assessmentScore.isAcceptableOrUnknown(
+              data['assessment_score']!, _assessmentScoreMeta));
+    }
+    if (data.containsKey('exam_score')) {
+      context.handle(_examScoreMeta,
+          examScore.isAcceptableOrUnknown(data['exam_score']!, _examScoreMeta));
+    }
+    if (data.containsKey('total_score')) {
+      context.handle(
+          _totalScoreMeta,
+          totalScore.isAcceptableOrUnknown(
+              data['total_score']!, _totalScoreMeta));
+    }
+    if (data.containsKey('grade')) {
+      context.handle(
+          _gradeMeta, grade.isAcceptableOrUnknown(data['grade']!, _gradeMeta));
+    }
+    if (data.containsKey('remarks')) {
+      context.handle(_remarksMeta,
+          remarks.isAcceptableOrUnknown(data['remarks']!, _remarksMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+        {studentId, subjectId, termId, academicYearId},
+      ];
+  @override
+  ResultTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ResultTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      studentId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}student_id'])!,
+      subjectId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}subject_id'])!,
+      termId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}term_id'])!,
+      academicYearId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}academic_year_id'])!,
+      assessmentScore: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}assessment_score'])!,
+      examScore: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}exam_score'])!,
+      totalScore: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}total_score'])!,
+      grade: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}grade']),
+      remarks: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}remarks']),
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+    );
+  }
+
+  @override
+  $ResultsTable createAlias(String alias) {
+    return $ResultsTable(attachedDatabase, alias);
+  }
+}
+
+class ResultTable extends DataClass implements Insertable<ResultTable> {
+  final int id;
+  final int studentId;
+  final int subjectId;
+  final int termId;
+  final int academicYearId;
+  final double assessmentScore;
+  final double examScore;
+  final double totalScore;
+  final String? grade;
+  final String? remarks;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  final String? deviceId;
+  final bool isDeleted;
+  const ResultTable(
+      {required this.id,
+      required this.studentId,
+      required this.subjectId,
+      required this.termId,
+      required this.academicYearId,
+      required this.assessmentScore,
+      required this.examScore,
+      required this.totalScore,
+      this.grade,
+      this.remarks,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt,
+      this.deviceId,
+      required this.isDeleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['student_id'] = Variable<int>(studentId);
+    map['subject_id'] = Variable<int>(subjectId);
+    map['term_id'] = Variable<int>(termId);
+    map['academic_year_id'] = Variable<int>(academicYearId);
+    map['assessment_score'] = Variable<double>(assessmentScore);
+    map['exam_score'] = Variable<double>(examScore);
+    map['total_score'] = Variable<double>(totalScore);
+    if (!nullToAbsent || grade != null) {
+      map['grade'] = Variable<String>(grade);
+    }
+    if (!nullToAbsent || remarks != null) {
+      map['remarks'] = Variable<String>(remarks);
+    }
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    return map;
+  }
+
+  ResultsCompanion toCompanion(bool nullToAbsent) {
+    return ResultsCompanion(
+      id: Value(id),
+      studentId: Value(studentId),
+      subjectId: Value(subjectId),
+      termId: Value(termId),
+      academicYearId: Value(academicYearId),
+      assessmentScore: Value(assessmentScore),
+      examScore: Value(examScore),
+      totalScore: Value(totalScore),
+      grade:
+          grade == null && nullToAbsent ? const Value.absent() : Value(grade),
+      remarks: remarks == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remarks),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      isDeleted: Value(isDeleted),
+    );
+  }
+
+  factory ResultTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ResultTable(
+      id: serializer.fromJson<int>(json['id']),
+      studentId: serializer.fromJson<int>(json['studentId']),
+      subjectId: serializer.fromJson<int>(json['subjectId']),
+      termId: serializer.fromJson<int>(json['termId']),
+      academicYearId: serializer.fromJson<int>(json['academicYearId']),
+      assessmentScore: serializer.fromJson<double>(json['assessmentScore']),
+      examScore: serializer.fromJson<double>(json['examScore']),
+      totalScore: serializer.fromJson<double>(json['totalScore']),
+      grade: serializer.fromJson<String?>(json['grade']),
+      remarks: serializer.fromJson<String?>(json['remarks']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'studentId': serializer.toJson<int>(studentId),
+      'subjectId': serializer.toJson<int>(subjectId),
+      'termId': serializer.toJson<int>(termId),
+      'academicYearId': serializer.toJson<int>(academicYearId),
+      'assessmentScore': serializer.toJson<double>(assessmentScore),
+      'examScore': serializer.toJson<double>(examScore),
+      'totalScore': serializer.toJson<double>(totalScore),
+      'grade': serializer.toJson<String?>(grade),
+      'remarks': serializer.toJson<String?>(remarks),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+    };
+  }
+
+  ResultTable copyWith(
+          {int? id,
+          int? studentId,
+          int? subjectId,
+          int? termId,
+          int? academicYearId,
+          double? assessmentScore,
+          double? examScore,
+          double? totalScore,
+          Value<String?> grade = const Value.absent(),
+          Value<String?> remarks = const Value.absent(),
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent(),
+          Value<String?> deviceId = const Value.absent(),
+          bool? isDeleted}) =>
+      ResultTable(
+        id: id ?? this.id,
+        studentId: studentId ?? this.studentId,
+        subjectId: subjectId ?? this.subjectId,
+        termId: termId ?? this.termId,
+        academicYearId: academicYearId ?? this.academicYearId,
+        assessmentScore: assessmentScore ?? this.assessmentScore,
+        examScore: examScore ?? this.examScore,
+        totalScore: totalScore ?? this.totalScore,
+        grade: grade.present ? grade.value : this.grade,
+        remarks: remarks.present ? remarks.value : this.remarks,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        isDeleted: isDeleted ?? this.isDeleted,
+      );
+  ResultTable copyWithCompanion(ResultsCompanion data) {
+    return ResultTable(
+      id: data.id.present ? data.id.value : this.id,
+      studentId: data.studentId.present ? data.studentId.value : this.studentId,
+      subjectId: data.subjectId.present ? data.subjectId.value : this.subjectId,
+      termId: data.termId.present ? data.termId.value : this.termId,
+      academicYearId: data.academicYearId.present
+          ? data.academicYearId.value
+          : this.academicYearId,
+      assessmentScore: data.assessmentScore.present
+          ? data.assessmentScore.value
+          : this.assessmentScore,
+      examScore: data.examScore.present ? data.examScore.value : this.examScore,
+      totalScore:
+          data.totalScore.present ? data.totalScore.value : this.totalScore,
+      grade: data.grade.present ? data.grade.value : this.grade,
+      remarks: data.remarks.present ? data.remarks.value : this.remarks,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ResultTable(')
+          ..write('id: $id, ')
+          ..write('studentId: $studentId, ')
+          ..write('subjectId: $subjectId, ')
+          ..write('termId: $termId, ')
+          ..write('academicYearId: $academicYearId, ')
+          ..write('assessmentScore: $assessmentScore, ')
+          ..write('examScore: $examScore, ')
+          ..write('totalScore: $totalScore, ')
+          ..write('grade: $grade, ')
+          ..write('remarks: $remarks, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      studentId,
+      subjectId,
+      termId,
+      academicYearId,
+      assessmentScore,
+      examScore,
+      totalScore,
+      grade,
+      remarks,
+      syncId,
+      updatedAt,
+      createdAt,
+      deviceId,
+      isDeleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ResultTable &&
+          other.id == this.id &&
+          other.studentId == this.studentId &&
+          other.subjectId == this.subjectId &&
+          other.termId == this.termId &&
+          other.academicYearId == this.academicYearId &&
+          other.assessmentScore == this.assessmentScore &&
+          other.examScore == this.examScore &&
+          other.totalScore == this.totalScore &&
+          other.grade == this.grade &&
+          other.remarks == this.remarks &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.deviceId == this.deviceId &&
+          other.isDeleted == this.isDeleted);
+}
+
+class ResultsCompanion extends UpdateCompanion<ResultTable> {
+  final Value<int> id;
+  final Value<int> studentId;
+  final Value<int> subjectId;
+  final Value<int> termId;
+  final Value<int> academicYearId;
+  final Value<double> assessmentScore;
+  final Value<double> examScore;
+  final Value<double> totalScore;
+  final Value<String?> grade;
+  final Value<String?> remarks;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  final Value<String?> deviceId;
+  final Value<bool> isDeleted;
+  const ResultsCompanion({
+    this.id = const Value.absent(),
+    this.studentId = const Value.absent(),
+    this.subjectId = const Value.absent(),
+    this.termId = const Value.absent(),
+    this.academicYearId = const Value.absent(),
+    this.assessmentScore = const Value.absent(),
+    this.examScore = const Value.absent(),
+    this.totalScore = const Value.absent(),
+    this.grade = const Value.absent(),
+    this.remarks = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  });
+  ResultsCompanion.insert({
+    this.id = const Value.absent(),
+    required int studentId,
+    required int subjectId,
+    required int termId,
+    required int academicYearId,
+    this.assessmentScore = const Value.absent(),
+    this.examScore = const Value.absent(),
+    this.totalScore = const Value.absent(),
+    this.grade = const Value.absent(),
+    this.remarks = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  })  : studentId = Value(studentId),
+        subjectId = Value(subjectId),
+        termId = Value(termId),
+        academicYearId = Value(academicYearId);
+  static Insertable<ResultTable> custom({
+    Expression<int>? id,
+    Expression<int>? studentId,
+    Expression<int>? subjectId,
+    Expression<int>? termId,
+    Expression<int>? academicYearId,
+    Expression<double>? assessmentScore,
+    Expression<double>? examScore,
+    Expression<double>? totalScore,
+    Expression<String>? grade,
+    Expression<String>? remarks,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? deviceId,
+    Expression<bool>? isDeleted,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (studentId != null) 'student_id': studentId,
+      if (subjectId != null) 'subject_id': subjectId,
+      if (termId != null) 'term_id': termId,
+      if (academicYearId != null) 'academic_year_id': academicYearId,
+      if (assessmentScore != null) 'assessment_score': assessmentScore,
+      if (examScore != null) 'exam_score': examScore,
+      if (totalScore != null) 'total_score': totalScore,
+      if (grade != null) 'grade': grade,
+      if (remarks != null) 'remarks': remarks,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+    });
+  }
+
+  ResultsCompanion copyWith(
+      {Value<int>? id,
+      Value<int>? studentId,
+      Value<int>? subjectId,
+      Value<int>? termId,
+      Value<int>? academicYearId,
+      Value<double>? assessmentScore,
+      Value<double>? examScore,
+      Value<double>? totalScore,
+      Value<String?>? grade,
+      Value<String?>? remarks,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt,
+      Value<String?>? deviceId,
+      Value<bool>? isDeleted}) {
+    return ResultsCompanion(
+      id: id ?? this.id,
+      studentId: studentId ?? this.studentId,
+      subjectId: subjectId ?? this.subjectId,
+      termId: termId ?? this.termId,
+      academicYearId: academicYearId ?? this.academicYearId,
+      assessmentScore: assessmentScore ?? this.assessmentScore,
+      examScore: examScore ?? this.examScore,
+      totalScore: totalScore ?? this.totalScore,
+      grade: grade ?? this.grade,
+      remarks: remarks ?? this.remarks,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      deviceId: deviceId ?? this.deviceId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (studentId.present) {
+      map['student_id'] = Variable<int>(studentId.value);
+    }
+    if (subjectId.present) {
+      map['subject_id'] = Variable<int>(subjectId.value);
+    }
+    if (termId.present) {
+      map['term_id'] = Variable<int>(termId.value);
+    }
+    if (academicYearId.present) {
+      map['academic_year_id'] = Variable<int>(academicYearId.value);
+    }
+    if (assessmentScore.present) {
+      map['assessment_score'] = Variable<double>(assessmentScore.value);
+    }
+    if (examScore.present) {
+      map['exam_score'] = Variable<double>(examScore.value);
+    }
+    if (totalScore.present) {
+      map['total_score'] = Variable<double>(totalScore.value);
+    }
+    if (grade.present) {
+      map['grade'] = Variable<String>(grade.value);
+    }
+    if (remarks.present) {
+      map['remarks'] = Variable<String>(remarks.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ResultsCompanion(')
+          ..write('id: $id, ')
+          ..write('studentId: $studentId, ')
+          ..write('subjectId: $subjectId, ')
+          ..write('termId: $termId, ')
+          ..write('academicYearId: $academicYearId, ')
+          ..write('assessmentScore: $assessmentScore, ')
+          ..write('examScore: $examScore, ')
+          ..write('totalScore: $totalScore, ')
+          ..write('grade: $grade, ')
+          ..write('remarks: $remarks, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -10256,6 +11758,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $StudentsTable students = $StudentsTable(this);
   late final $BusinessSettingsTable businessSettings =
       $BusinessSettingsTable(this);
+  late final $SubjectsTable subjects = $SubjectsTable(this);
+  late final $ResultsTable results = $ResultsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -10277,7 +11781,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         classes,
         feeTypes,
         students,
-        businessSettings
+        businessSettings,
+        subjects,
+        results
       ];
 }
 
@@ -12548,6 +14054,10 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showTopSellingChart,
   Value<bool> showStockValueChart,
   Value<String> businessMode,
+  Value<String?> menuOrder,
+  Value<bool> skipSplash,
+  Value<bool> restoreLastState,
+  Value<String?> lastRoute,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -12595,6 +14105,10 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showTopSellingChart,
   Value<bool> showStockValueChart,
   Value<String> businessMode,
+  Value<String?> menuOrder,
+  Value<bool> skipSplash,
+  Value<bool> restoreLastState,
+  Value<String?> lastRoute,
 });
 
 class $$SettingsTableFilterComposer
@@ -12761,6 +14275,19 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get businessMode => $composableBuilder(
       column: $table.businessMode, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get menuOrder => $composableBuilder(
+      column: $table.menuOrder, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get skipSplash => $composableBuilder(
+      column: $table.skipSplash, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get restoreLastState => $composableBuilder(
+      column: $table.restoreLastState,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lastRoute => $composableBuilder(
+      column: $table.lastRoute, builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -12934,6 +14461,19 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<String> get businessMode => $composableBuilder(
       column: $table.businessMode,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get menuOrder => $composableBuilder(
+      column: $table.menuOrder, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get skipSplash => $composableBuilder(
+      column: $table.skipSplash, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get restoreLastState => $composableBuilder(
+      column: $table.restoreLastState,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lastRoute => $composableBuilder(
+      column: $table.lastRoute, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -13079,6 +14619,18 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<String> get businessMode => $composableBuilder(
       column: $table.businessMode, builder: (column) => column);
+
+  GeneratedColumn<String> get menuOrder =>
+      $composableBuilder(column: $table.menuOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get skipSplash => $composableBuilder(
+      column: $table.skipSplash, builder: (column) => column);
+
+  GeneratedColumn<bool> get restoreLastState => $composableBuilder(
+      column: $table.restoreLastState, builder: (column) => column);
+
+  GeneratedColumn<String> get lastRoute =>
+      $composableBuilder(column: $table.lastRoute, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -13152,6 +14704,10 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showTopSellingChart = const Value.absent(),
             Value<bool> showStockValueChart = const Value.absent(),
             Value<String> businessMode = const Value.absent(),
+            Value<String?> menuOrder = const Value.absent(),
+            Value<bool> skipSplash = const Value.absent(),
+            Value<bool> restoreLastState = const Value.absent(),
+            Value<String?> lastRoute = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -13199,6 +14755,10 @@ class $$SettingsTableTableManager extends RootTableManager<
             showTopSellingChart: showTopSellingChart,
             showStockValueChart: showStockValueChart,
             businessMode: businessMode,
+            menuOrder: menuOrder,
+            skipSplash: skipSplash,
+            restoreLastState: restoreLastState,
+            lastRoute: lastRoute,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -13246,6 +14806,10 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showTopSellingChart = const Value.absent(),
             Value<bool> showStockValueChart = const Value.absent(),
             Value<String> businessMode = const Value.absent(),
+            Value<String?> menuOrder = const Value.absent(),
+            Value<bool> skipSplash = const Value.absent(),
+            Value<bool> restoreLastState = const Value.absent(),
+            Value<String?> lastRoute = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -13293,6 +14857,10 @@ class $$SettingsTableTableManager extends RootTableManager<
             showTopSellingChart: showTopSellingChart,
             showStockValueChart: showStockValueChart,
             businessMode: businessMode,
+            menuOrder: menuOrder,
+            skipSplash: skipSplash,
+            restoreLastState: restoreLastState,
+            lastRoute: lastRoute,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -15188,6 +16756,21 @@ final class $$AcademicYearsTableReferences extends BaseReferences<_$AppDatabase,
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: cache));
   }
+
+  static MultiTypedResultKey<$ResultsTable, List<ResultTable>>
+      _resultsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.results,
+              aliasName: $_aliasNameGenerator(
+                  db.academicYears.id, db.results.academicYearId));
+
+  $$ResultsTableProcessedTableManager get resultsRefs {
+    final manager = $$ResultsTableTableManager($_db, $_db.results)
+        .filter((f) => f.academicYearId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_resultsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
 }
 
 class $$AcademicYearsTableFilterComposer
@@ -15221,6 +16804,27 @@ class $$AcademicYearsTableFilterComposer
             $$TermsTableFilterComposer(
               $db: $db,
               $table: $db.terms,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> resultsRefs(
+      Expression<bool> Function($$ResultsTableFilterComposer f) f) {
+    final $$ResultsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.results,
+        getReferencedColumn: (t) => t.academicYearId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ResultsTableFilterComposer(
+              $db: $db,
+              $table: $db.results,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -15287,6 +16891,27 @@ class $$AcademicYearsTableAnnotationComposer
             ));
     return f(composer);
   }
+
+  Expression<T> resultsRefs<T extends Object>(
+      Expression<T> Function($$ResultsTableAnnotationComposer a) f) {
+    final $$ResultsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.results,
+        getReferencedColumn: (t) => t.academicYearId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ResultsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.results,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$AcademicYearsTableTableManager extends RootTableManager<
@@ -15300,7 +16925,7 @@ class $$AcademicYearsTableTableManager extends RootTableManager<
     $$AcademicYearsTableUpdateCompanionBuilder,
     (AcademicYearTable, $$AcademicYearsTableReferences),
     AcademicYearTable,
-    PrefetchHooks Function({bool termsRefs})> {
+    PrefetchHooks Function({bool termsRefs, bool resultsRefs})> {
   $$AcademicYearsTableTableManager(_$AppDatabase db, $AcademicYearsTable table)
       : super(TableManagerState(
           db: db,
@@ -15337,10 +16962,13 @@ class $$AcademicYearsTableTableManager extends RootTableManager<
                     $$AcademicYearsTableReferences(db, table, e)
                   ))
               .toList(),
-          prefetchHooksCallback: ({termsRefs = false}) {
+          prefetchHooksCallback: ({termsRefs = false, resultsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (termsRefs) db.terms],
+              explicitlyWatchedTables: [
+                if (termsRefs) db.terms,
+                if (resultsRefs) db.results
+              ],
               addJoins: null,
               getPrefetchedDataCallback: (items) async {
                 return [
@@ -15353,6 +16981,19 @@ class $$AcademicYearsTableTableManager extends RootTableManager<
                         managerFromTypedResult: (p0) =>
                             $$AcademicYearsTableReferences(db, table, p0)
                                 .termsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.academicYearId == item.id),
+                        typedResults: items),
+                  if (resultsRefs)
+                    await $_getPrefetchedData<AcademicYearTable,
+                            $AcademicYearsTable, ResultTable>(
+                        currentTable: table,
+                        referencedTable: $$AcademicYearsTableReferences
+                            ._resultsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$AcademicYearsTableReferences(db, table, p0)
+                                .resultsRefs,
                         referencedItemsForCurrentItem:
                             (item, referencedItems) => referencedItems
                                 .where((e) => e.academicYearId == item.id),
@@ -15375,7 +17016,7 @@ typedef $$AcademicYearsTableProcessedTableManager = ProcessedTableManager<
     $$AcademicYearsTableUpdateCompanionBuilder,
     (AcademicYearTable, $$AcademicYearsTableReferences),
     AcademicYearTable,
-    PrefetchHooks Function({bool termsRefs})>;
+    PrefetchHooks Function({bool termsRefs, bool resultsRefs})>;
 typedef $$TermsTableCreateCompanionBuilder = TermsCompanion Function({
   Value<int> id,
   required int academicYearId,
@@ -15406,6 +17047,20 @@ final class $$TermsTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static MultiTypedResultKey<$ResultsTable, List<ResultTable>>
+      _resultsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.results,
+              aliasName: $_aliasNameGenerator(db.terms.id, db.results.termId));
+
+  $$ResultsTableProcessedTableManager get resultsRefs {
+    final manager = $$ResultsTableTableManager($_db, $_db.results)
+        .filter((f) => f.termId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_resultsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
   }
 }
 
@@ -15444,6 +17099,27 @@ class $$TermsTableFilterComposer extends Composer<_$AppDatabase, $TermsTable> {
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  Expression<bool> resultsRefs(
+      Expression<bool> Function($$ResultsTableFilterComposer f) f) {
+    final $$ResultsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.results,
+        getReferencedColumn: (t) => t.termId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ResultsTableFilterComposer(
+              $db: $db,
+              $table: $db.results,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
   }
 }
 
@@ -15523,6 +17199,27 @@ class $$TermsTableAnnotationComposer
             ));
     return composer;
   }
+
+  Expression<T> resultsRefs<T extends Object>(
+      Expression<T> Function($$ResultsTableAnnotationComposer a) f) {
+    final $$ResultsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.results,
+        getReferencedColumn: (t) => t.termId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ResultsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.results,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$TermsTableTableManager extends RootTableManager<
@@ -15536,7 +17233,7 @@ class $$TermsTableTableManager extends RootTableManager<
     $$TermsTableUpdateCompanionBuilder,
     (TermTable, $$TermsTableReferences),
     TermTable,
-    PrefetchHooks Function({bool academicYearId})> {
+    PrefetchHooks Function({bool academicYearId, bool resultsRefs})> {
   $$TermsTableTableManager(_$AppDatabase db, $TermsTable table)
       : super(TableManagerState(
           db: db,
@@ -15575,10 +17272,11 @@ class $$TermsTableTableManager extends RootTableManager<
               .map((e) =>
                   (e.readTable(table), $$TermsTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: ({academicYearId = false}) {
+          prefetchHooksCallback: (
+              {academicYearId = false, resultsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [],
+              explicitlyWatchedTables: [if (resultsRefs) db.results],
               addJoins: <
                   T extends TableManagerState<
                       dynamic,
@@ -15606,7 +17304,20 @@ class $$TermsTableTableManager extends RootTableManager<
                 return state;
               },
               getPrefetchedDataCallback: (items) async {
-                return [];
+                return [
+                  if (resultsRefs)
+                    await $_getPrefetchedData<TermTable, $TermsTable,
+                            ResultTable>(
+                        currentTable: table,
+                        referencedTable:
+                            $$TermsTableReferences._resultsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$TermsTableReferences(db, table, p0).resultsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.termId == item.id),
+                        typedResults: items)
+                ];
               },
             );
           },
@@ -15624,7 +17335,7 @@ typedef $$TermsTableProcessedTableManager = ProcessedTableManager<
     $$TermsTableUpdateCompanionBuilder,
     (TermTable, $$TermsTableReferences),
     TermTable,
-    PrefetchHooks Function({bool academicYearId})>;
+    PrefetchHooks Function({bool academicYearId, bool resultsRefs})>;
 typedef $$ClassesTableCreateCompanionBuilder = ClassesCompanion Function({
   Value<int> id,
   required String name,
@@ -15980,6 +17691,11 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   Value<DateTime> registrationDate,
   Value<double> balance,
   Value<Uint8List?> image,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
 });
 typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<int> id,
@@ -15993,6 +17709,11 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<DateTime> registrationDate,
   Value<double> balance,
   Value<Uint8List?> image,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
 });
 
 final class $$StudentsTableReferences
@@ -16011,6 +17732,21 @@ final class $$StudentsTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static MultiTypedResultKey<$ResultsTable, List<ResultTable>>
+      _resultsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.results,
+              aliasName:
+                  $_aliasNameGenerator(db.students.id, db.results.studentId));
+
+  $$ResultsTableProcessedTableManager get resultsRefs {
+    final manager = $$ResultsTableTableManager($_db, $_db.results)
+        .filter((f) => f.studentId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_resultsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
   }
 }
 
@@ -16055,6 +17791,21 @@ class $$StudentsTableFilterComposer
   ColumnFilters<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
   $$ClassesTableFilterComposer get classId {
     final $$ClassesTableFilterComposer composer = $composerBuilder(
         composer: this,
@@ -16073,6 +17824,27 @@ class $$StudentsTableFilterComposer
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  Expression<bool> resultsRefs(
+      Expression<bool> Function($$ResultsTableFilterComposer f) f) {
+    final $$ResultsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.results,
+        getReferencedColumn: (t) => t.studentId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ResultsTableFilterComposer(
+              $db: $db,
+              $table: $db.results,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
   }
 }
 
@@ -16116,6 +17888,21 @@ class $$StudentsTableOrderingComposer
 
   ColumnOrderings<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
 
   $$ClassesTableOrderingComposer get classId {
     final $$ClassesTableOrderingComposer composer = $composerBuilder(
@@ -16177,6 +17964,21 @@ class $$StudentsTableAnnotationComposer
   GeneratedColumn<Uint8List> get image =>
       $composableBuilder(column: $table.image, builder: (column) => column);
 
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
   $$ClassesTableAnnotationComposer get classId {
     final $$ClassesTableAnnotationComposer composer = $composerBuilder(
         composer: this,
@@ -16196,6 +17998,27 @@ class $$StudentsTableAnnotationComposer
             ));
     return composer;
   }
+
+  Expression<T> resultsRefs<T extends Object>(
+      Expression<T> Function($$ResultsTableAnnotationComposer a) f) {
+    final $$ResultsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.results,
+        getReferencedColumn: (t) => t.studentId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ResultsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.results,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$StudentsTableTableManager extends RootTableManager<
@@ -16209,7 +18032,7 @@ class $$StudentsTableTableManager extends RootTableManager<
     $$StudentsTableUpdateCompanionBuilder,
     (StudentTable, $$StudentsTableReferences),
     StudentTable,
-    PrefetchHooks Function({bool classId})> {
+    PrefetchHooks Function({bool classId, bool resultsRefs})> {
   $$StudentsTableTableManager(_$AppDatabase db, $StudentsTable table)
       : super(TableManagerState(
           db: db,
@@ -16232,6 +18055,11 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<DateTime> registrationDate = const Value.absent(),
             Value<double> balance = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
           }) =>
               StudentsCompanion(
             id: id,
@@ -16245,6 +18073,11 @@ class $$StudentsTableTableManager extends RootTableManager<
             registrationDate: registrationDate,
             balance: balance,
             image: image,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -16258,6 +18091,11 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<DateTime> registrationDate = const Value.absent(),
             Value<double> balance = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
           }) =>
               StudentsCompanion.insert(
             id: id,
@@ -16271,15 +18109,20 @@ class $$StudentsTableTableManager extends RootTableManager<
             registrationDate: registrationDate,
             balance: balance,
             image: image,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
                   (e.readTable(table), $$StudentsTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: ({classId = false}) {
+          prefetchHooksCallback: ({classId = false, resultsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [],
+              explicitlyWatchedTables: [if (resultsRefs) db.results],
               addJoins: <
                   T extends TableManagerState<
                       dynamic,
@@ -16307,7 +18150,21 @@ class $$StudentsTableTableManager extends RootTableManager<
                 return state;
               },
               getPrefetchedDataCallback: (items) async {
-                return [];
+                return [
+                  if (resultsRefs)
+                    await $_getPrefetchedData<StudentTable, $StudentsTable,
+                            ResultTable>(
+                        currentTable: table,
+                        referencedTable:
+                            $$StudentsTableReferences._resultsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$StudentsTableReferences(db, table, p0)
+                                .resultsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.studentId == item.id),
+                        typedResults: items)
+                ];
               },
             );
           },
@@ -16325,7 +18182,7 @@ typedef $$StudentsTableProcessedTableManager = ProcessedTableManager<
     $$StudentsTableUpdateCompanionBuilder,
     (StudentTable, $$StudentsTableReferences),
     StudentTable,
-    PrefetchHooks Function({bool classId})>;
+    PrefetchHooks Function({bool classId, bool resultsRefs})>;
 typedef $$BusinessSettingsTableCreateCompanionBuilder
     = BusinessSettingsCompanion Function({
   Value<int> id,
@@ -16482,6 +18339,943 @@ typedef $$BusinessSettingsTableProcessedTableManager = ProcessedTableManager<
     ),
     BusinessSettingTable,
     PrefetchHooks Function()>;
+typedef $$SubjectsTableCreateCompanionBuilder = SubjectsCompanion Function({
+  Value<int> id,
+  required String name,
+  Value<String?> code,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+typedef $$SubjectsTableUpdateCompanionBuilder = SubjectsCompanion Function({
+  Value<int> id,
+  Value<String> name,
+  Value<String?> code,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+
+final class $$SubjectsTableReferences
+    extends BaseReferences<_$AppDatabase, $SubjectsTable, SubjectTable> {
+  $$SubjectsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$ResultsTable, List<ResultTable>>
+      _resultsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.results,
+              aliasName:
+                  $_aliasNameGenerator(db.subjects.id, db.results.subjectId));
+
+  $$ResultsTableProcessedTableManager get resultsRefs {
+    final manager = $$ResultsTableTableManager($_db, $_db.results)
+        .filter((f) => f.subjectId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_resultsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$SubjectsTableFilterComposer
+    extends Composer<_$AppDatabase, $SubjectsTable> {
+  $$SubjectsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get code => $composableBuilder(
+      column: $table.code, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> resultsRefs(
+      Expression<bool> Function($$ResultsTableFilterComposer f) f) {
+    final $$ResultsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.results,
+        getReferencedColumn: (t) => t.subjectId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ResultsTableFilterComposer(
+              $db: $db,
+              $table: $db.results,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$SubjectsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SubjectsTable> {
+  $$SubjectsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get code => $composableBuilder(
+      column: $table.code, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SubjectsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SubjectsTable> {
+  $$SubjectsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get code =>
+      $composableBuilder(column: $table.code, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  Expression<T> resultsRefs<T extends Object>(
+      Expression<T> Function($$ResultsTableAnnotationComposer a) f) {
+    final $$ResultsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.results,
+        getReferencedColumn: (t) => t.subjectId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ResultsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.results,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$SubjectsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SubjectsTable,
+    SubjectTable,
+    $$SubjectsTableFilterComposer,
+    $$SubjectsTableOrderingComposer,
+    $$SubjectsTableAnnotationComposer,
+    $$SubjectsTableCreateCompanionBuilder,
+    $$SubjectsTableUpdateCompanionBuilder,
+    (SubjectTable, $$SubjectsTableReferences),
+    SubjectTable,
+    PrefetchHooks Function({bool resultsRefs})> {
+  $$SubjectsTableTableManager(_$AppDatabase db, $SubjectsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SubjectsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SubjectsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SubjectsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String?> code = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              SubjectsCompanion(
+            id: id,
+            name: name,
+            code: code,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required String name,
+            Value<String?> code = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              SubjectsCompanion.insert(
+            id: id,
+            name: name,
+            code: code,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) =>
+                  (e.readTable(table), $$SubjectsTableReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: ({resultsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (resultsRefs) db.results],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (resultsRefs)
+                    await $_getPrefetchedData<SubjectTable, $SubjectsTable,
+                            ResultTable>(
+                        currentTable: table,
+                        referencedTable:
+                            $$SubjectsTableReferences._resultsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$SubjectsTableReferences(db, table, p0)
+                                .resultsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.subjectId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$SubjectsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SubjectsTable,
+    SubjectTable,
+    $$SubjectsTableFilterComposer,
+    $$SubjectsTableOrderingComposer,
+    $$SubjectsTableAnnotationComposer,
+    $$SubjectsTableCreateCompanionBuilder,
+    $$SubjectsTableUpdateCompanionBuilder,
+    (SubjectTable, $$SubjectsTableReferences),
+    SubjectTable,
+    PrefetchHooks Function({bool resultsRefs})>;
+typedef $$ResultsTableCreateCompanionBuilder = ResultsCompanion Function({
+  Value<int> id,
+  required int studentId,
+  required int subjectId,
+  required int termId,
+  required int academicYearId,
+  Value<double> assessmentScore,
+  Value<double> examScore,
+  Value<double> totalScore,
+  Value<String?> grade,
+  Value<String?> remarks,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+typedef $$ResultsTableUpdateCompanionBuilder = ResultsCompanion Function({
+  Value<int> id,
+  Value<int> studentId,
+  Value<int> subjectId,
+  Value<int> termId,
+  Value<int> academicYearId,
+  Value<double> assessmentScore,
+  Value<double> examScore,
+  Value<double> totalScore,
+  Value<String?> grade,
+  Value<String?> remarks,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+
+final class $$ResultsTableReferences
+    extends BaseReferences<_$AppDatabase, $ResultsTable, ResultTable> {
+  $$ResultsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $StudentsTable _studentIdTable(_$AppDatabase db) => db.students
+      .createAlias($_aliasNameGenerator(db.results.studentId, db.students.id));
+
+  $$StudentsTableProcessedTableManager get studentId {
+    final $_column = $_itemColumn<int>('student_id')!;
+
+    final manager = $$StudentsTableTableManager($_db, $_db.students)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_studentIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $SubjectsTable _subjectIdTable(_$AppDatabase db) => db.subjects
+      .createAlias($_aliasNameGenerator(db.results.subjectId, db.subjects.id));
+
+  $$SubjectsTableProcessedTableManager get subjectId {
+    final $_column = $_itemColumn<int>('subject_id')!;
+
+    final manager = $$SubjectsTableTableManager($_db, $_db.subjects)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_subjectIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $TermsTable _termIdTable(_$AppDatabase db) => db.terms
+      .createAlias($_aliasNameGenerator(db.results.termId, db.terms.id));
+
+  $$TermsTableProcessedTableManager get termId {
+    final $_column = $_itemColumn<int>('term_id')!;
+
+    final manager = $$TermsTableTableManager($_db, $_db.terms)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_termIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $AcademicYearsTable _academicYearIdTable(_$AppDatabase db) =>
+      db.academicYears.createAlias(
+          $_aliasNameGenerator(db.results.academicYearId, db.academicYears.id));
+
+  $$AcademicYearsTableProcessedTableManager get academicYearId {
+    final $_column = $_itemColumn<int>('academic_year_id')!;
+
+    final manager = $$AcademicYearsTableTableManager($_db, $_db.academicYears)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_academicYearIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
+class $$ResultsTableFilterComposer
+    extends Composer<_$AppDatabase, $ResultsTable> {
+  $$ResultsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get assessmentScore => $composableBuilder(
+      column: $table.assessmentScore,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get examScore => $composableBuilder(
+      column: $table.examScore, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get totalScore => $composableBuilder(
+      column: $table.totalScore, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get grade => $composableBuilder(
+      column: $table.grade, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remarks => $composableBuilder(
+      column: $table.remarks, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  $$StudentsTableFilterComposer get studentId {
+    final $$StudentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.studentId,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableFilterComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$SubjectsTableFilterComposer get subjectId {
+    final $$SubjectsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.subjectId,
+        referencedTable: $db.subjects,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SubjectsTableFilterComposer(
+              $db: $db,
+              $table: $db.subjects,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$TermsTableFilterComposer get termId {
+    final $$TermsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.termId,
+        referencedTable: $db.terms,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$TermsTableFilterComposer(
+              $db: $db,
+              $table: $db.terms,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$AcademicYearsTableFilterComposer get academicYearId {
+    final $$AcademicYearsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.academicYearId,
+        referencedTable: $db.academicYears,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AcademicYearsTableFilterComposer(
+              $db: $db,
+              $table: $db.academicYears,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ResultsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ResultsTable> {
+  $$ResultsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get assessmentScore => $composableBuilder(
+      column: $table.assessmentScore,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get examScore => $composableBuilder(
+      column: $table.examScore, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get totalScore => $composableBuilder(
+      column: $table.totalScore, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get grade => $composableBuilder(
+      column: $table.grade, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get remarks => $composableBuilder(
+      column: $table.remarks, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+
+  $$StudentsTableOrderingComposer get studentId {
+    final $$StudentsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.studentId,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableOrderingComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$SubjectsTableOrderingComposer get subjectId {
+    final $$SubjectsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.subjectId,
+        referencedTable: $db.subjects,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SubjectsTableOrderingComposer(
+              $db: $db,
+              $table: $db.subjects,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$TermsTableOrderingComposer get termId {
+    final $$TermsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.termId,
+        referencedTable: $db.terms,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$TermsTableOrderingComposer(
+              $db: $db,
+              $table: $db.terms,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$AcademicYearsTableOrderingComposer get academicYearId {
+    final $$AcademicYearsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.academicYearId,
+        referencedTable: $db.academicYears,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AcademicYearsTableOrderingComposer(
+              $db: $db,
+              $table: $db.academicYears,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ResultsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ResultsTable> {
+  $$ResultsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get assessmentScore => $composableBuilder(
+      column: $table.assessmentScore, builder: (column) => column);
+
+  GeneratedColumn<double> get examScore =>
+      $composableBuilder(column: $table.examScore, builder: (column) => column);
+
+  GeneratedColumn<double> get totalScore => $composableBuilder(
+      column: $table.totalScore, builder: (column) => column);
+
+  GeneratedColumn<String> get grade =>
+      $composableBuilder(column: $table.grade, builder: (column) => column);
+
+  GeneratedColumn<String> get remarks =>
+      $composableBuilder(column: $table.remarks, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  $$StudentsTableAnnotationComposer get studentId {
+    final $$StudentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.studentId,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$SubjectsTableAnnotationComposer get subjectId {
+    final $$SubjectsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.subjectId,
+        referencedTable: $db.subjects,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SubjectsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.subjects,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$TermsTableAnnotationComposer get termId {
+    final $$TermsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.termId,
+        referencedTable: $db.terms,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$TermsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.terms,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$AcademicYearsTableAnnotationComposer get academicYearId {
+    final $$AcademicYearsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.academicYearId,
+        referencedTable: $db.academicYears,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AcademicYearsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.academicYears,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+}
+
+class $$ResultsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ResultsTable,
+    ResultTable,
+    $$ResultsTableFilterComposer,
+    $$ResultsTableOrderingComposer,
+    $$ResultsTableAnnotationComposer,
+    $$ResultsTableCreateCompanionBuilder,
+    $$ResultsTableUpdateCompanionBuilder,
+    (ResultTable, $$ResultsTableReferences),
+    ResultTable,
+    PrefetchHooks Function(
+        {bool studentId, bool subjectId, bool termId, bool academicYearId})> {
+  $$ResultsTableTableManager(_$AppDatabase db, $ResultsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ResultsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ResultsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ResultsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<int> studentId = const Value.absent(),
+            Value<int> subjectId = const Value.absent(),
+            Value<int> termId = const Value.absent(),
+            Value<int> academicYearId = const Value.absent(),
+            Value<double> assessmentScore = const Value.absent(),
+            Value<double> examScore = const Value.absent(),
+            Value<double> totalScore = const Value.absent(),
+            Value<String?> grade = const Value.absent(),
+            Value<String?> remarks = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              ResultsCompanion(
+            id: id,
+            studentId: studentId,
+            subjectId: subjectId,
+            termId: termId,
+            academicYearId: academicYearId,
+            assessmentScore: assessmentScore,
+            examScore: examScore,
+            totalScore: totalScore,
+            grade: grade,
+            remarks: remarks,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required int studentId,
+            required int subjectId,
+            required int termId,
+            required int academicYearId,
+            Value<double> assessmentScore = const Value.absent(),
+            Value<double> examScore = const Value.absent(),
+            Value<double> totalScore = const Value.absent(),
+            Value<String?> grade = const Value.absent(),
+            Value<String?> remarks = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              ResultsCompanion.insert(
+            id: id,
+            studentId: studentId,
+            subjectId: subjectId,
+            termId: termId,
+            academicYearId: academicYearId,
+            assessmentScore: assessmentScore,
+            examScore: examScore,
+            totalScore: totalScore,
+            grade: grade,
+            remarks: remarks,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) =>
+                  (e.readTable(table), $$ResultsTableReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: (
+              {studentId = false,
+              subjectId = false,
+              termId = false,
+              academicYearId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (studentId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.studentId,
+                    referencedTable:
+                        $$ResultsTableReferences._studentIdTable(db),
+                    referencedColumn:
+                        $$ResultsTableReferences._studentIdTable(db).id,
+                  ) as T;
+                }
+                if (subjectId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.subjectId,
+                    referencedTable:
+                        $$ResultsTableReferences._subjectIdTable(db),
+                    referencedColumn:
+                        $$ResultsTableReferences._subjectIdTable(db).id,
+                  ) as T;
+                }
+                if (termId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.termId,
+                    referencedTable: $$ResultsTableReferences._termIdTable(db),
+                    referencedColumn:
+                        $$ResultsTableReferences._termIdTable(db).id,
+                  ) as T;
+                }
+                if (academicYearId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.academicYearId,
+                    referencedTable:
+                        $$ResultsTableReferences._academicYearIdTable(db),
+                    referencedColumn:
+                        $$ResultsTableReferences._academicYearIdTable(db).id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$ResultsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ResultsTable,
+    ResultTable,
+    $$ResultsTableFilterComposer,
+    $$ResultsTableOrderingComposer,
+    $$ResultsTableAnnotationComposer,
+    $$ResultsTableCreateCompanionBuilder,
+    $$ResultsTableUpdateCompanionBuilder,
+    (ResultTable, $$ResultsTableReferences),
+    ResultTable,
+    PrefetchHooks Function(
+        {bool studentId, bool subjectId, bool termId, bool academicYearId})>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -16520,4 +19314,8 @@ class $AppDatabaseManager {
       $$StudentsTableTableManager(_db, _db.students);
   $$BusinessSettingsTableTableManager get businessSettings =>
       $$BusinessSettingsTableTableManager(_db, _db.businessSettings);
+  $$SubjectsTableTableManager get subjects =>
+      $$SubjectsTableTableManager(_db, _db.subjects);
+  $$ResultsTableTableManager get results =>
+      $$ResultsTableTableManager(_db, _db.results);
 }

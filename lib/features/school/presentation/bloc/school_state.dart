@@ -5,6 +5,8 @@ import 'package:involve_app/features/school/domain/entities/school_class.dart';
 import 'package:involve_app/features/school/domain/entities/student.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import '../../domain/entities/subject.dart';
+import '../../domain/entities/academic_result.dart';
 
 abstract class SchoolEvent extends Equatable {
   @override
@@ -93,6 +95,58 @@ class LoadStudentRecordsEvent extends SchoolEvent {
   List<Object?> get props => [studentId];
 }
 
+// Subject Events
+class LoadSubjectsEvent extends SchoolEvent {}
+
+class AddSubjectEvent extends SchoolEvent {
+  final String name;
+  final String? code;
+  AddSubjectEvent({required this.name, this.code});
+  @override
+  List<Object?> get props => [name, code];
+}
+
+class UpdateSubjectEvent extends SchoolEvent {
+  final Subject subject;
+  UpdateSubjectEvent(this.subject);
+  @override
+  List<Object?> get props => [subject];
+}
+
+class DeleteSubjectEvent extends SchoolEvent {
+  final int id;
+  DeleteSubjectEvent(this.id);
+  @override
+  List<Object?> get props => [id];
+}
+
+// Result Events
+class LoadResultsEvent extends SchoolEvent {
+  final int? studentId;
+  final int? classId;
+  final int? subjectId;
+  final int? termId;
+  final int? academicYearId;
+
+  LoadResultsEvent({
+    this.studentId,
+    this.classId,
+    this.subjectId,
+    this.termId,
+    this.academicYearId,
+  });
+
+  @override
+  List<Object?> get props => [studentId, classId, subjectId, termId, academicYearId];
+}
+
+class SaveResultsEvent extends SchoolEvent {
+  final List<AcademicResult> results;
+  SaveResultsEvent(this.results);
+  @override
+  List<Object?> get props => [results];
+}
+
 class ResetSchoolStatus extends SchoolEvent {}
 
 enum SchoolStatus { initial, loading, success, failure }
@@ -104,6 +158,8 @@ class SchoolState extends Equatable {
   final List<Student> students;
   final List<Item> items;
   final List<Invoice> studentInvoices;
+  final List<Subject> subjects;
+  final List<AcademicResult> results;
   final bool isLoading;
   final String? error;
   final SchoolStatus status;
@@ -115,6 +171,8 @@ class SchoolState extends Equatable {
     this.students = const [],
     this.items = const [],
     this.studentInvoices = const [],
+    this.subjects = const [],
+    this.results = const [],
     this.isLoading = false,
     this.error,
     this.status = SchoolStatus.initial,
@@ -130,6 +188,8 @@ class SchoolState extends Equatable {
     List<Student>? students,
     List<Item>? items,
     List<Invoice>? studentInvoices,
+    List<Subject>? subjects,
+    List<AcademicResult>? results,
     bool? isLoading,
     String? error,
     SchoolStatus? status,
@@ -141,6 +201,8 @@ class SchoolState extends Equatable {
       students: students ?? this.students,
       items: items ?? this.items,
       studentInvoices: studentInvoices ?? this.studentInvoices,
+      subjects: subjects ?? this.subjects,
+      results: results ?? this.results,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       status: status ?? this.status,
@@ -148,5 +210,5 @@ class SchoolState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [academicYears, terms, classes, students, items, studentInvoices, isLoading, error, status];
+  List<Object?> get props => [academicYears, terms, classes, students, items, studentInvoices, subjects, results, isLoading, error, status];
 }

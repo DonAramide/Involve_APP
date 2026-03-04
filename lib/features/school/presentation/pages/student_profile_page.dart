@@ -5,8 +5,12 @@ import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/student.dart';
 import '../../domain/entities/school_class.dart';
+import '../../domain/entities/subject.dart';
+import '../../domain/entities/academic_result.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:collection/collection.dart';
 
 class StudentProfilePage extends StatefulWidget {
   final int studentId;
@@ -37,9 +41,11 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             appBar: AppBar(
               title: const Text('Student Profile'),
               bottom: const TabBar(
+                isScrollable: true,
                 tabs: [
                   Tab(text: 'General'),
                   Tab(text: 'Academic Records'),
+                  Tab(text: 'Results'),
                   Tab(text: 'Payments'),
                 ],
               ),
@@ -52,6 +58,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                     children: [
                       _buildGeneralTab(student),
                       _buildRecordsTab(state.studentInvoices, currency),
+                      _buildResultsTab(state.results),
                       _buildPaymentsTab(state.studentInvoices, currency),
                     ],
                   ),
@@ -115,12 +122,127 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildInfoTile('Parent/Guardian', student.parentName ?? 'Not Set', Icons.person_outline),
-        _buildInfoTile('Phone', student.parentPhone ?? 'Not Set', Icons.phone_android),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  _buildInfoTile('Parent/Guardian', student.parentName ?? 'Not Set', Icons.person_outline),
+                  _buildInteractivePhoneTile('Phone', student.parentPhone ?? 'Not Set', Icons.phone_android),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            if (student.image != null)
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  image: DecorationImage(
+                    image: MemoryImage(student.image!),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.person, size: 50, color: Colors.grey),
+              ),
+          ],
+        ),
+        const Divider(height: 32),
         _buildInfoTile('Date of Birth', student.dateOfBirth != null ? DateFormat('dd MMM yyyy').format(student.dateOfBirth!) : 'Not Set', Icons.cake_outlined),
         _buildInfoTile('Registration Date', student.registrationDate != null ? DateFormat('dd MMM yyyy').format(student.registrationDate!) : 'Not Set', Icons.calendar_today_outlined),
       ],
     );
+  }
+
+  Widget _buildInteractivePhoneTile(String label, String value, IconData icon) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.blueGrey),
+      title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+      onTap: value == 'Not Set' ? null : () => _showCommunicationOptions(context, value),
+    );
+  }
+
+  void _showCommunicationOptions(BuildContext context, String phoneNumber) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Contact Parent: $phoneNumber',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.call, color: Colors.white)),
+              title: const Text('Call'),
+              onTap: () {
+                _launchCaller(phoneNumber);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Colors.orange, child: Icon(Icons.message, color: Colors.white)),
+              title: const Text('Send SMS'),
+              onTap: () {
+                _launchSMS(phoneNumber);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Colors.green, child: Icon(Icons.forum, color: Colors.white)),
+              title: const Text('WhatsApp Message'),
+              onTap: () {
+                _launchWhatsApp(phoneNumber);
+                Navigator.pop(context);
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchCaller(String phoneNumber) async {
+    final Uri url = Uri(scheme: 'tel', path: phoneNumber);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    }
+  }
+
+  Future<void> _launchSMS(String phoneNumber) async {
+    final Uri url = Uri(scheme: 'sms', path: phoneNumber);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    }
+  }
+
+  Future<void> _launchWhatsApp(String phoneNumber) async {
+    // Normalize phone number (strip non-digits)
+    final String cleanNumber = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    // WhatsApp URL format
+    final Uri url = Uri.parse('https://wa.me/$cleanNumber');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildInfoTile(String label, String value, IconData icon) {
@@ -129,6 +251,97 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
       subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
       contentPadding: const EdgeInsets.symmetric(vertical: 4),
+    );
+  }
+
+  Widget _buildResultsTab(List<AcademicResult> results) {
+    if (results.isEmpty) {
+      return const Center(child: Text('No academic results recorded yet'));
+    }
+
+    return BlocBuilder<SchoolBloc, SchoolState>(
+      builder: (context, state) {
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: results.length,
+          itemBuilder: (context, index) {
+            final res = results[index];
+            final subject = state.subjects.firstWhereOrNull((s) => s.id == res.subjectId);
+            final term = state.terms.firstWhereOrNull((t) => t.id == res.termId);
+            
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          subject?.name ?? 'Unknown Subject',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            res.grade ?? 'N/A',
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Term: ${term?.name ?? "N/A"}',
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildScoreItem('CA', res.assessmentScore.toString()),
+                        _buildScoreItem('Exam', res.examScore.toString()),
+                        _buildScoreItem('Total', res.totalScore.toString(), isBold: true),
+                      ],
+                    ),
+                    if (res.remarks != null && res.remarks!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Remarks: ${res.remarks}',
+                        style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildScoreItem(String label, String score, {bool isBold = false}) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        Text(
+          score,
+          style: TextStyle(
+            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            fontSize: 14,
+          ),
+        ),
+      ],
     );
   }
 

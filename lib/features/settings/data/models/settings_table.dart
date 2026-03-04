@@ -59,4 +59,8 @@ class Settings extends Table {
   BoolColumn get showTopSellingChart => boolean().withDefault(const Constant(true))();
   BoolColumn get showStockValueChart => boolean().withDefault(const Constant(true))();
   TextColumn get businessMode => text().withDefault(const Constant('retail'))();
+  TextColumn get menuOrder => text().nullable()(); // JSON list of menu IDs
+  BoolColumn get skipSplash => boolean().withDefault(const Constant(false))();
+  BoolColumn get restoreLastState => boolean().withDefault(const Constant(false))();
+  TextColumn get lastRoute => text().nullable()();
 }

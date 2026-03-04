@@ -35,13 +35,15 @@ part 'app_database.g.dart';
   Classes,
   FeeTypes,
   Students,
-  BusinessSettings
+  BusinessSettings,
+  Subjects,
+  Results
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 45;
+  int get schemaVersion => 49;
 
   @override
   MigrationStrategy get migration {
@@ -181,6 +183,33 @@ class AppDatabase extends _$AppDatabase {
         if (from < 45) {
           // Schema V45: Add studentImage to Invoices table
           await _safeAddColumn(m, invoices, invoices.studentImage);
+        }
+        
+        if (from < 46) {
+          // Schema V46: Add menuOrder to Settings table
+          await _safeAddColumn(m, settings, settings.menuOrder);
+        }
+
+        if (from < 47) {
+          // Schema V47: Add sync columns to Students table
+          await _safeAddColumn(m, students, students.syncId);
+          await _safeAddColumn(m, students, students.updatedAt);
+          await _safeAddColumn(m, students, students.createdAt);
+          await _safeAddColumn(m, students, students.deviceId);
+          await _safeAddColumn(m, students, students.isDeleted);
+        }
+
+        if (from < 48) {
+          // Schema V48: Add Subjects and Results tables
+          await _safeCreateTable(m, subjects);
+          await _safeCreateTable(m, results);
+        }
+
+        if (from < 49) {
+          // Schema V49: Add skipSplash and state persistence toggles
+          await _safeAddColumn(m, settings, settings.skipSplash);
+          await _safeAddColumn(m, settings, settings.restoreLastState);
+          await _safeAddColumn(m, settings, settings.lastRoute);
         }
       },
       beforeOpen: (details) async {

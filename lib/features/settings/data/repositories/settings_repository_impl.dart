@@ -91,6 +91,10 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showTopSellingChart: Value(settings.showTopSellingChart),
       showStockValueChart: Value(settings.showStockValueChart),
       businessMode: Value(settings.businessMode),
+      menuOrder: Value(jsonEncode(settings.menuOrder)),
+      skipSplash: Value(settings.skipSplash),
+      restoreLastState: Value(settings.restoreLastState),
+      lastRoute: Value(settings.lastRoute),
     );
 
     if (existing == null) {
@@ -121,8 +125,15 @@ class SettingsRepositoryImpl implements SettingsRepository {
       try {
         serviceTypes = (jsonDecode(row.serviceTypes!) as List).cast<String>();
       } catch (e) {
-        // Handle decode error or fallback
-        serviceTypes = [];
+      }
+    }
+    
+    List<String> menuOrder = [];
+    if (row.menuOrder != null && row.menuOrder!.isNotEmpty) {
+      try {
+        menuOrder = (jsonDecode(row.menuOrder!) as List).cast<String>();
+      } catch (e) {
+        menuOrder = [];
       }
     }
 
@@ -172,6 +183,10 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showTopSellingChart: row.showTopSellingChart,
       showStockValueChart: row.showStockValueChart,
       businessMode: businessMode,
+      menuOrder: menuOrder,
+      skipSplash: row.skipSplash,
+      restoreLastState: row.restoreLastState,
+      lastRoute: row.lastRoute,
     );
   }
 }

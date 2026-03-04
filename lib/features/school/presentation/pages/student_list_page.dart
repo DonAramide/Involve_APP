@@ -229,10 +229,32 @@ class _StudentListPageState extends State<StudentListPage> {
                   children: [
                     GestureDetector(
                       onTap: () async {
-                        final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50);
-                        if (image != null) {
-                          final bytes = await image.readAsBytes();
-                          setDialogState(() => selectedImage = bytes);
+                        final source = await showModalBottomSheet<ImageSource>(
+                          context: context,
+                          builder: (ctx) => SafeArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ListTile(
+                                  leading: const Icon(Icons.camera_alt),
+                                  title: const Text('Take Photo'),
+                                  onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.photo_library),
+                                  title: const Text('Choose from Gallery'),
+                                  onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                        if (source != null) {
+                          final XFile? image = await picker.pickImage(source: source, imageQuality: 50);
+                          if (image != null) {
+                            final bytes = await image.readAsBytes();
+                            setDialogState(() => selectedImage = bytes);
+                          }
                         }
                       },
                       child: CircleAvatar(
@@ -242,7 +264,7 @@ class _StudentListPageState extends State<StudentListPage> {
                         child: selectedImage == null ? const Icon(Icons.camera_alt, size: 30, color: Colors.grey) : null,
                       ),
                     ),
-                    const Text('Tap to upload photo', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    const Text('Tap to set photo', style: TextStyle(fontSize: 10, color: Colors.grey)),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: firstNameController, 

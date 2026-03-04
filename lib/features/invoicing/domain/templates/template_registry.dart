@@ -8,6 +8,11 @@ class TemplateRegistry {
     TemplateType.professional: ProfessionalInvoiceTemplate(),
     TemplateType.modern: ModernProfessionalTemplate(),
     TemplateType.classic: ClassicBusinessTemplate(),
+    TemplateType.minimalist: MinimalistInvoiceTemplate(),
+    TemplateType.schoolTeal: SchoolTealTemplate(),
+    TemplateType.schoolPurple: SchoolPurpleTemplate(),
+    TemplateType.schoolAcademic: SchoolAcademicTemplate(),
+    TemplateType.schoolTraditional: SchoolTraditionalTemplate(),
   };
 
   static List<InvoiceTemplate> get availableTemplates => _templates.values.toList();

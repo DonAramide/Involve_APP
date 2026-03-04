@@ -30,8 +30,14 @@ import 'package:involve_app/features/stock/presentation/pages/manage_categories_
 import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
 import 'package:involve_app/features/school/presentation/pages/fee_management_page.dart';
+import 'package:involve_app/features/school/presentation/pages/manage_subjects_page.dart';
+import 'package:involve_app/features/school/presentation/pages/result_entry_page.dart';
+import 'package:reorderable_grid_view/reorderable_grid_view.dart';
+import 'package:collection/collection.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
 class DashboardPage extends StatefulWidget {
+  static const routeName = '/dashboard';
   final bool autoOpenSettings;
   const DashboardPage({super.key, this.autoOpenSettings = false});
 
@@ -233,107 +239,42 @@ class _DashboardPageState extends State<DashboardPage> {
             ],
           ),
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          body: GridView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 180,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.05,
-            ),
-            children: [
-          _buildMenuCard(
-            context,
-            settings?.newSaleLabel.toUpperCase() ?? 'NEW SALE',
-            Icons.add_shopping_cart,
-            Theme.of(context).colorScheme.primary,
-            () {
-              context.read<InvoiceBloc>().add(ResetInvoice());
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateInvoicePage()));
-            },
-          ),
-          BlocBuilder<PrinterBloc, PrinterState>(
+          body: BlocBuilder<PrinterBloc, PrinterState>(
             builder: (context, printerState) {
-              final isConnected = printerState.connectedDevice != null;
-              return _buildMenuCard(
-                context,
-                'PRINTER',
-                Icons.print,
-                Colors.purple,
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrinterSettingsPage())),
-                indicatorColor: isConnected ? Colors.green : Colors.red,
-                indicatorTooltip: isConnected ? 'Connected' : 'Disconnected',
+              final items = _getMenuItems(context, settings, printerState);
+              final screenWidth = MediaQuery.of(context).size.width;
+              final crossAxisCount = (screenWidth / 180).floor().clamp(2, 6);
+
+              return ReorderableGridView.count(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                crossAxisCount: crossAxisCount,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.05,
+                onReorder: (oldIndex, newIndex) {
+                  final newOrder = items.map((e) => e.id).toList();
+                  final item = newOrder.removeAt(oldIndex);
+                  newOrder.insert(newIndex, item);
+                  
+                  if (settings != null) {
+                    context.read<SettingsBloc>().add(
+                      UpdateAppSettings(settings.copyWith(menuOrder: newOrder)),
+                    );
+                  }
+                },
+                children: items.map((item) => _buildMenuCard(
+                  context,
+                  item.title,
+                  item.icon,
+                  item.color,
+                  item.onTap,
+                  key: ValueKey(item.id),
+                  indicatorColor: item.indicatorColor,
+                  indicatorTooltip: item.indicatorTooltip,
+                )).toList(),
               );
             },
           ),
-          if (settings?.businessMode != 'school')
-            _buildMenuCard(
-              context,
-              settings?.stockLabel.toUpperCase() ?? 'STOCK / ITEMS',
-              Icons.inventory,
-              Colors.orange,
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
-            ),
-          _buildMenuCard(
-            context,
-            settings?.salesLabel.toUpperCase() ?? 'SALES RECORDS',
-            Icons.assessment,
-            Colors.green,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvoiceHistoryPage())),
-          ),
-          _buildMenuCard(
-            context,
-            'CALCULATOR',
-            Icons.calculate,
-            Colors.teal,
-            () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalculatorPage())),
-          ),
-          _buildMenuCard(
-            context,
-            'SETTINGS',
-            Icons.settings,
-            Colors.blueGrey,
-            () => _verifyAndNavigateToSettings(context),
-          ),
-          if (settings?.businessMode == 'school') ...[
-            _buildMenuCard(
-              context,
-              'STUDENTS',
-              Icons.people_alt,
-              Colors.indigo,
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentListPage())),
-            ),
-            _buildMenuCard(
-              context,
-              'ACADEMIC SETUP',
-              Icons.school,
-              Colors.brown,
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolSetupPage())),
-            ),
-            _buildMenuCard(
-              context,
-              'FEE MANAGEMENT',
-              Icons.payments,
-              Colors.cyan,
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeManagementPage())),
-            ),
-            _buildMenuCard(
-              context,
-              settings?.productsLabel.toUpperCase() ?? 'CLASSES',
-              Icons.grid_view,
-              Colors.orange,
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => StockManagementPage())),
-            ),
-            _buildMenuCard(
-              context,
-              settings?.categoriesLabel.toUpperCase() ?? 'FEE TYPES',
-              Icons.category,
-              Colors.teal,
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageCategoriesPage())), // Categorires are managed here
-            ),
-          ],
-        ],
-      ),
       bottomNavigationBar: (settingsState.userPlan?.isValid ?? false) 
           ? const SizedBox.shrink()
           : FutureBuilder<int>(
@@ -414,6 +355,126 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState) {
+    final isSchool = settings?.businessMode == 'school';
+    
+    final allItems = <_DashboardMenuItem>[
+      _DashboardMenuItem(
+        id: 'new_sale',
+        title: settings?.newSaleLabel.toUpperCase() ?? 'NEW SALE',
+        icon: Icons.add_shopping_cart,
+        color: Theme.of(context).colorScheme.primary,
+        onTap: () {
+          context.read<InvoiceBloc>().add(ResetInvoice());
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateInvoicePage()));
+        },
+      ),
+      _DashboardMenuItem(
+        id: 'printer',
+        title: 'PRINTER',
+        icon: Icons.print,
+        color: Colors.purple,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrinterSettingsPage())),
+        indicatorColor: printerState.connectedDevice != null ? Colors.green : Colors.red,
+        indicatorTooltip: printerState.connectedDevice != null ? 'Connected' : 'Disconnected',
+      ),
+      if (!isSchool)
+        _DashboardMenuItem(
+          id: 'stock',
+          title: settings?.stockLabel.toUpperCase() ?? 'STOCK / ITEMS',
+          icon: Icons.inventory,
+          color: Colors.orange,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
+        ),
+      _DashboardMenuItem(
+        id: 'sales_records',
+        title: settings?.salesLabel.toUpperCase() ?? 'SALES RECORDS',
+        icon: Icons.assessment,
+        color: Colors.green,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvoiceHistoryPage())),
+      ),
+      _DashboardMenuItem(
+        id: 'calculator',
+        title: 'CALCULATOR',
+        icon: Icons.calculate,
+        color: Colors.teal,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalculatorPage())),
+      ),
+      _DashboardMenuItem(
+        id: 'settings',
+        title: 'SETTINGS',
+        icon: Icons.settings,
+        color: Colors.blueGrey,
+        onTap: () => _verifyAndNavigateToSettings(context),
+      ),
+    ];
+
+    if (isSchool) {
+      allItems.addAll([
+        _DashboardMenuItem(
+          id: 'students',
+          title: 'STUDENTS',
+          icon: Icons.people_alt,
+          color: Colors.indigo,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentListPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'academic_setup',
+          title: 'ACADEMIC SETUP',
+          icon: Icons.school,
+          color: Colors.brown,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolSetupPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'fee_management',
+          title: 'FEE MANAGEMENT',
+          icon: Icons.payments,
+          color: Colors.cyan,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeManagementPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'fees',
+          title: settings?.productsLabel.toUpperCase() ?? 'FEES',
+          icon: Icons.grid_view,
+          color: Colors.orange,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'subjects',
+          title: 'SUBJECTS',
+          icon: Icons.book,
+          color: Colors.blue,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageSubjectsPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'result_entry',
+          title: 'RESULT ENTRY',
+          icon: Icons.edit_note,
+          color: Colors.redAccent,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResultEntryPage())),
+        ),
+      ]);
+    }
+
+    // Sort items based on menuOrder settings
+    final order = settings?.menuOrder ?? [];
+    if (order.isEmpty) return allItems;
+
+    final sortedItems = <_DashboardMenuItem>[];
+    // Add items that are in the order list first
+    for (final id in order) {
+      final item = allItems.firstWhereOrNull((e) => e.id == id);
+      if (item != null) {
+        sortedItems.add(item);
+        allItems.remove(item);
+      }
+    }
+    // Add any remaining items (newly added features etc.)
+    sortedItems.addAll(allItems);
+    
+    return sortedItems;
+  }
+
 
   Widget _buildMenuCard(
     BuildContext context, 
@@ -421,6 +482,7 @@ class _DashboardPageState extends State<DashboardPage> {
     IconData icon, 
     Color color, 
     VoidCallback onTap, {
+    required Key key,
     Color? indicatorColor,
     String? indicatorTooltip,
   }) {
@@ -428,6 +490,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final isDark = theme.brightness == Brightness.dark;
 
     return Card(
+      key: key,
       elevation: 4,
       shadowColor: color.withOpacity(0.3),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -496,4 +559,24 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     );
   }
+}
+
+class _DashboardMenuItem {
+  final String id;
+  final String title;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final Color? indicatorColor;
+  final String? indicatorTooltip;
+
+  _DashboardMenuItem({
+    required this.id,
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.indicatorColor,
+    this.indicatorTooltip,
+  });
 }

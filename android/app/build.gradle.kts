@@ -49,9 +49,17 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = if (keystorePropertiesFile.exists()) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
+            // Fallback: If key.properties exists AND we haven't explicitly requested an unsigned build, sign with release.
+            // Otherwise, if we requested 'unsigned' via Env Var, use no signingConfig (produces unsigned APK).
+            // Else, fall back to debug signing for local testing.
+            val buildUnsigned = System.getenv("BUILD_UNSIGNED") == "true"
+            signingConfig = if (keystorePropertiesFile.exists() && !buildUnsigned) {
+                signingConfigs.getByName("release")
+            } else if (buildUnsigned) {
+                null
+            } else {
+                signingConfigs.getByName("debug")
+            }
             
             isMinifyEnabled = true
             isShrinkResources = true

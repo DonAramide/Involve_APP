@@ -277,6 +277,21 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildSwitchTile('Show Stock Value Pie Chart (Inventory Report)', settings.showStockValueChart, (val) => _update(context, settings.copyWith(showStockValueChart: val))),
         const Divider(),
       ],
+      // Startup & State Persistence
+      if (_matches('Startup & State Persistence', ['splash', 'last state', 'restore'])) ...[
+        _buildSectionHeader(context, 'Startup & State Persistence'),
+        _buildSwitchTile(
+          'Skip Splash Screen', 
+          settings.skipSplash, 
+          (val) => _update(context, settings.copyWith(skipSplash: val)),
+        ),
+        _buildSwitchTile(
+          'Always Restore Last State', 
+          settings.restoreLastState, 
+          (val) => _update(context, settings.copyWith(restoreLastState: val)),
+        ),
+        const Divider(),
+      ],
 
       // Maintenance
       if (_matches('Maintenance', ['backup', 'export', 'sync', 'restore', 'date', 'time', 'total sales'])) ...[

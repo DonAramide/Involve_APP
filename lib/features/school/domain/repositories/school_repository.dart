@@ -2,6 +2,8 @@ import '../entities/academic_year.dart';
 import '../entities/term.dart';
 import '../entities/school_class.dart';
 import '../entities/student.dart';
+import '../entities/subject.dart';
+import '../entities/academic_result.dart';
 
 abstract class SchoolRepository {
   // Academic Years
@@ -30,4 +32,20 @@ abstract class SchoolRepository {
   Future<void> updateStudent(Student student);
   Future<void> deleteStudent(int id);
   Future<void> promoteStudents(List<int> studentIds, int targetClassId);
+
+  // Subjects
+  Future<List<Subject>> getSubjects();
+  Future<void> addSubject(Subject subject);
+  Future<void> updateSubject(Subject subject);
+  Future<void> deleteSubject(int id);
+
+  // Results
+  Future<List<AcademicResult>> getResults({
+    int? studentId,
+    int? classId,
+    int? subjectId,
+    int? termId,
+    int? academicYearId,
+  });
+  Future<void> saveResults(List<AcademicResult> results);
 }

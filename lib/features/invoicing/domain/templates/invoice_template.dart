@@ -9,6 +9,11 @@ enum TemplateType {
   elegant,
   bold,
   professional,
+  minimalist,
+  schoolTeal,
+  schoolPurple,
+  schoolAcademic,
+  schoolTraditional,
 }
 
 enum LogoPlacement {

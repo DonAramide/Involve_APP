@@ -4,6 +4,8 @@ import 'package:involve_app/features/school/domain/entities/academic_year.dart';
 import 'package:involve_app/features/school/domain/entities/term.dart';
 import 'package:involve_app/features/school/domain/entities/school_class.dart';
 import 'package:involve_app/features/school/domain/entities/student.dart';
+import 'package:involve_app/features/school/domain/entities/subject.dart';
+import 'package:involve_app/features/school/domain/entities/academic_result.dart';
 import 'package:involve_app/features/stock/domain/repositories/item_repository.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
@@ -31,6 +33,12 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     on<DeleteStudentEvent>(_onDeleteStudent);
     on<PromoteStudentsEvent>(_onPromoteStudents);
     on<LoadStudentRecordsEvent>(_onLoadStudentRecords);
+    on<LoadSubjectsEvent>(_onLoadSubjects);
+    on<AddSubjectEvent>(_onAddSubject);
+    on<UpdateSubjectEvent>(_onUpdateSubject);
+    on<DeleteSubjectEvent>(_onDeleteSubject);
+    on<LoadResultsEvent>(_onLoadResults);
+    on<SaveResultsEvent>(_onSaveResults);
     on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null)));
     
     add(LoadSchoolData());
@@ -178,6 +186,73 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(studentInvoices: invoices, isLoading: false));
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onLoadSubjects(LoadSubjectsEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true));
+    try {
+      final subjects = await repository.getSubjects();
+      emit(state.copyWith(subjects: subjects, isLoading: false));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onAddSubject(AddSubjectEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
+    try {
+      await repository.addSubject(Subject(name: event.name, code: event.code));
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadSubjectsEvent());
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onUpdateSubject(UpdateSubjectEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
+    try {
+      await repository.updateSubject(event.subject);
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadSubjectsEvent());
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onDeleteSubject(DeleteSubjectEvent event, Emitter<SchoolState> emit) async {
+    try {
+      await repository.deleteSubject(event.id);
+      add(LoadSubjectsEvent());
+    } catch (e) {
+      emit(state.copyWith(error: e.toString()));
+    }
+  }
+
+  Future<void> _onLoadResults(LoadResultsEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true));
+    try {
+      final results = await repository.getResults(
+        studentId: event.studentId,
+        classId: event.classId,
+        subjectId: event.subjectId,
+        termId: event.termId,
+        academicYearId: event.academicYearId,
+      );
+      emit(state.copyWith(results: results, isLoading: false));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onSaveResults(SaveResultsEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
+    try {
+      await repository.saveResults(event.results);
+      emit(state.copyWith(status: SchoolStatus.success));
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
     }
   }
 }

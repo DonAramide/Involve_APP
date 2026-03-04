@@ -19,6 +19,7 @@ import 'dart:convert';
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
+import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
 
 class CreateInvoicePage extends StatefulWidget {
   const CreateInvoicePage({super.key});
@@ -99,27 +100,53 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
             },
           ),
           BlocListener<InvoiceBloc, InvoiceState>(
-            listenWhen: (prev, curr) => !prev.isSaved && curr.isSaved,
+            listenWhen: (prev, curr) => (!prev.isSaved && curr.isSaved) || (prev.error != curr.error && curr.error != null),
             listener: (context, state) {
-              // 1. Reload stock (since items were sold)
-              context.read<StockBloc>().add(LoadItems());
+              if (state.error != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: ${state.error}'),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
 
-              // 2. Clear all modal overlays (Preview Dialog AND Cart Bottom Sheet)
-              // We pop until we are back at the main Scaffold of this page.
-              // Modal routes (dialogs/bottom sheets) will be dismissed.
-              Navigator.of(context).popUntil((route) => route.isFirst);
+              if (state.isSaved) {
+                // 1. Reload stock (since items were sold)
+                context.read<StockBloc>().add(LoadItems());
 
-              // 3. Show success feedback
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Invoice saved & printed successfully!'),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+                // 2. Format name for success message
+                final name = state.customerName ?? 'Transaction';
 
-              // 4. Reset flow for next transaction
-              context.read<InvoiceBloc>().add(ResetInvoice());
+                // 3. Clear all modal overlays (Preview Dialog AND Cart Bottom Sheet)
+                // and return to the main menu (Dashboard)
+                Navigator.of(context).popUntil((route) => route.isFirst);
+
+                // 4. Show success feedback
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('$name has been saved and printed successfully!'),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 5),
+                    action: SnackBarAction(
+                      label: 'VIEW HISTORY',
+                      textColor: Colors.white,
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => InvoiceHistoryPage()),
+                        );
+                      },
+                    ),
+                  ),
+                );
+
+                // 5. Reset flow for next transaction
+                context.read<InvoiceBloc>().add(ResetInvoice());
+              }
             },
           ),
         ],
@@ -910,7 +937,7 @@ class _CartSummary extends StatelessWidget {
                       title: Text(
                         state.customerName != null 
                           ? '${state.customerName}${state.customerPhone != null ? " (${state.customerPhone})" : ""}'
-                          : 'Add Customer Name & Phone', 
+                          : (settings?.assignToCustomerLabel ?? 'Add Customer Name & Phone'), 
                         style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)
                       ),
                       subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
@@ -1123,25 +1150,25 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Customer Information'),
+      title: Text(settings?.customerInfoLabel ?? 'Customer Information'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: nameController,
-            decoration: const InputDecoration(labelText: 'Customer Name', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: settings?.customerNameLabel ?? 'Customer Name', border: const OutlineInputBorder()),
             autofocus: true,
           ),
           const SizedBox(height: 12),
           TextField(
             controller: phoneController,
-            decoration: const InputDecoration(labelText: 'Customer Phone', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: settings?.customerPhoneLabel ?? 'Customer Phone', border: const OutlineInputBorder()),
             keyboardType: TextInputType.phone,
           ),
           const SizedBox(height: 12),
           TextField(
             controller: addrController,
-            decoration: const InputDecoration(labelText: 'Customer Address', border: OutlineInputBorder()),
+            decoration: InputDecoration(labelText: settings?.customerAddressLabel ?? 'Customer Address', border: const OutlineInputBorder()),
             maxLines: 2,
           ),
         ],

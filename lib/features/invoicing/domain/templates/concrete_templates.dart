@@ -181,7 +181,7 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
   @override
   String get name => 'Minimalist';
   @override
-  TemplateType get type => TemplateType.compact;
+  TemplateType get type => TemplateType.minimalist;
   @override
   LogoPlacement get logoPlacement => LogoPlacement.none;
   @override
@@ -518,6 +518,159 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
   String _formatRow(String left, String right, int width) {
     final spaces = ' ' * (width - left.length - right.length).clamp(1, width);
     return left + spaces + right;
+  }
+}
+
+abstract class SchoolBaseTemplate extends InvoiceTemplate {
+  @override
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final settings = orgSettings as AppSettings;
+    final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+
+    return [
+      if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
+      TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
+      if (settings.address.isNotEmpty) TextCommand(settings.address, align: 'center'),
+      if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
+      TextCommand('=' * width),
+      TextCommand('SCHOOL RECEIPT', align: 'center', isBold: true),
+      TextCommand('No: ${invoice.invoiceNumber}'),
+      TextCommand('Date: ${DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated)}'),
+      TextCommand('-' * width),
+      
+      // Student Info Section
+      TextCommand('STUDENT: ${invoice.customerName?.toUpperCase() ?? "N/A"}', isBold: true),
+      if (invoice.admissionNumber != null && invoice.admissionNumber!.isNotEmpty) 
+        TextCommand('ADM NO: ${invoice.admissionNumber}'),
+      if (invoice.className != null && invoice.className!.isNotEmpty) 
+        TextCommand('CLASS: ${invoice.className}'),
+      if (invoice.termName != null || invoice.academicYearName != null) 
+        TextCommand('PERIOD: ${invoice.termName ?? ""} ${invoice.academicYearName ?? ""}'),
+      
+      TextCommand('-' * width),
+      TextCommand(_formatRow('FEE DESCRIPTION', 'AMOUNT', width), isBold: true),
+      TextCommand('-' * width),
+      
+      ...invoice.items.map((item) {
+        final usePrint = settings.customReceiptPricingEnabled && item.printPrice != null;
+        final amount = CurrencyFormatter.format(usePrint ? item.totalPrint : item.total);
+        return TextCommand(_formatRow(item.item.name, amount, width));
+      }),
+      
+      TextCommand('-' * width),
+      TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      if (invoice.amountPaid > 0)
+        TextCommand(_formatRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid), width)),
+      if (invoice.balanceAmount > 0)
+        TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width), isBold: true),
+      
+      TextCommand('=' * width),
+      if (settings.showAccountDetails && settings.bankName != null) ...[
+        TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
+        TextCommand('Bank: ${settings.bankName}', align: 'center'),
+        if (settings.accountNumber != null) TextCommand('A/C: ${settings.accountNumber}', align: 'center'),
+        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+        TextCommand('-' * width),
+      ],
+      
+      if (settings.showSignatureSpace) ...[
+        SizedBoxCommand(height: 1),
+        TextCommand('Accountant Signature', align: 'center'),
+        TextCommand('..........................', align: 'center'),
+      ],
+      
+      SizedBoxCommand(height: 1),
+      TextCommand(settings.receiptFooter, align: 'center'),
+      TextCommand('Thank you for choosing ${settings.organizationName}!', align: 'center'),
+      TextCommand('Powered by IIPS', align: 'center'),
+    ];
+  }
+
+  String _formatRow(String left, String right, int width) {
+    if (left.length + right.length >= width) {
+       return left + '\n' + (' ' * (width - right.length)) + right;
+    }
+    final spaces = ' ' * (width - left.length - right.length).clamp(1, width);
+    return left + spaces + right;
+  }
+}
+
+class SchoolTealTemplate extends SchoolBaseTemplate {
+  @override
+  String get name => 'School Teal';
+  @override
+  TemplateType get type => TemplateType.schoolTeal;
+  @override
+  LogoPlacement get logoPlacement => LogoPlacement.topCenter;
+  @override
+  bool get useBoldHeaders => true;
+  @override
+  double get columnSpacing => 2.0;
+}
+
+class SchoolPurpleTemplate extends SchoolBaseTemplate {
+  @override
+  String get name => 'School Purple';
+  @override
+  TemplateType get type => TemplateType.schoolPurple;
+  @override
+  LogoPlacement get logoPlacement => LogoPlacement.topCenter;
+  @override
+  bool get useBoldHeaders => true;
+  @override
+  double get columnSpacing => 2.0;
+}
+
+class SchoolAcademicTemplate extends SchoolBaseTemplate {
+  @override
+  String get name => 'School Academic';
+  @override
+  TemplateType get type => TemplateType.schoolAcademic;
+  @override
+  LogoPlacement get logoPlacement => LogoPlacement.topCenter;
+  @override
+  bool get useBoldHeaders => true;
+  @override
+  double get columnSpacing => 2.0;
+
+  @override
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final settings = orgSettings as AppSettings;
+    final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+    final commands = super.generateCommands(invoice, orgSettings);
+    
+    // Insert Staff info before footer
+    final footerIndex = commands.indexWhere((c) => c is TextCommand && c.text == settings.receiptFooter);
+    if (footerIndex != -1) {
+      commands.insert(footerIndex, TextCommand('Issued By: ${invoice.staffName ?? "Admin"}', align: 'center'));
+    }
+    
+    return commands;
+  }
+}
+
+class SchoolTraditionalTemplate extends SchoolBaseTemplate {
+  @override
+  String get name => 'School Traditional';
+  @override
+  TemplateType get type => TemplateType.schoolTraditional;
+  @override
+  LogoPlacement get logoPlacement => LogoPlacement.topCenter;
+  @override
+  bool get useBoldHeaders => true;
+  @override
+  double get columnSpacing => 2.0;
+
+  @override
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+    final commands = super.generateCommands(invoice, orgSettings);
+    // Replace "=" with "*" for traditional voucher feel
+    return commands.map((c) {
+      if (c is TextCommand && c.text.contains('=')) {
+        return TextCommand(c.text.replaceAll('=', '*'), align: c.align, isBold: c.isBold);
+      }
+      return c;
+    }).toList();
   }
 }
 

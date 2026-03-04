@@ -56,6 +56,10 @@ class AppSettings extends Equatable {
   final bool showTopSellingChart;
   final bool showStockValueChart;
   final String businessMode;
+  final List<String> menuOrder;
+  final bool skipSplash;
+  final bool restoreLastState;
+  final String? lastRoute;
 
   const AppSettings({
     this.id,
@@ -103,6 +107,10 @@ class AppSettings extends Equatable {
     this.showTopSellingChart = true,
     this.showStockValueChart = true,
     this.businessMode = 'retail',
+    this.menuOrder = const [],
+    this.skipSplash = false,
+    this.restoreLastState = false,
+    this.lastRoute,
   });
 
   AppSettings copyWith({
@@ -151,6 +159,10 @@ class AppSettings extends Equatable {
     bool? showTopSellingChart,
     bool? showStockValueChart,
     String? businessMode,
+    List<String>? menuOrder,
+    bool? skipSplash,
+    bool? restoreLastState,
+    String? lastRoute,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -198,6 +210,10 @@ class AppSettings extends Equatable {
       showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
       showStockValueChart: showStockValueChart ?? this.showStockValueChart,
       businessMode: businessMode ?? this.businessMode,
+      menuOrder: menuOrder ?? this.menuOrder,
+      skipSplash: skipSplash ?? this.skipSplash,
+      restoreLastState: restoreLastState ?? this.restoreLastState,
+      lastRoute: lastRoute ?? this.lastRoute,
     );
   }
 
@@ -248,5 +264,9 @@ class AppSettings extends Equatable {
         showTopSellingChart,
         showStockValueChart,
         businessMode,
+        menuOrder,
+        skipSplash,
+        restoreLastState,
+        lastRoute,
       ];
 }
