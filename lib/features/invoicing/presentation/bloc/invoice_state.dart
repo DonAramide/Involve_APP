@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/invoice.dart';
 import '../../../stock/domain/entities/item.dart';
@@ -68,9 +69,29 @@ class UpdateSchoolInfo extends InvoiceEvent {
   final int? classId;
   final int? termId;
   final int? academicYearId;
-  UpdateSchoolInfo({this.studentId, this.classId, this.termId, this.academicYearId});
+  final String? admissionNumber;
+  final String? className;
+  final String? termName;
+  final String? academicYearName;
+  final Uint8List? studentImage;
+
+  UpdateSchoolInfo({
+    this.studentId, 
+    this.classId, 
+    this.termId, 
+    this.academicYearId,
+    this.admissionNumber,
+    this.className,
+    this.termName,
+    this.academicYearName,
+    this.studentImage,
+  });
+  
   @override
-  List<Object?> get props => [studentId, classId, termId, academicYearId];
+  List<Object?> get props => [
+    studentId, classId, termId, academicYearId, 
+    admissionNumber, className, termName, academicYearName, studentImage
+  ];
 }
 
 class UpdateBusinessMode extends InvoiceEvent {
@@ -128,6 +149,11 @@ class InvoiceState extends Equatable {
   final int? classId;
   final int? termId;
   final int? academicYearId;
+  final String? admissionNumber;
+  final String? className;
+  final String? termName;
+  final String? academicYearName;
+  final Uint8List? studentImage;
 
   const InvoiceState({
     this.items = const [],
@@ -152,6 +178,11 @@ class InvoiceState extends Equatable {
     this.classId,
     this.termId,
     this.academicYearId,
+    this.admissionNumber,
+    this.className,
+    this.termName,
+    this.academicYearName,
+    this.studentImage,
   });
 
   InvoiceState copyWith({
@@ -177,6 +208,11 @@ class InvoiceState extends Equatable {
     int? classId,
     int? termId,
     int? academicYearId,
+    String? admissionNumber,
+    String? className,
+    String? termName,
+    String? academicYearName,
+    Uint8List? studentImage,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -201,6 +237,11 @@ class InvoiceState extends Equatable {
       classId: classId ?? this.classId,
       termId: termId ?? this.termId,
       academicYearId: academicYearId ?? this.academicYearId,
+      admissionNumber: admissionNumber ?? this.admissionNumber,
+      className: className ?? this.className,
+      termName: termName ?? this.termName,
+      academicYearName: academicYearName ?? this.academicYearName,
+      studentImage: studentImage ?? this.studentImage,
     );
   }
 
@@ -228,5 +269,10 @@ class InvoiceState extends Equatable {
         classId,
         termId,
         academicYearId,
+        admissionNumber,
+        className,
+        termName,
+        academicYearName,
+        studentImage,
       ];
 }

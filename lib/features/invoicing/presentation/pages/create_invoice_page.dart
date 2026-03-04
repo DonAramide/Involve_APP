@@ -1222,9 +1222,20 @@ void _showStudentPicker(BuildContext context) {
                           name: student.fullName,
                           phone: student.parentPhone,
                         ));
+                        final className = state.classes.where((c) => c.id == student.classId).firstOrNull?.name;
+                        final term = state.activeTerm;
+                        final year = state.activeYear;
+
                         invoiceBloc.add(UpdateSchoolInfo(
                           studentId: student.id,
                           classId: student.classId,
+                          termId: term?.id,
+                          academicYearId: year?.id,
+                          admissionNumber: student.admissionNumber,
+                          className: className,
+                          termName: term?.name,
+                          academicYearName: year?.name,
+                          studentImage: student.image,
                         ));
                         
                         // Carry Forward Logic

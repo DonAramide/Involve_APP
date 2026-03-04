@@ -126,6 +126,11 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         classId: state.classId,
         termId: state.termId,
         academicYearId: state.academicYearId,
+        admissionNumber: state.admissionNumber,
+        className: state.className,
+        termName: state.termName,
+        academicYearName: state.academicYearName,
+        studentImage: state.studentImage,
       );
 
       await repository.saveInvoice(invoice);
@@ -194,6 +199,11 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
       classId: event.classId,
       termId: event.termId,
       academicYearId: event.academicYearId,
+      admissionNumber: event.admissionNumber,
+      className: event.className,
+      termName: event.termName,
+      academicYearName: event.academicYearName,
+      studentImage: event.studentImage,
     ));
   }
 
