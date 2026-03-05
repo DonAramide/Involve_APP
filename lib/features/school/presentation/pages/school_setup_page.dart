@@ -4,6 +4,7 @@ import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
+import 'manage_grading_rules_page.dart';
 
 class SchoolSetupPage extends StatelessWidget {
   const SchoolSetupPage({super.key});
@@ -15,6 +16,18 @@ class SchoolSetupPage extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Academic Setup'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.rule),
+              tooltip: 'Grading Rules',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ManageGradingRulesPage()),
+                );
+              },
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Years', icon: Icon(Icons.calendar_today)),

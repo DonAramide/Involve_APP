@@ -55,7 +55,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 isScrollable: true,
                 tabs: [
                   Tab(text: 'General'),
-                  Tab(text: 'Academic Records'),
+                  Tab(text: 'Billing Records'),
                   Tab(text: 'Results'),
                   Tab(text: 'Payments'),
                 ],

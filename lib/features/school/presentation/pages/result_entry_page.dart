@@ -92,8 +92,8 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
               if (classStudents.isNotEmpty && _selectedSubjectId != null)
                 TextButton.icon(
                   onPressed: () => _saveResults(state),
-                  icon: const Icon(Icons.save, color: Colors.white),
-                  label: const Text('SAVE', style: TextStyle(color: Colors.white)),
+                  icon: Icon(Icons.save, color: Theme.of(context).primaryColor),
+                  label: Text('SAVE', style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
                 ),
             ],
           ),

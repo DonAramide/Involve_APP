@@ -191,7 +191,12 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     emit(state.copyWith(isLoading: true));
     try {
       final invoices = await invoiceRepository.getInvoicesByStudentId(event.studentId);
-      emit(state.copyWith(studentInvoices: invoices, isLoading: false));
+      final results = await repository.getResults(studentId: event.studentId);
+      emit(state.copyWith(
+        studentInvoices: invoices, 
+        results: results,
+        isLoading: false
+      ));
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
     }
