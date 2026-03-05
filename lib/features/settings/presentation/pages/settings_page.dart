@@ -184,8 +184,11 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         if (_matches('Enable Discounts'))
           _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
-        if (_matches('Confirm Item Price on Selection'))
-          _buildSwitchTile('Confirm Item Price on Selection', settings.confirmPriceOnSelection, (val) => _update(context, settings.copyWith(confirmPriceOnSelection: val))),
+        if (_matches('Confirm Item Price on Selection', ['fee', 'confirm']))
+          _buildSwitchTile(
+            settings.businessMode == 'school' ? 'Confirm Fees on Selection' : 'Confirm Item Price on Selection', 
+            settings.confirmPriceOnSelection, (val) => _update(context, settings.copyWith(confirmPriceOnSelection: val))
+          ),
         if (_matches('Enable Payment Methods'))
           _buildSwitchTile('Enable Payment Methods (Cash/POS/Transfer)', settings.paymentMethodsEnabled, (val) => _update(context, settings.copyWith(paymentMethodsEnabled: val))),
         if (_matches('Enable Custom Receipt Pricing'))

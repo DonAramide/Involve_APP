@@ -59,6 +59,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final classes = await repository.getClasses();
       final students = await repository.getStudents();
       final items = await itemRepository.getAllItems();
+      final subjects = await repository.getSubjects();
       
       final activeYear = years.where((y) => y.isActive).firstOrNull ?? years.firstOrNull;
       List<Term> terms = [];
@@ -72,6 +73,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         terms: terms,
         students: students,
         items: items,
+        subjects: subjects,
         isLoading: false,
         status: SchoolStatus.initial,
       ));
