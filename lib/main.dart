@@ -1,56 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'features/school/data/repositories/school_repository_impl.dart';
-import 'features/school/presentation/bloc/school_bloc.dart';
-import 'features/school/presentation/bloc/school_state.dart';
+import 'package:involve_app/features/school/data/repositories/school_repository_impl.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
+import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
+import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
+import 'package:involve_app/core/utils/bloc_observer.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:involve_app/features/stock/data/repositories/item_repository_impl.dart';
+import 'package:involve_app/features/stock/domain/repositories/item_repository.dart';
+import 'package:involve_app/features/stock/data/repositories/category_repository_impl.dart';
+import 'package:involve_app/features/stock/domain/repositories/category_repository.dart';
+import 'package:involve_app/features/stock/domain/usecases/stock_usecases.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
+import 'package:involve_app/features/invoicing/data/repositories/invoice_repository_impl.dart';
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/features/invoicing/domain/usecases/history_usecases.dart';
+import 'package:involve_app/features/invoicing/domain/services/invoice_calculation_service.dart';
+import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.dart';
+import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
+import 'package:involve_app/features/settings/data/repositories/settings_repository_impl.dart';
+import 'package:involve_app/features/settings/domain/repositories/settings_repository.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart';
+import 'package:involve_app/features/settings/data/repositories/staff_repository_impl.dart';
+import 'package:involve_app/features/settings/domain/repositories/staff_repository.dart';
+import 'package:involve_app/features/printer/data/repositories/cross_platform_printer_service.dart';
+import 'package:involve_app/features/printer/data/repositories/blue_thermal_printer_service.dart';
+import 'package:involve_app/features/printer/data/repositories/network_printer_service.dart';
+import 'package:involve_app/features/printer/data/repositories/unified_printer_service.dart';
+import 'package:involve_app/features/printer/domain/repositories/printer_service.dart';
+import 'package:involve_app/features/printer/domain/usecases/printer_usecases.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
+import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/core/license/landing_page.dart';
-import 'core/utils/bloc_observer.dart';
-import 'features/stock/data/datasources/app_database.dart';
-import 'features/stock/data/repositories/item_repository_impl.dart';
-import 'features/stock/domain/repositories/item_repository.dart';
-import 'features/stock/data/repositories/category_repository_impl.dart';
-import 'features/stock/domain/repositories/category_repository.dart';
-import 'features/stock/domain/usecases/stock_usecases.dart';
-import 'features/stock/presentation/bloc/stock_bloc.dart';
-import 'features/invoicing/data/repositories/invoice_repository_impl.dart';
-import 'features/invoicing/domain/repositories/invoice_repository.dart';
-import 'features/invoicing/domain/usecases/history_usecases.dart';
-import 'features/invoicing/domain/services/invoice_calculation_service.dart';
-import 'features/invoicing/presentation/bloc/invoice_bloc.dart';
-import 'features/invoicing/presentation/history/bloc/history_bloc.dart';
-import 'features/settings/data/repositories/settings_repository_impl.dart';
-import 'features/settings/domain/repositories/settings_repository.dart';
-import 'features/settings/domain/services/security_service.dart';
-import 'features/settings/presentation/bloc/settings_bloc.dart';
-import 'features/settings/presentation/bloc/staff_bloc.dart';
-import 'features/settings/presentation/bloc/staff_state.dart';
-import 'features/settings/data/repositories/staff_repository_impl.dart';
-import 'features/settings/domain/repositories/staff_repository.dart';
-import 'features/school/domain/repositories/school_repository.dart';
-import 'features/printer/data/repositories/cross_platform_printer_service.dart';
-import 'features/printer/data/repositories/blue_thermal_printer_service.dart';
-import 'features/printer/data/repositories/network_printer_service.dart';
-import 'features/printer/data/repositories/unified_printer_service.dart';
-import 'features/printer/domain/repositories/printer_service.dart';
-import 'features/printer/domain/usecases/printer_usecases.dart';
-import 'features/printer/presentation/bloc/printer_bloc.dart';
-import 'features/stock/presentation/bloc/stock_state.dart';
-import 'features/settings/presentation/bloc/settings_state.dart';
-// import 'features/dashboard/presentation/pages/dashboard_page.dart';
-import 'core/services/backup_service.dart';
-import 'core/sync/data/repositories/sync_repository_impl.dart';
-import 'core/sync/domain/services/discovery_service.dart';
-import 'core/sync/domain/services/sync_server.dart';
-import 'core/sync/domain/services/sync_manager.dart';
-import 'core/sync/presentation/bloc/sync_bloc.dart';
-import 'core/sync/domain/services/bluetooth_discovery_service.dart';
-import 'core/sync/domain/services/bluetooth_sync_server.dart';
-import 'core/sync/domain/services/bluetooth_discovery_service_stub.dart'
-    if (dart.library.io) 'core/sync/domain/services/bluetooth_discovery_service_native.dart'
-    if (dart.library.html) 'core/sync/domain/services/bluetooth_discovery_service_web.dart';
-import 'core/utils/device_info_service.dart';
-import 'core/utils/route_observer.dart';
+import 'package:involve_app/core/services/backup_service.dart';
+import 'package:involve_app/core/sync/data/repositories/sync_repository_impl.dart';
+import 'package:involve_app/core/sync/domain/services/discovery_service.dart';
+import 'package:involve_app/core/sync/domain/services/sync_server.dart';
+import 'package:involve_app/core/sync/domain/services/sync_manager.dart';
+import 'package:involve_app/core/sync/presentation/bloc/sync_bloc.dart';
+import 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service.dart';
+import 'package:involve_app/core/sync/domain/services/bluetooth_sync_server.dart';
+import 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_stub.dart'
+    if (dart.library.io) 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_native.dart'
+    if (dart.library.html) 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_web.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:involve_app/core/utils/route_observer.dart';
 import 'package:involve_app/core/license/license_service.dart';
 
 void main() async {
@@ -376,6 +376,10 @@ class MyApp extends StatelessWidget {
             ),
             navigatorObservers: [AppRouteObserver(context)],
             home: const LandingPage(),
+            routes: {
+              DashboardPage.routeName: (_) => const DashboardPage(),
+              ActivationPage.routeName: (_) => const ActivationPage(),
+            },
           );
         },
       ),

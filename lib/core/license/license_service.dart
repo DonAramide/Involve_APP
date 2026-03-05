@@ -3,7 +3,6 @@ import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:drift/drift.dart';
 import 'package:involve_app/core/license/license_validator.dart';
-import 'package:involve_app/core/license/license_generator.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:flutter/foundation.dart';
 
@@ -67,7 +66,7 @@ class LicenseService {
     }
 
     // 2. Check for Lifetime status
-    final isLifetime = await StorageService.isBusinessNameLocked(); // Simplistic check for now, can be improved
+    await StorageService.isBusinessNameLocked(); // Simplistic check for now, can be improved
     // Note: isDeviceAuthorized is better for lifetime, but it's in SecurityService
 
     // 3. Check for Activation Code License

@@ -1,8 +1,8 @@
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/school_entities.dart';
-import '../../domain/entities/grading_rule.dart';
-import '../../../stock/domain/entities/item.dart';
-import '../../../invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/features/school/domain/entities/grading_rule.dart';
+import 'package:involve_app/features/stock/domain/entities/item.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 
 enum SchoolStatus { initial, loading, success, failure }
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../bloc/school_bloc.dart';
-import '../bloc/school_state.dart';
-import '../../domain/entities/school_entities.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:collection/collection.dart';
 
 class ManageSubjectsPage extends StatefulWidget {

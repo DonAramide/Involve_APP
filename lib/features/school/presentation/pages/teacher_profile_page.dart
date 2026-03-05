@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../../domain/entities/school_entities.dart';
-import '../bloc/school_bloc.dart';
-import '../bloc/school_state.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../../core/utils/currency_formatter.dart';
-import 'student_list_page.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
 
 class TeacherProfilePage extends StatelessWidget {
   final Teacher teacher;

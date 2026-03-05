@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../bloc/school_bloc.dart';
-import '../bloc/school_state.dart';
-import '../../domain/entities/school_entities.dart';
-import 'teacher_profile_page.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
+import 'package:involve_app/features/school/presentation/pages/teacher_profile_page.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 
