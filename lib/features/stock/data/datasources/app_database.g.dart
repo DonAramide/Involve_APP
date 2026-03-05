@@ -12271,6 +12271,505 @@ class ResultsCompanion extends UpdateCompanion<ResultTable> {
   }
 }
 
+class $GradingRulesTable extends GradingRules
+    with TableInfo<$GradingRulesTable, GradingRuleTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GradingRulesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _minScoreMeta =
+      const VerificationMeta('minScore');
+  @override
+  late final GeneratedColumn<double> minScore = GeneratedColumn<double>(
+      'min_score', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _maxScoreMeta =
+      const VerificationMeta('maxScore');
+  @override
+  late final GeneratedColumn<double> maxScore = GeneratedColumn<double>(
+      'max_score', aliasedName, false,
+      type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _gradeMeta = const VerificationMeta('grade');
+  @override
+  late final GeneratedColumn<String> grade = GeneratedColumn<String>(
+      'grade', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _remarksMeta =
+      const VerificationMeta('remarks');
+  @override
+  late final GeneratedColumn<String> remarks = GeneratedColumn<String>(
+      'remarks', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
+  @override
+  late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
+      'sync_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDeletedMeta =
+      const VerificationMeta('isDeleted');
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+      'is_deleted', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        minScore,
+        maxScore,
+        grade,
+        remarks,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'grading_rules';
+  @override
+  VerificationContext validateIntegrity(Insertable<GradingRuleTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('min_score')) {
+      context.handle(_minScoreMeta,
+          minScore.isAcceptableOrUnknown(data['min_score']!, _minScoreMeta));
+    } else if (isInserting) {
+      context.missing(_minScoreMeta);
+    }
+    if (data.containsKey('max_score')) {
+      context.handle(_maxScoreMeta,
+          maxScore.isAcceptableOrUnknown(data['max_score']!, _maxScoreMeta));
+    } else if (isInserting) {
+      context.missing(_maxScoreMeta);
+    }
+    if (data.containsKey('grade')) {
+      context.handle(
+          _gradeMeta, grade.isAcceptableOrUnknown(data['grade']!, _gradeMeta));
+    } else if (isInserting) {
+      context.missing(_gradeMeta);
+    }
+    if (data.containsKey('remarks')) {
+      context.handle(_remarksMeta,
+          remarks.isAcceptableOrUnknown(data['remarks']!, _remarksMeta));
+    }
+    if (data.containsKey('sync_id')) {
+      context.handle(_syncIdMeta,
+          syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    }
+    if (data.containsKey('is_deleted')) {
+      context.handle(_isDeletedMeta,
+          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GradingRuleTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GradingRuleTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      minScore: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}min_score'])!,
+      maxScore: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}max_score'])!,
+      grade: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}grade'])!,
+      remarks: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}remarks']),
+      syncId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at']),
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
+      isDeleted: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+    );
+  }
+
+  @override
+  $GradingRulesTable createAlias(String alias) {
+    return $GradingRulesTable(attachedDatabase, alias);
+  }
+}
+
+class GradingRuleTable extends DataClass
+    implements Insertable<GradingRuleTable> {
+  final int id;
+  final double minScore;
+  final double maxScore;
+  final String grade;
+  final String? remarks;
+  final String? syncId;
+  final DateTime? updatedAt;
+  final DateTime? createdAt;
+  final String? deviceId;
+  final bool isDeleted;
+  const GradingRuleTable(
+      {required this.id,
+      required this.minScore,
+      required this.maxScore,
+      required this.grade,
+      this.remarks,
+      this.syncId,
+      this.updatedAt,
+      this.createdAt,
+      this.deviceId,
+      required this.isDeleted});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['min_score'] = Variable<double>(minScore);
+    map['max_score'] = Variable<double>(maxScore);
+    map['grade'] = Variable<String>(grade);
+    if (!nullToAbsent || remarks != null) {
+      map['remarks'] = Variable<String>(remarks);
+    }
+    if (!nullToAbsent || syncId != null) {
+      map['sync_id'] = Variable<String>(syncId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || createdAt != null) {
+      map['created_at'] = Variable<DateTime>(createdAt);
+    }
+    if (!nullToAbsent || deviceId != null) {
+      map['device_id'] = Variable<String>(deviceId);
+    }
+    map['is_deleted'] = Variable<bool>(isDeleted);
+    return map;
+  }
+
+  GradingRulesCompanion toCompanion(bool nullToAbsent) {
+    return GradingRulesCompanion(
+      id: Value(id),
+      minScore: Value(minScore),
+      maxScore: Value(maxScore),
+      grade: Value(grade),
+      remarks: remarks == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remarks),
+      syncId:
+          syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      createdAt: createdAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(createdAt),
+      deviceId: deviceId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deviceId),
+      isDeleted: Value(isDeleted),
+    );
+  }
+
+  factory GradingRuleTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GradingRuleTable(
+      id: serializer.fromJson<int>(json['id']),
+      minScore: serializer.fromJson<double>(json['minScore']),
+      maxScore: serializer.fromJson<double>(json['maxScore']),
+      grade: serializer.fromJson<String>(json['grade']),
+      remarks: serializer.fromJson<String?>(json['remarks']),
+      syncId: serializer.fromJson<String?>(json['syncId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      deviceId: serializer.fromJson<String?>(json['deviceId']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'minScore': serializer.toJson<double>(minScore),
+      'maxScore': serializer.toJson<double>(maxScore),
+      'grade': serializer.toJson<String>(grade),
+      'remarks': serializer.toJson<String?>(remarks),
+      'syncId': serializer.toJson<String?>(syncId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'deviceId': serializer.toJson<String?>(deviceId),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
+    };
+  }
+
+  GradingRuleTable copyWith(
+          {int? id,
+          double? minScore,
+          double? maxScore,
+          String? grade,
+          Value<String?> remarks = const Value.absent(),
+          Value<String?> syncId = const Value.absent(),
+          Value<DateTime?> updatedAt = const Value.absent(),
+          Value<DateTime?> createdAt = const Value.absent(),
+          Value<String?> deviceId = const Value.absent(),
+          bool? isDeleted}) =>
+      GradingRuleTable(
+        id: id ?? this.id,
+        minScore: minScore ?? this.minScore,
+        maxScore: maxScore ?? this.maxScore,
+        grade: grade ?? this.grade,
+        remarks: remarks.present ? remarks.value : this.remarks,
+        syncId: syncId.present ? syncId.value : this.syncId,
+        updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+        createdAt: createdAt.present ? createdAt.value : this.createdAt,
+        deviceId: deviceId.present ? deviceId.value : this.deviceId,
+        isDeleted: isDeleted ?? this.isDeleted,
+      );
+  GradingRuleTable copyWithCompanion(GradingRulesCompanion data) {
+    return GradingRuleTable(
+      id: data.id.present ? data.id.value : this.id,
+      minScore: data.minScore.present ? data.minScore.value : this.minScore,
+      maxScore: data.maxScore.present ? data.maxScore.value : this.maxScore,
+      grade: data.grade.present ? data.grade.value : this.grade,
+      remarks: data.remarks.present ? data.remarks.value : this.remarks,
+      syncId: data.syncId.present ? data.syncId.value : this.syncId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GradingRuleTable(')
+          ..write('id: $id, ')
+          ..write('minScore: $minScore, ')
+          ..write('maxScore: $maxScore, ')
+          ..write('grade: $grade, ')
+          ..write('remarks: $remarks, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, minScore, maxScore, grade, remarks,
+      syncId, updatedAt, createdAt, deviceId, isDeleted);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GradingRuleTable &&
+          other.id == this.id &&
+          other.minScore == this.minScore &&
+          other.maxScore == this.maxScore &&
+          other.grade == this.grade &&
+          other.remarks == this.remarks &&
+          other.syncId == this.syncId &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.deviceId == this.deviceId &&
+          other.isDeleted == this.isDeleted);
+}
+
+class GradingRulesCompanion extends UpdateCompanion<GradingRuleTable> {
+  final Value<int> id;
+  final Value<double> minScore;
+  final Value<double> maxScore;
+  final Value<String> grade;
+  final Value<String?> remarks;
+  final Value<String?> syncId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> createdAt;
+  final Value<String?> deviceId;
+  final Value<bool> isDeleted;
+  const GradingRulesCompanion({
+    this.id = const Value.absent(),
+    this.minScore = const Value.absent(),
+    this.maxScore = const Value.absent(),
+    this.grade = const Value.absent(),
+    this.remarks = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  });
+  GradingRulesCompanion.insert({
+    this.id = const Value.absent(),
+    required double minScore,
+    required double maxScore,
+    required String grade,
+    this.remarks = const Value.absent(),
+    this.syncId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.isDeleted = const Value.absent(),
+  })  : minScore = Value(minScore),
+        maxScore = Value(maxScore),
+        grade = Value(grade);
+  static Insertable<GradingRuleTable> custom({
+    Expression<int>? id,
+    Expression<double>? minScore,
+    Expression<double>? maxScore,
+    Expression<String>? grade,
+    Expression<String>? remarks,
+    Expression<String>? syncId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? deviceId,
+    Expression<bool>? isDeleted,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (minScore != null) 'min_score': minScore,
+      if (maxScore != null) 'max_score': maxScore,
+      if (grade != null) 'grade': grade,
+      if (remarks != null) 'remarks': remarks,
+      if (syncId != null) 'sync_id': syncId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deviceId != null) 'device_id': deviceId,
+      if (isDeleted != null) 'is_deleted': isDeleted,
+    });
+  }
+
+  GradingRulesCompanion copyWith(
+      {Value<int>? id,
+      Value<double>? minScore,
+      Value<double>? maxScore,
+      Value<String>? grade,
+      Value<String?>? remarks,
+      Value<String?>? syncId,
+      Value<DateTime?>? updatedAt,
+      Value<DateTime?>? createdAt,
+      Value<String?>? deviceId,
+      Value<bool>? isDeleted}) {
+    return GradingRulesCompanion(
+      id: id ?? this.id,
+      minScore: minScore ?? this.minScore,
+      maxScore: maxScore ?? this.maxScore,
+      grade: grade ?? this.grade,
+      remarks: remarks ?? this.remarks,
+      syncId: syncId ?? this.syncId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      deviceId: deviceId ?? this.deviceId,
+      isDeleted: isDeleted ?? this.isDeleted,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (minScore.present) {
+      map['min_score'] = Variable<double>(minScore.value);
+    }
+    if (maxScore.present) {
+      map['max_score'] = Variable<double>(maxScore.value);
+    }
+    if (grade.present) {
+      map['grade'] = Variable<String>(grade.value);
+    }
+    if (remarks.present) {
+      map['remarks'] = Variable<String>(remarks.value);
+    }
+    if (syncId.present) {
+      map['sync_id'] = Variable<String>(syncId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GradingRulesCompanion(')
+          ..write('id: $id, ')
+          ..write('minScore: $minScore, ')
+          ..write('maxScore: $maxScore, ')
+          ..write('grade: $grade, ')
+          ..write('remarks: $remarks, ')
+          ..write('syncId: $syncId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('isDeleted: $isDeleted')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -12294,6 +12793,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $BusinessSettingsTable(this);
   late final $SubjectsTable subjects = $SubjectsTable(this);
   late final $ResultsTable results = $ResultsTable(this);
+  late final $GradingRulesTable gradingRules = $GradingRulesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -12316,7 +12816,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         students,
         businessSettings,
         subjects,
-        results
+        results,
+        gradingRules
       ];
 }
 
@@ -19965,6 +20466,248 @@ typedef $$ResultsTableProcessedTableManager = ProcessedTableManager<
     ResultTable,
     PrefetchHooks Function(
         {bool studentId, bool subjectId, bool termId, bool academicYearId})>;
+typedef $$GradingRulesTableCreateCompanionBuilder = GradingRulesCompanion
+    Function({
+  Value<int> id,
+  required double minScore,
+  required double maxScore,
+  required String grade,
+  Value<String?> remarks,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+typedef $$GradingRulesTableUpdateCompanionBuilder = GradingRulesCompanion
+    Function({
+  Value<int> id,
+  Value<double> minScore,
+  Value<double> maxScore,
+  Value<String> grade,
+  Value<String?> remarks,
+  Value<String?> syncId,
+  Value<DateTime?> updatedAt,
+  Value<DateTime?> createdAt,
+  Value<String?> deviceId,
+  Value<bool> isDeleted,
+});
+
+class $$GradingRulesTableFilterComposer
+    extends Composer<_$AppDatabase, $GradingRulesTable> {
+  $$GradingRulesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get minScore => $composableBuilder(
+      column: $table.minScore, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get maxScore => $composableBuilder(
+      column: $table.maxScore, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get grade => $composableBuilder(
+      column: $table.grade, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remarks => $composableBuilder(
+      column: $table.remarks, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+}
+
+class $$GradingRulesTableOrderingComposer
+    extends Composer<_$AppDatabase, $GradingRulesTable> {
+  $$GradingRulesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get minScore => $composableBuilder(
+      column: $table.minScore, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get maxScore => $composableBuilder(
+      column: $table.maxScore, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get grade => $composableBuilder(
+      column: $table.grade, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get remarks => $composableBuilder(
+      column: $table.remarks, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncId => $composableBuilder(
+      column: $table.syncId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+}
+
+class $$GradingRulesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GradingRulesTable> {
+  $$GradingRulesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<double> get minScore =>
+      $composableBuilder(column: $table.minScore, builder: (column) => column);
+
+  GeneratedColumn<double> get maxScore =>
+      $composableBuilder(column: $table.maxScore, builder: (column) => column);
+
+  GeneratedColumn<String> get grade =>
+      $composableBuilder(column: $table.grade, builder: (column) => column);
+
+  GeneratedColumn<String> get remarks =>
+      $composableBuilder(column: $table.remarks, builder: (column) => column);
+
+  GeneratedColumn<String> get syncId =>
+      $composableBuilder(column: $table.syncId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+}
+
+class $$GradingRulesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $GradingRulesTable,
+    GradingRuleTable,
+    $$GradingRulesTableFilterComposer,
+    $$GradingRulesTableOrderingComposer,
+    $$GradingRulesTableAnnotationComposer,
+    $$GradingRulesTableCreateCompanionBuilder,
+    $$GradingRulesTableUpdateCompanionBuilder,
+    (
+      GradingRuleTable,
+      BaseReferences<_$AppDatabase, $GradingRulesTable, GradingRuleTable>
+    ),
+    GradingRuleTable,
+    PrefetchHooks Function()> {
+  $$GradingRulesTableTableManager(_$AppDatabase db, $GradingRulesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GradingRulesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GradingRulesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$GradingRulesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<double> minScore = const Value.absent(),
+            Value<double> maxScore = const Value.absent(),
+            Value<String> grade = const Value.absent(),
+            Value<String?> remarks = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              GradingRulesCompanion(
+            id: id,
+            minScore: minScore,
+            maxScore: maxScore,
+            grade: grade,
+            remarks: remarks,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            required double minScore,
+            required double maxScore,
+            required String grade,
+            Value<String?> remarks = const Value.absent(),
+            Value<String?> syncId = const Value.absent(),
+            Value<DateTime?> updatedAt = const Value.absent(),
+            Value<DateTime?> createdAt = const Value.absent(),
+            Value<String?> deviceId = const Value.absent(),
+            Value<bool> isDeleted = const Value.absent(),
+          }) =>
+              GradingRulesCompanion.insert(
+            id: id,
+            minScore: minScore,
+            maxScore: maxScore,
+            grade: grade,
+            remarks: remarks,
+            syncId: syncId,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            deviceId: deviceId,
+            isDeleted: isDeleted,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$GradingRulesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $GradingRulesTable,
+    GradingRuleTable,
+    $$GradingRulesTableFilterComposer,
+    $$GradingRulesTableOrderingComposer,
+    $$GradingRulesTableAnnotationComposer,
+    $$GradingRulesTableCreateCompanionBuilder,
+    $$GradingRulesTableUpdateCompanionBuilder,
+    (
+      GradingRuleTable,
+      BaseReferences<_$AppDatabase, $GradingRulesTable, GradingRuleTable>
+    ),
+    GradingRuleTable,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -20005,4 +20748,6 @@ class $AppDatabaseManager {
       $$SubjectsTableTableManager(_db, _db.subjects);
   $$ResultsTableTableManager get results =>
       $$ResultsTableTableManager(_db, _db.results);
+  $$GradingRulesTableTableManager get gradingRules =>
+      $$GradingRulesTableTableManager(_db, _db.gradingRules);
 }

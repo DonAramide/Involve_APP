@@ -44,4 +44,10 @@ abstract class SchoolRepository {
     int? academicYearId,
   });
   Future<void> saveResults(List<AcademicResult> results);
+
+  // Grading Rules
+  Future<List<GradingRule>> getGradingRules();
+  Future<void> addGradingRule(GradingRule rule);
+  Future<void> updateGradingRule(GradingRule rule);
+  Future<void> deleteGradingRule(int id);
 }

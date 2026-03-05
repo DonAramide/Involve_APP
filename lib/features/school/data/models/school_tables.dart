@@ -121,3 +121,20 @@ class Results extends Table {
   TextColumn get deviceId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }
+
+@DataClassName('GradingRuleTable')
+class GradingRules extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  RealColumn get minScore => real()();
+  RealColumn get maxScore => real()();
+  TextColumn get grade => text()();
+  TextColumn get remarks => text().nullable()();
+
+  // Sync Columns
+  TextColumn get syncId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get deviceId => text().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+}
+

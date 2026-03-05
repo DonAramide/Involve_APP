@@ -320,4 +320,44 @@ class SchoolRepositoryImpl implements SchoolRepository {
       }
     }
   }
+
+  @override
+  Future<List<GradingRule>> getGradingRules() async {
+    final rows = await database.select(database.gradingRules).get();
+    return rows.map((row) => GradingRule(
+      id: row.id,
+      minScore: row.minScore,
+      maxScore: row.maxScore,
+      grade: row.grade,
+      remarks: row.remarks,
+    )).toList();
+  }
+
+  @override
+  Future<void> addGradingRule(GradingRule rule) async {
+    await database.into(database.gradingRules).insert(db.GradingRulesCompanion.insert(
+      minScore: rule.minScore,
+      maxScore: rule.maxScore,
+      grade: rule.grade,
+      remarks: Value(rule.remarks),
+    ));
+  }
+
+  @override
+  Future<void> updateGradingRule(GradingRule rule) async {
+    await (database.update(database.gradingRules)
+      ..where((t) => t.id.equals(rule.id!)))
+    .write(db.GradingRulesCompanion(
+      minScore: Value(rule.minScore),
+      maxScore: Value(rule.maxScore),
+      grade: Value(rule.grade),
+      remarks: Value(rule.remarks),
+    ));
+  }
+
+  @override
+  Future<void> deleteGradingRule(int id) async {
+    await (database.delete(database.gradingRules)..where((t) => t.id.equals(id))).go();
+  }
 }
+

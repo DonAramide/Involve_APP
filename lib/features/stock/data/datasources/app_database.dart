@@ -36,13 +36,14 @@ part 'app_database.g.dart';
   Students,
   BusinessSettings,
   Subjects,
-  Results
+  Results,
+  GradingRules
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 49;
+  int get schemaVersion => 50;
 
   @override
   MigrationStrategy get migration {
@@ -213,6 +214,11 @@ class AppDatabase extends _$AppDatabase {
           await _safeAddColumn(m, settings, settings.skipSplash);
           await _safeAddColumn(m, settings, settings.restoreLastState);
           await _safeAddColumn(m, settings, settings.lastRoute);
+        }
+
+        if (from < 50) {
+          // Schema V50: Add GradingRules table
+          await _safeCreateTable(m, gradingRules);
         }
       },
       beforeOpen: (details) async {

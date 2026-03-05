@@ -268,13 +268,25 @@ class _SettingsPageState extends State<SettingsPage> {
       if (_matches('Graph Visibility', ['charts', 'sales trend', 'expense', 'top selling', 'stock value'])) ...[
         _buildSectionHeader(context, 'Graph Visibility (Admin)'),
         if (_matches('Show Sales Trend'))
-          _buildSwitchTile('Show Sales Trend (Invoice History)', settings.showSalesTrendChart, (val) => _update(context, settings.copyWith(showSalesTrendChart: val))),
+          _buildSwitchTile(
+            settings.businessMode == 'school' ? 'Show Revenue Trend (Billing History)' : 'Show Sales Trend (Invoice History)', 
+            settings.showSalesTrendChart, (val) => _update(context, settings.copyWith(showSalesTrendChart: val))
+          ),
         if (_matches('Show Expense Pie Chart'))
-          _buildSwitchTile('Show Expense Pie Chart (Profit Report)', settings.showExpensePieChart, (val) => _update(context, settings.copyWith(showExpensePieChart: val))),
+          _buildSwitchTile(
+            settings.businessMode == 'school' ? 'Show Expense Pie Chart (Financial Report)' : 'Show Expense Pie Chart (Profit Report)', 
+            settings.showExpensePieChart, (val) => _update(context, settings.copyWith(showExpensePieChart: val))
+          ),
         if (_matches('Show Top Selling Bar Chart'))
-          _buildSwitchTile('Show Top Selling Bar Chart (Inventory Report)', settings.showTopSellingChart, (val) => _update(context, settings.copyWith(showTopSellingChart: val))),
+          _buildSwitchTile(
+            settings.businessMode == 'school' ? 'Show Top Revenue Sources (Financial Report)' : 'Show Top Selling Bar Chart (Inventory Report)', 
+            settings.showTopSellingChart, (val) => _update(context, settings.copyWith(showTopSellingChart: val))
+          ),
         if (_matches('Show Stock Value Pie Chart'))
-          _buildSwitchTile('Show Stock Value Pie Chart (Inventory Report)', settings.showStockValueChart, (val) => _update(context, settings.copyWith(showStockValueChart: val))),
+          _buildSwitchTile(
+            settings.businessMode == 'school' ? 'Show Inventory Value Chart (Financial Report)' : 'Show Stock Value Pie Chart (Inventory Report)', 
+            settings.showStockValueChart, (val) => _update(context, settings.copyWith(showStockValueChart: val))
+          ),
         const Divider(),
       ],
       // Startup & State Persistence
@@ -314,10 +326,16 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
         if (_matches('Show Sync Status'))
           _buildSwitchTile('Show Sync Status', settings.showSyncStatus, (val) => _update(context, settings.copyWith(showSyncStatus: val))),
-        if (_matches('Show Total Sales Card'))
-          _buildSwitchTile('Show Total Sales Card', settings.showTotalSalesCard, (val) => _update(context, settings.copyWith(showTotalSalesCard: val))),
-        if (_matches('Enable Stock Return & Replace'))
-          _buildSwitchTile('Enable Stock Return & Replace', settings.stockReturnEnabled, (val) => _update(context, settings.copyWith(stockReturnEnabled: val))),
+        if (_matches('Show Total Sales Card', ['revenue']))
+          _buildSwitchTile(
+            settings.businessMode == 'school' ? 'Show Total Revenue Card' : 'Show Total Sales Card', 
+            settings.showTotalSalesCard, (val) => _update(context, settings.copyWith(showTotalSalesCard: val))
+          ),
+        if (_matches('Enable Stock Return & Replace', ['refund', 'return']))
+          _buildSwitchTile(
+            settings.businessMode == 'school' ? 'Enable Fee Refunds / Returns' : 'Enable Stock Return & Replace', 
+            settings.stockReturnEnabled, (val) => _update(context, settings.copyWith(stockReturnEnabled: val))
+          ),
         if (_matches('Restore Backup'))
           ListTile(
             title: const Text('Restore Backup'),

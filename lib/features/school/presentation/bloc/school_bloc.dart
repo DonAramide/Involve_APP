@@ -40,6 +40,13 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     on<DeleteSubjectEvent>(_onDeleteSubject);
     on<LoadResultsEvent>(_onLoadResults);
     on<SaveResultsEvent>(_onSaveResults);
+
+    // Grading Rules
+    on<LoadGradingRules>(_onLoadGradingRules);
+    on<AddGradingRuleEvent>(_onAddGradingRule);
+    on<UpdateGradingRuleEvent>(_onUpdateGradingRule);
+    on<DeleteGradingRuleEvent>(_onDeleteGradingRule);
+
     on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null)));
     
     add(LoadSchoolData());
@@ -268,4 +275,46 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
     }
   }
+
+  Future<void> _onLoadGradingRules(LoadGradingRules event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true));
+    try {
+      final rules = await repository.getGradingRules();
+      emit(state.copyWith(gradingRules: rules, isLoading: false));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onAddGradingRule(AddGradingRuleEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
+    try {
+      await repository.addGradingRule(event.rule);
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadGradingRules());
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onUpdateGradingRule(UpdateGradingRuleEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
+    try {
+      await repository.updateGradingRule(event.rule);
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadGradingRules());
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onDeleteGradingRule(DeleteGradingRuleEvent event, Emitter<SchoolState> emit) async {
+    try {
+      await repository.deleteGradingRule(event.id);
+      add(LoadGradingRules());
+    } catch (e) {
+      emit(state.copyWith(error: e.toString()));
+    }
+  }
 }
+
