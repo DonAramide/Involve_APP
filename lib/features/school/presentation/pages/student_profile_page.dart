@@ -44,6 +44,9 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           (c) => c.id == student.classId, 
           orElse: () => const SchoolClass(id: 0, name: 'N/A'),
         );
+        final assignedTeacher = state.teachers.firstWhereOrNull(
+          (t) => t.classId == sClass.id && sClass.id != 0,
+        );
         final currency = context.watch<SettingsBloc>().state.settings?.currency ?? '₦';
 
         return DefaultTabController(
@@ -63,7 +66,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             ),
             body: Column(
               children: [
-                _buildHeader(context, student, sClass, currency),
+                _buildHeader(context, student, sClass, assignedTeacher, currency),
                 Expanded(
                   child: TabBarView(
                     children: [
@@ -82,7 +85,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, Student student, SchoolClass sClass, String currency) {
+  Widget _buildHeader(BuildContext context, Student student, SchoolClass sClass, Teacher? assignedTeacher, String currency) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -106,6 +109,8 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 Text('Class: ${sClass.name} | ID: ${student.admissionNumber ?? "N/A"}'),
+                if (assignedTeacher != null)
+                  Text('Teacher: ${assignedTeacher.fullName}', style: const TextStyle(fontSize: 14, color: Colors.blueGrey)),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

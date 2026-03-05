@@ -98,9 +98,10 @@ class LoadSubjectsEvent extends SchoolEvent {}
 class AddSubjectEvent extends SchoolEvent {
   final String name;
   final String? code;
-  const AddSubjectEvent({required this.name, this.code});
+  final int? teacherId;
+  const AddSubjectEvent({required this.name, this.code, this.teacherId});
   @override
-  List<Object?> get props => [name, code];
+  List<Object?> get props => [name, code, teacherId];
 }
 
 class UpdateSubjectEvent extends SchoolEvent {

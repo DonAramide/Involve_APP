@@ -231,7 +231,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   Future<void> _onAddSubject(AddSubjectEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
     try {
-      await repository.addSubject(Subject(name: event.name, code: event.code));
+      await repository.addSubject(Subject(name: event.name, code: event.code, teacherId: event.teacherId));
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSubjectsEvent());
     } catch (e) {

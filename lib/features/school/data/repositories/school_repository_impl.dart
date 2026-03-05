@@ -209,6 +209,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       id: row.id,
       name: row.name,
       code: row.code,
+      teacherId: row.teacherId,
     )).toList();
   }
 
@@ -217,6 +218,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
     await database.into(database.subjects).insert(db.SubjectsCompanion.insert(
       name: subject.name,
       code: Value(subject.code),
+      teacherId: Value(subject.teacherId),
     ));
   }
 
@@ -226,6 +228,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
         .write(db.SubjectsCompanion(
       name: Value(subject.name),
       code: Value(subject.code),
+      teacherId: Value(subject.teacherId),
     ));
   }
 

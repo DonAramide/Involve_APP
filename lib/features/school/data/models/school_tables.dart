@@ -104,6 +104,7 @@ class Subjects extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().unique()();
   TextColumn get code => text().nullable()();
+  IntColumn get teacherId => integer().nullable().references(Teachers, #id)();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

@@ -167,23 +167,31 @@ class Subject extends Equatable {
   final int? id;
   final String name;
   final String? code;
+  final int? teacherId;
 
-  const Subject({this.id, required this.name, this.code});
+  const Subject({
+    this.id,
+    required this.name,
+    this.code,
+    this.teacherId,
+  });
 
   Subject copyWith({
     int? id,
     String? name,
     String? code,
+    int? teacherId,
   }) {
     return Subject(
       id: id ?? this.id,
       name: name ?? this.name,
       code: code ?? this.code,
+      teacherId: teacherId ?? this.teacherId,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, code];
+  List<Object?> get props => [id, name, code, teacherId];
 }
 
 class AcademicResult extends Equatable {

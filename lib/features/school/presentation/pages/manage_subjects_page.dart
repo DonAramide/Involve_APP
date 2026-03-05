@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
+import 'package:collection/collection.dart';
 
 class ManageSubjectsPage extends StatefulWidget {
   const ManageSubjectsPage({super.key});
@@ -51,11 +52,14 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
             itemCount: state.subjects.length,
             itemBuilder: (context, index) {
               final subject = state.subjects[index];
+              final teacher = state.teachers.firstWhereOrNull((t) => t.id == subject.teacherId);
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
                   title: Text(subject.name),
-                  subtitle: subject.code != null ? Text('Code: ${subject.code}') : null,
+                  subtitle: subject.code != null 
+                    ? Text('Code: ${subject.code}${teacher != null ? ' • Teacher: ${teacher.fullName}' : ''}') 
+                    : teacher != null ? Text('Teacher: ${teacher.fullName}') : null,
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -81,6 +85,7 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
   void _showSubjectDialog(BuildContext context, {Subject? subject}) {
     final nameController = TextEditingController(text: subject?.name);
     final codeController = TextEditingController(text: subject?.code);
+    int? selectedTeacherId = subject?.teacherId;
 
     showDialog(
       context: context,
@@ -106,6 +111,20 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
                 controller: codeController,
                 decoration: const InputDecoration(labelText: 'Subject Code (Optional)'),
               ),
+              const SizedBox(height: 16),
+              BlocBuilder<SchoolBloc, SchoolState>(
+                builder: (context, state) {
+                  return DropdownButtonFormField<int>(
+                    value: selectedTeacherId,
+                    decoration: const InputDecoration(labelText: 'Assign Teacher', border: OutlineInputBorder()),
+                    items: [
+                      const DropdownMenuItem<int>(value: null, child: Text('None')),
+                      ...state.teachers.map((t) => DropdownMenuItem(value: t.id, child: Text(t.fullName))),
+                    ],
+                    onChanged: (v) => selectedTeacherId = v,
+                  );
+                },
+              ),
             ],
           ),
           actions: [
@@ -117,12 +136,14 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
                     context.read<SchoolBloc>().add(AddSubjectEvent(
                       name: nameController.text,
                       code: codeController.text.isNotEmpty ? codeController.text : null,
+                      teacherId: selectedTeacherId,
                     ));
                   } else {
                     context.read<SchoolBloc>().add(UpdateSubjectEvent(
                       subject.copyWith(
                         name: nameController.text,
                         code: codeController.text.isNotEmpty ? codeController.text : null,
+                        teacherId: selectedTeacherId,
                       ),
                     ));
                   }
