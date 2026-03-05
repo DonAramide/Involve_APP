@@ -28,6 +28,7 @@ import '../../../../core/sync/presentation/pages/device_sync_page.dart';
 import '../../../../core/utils/terminology.dart';
 import 'package:involve_app/features/stock/presentation/pages/manage_categories_page.dart';
 import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/student_analytics_page.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
 import 'package:involve_app/features/school/presentation/pages/fee_management_page.dart';
 import 'package:involve_app/features/school/presentation/pages/manage_subjects_page.dart';
@@ -411,6 +412,13 @@ class _DashboardPageState extends State<DashboardPage> {
 
     if (isSchool) {
       allItems.addAll([
+        _DashboardMenuItem(
+          id: 'student_analytics',
+          title: 'STUDENT ANALYTICS',
+          icon: Icons.analytics_outlined,
+          color: Colors.blueAccent,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentAnalyticsPage())),
+        ),
         _DashboardMenuItem(
           id: 'students',
           title: 'STUDENTS',
