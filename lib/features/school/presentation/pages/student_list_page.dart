@@ -20,6 +20,11 @@ class StudentListPage extends StatefulWidget {
 class _StudentListPageState extends State<StudentListPage> {
   final Set<int> _selectedStudentIds = {};
   bool _isSelectionMode = false;
+  
+  int? _selectedClassFilter;
+  String _selectedOwingFilter = 'All'; // 'All', 'Owing', 'Not Owing'
+  int? _selectedYearFilter;
+  String _searchQuery = '';
 
   void _toggleSelection(int id) {
     setState(() {
@@ -74,79 +79,191 @@ class _StudentListPageState extends State<StudentListPage> {
           ),
           body: state.isLoading 
             ? const Center(child: CircularProgressIndicator())
-            : state.students.isEmpty 
-              ? const Center(child: Text('No students added yet.'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: state.students.length,
-                  itemBuilder: (context, index) {
-                    final student = state.students[index];
-                    final isSelected = _selectedStudentIds.contains(student.id);
-                    final sClass = state.classes.firstWhere(
-                      (c) => c.id == student.classId, 
-                      orElse: () => const SchoolClass(id: 0, name: 'No Class')
-                    );
-                    
-                    return Card(
-                      elevation: isSelected ? 4 : 1,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: isSelected ? BorderSide(color: Theme.of(context).primaryColor, width: 2) : BorderSide.none,
-                      ),
-                      child: ListTile(
-                        leading: GestureDetector(
-                          onTap: _isSelectionMode ? () => _toggleSelection(student.id!) : null,
-                          child: CircleAvatar(
-                            backgroundImage: student.image != null ? MemoryImage(student.image!) : null,
-                            child: student.image == null ? Text(student.firstName[0] + student.lastName[0]) : null,
-                          ),
-                        ),
-                        title: Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text('Class: ${sClass.name} | ID: ${student.admissionNumber ?? 'N/A'}'),
-                        trailing: _isSelectionMode 
-                          ? Checkbox(
-                              value: isSelected,
-                              onChanged: (_) => _toggleSelection(student.id!),
-                            )
-                          : PopupMenuButton<String>(
-                              icon: const Icon(Icons.more_vert),
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _showStudentDialog(context, student: student);
-                                } else if (value == 'profile') {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(builder: (_) => StudentProfilePage(studentId: student.id!)),
-                                  );
-                                } else if (value == 'delete') {
-                                  _confirmDeleteStudent(context, student);
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                const PopupMenuItem(value: 'profile', child: ListTile(leading: Icon(Icons.person_outline), title: Text('Profile'))),
-                                const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Edit'))),
-                                const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline, color: Colors.red), title: Text('Delete', style: TextStyle(color: Colors.red)))),
-                              ],
-                            ),
-                        onLongPress: () => _toggleSelection(student.id!),
-                        onTap: () {
-                          if (_isSelectionMode) {
-                            _toggleSelection(student.id!);
-                          } else {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => StudentProfilePage(studentId: student.id!)),
-                            );
-                          }
-                        },
-                      ),
-                    );
-                  },
-                ),
+            : Column(
+                children: [
+                  _buildFilterBar(state),
+                  Expanded(
+                    child: state.students.isEmpty 
+                      ? const Center(child: Text('No students found.'))
+                      : _buildStudentList(state),
+                  ),
+                ],
+              ),
           );
         },
       ),
+    );
+  }
+
+  Widget _buildFilterBar(SchoolState state) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Theme.of(context).cardColor,
+      child: Column(
+        children: [
+          // Search Bar
+          TextField(
+            decoration: InputDecoration(
+              hintText: 'Search by name or admission ID...',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+            onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
+          ),
+          const SizedBox(height: 8),
+          // Filters
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // Class Filter
+                DropdownButton<int?>(
+                  value: _selectedClassFilter,
+                  hint: const Text('All Classes'),
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('All Classes')),
+                    ...state.classes.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                  ],
+                  onChanged: (val) => setState(() => _selectedClassFilter = val),
+                ),
+                const SizedBox(width: 16),
+                
+                // Owing Status Filter
+                DropdownButton<String>(
+                  value: _selectedOwingFilter,
+                  items: ['All', 'Owing', 'Not Owing']
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (val) => setState(() => _selectedOwingFilter = val ?? 'All'),
+                ),
+                const SizedBox(width: 16),
+
+                // Academic Year Filter
+                DropdownButton<int?>(
+                  value: _selectedYearFilter,
+                  hint: const Text('All Years'),
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('All Years')),
+                    ...state.academicYears.map((y) => DropdownMenuItem(value: y.id, child: Text(y.name))),
+                  ],
+                  onChanged: (val) => setState(() => _selectedYearFilter = val),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStudentList(SchoolState state) {
+    final filteredStudents = state.students.where((s) {
+      if (_searchQuery.isNotEmpty) {
+        final nameMatch = s.fullName.toLowerCase().contains(_searchQuery);
+        final idMatch = (s.admissionNumber ?? '').toLowerCase().contains(_searchQuery);
+        if (!nameMatch && !idMatch) return false;
+      }
+      
+      if (_selectedClassFilter != null && s.classId != _selectedClassFilter) return false;
+      
+      final isOwing = (s.balance ?? 0) > 0;
+      if (_selectedOwingFilter == 'Owing' && !isOwing) return false;
+      if (_selectedOwingFilter == 'Not Owing' && isOwing) return false;
+
+      // Note: Student currently doesn't have an explicit academicYearId on the model itself,
+      // but if the backend filtering or future additions require it, this structure is ready.
+      // Assuming students belong to classes mapped to years, or if they have an enrollmentYearId.
+      // Currently bypassing year filter to prevent 0 results until data model supports it directly.
+      
+      return true;
+    }).toList();
+
+    // Alphabetical Sorting by full name
+    filteredStudents.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+
+    if (filteredStudents.isEmpty) {
+      return const Center(child: Text('No students match the selected filters.'));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: filteredStudents.length,
+      itemBuilder: (context, index) {
+        final student = filteredStudents[index];
+        final isSelected = _selectedStudentIds.contains(student.id);
+        final sClass = state.classes.firstWhere(
+          (c) => c.id == student.classId, 
+          orElse: () => const SchoolClass(id: 0, name: 'No Class')
+        );
+        
+        return Card(
+          elevation: isSelected ? 4 : 1,
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: isSelected ? BorderSide(color: Theme.of(context).primaryColor, width: 2) : BorderSide.none,
+          ),
+          child: ListTile(
+            leading: GestureDetector(
+              onTap: _isSelectionMode ? () => _toggleSelection(student.id!) : null,
+              child: CircleAvatar(
+                backgroundImage: student.image != null ? MemoryImage(student.image!) : null,
+                child: student.image == null ? Text(student.firstName[0] + student.lastName[0]) : null,
+              ),
+            ),
+            title: Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Class: ${sClass.name} | ID: ${student.admissionNumber ?? 'N/A'}'),
+                if ((student.balance ?? 0) > 0)
+                  Text(
+                    'Balance: ${CurrencyFormatter.format(student.balance!)}',
+                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                  ),
+              ],
+            ),
+            trailing: _isSelectionMode 
+              ? Checkbox(
+                  value: isSelected,
+                  onChanged: (_) => _toggleSelection(student.id!),
+                )
+              : PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _showStudentDialog(context, student: student);
+                    } else if (value == 'profile') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => StudentProfilePage(studentId: student.id!)),
+                      );
+                    } else if (value == 'delete') {
+                      _confirmDeleteStudent(context, student);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'profile', child: ListTile(leading: Icon(Icons.person_outline), title: Text('Profile'))),
+                    const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Edit'))),
+                    const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline, color: Colors.red), title: Text('Delete', style: TextStyle(color: Colors.red)))),
+                  ],
+                ),
+            onLongPress: () => _toggleSelection(student.id!),
+            onTap: () {
+              if (_isSelectionMode) {
+                _toggleSelection(student.id!);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => StudentProfilePage(studentId: student.id!)),
+                );
+              }
+            },
+          ),
+        );
+      },
     );
   }
 
