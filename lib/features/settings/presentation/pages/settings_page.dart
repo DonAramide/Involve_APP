@@ -191,7 +191,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         if (_matches('Enable Payment Methods'))
           _buildSwitchTile('Enable Payment Methods (Cash/POS/Transfer)', settings.paymentMethodsEnabled, (val) => _update(context, settings.copyWith(paymentMethodsEnabled: val))),
-        if (_matches('Enable Custom Receipt Pricing'))
+        if (settings.businessMode != 'school' && _matches('Enable Custom Receipt Pricing'))
           _buildSwitchTile('Enable Custom Receipt Pricing (Inflated Prices)', settings.customReceiptPricingEnabled, (val) => _update(context, settings.copyWith(customReceiptPricingEnabled: val))),
         if (_matches('Currency'))
           _buildDropdownTile(
