@@ -16,6 +16,10 @@ import 'package:involve_app/features/help/presentation/pages/help_page.dart';
 import 'about_page.dart';
 import 'contact_page.dart';
 import 'calculator_page.dart';
+import '../widgets/recent_transactions_widget.dart';
+import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
+import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/printer/presentation/pages/printer_settings_page.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
@@ -56,6 +60,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _verifyAndNavigateToSettings(context);
       });
     }
+    context.read<HistoryBloc>().add(LoadHistory());
   }
 
   @override
@@ -261,10 +266,12 @@ class _DashboardPageState extends State<DashboardPage> {
               final items = _getMenuItems(context, settings, printerState);
               final screenWidth = MediaQuery.of(context).size.width;
               final crossAxisCount = (screenWidth / 180).floor().clamp(2, 6);
+              final isTablet = screenWidth >= 900;
+              final isRetail = settings?.businessMode != 'school';
 
-              return ReorderableGridView.count(
+              Widget menuGrid = ReorderableGridView.count(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                crossAxisCount: crossAxisCount,
+                crossAxisCount: isTablet ? (crossAxisCount * 0.7).floor().clamp(2, 4) : crossAxisCount,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
                 childAspectRatio: 1.05,
@@ -290,6 +297,27 @@ class _DashboardPageState extends State<DashboardPage> {
                   indicatorTooltip: item.indicatorTooltip,
                 )).toList(),
               );
+
+              if (isTablet && isRetail) {
+                return Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: menuGrid,
+                    ),
+                    const VerticalDivider(width: 1, thickness: 1),
+                    const Expanded(
+                      flex: 1,
+                      child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: RecentTransactionsWidget(),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              return menuGrid;
             },
           ),
         ],
