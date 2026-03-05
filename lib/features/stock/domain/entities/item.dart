@@ -24,6 +24,7 @@ class Item extends Equatable {
   final bool requiresTimeTracking;
   final String businessMode;
   final String? syncId;
+  final bool isDefault;
 
   const Item({
     this.id,
@@ -41,6 +42,7 @@ class Item extends Equatable {
     this.requiresTimeTracking = false,
     this.businessMode = 'retail',
     this.syncId,
+    this.isDefault = false,
   });
 
   Item copyWith({
@@ -59,6 +61,7 @@ class Item extends Equatable {
     bool? requiresTimeTracking,
     String? businessMode,
     String? syncId,
+    bool? isDefault,
   }) {
     return Item(
       id: id ?? this.id,
@@ -76,6 +79,7 @@ class Item extends Equatable {
       requiresTimeTracking: requiresTimeTracking ?? this.requiresTimeTracking,
       businessMode: businessMode ?? this.businessMode,
       syncId: syncId ?? this.syncId,
+      isDefault: isDefault ?? this.isDefault,
     );
   }
 
@@ -96,6 +100,7 @@ class Item extends Equatable {
         requiresTimeTracking,
         businessMode,
         syncId,
+        isDefault,
       ];
 }
 

@@ -60,6 +60,7 @@ class AppSettings extends Equatable {
   final bool skipSplash;
   final bool restoreLastState;
   final String? lastRoute;
+  final bool showLogoAsMenuBackground;
 
   const AppSettings({
     this.id,
@@ -111,6 +112,7 @@ class AppSettings extends Equatable {
     this.skipSplash = false,
     this.restoreLastState = false,
     this.lastRoute,
+    this.showLogoAsMenuBackground = false,
   });
 
   AppSettings copyWith({
@@ -163,6 +165,7 @@ class AppSettings extends Equatable {
     bool? skipSplash,
     bool? restoreLastState,
     String? lastRoute,
+    bool? showLogoAsMenuBackground,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -214,6 +217,7 @@ class AppSettings extends Equatable {
       skipSplash: skipSplash ?? this.skipSplash,
       restoreLastState: restoreLastState ?? this.restoreLastState,
       lastRoute: lastRoute ?? this.lastRoute,
+      showLogoAsMenuBackground: showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
     );
   }
 
@@ -268,5 +272,6 @@ class AppSettings extends Equatable {
         skipSplash,
         restoreLastState,
         lastRoute,
+        showLogoAsMenuBackground,
       ];
 }

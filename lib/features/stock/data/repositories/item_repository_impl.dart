@@ -1,10 +1,8 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
-import '../models/item_table.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
 import 'package:involve_app/features/stock/domain/entities/expense.dart';
-import '../models/expense_table.dart';
 import '../../domain/repositories/item_repository.dart';
 
 class ItemRepositoryImpl implements ItemRepository {
@@ -58,6 +56,7 @@ class ItemRepositoryImpl implements ItemRepository {
             updatedAt: Value(now),
             createdAt: Value(now),
             isDeleted: const Value(false),
+            isDefault: Value(item.isDefault),
           ),
         );
   }
@@ -81,6 +80,7 @@ class ItemRepositoryImpl implements ItemRepository {
             businessMode: Value(item.businessMode),
             updatedAt: Value(DateTime.now()),
             isDeleted: const Value(false),
+            isDefault: Value(item.isDefault),
           ),
         );
   }
@@ -329,6 +329,7 @@ class ItemRepositoryImpl implements ItemRepository {
       requiresTimeTracking: row.requiresTimeTracking,
       businessMode: row.businessMode,
       syncId: row.syncId,
+      isDefault: row.isDefault,
     );
   }
 }

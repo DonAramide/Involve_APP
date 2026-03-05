@@ -572,6 +572,16 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _isDefaultMeta =
+      const VerificationMeta('isDefault');
+  @override
+  late final GeneratedColumn<bool> isDefault = GeneratedColumn<bool>(
+      'is_default', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_default" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -592,7 +602,8 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
         updatedAt,
         createdAt,
         deviceId,
-        isDeleted
+        isDeleted,
+        isDefault
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -697,6 +708,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
       context.handle(_isDeletedMeta,
           isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
     }
+    if (data.containsKey('is_default')) {
+      context.handle(_isDefaultMeta,
+          isDefault.isAcceptableOrUnknown(data['is_default']!, _isDefaultMeta));
+    }
     return context;
   }
 
@@ -744,6 +759,8 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
           .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
       isDeleted: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+      isDefault: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_default'])!,
     );
   }
 
@@ -773,6 +790,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
   final DateTime? createdAt;
   final String? deviceId;
   final bool isDeleted;
+  final bool isDefault;
   const ItemTable(
       {required this.id,
       required this.name,
@@ -792,7 +810,8 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       this.updatedAt,
       this.createdAt,
       this.deviceId,
-      required this.isDeleted});
+      required this.isDeleted,
+      required this.isDefault});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -831,6 +850,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       map['device_id'] = Variable<String>(deviceId);
     }
     map['is_deleted'] = Variable<bool>(isDeleted);
+    map['is_default'] = Variable<bool>(isDefault);
     return map;
   }
 
@@ -869,6 +889,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           ? const Value.absent()
           : Value(deviceId),
       isDeleted: Value(isDeleted),
+      isDefault: Value(isDefault),
     );
   }
 
@@ -896,6 +917,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
       deviceId: serializer.fromJson<String?>(json['deviceId']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      isDefault: serializer.fromJson<bool>(json['isDefault']),
     );
   }
   @override
@@ -921,6 +943,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       'createdAt': serializer.toJson<DateTime?>(createdAt),
       'deviceId': serializer.toJson<String?>(deviceId),
       'isDeleted': serializer.toJson<bool>(isDeleted),
+      'isDefault': serializer.toJson<bool>(isDefault),
     };
   }
 
@@ -943,7 +966,8 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
           Value<String?> deviceId = const Value.absent(),
-          bool? isDeleted}) =>
+          bool? isDeleted,
+          bool? isDefault}) =>
       ItemTable(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -966,6 +990,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
         isDeleted: isDeleted ?? this.isDeleted,
+        isDefault: isDefault ?? this.isDefault,
       );
   ItemTable copyWithCompanion(ItemsCompanion data) {
     return ItemTable(
@@ -997,6 +1022,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      isDefault: data.isDefault.present ? data.isDefault.value : this.isDefault,
     );
   }
 
@@ -1021,7 +1047,8 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('isDefault: $isDefault')
           ..write(')'))
         .toString();
   }
@@ -1046,7 +1073,8 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       updatedAt,
       createdAt,
       deviceId,
-      isDeleted);
+      isDeleted,
+      isDefault);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1069,7 +1097,8 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
           other.deviceId == this.deviceId &&
-          other.isDeleted == this.isDeleted);
+          other.isDeleted == this.isDeleted &&
+          other.isDefault == this.isDefault);
 }
 
 class ItemsCompanion extends UpdateCompanion<ItemTable> {
@@ -1092,6 +1121,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
   final Value<DateTime?> createdAt;
   final Value<String?> deviceId;
   final Value<bool> isDeleted;
+  final Value<bool> isDefault;
   const ItemsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -1112,6 +1142,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     this.createdAt = const Value.absent(),
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.isDefault = const Value.absent(),
   });
   ItemsCompanion.insert({
     this.id = const Value.absent(),
@@ -1133,6 +1164,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     this.createdAt = const Value.absent(),
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.isDefault = const Value.absent(),
   })  : name = Value(name),
         category = Value(category),
         price = Value(price);
@@ -1156,6 +1188,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     Expression<DateTime>? createdAt,
     Expression<String>? deviceId,
     Expression<bool>? isDeleted,
+    Expression<bool>? isDefault,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1178,6 +1211,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       if (createdAt != null) 'created_at': createdAt,
       if (deviceId != null) 'device_id': deviceId,
       if (isDeleted != null) 'is_deleted': isDeleted,
+      if (isDefault != null) 'is_default': isDefault,
     });
   }
 
@@ -1200,7 +1234,8 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
       Value<String?>? deviceId,
-      Value<bool>? isDeleted}) {
+      Value<bool>? isDeleted,
+      Value<bool>? isDefault}) {
     return ItemsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -1221,6 +1256,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       createdAt: createdAt ?? this.createdAt,
       deviceId: deviceId ?? this.deviceId,
       isDeleted: isDeleted ?? this.isDeleted,
+      isDefault: isDefault ?? this.isDefault,
     );
   }
 
@@ -1285,6 +1321,9 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
+    if (isDefault.present) {
+      map['is_default'] = Variable<bool>(isDefault.value);
+    }
     return map;
   }
 
@@ -1309,7 +1348,8 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('isDefault: $isDefault')
           ..write(')'))
         .toString();
   }
@@ -3860,6 +3900,17 @@ class $SettingsTable extends Settings
   late final GeneratedColumn<String> lastRoute = GeneratedColumn<String>(
       'last_route', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _showLogoAsMenuBackgroundMeta =
+      const VerificationMeta('showLogoAsMenuBackground');
+  @override
+  late final GeneratedColumn<bool> showLogoAsMenuBackground =
+      GeneratedColumn<bool>(
+          'show_logo_as_menu_background', aliasedName, false,
+          type: DriftSqlType.bool,
+          requiredDuringInsert: false,
+          defaultConstraints: GeneratedColumn.constraintIsAlways(
+              'CHECK ("show_logo_as_menu_background" IN (0, 1))'),
+          defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -3910,7 +3961,8 @@ class $SettingsTable extends Settings
         menuOrder,
         skipSplash,
         restoreLastState,
-        lastRoute
+        lastRoute,
+        showLogoAsMenuBackground
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4191,6 +4243,13 @@ class $SettingsTable extends Settings
       context.handle(_lastRouteMeta,
           lastRoute.isAcceptableOrUnknown(data['last_route']!, _lastRouteMeta));
     }
+    if (data.containsKey('show_logo_as_menu_background')) {
+      context.handle(
+          _showLogoAsMenuBackgroundMeta,
+          showLogoAsMenuBackground.isAcceptableOrUnknown(
+              data['show_logo_as_menu_background']!,
+              _showLogoAsMenuBackgroundMeta));
+    }
     return context;
   }
 
@@ -4304,6 +4363,9 @@ class $SettingsTable extends Settings
           DriftSqlType.bool, data['${effectivePrefix}restore_last_state'])!,
       lastRoute: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}last_route']),
+      showLogoAsMenuBackground: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool,
+          data['${effectivePrefix}show_logo_as_menu_background'])!,
     );
   }
 
@@ -4363,6 +4425,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool skipSplash;
   final bool restoreLastState;
   final String? lastRoute;
+  final bool showLogoAsMenuBackground;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -4412,7 +4475,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       this.menuOrder,
       required this.skipSplash,
       required this.restoreLastState,
-      this.lastRoute});
+      this.lastRoute,
+      required this.showLogoAsMenuBackground});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4490,6 +4554,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     if (!nullToAbsent || lastRoute != null) {
       map['last_route'] = Variable<String>(lastRoute);
     }
+    map['show_logo_as_menu_background'] =
+        Variable<bool>(showLogoAsMenuBackground);
     return map;
   }
 
@@ -4565,6 +4631,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       lastRoute: lastRoute == null && nullToAbsent
           ? const Value.absent()
           : Value(lastRoute),
+      showLogoAsMenuBackground: Value(showLogoAsMenuBackground),
     );
   }
 
@@ -4632,6 +4699,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       skipSplash: serializer.fromJson<bool>(json['skipSplash']),
       restoreLastState: serializer.fromJson<bool>(json['restoreLastState']),
       lastRoute: serializer.fromJson<String?>(json['lastRoute']),
+      showLogoAsMenuBackground:
+          serializer.fromJson<bool>(json['showLogoAsMenuBackground']),
     );
   }
   @override
@@ -4690,6 +4759,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'skipSplash': serializer.toJson<bool>(skipSplash),
       'restoreLastState': serializer.toJson<bool>(restoreLastState),
       'lastRoute': serializer.toJson<String?>(lastRoute),
+      'showLogoAsMenuBackground':
+          serializer.toJson<bool>(showLogoAsMenuBackground),
     };
   }
 
@@ -4742,7 +4813,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           Value<String?> menuOrder = const Value.absent(),
           bool? skipSplash,
           bool? restoreLastState,
-          Value<String?> lastRoute = const Value.absent()}) =>
+          Value<String?> lastRoute = const Value.absent(),
+          bool? showLogoAsMenuBackground}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -4803,6 +4875,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         skipSplash: skipSplash ?? this.skipSplash,
         restoreLastState: restoreLastState ?? this.restoreLastState,
         lastRoute: lastRoute.present ? lastRoute.value : this.lastRoute,
+        showLogoAsMenuBackground:
+            showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -4917,6 +4991,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ? data.restoreLastState.value
           : this.restoreLastState,
       lastRoute: data.lastRoute.present ? data.lastRoute.value : this.lastRoute,
+      showLogoAsMenuBackground: data.showLogoAsMenuBackground.present
+          ? data.showLogoAsMenuBackground.value
+          : this.showLogoAsMenuBackground,
     );
   }
 
@@ -4971,7 +5048,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('menuOrder: $menuOrder, ')
           ..write('skipSplash: $skipSplash, ')
           ..write('restoreLastState: $restoreLastState, ')
-          ..write('lastRoute: $lastRoute')
+          ..write('lastRoute: $lastRoute, ')
+          ..write('showLogoAsMenuBackground: $showLogoAsMenuBackground')
           ..write(')'))
         .toString();
   }
@@ -5026,7 +5104,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         menuOrder,
         skipSplash,
         restoreLastState,
-        lastRoute
+        lastRoute,
+        showLogoAsMenuBackground
       ]);
   @override
   bool operator ==(Object other) =>
@@ -5081,7 +5160,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.menuOrder == this.menuOrder &&
           other.skipSplash == this.skipSplash &&
           other.restoreLastState == this.restoreLastState &&
-          other.lastRoute == this.lastRoute);
+          other.lastRoute == this.lastRoute &&
+          other.showLogoAsMenuBackground == this.showLogoAsMenuBackground);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -5134,6 +5214,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> skipSplash;
   final Value<bool> restoreLastState;
   final Value<String?> lastRoute;
+  final Value<bool> showLogoAsMenuBackground;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -5184,6 +5265,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.skipSplash = const Value.absent(),
     this.restoreLastState = const Value.absent(),
     this.lastRoute = const Value.absent(),
+    this.showLogoAsMenuBackground = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -5235,6 +5317,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.skipSplash = const Value.absent(),
     this.restoreLastState = const Value.absent(),
     this.lastRoute = const Value.absent(),
+    this.showLogoAsMenuBackground = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -5288,6 +5371,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? skipSplash,
     Expression<bool>? restoreLastState,
     Expression<String>? lastRoute,
+    Expression<bool>? showLogoAsMenuBackground,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -5354,6 +5438,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (skipSplash != null) 'skip_splash': skipSplash,
       if (restoreLastState != null) 'restore_last_state': restoreLastState,
       if (lastRoute != null) 'last_route': lastRoute,
+      if (showLogoAsMenuBackground != null)
+        'show_logo_as_menu_background': showLogoAsMenuBackground,
     });
   }
 
@@ -5406,7 +5492,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String?>? menuOrder,
       Value<bool>? skipSplash,
       Value<bool>? restoreLastState,
-      Value<String?>? lastRoute}) {
+      Value<String?>? lastRoute,
+      Value<bool>? showLogoAsMenuBackground}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -5463,6 +5550,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       skipSplash: skipSplash ?? this.skipSplash,
       restoreLastState: restoreLastState ?? this.restoreLastState,
       lastRoute: lastRoute ?? this.lastRoute,
+      showLogoAsMenuBackground:
+          showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
     );
   }
 
@@ -5622,6 +5711,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (lastRoute.present) {
       map['last_route'] = Variable<String>(lastRoute.value);
     }
+    if (showLogoAsMenuBackground.present) {
+      map['show_logo_as_menu_background'] =
+          Variable<bool>(showLogoAsMenuBackground.value);
+    }
     return map;
   }
 
@@ -5676,7 +5769,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('menuOrder: $menuOrder, ')
           ..write('skipSplash: $skipSplash, ')
           ..write('restoreLastState: $restoreLastState, ')
-          ..write('lastRoute: $lastRoute')
+          ..write('lastRoute: $lastRoute, ')
+          ..write('showLogoAsMenuBackground: $showLogoAsMenuBackground')
           ..write(')'))
         .toString();
   }
@@ -13903,6 +13997,7 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   Value<DateTime?> createdAt,
   Value<String?> deviceId,
   Value<bool> isDeleted,
+  Value<bool> isDefault,
 });
 typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<int> id,
@@ -13924,6 +14019,7 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<DateTime?> createdAt,
   Value<String?> deviceId,
   Value<bool> isDeleted,
+  Value<bool> isDefault,
 });
 
 final class $$ItemsTableReferences
@@ -14053,6 +14149,9 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDefault => $composableBuilder(
+      column: $table.isDefault, builder: (column) => ColumnFilters(column));
 
   $$CategoriesTableFilterComposer get categoryId {
     final $$CategoriesTableFilterComposer composer = $composerBuilder(
@@ -14204,6 +14303,9 @@ class $$ItemsTableOrderingComposer
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isDefault => $composableBuilder(
+      column: $table.isDefault, builder: (column) => ColumnOrderings(column));
+
   $$CategoriesTableOrderingComposer get categoryId {
     final $$CategoriesTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -14287,6 +14389,9 @@ class $$ItemsTableAnnotationComposer
 
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDefault =>
+      $composableBuilder(column: $table.isDefault, builder: (column) => column);
 
   $$CategoriesTableAnnotationComposer get categoryId {
     final $$CategoriesTableAnnotationComposer composer = $composerBuilder(
@@ -14418,6 +14523,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<DateTime?> createdAt = const Value.absent(),
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<bool> isDefault = const Value.absent(),
           }) =>
               ItemsCompanion(
             id: id,
@@ -14439,6 +14545,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             createdAt: createdAt,
             deviceId: deviceId,
             isDeleted: isDeleted,
+            isDefault: isDefault,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -14460,6 +14567,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<DateTime?> createdAt = const Value.absent(),
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<bool> isDefault = const Value.absent(),
           }) =>
               ItemsCompanion.insert(
             id: id,
@@ -14481,6 +14589,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             createdAt: createdAt,
             deviceId: deviceId,
             isDeleted: isDeleted,
+            isDefault: isDefault,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -15861,6 +15970,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> skipSplash,
   Value<bool> restoreLastState,
   Value<String?> lastRoute,
+  Value<bool> showLogoAsMenuBackground,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -15912,6 +16022,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> skipSplash,
   Value<bool> restoreLastState,
   Value<String?> lastRoute,
+  Value<bool> showLogoAsMenuBackground,
 });
 
 class $$SettingsTableFilterComposer
@@ -16091,6 +16202,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get lastRoute => $composableBuilder(
       column: $table.lastRoute, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showLogoAsMenuBackground => $composableBuilder(
+      column: $table.showLogoAsMenuBackground,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$SettingsTableOrderingComposer
@@ -16277,6 +16392,10 @@ class $$SettingsTableOrderingComposer
 
   ColumnOrderings<String> get lastRoute => $composableBuilder(
       column: $table.lastRoute, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showLogoAsMenuBackground => $composableBuilder(
+      column: $table.showLogoAsMenuBackground,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -16434,6 +16553,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<String> get lastRoute =>
       $composableBuilder(column: $table.lastRoute, builder: (column) => column);
+
+  GeneratedColumn<bool> get showLogoAsMenuBackground => $composableBuilder(
+      column: $table.showLogoAsMenuBackground, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -16511,6 +16633,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> skipSplash = const Value.absent(),
             Value<bool> restoreLastState = const Value.absent(),
             Value<String?> lastRoute = const Value.absent(),
+            Value<bool> showLogoAsMenuBackground = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -16562,6 +16685,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             skipSplash: skipSplash,
             restoreLastState: restoreLastState,
             lastRoute: lastRoute,
+            showLogoAsMenuBackground: showLogoAsMenuBackground,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -16613,6 +16737,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> skipSplash = const Value.absent(),
             Value<bool> restoreLastState = const Value.absent(),
             Value<String?> lastRoute = const Value.absent(),
+            Value<bool> showLogoAsMenuBackground = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -16664,6 +16789,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             skipSplash: skipSplash,
             restoreLastState: restoreLastState,
             lastRoute: lastRoute,
+            showLogoAsMenuBackground: showLogoAsMenuBackground,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

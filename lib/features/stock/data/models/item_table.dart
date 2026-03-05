@@ -28,6 +28,7 @@ class Items extends Table {
   DateTimeColumn get createdAt => dateTime().nullable()();
   TextColumn get deviceId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+  BoolColumn get isDefault => boolean().withDefault(const Constant(false))();
 }
 
 @DataClassName('StockIncrementTable')

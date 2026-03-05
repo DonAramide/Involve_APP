@@ -81,7 +81,9 @@ class ReceiptPreviewPage extends StatelessWidget {
 
     try {
       // Use preferred template
-      final templateName = settings?.defaultInvoiceTemplate ?? 'compact';
+      final templateName = (settings?.defaultInvoiceTemplate == 'compact' && settings?.businessMode == 'school') 
+          ? 'school_academic' 
+          : (settings?.defaultInvoiceTemplate ?? 'compact');
       
       // Use Registry to get the correct template instance
       TemplateType type;

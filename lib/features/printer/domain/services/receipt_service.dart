@@ -20,7 +20,9 @@ class ReceiptService {
         bold: boldFont,
       ),
     );
-    final template = settings.defaultInvoiceTemplate;
+    final template = settings.defaultInvoiceTemplate == 'compact' && settings.businessMode == 'school' 
+        ? 'school_academic' 
+        : settings.defaultInvoiceTemplate;
     final bool useCustomPrices = useCustomPricesOverride ?? settings.customReceiptPricingEnabled;
 
     // Decode logo if available and enabled

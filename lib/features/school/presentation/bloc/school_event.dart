@@ -25,6 +25,13 @@ class SetActiveYearEvent extends SchoolEvent {
   List<Object?> get props => [id];
 }
 
+class UpdateAcademicYearEvent extends SchoolEvent {
+  final AcademicYear year;
+  const UpdateAcademicYearEvent(this.year);
+  @override
+  List<Object?> get props => [year];
+}
+
 class AddTermEvent extends SchoolEvent {
   final int academicYearId;
   final String name;
@@ -40,6 +47,13 @@ class SetActiveTermEvent extends SchoolEvent {
   const SetActiveTermEvent(this.id);
   @override
   List<Object?> get props => [id];
+}
+
+class UpdateTermEvent extends SchoolEvent {
+  final Term term;
+  const UpdateTermEvent(this.term);
+  @override
+  List<Object?> get props => [term];
 }
 
 class AddClassEvent extends SchoolEvent {
@@ -195,4 +209,19 @@ class SaveResultsEvent extends SchoolEvent {
   const SaveResultsEvent(this.results);
   @override
   List<Object?> get props => [results];
+}
+
+class MakeStudentPaymentEvent extends SchoolEvent {
+  final int studentId;
+  final double amount;
+  final String method;
+  final String? remarks;
+  const MakeStudentPaymentEvent({
+    required this.studentId,
+    required this.amount,
+    required this.method,
+    this.remarks,
+  });
+  @override
+  List<Object?> get props => [studentId, amount, method, remarks];
 }

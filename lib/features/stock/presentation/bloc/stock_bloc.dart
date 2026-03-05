@@ -60,6 +60,7 @@ class StockBloc extends Bloc<StockEvent, StockState> {
     on<LoadCategories>(_onLoadCategories);
     on<AddCategory>(_onAddCategory);
     on<DeleteCategory>(_onDeleteCategory);
+    on<ToggleItemDefaultEvent>(_onToggleItemDefault);
   }
 
   Future<void> _onLoadItems(LoadItems event, Emitter<StockState> emit) async {
@@ -191,6 +192,16 @@ class StockBloc extends Bloc<StockEvent, StockState> {
       add(LoadCategories(businessMode: state.businessMode));
     } catch (e) {
       emit(StockError('Failed to delete category: ${e.toString()}', items: state.items, categories: state.categories));
+    }
+  }
+
+  Future<void> _onToggleItemDefault(ToggleItemDefaultEvent event, Emitter<StockState> emit) async {
+    try {
+      final updatedItem = event.item.copyWith(isDefault: !event.item.isDefault);
+      await updateItem(updatedItem);
+      add(LoadItems(businessMode: state.businessMode));
+    } catch (e) {
+      emit(StockError('Failed to toggle default status: ${e.toString()}', items: state.items, categories: state.categories));
     }
   }
 }

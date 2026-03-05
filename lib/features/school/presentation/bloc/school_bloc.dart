@@ -24,8 +24,10 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   }) : super(const SchoolState()) {
     on<LoadSchoolData>(_onLoadSchoolData);
     on<AddAcademicYearEvent>(_onAddAcademicYear);
+    on<UpdateAcademicYearEvent>(_onUpdateAcademicYear);
     on<SetActiveYearEvent>(_onSetActiveYear);
     on<AddTermEvent>(_onAddTerm);
+    on<UpdateTermEvent>(_onUpdateTerm);
     on<SetActiveTermEvent>(_onSetActiveTerm);
     on<AddClassEvent>(_onAddClass);
     on<DeleteClassEvent>(_onDeleteClass);
@@ -51,6 +53,8 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     on<AddTeacherEvent>(_onAddTeacher);
     on<UpdateTeacherEvent>(_onUpdateTeacher);
     on<DeleteTeacherEvent>(_onDeleteTeacher);
+
+    on<MakeStudentPaymentEvent>(_onMakeStudentPayment);
 
     on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null)));
     
@@ -139,6 +143,28 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       add(LoadSchoolData());
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
+    }
+  }
+
+  Future<void> _onUpdateAcademicYear(UpdateAcademicYearEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
+    try {
+      await repository.updateAcademicYear(event.year);
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadSchoolData());
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onUpdateTerm(UpdateTermEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
+    try {
+      await repository.updateTerm(event.term);
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadSchoolData());
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
     }
   }
 
@@ -279,9 +305,9 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading));
     try {
       await repository.saveResults(event.results);
-      emit(state.copyWith(status: SchoolStatus.success));
+      emit(state.copyWith(isLoading: false, status: SchoolStatus.success));
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
     }
   }
 
@@ -357,6 +383,64 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onMakeStudentPayment(MakeStudentPaymentEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
+    try {
+      final student = state.students.firstWhere((s) => s.id == event.studentId);
+      final newBalance = student.balance - event.amount;
+      
+      // 1. Update Student Balance
+      await repository.updateStudent(student.copyWith(balance: newBalance));
+      
+      // 2. Generate Payment Receipt Invoice
+      final activeTerm = state.terms.where((t) => t.isActive).firstOrNull ?? state.terms.firstOrNull;
+      final activeYear = state.academicYears.where((y) => y.isActive).firstOrNull ?? state.academicYears.firstOrNull;
+      
+      final invoice = Invoice(
+        invoiceNumber: 'PMT-${student.admissionNumber ?? student.id}-${DateTime.now().millisecondsSinceEpoch}',
+        dateCreated: DateTime.now(),
+        items: [
+          InvoiceItem(
+            item: Item(
+              id: -99,
+              name: 'School Fees Payment ${event.remarks ?? ""}',
+              price: event.amount,
+              category: ItemCategory.service,
+              type: 'service',
+              stockQty: 0,
+            ),
+            quantity: 1,
+            unitPrice: event.amount,
+            type: 'service',
+          )
+        ],
+        subtotal: event.amount,
+        taxAmount: 0,
+        discountAmount: 0,
+        totalAmount: event.amount,
+        paymentStatus: 'Paid',
+        amountPaid: event.amount,
+        balanceAmount: 0,
+        customerName: student.fullName,
+        customerPhone: student.parentPhone,
+        paymentMethod: event.method,
+        businessMode: 'school',
+        studentId: student.id,
+        classId: student.classId,
+        termId: activeTerm?.id,
+        academicYearId: activeYear?.id,
+      );
+      
+      await invoiceRepository.saveInvoice(invoice);
+      
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadSchoolData());
+      add(LoadStudentRecordsEvent(event.studentId)); // Refresh invoices list
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
     }
   }
 }

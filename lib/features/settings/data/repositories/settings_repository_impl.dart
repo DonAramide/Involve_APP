@@ -95,6 +95,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       skipSplash: Value(settings.skipSplash),
       restoreLastState: Value(settings.restoreLastState),
       lastRoute: Value(settings.lastRoute),
+      showLogoAsMenuBackground: Value(settings.showLogoAsMenuBackground),
     );
 
     if (existing == null) {
@@ -187,6 +188,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       skipSplash: row.skipSplash,
       restoreLastState: row.restoreLastState,
       lastRoute: row.lastRoute,
+      showLogoAsMenuBackground: row.showLogoAsMenuBackground,
     );
   }
 }

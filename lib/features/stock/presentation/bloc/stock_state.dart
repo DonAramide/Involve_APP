@@ -110,6 +110,13 @@ class DeleteCategory extends StockEvent {
   List<Object?> get props => [id];
 }
 
+class ToggleItemDefaultEvent extends StockEvent {
+  final Item item;
+  ToggleItemDefaultEvent(this.item);
+  @override
+  List<Object?> get props => [item];
+}
+
 class ResetStockStatus extends StockEvent {}
 
 // States

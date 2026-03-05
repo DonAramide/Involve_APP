@@ -455,7 +455,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   icon: const Icon(Icons.print),
                   label: const Text('REPRINT'),
                 ),
-                if (context.read<SettingsBloc>().state.settings?.stockReturnEnabled == true)
+                if (context.read<SettingsBloc>().state.settings?.stockReturnEnabled == true && invoice.businessMode != 'school')
                   ElevatedButton.icon(
                     onPressed: () => _showReturnDialog(context, invoice),
                     icon: const Icon(Icons.assignment_return_outlined),

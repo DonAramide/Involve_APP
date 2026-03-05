@@ -5,6 +5,8 @@ import 'package:involve_app/features/settings/presentation/pages/super_admin_set
 import 'package:involve_app/features/admin/presentation/widgets/admin_login_dialog.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/admin/presentation/widgets/device_access_dialog.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key});
@@ -75,8 +77,12 @@ class _HelpPageState extends State<HelpPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, state) {
+        final isSchool = state.settings?.businessMode == 'school';
+
+        return Scaffold(
+          appBar: AppBar(
         title: GestureDetector(
           onTap: _onTitleTap,
           child: Text(
@@ -125,21 +131,33 @@ class _HelpPageState extends State<HelpPage> {
 
           _buildExpansionTile(
             icon: Icons.inventory,
-            title: 'Stock Management',
-            content: '• Go to "Stock Management" to manage your inventory.\n'
-                '• Tap "+" to add new items with images and categories.\n'
-                '• **Safeguard**: You cannot delete a product or category if it still contains items in stock (> 0). This prevents accidental data loss.',
+            title: isSchool ? 'Fee & Items Management' : 'Stock Management',
+            content: isSchool 
+                ? '• Go to "Fee Management" to manage school fees.\n'
+                  '• Go to "Stock Management" for canteen or other items.\n'
+                  '• Tap "+" to add new fee types with categories.\n'
+                  '• **Safeguard**: You cannot delete a fee type if there are active records linked to it.'
+                : '• Go to "Stock Management" to manage your inventory.\n'
+                  '• Tap "+" to add new items with images and categories.\n'
+                  '• **Safeguard**: You cannot delete a product or category if it still contains items in stock (> 0). This prevents accidental data loss.',
           ),
           _buildExpansionTile(
             icon: Icons.shopping_cart,
-            title: 'Making Sales',
-            content: '• Go to "New Invoice" to start a sale.\n'
-                '• Tap items to add them to the cart.\n'
-                '• Use the category chips to filter items.\n'
-                '• Swipe left on a cart item to remove it.\n'
-                '• **Custom Pricing**: If enabled in Settings, you can tap "Set Receipt Price" on items to inflate the price shown on the customer\'s receipt while keeping your actual accounts accurate.\n'
-                '• Tap "Charge" to finalize.\n'
-                '• Partial Payments: Enter "Amount Received" during checkout. The system will track the balance for later.',
+            title: isSchool ? 'Collecting Fees' : 'Making Sales',
+            content: isSchool
+                ? '• Go to "New Sale" to start a fee collection session.\n'
+                  '• Tap fees to add them to the student\'s registry.\n'
+                  '• Use searching filtered by Class or Student ID.\n'
+                  '• **Custom Pricing**: Adjust specific amounts if scholarships or discounts apply.\n'
+                  '• Tap "Charge" to finalize payment and generate a School Receipt.\n'
+                  '• Partial Payments: Record deposits; balance stays on student profile.'
+                : '• Go to "New Invoice" to start a sale.\n'
+                  '• Tap items to add them to the cart.\n'
+                  '• Use the category chips to filter items.\n'
+                  '• Swipe left on a cart item to remove it.\n'
+                  '• **Custom Pricing**: If enabled in Settings, you can tap "Set Receipt Price" on items to inflate the price shown on the customer\'s receipt while keeping your actual accounts accurate.\n'
+                  '• Tap "Charge" to finalize.\n'
+                  '• Partial Payments: Enter "Amount Received" during checkout. The system will track the balance for later.',
           ),
           _buildExpansionTile(
             icon: Icons.print,
@@ -161,8 +179,8 @@ class _HelpPageState extends State<HelpPage> {
             icon: Icons.settings,
             title: 'Settings & Security',
             content: '• Device Sync: The App Bar icon spins green during active data exchange.\n'
-                '• Data Backup: Export all business records to device storage (Android/Desktop).\n'
-                '• Super Admin: Advanced access for critical business changes.\n'
+                '• Data Backup: Export all school records to device storage (Android/Desktop).\n'
+                '• Operations: Switch modes to align terminology with Educational standards.\n'
                 '• Security: One-time "Device Access" PIN required for new machines.',
           ),
           
@@ -210,7 +228,9 @@ class _HelpPageState extends State<HelpPage> {
         ],
       ),
     );
-  }
+  },
+);
+}
 
   Widget _buildExpansionTile({
     required IconData icon,

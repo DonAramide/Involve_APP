@@ -50,7 +50,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         final currency = context.watch<SettingsBloc>().state.settings?.currency ?? '₦';
 
         return DefaultTabController(
-          length: 3,
+          length: 4,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Student Profile'),
@@ -112,19 +112,38 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 if (assignedTeacher != null)
                   Text('Teacher: ${assignedTeacher.fullName}', style: const TextStyle(fontSize: 14, color: Colors.blueGrey)),
                 const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: student.balance > 0 ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Balance: ${CurrencyFormatter.formatWithSymbol(student.balance, symbol: currency)}',
-                    style: TextStyle(
-                      color: student.balance > 0 ? Colors.red : Colors.green,
-                      fontWeight: FontWeight.bold,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: student.balance > 0 ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Balance: ${CurrencyFormatter.formatWithSymbol(student.balance, symbol: currency)}',
+                        style: TextStyle(
+                          color: student.balance > 0 ? Colors.red : Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (student.balance > 0) ...[
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: () => _showPaymentDialog(context, student),
+                        icon: const Icon(Icons.payment, size: 16),
+                        label: const Text('PAY BALANCE'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.blue,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -434,6 +453,61 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       context,
       MaterialPageRoute(
         builder: (_) => ReceiptPreviewPage(invoice: invoice, receiptTitle: title),
+      ),
+    );
+  }
+
+  void _showPaymentDialog(BuildContext context, Student student) {
+    final amountController = TextEditingController(text: student.balance.toString());
+    final remarksController = TextEditingController();
+    String paymentMethod = 'Cash';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Processes Payment'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Amount to Pay', prefixText: '₦ '),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: paymentMethod,
+                decoration: const InputDecoration(labelText: 'Payment Method'),
+                items: ['Cash', 'POS', 'Transfer'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                onChanged: (val) => setDialogState(() => paymentMethod = val!),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: remarksController,
+                decoration: const InputDecoration(labelText: 'Remarks (Optional)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                final amount = double.tryParse(amountController.text) ?? 0;
+                if (amount > 0) {
+                  context.read<SchoolBloc>().add(MakeStudentPaymentEvent(
+                    studentId: student.id!,
+                    amount: amount,
+                    method: paymentMethod,
+                    remarks: remarksController.text,
+                  ));
+                  Navigator.pop(ctx);
+                }
+              },
+              child: const Text('Submit Payment'),
+            ),
+          ],
+        ),
       ),
     );
   }

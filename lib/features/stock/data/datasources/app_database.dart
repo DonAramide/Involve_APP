@@ -44,7 +44,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 53;
+  int get schemaVersion => 55;
 
   @override
   MigrationStrategy get migration {
@@ -236,6 +236,16 @@ class AppDatabase extends _$AppDatabase {
           // Schema V53: Add employmentDate to Teachers table
           await _safeAddColumn(m, teachers, teachers.employmentDate);
         }
+
+        if (from < 54) {
+          // Schema V54: Add isDefault to Items table
+          await _safeAddColumn(m, items, items.isDefault);
+        }
+
+        if (from < 55) {
+          // Schema V55: Add showLogoAsMenuBackground to Settings table
+          await _safeAddColumn(m, settings, settings.showLogoAsMenuBackground);
+        }
       },
       beforeOpen: (details) async {
         // Enforce Foreign Keys (SQLite only, harmless on Web/IndexedDB)
@@ -247,7 +257,7 @@ class AppDatabase extends _$AppDatabase {
   /// Safely adds a column, silently ignoring the error if it already exists.
   /// This prevents migration failures when a column was already applied in
   /// a prior debug build or partial upgrade.
-  Future<void> _safeAddColumn(Migrator m, TableInfo table, GeneratedColumn col) async {
+  Future<void> _safeAddColumn(Migrator m, TableInfo table, dynamic col) async {
     try {
       await m.addColumn(table, col);
     } catch (e) {

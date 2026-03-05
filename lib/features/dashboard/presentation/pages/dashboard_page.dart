@@ -241,8 +241,23 @@ class _DashboardPageState extends State<DashboardPage> {
             ],
           ),
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-          body: BlocBuilder<PrinterBloc, PrinterState>(
-            builder: (context, printerState) {
+          body: Stack(
+            children: [
+              if (settings?.businessMode == 'school' && settings?.showLogoAsMenuBackground == true && settings?.logo != null)
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: 0.05,
+                    child: Center(
+                      child: Image.memory(
+                        settings!.logo!,
+                        fit: BoxFit.contain,
+                        width: MediaQuery.of(context).size.width * 0.8,
+                      ),
+                    ),
+                  ),
+                ),
+              BlocBuilder<PrinterBloc, PrinterState>(
+                builder: (context, printerState) {
               final items = _getMenuItems(context, settings, printerState);
               final screenWidth = MediaQuery.of(context).size.width;
               final crossAxisCount = (screenWidth / 180).floor().clamp(2, 6);
@@ -277,6 +292,8 @@ class _DashboardPageState extends State<DashboardPage> {
               );
             },
           ),
+        ],
+      ),
       bottomNavigationBar: (settingsState.userPlan?.isValid ?? false) 
           ? const SizedBox.shrink()
           : FutureBuilder<int>(

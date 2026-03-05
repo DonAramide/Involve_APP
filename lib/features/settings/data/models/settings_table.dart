@@ -63,4 +63,5 @@ class Settings extends Table {
   BoolColumn get skipSplash => boolean().withDefault(const Constant(false))();
   BoolColumn get restoreLastState => boolean().withDefault(const Constant(false))();
   TextColumn get lastRoute => text().nullable()();
+  BoolColumn get showLogoAsMenuBackground => boolean().withDefault(const Constant(false))();
 }

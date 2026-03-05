@@ -300,6 +300,12 @@ class _SettingsPageState extends State<SettingsPage> {
           settings.skipSplash, 
           (val) => _update(context, settings.copyWith(skipSplash: val)),
         ),
+        if (settings.businessMode == 'school')
+          _buildSwitchTile(
+            'Show Logo as Menu Background', 
+            settings.showLogoAsMenuBackground, 
+            (val) => _update(context, settings.copyWith(showLogoAsMenuBackground: val)),
+          ),
         _buildSwitchTile(
           'Always Restore Last State', 
           settings.restoreLastState, 

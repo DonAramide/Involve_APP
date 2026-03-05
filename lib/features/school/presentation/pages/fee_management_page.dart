@@ -65,6 +65,11 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
+                // Auto-select defaults if list is empty (first load)
+                if (_selectedFees.isEmpty && stockState.items.isNotEmpty) {
+                  _selectedFees.addAll(stockState.items.where((i) => i.isDefault));
+                }
+
                 return Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -96,8 +101,38 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
                                 final item = stockState.items[index];
                                 final isSelected = _selectedFees.any((f) => f.id == item.id);
                                 return CheckboxListTile(
-                                  title: Text(item.name),
+                                  title: Row(
+                                    children: [
+                                      Text(item.name),
+                                      if (item.isDefault) ...[
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.amber[700]!, width: 0.5),
+                                          ),
+                                          child: Text(
+                                            'DEFAULT',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber[900]),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                   subtitle: Text(CurrencyFormatter.formatWithSymbol(item.price, symbol: '₦')),
+                                  secondary: IconButton(
+                                    icon: Icon(
+                                      item.isDefault ? Icons.star : Icons.star_border,
+                                      color: item.isDefault ? Colors.amber[700] : Colors.grey,
+                                      size: 20,
+                                    ),
+                                    onPressed: () {
+                                      context.read<StockBloc>().add(ToggleItemDefaultEvent(item));
+                                    },
+                                    tooltip: 'Toggle Default Status',
+                                  ),
                                   value: isSelected,
                                   onChanged: (val) {
                                     setState(() {

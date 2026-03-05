@@ -83,12 +83,22 @@ class _YearsTab extends StatelessWidget {
           final year = state.academicYears[index];
           return ListTile(
             title: Text(year.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            trailing: year.isActive 
-              ? const Icon(Icons.check_circle, color: Colors.green)
-              : ElevatedButton(
-                  onPressed: () => context.read<SchoolBloc>().add(SetActiveYearEvent(year.id!)),
-                  child: const Text('Set Active'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () => _showEditYearDialog(context, year),
                 ),
+                if (year.isActive)
+                  const Icon(Icons.check_circle, color: Colors.green)
+                else
+                  ElevatedButton(
+                    onPressed: () => context.read<SchoolBloc>().add(SetActiveYearEvent(year.id!)),
+                    child: const Text('Set Active'),
+                  ),
+              ],
+            ),
           );
         },
       ),
@@ -96,7 +106,16 @@ class _YearsTab extends StatelessWidget {
   }
 
   void _showAddYearDialog(BuildContext context) {
-    final controller = TextEditingController();
+    _showYearDialog(context);
+  }
+
+  void _showEditYearDialog(BuildContext context, AcademicYear year) {
+    _showYearDialog(context, year: year);
+  }
+
+  void _showYearDialog(BuildContext context, {AcademicYear? year}) {
+    final isEdit = year != null;
+    final controller = TextEditingController(text: year?.name);
     context.read<SchoolBloc>().add(ResetSchoolStatus());
     showDialog(
       context: context,
@@ -109,7 +128,7 @@ class _YearsTab extends StatelessWidget {
           }
         },
         child: AlertDialog(
-          title: const Text('Add Academic Year'),
+          title: Text(isEdit ? 'Edit Academic Year' : 'Add Academic Year'),
           content: TextField(
             controller: controller,
             decoration: const InputDecoration(hintText: 'e.g. 2023/2024'),
@@ -119,11 +138,17 @@ class _YearsTab extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 if (controller.text.isNotEmpty) {
-                  context.read<SchoolBloc>().add(AddAcademicYearEvent(
-                    name: controller.text,
-                    startDate: DateTime.now(),
-                    endDate: DateTime.now().add(const Duration(days: 365)),
-                  ));
+                  if (isEdit) {
+                    context.read<SchoolBloc>().add(UpdateAcademicYearEvent(
+                      year!.copyWith(name: controller.text),
+                    ));
+                  } else {
+                    context.read<SchoolBloc>().add(AddAcademicYearEvent(
+                      name: controller.text,
+                      startDate: DateTime.now(),
+                      endDate: DateTime.now().add(const Duration(days: 365)),
+                    ));
+                  }
                 }
               },
               child: BlocBuilder<SchoolBloc, SchoolState>(
@@ -135,7 +160,7 @@ class _YearsTab extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     );
                   }
-                  return const Text('Add');
+                  return Text(isEdit ? 'Update' : 'Add');
                 },
               ),
             ),
@@ -175,12 +200,22 @@ class _TermsTab extends StatelessWidget {
                 final term = state.terms[index];
                 return ListTile(
                   title: Text(term.name),
-                  trailing: term.isActive
-                    ? const Icon(Icons.check_circle, color: Colors.green)
-                    : ElevatedButton(
-                        onPressed: () => context.read<SchoolBloc>().add(SetActiveTermEvent(term.id!)),
-                        child: const Text('Set Active'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => _showEditTermDialog(context, term),
                       ),
+                      if (term.isActive)
+                        const Icon(Icons.check_circle, color: Colors.green)
+                      else
+                        ElevatedButton(
+                          onPressed: () => context.read<SchoolBloc>().add(SetActiveTermEvent(term.id!)),
+                          child: const Text('Set Active'),
+                        ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -191,7 +226,16 @@ class _TermsTab extends StatelessWidget {
   }
 
   void _showAddTermDialog(BuildContext context, int yearId) {
-    final controller = TextEditingController();
+    _showTermDialog(context, yearId: yearId);
+  }
+
+  void _showEditTermDialog(BuildContext context, Term term) {
+    _showTermDialog(context, yearId: term.academicYearId, term: term);
+  }
+
+  void _showTermDialog(BuildContext context, {required int yearId, Term? term}) {
+    final isEdit = term != null;
+    final controller = TextEditingController(text: term?.name);
     context.read<SchoolBloc>().add(ResetSchoolStatus());
     showDialog(
       context: context,
@@ -204,7 +248,7 @@ class _TermsTab extends StatelessWidget {
           }
         },
         child: AlertDialog(
-          title: const Text('Add Term'),
+          title: Text(isEdit ? 'Edit Term' : 'Add Term'),
           content: TextField(
             controller: controller,
             decoration: const InputDecoration(hintText: 'e.g. First Term'),
@@ -214,12 +258,18 @@ class _TermsTab extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 if (controller.text.isNotEmpty) {
-                  context.read<SchoolBloc>().add(AddTermEvent(
-                    academicYearId: yearId, 
-                    name: controller.text,
-                    startDate: DateTime.now(),
-                    endDate: DateTime.now().add(const Duration(days: 90)),
-                  ));
+                  if (isEdit) {
+                    context.read<SchoolBloc>().add(UpdateTermEvent(
+                      term!.copyWith(name: controller.text),
+                    ));
+                  } else {
+                    context.read<SchoolBloc>().add(AddTermEvent(
+                      academicYearId: yearId, 
+                      name: controller.text,
+                      startDate: DateTime.now(),
+                      endDate: DateTime.now().add(const Duration(days: 90)),
+                    ));
+                  }
                 }
               },
               child: BlocBuilder<SchoolBloc, SchoolState>(
@@ -231,7 +281,7 @@ class _TermsTab extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     );
                   }
-                  return const Text('Add');
+                  return Text(isEdit ? 'Update' : 'Add');
                 },
               ),
             ),

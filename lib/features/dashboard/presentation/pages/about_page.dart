@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AboutPage extends StatelessWidget {
@@ -10,7 +13,11 @@ class AboutPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('About'),
       ),
-      body: SingleChildScrollView(
+      body: BlocBuilder<SettingsBloc, SettingsState>(
+        builder: (context, state) {
+          final isSchool = state.settings?.businessMode == 'school';
+
+          return SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -45,26 +52,32 @@ class AboutPage extends StatelessWidget {
             const SizedBox(height: 32),
             
             // Description
-            const Text(
-              'A comprehensive Point of Sale (POS) system designed for bars, hotels, and retail businesses. Manage inventory, create invoices, track sales, and print receipts with ease.',
+            Text(
+              isSchool 
+                  ? 'A specialized School Management System designed for educational institutions. Manage students, staff, academic records, and fee collections with ease.'
+                  : 'A comprehensive Point of Sale (POS) system designed for bars, hotels, and retail businesses. Manage inventory, create invoices, track sales, and print receipts with ease.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 40),
             
             // Features
             _buildFeatureCard(
               context,
-              icon: Icons.inventory_2,
-              title: 'Stock Management',
-              description: 'Track and manage your inventory efficiently',
+              icon: isSchool ? Icons.school : Icons.inventory_2,
+              title: isSchool ? 'Academic Management' : 'Stock Management',
+              description: isSchool 
+                  ? 'Track students, teachers, and academic performance'
+                  : 'Track and manage your inventory efficiently',
             ),
             const SizedBox(height: 16),
             _buildFeatureCard(
               context,
-              icon: Icons.receipt_long,
-              title: 'Invoice Generation',
-              description: 'Create professional invoices with PDF support',
+              icon: isSchool ? Icons.payments : Icons.receipt_long,
+              title: isSchool ? 'Fee Collection' : 'Invoice Generation',
+              description: isSchool
+                  ? 'Manage school fees and generate formal receipts'
+                  : 'Create professional invoices with PDF support',
             ),
             const SizedBox(height: 16),
             _buildFeatureCard(
@@ -111,9 +124,11 @@ class AboutPage extends StatelessWidget {
             const SizedBox(height: 40),
           ],
         ),
-      ),
-    );
-  }
+      );
+    },
+  ),
+);
+}
 
   Widget _buildFeatureCard(BuildContext context, {
     required IconData icon,
