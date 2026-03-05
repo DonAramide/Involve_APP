@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../../domain/entities/school_entities.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
@@ -124,7 +125,8 @@ class TeacherProfilePage extends StatelessWidget {
                         _buildDetailRow('Assigned Class:', assignedClass?.name ?? 'None'),
                         _buildDetailRow('Phone:', currentTeacher.phone ?? 'N/A'),
                         _buildDetailRow('Salary:', CurrencyFormatter.format(currentTeacher.salary)),
-                        _buildDetailRow('Years in School:', currentTeacher.yearsInSchool.toString()),
+                        _buildDetailRow('Date Joined:', DateFormat('MMMM dd, yyyy').format(currentTeacher.employmentDate)),
+                        _buildDetailRow('Years in School:', '${currentTeacher.yearsInSchool} ${currentTeacher.yearsInSchool == 1 ? 'year' : 'years'}'),
                         const SizedBox(height: 8),
                         const Text('Certificates:', style: TextStyle(fontWeight: FontWeight.bold)),
                         Text(currentTeacher.certificates?.isNotEmpty == true ? currentTeacher.certificates! : 'No certificates recorded.'),

@@ -374,7 +374,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       profession: row.profession,
       classId: row.classId,
       salary: row.salary,
-      yearsInSchool: row.yearsInSchool,
+      employmentDate: row.employmentDate,
       certificates: row.certificates,
       image: row.image,
     )).toList();
@@ -388,7 +388,8 @@ class SchoolRepositoryImpl implements SchoolRepository {
       profession: Value(teacher.profession),
       classId: Value(teacher.classId),
       salary: Value(teacher.salary),
-      yearsInSchool: Value(teacher.yearsInSchool),
+      employmentDate: Value(teacher.employmentDate),
+      yearsInSchool: const Value(0),
       certificates: Value(teacher.certificates),
       image: Value(teacher.image),
     ));
@@ -403,7 +404,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       profession: Value(teacher.profession),
       classId: Value(teacher.classId),
       salary: Value(teacher.salary),
-      yearsInSchool: Value(teacher.yearsInSchool),
+      employmentDate: Value(teacher.employmentDate),
       certificates: Value(teacher.certificates),
       image: Value(teacher.image),
     ));

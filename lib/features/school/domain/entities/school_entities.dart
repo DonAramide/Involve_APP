@@ -260,7 +260,7 @@ class Teacher extends Equatable {
   final String? profession;
   final int? classId;
   final double salary;
-  final int yearsInSchool;
+  final DateTime employmentDate;
   final String? certificates;
   final Uint8List? image;
 
@@ -271,10 +271,19 @@ class Teacher extends Equatable {
     this.profession,
     this.classId,
     this.salary = 0.0,
-    this.yearsInSchool = 0,
+    required this.employmentDate,
     this.certificates,
     this.image,
   });
+
+  int get yearsInSchool {
+    final now = DateTime.now();
+    int years = now.year - employmentDate.year;
+    if (now.month < employmentDate.month || (now.month == employmentDate.month && now.day < employmentDate.day)) {
+      years--;
+    }
+    return years >= 0 ? years : 0;
+  }
 
   Teacher copyWith({
     int? id,
@@ -283,7 +292,7 @@ class Teacher extends Equatable {
     String? profession,
     int? classId,
     double? salary,
-    int? yearsInSchool,
+    DateTime? employmentDate,
     String? certificates,
     Uint8List? image,
   }) {
@@ -294,7 +303,7 @@ class Teacher extends Equatable {
       profession: profession ?? this.profession,
       classId: classId ?? this.classId,
       salary: salary ?? this.salary,
-      yearsInSchool: yearsInSchool ?? this.yearsInSchool,
+      employmentDate: employmentDate ?? this.employmentDate,
       certificates: certificates ?? this.certificates,
       image: image ?? this.image,
     );
@@ -308,7 +317,7 @@ class Teacher extends Equatable {
         profession,
         classId,
         salary,
-        yearsInSchool,
+        employmentDate,
         certificates,
         image,
       ];

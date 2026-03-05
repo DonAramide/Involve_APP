@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
@@ -27,7 +28,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
     final phoneCtrl = TextEditingController(text: teacher?.phone);
     final professionCtrl = TextEditingController(text: teacher?.profession);
     final salaryCtrl = TextEditingController(text: teacher?.salary.toString() ?? '0');
-    final yearsCtrl = TextEditingController(text: teacher?.yearsInSchool.toString() ?? '0');
+    DateTime? selectedEmploymentDate = teacher?.employmentDate ?? DateTime.now();
     final certCtrl = TextEditingController(text: teacher?.certificates);
     int? selectedClassId = teacher?.classId;
     Uint8List? imageBytes = teacher?.image;
@@ -101,10 +102,25 @@ class _TeacherListPageState extends State<TeacherListPage> {
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          controller: yearsCtrl,
-                          decoration: const InputDecoration(labelText: 'Years in School', border: OutlineInputBorder()),
-                          keyboardType: TextInputType.number,
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text('Date Joined: ${selectedEmploymentDate != null ? DateFormat('MMM dd, yyyy').format(selectedEmploymentDate!) : 'Select Date'}'),
+                          trailing: const Icon(Icons.calendar_today),
+                          shape: RoundedRectangleBorder(
+                            side: BorderSide(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          onTap: () async {
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: selectedEmploymentDate ?? DateTime.now(),
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime.now(),
+                            );
+                            if (date != null) {
+                              setState(() => selectedEmploymentDate = date);
+                            }
+                          },
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
@@ -132,7 +148,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
                         profession: professionCtrl.text,
                         classId: selectedClassId,
                         salary: double.tryParse(salaryCtrl.text) ?? 0.0,
-                        yearsInSchool: int.tryParse(yearsCtrl.text) ?? 0,
+                        employmentDate: selectedEmploymentDate ?? DateTime.now(),
                         certificates: certCtrl.text,
                         image: imageBytes,
                       );

@@ -60,6 +60,7 @@ class Teachers extends Table {
   IntColumn get classId => integer().nullable().references(Classes, #id)();
   RealColumn get salary => real().withDefault(const Constant(0.0))();
   IntColumn get yearsInSchool => integer().withDefault(const Constant(0))();
+  DateTimeColumn get employmentDate => dateTime().withDefault(currentDateAndTime)();
   TextColumn get certificates => text().nullable()();
   BlobColumn get image => blob().nullable()();
 

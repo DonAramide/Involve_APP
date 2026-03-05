@@ -44,7 +44,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 52;
+  int get schemaVersion => 53;
 
   @override
   MigrationStrategy get migration {
@@ -230,6 +230,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 52) {
           // Schema V52: Add teacherId to Subjects table
           await _safeAddColumn(m, subjects, subjects.teacherId);
+        }
+
+        if (from < 53) {
+          // Schema V53: Add employmentDate to Teachers table
+          await _safeAddColumn(m, teachers, teachers.employmentDate);
         }
       },
       beforeOpen: (details) async {

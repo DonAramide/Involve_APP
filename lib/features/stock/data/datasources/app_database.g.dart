@@ -11148,6 +11148,14 @@ class $TeachersTable extends Teachers with TableInfo<$TeachersTable, Teacher> {
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _employmentDateMeta =
+      const VerificationMeta('employmentDate');
+  @override
+  late final GeneratedColumn<DateTime> employmentDate =
+      GeneratedColumn<DateTime>('employment_date', aliasedName, false,
+          type: DriftSqlType.dateTime,
+          requiredDuringInsert: false,
+          defaultValue: currentDateAndTime);
   static const VerificationMeta _certificatesMeta =
       const VerificationMeta('certificates');
   @override
@@ -11201,6 +11209,7 @@ class $TeachersTable extends Teachers with TableInfo<$TeachersTable, Teacher> {
         classId,
         salary,
         yearsInSchool,
+        employmentDate,
         certificates,
         image,
         syncId,
@@ -11251,6 +11260,12 @@ class $TeachersTable extends Teachers with TableInfo<$TeachersTable, Teacher> {
           _yearsInSchoolMeta,
           yearsInSchool.isAcceptableOrUnknown(
               data['years_in_school']!, _yearsInSchoolMeta));
+    }
+    if (data.containsKey('employment_date')) {
+      context.handle(
+          _employmentDateMeta,
+          employmentDate.isAcceptableOrUnknown(
+              data['employment_date']!, _employmentDateMeta));
     }
     if (data.containsKey('certificates')) {
       context.handle(
@@ -11305,6 +11320,8 @@ class $TeachersTable extends Teachers with TableInfo<$TeachersTable, Teacher> {
           .read(DriftSqlType.double, data['${effectivePrefix}salary'])!,
       yearsInSchool: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}years_in_school'])!,
+      employmentDate: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}employment_date'])!,
       certificates: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}certificates']),
       image: attachedDatabase.typeMapping
@@ -11336,6 +11353,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
   final int? classId;
   final double salary;
   final int yearsInSchool;
+  final DateTime employmentDate;
   final String? certificates;
   final Uint8List? image;
   final String? syncId;
@@ -11351,6 +11369,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
       this.classId,
       required this.salary,
       required this.yearsInSchool,
+      required this.employmentDate,
       this.certificates,
       this.image,
       this.syncId,
@@ -11374,6 +11393,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
     }
     map['salary'] = Variable<double>(salary);
     map['years_in_school'] = Variable<int>(yearsInSchool);
+    map['employment_date'] = Variable<DateTime>(employmentDate);
     if (!nullToAbsent || certificates != null) {
       map['certificates'] = Variable<String>(certificates);
     }
@@ -11410,6 +11430,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
           : Value(classId),
       salary: Value(salary),
       yearsInSchool: Value(yearsInSchool),
+      employmentDate: Value(employmentDate),
       certificates: certificates == null && nullToAbsent
           ? const Value.absent()
           : Value(certificates),
@@ -11441,6 +11462,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
       classId: serializer.fromJson<int?>(json['classId']),
       salary: serializer.fromJson<double>(json['salary']),
       yearsInSchool: serializer.fromJson<int>(json['yearsInSchool']),
+      employmentDate: serializer.fromJson<DateTime>(json['employmentDate']),
       certificates: serializer.fromJson<String?>(json['certificates']),
       image: serializer.fromJson<Uint8List?>(json['image']),
       syncId: serializer.fromJson<String?>(json['syncId']),
@@ -11461,6 +11483,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
       'classId': serializer.toJson<int?>(classId),
       'salary': serializer.toJson<double>(salary),
       'yearsInSchool': serializer.toJson<int>(yearsInSchool),
+      'employmentDate': serializer.toJson<DateTime>(employmentDate),
       'certificates': serializer.toJson<String?>(certificates),
       'image': serializer.toJson<Uint8List?>(image),
       'syncId': serializer.toJson<String?>(syncId),
@@ -11479,6 +11502,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
           Value<int?> classId = const Value.absent(),
           double? salary,
           int? yearsInSchool,
+          DateTime? employmentDate,
           Value<String?> certificates = const Value.absent(),
           Value<Uint8List?> image = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
@@ -11494,6 +11518,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
         classId: classId.present ? classId.value : this.classId,
         salary: salary ?? this.salary,
         yearsInSchool: yearsInSchool ?? this.yearsInSchool,
+        employmentDate: employmentDate ?? this.employmentDate,
         certificates:
             certificates.present ? certificates.value : this.certificates,
         image: image.present ? image.value : this.image,
@@ -11515,6 +11540,9 @@ class Teacher extends DataClass implements Insertable<Teacher> {
       yearsInSchool: data.yearsInSchool.present
           ? data.yearsInSchool.value
           : this.yearsInSchool,
+      employmentDate: data.employmentDate.present
+          ? data.employmentDate.value
+          : this.employmentDate,
       certificates: data.certificates.present
           ? data.certificates.value
           : this.certificates,
@@ -11537,6 +11565,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
           ..write('classId: $classId, ')
           ..write('salary: $salary, ')
           ..write('yearsInSchool: $yearsInSchool, ')
+          ..write('employmentDate: $employmentDate, ')
           ..write('certificates: $certificates, ')
           ..write('image: $image, ')
           ..write('syncId: $syncId, ')
@@ -11557,6 +11586,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
       classId,
       salary,
       yearsInSchool,
+      employmentDate,
       certificates,
       $driftBlobEquality.hash(image),
       syncId,
@@ -11575,6 +11605,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
           other.classId == this.classId &&
           other.salary == this.salary &&
           other.yearsInSchool == this.yearsInSchool &&
+          other.employmentDate == this.employmentDate &&
           other.certificates == this.certificates &&
           $driftBlobEquality.equals(other.image, this.image) &&
           other.syncId == this.syncId &&
@@ -11592,6 +11623,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
   final Value<int?> classId;
   final Value<double> salary;
   final Value<int> yearsInSchool;
+  final Value<DateTime> employmentDate;
   final Value<String?> certificates;
   final Value<Uint8List?> image;
   final Value<String?> syncId;
@@ -11607,6 +11639,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
     this.classId = const Value.absent(),
     this.salary = const Value.absent(),
     this.yearsInSchool = const Value.absent(),
+    this.employmentDate = const Value.absent(),
     this.certificates = const Value.absent(),
     this.image = const Value.absent(),
     this.syncId = const Value.absent(),
@@ -11623,6 +11656,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
     this.classId = const Value.absent(),
     this.salary = const Value.absent(),
     this.yearsInSchool = const Value.absent(),
+    this.employmentDate = const Value.absent(),
     this.certificates = const Value.absent(),
     this.image = const Value.absent(),
     this.syncId = const Value.absent(),
@@ -11639,6 +11673,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
     Expression<int>? classId,
     Expression<double>? salary,
     Expression<int>? yearsInSchool,
+    Expression<DateTime>? employmentDate,
     Expression<String>? certificates,
     Expression<Uint8List>? image,
     Expression<String>? syncId,
@@ -11655,6 +11690,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
       if (classId != null) 'class_id': classId,
       if (salary != null) 'salary': salary,
       if (yearsInSchool != null) 'years_in_school': yearsInSchool,
+      if (employmentDate != null) 'employment_date': employmentDate,
       if (certificates != null) 'certificates': certificates,
       if (image != null) 'image': image,
       if (syncId != null) 'sync_id': syncId,
@@ -11673,6 +11709,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
       Value<int?>? classId,
       Value<double>? salary,
       Value<int>? yearsInSchool,
+      Value<DateTime>? employmentDate,
       Value<String?>? certificates,
       Value<Uint8List?>? image,
       Value<String?>? syncId,
@@ -11688,6 +11725,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
       classId: classId ?? this.classId,
       salary: salary ?? this.salary,
       yearsInSchool: yearsInSchool ?? this.yearsInSchool,
+      employmentDate: employmentDate ?? this.employmentDate,
       certificates: certificates ?? this.certificates,
       image: image ?? this.image,
       syncId: syncId ?? this.syncId,
@@ -11721,6 +11759,9 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
     }
     if (yearsInSchool.present) {
       map['years_in_school'] = Variable<int>(yearsInSchool.value);
+    }
+    if (employmentDate.present) {
+      map['employment_date'] = Variable<DateTime>(employmentDate.value);
     }
     if (certificates.present) {
       map['certificates'] = Variable<String>(certificates.value);
@@ -11756,6 +11797,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
           ..write('classId: $classId, ')
           ..write('salary: $salary, ')
           ..write('yearsInSchool: $yearsInSchool, ')
+          ..write('employmentDate: $employmentDate, ')
           ..write('certificates: $certificates, ')
           ..write('image: $image, ')
           ..write('syncId: $syncId, ')
@@ -20322,6 +20364,7 @@ typedef $$TeachersTableCreateCompanionBuilder = TeachersCompanion Function({
   Value<int?> classId,
   Value<double> salary,
   Value<int> yearsInSchool,
+  Value<DateTime> employmentDate,
   Value<String?> certificates,
   Value<Uint8List?> image,
   Value<String?> syncId,
@@ -20338,6 +20381,7 @@ typedef $$TeachersTableUpdateCompanionBuilder = TeachersCompanion Function({
   Value<int?> classId,
   Value<double> salary,
   Value<int> yearsInSchool,
+  Value<DateTime> employmentDate,
   Value<String?> certificates,
   Value<Uint8List?> image,
   Value<String?> syncId,
@@ -20407,6 +20451,10 @@ class $$TeachersTableFilterComposer
 
   ColumnFilters<int> get yearsInSchool => $composableBuilder(
       column: $table.yearsInSchool, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get employmentDate => $composableBuilder(
+      column: $table.employmentDate,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get certificates => $composableBuilder(
       column: $table.certificates, builder: (column) => ColumnFilters(column));
@@ -20499,6 +20547,10 @@ class $$TeachersTableOrderingComposer
       column: $table.yearsInSchool,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<DateTime> get employmentDate => $composableBuilder(
+      column: $table.employmentDate,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get certificates => $composableBuilder(
       column: $table.certificates,
       builder: (column) => ColumnOrderings(column));
@@ -20568,6 +20620,9 @@ class $$TeachersTableAnnotationComposer
 
   GeneratedColumn<int> get yearsInSchool => $composableBuilder(
       column: $table.yearsInSchool, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get employmentDate => $composableBuilder(
+      column: $table.employmentDate, builder: (column) => column);
 
   GeneratedColumn<String> get certificates => $composableBuilder(
       column: $table.certificates, builder: (column) => column);
@@ -20662,6 +20717,7 @@ class $$TeachersTableTableManager extends RootTableManager<
             Value<int?> classId = const Value.absent(),
             Value<double> salary = const Value.absent(),
             Value<int> yearsInSchool = const Value.absent(),
+            Value<DateTime> employmentDate = const Value.absent(),
             Value<String?> certificates = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
@@ -20678,6 +20734,7 @@ class $$TeachersTableTableManager extends RootTableManager<
             classId: classId,
             salary: salary,
             yearsInSchool: yearsInSchool,
+            employmentDate: employmentDate,
             certificates: certificates,
             image: image,
             syncId: syncId,
@@ -20694,6 +20751,7 @@ class $$TeachersTableTableManager extends RootTableManager<
             Value<int?> classId = const Value.absent(),
             Value<double> salary = const Value.absent(),
             Value<int> yearsInSchool = const Value.absent(),
+            Value<DateTime> employmentDate = const Value.absent(),
             Value<String?> certificates = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
@@ -20710,6 +20768,7 @@ class $$TeachersTableTableManager extends RootTableManager<
             classId: classId,
             salary: salary,
             yearsInSchool: yearsInSchool,
+            employmentDate: employmentDate,
             certificates: certificates,
             image: image,
             syncId: syncId,
