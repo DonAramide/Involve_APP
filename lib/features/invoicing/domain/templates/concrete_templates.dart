@@ -2,6 +2,7 @@ import 'invoice_template.dart';
 import '../entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/number_to_words.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 
@@ -563,6 +564,14 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid), width)),
       if (invoice.balanceAmount > 0)
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width), isBold: true),
+      
+      SizedBoxCommand(height: 1),
+      TextCommand('Amount in Words:', isBold: true),
+      TextCommand(NumberToWords.convert(
+        settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+        currency: settings.currencyName,
+        subunit: settings.currencySubunit,
+      )),
       
       TextCommand('=' * width),
       if (settings.showAccountDetails && settings.bankName != null) ...[

@@ -8,6 +8,7 @@ import '../../../invoicing/domain/entities/invoice.dart';
 import '../../../settings/domain/entities/settings.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/number_to_words.dart';
 
 class ReceiptService {
   Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride, String? receiptTitle}) async {
@@ -174,6 +175,14 @@ class ReceiptService {
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
               ),
+              if (settings.businessMode == 'school') ...[
+                pw.SizedBox(height: 4),
+                pw.Text('Amount in Words: ${NumberToWords.convert(
+                  useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                  currency: settings.currencyName,
+                  subunit: settings.currencySubunit,
+                )} Only', style: const pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic)),
+              ],
               if (invoice.balanceAmount > 0) ...[
                 pw.SizedBox(height: 4),
                 pw.Row(
@@ -314,18 +323,36 @@ class ReceiptService {
                 children: [
                   pw.Container(
                     width: 200,
-                    child: pw.Table(
-                      border: pw.TableBorder.all(color: PdfColors.grey300),
+                    child: pw.Column(
                       children: [
-                        _summaryRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal)),
-                        if (invoice.taxAmount > 0)
-                          _summaryRow('SALES TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%)', CurrencyFormatter.format(invoice.taxAmount)),
-                        if (invoice.discountAmount > 0)
-                          _summaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}'),
-                        _summaryRow('TOTAL DUE', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
-                        if (invoice.balanceAmount > 0) ...[
-                          _summaryRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid)),
-                          _summaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), isBold: true),
+                        pw.Table(
+                          border: pw.TableBorder.all(color: PdfColors.grey300),
+                          children: [
+                            _summaryRow('SUBTOTAL', CurrencyFormatter.format(invoice.subtotal)),
+                            if (invoice.taxAmount > 0)
+                              _summaryRow('SALES TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%)', CurrencyFormatter.format(invoice.taxAmount)),
+                            if (invoice.discountAmount > 0)
+                              _summaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}'),
+                            _summaryRow('TOTAL DUE', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
+                            if (invoice.balanceAmount > 0) ...[
+                              _summaryRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid)),
+                              _summaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), isBold: true),
+                            ],
+                          ],
+                        ),
+                        if (settings.businessMode == 'school') ...[
+                          pw.SizedBox(height: 10),
+                          pw.Align(
+                            alignment: pw.Alignment.centerRight,
+                            child: pw.Text(
+                              'Amount in Words: ${NumberToWords.convert(
+                                useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                                currency: settings.currencyName,
+                                subunit: settings.currencySubunit,
+                              )}',
+                              style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, fontWeight: pw.FontWeight.bold),
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -574,6 +601,18 @@ class ReceiptService {
                             ],
                           ),
                         ),
+                        pw.SizedBox(height: 10),
+                        pw.Align(
+                          alignment: pw.Alignment.centerRight,
+                          child: pw.Text(
+                            'Amount in Words: ${NumberToWords.convert(
+                              useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                              currency: settings.currencyName,
+                              subunit: settings.currencySubunit,
+                            )}',
+                            style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -804,6 +843,18 @@ class ReceiptService {
                             ],
                           ),
                         ),
+                        pw.SizedBox(height: 10),
+                        pw.Align(
+                          alignment: pw.Alignment.centerRight,
+                          child: pw.Text(
+                            'Amount in Words: ${NumberToWords.convert(
+                              useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                              currency: settings.currencyName,
+                              subunit: settings.currencySubunit,
+                            )}',
+                            style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -943,7 +994,11 @@ class ReceiptService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    _academicSimpleRow('The total sum of:', NumberToWords.convert(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)),
+                    _academicSimpleRow('The total sum of:', NumberToWords.convert(
+                      useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                      currency: settings.currencyName,
+                      subunit: settings.currencySubunit,
+                    )),
                     _academicSimpleRow('Being payment for:', '${invoice.termName ?? "Fees"} - ${invoice.academicYearName ?? ""}'),
                     _academicSimpleRow('Receipt printed on:', dateFormat.format(DateTime.now())),
                   ],
@@ -1071,7 +1126,11 @@ class ReceiptService {
                       pw.SizedBox(height: 30),
                       
                       _voucherRow('Received from', invoice.customerName?.toUpperCase() ?? 'N/A'),
-                      _voucherRow('The sum of', '${NumberToWords.convert(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)} Only'),
+                       _voucherRow('The sum of', NumberToWords.convert(
+                        useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                        currency: settings.currencyName,
+                        subunit: settings.currencySubunit,
+                      )),
                       _voucherRow('Being Payment for', '${invoice.items.first.item.name} for ${invoice.className ?? "Class"}'),
                       
                       pw.SizedBox(height: 30),
@@ -1153,13 +1212,5 @@ class ReceiptService {
     } catch (e) {
       return '';
     }
-  }
-}
-
-class NumberToWords {
-  static String convert(double amount) {
-    // Simple helper to convert 1234 to words, or just return as string for now
-    // In a real app we might use a package, but for now we'll do a simple format
-    return '${amount.toStringAsFixed(0)} Naira';
   }
 }

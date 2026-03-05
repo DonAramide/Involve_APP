@@ -3911,6 +3911,22 @@ class $SettingsTable extends Settings
           defaultConstraints: GeneratedColumn.constraintIsAlways(
               'CHECK ("show_logo_as_menu_background" IN (0, 1))'),
           defaultValue: const Constant(false));
+  static const VerificationMeta _currencyNameMeta =
+      const VerificationMeta('currencyName');
+  @override
+  late final GeneratedColumn<String> currencyName = GeneratedColumn<String>(
+      'currency_name', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('Naira'));
+  static const VerificationMeta _currencySubunitMeta =
+      const VerificationMeta('currencySubunit');
+  @override
+  late final GeneratedColumn<String> currencySubunit = GeneratedColumn<String>(
+      'currency_subunit', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('Kobo'));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -3962,7 +3978,9 @@ class $SettingsTable extends Settings
         skipSplash,
         restoreLastState,
         lastRoute,
-        showLogoAsMenuBackground
+        showLogoAsMenuBackground,
+        currencyName,
+        currencySubunit
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4250,6 +4268,18 @@ class $SettingsTable extends Settings
               data['show_logo_as_menu_background']!,
               _showLogoAsMenuBackgroundMeta));
     }
+    if (data.containsKey('currency_name')) {
+      context.handle(
+          _currencyNameMeta,
+          currencyName.isAcceptableOrUnknown(
+              data['currency_name']!, _currencyNameMeta));
+    }
+    if (data.containsKey('currency_subunit')) {
+      context.handle(
+          _currencySubunitMeta,
+          currencySubunit.isAcceptableOrUnknown(
+              data['currency_subunit']!, _currencySubunitMeta));
+    }
     return context;
   }
 
@@ -4366,6 +4396,10 @@ class $SettingsTable extends Settings
       showLogoAsMenuBackground: attachedDatabase.typeMapping.read(
           DriftSqlType.bool,
           data['${effectivePrefix}show_logo_as_menu_background'])!,
+      currencyName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}currency_name'])!,
+      currencySubunit: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}currency_subunit'])!,
     );
   }
 
@@ -4426,6 +4460,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool restoreLastState;
   final String? lastRoute;
   final bool showLogoAsMenuBackground;
+  final String currencyName;
+  final String currencySubunit;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -4476,7 +4512,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.skipSplash,
       required this.restoreLastState,
       this.lastRoute,
-      required this.showLogoAsMenuBackground});
+      required this.showLogoAsMenuBackground,
+      required this.currencyName,
+      required this.currencySubunit});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4556,6 +4594,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     }
     map['show_logo_as_menu_background'] =
         Variable<bool>(showLogoAsMenuBackground);
+    map['currency_name'] = Variable<String>(currencyName);
+    map['currency_subunit'] = Variable<String>(currencySubunit);
     return map;
   }
 
@@ -4632,6 +4672,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ? const Value.absent()
           : Value(lastRoute),
       showLogoAsMenuBackground: Value(showLogoAsMenuBackground),
+      currencyName: Value(currencyName),
+      currencySubunit: Value(currencySubunit),
     );
   }
 
@@ -4701,6 +4743,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       lastRoute: serializer.fromJson<String?>(json['lastRoute']),
       showLogoAsMenuBackground:
           serializer.fromJson<bool>(json['showLogoAsMenuBackground']),
+      currencyName: serializer.fromJson<String>(json['currencyName']),
+      currencySubunit: serializer.fromJson<String>(json['currencySubunit']),
     );
   }
   @override
@@ -4761,6 +4805,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'lastRoute': serializer.toJson<String?>(lastRoute),
       'showLogoAsMenuBackground':
           serializer.toJson<bool>(showLogoAsMenuBackground),
+      'currencyName': serializer.toJson<String>(currencyName),
+      'currencySubunit': serializer.toJson<String>(currencySubunit),
     };
   }
 
@@ -4814,7 +4860,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? skipSplash,
           bool? restoreLastState,
           Value<String?> lastRoute = const Value.absent(),
-          bool? showLogoAsMenuBackground}) =>
+          bool? showLogoAsMenuBackground,
+          String? currencyName,
+          String? currencySubunit}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -4877,6 +4925,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         lastRoute: lastRoute.present ? lastRoute.value : this.lastRoute,
         showLogoAsMenuBackground:
             showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
+        currencyName: currencyName ?? this.currencyName,
+        currencySubunit: currencySubunit ?? this.currencySubunit,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -4994,6 +5044,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showLogoAsMenuBackground: data.showLogoAsMenuBackground.present
           ? data.showLogoAsMenuBackground.value
           : this.showLogoAsMenuBackground,
+      currencyName: data.currencyName.present
+          ? data.currencyName.value
+          : this.currencyName,
+      currencySubunit: data.currencySubunit.present
+          ? data.currencySubunit.value
+          : this.currencySubunit,
     );
   }
 
@@ -5049,7 +5105,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('skipSplash: $skipSplash, ')
           ..write('restoreLastState: $restoreLastState, ')
           ..write('lastRoute: $lastRoute, ')
-          ..write('showLogoAsMenuBackground: $showLogoAsMenuBackground')
+          ..write('showLogoAsMenuBackground: $showLogoAsMenuBackground, ')
+          ..write('currencyName: $currencyName, ')
+          ..write('currencySubunit: $currencySubunit')
           ..write(')'))
         .toString();
   }
@@ -5105,7 +5163,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         skipSplash,
         restoreLastState,
         lastRoute,
-        showLogoAsMenuBackground
+        showLogoAsMenuBackground,
+        currencyName,
+        currencySubunit
       ]);
   @override
   bool operator ==(Object other) =>
@@ -5161,7 +5221,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.skipSplash == this.skipSplash &&
           other.restoreLastState == this.restoreLastState &&
           other.lastRoute == this.lastRoute &&
-          other.showLogoAsMenuBackground == this.showLogoAsMenuBackground);
+          other.showLogoAsMenuBackground == this.showLogoAsMenuBackground &&
+          other.currencyName == this.currencyName &&
+          other.currencySubunit == this.currencySubunit);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -5215,6 +5277,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> restoreLastState;
   final Value<String?> lastRoute;
   final Value<bool> showLogoAsMenuBackground;
+  final Value<String> currencyName;
+  final Value<String> currencySubunit;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -5266,6 +5330,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.restoreLastState = const Value.absent(),
     this.lastRoute = const Value.absent(),
     this.showLogoAsMenuBackground = const Value.absent(),
+    this.currencyName = const Value.absent(),
+    this.currencySubunit = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -5318,6 +5384,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.restoreLastState = const Value.absent(),
     this.lastRoute = const Value.absent(),
     this.showLogoAsMenuBackground = const Value.absent(),
+    this.currencyName = const Value.absent(),
+    this.currencySubunit = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -5372,6 +5440,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? restoreLastState,
     Expression<String>? lastRoute,
     Expression<bool>? showLogoAsMenuBackground,
+    Expression<String>? currencyName,
+    Expression<String>? currencySubunit,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -5440,6 +5510,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (lastRoute != null) 'last_route': lastRoute,
       if (showLogoAsMenuBackground != null)
         'show_logo_as_menu_background': showLogoAsMenuBackground,
+      if (currencyName != null) 'currency_name': currencyName,
+      if (currencySubunit != null) 'currency_subunit': currencySubunit,
     });
   }
 
@@ -5493,7 +5565,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? skipSplash,
       Value<bool>? restoreLastState,
       Value<String?>? lastRoute,
-      Value<bool>? showLogoAsMenuBackground}) {
+      Value<bool>? showLogoAsMenuBackground,
+      Value<String>? currencyName,
+      Value<String>? currencySubunit}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -5552,6 +5626,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       lastRoute: lastRoute ?? this.lastRoute,
       showLogoAsMenuBackground:
           showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
+      currencyName: currencyName ?? this.currencyName,
+      currencySubunit: currencySubunit ?? this.currencySubunit,
     );
   }
 
@@ -5715,6 +5791,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       map['show_logo_as_menu_background'] =
           Variable<bool>(showLogoAsMenuBackground.value);
     }
+    if (currencyName.present) {
+      map['currency_name'] = Variable<String>(currencyName.value);
+    }
+    if (currencySubunit.present) {
+      map['currency_subunit'] = Variable<String>(currencySubunit.value);
+    }
     return map;
   }
 
@@ -5770,7 +5852,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('skipSplash: $skipSplash, ')
           ..write('restoreLastState: $restoreLastState, ')
           ..write('lastRoute: $lastRoute, ')
-          ..write('showLogoAsMenuBackground: $showLogoAsMenuBackground')
+          ..write('showLogoAsMenuBackground: $showLogoAsMenuBackground, ')
+          ..write('currencyName: $currencyName, ')
+          ..write('currencySubunit: $currencySubunit')
           ..write(')'))
         .toString();
   }
@@ -15971,6 +16055,8 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> restoreLastState,
   Value<String?> lastRoute,
   Value<bool> showLogoAsMenuBackground,
+  Value<String> currencyName,
+  Value<String> currencySubunit,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -16023,6 +16109,8 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> restoreLastState,
   Value<String?> lastRoute,
   Value<bool> showLogoAsMenuBackground,
+  Value<String> currencyName,
+  Value<String> currencySubunit,
 });
 
 class $$SettingsTableFilterComposer
@@ -16205,6 +16293,13 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get showLogoAsMenuBackground => $composableBuilder(
       column: $table.showLogoAsMenuBackground,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get currencyName => $composableBuilder(
+      column: $table.currencyName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get currencySubunit => $composableBuilder(
+      column: $table.currencySubunit,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -16396,6 +16491,14 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get showLogoAsMenuBackground => $composableBuilder(
       column: $table.showLogoAsMenuBackground,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get currencyName => $composableBuilder(
+      column: $table.currencyName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get currencySubunit => $composableBuilder(
+      column: $table.currencySubunit,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -16556,6 +16659,12 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get showLogoAsMenuBackground => $composableBuilder(
       column: $table.showLogoAsMenuBackground, builder: (column) => column);
+
+  GeneratedColumn<String> get currencyName => $composableBuilder(
+      column: $table.currencyName, builder: (column) => column);
+
+  GeneratedColumn<String> get currencySubunit => $composableBuilder(
+      column: $table.currencySubunit, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -16634,6 +16743,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> restoreLastState = const Value.absent(),
             Value<String?> lastRoute = const Value.absent(),
             Value<bool> showLogoAsMenuBackground = const Value.absent(),
+            Value<String> currencyName = const Value.absent(),
+            Value<String> currencySubunit = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -16686,6 +16797,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             restoreLastState: restoreLastState,
             lastRoute: lastRoute,
             showLogoAsMenuBackground: showLogoAsMenuBackground,
+            currencyName: currencyName,
+            currencySubunit: currencySubunit,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -16738,6 +16851,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> restoreLastState = const Value.absent(),
             Value<String?> lastRoute = const Value.absent(),
             Value<bool> showLogoAsMenuBackground = const Value.absent(),
+            Value<String> currencyName = const Value.absent(),
+            Value<String> currencySubunit = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -16790,6 +16905,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             restoreLastState: restoreLastState,
             lastRoute: lastRoute,
             showLogoAsMenuBackground: showLogoAsMenuBackground,
+            currencyName: currencyName,
+            currencySubunit: currencySubunit,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

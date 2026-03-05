@@ -96,6 +96,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       restoreLastState: Value(settings.restoreLastState),
       lastRoute: Value(settings.lastRoute),
       showLogoAsMenuBackground: Value(settings.showLogoAsMenuBackground),
+      currencyName: Value(settings.currencyName),
+      currencySubunit: Value(settings.currencySubunit),
     );
 
     if (existing == null) {
@@ -189,6 +191,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       restoreLastState: row.restoreLastState,
       lastRoute: row.lastRoute,
       showLogoAsMenuBackground: row.showLogoAsMenuBackground,
+      currencyName: row.currencyName,
+      currencySubunit: row.currencySubunit,
     );
   }
 }

@@ -61,6 +61,8 @@ class AppSettings extends Equatable {
   final bool restoreLastState;
   final String? lastRoute;
   final bool showLogoAsMenuBackground;
+  final String currencyName;
+  final String currencySubunit;
 
   const AppSettings({
     this.id,
@@ -113,6 +115,8 @@ class AppSettings extends Equatable {
     this.restoreLastState = false,
     this.lastRoute,
     this.showLogoAsMenuBackground = false,
+    this.currencyName = 'Naira',
+    this.currencySubunit = 'Kobo',
   });
 
   AppSettings copyWith({
@@ -166,6 +170,8 @@ class AppSettings extends Equatable {
     bool? restoreLastState,
     String? lastRoute,
     bool? showLogoAsMenuBackground,
+    String? currencyName,
+    String? currencySubunit,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -218,6 +224,8 @@ class AppSettings extends Equatable {
       restoreLastState: restoreLastState ?? this.restoreLastState,
       lastRoute: lastRoute ?? this.lastRoute,
       showLogoAsMenuBackground: showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
+      currencyName: currencyName ?? this.currencyName,
+      currencySubunit: currencySubunit ?? this.currencySubunit,
     );
   }
 
@@ -273,5 +281,7 @@ class AppSettings extends Equatable {
         restoreLastState,
         lastRoute,
         showLogoAsMenuBackground,
+        currencyName,
+        currencySubunit,
       ];
 }

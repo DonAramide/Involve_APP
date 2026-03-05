@@ -64,4 +64,6 @@ class Settings extends Table {
   BoolColumn get restoreLastState => boolean().withDefault(const Constant(false))();
   TextColumn get lastRoute => text().nullable()();
   BoolColumn get showLogoAsMenuBackground => boolean().withDefault(const Constant(false))();
+  TextColumn get currencyName => text().withDefault(const Constant('Naira'))();
+  TextColumn get currencySubunit => text().withDefault(const Constant('Kobo'))();
 }
