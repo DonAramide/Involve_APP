@@ -50,4 +50,10 @@ abstract class SchoolRepository {
   Future<void> addGradingRule(GradingRule rule);
   Future<void> updateGradingRule(GradingRule rule);
   Future<void> deleteGradingRule(int id);
+
+  // Teachers
+  Future<List<Teacher>> getTeachers();
+  Future<void> addTeacher(Teacher teacher);
+  Future<void> updateTeacher(Teacher teacher);
+  Future<void> deleteTeacher(int id);
 }

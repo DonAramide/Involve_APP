@@ -52,6 +52,25 @@ class Classes extends Table {
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }
 
+class Teachers extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get fullName => text()();
+  TextColumn get phone => text().nullable()();
+  TextColumn get profession => text().nullable()();
+  IntColumn get classId => integer().nullable().references(Classes, #id)();
+  RealColumn get salary => real().withDefault(const Constant(0.0))();
+  IntColumn get yearsInSchool => integer().withDefault(const Constant(0))();
+  TextColumn get certificates => text().nullable()();
+  BlobColumn get image => blob().nullable()();
+
+  // Sync Columns
+  TextColumn get syncId => text().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get createdAt => dateTime().nullable()();
+  TextColumn get deviceId => text().nullable()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+}
+
 class Students extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get admissionNumber => text().unique()();

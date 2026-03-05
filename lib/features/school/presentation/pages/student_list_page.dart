@@ -11,7 +11,8 @@ import './student_profile_page.dart';
 import 'package:intl/intl.dart';
 
 class StudentListPage extends StatefulWidget {
-  const StudentListPage({super.key});
+  final int? initialClassFilter;
+  const StudentListPage({super.key, this.initialClassFilter});
 
   @override
   State<StudentListPage> createState() => _StudentListPageState();
@@ -25,6 +26,12 @@ class _StudentListPageState extends State<StudentListPage> {
   String _selectedOwingFilter = 'All'; // 'All', 'Owing', 'Not Owing'
   int? _selectedYearFilter;
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedClassFilter = widget.initialClassFilter;
+  }
 
   void _toggleSelection(int id) {
     setState(() {

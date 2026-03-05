@@ -359,5 +359,56 @@ class SchoolRepositoryImpl implements SchoolRepository {
   Future<void> deleteGradingRule(int id) async {
     await (database.delete(database.gradingRules)..where((t) => t.id.equals(id))).go();
   }
+
+  // Teachers
+  @override
+  Future<List<Teacher>> getTeachers() async {
+    final rows = await database.select(database.teachers).get();
+    return rows.map((row) => Teacher(
+      id: row.id,
+      fullName: row.fullName,
+      phone: row.phone,
+      profession: row.profession,
+      classId: row.classId,
+      salary: row.salary,
+      yearsInSchool: row.yearsInSchool,
+      certificates: row.certificates,
+      image: row.image,
+    )).toList();
+  }
+
+  @override
+  Future<void> addTeacher(Teacher teacher) async {
+    await database.into(database.teachers).insert(db.TeachersCompanion.insert(
+      fullName: teacher.fullName,
+      phone: Value(teacher.phone),
+      profession: Value(teacher.profession),
+      classId: Value(teacher.classId),
+      salary: Value(teacher.salary),
+      yearsInSchool: Value(teacher.yearsInSchool),
+      certificates: Value(teacher.certificates),
+      image: Value(teacher.image),
+    ));
+  }
+
+  @override
+  Future<void> updateTeacher(Teacher teacher) async {
+    await (database.update(database.teachers)..where((t) => t.id.equals(teacher.id!)))
+        .write(db.TeachersCompanion(
+      fullName: Value(teacher.fullName),
+      phone: Value(teacher.phone),
+      profession: Value(teacher.profession),
+      classId: Value(teacher.classId),
+      salary: Value(teacher.salary),
+      yearsInSchool: Value(teacher.yearsInSchool),
+      certificates: Value(teacher.certificates),
+      image: Value(teacher.image),
+    ));
+  }
+
+  @override
+  Future<void> deleteTeacher(int id) async {
+    await (database.delete(database.teachers)..where((t) => t.id.equals(id))).go();
+  }
 }
 

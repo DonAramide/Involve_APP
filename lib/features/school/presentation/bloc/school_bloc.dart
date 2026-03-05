@@ -47,6 +47,11 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     on<UpdateGradingRuleEvent>(_onUpdateGradingRule);
     on<DeleteGradingRuleEvent>(_onDeleteGradingRule);
 
+    // Teachers
+    on<AddTeacherEvent>(_onAddTeacher);
+    on<UpdateTeacherEvent>(_onUpdateTeacher);
+    on<DeleteTeacherEvent>(_onDeleteTeacher);
+
     on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null)));
     
     add(LoadSchoolData());
@@ -60,6 +65,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final students = await repository.getStudents();
       final items = await itemRepository.getAllItems();
       final subjects = await repository.getSubjects();
+      final teachers = await repository.getTeachers();
       
       final activeYear = years.where((y) => y.isActive).firstOrNull ?? years.firstOrNull;
       List<Term> terms = [];
@@ -74,6 +80,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         students: students,
         items: items,
         subjects: subjects,
+        teachers: teachers,
         isLoading: false,
         status: SchoolStatus.initial,
       ));
@@ -316,6 +323,40 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       add(LoadGradingRules());
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
+    }
+  }
+
+  // Teacher Handlers
+  Future<void> _onAddTeacher(AddTeacherEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, error: null, status: SchoolStatus.loading));
+    try {
+      await repository.addTeacher(event.teacher);
+      final teachers = await repository.getTeachers();
+      emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onUpdateTeacher(UpdateTeacherEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, error: null, status: SchoolStatus.loading));
+    try {
+      await repository.updateTeacher(event.teacher);
+      final teachers = await repository.getTeachers();
+      emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onDeleteTeacher(DeleteTeacherEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, error: null, status: SchoolStatus.loading));
+    try {
+      await repository.deleteTeacher(event.id);
+      final teachers = await repository.getTeachers();
+      emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
     }
   }
 }

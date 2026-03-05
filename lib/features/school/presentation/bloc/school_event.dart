@@ -161,6 +161,27 @@ class DeleteGradingRuleEvent extends SchoolEvent {
   List<Object?> get props => [id];
 }
 
+class AddTeacherEvent extends SchoolEvent {
+  final Teacher teacher;
+  const AddTeacherEvent(this.teacher);
+  @override
+  List<Object?> get props => [teacher];
+}
+
+class UpdateTeacherEvent extends SchoolEvent {
+  final Teacher teacher;
+  const UpdateTeacherEvent(this.teacher);
+  @override
+  List<Object?> get props => [teacher];
+}
+
+class DeleteTeacherEvent extends SchoolEvent {
+  final int id;
+  const DeleteTeacherEvent(this.id);
+  @override
+  List<Object?> get props => [id];
+}
+
 class LoadStudentsEvent extends SchoolEvent {
   final int classId;
   const LoadStudentsEvent(this.classId);

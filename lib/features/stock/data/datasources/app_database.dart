@@ -37,13 +37,14 @@ part 'app_database.g.dart';
   BusinessSettings,
   Subjects,
   Results,
-  GradingRules
+  GradingRules,
+  Teachers
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 50;
+  int get schemaVersion => 51;
 
   @override
   MigrationStrategy get migration {
@@ -219,6 +220,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 50) {
           // Schema V50: Add GradingRules table
           await _safeCreateTable(m, gradingRules);
+        }
+
+        if (from < 51) {
+          // Schema V51: Add Teachers table
+          await _safeCreateTable(m, teachers);
         }
       },
       beforeOpen: (details) async {

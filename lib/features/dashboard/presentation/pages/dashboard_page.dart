@@ -28,6 +28,7 @@ import '../../../../core/sync/presentation/pages/device_sync_page.dart';
 import '../../../../core/utils/terminology.dart';
 import 'package:involve_app/features/stock/presentation/pages/manage_categories_page.dart';
 import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/teacher_list_page.dart';
 import 'package:involve_app/features/school/presentation/pages/student_analytics_page.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
 import 'package:involve_app/features/school/presentation/pages/fee_management_page.dart';
@@ -425,6 +426,13 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.people_alt,
           color: Colors.indigo,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentListPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'teachers',
+          title: 'TEACHERS',
+          icon: Icons.assignment_ind,
+          color: Colors.deepPurple,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherListPage())),
         ),
         _DashboardMenuItem(
           id: 'academic_setup',

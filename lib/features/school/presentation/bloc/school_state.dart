@@ -16,6 +16,7 @@ class SchoolState extends Equatable {
   final List<Subject> subjects;
   final List<AcademicResult> results;
   final List<GradingRule> gradingRules;
+  final List<Teacher> teachers;
   final bool isLoading;
   final String? error;
   final SchoolStatus status;
@@ -30,6 +31,7 @@ class SchoolState extends Equatable {
     this.subjects = const [],
     this.results = const [],
     this.gradingRules = const [],
+    this.teachers = const [],
     this.isLoading = false,
     this.error,
     this.status = SchoolStatus.initial,
@@ -48,6 +50,7 @@ class SchoolState extends Equatable {
     List<Subject>? subjects,
     List<AcademicResult>? results,
     List<GradingRule>? gradingRules,
+    List<Teacher>? teachers,
     bool? isLoading,
     String? error,
     SchoolStatus? status,
@@ -62,6 +65,7 @@ class SchoolState extends Equatable {
       subjects: subjects ?? this.subjects,
       results: results ?? this.results,
       gradingRules: gradingRules ?? this.gradingRules,
+      teachers: teachers ?? this.teachers,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       status: status ?? this.status,
@@ -69,5 +73,5 @@ class SchoolState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [academicYears, terms, classes, students, items, studentInvoices, subjects, results, gradingRules, isLoading, error, status];
+  List<Object?> get props => [academicYears, terms, classes, students, items, studentInvoices, subjects, results, gradingRules, teachers, isLoading, error, status];
 }

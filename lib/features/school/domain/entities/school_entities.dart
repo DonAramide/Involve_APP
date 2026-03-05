@@ -244,3 +244,64 @@ class AcademicResult extends Equatable {
   @override
   List<Object?> get props => [id, studentId, subjectId, termId, academicYearId, assessmentScore, examScore, totalScore, grade, remarks, dateEntered];
 }
+
+class Teacher extends Equatable {
+  final int? id;
+  final String fullName;
+  final String? phone;
+  final String? profession;
+  final int? classId;
+  final double salary;
+  final int yearsInSchool;
+  final String? certificates;
+  final Uint8List? image;
+
+  const Teacher({
+    this.id,
+    required this.fullName,
+    this.phone,
+    this.profession,
+    this.classId,
+    this.salary = 0.0,
+    this.yearsInSchool = 0,
+    this.certificates,
+    this.image,
+  });
+
+  Teacher copyWith({
+    int? id,
+    String? fullName,
+    String? phone,
+    String? profession,
+    int? classId,
+    double? salary,
+    int? yearsInSchool,
+    String? certificates,
+    Uint8List? image,
+  }) {
+    return Teacher(
+      id: id ?? this.id,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      profession: profession ?? this.profession,
+      classId: classId ?? this.classId,
+      salary: salary ?? this.salary,
+      yearsInSchool: yearsInSchool ?? this.yearsInSchool,
+      certificates: certificates ?? this.certificates,
+      image: image ?? this.image,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        id,
+        fullName,
+        phone,
+        profession,
+        classId,
+        salary,
+        yearsInSchool,
+        certificates,
+        image,
+      ];
+}
