@@ -1185,6 +1185,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final existingCode = staff?.staffCode;
     final isCodeHashed = existingCode != null && existingCode.length > 4;
     final codeController = TextEditingController(text: isCodeHashed ? '' : existingCode);
+    final phoneController = TextEditingController(text: staff?.phone);
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -1214,6 +1215,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   return (val?.length != 4) ? 'Must be 4 digits' : null;
                 },
               ),
+              TextFormField(
+                controller: phoneController,
+                decoration: const InputDecoration(labelText: 'Phone Number'),
+                keyboardType: TextInputType.phone,
+              ),
             ],
           ),
         ),
@@ -1228,6 +1234,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   staffCode: codeController.text.isEmpty && staff != null 
                       ? staff.staffCode 
                       : codeController.text,
+                  phone: phoneController.text,
                 );
                 if (staff == null) {
                   context.read<StaffBloc>().add(AddStaff(newStaff));

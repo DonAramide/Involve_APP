@@ -44,7 +44,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 56;
+  int get schemaVersion => 57;
 
   @override
   MigrationStrategy get migration {
@@ -248,8 +248,11 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 56) {
           // Schema V56: Add currencyName and currencySubunit to Settings table
-          await _safeAddColumn(m, settings, settings.currencyName);
           await _safeAddColumn(m, settings, settings.currencySubunit);
+        }
+        if (from < 57) {
+          // Schema V57: Add phone to Staff table
+          await _safeAddColumn(m, staff, staff.phone);
         }
       },
       beforeOpen: (details) async {

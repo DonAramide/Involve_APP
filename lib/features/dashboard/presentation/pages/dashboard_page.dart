@@ -501,6 +501,13 @@ class _DashboardPageState extends State<DashboardPage> {
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
         ),
         _DashboardMenuItem(
+          id: 'contacts',
+          title: 'CONTACTS',
+          icon: Icons.contact_phone,
+          color: Colors.teal,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactPage())),
+        ),
+        _DashboardMenuItem(
           id: 'subjects',
           title: 'SUBJECTS',
           icon: Icons.book,

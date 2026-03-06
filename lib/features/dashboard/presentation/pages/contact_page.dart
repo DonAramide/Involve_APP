@@ -1,264 +1,248 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
+import 'package:involve_app/features/settings/domain/entities/staff.dart';
+import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class ContactPage extends StatelessWidget {
+class ContactPage extends StatefulWidget {
   const ContactPage({super.key});
 
   @override
+  State<ContactPage> createState() => _ContactPageState();
+}
+
+class _ContactPageState extends State<ContactPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    context.read<StaffBloc>().add(LoadStaffList());
+    context.read<SchoolBloc>().add(LoadSchoolData());
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Contact Us'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Contact Directory'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.people), text: 'Staff'),
+              Tab(icon: Icon(Icons.family_restroom), text: 'Parents'),
+            ],
+          ),
+          actions: [
+            IconButton(
+              onPressed: () {
+                // Potential addition: Filter by class or department
+              },
+              icon: const Icon(Icons.filter_list),
+            ),
+          ],
+        ),
+        body: Column(
           children: [
-            const SizedBox(height: 20),
-            Center(
-              child: Image.asset(
-                'assets/images/logo_transparent.png',
-                height: 120,
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Header
-            const Text(
-              'Get in Touch',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'We\'d love to hear from you!',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 40),
-            
-            // Contact Cards
-            _buildContactCard(
-              context,
-              icon: Icons.email,
-              title: 'Email',
-              value: 'info.iips.ng@gmail.com',
-              onTap: () => _launchEmail('info.iips.ng@gmail.com'),
-            ),
-            const SizedBox(height: 16),
-            _buildContactCard(
-              context,
-              icon: Icons.phone,
-              title: 'Support',
-              value: 'WA: 08023552282 | Tel: 09027033748',
-              onTap: () => _launchPhone('+2348023552282'),
-            ),
-            const SizedBox(height: 16),
-            _buildContactCard(
-              context,
-              icon: Icons.language,
-              title: 'Website',
-              value: 'www.IIPS.app',
-              onTap: () => _launchWebsite('https://www.IIPS.app'),
-            ),
-            const SizedBox(height: 16),
-            _buildContactCard(
-              context,
-              icon: Icons.location_on,
-              title: 'Address',
-              value: 'Line 9 Office 8 Owode Onirin Market Ikorodu Road Owode Onirin Bus/Stop Lagos, Nigeria',
-              onTap: null,
-            ),
-            const SizedBox(height: 40),
-            
-            // Support Hours
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.access_time,
-                      size: 40,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Support Hours',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Monday - Friday: 9:00 AM - 6:00 PM',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    const Text(
-                      'Saturday: 10:00 AM - 4:00 PM',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    const Text(
-                      'Sunday: Closed',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                  ],
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by name or phone...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              _searchQuery = '';
+                            });
+                          },
+                        )
+                      : null,
                 ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
               ),
             ),
-            const SizedBox(height: 40),
-            Center(
-              child: Column(
+            Expanded(
+              child: TabBarView(
                 children: [
-                  Text(
-                    'Powered by',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Image.asset(
-                    'assets/images/iips_logo.png',
-                    height: 100,
-                  ),
+                  _buildStaffTab(),
+                  _buildParentsTab(),
                 ],
               ),
             ),
-            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContactCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String value,
-    required VoidCallback? onTap,
-  }) {
-    return Card(
-      elevation: 2,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  color: Theme.of(context).primaryColor,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      value,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (onTap != null)
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.grey[400],
-                ),
-            ],
-          ),
-        ),
-      ),
+  Widget _buildStaffTab() {
+    return BlocBuilder<StaffBloc, StaffState>(
+      builder: (context, state) {
+        if (state.isLoading) return const Center(child: CircularProgressIndicator());
+        
+        final filteredList = state.staffList.where((staff) {
+          final query = _searchQuery;
+          return staff.name.toLowerCase().contains(query) || 
+                 (staff.phone?.contains(query) ?? false);
+        }).toList();
+
+        if (filteredList.isEmpty) {
+          return const Center(child: Text('No staff found'));
+        }
+
+        return ListView.builder(
+          itemCount: filteredList.length,
+          itemBuilder: (context, index) {
+            final staff = filteredList[index];
+            return _ContactTile(
+              name: staff.name,
+              phone: staff.phone,
+              subtitle: 'Staff ID: ${staff.staffCode}',
+              icon: Icons.person_outline,
+            );
+          },
+        );
+      },
     );
   }
 
-  Widget _buildSocialButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 80,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 32, color: Theme.of(context).primaryColor),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 10),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+  Widget _buildParentsTab() {
+    return BlocBuilder<SchoolBloc, SchoolState>(
+      builder: (context, state) {
+        if (state.isLoading) return const Center(child: CircularProgressIndicator());
+
+        // Extract unique parents from students
+        final Map<String, Student> parentMap = {};
+        for (var student in state.students) {
+          if (student.parentName != null && student.parentName!.isNotEmpty) {
+            final key = '${student.parentName}_${student.parentPhone}';
+            if (!parentMap.containsKey(key)) {
+              parentMap[key] = student;
+            }
+          }
+        }
+
+        final parentList = parentMap.values.toList();
+        final filteredList = parentList.where((p) {
+          final query = _searchQuery;
+          return p.parentName!.toLowerCase().contains(query) || 
+                 (p.parentPhone?.contains(query) ?? false);
+        }).toList();
+
+        if (filteredList.isEmpty) {
+          return const Center(child: Text('No parents found'));
+        }
+
+        return ListView.builder(
+          itemCount: filteredList.length,
+          itemBuilder: (context, index) {
+            final parent = filteredList[index];
+            return _ContactTile(
+              name: parent.parentName!,
+              phone: parent.parentPhone,
+              subtitle: 'Parent of: ${parent.fullName}',
+              icon: Icons.family_restroom_outlined,
+            );
+          },
+        );
+      },
     );
   }
+}
 
-  Future<void> _launchEmail(String email) async {
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: email,
-      query: 'subject=Involve App Support',
-    );
-    if (await canLaunchUrl(emailUri)) {
-      await launchUrl(emailUri);
+class _ContactTile extends StatelessWidget {
+  final String name;
+  final String? phone;
+  final String subtitle;
+  final IconData icon;
+
+  const _ContactTile({
+    required this.name,
+    this.phone,
+    required this.subtitle,
+    required this.icon,
+  });
+
+  Future<void> _launch(String scheme, String number) async {
+    final cleanNumber = number.replaceAll(RegExp(r'[^0-9+]'), '');
+    Uri uri;
+    if (scheme == 'whatsapp') {
+      uri = Uri.parse('https://wa.me/$cleanNumber');
+    } else {
+      uri = Uri(scheme: scheme, path: cleanNumber);
     }
-  }
-
-  Future<void> _launchPhone(String phone) async {
-    final Uri phoneUri = Uri(scheme: 'tel', path: phone);
-    if (await canLaunchUrl(phoneUri)) {
-      await launchUrl(phoneUri);
-    }
-  }
-
-  Future<void> _launchWebsite(String url) async {
-    final Uri uri = Uri.parse(url);
+    
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      await launchUrl(uri);
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhone = phone != null && phone!.isNotEmpty;
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          child: Icon(icon),
+        ),
+        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(subtitle),
+            if (hasPhone) Text(phone!, style: const TextStyle(color: Colors.blueGrey)),
+          ],
+        ),
+        trailing: hasPhone
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.call, color: Colors.green),
+                    onPressed: () => _launch('tel', phone!),
+                    tooltip: 'Call',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.message, color: Colors.blue),
+                    onPressed: () => _launch('sms', phone!),
+                    tooltip: 'SMS',
+                  ),
+                  IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.chat, color: Colors.white, size: 16),
+                    ),
+                    onPressed: () => _launch('whatsapp', phone!),
+                    tooltip: 'WhatsApp',
+                  ),
+                ],
+              )
+            : null,
+      ),
+    );
   }
 }
