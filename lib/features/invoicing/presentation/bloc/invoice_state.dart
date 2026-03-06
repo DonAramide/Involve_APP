@@ -35,9 +35,10 @@ class UpdateItemPrintPrice extends InvoiceEvent {
 
 class UpdateDiscount extends InvoiceEvent {
   final double discount;
-  UpdateDiscount(this.discount);
+  final DiscountType type;
+  UpdateDiscount(this.discount, {this.type = DiscountType.amount});
   @override
-  List<Object?> get props => [discount];
+  List<Object?> get props => [discount, type];
 }
 
 class UpdateCustomerInfo extends InvoiceEvent {
@@ -131,6 +132,7 @@ class InvoiceState extends Equatable {
   final double subtotal;
   final double tax;
   final double discount;
+  final DiscountType discountType;
   final double total;
   final bool isSaving;
   final bool isSaved;
@@ -160,6 +162,7 @@ class InvoiceState extends Equatable {
     this.subtotal = 0,
     this.tax = 0,
     this.discount = 0,
+    this.discountType = DiscountType.amount,
     this.total = 0,
     this.isSaving = false,
     this.isSaved = false,
@@ -190,6 +193,7 @@ class InvoiceState extends Equatable {
     double? subtotal,
     double? tax,
     double? discount,
+    DiscountType? discountType,
     double? total,
     bool? isSaving,
     bool? isSaved,
@@ -219,6 +223,7 @@ class InvoiceState extends Equatable {
       subtotal: subtotal ?? this.subtotal,
       tax: tax ?? this.tax,
       discount: discount ?? this.discount,
+      discountType: discountType ?? this.discountType,
       total: total ?? this.total,
       isSaving: isSaving ?? this.isSaving,
       isSaved: isSaved ?? this.isSaved,
@@ -251,6 +256,7 @@ class InvoiceState extends Equatable {
         subtotal,
         tax,
         discount,
+        discountType,
         total,
         isSaving,
         isSaved,

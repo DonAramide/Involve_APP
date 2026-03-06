@@ -9,6 +9,7 @@ class Invoices extends Table {
   RealColumn get subtotal => real()();
   RealColumn get taxAmount => real()();
   RealColumn get discountAmount => real()();
+  TextColumn get discountType => text().withDefault(const Constant('amount'))(); // 'amount' or 'percentage'
   RealColumn get totalAmount => real()();
   TextColumn get paymentStatus => text()(); // e.g., 'Paid', 'Unpaid', 'Partial'
   RealColumn get amountPaid => real().withDefault(const Constant(0.0))();

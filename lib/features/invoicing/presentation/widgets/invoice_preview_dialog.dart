@@ -116,8 +116,20 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         const Divider(),
                         _row('Subtotal', invoiceState.subtotal, settings?.currency ?? '₦'),
                         _row('Tax (${(invoiceState.taxRate * 100).toStringAsFixed(0)}%)', invoiceState.tax, settings?.currency ?? '₦'),
-                        if (invoiceState.discount > 0)
-                          _row('Discount', -invoiceState.discount, settings?.currency ?? '₦'),
+                        if (invoiceState.discount > 0) ...[
+                          _row(
+                            invoiceState.discountType == DiscountType.percentage 
+                              ? 'Discount (${invoiceState.discount % 1 == 0 ? invoiceState.discount.toInt() : invoiceState.discount}%)' 
+                              : 'Discount', 
+                            -widget.invoiceBloc.calculationService.calculateDiscountAmount(
+                              invoiceState.subtotal, 
+                              invoiceState.tax, 
+                              invoiceState.discount, 
+                              invoiceState.discountType,
+                            ), 
+                            settings?.currency ?? '₦'
+                          ),
+                        ],
                         const Divider(),
                         _row('Total', invoiceState.total, settings?.currency ?? '₦', isBold: true),
                         
@@ -196,7 +208,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         items: List.from(invoiceState.items),
                         subtotal: invoiceState.subtotal,
                         taxAmount: invoiceState.tax,
-                        discountAmount: invoiceState.discount,
+                        discountAmount: widget.invoiceBloc.calculationService.calculateDiscountAmount(
+                          invoiceState.subtotal, 
+                          invoiceState.tax, 
+                          invoiceState.discount, 
+                          invoiceState.discountType,
+                        ),
+                        discountType: invoiceState.discountType,
                         totalAmount: invoiceState.total,
                         paymentStatus: status,
                         amountPaid: amountReceived,
@@ -235,7 +253,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         items: List.from(invoiceState.items),
                         subtotal: invoiceState.subtotal,
                         taxAmount: invoiceState.tax,
-                        discountAmount: invoiceState.discount,
+                        discountAmount: widget.invoiceBloc.calculationService.calculateDiscountAmount(
+                          invoiceState.subtotal, 
+                          invoiceState.tax, 
+                          invoiceState.discount, 
+                          invoiceState.discountType,
+                        ),
+                        discountType: invoiceState.discountType,
                         totalAmount: invoiceState.total,
                         paymentStatus: status,
                         amountPaid: amountReceived,

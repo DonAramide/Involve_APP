@@ -2,6 +2,8 @@ import 'dart:typed_data';
 import 'package:equatable/equatable.dart';
 import '../../../stock/domain/entities/item.dart';
 
+enum DiscountType { amount, percentage }
+
 class InvoiceItem extends Equatable {
   final int? id;
   final Item item;
@@ -68,6 +70,7 @@ class Invoice extends Equatable {
   final double subtotal;
   final double taxAmount;
   final double discountAmount;
+  final DiscountType discountType;
   final double totalAmount;
   final String paymentStatus;
   final double amountPaid;
@@ -101,6 +104,7 @@ class Invoice extends Equatable {
     required this.subtotal,
     required this.taxAmount,
     required this.discountAmount,
+    this.discountType = DiscountType.amount,
     required this.totalAmount,
     required this.paymentStatus,
     this.amountPaid = 0.0,

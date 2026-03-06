@@ -55,16 +55,16 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
       ));
     }
 
-    _emitUpdatedState(updatedItems, state.discount, emit);
+    _emitUpdatedState(updatedItems, state.discount, state.discountType, emit);
   }
 
   void _onRemoveItem(RemoveItemFromInvoice event, Emitter<InvoiceState> emit) {
     final updatedItems = state.items.where((i) => i.item.id != event.item.id).toList();
-    _emitUpdatedState(updatedItems, state.discount, emit);
+    _emitUpdatedState(updatedItems, state.discount, state.discountType, emit);
   }
 
   void _onUpdateDiscount(UpdateDiscount event, Emitter<InvoiceState> emit) {
-    _emitUpdatedState(state.items, event.discount, emit);
+    _emitUpdatedState(state.items, event.discount, event.type, emit);
   }
 
   void _onUpdateItemPrintPrice(UpdateItemPrintPrice event, Emitter<InvoiceState> emit) {
@@ -74,7 +74,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
       }
       return item;
     }).toList();
-    _emitUpdatedState(updatedItems, state.discount, emit);
+    _emitUpdatedState(updatedItems, state.discount, state.discountType, emit);
   }
 
   Future<void> _onSaveInvoice(SaveInvoice event, Emitter<InvoiceState> emit) async {
@@ -101,6 +101,14 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         state.taxRate, 
         state.taxEnabled, 
         state.discount,
+        state.discountType,
+      );
+
+      final discountAmount = calculationService.calculateDiscountAmount(
+        state.subtotal, 
+        state.tax, 
+        state.discount, 
+        state.discountType,
       );
 
       final invoice = Invoice(
@@ -109,7 +117,8 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         items: state.items,
         subtotal: state.subtotal,
         taxAmount: state.tax,
-        discountAmount: state.discount,
+        discountAmount: discountAmount,
+        discountType: state.discountType,
         totalAmount: state.total,
         paymentStatus: status,
         amountPaid: amountPaid,
@@ -175,19 +184,20 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     ));
     // If discount is disabled, reset any existing discount
     final currentDiscount = event.discountEnabled ? state.discount : 0.0;
-    _emitUpdatedState(state.items, currentDiscount, emit);
+    _emitUpdatedState(state.items, currentDiscount, state.discountType, emit);
   }
 
-  void _emitUpdatedState(List<InvoiceItem> items, double discount, Emitter<InvoiceState> emit) {
+  void _emitUpdatedState(List<InvoiceItem> items, double discount, DiscountType discountType, Emitter<InvoiceState> emit) {
     final subtotal = calculationService.calculateSubtotal(items);
     final tax = calculationService.calculateTax(subtotal, state.taxRate, state.taxEnabled);
-    final total = calculationService.calculateTotal(subtotal, tax, discount);
+    final total = calculationService.calculateTotal(subtotal, tax, discount, discountType);
 
     emit(state.copyWith(
       items: items,
       subtotal: subtotal,
       tax: tax,
       discount: discount,
+      discountType: discountType,
       total: total,
       isSaved: false,
     ));

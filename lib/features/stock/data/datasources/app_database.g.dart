@@ -1402,6 +1402,14 @@ class $InvoicesTable extends Invoices
   late final GeneratedColumn<double> discountAmount = GeneratedColumn<double>(
       'discount_amount', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _discountTypeMeta =
+      const VerificationMeta('discountType');
+  @override
+  late final GeneratedColumn<String> discountType = GeneratedColumn<String>(
+      'discount_type', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('amount'));
   static const VerificationMeta _totalAmountMeta =
       const VerificationMeta('totalAmount');
   @override
@@ -1568,6 +1576,7 @@ class $InvoicesTable extends Invoices
         subtotal,
         taxAmount,
         discountAmount,
+        discountType,
         totalAmount,
         paymentStatus,
         amountPaid,
@@ -1640,6 +1649,12 @@ class $InvoicesTable extends Invoices
               data['discount_amount']!, _discountAmountMeta));
     } else if (isInserting) {
       context.missing(_discountAmountMeta);
+    }
+    if (data.containsKey('discount_type')) {
+      context.handle(
+          _discountTypeMeta,
+          discountType.isAcceptableOrUnknown(
+              data['discount_type']!, _discountTypeMeta));
     }
     if (data.containsKey('total_amount')) {
       context.handle(
@@ -1792,6 +1807,8 @@ class $InvoicesTable extends Invoices
           .read(DriftSqlType.double, data['${effectivePrefix}tax_amount'])!,
       discountAmount: attachedDatabase.typeMapping.read(
           DriftSqlType.double, data['${effectivePrefix}discount_amount'])!,
+      discountType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}discount_type'])!,
       totalAmount: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}total_amount'])!,
       paymentStatus: attachedDatabase.typeMapping
@@ -1858,6 +1875,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
   final double subtotal;
   final double taxAmount;
   final double discountAmount;
+  final String discountType;
   final double totalAmount;
   final String paymentStatus;
   final double amountPaid;
@@ -1890,6 +1908,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       required this.subtotal,
       required this.taxAmount,
       required this.discountAmount,
+      required this.discountType,
       required this.totalAmount,
       required this.paymentStatus,
       required this.amountPaid,
@@ -1924,6 +1943,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
     map['subtotal'] = Variable<double>(subtotal);
     map['tax_amount'] = Variable<double>(taxAmount);
     map['discount_amount'] = Variable<double>(discountAmount);
+    map['discount_type'] = Variable<String>(discountType);
     map['total_amount'] = Variable<double>(totalAmount);
     map['payment_status'] = Variable<String>(paymentStatus);
     map['amount_paid'] = Variable<double>(amountPaid);
@@ -1998,6 +2018,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       subtotal: Value(subtotal),
       taxAmount: Value(taxAmount),
       discountAmount: Value(discountAmount),
+      discountType: Value(discountType),
       totalAmount: Value(totalAmount),
       paymentStatus: Value(paymentStatus),
       amountPaid: Value(amountPaid),
@@ -2072,6 +2093,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       subtotal: serializer.fromJson<double>(json['subtotal']),
       taxAmount: serializer.fromJson<double>(json['taxAmount']),
       discountAmount: serializer.fromJson<double>(json['discountAmount']),
+      discountType: serializer.fromJson<String>(json['discountType']),
       totalAmount: serializer.fromJson<double>(json['totalAmount']),
       paymentStatus: serializer.fromJson<String>(json['paymentStatus']),
       amountPaid: serializer.fromJson<double>(json['amountPaid']),
@@ -2109,6 +2131,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       'subtotal': serializer.toJson<double>(subtotal),
       'taxAmount': serializer.toJson<double>(taxAmount),
       'discountAmount': serializer.toJson<double>(discountAmount),
+      'discountType': serializer.toJson<String>(discountType),
       'totalAmount': serializer.toJson<double>(totalAmount),
       'paymentStatus': serializer.toJson<String>(paymentStatus),
       'amountPaid': serializer.toJson<double>(amountPaid),
@@ -2144,6 +2167,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           double? subtotal,
           double? taxAmount,
           double? discountAmount,
+          String? discountType,
           double? totalAmount,
           String? paymentStatus,
           double? amountPaid,
@@ -2176,6 +2200,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         subtotal: subtotal ?? this.subtotal,
         taxAmount: taxAmount ?? this.taxAmount,
         discountAmount: discountAmount ?? this.discountAmount,
+        discountType: discountType ?? this.discountType,
         totalAmount: totalAmount ?? this.totalAmount,
         paymentStatus: paymentStatus ?? this.paymentStatus,
         amountPaid: amountPaid ?? this.amountPaid,
@@ -2227,6 +2252,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       discountAmount: data.discountAmount.present
           ? data.discountAmount.value
           : this.discountAmount,
+      discountType: data.discountType.present
+          ? data.discountType.value
+          : this.discountType,
       totalAmount:
           data.totalAmount.present ? data.totalAmount.value : this.totalAmount,
       paymentStatus: data.paymentStatus.present
@@ -2288,6 +2316,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ..write('subtotal: $subtotal, ')
           ..write('taxAmount: $taxAmount, ')
           ..write('discountAmount: $discountAmount, ')
+          ..write('discountType: $discountType, ')
           ..write('totalAmount: $totalAmount, ')
           ..write('paymentStatus: $paymentStatus, ')
           ..write('amountPaid: $amountPaid, ')
@@ -2325,6 +2354,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         subtotal,
         taxAmount,
         discountAmount,
+        discountType,
         totalAmount,
         paymentStatus,
         amountPaid,
@@ -2361,6 +2391,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           other.subtotal == this.subtotal &&
           other.taxAmount == this.taxAmount &&
           other.discountAmount == this.discountAmount &&
+          other.discountType == this.discountType &&
           other.totalAmount == this.totalAmount &&
           other.paymentStatus == this.paymentStatus &&
           other.amountPaid == this.amountPaid &&
@@ -2395,6 +2426,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
   final Value<double> subtotal;
   final Value<double> taxAmount;
   final Value<double> discountAmount;
+  final Value<String> discountType;
   final Value<double> totalAmount;
   final Value<String> paymentStatus;
   final Value<double> amountPaid;
@@ -2427,6 +2459,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.subtotal = const Value.absent(),
     this.taxAmount = const Value.absent(),
     this.discountAmount = const Value.absent(),
+    this.discountType = const Value.absent(),
     this.totalAmount = const Value.absent(),
     this.paymentStatus = const Value.absent(),
     this.amountPaid = const Value.absent(),
@@ -2460,6 +2493,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     required double subtotal,
     required double taxAmount,
     required double discountAmount,
+    this.discountType = const Value.absent(),
     required double totalAmount,
     required String paymentStatus,
     this.amountPaid = const Value.absent(),
@@ -2498,6 +2532,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     Expression<double>? subtotal,
     Expression<double>? taxAmount,
     Expression<double>? discountAmount,
+    Expression<String>? discountType,
     Expression<double>? totalAmount,
     Expression<String>? paymentStatus,
     Expression<double>? amountPaid,
@@ -2531,6 +2566,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       if (subtotal != null) 'subtotal': subtotal,
       if (taxAmount != null) 'tax_amount': taxAmount,
       if (discountAmount != null) 'discount_amount': discountAmount,
+      if (discountType != null) 'discount_type': discountType,
       if (totalAmount != null) 'total_amount': totalAmount,
       if (paymentStatus != null) 'payment_status': paymentStatus,
       if (amountPaid != null) 'amount_paid': amountPaid,
@@ -2566,6 +2602,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       Value<double>? subtotal,
       Value<double>? taxAmount,
       Value<double>? discountAmount,
+      Value<String>? discountType,
       Value<double>? totalAmount,
       Value<String>? paymentStatus,
       Value<double>? amountPaid,
@@ -2598,6 +2635,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       subtotal: subtotal ?? this.subtotal,
       taxAmount: taxAmount ?? this.taxAmount,
       discountAmount: discountAmount ?? this.discountAmount,
+      discountType: discountType ?? this.discountType,
       totalAmount: totalAmount ?? this.totalAmount,
       paymentStatus: paymentStatus ?? this.paymentStatus,
       amountPaid: amountPaid ?? this.amountPaid,
@@ -2646,6 +2684,9 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     }
     if (discountAmount.present) {
       map['discount_amount'] = Variable<double>(discountAmount.value);
+    }
+    if (discountType.present) {
+      map['discount_type'] = Variable<String>(discountType.value);
     }
     if (totalAmount.present) {
       map['total_amount'] = Variable<double>(totalAmount.value);
@@ -2734,6 +2775,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
           ..write('subtotal: $subtotal, ')
           ..write('taxAmount: $taxAmount, ')
           ..write('discountAmount: $discountAmount, ')
+          ..write('discountType: $discountType, ')
           ..write('totalAmount: $totalAmount, ')
           ..write('paymentStatus: $paymentStatus, ')
           ..write('amountPaid: $amountPaid, ')
@@ -14825,6 +14867,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   required double subtotal,
   required double taxAmount,
   required double discountAmount,
+  Value<String> discountType,
   required double totalAmount,
   required String paymentStatus,
   Value<double> amountPaid,
@@ -14858,6 +14901,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<double> subtotal,
   Value<double> taxAmount,
   Value<double> discountAmount,
+  Value<String> discountType,
   Value<double> totalAmount,
   Value<String> paymentStatus,
   Value<double> amountPaid,
@@ -14947,6 +14991,9 @@ class $$InvoicesTableFilterComposer
   ColumnFilters<double> get discountAmount => $composableBuilder(
       column: $table.discountAmount,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get discountType => $composableBuilder(
+      column: $table.discountType, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<double> get totalAmount => $composableBuilder(
       column: $table.totalAmount, builder: (column) => ColumnFilters(column));
@@ -15100,6 +15147,10 @@ class $$InvoicesTableOrderingComposer
       column: $table.discountAmount,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get discountType => $composableBuilder(
+      column: $table.discountType,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<double> get totalAmount => $composableBuilder(
       column: $table.totalAmount, builder: (column) => ColumnOrderings(column));
 
@@ -15213,6 +15264,9 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<double> get discountAmount => $composableBuilder(
       column: $table.discountAmount, builder: (column) => column);
+
+  GeneratedColumn<String> get discountType => $composableBuilder(
+      column: $table.discountType, builder: (column) => column);
 
   GeneratedColumn<double> get totalAmount => $composableBuilder(
       column: $table.totalAmount, builder: (column) => column);
@@ -15361,6 +15415,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<double> subtotal = const Value.absent(),
             Value<double> taxAmount = const Value.absent(),
             Value<double> discountAmount = const Value.absent(),
+            Value<String> discountType = const Value.absent(),
             Value<double> totalAmount = const Value.absent(),
             Value<String> paymentStatus = const Value.absent(),
             Value<double> amountPaid = const Value.absent(),
@@ -15394,6 +15449,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             subtotal: subtotal,
             taxAmount: taxAmount,
             discountAmount: discountAmount,
+            discountType: discountType,
             totalAmount: totalAmount,
             paymentStatus: paymentStatus,
             amountPaid: amountPaid,
@@ -15427,6 +15483,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             required double subtotal,
             required double taxAmount,
             required double discountAmount,
+            Value<String> discountType = const Value.absent(),
             required double totalAmount,
             required String paymentStatus,
             Value<double> amountPaid = const Value.absent(),
@@ -15460,6 +15517,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             subtotal: subtotal,
             taxAmount: taxAmount,
             discountAmount: discountAmount,
+            discountType: discountType,
             totalAmount: totalAmount,
             paymentStatus: paymentStatus,
             amountPaid: amountPaid,

@@ -921,7 +921,7 @@ class _CartSummary extends StatelessWidget {
                       SizedBox(
                         width: double.infinity,
                         child: TextButton.icon(
-                          onPressed: () => _showDiscountDialog(context, state.discount),
+                          onPressed: () => _showDiscountDialog(context, state.discount, state.discountType),
                           icon: const Icon(Icons.add_circle_outline, size: 18),
                           label: Text(state.discount > 0 ? 'CHANGE DISCOUNT' : 'ADD DISCOUNT'),
                           style: TextButton.styleFrom(
@@ -1058,51 +1058,109 @@ class _CartSummary extends StatelessWidget {
     );
   }
 
-  void _showDiscountDialog(BuildContext context, double currentDiscount) {
-    final controller = TextEditingController(text: currentDiscount > 0 ? currentDiscount.toString() : '');
+  void _showDiscountDialog(BuildContext context, double currentPriceDiscount, DiscountType currentDiscountType) {
+    final controller = TextEditingController(text: currentPriceDiscount > 0 ? (currentPriceDiscount % 1 == 0 ? currentPriceDiscount.toInt().toString() : currentPriceDiscount.toString()) : '');
     final invoiceBloc = context.read<InvoiceBloc>();
     final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    
+    // We need to track local state for the dialog
+    DiscountType selectedType = currentDiscountType;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Apply Discount'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Enter fixed discount amount to apply to total.'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Discount Amount ($currency)',
-                border: const OutlineInputBorder(),
-                prefixText: currency,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Apply Discount'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Toggle Button for Discount Type
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => selectedType = DiscountType.amount),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: selectedType == DiscountType.amount ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: selectedType == DiscountType.amount ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
+                            ),
+                            child: const Text('AMOUNT', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => setState(() => selectedType = DiscountType.percentage),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: selectedType == DiscountType.percentage ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: selectedType == DiscountType.percentage ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
+                            ),
+                            child: const Text('PERCENTAGE', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: controller,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: selectedType == DiscountType.amount ? 'Discount Amount ($currency)' : 'Discount Percentage (%)',
+                    border: const OutlineInputBorder(),
+                    prefixText: selectedType == DiscountType.amount ? currency : null,
+                    suffixText: selectedType == DiscountType.percentage ? '%' : null,
+                  ),
+                ),
+                if (selectedType == DiscountType.percentage) ...[
+                  const SizedBox(height: 8),
+                  const Text('Enter percentage (0-100) to apply to subtotal + tax.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+              if (currentPriceDiscount > 0)
+                TextButton(
+                  onPressed: () {
+                    invoiceBloc.add(UpdateDiscount(0));
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('REMOVE', style: TextStyle(color: Colors.red)),
+                ),
+              ElevatedButton(
+                onPressed: () {
+                  final discount = double.tryParse(controller.text) ?? 0;
+                  // Basic validation for percentage
+                  if (selectedType == DiscountType.percentage && (discount < 0 || discount > 100)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please enter a percentage between 0 and 100')),
+                    );
+                    return;
+                  }
+                  invoiceBloc.add(UpdateDiscount(discount, type: selectedType));
+                  Navigator.pop(ctx);
+                },
+                child: const Text('APPLY'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          if (currentDiscount > 0)
-            TextButton(
-              onPressed: () {
-                invoiceBloc.add(UpdateDiscount(0));
-                Navigator.pop(ctx);
-              },
-              child: const Text('REMOVE', style: TextStyle(color: Colors.red)),
-            ),
-          ElevatedButton(
-            onPressed: () {
-              final discount = double.tryParse(controller.text) ?? 0;
-              invoiceBloc.add(UpdateDiscount(discount));
-              Navigator.pop(ctx);
-            },
-            child: const Text('APPLY'),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
