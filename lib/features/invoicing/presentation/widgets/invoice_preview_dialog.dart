@@ -192,6 +192,23 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                     onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                       final amountReceived = double.tryParse(_amountReceivedController.text) ?? 0.0;
+                      
+                      // Safety check for significant overpayment
+                      if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
+                        final proceed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Confirm Overpayment'),
+                            content: Text('The amount received ($amountReceived) is significantly higher than the total (${invoiceState.total}). Are you sure you want to proceed?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('NO, CORRECT IT')),
+                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('YES, PROCEED')),
+                            ],
+                          ),
+                        );
+                        if (proceed != true) return;
+                      }
+
                       final invoiceNumber = widget.invoiceBloc.calculationService.generateInvoiceNumber();
                       
                       widget.invoiceBloc.add(SaveInvoice(
@@ -218,12 +235,30 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         totalAmount: invoiceState.total,
                         paymentStatus: status,
                         amountPaid: amountReceived,
-                        balanceAmount: invoiceState.total - amountReceived,
+                        balanceAmount: (invoiceState.total - amountReceived).clamp(0, double.infinity),
                         customerName: invoiceState.customerName,
+                        customerPhone: invoiceState.customerPhone,
                         customerAddress: invoiceState.customerAddress,
                         paymentMethod: invoiceState.paymentMethod,
                         staffId: invoiceState.staffId,
                         staffName: invoiceState.staffName,
+                        totalPrintAmount: widget.invoiceBloc.calculationService.calculateTotalPrintAmount(
+                          invoiceState.items, 
+                          invoiceState.taxRate, 
+                          invoiceState.taxEnabled, 
+                          invoiceState.discount,
+                          invoiceState.discountType,
+                        ),
+                        businessMode: invoiceState.businessMode,
+                        studentId: invoiceState.studentId,
+                        classId: invoiceState.classId,
+                        termId: invoiceState.termId,
+                        academicYearId: invoiceState.academicYearId,
+                        admissionNumber: invoiceState.admissionNumber,
+                        className: invoiceState.className,
+                        termName: invoiceState.termName,
+                        academicYearName: invoiceState.academicYearName,
+                        studentImage: invoiceState.studentImage,
                       );
 
                       _printInvoice(context, invoice, settings!);
@@ -236,6 +271,23 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   ElevatedButton(
                     onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                       final amountReceived = double.tryParse(_amountReceivedController.text) ?? 0.0;
+
+                      // Safety check for significant overpayment
+                      if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
+                        final proceed = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Confirm Overpayment'),
+                            content: Text('The amount received ($amountReceived) is significantly higher than the total (${invoiceState.total}). Are you sure you want to proceed?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('NO, CORRECT IT')),
+                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('YES, PROCEED')),
+                            ],
+                          ),
+                        );
+                        if (proceed != true) return;
+                      }
+
                       final invoiceNumber = widget.invoiceBloc.calculationService.generateInvoiceNumber();
                       
                       widget.invoiceBloc.add(SaveInvoice(
@@ -263,12 +315,30 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         totalAmount: invoiceState.total,
                         paymentStatus: status,
                         amountPaid: amountReceived,
-                        balanceAmount: invoiceState.total - amountReceived,
+                        balanceAmount: (invoiceState.total - amountReceived).clamp(0, double.infinity),
                         customerName: invoiceState.customerName,
+                        customerPhone: invoiceState.customerPhone,
                         customerAddress: invoiceState.customerAddress,
                         paymentMethod: invoiceState.paymentMethod,
                         staffId: invoiceState.staffId,
                         staffName: invoiceState.staffName,
+                        totalPrintAmount: widget.invoiceBloc.calculationService.calculateTotalPrintAmount(
+                          invoiceState.items, 
+                          invoiceState.taxRate, 
+                          invoiceState.taxEnabled, 
+                          invoiceState.discount,
+                          invoiceState.discountType,
+                        ),
+                        businessMode: invoiceState.businessMode,
+                        studentId: invoiceState.studentId,
+                        classId: invoiceState.classId,
+                        termId: invoiceState.termId,
+                        academicYearId: invoiceState.academicYearId,
+                        admissionNumber: invoiceState.admissionNumber,
+                        className: invoiceState.className,
+                        termName: invoiceState.termName,
+                        academicYearName: invoiceState.academicYearName,
+                        studentImage: invoiceState.studentImage,
                       );
 
                       Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));

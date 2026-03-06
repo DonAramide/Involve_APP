@@ -1204,6 +1204,7 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
     return;
   }
   
+  final formKey = GlobalKey<FormState>();
   final nameController = TextEditingController(text: currentName);
   final phoneController = TextEditingController(text: currentPhone);
   final addrController = TextEditingController(text: currentAddress);
@@ -1213,38 +1214,65 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(settings?.customerInfoLabel ?? 'Customer Information'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: nameController,
-            decoration: InputDecoration(labelText: settings?.customerNameLabel ?? 'Customer Name', border: const OutlineInputBorder()),
-            autofocus: true,
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: phoneController,
-            decoration: InputDecoration(labelText: settings?.customerPhoneLabel ?? 'Customer Phone', border: const OutlineInputBorder()),
-            keyboardType: TextInputType.phone,
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: addrController,
-            decoration: InputDecoration(labelText: settings?.customerAddressLabel ?? 'Customer Address', border: const OutlineInputBorder()),
-            maxLines: 2,
-          ),
-        ],
+      content: Form(
+        key: formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: settings?.customerNameLabel ?? 'Customer Name', 
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.person),
+              ),
+              autofocus: true,
+              validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter customer name' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: phoneController,
+              decoration: InputDecoration(
+                labelText: settings?.customerPhoneLabel ?? 'Customer Phone', 
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.phone),
+                hintText: 'e.g. 08012345678',
+              ),
+              keyboardType: TextInputType.phone,
+              validator: (val) {
+                if (val == null || val.isEmpty) return 'Phone number required';
+                final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
+                if (digitsOnly.length < 11 || digitsOnly.length > 15) {
+                  return 'Phone must be 11 to 15 digits';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: addrController,
+              decoration: InputDecoration(
+                labelText: settings?.customerAddressLabel ?? 'Customer Address', 
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.location_on),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
         ElevatedButton(
           onPressed: () {
-            invoiceBloc.add(UpdateCustomerInfo(
-              name: nameController.text.isEmpty ? null : nameController.text,
-              phone: phoneController.text.isEmpty ? null : phoneController.text,
-              address: addrController.text.isEmpty ? null : addrController.text,
-            ));
-            Navigator.pop(ctx);
+            if (formKey.currentState?.validate() ?? false) {
+              invoiceBloc.add(UpdateCustomerInfo(
+                name: nameController.text.trim(),
+                phone: phoneController.text.trim(),
+                address: addrController.text.isEmpty ? null : addrController.text.trim(),
+              ));
+              Navigator.pop(ctx);
+            }
           },
           child: const Text('SAVE'),
         ),

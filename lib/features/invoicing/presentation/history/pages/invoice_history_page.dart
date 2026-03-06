@@ -437,13 +437,31 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           }),
           const Divider(),
           Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+            child: Column(
+              children: [
+                _buildHistorySummaryRow('Subtotal', invoice.subtotal, context),
+                if (invoice.taxAmount > 0)
+                  _buildHistorySummaryRow('Tax', invoice.taxAmount, context),
+                if (invoice.discountAmount > 0)
+                  _buildHistorySummaryRow('Discount', -invoice.discountAmount, context),
+                _buildHistorySummaryRow('Total', invoice.totalAmount, context, isTotal: true),
+                const SizedBox(height: 4),
+                _buildHistorySummaryRow('Paid', invoice.amountPaid, context),
+                if (invoice.balanceAmount > 0)
+                  _buildHistorySummaryRow('Balance', invoice.balanceAmount, context, color: Colors.red, isBold: true),
+              ],
+            ),
+          ),
+          const Divider(),
+          Padding(
             padding: const EdgeInsets.all(8.0),
             child: Wrap(
               alignment: WrapAlignment.end,
               spacing: 8.0,
               runSpacing: 4.0,
               children: [
-                if (invoice.paymentStatus != 'Paid')
+                if (invoice.balanceAmount > 0)
                   ElevatedButton.icon(
                     onPressed: () => _showBalancePaymentDialog(context, invoice),
                     icon: const Icon(Icons.account_balance_wallet_outlined),
@@ -463,6 +481,33 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700], foregroundColor: Colors.white),
                   ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistorySummaryRow(String label, double amount, BuildContext context, {bool isTotal = false, bool isBold = false, Color? color}) {
+    final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label, 
+            style: TextStyle(
+              fontWeight: (isTotal || isBold) ? FontWeight.bold : FontWeight.normal,
+              fontSize: isTotal ? 14 : 12,
+            )
+          ),
+          Text(
+            CurrencyFormatter.formatWithSymbol(amount, symbol: currency),
+            style: TextStyle(
+              fontWeight: (isTotal || isBold) ? FontWeight.bold : FontWeight.normal,
+              fontSize: isTotal ? 14 : 12,
+              color: color,
             ),
           ),
         ],
