@@ -318,27 +318,27 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
               
               TextFormField(
                 controller: _priceController,
-                decoration: const InputDecoration(labelText: 'Price / Rate'),
+                decoration: InputDecoration(labelText: '${term.sellingPriceLabel} / Rate'),
                 keyboardType: TextInputType.number,
-                validator: (val) => InputValidator.validateNumber(val, 'Price'),
+                validator: (val) => InputValidator.validateNumber(val, term.sellingPriceLabel),
               ),
               if (_type == 'product') ...[
                 const SizedBox(height: 10),
                 TextFormField(
                   controller: _costPriceController,
-                  decoration: const InputDecoration(labelText: 'Cost Price (Optional)'),
+                  decoration: InputDecoration(labelText: '${term.costPriceLabel} (Optional)'),
                   keyboardType: TextInputType.number,
                   validator: (val) {
                     if (val == null || val.isEmpty || val == '0' || val == '0.0') return null;
                     
-                    final costErr = InputValidator.validateNumber(val, 'Cost Price');
+                    final costErr = InputValidator.validateNumber(val, term.costPriceLabel);
                     if (costErr != null) return costErr;
 
                     final cost = double.tryParse(val) ?? 0.0;
                     final price = double.tryParse(_priceController.text) ?? 0.0;
 
                     if (cost > price) {
-                      return 'Cost Price cannot exceed Selling Price';
+                      return '${term.costPriceLabel} cannot exceed ${term.sellingPriceLabel}';
                     }
                     return null;
                   },

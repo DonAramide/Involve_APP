@@ -25,4 +25,7 @@ extension BusinessTerminology on AppSettings {
   String get customerNameLabel => businessMode == 'school' ? 'Student Full Name' : 'Customer Name';
   String get customerPhoneLabel => businessMode == 'school' ? 'Parent Phone Number' : 'Customer Phone';
   String get customerAddressLabel => businessMode == 'school' ? 'Home Address' : 'Customer Address';
+  
+  String get sellingPriceLabel => businessMode == 'school' ? 'Fee Amount' : 'Selling Price';
+  String get costPriceLabel => businessMode == 'school' ? 'Base Cost' : 'Cost Price';
 }
