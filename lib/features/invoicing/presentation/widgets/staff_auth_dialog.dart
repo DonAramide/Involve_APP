@@ -156,7 +156,8 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
 
     if (_selectedStaff == null) return;
     
-    if (_hash(_codeController.text) == _selectedStaff!.staffCode) {
+    final pin = _codeController.text.trim();
+    if (_hash(pin) == _selectedStaff!.staffCode) {
       // Clear failed attempts on success
       settingsBloc.add(ResetFailedAttempts());
       Navigator.pop(context, _selectedStaff);

@@ -25,6 +25,8 @@ class _CalculatorPageState extends State<CalculatorPage> {
       _backspace();
     } else if (buttonText == '+' || buttonText == '-' || buttonText == '×' || buttonText == '÷') {
       _setOperand(buttonText);
+    } else if (buttonText == '%') {
+      _applyPercentage();
     } else if (buttonText == '=') {
       _calculateResult();
     } else if (buttonText == '.') {
@@ -45,6 +47,38 @@ class _CalculatorPageState extends State<CalculatorPage> {
         _output = _currentInput;
       });
     }
+  }
+
+  void _applyPercentage() {
+    if (_output == '0' || _output == 'Error') return;
+    
+    double currentNum = double.tryParse(_currentInput.isEmpty ? _output : _currentInput) ?? 0;
+    double result;
+    
+    if (_operand.isNotEmpty && _num1 != 0) {
+      // Contextual percentage: num1 operator (num1 * currentNum / 100)
+      // e.g. 200 + 10% -> 200 + 20
+      result = (_num1 * currentNum) / 100;
+    } else {
+      // Simple percentage: currentNum / 100
+      result = currentNum / 100;
+    }
+
+    setState(() {
+      String resultStr = result.toString();
+      // Remove trailing .0 but keep other decimals
+      if (resultStr.contains('.') && resultStr.endsWith('0')) {
+        while (resultStr.endsWith('0')) {
+          resultStr = resultStr.substring(0, resultStr.length - 1);
+        }
+        if (resultStr.endsWith('.')) {
+          resultStr = resultStr.substring(0, resultStr.length - 1);
+        }
+      }
+      
+      _currentInput = resultStr;
+      _output = resultStr;
+    });
   }
 
   void _clear() {
@@ -80,9 +114,7 @@ class _CalculatorPageState extends State<CalculatorPage> {
         // Change operand if already set
         _operand = newOperand;
         // Update history to show new operand
-        // This is a bit complex with simple history string, so we just reset if needed or keep it simple
-        // For now, let's just update the display history if possible
-        if (_history.length > 2) {
+        if (_history.length >= 1) {
            _history = '${_history.substring(0, _history.length - 1)}$newOperand';
         }
       }
@@ -119,7 +151,6 @@ class _CalculatorPageState extends State<CalculatorPage> {
     }
 
     setState(() {
-      // Format result to remove trailing .0
       String resultStr = result.toString();
       if (resultStr.endsWith('.0')) {
         resultStr = resultStr.substring(0, resultStr.length - 2);
@@ -186,15 +217,13 @@ class _CalculatorPageState extends State<CalculatorPage> {
               color: colorScheme.surface,
               child: Column(
                 children: [
-                  _buildButtonRow(['C', '÷', '×', '⌫'], 
+                  _buildButtonRow(['C', '%', '÷', '⌫'], 
                     textColor: colorScheme.error, 
                     opColor: colorScheme.primary),
-                  _buildButtonRow(['7', '8', '9', '-'], opColor: colorScheme.primary),
-                  _buildButtonRow(['4', '5', '6', '+'], opColor: colorScheme.primary),
-                  _buildButtonRow(['1', '2', '3', '='], 
-                    opColor: colorScheme.primary, 
-                    isEquals: true), // We'll handle layout differently inside
-                  _buildButtonRow(['0', '.'], isZeroRow: true),
+                  _buildButtonRow(['7', '8', '9', '×'], opColor: colorScheme.primary),
+                  _buildButtonRow(['4', '5', '6', '-'], opColor: colorScheme.primary),
+                  _buildButtonRow(['1', '2', '3', '+'], opColor: colorScheme.primary),
+                  _buildButtonRow(['0', '.', '='], isZeroRow: true, isEquals: true),
                 ],
               ),
             ),
@@ -236,7 +265,7 @@ class _CalculatorPageState extends State<CalculatorPage> {
   }
 
   Widget _buildButton(String text, {Color? textColor, Color? opColor, Color? backgroundColor}) {
-    final isOperator = ['+', '-', '×', '÷', '='].contains(text);
+    final isOperator = ['+', '-', '×', '÷', '=', '%'].contains(text);
     final isAction = ['C', '⌫'].contains(text);
     
     return Container(

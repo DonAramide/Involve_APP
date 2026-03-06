@@ -1239,13 +1239,14 @@ class _SettingsPageState extends State<SettingsPage> {
           ElevatedButton(
             onPressed: () {
               if (formKey.currentState!.validate()) {
+                final pin = codeController.text.trim();
                 final newStaff = Staff(
                   id: staff?.id,
-                  name: nameController.text,
-                  staffCode: codeController.text.isEmpty && staff != null 
+                  name: nameController.text.trim(),
+                  staffCode: pin.isEmpty && staff != null 
                       ? staff.staffCode 
-                      : codeController.text,
-                  phone: phoneController.text,
+                      : pin,
+                  phone: phoneController.text.trim(),
                 );
                 if (staff == null) {
                   context.read<StaffBloc>().add(AddStaff(newStaff));
