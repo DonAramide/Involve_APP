@@ -999,7 +999,12 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Service Categories', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+              Text(
+                settings.businessMode == 'school' 
+                    ? 'Service Categories (Hostel/Bus/Hall)' 
+                    : 'Service Categories (Rentals/Consultations)', 
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)
+              ),
               IconButton(
                 icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
                 onPressed: () => _addServiceType(context, settings),
@@ -1075,7 +1080,13 @@ class _SettingsPageState extends State<SettingsPage> {
     return ListTile(
       title: Row(
         children: [
-          const Expanded(child: Text('Enable Service Billing (school Hostel and Hall)')),
+          Expanded(
+            child: Text(
+              settings.businessMode == 'school' 
+                  ? 'Enable Service Billing (Hostel and Hall)' 
+                  : 'Enable Service Billing (Rentals and Services)'
+            )
+          ),
           if (isLocked) ...[
             const SizedBox(width: 8),
             const Icon(Icons.lock, size: 16, color: Colors.orange),
