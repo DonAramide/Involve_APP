@@ -405,7 +405,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           },
         ),
         RadioListTile<String>(
-          title: const Text('Pay Later (Deferred)', style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold)),
+          title: const Text('Pay Later (deferred)/ part payment', style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold)),
           value: 'Deferred',
           groupValue: state.paymentMethod,
           dense: true,
