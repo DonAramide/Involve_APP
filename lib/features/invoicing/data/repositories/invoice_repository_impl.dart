@@ -210,7 +210,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         subtotal: row.subtotal,
         taxAmount: row.taxAmount,
         discountAmount: row.discountAmount,
-        discountType: DiscountType.values.byName(row.discountType),
+        discountType: DiscountType.values.byName(row.discountType ?? 'amount'),
         totalAmount: row.totalAmount,
         paymentStatus: row.paymentStatus,
         amountPaid: row.amountPaid,
