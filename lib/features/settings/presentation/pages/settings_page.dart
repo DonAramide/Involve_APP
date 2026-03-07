@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart'; // For logo picking
 import '../../../../core/utils/validators.dart';
+import '../../../../core/utils/logo_processor.dart';
 import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
 import '../widgets/password_dialog.dart';
@@ -781,7 +782,28 @@ class _SettingsPageState extends State<SettingsPage> {
     final image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       final bytes = await image.readAsBytes();
-      _update(context, settings.copyWith(logo: bytes));
+      
+      // Process logo to high-contrast black on transparent
+      final processedPng = LogoProcessor.processToBlackPng(bytes);
+      if (processedPng != null) {
+        final processedSvg = LogoProcessor.generateBlackSvg(processedPng);
+        _update(context, settings.copyWith(
+          logo: processedPng,
+          logoSvg: processedSvg,
+        ));
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Logo optimized for high-contrast printing'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      } else {
+        // Fallback to original if processing fails
+        _update(context, settings.copyWith(logo: bytes));
+      }
     }
   }
 

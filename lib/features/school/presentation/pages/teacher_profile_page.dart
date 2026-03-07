@@ -7,6 +7,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_state.dart'
 import 'package:url_launcher/url_launcher.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
+import '../widgets/teacher_form_dialog.dart';
 
 class TeacherProfilePage extends StatelessWidget {
   final Teacher teacher;
@@ -31,6 +32,10 @@ class TeacherProfilePage extends StatelessWidget {
           appBar: AppBar(
             title: Text(currentTeacher.fullName),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: () => TeacherFormDialog.show(context, teacher: currentTeacher),
+              ),
               IconButton(
                 icon: const Icon(Icons.delete, color: Colors.red),
                 onPressed: () {

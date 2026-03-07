@@ -3585,6 +3585,12 @@ class $SettingsTable extends Settings
   late final GeneratedColumn<Uint8List> logo = GeneratedColumn<Uint8List>(
       'logo', aliasedName, true,
       type: DriftSqlType.blob, requiredDuringInsert: false);
+  static const VerificationMeta _logoSvgMeta =
+      const VerificationMeta('logoSvg');
+  @override
+  late final GeneratedColumn<String> logoSvg = GeneratedColumn<String>(
+      'logo_svg', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _themeModeMeta =
       const VerificationMeta('themeMode');
   @override
@@ -3979,6 +3985,7 @@ class $SettingsTable extends Settings
         taxId,
         logoPath,
         logo,
+        logoSvg,
         themeMode,
         currency,
         taxEnabled,
@@ -4074,6 +4081,10 @@ class $SettingsTable extends Settings
     if (data.containsKey('logo')) {
       context.handle(
           _logoMeta, logo.isAcceptableOrUnknown(data['logo']!, _logoMeta));
+    }
+    if (data.containsKey('logo_svg')) {
+      context.handle(_logoSvgMeta,
+          logoSvg.isAcceptableOrUnknown(data['logo_svg']!, _logoSvgMeta));
     }
     if (data.containsKey('theme_mode')) {
       context.handle(_themeModeMeta,
@@ -4347,6 +4358,8 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.string, data['${effectivePrefix}logo_path']),
       logo: attachedDatabase.typeMapping
           .read(DriftSqlType.blob, data['${effectivePrefix}logo']),
+      logoSvg: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}logo_svg']),
       themeMode: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}theme_mode'])!,
       currency: attachedDatabase.typeMapping
@@ -4460,6 +4473,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final String? taxId;
   final String? logoPath;
   final Uint8List? logo;
+  final String? logoSvg;
   final String themeMode;
   final String currency;
   final bool taxEnabled;
@@ -4513,6 +4527,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       this.taxId,
       this.logoPath,
       this.logo,
+      this.logoSvg,
       required this.themeMode,
       required this.currency,
       required this.taxEnabled,
@@ -4575,6 +4590,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     }
     if (!nullToAbsent || logo != null) {
       map['logo'] = Variable<Uint8List>(logo);
+    }
+    if (!nullToAbsent || logoSvg != null) {
+      map['logo_svg'] = Variable<String>(logoSvg);
     }
     map['theme_mode'] = Variable<String>(themeMode);
     map['currency'] = Variable<String>(currency);
@@ -4656,6 +4674,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ? const Value.absent()
           : Value(logoPath),
       logo: logo == null && nullToAbsent ? const Value.absent() : Value(logo),
+      logoSvg: logoSvg == null && nullToAbsent
+          ? const Value.absent()
+          : Value(logoSvg),
       themeMode: Value(themeMode),
       currency: Value(currency),
       taxEnabled: Value(taxEnabled),
@@ -4732,6 +4753,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       taxId: serializer.fromJson<String?>(json['taxId']),
       logoPath: serializer.fromJson<String?>(json['logoPath']),
       logo: serializer.fromJson<Uint8List?>(json['logo']),
+      logoSvg: serializer.fromJson<String?>(json['logoSvg']),
       themeMode: serializer.fromJson<String>(json['themeMode']),
       currency: serializer.fromJson<String>(json['currency']),
       taxEnabled: serializer.fromJson<bool>(json['taxEnabled']),
@@ -4801,6 +4823,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'taxId': serializer.toJson<String?>(taxId),
       'logoPath': serializer.toJson<String?>(logoPath),
       'logo': serializer.toJson<Uint8List?>(logo),
+      'logoSvg': serializer.toJson<String?>(logoSvg),
       'themeMode': serializer.toJson<String>(themeMode),
       'currency': serializer.toJson<String>(currency),
       'taxEnabled': serializer.toJson<bool>(taxEnabled),
@@ -4861,6 +4884,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           Value<String?> taxId = const Value.absent(),
           Value<String?> logoPath = const Value.absent(),
           Value<Uint8List?> logo = const Value.absent(),
+          Value<String?> logoSvg = const Value.absent(),
           String? themeMode,
           String? currency,
           bool? taxEnabled,
@@ -4916,6 +4940,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         taxId: taxId.present ? taxId.value : this.taxId,
         logoPath: logoPath.present ? logoPath.value : this.logoPath,
         logo: logo.present ? logo.value : this.logo,
+        logoSvg: logoSvg.present ? logoSvg.value : this.logoSvg,
         themeMode: themeMode ?? this.themeMode,
         currency: currency ?? this.currency,
         taxEnabled: taxEnabled ?? this.taxEnabled,
@@ -4984,6 +5009,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       taxId: data.taxId.present ? data.taxId.value : this.taxId,
       logoPath: data.logoPath.present ? data.logoPath.value : this.logoPath,
       logo: data.logo.present ? data.logo.value : this.logo,
+      logoSvg: data.logoSvg.present ? data.logoSvg.value : this.logoSvg,
       themeMode: data.themeMode.present ? data.themeMode.value : this.themeMode,
       currency: data.currency.present ? data.currency.value : this.currency,
       taxEnabled:
@@ -5106,6 +5132,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('taxId: $taxId, ')
           ..write('logoPath: $logoPath, ')
           ..write('logo: $logo, ')
+          ..write('logoSvg: $logoSvg, ')
           ..write('themeMode: $themeMode, ')
           ..write('currency: $currency, ')
           ..write('taxEnabled: $taxEnabled, ')
@@ -5164,6 +5191,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         taxId,
         logoPath,
         $driftBlobEquality.hash(logo),
+        logoSvg,
         themeMode,
         currency,
         taxEnabled,
@@ -5221,6 +5249,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.taxId == this.taxId &&
           other.logoPath == this.logoPath &&
           $driftBlobEquality.equals(other.logo, this.logo) &&
+          other.logoSvg == this.logoSvg &&
           other.themeMode == this.themeMode &&
           other.currency == this.currency &&
           other.taxEnabled == this.taxEnabled &&
@@ -5277,6 +5306,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<String?> taxId;
   final Value<String?> logoPath;
   final Value<Uint8List?> logo;
+  final Value<String?> logoSvg;
   final Value<String> themeMode;
   final Value<String> currency;
   final Value<bool> taxEnabled;
@@ -5330,6 +5360,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.taxId = const Value.absent(),
     this.logoPath = const Value.absent(),
     this.logo = const Value.absent(),
+    this.logoSvg = const Value.absent(),
     this.themeMode = const Value.absent(),
     this.currency = const Value.absent(),
     this.taxEnabled = const Value.absent(),
@@ -5384,6 +5415,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.taxId = const Value.absent(),
     this.logoPath = const Value.absent(),
     this.logo = const Value.absent(),
+    this.logoSvg = const Value.absent(),
     this.themeMode = const Value.absent(),
     this.currency = const Value.absent(),
     this.taxEnabled = const Value.absent(),
@@ -5440,6 +5472,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<String>? taxId,
     Expression<String>? logoPath,
     Expression<Uint8List>? logo,
+    Expression<String>? logoSvg,
     Expression<String>? themeMode,
     Expression<String>? currency,
     Expression<bool>? taxEnabled,
@@ -5495,6 +5528,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (taxId != null) 'tax_id': taxId,
       if (logoPath != null) 'logo_path': logoPath,
       if (logo != null) 'logo': logo,
+      if (logoSvg != null) 'logo_svg': logoSvg,
       if (themeMode != null) 'theme_mode': themeMode,
       if (currency != null) 'currency': currency,
       if (taxEnabled != null) 'tax_enabled': taxEnabled,
@@ -5566,6 +5600,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String?>? taxId,
       Value<String?>? logoPath,
       Value<Uint8List?>? logo,
+      Value<String?>? logoSvg,
       Value<String>? themeMode,
       Value<String>? currency,
       Value<bool>? taxEnabled,
@@ -5619,6 +5654,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       taxId: taxId ?? this.taxId,
       logoPath: logoPath ?? this.logoPath,
       logo: logo ?? this.logo,
+      logoSvg: logoSvg ?? this.logoSvg,
       themeMode: themeMode ?? this.themeMode,
       currency: currency ?? this.currency,
       taxEnabled: taxEnabled ?? this.taxEnabled,
@@ -5699,6 +5735,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     }
     if (logo.present) {
       map['logo'] = Variable<Uint8List>(logo.value);
+    }
+    if (logoSvg.present) {
+      map['logo_svg'] = Variable<String>(logoSvg.value);
     }
     if (themeMode.present) {
       map['theme_mode'] = Variable<String>(themeMode.value);
@@ -5853,6 +5892,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('taxId: $taxId, ')
           ..write('logoPath: $logoPath, ')
           ..write('logo: $logo, ')
+          ..write('logoSvg: $logoSvg, ')
           ..write('themeMode: $themeMode, ')
           ..write('currency: $currency, ')
           ..write('taxEnabled: $taxEnabled, ')
@@ -13794,6 +13834,290 @@ class GradingRulesCompanion extends UpdateCompanion<GradingRuleTable> {
   }
 }
 
+class $PrinterConfigsTable extends PrinterConfigs
+    with TableInfo<$PrinterConfigsTable, PrinterConfig> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PrinterConfigsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _addressMeta =
+      const VerificationMeta('address');
+  @override
+  late final GeneratedColumn<String> address = GeneratedColumn<String>(
+      'address', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _customNameMeta =
+      const VerificationMeta('customName');
+  @override
+  late final GeneratedColumn<String> customName = GeneratedColumn<String>(
+      'custom_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+      'type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _lastConnectedAtMeta =
+      const VerificationMeta('lastConnectedAt');
+  @override
+  late final GeneratedColumn<DateTime> lastConnectedAt =
+      GeneratedColumn<DateTime>('last_connected_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [address, customName, type, lastConnectedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'printer_configs';
+  @override
+  VerificationContext validateIntegrity(Insertable<PrinterConfig> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('address')) {
+      context.handle(_addressMeta,
+          address.isAcceptableOrUnknown(data['address']!, _addressMeta));
+    } else if (isInserting) {
+      context.missing(_addressMeta);
+    }
+    if (data.containsKey('custom_name')) {
+      context.handle(
+          _customNameMeta,
+          customName.isAcceptableOrUnknown(
+              data['custom_name']!, _customNameMeta));
+    }
+    if (data.containsKey('type')) {
+      context.handle(
+          _typeMeta, type.isAcceptableOrUnknown(data['type']!, _typeMeta));
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('last_connected_at')) {
+      context.handle(
+          _lastConnectedAtMeta,
+          lastConnectedAt.isAcceptableOrUnknown(
+              data['last_connected_at']!, _lastConnectedAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {address};
+  @override
+  PrinterConfig map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PrinterConfig(
+      address: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}address'])!,
+      customName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}custom_name']),
+      type: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}type'])!,
+      lastConnectedAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}last_connected_at']),
+    );
+  }
+
+  @override
+  $PrinterConfigsTable createAlias(String alias) {
+    return $PrinterConfigsTable(attachedDatabase, alias);
+  }
+}
+
+class PrinterConfig extends DataClass implements Insertable<PrinterConfig> {
+  final String address;
+  final String? customName;
+  final String type;
+  final DateTime? lastConnectedAt;
+  const PrinterConfig(
+      {required this.address,
+      this.customName,
+      required this.type,
+      this.lastConnectedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['address'] = Variable<String>(address);
+    if (!nullToAbsent || customName != null) {
+      map['custom_name'] = Variable<String>(customName);
+    }
+    map['type'] = Variable<String>(type);
+    if (!nullToAbsent || lastConnectedAt != null) {
+      map['last_connected_at'] = Variable<DateTime>(lastConnectedAt);
+    }
+    return map;
+  }
+
+  PrinterConfigsCompanion toCompanion(bool nullToAbsent) {
+    return PrinterConfigsCompanion(
+      address: Value(address),
+      customName: customName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customName),
+      type: Value(type),
+      lastConnectedAt: lastConnectedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastConnectedAt),
+    );
+  }
+
+  factory PrinterConfig.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PrinterConfig(
+      address: serializer.fromJson<String>(json['address']),
+      customName: serializer.fromJson<String?>(json['customName']),
+      type: serializer.fromJson<String>(json['type']),
+      lastConnectedAt: serializer.fromJson<DateTime?>(json['lastConnectedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'address': serializer.toJson<String>(address),
+      'customName': serializer.toJson<String?>(customName),
+      'type': serializer.toJson<String>(type),
+      'lastConnectedAt': serializer.toJson<DateTime?>(lastConnectedAt),
+    };
+  }
+
+  PrinterConfig copyWith(
+          {String? address,
+          Value<String?> customName = const Value.absent(),
+          String? type,
+          Value<DateTime?> lastConnectedAt = const Value.absent()}) =>
+      PrinterConfig(
+        address: address ?? this.address,
+        customName: customName.present ? customName.value : this.customName,
+        type: type ?? this.type,
+        lastConnectedAt: lastConnectedAt.present
+            ? lastConnectedAt.value
+            : this.lastConnectedAt,
+      );
+  PrinterConfig copyWithCompanion(PrinterConfigsCompanion data) {
+    return PrinterConfig(
+      address: data.address.present ? data.address.value : this.address,
+      customName:
+          data.customName.present ? data.customName.value : this.customName,
+      type: data.type.present ? data.type.value : this.type,
+      lastConnectedAt: data.lastConnectedAt.present
+          ? data.lastConnectedAt.value
+          : this.lastConnectedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PrinterConfig(')
+          ..write('address: $address, ')
+          ..write('customName: $customName, ')
+          ..write('type: $type, ')
+          ..write('lastConnectedAt: $lastConnectedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(address, customName, type, lastConnectedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PrinterConfig &&
+          other.address == this.address &&
+          other.customName == this.customName &&
+          other.type == this.type &&
+          other.lastConnectedAt == this.lastConnectedAt);
+}
+
+class PrinterConfigsCompanion extends UpdateCompanion<PrinterConfig> {
+  final Value<String> address;
+  final Value<String?> customName;
+  final Value<String> type;
+  final Value<DateTime?> lastConnectedAt;
+  final Value<int> rowid;
+  const PrinterConfigsCompanion({
+    this.address = const Value.absent(),
+    this.customName = const Value.absent(),
+    this.type = const Value.absent(),
+    this.lastConnectedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PrinterConfigsCompanion.insert({
+    required String address,
+    this.customName = const Value.absent(),
+    required String type,
+    this.lastConnectedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : address = Value(address),
+        type = Value(type);
+  static Insertable<PrinterConfig> custom({
+    Expression<String>? address,
+    Expression<String>? customName,
+    Expression<String>? type,
+    Expression<DateTime>? lastConnectedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (address != null) 'address': address,
+      if (customName != null) 'custom_name': customName,
+      if (type != null) 'type': type,
+      if (lastConnectedAt != null) 'last_connected_at': lastConnectedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PrinterConfigsCompanion copyWith(
+      {Value<String>? address,
+      Value<String?>? customName,
+      Value<String>? type,
+      Value<DateTime?>? lastConnectedAt,
+      Value<int>? rowid}) {
+    return PrinterConfigsCompanion(
+      address: address ?? this.address,
+      customName: customName ?? this.customName,
+      type: type ?? this.type,
+      lastConnectedAt: lastConnectedAt ?? this.lastConnectedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (address.present) {
+      map['address'] = Variable<String>(address.value);
+    }
+    if (customName.present) {
+      map['custom_name'] = Variable<String>(customName.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (lastConnectedAt.present) {
+      map['last_connected_at'] = Variable<DateTime>(lastConnectedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PrinterConfigsCompanion(')
+          ..write('address: $address, ')
+          ..write('customName: $customName, ')
+          ..write('type: $type, ')
+          ..write('lastConnectedAt: $lastConnectedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -13819,6 +14143,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SubjectsTable subjects = $SubjectsTable(this);
   late final $ResultsTable results = $ResultsTable(this);
   late final $GradingRulesTable gradingRules = $GradingRulesTable(this);
+  late final $PrinterConfigsTable printerConfigs = $PrinterConfigsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -13843,7 +14168,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         teachers,
         subjects,
         results,
-        gradingRules
+        gradingRules,
+        printerConfigs
       ];
 }
 
@@ -16108,6 +16434,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<String?> taxId,
   Value<String?> logoPath,
   Value<Uint8List?> logo,
+  Value<String?> logoSvg,
   Value<String> themeMode,
   Value<String> currency,
   Value<bool> taxEnabled,
@@ -16162,6 +16489,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String?> taxId,
   Value<String?> logoPath,
   Value<Uint8List?> logo,
+  Value<String?> logoSvg,
   Value<String> themeMode,
   Value<String> currency,
   Value<bool> taxEnabled,
@@ -16242,6 +16570,9 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<Uint8List> get logo => $composableBuilder(
       column: $table.logo, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get logoSvg => $composableBuilder(
+      column: $table.logoSvg, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get themeMode => $composableBuilder(
       column: $table.themeMode, builder: (column) => ColumnFilters(column));
@@ -16432,6 +16763,9 @@ class $$SettingsTableOrderingComposer
 
   ColumnOrderings<Uint8List> get logo => $composableBuilder(
       column: $table.logo, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get logoSvg => $composableBuilder(
+      column: $table.logoSvg, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get themeMode => $composableBuilder(
       column: $table.themeMode, builder: (column) => ColumnOrderings(column));
@@ -16629,6 +16963,9 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<Uint8List> get logo =>
       $composableBuilder(column: $table.logo, builder: (column) => column);
 
+  GeneratedColumn<String> get logoSvg =>
+      $composableBuilder(column: $table.logoSvg, builder: (column) => column);
+
   GeneratedColumn<String> get themeMode =>
       $composableBuilder(column: $table.themeMode, builder: (column) => column);
 
@@ -16796,6 +17133,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String?> taxId = const Value.absent(),
             Value<String?> logoPath = const Value.absent(),
             Value<Uint8List?> logo = const Value.absent(),
+            Value<String?> logoSvg = const Value.absent(),
             Value<String> themeMode = const Value.absent(),
             Value<String> currency = const Value.absent(),
             Value<bool> taxEnabled = const Value.absent(),
@@ -16850,6 +17188,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             taxId: taxId,
             logoPath: logoPath,
             logo: logo,
+            logoSvg: logoSvg,
             themeMode: themeMode,
             currency: currency,
             taxEnabled: taxEnabled,
@@ -16904,6 +17243,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String?> taxId = const Value.absent(),
             Value<String?> logoPath = const Value.absent(),
             Value<Uint8List?> logo = const Value.absent(),
+            Value<String?> logoSvg = const Value.absent(),
             Value<String> themeMode = const Value.absent(),
             Value<String> currency = const Value.absent(),
             Value<bool> taxEnabled = const Value.absent(),
@@ -16958,6 +17298,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             taxId: taxId,
             logoPath: logoPath,
             logo: logo,
+            logoSvg: logoSvg,
             themeMode: themeMode,
             currency: currency,
             taxEnabled: taxEnabled,
@@ -22497,6 +22838,167 @@ typedef $$GradingRulesTableProcessedTableManager = ProcessedTableManager<
     ),
     GradingRuleTable,
     PrefetchHooks Function()>;
+typedef $$PrinterConfigsTableCreateCompanionBuilder = PrinterConfigsCompanion
+    Function({
+  required String address,
+  Value<String?> customName,
+  required String type,
+  Value<DateTime?> lastConnectedAt,
+  Value<int> rowid,
+});
+typedef $$PrinterConfigsTableUpdateCompanionBuilder = PrinterConfigsCompanion
+    Function({
+  Value<String> address,
+  Value<String?> customName,
+  Value<String> type,
+  Value<DateTime?> lastConnectedAt,
+  Value<int> rowid,
+});
+
+class $$PrinterConfigsTableFilterComposer
+    extends Composer<_$AppDatabase, $PrinterConfigsTable> {
+  $$PrinterConfigsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get address => $composableBuilder(
+      column: $table.address, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get customName => $composableBuilder(
+      column: $table.customName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastConnectedAt => $composableBuilder(
+      column: $table.lastConnectedAt,
+      builder: (column) => ColumnFilters(column));
+}
+
+class $$PrinterConfigsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PrinterConfigsTable> {
+  $$PrinterConfigsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get address => $composableBuilder(
+      column: $table.address, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get customName => $composableBuilder(
+      column: $table.customName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get type => $composableBuilder(
+      column: $table.type, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastConnectedAt => $composableBuilder(
+      column: $table.lastConnectedAt,
+      builder: (column) => ColumnOrderings(column));
+}
+
+class $$PrinterConfigsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PrinterConfigsTable> {
+  $$PrinterConfigsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get address =>
+      $composableBuilder(column: $table.address, builder: (column) => column);
+
+  GeneratedColumn<String> get customName => $composableBuilder(
+      column: $table.customName, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastConnectedAt => $composableBuilder(
+      column: $table.lastConnectedAt, builder: (column) => column);
+}
+
+class $$PrinterConfigsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $PrinterConfigsTable,
+    PrinterConfig,
+    $$PrinterConfigsTableFilterComposer,
+    $$PrinterConfigsTableOrderingComposer,
+    $$PrinterConfigsTableAnnotationComposer,
+    $$PrinterConfigsTableCreateCompanionBuilder,
+    $$PrinterConfigsTableUpdateCompanionBuilder,
+    (
+      PrinterConfig,
+      BaseReferences<_$AppDatabase, $PrinterConfigsTable, PrinterConfig>
+    ),
+    PrinterConfig,
+    PrefetchHooks Function()> {
+  $$PrinterConfigsTableTableManager(
+      _$AppDatabase db, $PrinterConfigsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PrinterConfigsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PrinterConfigsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PrinterConfigsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> address = const Value.absent(),
+            Value<String?> customName = const Value.absent(),
+            Value<String> type = const Value.absent(),
+            Value<DateTime?> lastConnectedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              PrinterConfigsCompanion(
+            address: address,
+            customName: customName,
+            type: type,
+            lastConnectedAt: lastConnectedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String address,
+            Value<String?> customName = const Value.absent(),
+            required String type,
+            Value<DateTime?> lastConnectedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              PrinterConfigsCompanion.insert(
+            address: address,
+            customName: customName,
+            type: type,
+            lastConnectedAt: lastConnectedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$PrinterConfigsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $PrinterConfigsTable,
+    PrinterConfig,
+    $$PrinterConfigsTableFilterComposer,
+    $$PrinterConfigsTableOrderingComposer,
+    $$PrinterConfigsTableAnnotationComposer,
+    $$PrinterConfigsTableCreateCompanionBuilder,
+    $$PrinterConfigsTableUpdateCompanionBuilder,
+    (
+      PrinterConfig,
+      BaseReferences<_$AppDatabase, $PrinterConfigsTable, PrinterConfig>
+    ),
+    PrinterConfig,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -22541,4 +23043,6 @@ class $AppDatabaseManager {
       $$ResultsTableTableManager(_db, _db.results);
   $$GradingRulesTableTableManager get gradingRules =>
       $$GradingRulesTableTableManager(_db, _db.gradingRules);
+  $$PrinterConfigsTableTableManager get printerConfigs =>
+      $$PrinterConfigsTableTableManager(_db, _db.printerConfigs);
 }

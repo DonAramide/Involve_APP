@@ -53,9 +53,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
               // Initialize amount received once total and method are available
               if (!_isInitialized && settings != null) {
                 if (invoiceState.paymentMethod == 'Deferred') {
-                  _amountReceivedController.text = '0';
+                  _amountReceivedController.text = '0.00';
                 } else if (invoiceState.paymentMethod != null) {
-                  _amountReceivedController.text = invoiceState.total.toString();
+                  _amountReceivedController.text = CurrencyFormatter.format(invoiceState.total);
                 }
                 _isInitialized = true;
               }
@@ -191,7 +191,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                     onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
-                      final amountReceived = double.tryParse(_amountReceivedController.text) ?? 0.0;
+                      final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
                       
                       // Safety check for significant overpayment
                       if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
@@ -270,7 +270,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   ),
                   ElevatedButton(
                     onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
-                      final amountReceived = double.tryParse(_amountReceivedController.text) ?? 0.0;
+                      final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
 
                       // Safety check for significant overpayment
                       if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
@@ -379,7 +379,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           contentPadding: EdgeInsets.zero,
           onChanged: (val) {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = state.total.toString();
+            _amountReceivedController.text = CurrencyFormatter.format(state.total);
           },
         ),
         RadioListTile<String>(
@@ -390,7 +390,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           contentPadding: EdgeInsets.zero,
           onChanged: (val) {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = state.total.toString();
+            _amountReceivedController.text = CurrencyFormatter.format(state.total);
           },
         ),
         RadioListTile<String>(
@@ -401,7 +401,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           contentPadding: EdgeInsets.zero,
           onChanged: (val) {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = state.total.toString();
+            _amountReceivedController.text = CurrencyFormatter.format(state.total);
           },
         ),
         RadioListTile<String>(
@@ -412,7 +412,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           contentPadding: EdgeInsets.zero,
           onChanged: (val) {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = '0';
+            _amountReceivedController.text = '0.00';
           },
         ),
         if (state.paymentMethod == null)

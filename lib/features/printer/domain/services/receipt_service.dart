@@ -175,14 +175,45 @@ class ReceiptService {
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
               ),
-              if (settings.businessMode == 'school') ...[
-                pw.SizedBox(height: 4),
-                pw.Text('Amount in Words: ${NumberToWords.convert(
-                  useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
-                  currency: settings.currencyName,
-                  subunit: settings.currencySubunit,
-                )} Only', style: const pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic)),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                   pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red),
+                    ),
+                    child: pw.Text(
+                      invoice.balanceAmount <= 0 ? 'PAID' : 'DUE',
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold, 
+                        fontSize: 10,
+                        color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red,
+                      ),
+                    ),
+                  ),
+                  pw.Align(
+                    alignment: pw.Alignment.centerRight,
+                    child: pw.Text(
+                      'Amount in Words: ${NumberToWords.convert(
+                        useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                        currency: settings.currencyName,
+                        subunit: settings.currencySubunit,
+                      )} Only', 
+                      style: pw.TextStyle(fontSize: 9, fontStyle: pw.FontStyle.italic)
+                    ),
+                  ),
+                ],
+              ),
+
+              if (settings.showAccountDetails && settings.bankName != null) ...[
+                pw.SizedBox(height: 6),
+                pw.Text('Bank: ${settings.bankName}', style: const pw.TextStyle(fontSize: 9)),
+                pw.Text('Acc No: ${settings.accountNumber}', style: const pw.TextStyle(fontSize: 9)),
+                pw.Text('Acc Name: ${settings.accountName}', style: const pw.TextStyle(fontSize: 9)),
               ],
+
               if (invoice.balanceAmount > 0) ...[
                 pw.SizedBox(height: 4),
                 pw.Row(
@@ -602,6 +633,33 @@ class ReceiptService {
                           ),
                         ),
                         pw.SizedBox(height: 10),
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: pw.BoxDecoration(
+                                border: pw.Border.all(color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red, width: 2),
+                              ),
+                              child: pw.Text(
+                                invoice.balanceAmount <= 0 ? 'PAID' : 'BALANCE DUE',
+                                style: pw.TextStyle(
+                                  color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red,
+                                  fontWeight: pw.FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.end,
+                              children: [
+                                _schoolSummaryRow('Paid:', CurrencyFormatter.format(invoice.amountPaid)),
+                                _schoolSummaryRow('Due:', CurrencyFormatter.format(invoice.balanceAmount)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        pw.SizedBox(height: 10),
                         pw.Align(
                           alignment: pw.Alignment.centerRight,
                           child: pw.Text(
@@ -810,6 +868,13 @@ class ReceiptService {
                       pw.Text('Payments Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
                       pw.Text(invoice.paymentMethod ?? 'N/A'),
                       pw.SizedBox(height: 10),
+                      if (settings.showAccountDetails && settings.bankName != null) ...[
+                        pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                        pw.Text('Bank: ${settings.bankName}'),
+                        pw.Text('Acc No: ${settings.accountNumber}'),
+                        pw.Text('Acc Name: ${settings.accountName}'),
+                        pw.SizedBox(height: 10),
+                      ],
                       pw.Text('Terms & Conditions:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
                       pw.Container(
                         width: 250,
@@ -842,6 +907,33 @@ class ReceiptService {
                                   style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 14)),
                             ],
                           ),
+                        ),
+                        pw.SizedBox(height: 10),
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: pw.BoxDecoration(
+                                border: pw.Border.all(color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red, width: 2),
+                              ),
+                              child: pw.Text(
+                                invoice.balanceAmount <= 0 ? 'PAID' : 'BALANCE DUE',
+                                style: pw.TextStyle(
+                                  color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red,
+                                  fontWeight: pw.FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.end,
+                              children: [
+                                _schoolSummaryRow('Paid:', CurrencyFormatter.format(invoice.amountPaid)),
+                                _schoolSummaryRow('Due:', CurrencyFormatter.format(invoice.balanceAmount)),
+                              ],
+                            ),
+                          ],
                         ),
                         pw.SizedBox(height: 10),
                         pw.Align(
@@ -924,14 +1016,16 @@ class ReceiptService {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.start,
                 children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      _academicInfoRow('ADM NO:', invoice.admissionNumber ?? 'N/A'),
-                      _academicInfoRow('NAME:', invoice.customerName?.toUpperCase() ?? 'N/A'),
-                      _academicInfoRow('CLASS:', invoice.className?.toUpperCase() ?? 'N/A'),
-                      if (invoice.termName != null) _academicInfoRow('TERM:', invoice.termName!.toUpperCase()),
-                    ],
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _academicInfoRow('ADM NO:', invoice.admissionNumber ?? 'N/A'),
+                        _academicInfoRow('NAME:', invoice.customerName?.toUpperCase() ?? 'N/A'),
+                        _academicInfoRow('CLASS:', invoice.className?.toUpperCase() ?? 'N/A'),
+                        if (invoice.termName != null) _academicInfoRow('TERM:', invoice.termName!.toUpperCase()),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -989,20 +1083,57 @@ class ReceiptService {
               ),
               pw.SizedBox(height: 20),
 
-              pw.Align(
-                alignment: pw.Alignment.centerLeft,
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    _academicSimpleRow('The total sum of:', NumberToWords.convert(
-                      useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
-                      currency: settings.currencyName,
-                      subunit: settings.currencySubunit,
-                    )),
-                    _academicSimpleRow('Being payment for:', '${invoice.termName ?? "Fees"} - ${invoice.academicYearName ?? ""}'),
-                    _academicSimpleRow('Receipt printed on:', dateFormat.format(DateTime.now())),
-                  ],
-                ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _academicSimpleRow('The total sum of:', NumberToWords.convert(
+                          useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                          currency: settings.currencyName,
+                          subunit: settings.currencySubunit,
+                        )),
+                        _academicSimpleRow('Being payment for:', '${invoice.termName ?? "Fees"} - ${invoice.academicYearName ?? ""}'),
+                        _academicSimpleRow('Receipt printed on:', dateFormat.format(DateTime.now())),
+                        if (settings.showAccountDetails && settings.bankName != null) ...[
+                          pw.SizedBox(height: 10),
+                          pw.Text('PAYMENT DETAILS:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                          pw.Text('Bank: ${settings.bankName} | Acc No: ${settings.accountNumber} | Acc Name: ${settings.accountName}', 
+                              style: const pw.TextStyle(fontSize: 10)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: 20),
+                  pw.Container(
+                    width: 150,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red, width: 1),
+                          ),
+                          child: pw.Text(
+                            invoice.balanceAmount <= 0 ? 'PAID' : 'BALANCE DUE',
+                            style: pw.TextStyle(
+                              color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red,
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        pw.SizedBox(height: 5),
+                        pw.Text('Paid: ${settings.currency} ${CurrencyFormatter.format(invoice.amountPaid)}', style: const pw.TextStyle(fontSize: 10)),
+                        pw.Text('Due: ${settings.currency} ${CurrencyFormatter.format(invoice.balanceAmount)}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: invoice.balanceAmount > 0 ? PdfColors.red : PdfColors.black)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
 
               pw.Spacer(),
@@ -1028,9 +1159,12 @@ class ReceiptService {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 2),
       child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Container(width: 100, child: pw.Text(label, style: const pw.TextStyle(fontSize: 12))),
-          pw.Text(value, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, decoration: pw.TextDecoration.underline)),
+          pw.Expanded(
+            child: pw.Text(value, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, decoration: pw.TextDecoration.underline)),
+          ),
         ],
       ),
     );
@@ -1050,10 +1184,13 @@ class ReceiptService {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(vertical: 4),
       child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
            pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
            pw.SizedBox(width: 8),
-           pw.Text(value, style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, decoration: pw.TextDecoration.underline)),
+           pw.Expanded(
+             child: pw.Text(value, style: pw.TextStyle(fontSize: 10, fontStyle: pw.FontStyle.italic, decoration: pw.TextDecoration.underline)),
+           ),
         ],
       ),
     );
@@ -1115,6 +1252,19 @@ class ReceiptService {
                              decoration: const pw.BoxDecoration(color: greenTheme),
                              child: pw.Text(receiptTitle ?? 'Payment Receipt', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
                            ),
+                           pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: pw.BoxDecoration(
+                                border: pw.Border.all(color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red, width: 2),
+                              ),
+                              child: pw.Text(
+                                invoice.balanceAmount <= 0 ? 'STATUS: PAID' : 'STATUS: UNPAID',
+                                style: pw.TextStyle(
+                                  color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red,
+                                  fontWeight: pw.FontWeight.bold,
+                                ),
+                              ),
+                            ),
                            pw.Row(
                              children: [
                                 pw.Text('Date: ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
@@ -1156,6 +1306,19 @@ class ReceiptService {
                                ),
                              ],
                           ),
+                          if (settings.showAccountDetails && settings.bankName != null) ...[
+                            pw.SizedBox(width: 10),
+                            pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Text('PAYMENT DETAILS:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: greenTheme, fontSize: 9)),
+                                pw.Text('Bank: ${settings.bankName}', style: const pw.TextStyle(fontSize: 8)),
+                                pw.Text('Acc No: ${settings.accountNumber}', style: const pw.TextStyle(fontSize: 8)),
+                                pw.Text('Acc Name: ${settings.accountName}', style: const pw.TextStyle(fontSize: 8)),
+                              ],
+                            ),
+                          ],
+                          pw.Spacer(),
                           pw.Column(
                              children: [
                                pw.Container(

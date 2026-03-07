@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:drift/drift.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
@@ -15,6 +14,7 @@ import 'package:involve_app/core/license/license_history_table.dart';
 import 'package:involve_app/features/stock/data/models/stock_return_table.dart';
 import 'package:involve_app/features/stock/data/models/expense_table.dart';
 import 'package:involve_app/features/school/data/models/school_tables.dart';
+import 'package:involve_app/features/printer/data/models/printer_table.dart';
 
 part 'app_database.g.dart';
 
@@ -38,13 +38,14 @@ part 'app_database.g.dart';
   Subjects,
   Results,
   GradingRules,
-  Teachers
+  Teachers,
+  PrinterConfigs
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 58;
+  int get schemaVersion => 60;
 
   @override
   MigrationStrategy get migration {
@@ -257,6 +258,14 @@ class AppDatabase extends _$AppDatabase {
         if (from < 58) {
           // Schema V58: Add discountType to Invoices table
           await _safeAddColumn(m, invoices, invoices.discountType);
+        }
+        if (from < 59) {
+          // Schema V59: Add logoSvg to Settings table
+          await _safeAddColumn(m, settings, settings.logoSvg);
+        }
+        if (from < 60) {
+          // Schema V60: Add PrinterConfigs table for renaming and auto-connect
+          await _safeCreateTable(m, printerConfigs);
         }
       },
       beforeOpen: (details) async {

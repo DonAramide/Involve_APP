@@ -98,6 +98,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showLogoAsMenuBackground: Value(settings.showLogoAsMenuBackground),
       currencyName: Value(settings.currencyName),
       currencySubunit: Value(settings.currencySubunit),
+      logoSvg: Value(settings.logoSvg),
     );
 
     if (existing == null) {
@@ -193,6 +194,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       showLogoAsMenuBackground: row.showLogoAsMenuBackground,
       currencyName: row.currencyName,
       currencySubunit: row.currencySubunit,
+      logoSvg: row.logoSvg,
     );
   }
 }

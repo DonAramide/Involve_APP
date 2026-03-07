@@ -10,6 +10,7 @@ class AppSettings extends Equatable {
   final String? taxId;
   final String? logoPath;
   final Uint8List? logo; // New field
+  final String? logoSvg;
   final String themeMode; // 'system', 'light', 'dark'
   final String currency;
   final bool taxEnabled;
@@ -117,6 +118,7 @@ class AppSettings extends Equatable {
     this.showLogoAsMenuBackground = false,
     this.currencyName = 'Naira',
     this.currencySubunit = 'Kobo',
+    this.logoSvg,
   });
 
   AppSettings copyWith({
@@ -172,6 +174,7 @@ class AppSettings extends Equatable {
     bool? showLogoAsMenuBackground,
     String? currencyName,
     String? currencySubunit,
+    String? logoSvg,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -226,6 +229,7 @@ class AppSettings extends Equatable {
       showLogoAsMenuBackground: showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
       currencyName: currencyName ?? this.currencyName,
       currencySubunit: currencySubunit ?? this.currencySubunit,
+      logoSvg: logoSvg ?? this.logoSvg,
     );
   }
 
@@ -283,5 +287,6 @@ class AppSettings extends Equatable {
         showLogoAsMenuBackground,
         currencyName,
         currencySubunit,
+        logoSvg,
       ];
 }

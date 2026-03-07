@@ -32,9 +32,11 @@ import 'package:involve_app/features/printer/data/repositories/cross_platform_pr
 import 'package:involve_app/features/printer/data/repositories/blue_thermal_printer_service.dart';
 import 'package:involve_app/features/printer/data/repositories/network_printer_service.dart';
 import 'package:involve_app/features/printer/data/repositories/unified_printer_service.dart';
+import 'package:involve_app/features/printer/data/repositories/printer_repository_impl.dart';
 import 'package:involve_app/features/printer/domain/repositories/printer_service.dart';
 import 'package:involve_app/features/printer/domain/usecases/printer_usecases.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/core/license/landing_page.dart';
@@ -82,6 +84,7 @@ void main() async {
     sppService: sppService,
     networkService: networkService,
   );
+  final printerRepository = PrinterRepositoryImpl(database);
   final securityService = SecurityService();
   final calculationService = InvoiceCalculationService();
   final backupService = BackupService(database: database);
@@ -166,6 +169,7 @@ void main() async {
     addExpense: addExpense,
     getExpenses: getExpenses,
     getTotalExpenses: getTotalExpenses,
+    printerRepository: printerRepository,
     staffRepository: staffRepository,
     syncRepository: syncRepository,
     discoveryService: discoveryService,
@@ -219,6 +223,7 @@ class MyApp extends StatelessWidget {
   final SyncManager syncManager;
   final String deviceId;
   final SchoolRepositoryImpl schoolRepository;
+  final PrinterRepository printerRepository;
 
   const MyApp({
     super.key,
@@ -259,6 +264,7 @@ class MyApp extends StatelessWidget {
     required this.syncManager,
     required this.deviceId,
     required this.schoolRepository,
+    required this.printerRepository,
   });
 
   @override
@@ -317,7 +323,8 @@ class MyApp extends StatelessWidget {
               getDevices: getDevices,
               connectPrinter: connectPrinter,
               printInvoice: printInvoice,
-            ),
+              repository: printerRepository,
+            )..add(AutoConnectPrinter()),
           ),
           BlocProvider(
             create: (_) => StaffBloc(
@@ -380,10 +387,10 @@ class MyApp extends StatelessWidget {
               DashboardPage.routeName: (_) => const DashboardPage(),
               ActivationPage.routeName: (_) => const ActivationPage(),
             },
-          );
-        },
+            );
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

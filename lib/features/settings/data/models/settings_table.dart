@@ -10,6 +10,7 @@ class Settings extends Table {
   TextColumn get taxId => text().nullable()();
   TextColumn get logoPath => text().nullable()();
   BlobColumn get logo => blob().nullable()();
+  TextColumn get logoSvg => text().nullable()();
   TextColumn get themeMode => text().withDefault(const Constant('system'))();
   TextColumn get currency => text().withDefault(const Constant('NGN'))();
   BoolColumn get taxEnabled => boolean().withDefault(const Constant(true))();

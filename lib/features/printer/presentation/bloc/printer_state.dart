@@ -4,11 +4,14 @@ import '../../domain/repositories/printer_service.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 
 // Printer Events
-abstract class PrinterEvent {}
+abstract class PrinterEvent extends Equatable {
+  @override
+  List<Object?> get props => [];
+}
 
 class ScanForDevices extends PrinterEvent {}
 
-class ConnectToDevice extends PrinterEvent implements Equatable {
+class ConnectToDevice extends PrinterEvent {
   final PrinterDevice device;
   ConnectToDevice(this.device);
   @override
@@ -28,6 +31,14 @@ class PrintCommandsEvent extends PrinterEvent {
   List<Object?> get props => [commands, paperWidth];
 }
 
+class RenamePrinter extends PrinterEvent {
+  final String address;
+  final String newName;
+  RenamePrinter(this.address, this.newName);
+}
+
+class AutoConnectPrinter extends PrinterEvent {}
+
 // States
 class CheckConnectionStatus extends PrinterEvent {}
 
@@ -38,6 +49,7 @@ class PrinterState extends Equatable {
   final PrinterDevice? connectedDevice;
   final bool isScanning;
   final bool isConnecting;
+  final bool isAutoConnecting;
   final String? error;
 
   const PrinterState({
@@ -45,6 +57,7 @@ class PrinterState extends Equatable {
     this.connectedDevice,
     this.isScanning = false,
     this.isConnecting = false,
+    this.isAutoConnecting = false,
     this.error,
   });
 
@@ -53,6 +66,7 @@ class PrinterState extends Equatable {
     PrinterDevice? connectedDevice,
     bool? isScanning,
     bool? isConnecting,
+    bool? isAutoConnecting,
     String? error,
   }) {
     return PrinterState(
@@ -60,10 +74,11 @@ class PrinterState extends Equatable {
       connectedDevice: connectedDevice ?? this.connectedDevice,
       isScanning: isScanning ?? this.isScanning,
       isConnecting: isConnecting ?? this.isConnecting,
+      isAutoConnecting: isAutoConnecting ?? this.isAutoConnecting,
       error: error ?? this.error,
     );
   }
 
   @override
-  List<Object?> get props => [devices, connectedDevice, isScanning, isConnecting, error];
+  List<Object?> get props => [devices, connectedDevice, isScanning, isConnecting, isAutoConnecting, error];
 }

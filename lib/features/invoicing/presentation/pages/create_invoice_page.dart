@@ -906,69 +906,71 @@ class _CartSummary extends StatelessWidget {
                   color: Colors.grey[50],
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildSummaryRow(context, 'Subtotal', state.subtotal, settings?.currency ?? '₦'),
-                    _buildSummaryRow(context, 'Tax (${(state.taxRate * 100).toStringAsFixed(0)}%)', state.tax, settings?.currency ?? '₦'),
-                    if (state.discount > 0)
-                      _buildSummaryRow(context, 'Discount', -state.discount, settings?.currency ?? '₦'),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.0),
-                      child: Divider(),
-                    ),
-                    if (settings?.discountEnabled == true) ...[
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton.icon(
-                          onPressed: () => _showDiscountDialog(context, state.discount, state.discountType),
-                          icon: const Icon(Icons.add_circle_outline, size: 18),
-                          label: Text(state.discount > 0 ? 'CHANGE DISCOUNT' : 'ADD DISCOUNT'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Theme.of(context).colorScheme.primary,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildSummaryRow(context, 'Subtotal', state.subtotal, settings?.currency ?? '₦'),
+                      _buildSummaryRow(context, 'Tax (${(state.taxRate * 100).toStringAsFixed(0)}%)', state.tax, settings?.currency ?? '₦'),
+                      if (state.discount > 0)
+                        _buildSummaryRow(context, 'Discount', -state.discount, settings?.currency ?? '₦'),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8.0),
+                        child: Divider(),
+                      ),
+                      if (settings?.discountEnabled == true) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextButton.icon(
+                            onPressed: () => _showDiscountDialog(context, state.discount, state.discountType),
+                            icon: const Icon(Icons.add_circle_outline, size: 18),
+                            label: Text(state.discount > 0 ? 'CHANGE DISCOUNT' : 'ADD DISCOUNT'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Theme.of(context).colorScheme.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    _buildSummaryRow(context, 'Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
-                    const SizedBox(height: 12),
-                    const Divider(),
-                    ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        state.customerName != null 
-                          ? '${state.customerName}${state.customerPhone != null ? " (${state.customerPhone})" : ""}'
-                          : (settings?.assignToCustomerLabel ?? 'Add Customer Name & Phone'), 
-                        style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)
-                      ),
-                      subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
-                      leading: Icon(Icons.person_outline, color: state.customerName != null ? Theme.of(context).colorScheme.primary : Colors.grey),
-                      trailing: const Icon(Icons.edit, size: 16),
-                      onTap: () => _showCustomerDialog(context, state.customerName, state.customerPhone, state.customerAddress),
-                    ),
-                    if (settings?.businessMode == 'school') ...[
+                        const SizedBox(height: 8),
+                      ],
+                      _buildSummaryRow(context, 'Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
+                      const SizedBox(height: 12),
                       const Divider(),
-                      _buildSchoolInfoTile(context, state),
-                    ],
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: state.items.isEmpty ? null : () => _showPreview(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Theme.of(context).colorScheme.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          state.customerName != null 
+                            ? '${state.customerName}${state.customerPhone != null ? " (${state.customerPhone})" : ""}'
+                            : (settings?.assignToCustomerLabel ?? 'Add Customer Name & Phone'), 
+                          style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)
                         ),
-                        child: const Text('PROCEED TO CHECKOUT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
+                        leading: Icon(Icons.person_outline, color: state.customerName != null ? Theme.of(context).colorScheme.primary : Colors.grey),
+                        trailing: const Icon(Icons.edit, size: 16),
+                        onTap: () => _showCustomerDialog(context, state.customerName, state.customerPhone, state.customerAddress),
                       ),
-                    ),
-                  ],
+                      if (settings?.businessMode == 'school') ...[
+                        const Divider(),
+                        _buildSchoolInfoTile(context, state),
+                      ],
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: ElevatedButton(
+                          onPressed: state.items.isEmpty ? null : () => _showPreview(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('PROCEED TO CHECKOUT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -1283,78 +1285,180 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
 
 void _showStudentPicker(BuildContext context) {
   final invoiceBloc = context.read<InvoiceBloc>();
+  int? selectedClassId;
+  String studentSearchQuery = '';
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (ctx) => Container(
-      padding: const EdgeInsets.all(16),
-      height: MediaQuery.of(context).size.height * 0.7,
-      child: Column(
-        children: [
-          const Text('Select Student', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          Expanded(
-            child: BlocBuilder<SchoolBloc, SchoolState>(
-              builder: (context, state) {
-                if (state.isLoading) return const Center(child: CircularProgressIndicator());
-                if (state.students.isEmpty) return const Center(child: Text('No students found. Add students first.'));
-                
-                return ListView.builder(
-                  itemCount: state.students.length,
-                  itemBuilder: (context, index) {
-                    final student = state.students[index];
-                    return ListTile(
-                      leading: const CircleAvatar(child: Icon(Icons.person)),
-                      title: Text(student.fullName),
-                      subtitle: Text('ID: ${student.admissionNumber ?? 'N/A'}'),
-                      onTap: () {
-                        invoiceBloc.add(UpdateCustomerInfo(
-                          name: student.fullName,
-                          phone: student.parentPhone,
-                        ));
-                        final className = state.classes.where((c) => c.id == student.classId).firstOrNull?.name;
-                        final term = state.activeTerm;
-                        final year = state.activeYear;
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setState) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.all(16),
+        height: MediaQuery.of(context).size.height * 0.85,
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const Text('Select Student', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            
+            // Search Bar for Students
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Search by name or admission number...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+              onChanged: (val) => setState(() => studentSearchQuery = val.toLowerCase()),
+            ),
+            const SizedBox(height: 12),
 
-                        invoiceBloc.add(UpdateSchoolInfo(
-                          studentId: student.id,
-                          classId: student.classId,
-                          termId: term?.id,
-                          academicYearId: year?.id,
-                          admissionNumber: student.admissionNumber,
-                          className: className,
-                          termName: term?.name,
-                          academicYearName: year?.name,
-                          studentImage: student.image,
-                        ));
-                        
-                        // Carry Forward Logic
-                        if (student.balance > 0) {
-                          // Check if already added
-                          final hasBalanceItem = invoiceBloc.state.items.any((i) => i.item.name == 'Previous Term Balance');
-                          if (!hasBalanceItem) {
-                            invoiceBloc.add(AddItemToInvoice(
-                              Item(
-                                id: -1, // Temporary ID for virtual item
-                                name: 'Previous Term Balance',
-                                price: student.balance,
-                                category: ItemCategory.service,
-                                type: 'service',
-                                stockQty: 0,
-                              ),
-                              1,
-                            ));
-                          }
-                        }
-                        Navigator.pop(ctx);
-                      },
-                    );
-                  },
+            // Class Filter
+            BlocBuilder<SchoolBloc, SchoolState>(
+              builder: (context, state) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      FilterChip(
+                        label: const Text('All Classes'),
+                        selected: selectedClassId == null,
+                        onSelected: (selected) => setState(() => selectedClassId = null),
+                      ),
+                      const SizedBox(width: 8),
+                      ...state.classes.map((cls) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(cls.name),
+                          selected: selectedClassId == cls.id,
+                          onSelected: (selected) => setState(() => selectedClassId = selected ? cls.id : null),
+                        ),
+                      )),
+                    ],
+                  ),
                 );
               },
             ),
-          ),
-        ],
+            const Divider(),
+            
+            Expanded(
+              child: BlocBuilder<SchoolBloc, SchoolState>(
+                builder: (context, state) {
+                  if (state.isLoading) return const Center(child: CircularProgressIndicator());
+                  
+                  var filteredStudents = state.students;
+                  
+                  // Filter by Class
+                  if (selectedClassId != null) {
+                    filteredStudents = filteredStudents.where((s) => s.classId == selectedClassId).toList();
+                  }
+                  
+                  // Filter by Search Query
+                  if (studentSearchQuery.isNotEmpty) {
+                    filteredStudents = filteredStudents.where((s) => 
+                      s.fullName.toLowerCase().contains(studentSearchQuery) || 
+                      s.admissionNumber.toLowerCase().contains(studentSearchQuery)
+                    ).toList();
+                  }
+
+                  if (filteredStudents.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.person_off_outlined, size: 64, color: Colors.grey[300]),
+                          const SizedBox(height: 16),
+                          Text(studentSearchQuery.isEmpty && selectedClassId == null 
+                            ? 'No students found. Add students first.' 
+                            : 'No students matching your filters.',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  
+                  return ListView.separated(
+                    itemCount: filteredStudents.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final student = filteredStudents[index];
+                      final className = state.classes.where((c) => c.id == student.classId).firstOrNull?.name ?? 'No Class';
+                      
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundImage: student.image != null ? MemoryImage(student.image!) : null,
+                          child: student.image == null ? const Icon(Icons.person) : null,
+                        ),
+                        title: Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text('ID: ${student.admissionNumber} | Class: $className'),
+                        trailing: student.balance > 0 
+                          ? Text(
+                              'Debt: ${CurrencyFormatter.formatWithSymbol(student.balance, symbol: context.watch<SettingsBloc>().state.settings?.currency ?? '₦')}',
+                              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                            )
+                          : null,
+                        onTap: () {
+                          invoiceBloc.add(UpdateCustomerInfo(
+                            name: student.fullName,
+                            phone: student.parentPhone,
+                          ));
+                          final term = state.activeTerm;
+                          final year = state.activeYear;
+
+                          invoiceBloc.add(UpdateSchoolInfo(
+                            studentId: student.id,
+                            classId: student.classId,
+                            termId: term?.id,
+                            academicYearId: year?.id,
+                            admissionNumber: student.admissionNumber,
+                            className: className,
+                            termName: term?.name,
+                            academicYearName: year?.name,
+                            studentImage: student.image,
+                          ));
+                          
+                          // Carry Forward Logic
+                          if (student.balance > 0) {
+                            final hasBalanceItem = invoiceBloc.state.items.any((i) => i.item.name == 'Previous Term Balance');
+                            if (!hasBalanceItem) {
+                              invoiceBloc.add(AddItemToInvoice(
+                                Item(
+                                  id: -1, 
+                                  name: 'Previous Term Balance',
+                                  price: student.balance,
+                                  category: ItemCategory.service,
+                                  type: 'service',
+                                  stockQty: 0,
+                                ),
+                                1,
+                              ));
+                            }
+                          }
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     ),
   );

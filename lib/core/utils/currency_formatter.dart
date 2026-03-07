@@ -13,4 +13,12 @@ class CurrencyFormatter {
   static String formatWithSymbol(double amount, {String symbol = '₦'}) {
     return '$symbol${format(amount)}';
   }
+
+  /// Parses a formatted string back to a double by removing commas.
+  static double parse(String value) {
+    if (value.isEmpty) return 0.0;
+    // Remove currency symbols, commas, and other non-numeric chars except decimal point
+    final cleanValue = value.replaceAll(RegExp(r'[^0-9.]'), '');
+    return double.tryParse(cleanValue) ?? 0.0;
+  }
 }

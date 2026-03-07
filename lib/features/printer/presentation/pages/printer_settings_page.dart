@@ -6,7 +6,6 @@ import '../bloc/printer_state.dart';
 import '../widgets/network_printer_config_dialog.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 import '../../domain/repositories/printer_service.dart';
-import '../../data/repositories/network_printer_service.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 
 class PrinterSettingsPage extends StatefulWidget {
@@ -37,12 +36,23 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
               );
-              // We should probably clear the error in the Bloc too, but for now just show it
             });
           }
 
           return Column(
             children: [
+              if (state.isAutoConnecting)
+                Container(
+                  color: Colors.blue[50],
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: const Row(
+                    children: [
+                      SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 12),
+                      Text('Auto-connecting to last used printer...', style: TextStyle(fontSize: 13, color: Colors.blue)),
+                    ],
+                  ),
+                ),
               _buildConnectionStatus(context, state),
               const Divider(),
               
@@ -131,16 +141,35 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                           final device = state.devices[index];
                           return ListTile(
                             leading: const Icon(Icons.print),
-                            title: Text(device.name),
-                            subtitle: Text(device.address),
-                            trailing: state.connectedDevice?.address == device.address
-                                ? const Icon(Icons.check_circle, color: Colors.green)
-                                : ElevatedButton(
+                            title: Text(device.displayName),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(device.address),
+                                if (device.customName != null)
+                                  Text('Original: ${device.name}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, size: 20),
+                                  onPressed: () => _showRenameDialog(context, device),
+                                  tooltip: 'Rename Printer',
+                                ),
+                                if (state.connectedDevice?.address == device.address)
+                                  const Icon(Icons.check_circle, color: Colors.green)
+                                else
+                                  ElevatedButton(
                                     onPressed: state.isConnecting ? null : () {
                                       context.read<PrinterBloc>().add(ConnectToDevice(device));
                                     },
                                     child: const Text('CONNECT'),
                                   ),
+                              ],
+                            ),
+                            onLongPress: () => _showRenameDialog(context, device),
                           );
                         },
                       ),
@@ -170,6 +199,37 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     );
   }
 
+  void _showRenameDialog(BuildContext context, PrinterDevice device) {
+    final controller = TextEditingController(text: device.customName ?? device.name);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename Printer'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Custom Name',
+            hintText: 'e.g. Kitchen Printer, Main Receipt',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty) {
+                context.read<PrinterBloc>().add(RenamePrinter(device.address, newName));
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showNetworkPrinterDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -184,38 +244,49 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
   }
 
   Widget _buildConnectionStatus(BuildContext context, PrinterState state) {
+    final device = state.connectedDevice;
     return ListTile(
-      tileColor: state.connectedDevice != null ? Colors.green[50] : Colors.red[50],
+      tileColor: device != null ? Colors.green[50] : Colors.red[50],
       title: Text(
-        state.connectedDevice != null 
-            ? 'Connected to: ${state.connectedDevice!.name}' 
+        device != null 
+            ? 'Connected to: ${device.displayName}' 
             : 'No Printer Connected',
         style: TextStyle(
           fontWeight: FontWeight.bold, 
-          color: state.connectedDevice != null ? Colors.green : Colors.red,
+          color: device != null ? Colors.green : Colors.red,
         ),
       ),
-      subtitle: state.connectedDevice != null
-          ? Text('Address: ${state.connectedDevice!.address}')
+      subtitle: device != null
+          ? Text('Address: ${device.address}')
           : const Text('Select a connection type to get started'),
-      trailing: state.connectedDevice != null 
-          ? TextButton(
-              onPressed: () {
-                context.read<PrinterBloc>().add(
-                  PrintCommandsEvent([
-                    TextCommand('*** TEST PRINT ***', isBold: true, align: 'center'),
-                    TextCommand('Printer Connected Successfully', align: 'center'),
-                    DividerCommand(),
-                    TextCommand('Date: ${DateTime.now().toString().split('.')[0]}', align: 'center'),
-                    TextCommand('Thank you for choosing Invify', align: 'center'),
-                    DividerCommand(),
-                  ], context.read<SettingsBloc>().state.settings?.paperWidth ?? 58)
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Test print sent!')),
-                );
-              }, 
-              child: const Text('TEST PRINT'),
+      trailing: device != null 
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 18),
+                  onPressed: () => _showRenameDialog(context, device),
+                  tooltip: 'Rename Connected Printer',
+                ),
+                TextButton(
+                  onPressed: () {
+                    context.read<PrinterBloc>().add(
+                      PrintCommandsEvent([
+                        TextCommand('*** TEST PRINT ***', isBold: true, align: 'center'),
+                        TextCommand('Printer Connected Successfully', align: 'center'),
+                        DividerCommand(),
+                        TextCommand('Date: ${DateTime.now().toString().split('.')[0]}', align: 'center'),
+                        TextCommand('Thank you for choosing Invify', align: 'center'),
+                        DividerCommand(),
+                      ], context.read<SettingsBloc>().state.settings?.paperWidth ?? 58)
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Test print sent!')),
+                    );
+                  }, 
+                  child: const Text('TEST PRINT'),
+                ),
+              ],
             ) 
           : null,
     );

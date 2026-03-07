@@ -261,10 +261,11 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
         await invoiceRepo.saveInvoice(invoice);
       }
 
+      Navigator.pop(context);
+      context.read<SchoolBloc>().add(LoadSchoolData());
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Successfully generated ${studentsInClass.length} bills!')),
       );
-      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),

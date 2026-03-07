@@ -234,9 +234,14 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     try {
       final invoices = await invoiceRepository.getInvoicesByStudentId(event.studentId);
       final results = await repository.getResults(studentId: event.studentId);
+      
+      // Also refresh the specific student's data to get the latest balance
+      final students = await repository.getStudents();
+      
       emit(state.copyWith(
         studentInvoices: invoices, 
         results: results,
+        students: students,
         isLoading: false
       ));
     } catch (e) {

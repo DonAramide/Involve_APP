@@ -114,12 +114,27 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         }
       }
 
-      // 3. Update Student Balance if in School Mode
-      if (invoice.businessMode == 'school' && invoice.studentId != null) {
+      // 3. Update Student Balance if student is associated with invoice
+      if (invoice.studentId != null) {
+        // Calculate the increment: Balance Amount - Carry Forward amounts
+        // We do this because the UI adds the old balance as a line item ("Previous Term Balance").
+        // If we simply add invoice.balanceAmount to student.balance, we double the debt.
+        double carryForwardAmount = 0.0;
+        for (final item in invoice.items) {
+          if (item.item.name == 'Previous Term Balance') {
+            carryForwardAmount += (item.unitPrice * item.quantity);
+          }
+        }
+
+        final double balanceIncrement = invoice.balanceAmount - carryForwardAmount;
+
+        // Log for debugging
+        print('DEBUG: Found Carry Forward: $carryForwardAmount. Final increment: $balanceIncrement');
+        
         await db.customUpdate(
           'UPDATE students SET balance = balance + ?, updated_at = ? WHERE id = ?',
           variables: [
-            Variable.withReal(invoice.balanceAmount),
+            Variable.withReal(balanceIncrement),
             Variable.withDateTime(now),
             Variable.withInt(invoice.studentId!)
           ],
