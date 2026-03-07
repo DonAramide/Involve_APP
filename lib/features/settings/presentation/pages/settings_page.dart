@@ -783,19 +783,18 @@ class _SettingsPageState extends State<SettingsPage> {
     if (image != null) {
       final bytes = await image.readAsBytes();
       
-      // Process logo to high-contrast black on transparent
-      final processedPng = LogoProcessor.processToBlackPng(bytes);
+      // Process logo to remove background
+      final processedPng = LogoProcessor.processLogoWithTransparency(bytes);
       if (processedPng != null) {
-        final processedSvg = LogoProcessor.generateBlackSvg(processedPng);
         _update(context, settings.copyWith(
           logo: processedPng,
-          logoSvg: processedSvg,
+          logoSvg: null, // SVG not generated for colored logos
         ));
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Logo optimized for high-contrast printing'),
+              content: Text('Logo background removed'),
               backgroundColor: Colors.blue,
             ),
           );

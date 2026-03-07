@@ -16,14 +16,27 @@ class PrinterRepositoryImpl implements PrinterRepository {
 
   @override
   Future<void> saveConfig(PrinterDevice device) async {
-    await db.into(db.printerConfigs).insertOnConflictUpdate(
-      PrinterConfigsCompanion(
-        address: Value(device.address),
-        customName: Value(device.customName),
-        type: Value(device.type ?? 'unknown'),
-        lastConnectedAt: Value(DateTime.now()),
-      ),
-    );
+    final existing = await getConfig(device.address);
+    final now = DateTime.now();
+    
+    if (existing != null) {
+      await (db.update(db.printerConfigs)..where((t) => t.address.equals(device.address))).write(
+        PrinterConfigsCompanion(
+          customName: Value(device.customName ?? existing.customName),
+          type: Value(device.type ?? existing.type),
+          lastConnectedAt: Value(now),
+        ),
+      );
+    } else {
+      await db.into(db.printerConfigs).insert(
+        PrinterConfigsCompanion.insert(
+          address: device.address,
+          customName: Value(device.customName),
+          type: Value(device.type ?? 'unknown'),
+          lastConnectedAt: Value(now),
+        ),
+      );
+    }
   }
 
   @override
