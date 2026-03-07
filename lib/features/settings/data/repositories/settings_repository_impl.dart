@@ -99,6 +99,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       currencyName: Value(settings.currencyName),
       currencySubunit: Value(settings.currencySubunit),
       logoSvg: Value(settings.logoSvg),
+      adminSignature: Value(LogoCompressor.compress(settings.adminSignature)),
+      showAdminSignature: Value(settings.showAdminSignature),
     );
 
     if (existing == null) {
@@ -195,6 +197,8 @@ class SettingsRepositoryImpl implements SettingsRepository {
       currencyName: row.currencyName,
       currencySubunit: row.currencySubunit,
       logoSvg: row.logoSvg,
+      adminSignature: row.adminSignature,
+      showAdminSignature: row.showAdminSignature,
     );
   }
 }

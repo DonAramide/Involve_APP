@@ -64,6 +64,8 @@ class AppSettings extends Equatable {
   final bool showLogoAsMenuBackground;
   final String currencyName;
   final String currencySubunit;
+  final Uint8List? adminSignature;
+  final bool showAdminSignature;
 
   const AppSettings({
     this.id,
@@ -116,9 +118,11 @@ class AppSettings extends Equatable {
     this.restoreLastState = false,
     this.lastRoute,
     this.showLogoAsMenuBackground = false,
-    this.currencyName = 'Naira',
     this.currencySubunit = 'Kobo',
+    this.currencyName = 'Naira',
     this.logoSvg,
+    this.adminSignature,
+    this.showAdminSignature = false,
   });
 
   AppSettings copyWith({
@@ -172,9 +176,11 @@ class AppSettings extends Equatable {
     bool? restoreLastState,
     String? lastRoute,
     bool? showLogoAsMenuBackground,
-    String? currencyName,
     String? currencySubunit,
+    String? currencyName,
     String? logoSvg,
+    Uint8List? adminSignature,
+    bool? showAdminSignature,
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -230,6 +236,8 @@ class AppSettings extends Equatable {
       currencyName: currencyName ?? this.currencyName,
       currencySubunit: currencySubunit ?? this.currencySubunit,
       logoSvg: logoSvg ?? this.logoSvg,
+      adminSignature: adminSignature ?? this.adminSignature,
+      showAdminSignature: showAdminSignature ?? this.showAdminSignature,
     );
   }
 
@@ -288,5 +296,7 @@ class AppSettings extends Equatable {
         currencyName,
         currencySubunit,
         logoSvg,
+        adminSignature,
+        showAdminSignature,
       ];
 }

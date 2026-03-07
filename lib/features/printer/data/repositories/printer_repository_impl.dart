@@ -23,7 +23,7 @@ class PrinterRepositoryImpl implements PrinterRepository {
       await (db.update(db.printerConfigs)..where((t) => t.address.equals(device.address))).write(
         PrinterConfigsCompanion(
           customName: Value(device.customName ?? existing.customName),
-          type: Value(device.type ?? existing.type),
+          type: Value(device.type ?? existing.type ?? 'bluetooth'),
           lastConnectedAt: Value(now),
         ),
       );
@@ -32,7 +32,7 @@ class PrinterRepositoryImpl implements PrinterRepository {
         PrinterConfigsCompanion.insert(
           address: device.address,
           customName: Value(device.customName),
-          type: Value(device.type ?? 'unknown'),
+          type: device.type ?? 'unknown',
           lastConnectedAt: Value(now),
         ),
       );

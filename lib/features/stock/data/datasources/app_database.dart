@@ -45,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 60;
+  int get schemaVersion => 61;
 
   @override
   MigrationStrategy get migration {
@@ -266,6 +266,11 @@ class AppDatabase extends _$AppDatabase {
         if (from < 60) {
           // Schema V60: Add PrinterConfigs table for renaming and auto-connect
           await _safeCreateTable(m, printerConfigs);
+        }
+        if (from < 61) {
+          // Schema V61: Add adminSignature and showAdminSignature to Settings table
+          await _safeAddColumn(m, settings, settings.adminSignature);
+          await _safeAddColumn(m, settings, settings.showAdminSignature);
         }
       },
       beforeOpen: (details) async {

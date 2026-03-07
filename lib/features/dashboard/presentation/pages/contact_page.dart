@@ -7,6 +7,8 @@ import 'package:involve_app/features/school/presentation/bloc/school_state.dart'
 import 'package:involve_app/features/settings/domain/entities/staff.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 
 class ContactPage extends StatefulWidget {
   const ContactPage({super.key});
@@ -28,72 +30,114 @@ class _ContactPageState extends State<ContactPage> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Contact Directory'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.people), text: 'Staff'),
-              Tab(icon: Icon(Icons.family_restroom), text: 'Parents'),
-            ],
-          ),
-          actions: [
-            IconButton(
-              onPressed: () {
-                // Potential addition: Filter by class or department
-              },
-              icon: const Icon(Icons.filter_list),
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search by name or phone...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                      : null,
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value.toLowerCase();
-                  });
-                },
-              ),
-            ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _buildStaffTab(),
-                  _buildParentsTab(),
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, settingsState) {
+        final isSchoolMode = settingsState.settings?.businessMode == 'school';
+        final tabCount = isSchoolMode ? 3 : 2;
+
+        return DefaultTabController(
+          length: tabCount,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Contact Directory'),
+              bottom: TabBar(
+                isScrollable: isSchoolMode,
+                tabs: [
+                  Tab(icon: const Icon(Icons.people), text: isSchoolMode ? 'Management Staff' : 'Staff'),
+                  if (isSchoolMode) 
+                    const Tab(icon: Icon(Icons.school), text: 'Academic Staff'),
+                  const Tab(icon: Icon(Icons.family_restroom), text: 'Parents'),
                 ],
               ),
+              actions: [
+                IconButton(
+                  onPressed: () {
+                    // Potential addition: Filter by class or department
+                  },
+                  icon: const Icon(Icons.filter_list),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+            body: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search by name or phone...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (value) {
+                      setState(() {
+                        _searchQuery = value.toLowerCase();
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildStaffTab(isSchoolMode),
+                      if (isSchoolMode) _buildTeachersTab(isSchoolMode),
+                      _buildParentsTab(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildStaffTab() {
+  Widget _buildTeachersTab(bool isSchoolMode) {
+    return BlocBuilder<SchoolBloc, SchoolState>(
+      builder: (context, state) {
+        if (state.isLoading) return const Center(child: CircularProgressIndicator());
+        
+        final filteredList = state.teachers.where((teacher) {
+          final query = _searchQuery;
+          return teacher.fullName.toLowerCase().contains(query) || 
+                 (teacher.phone?.contains(query) ?? false);
+        }).toList();
+
+        if (filteredList.isEmpty) {
+          return Center(child: Text(isSchoolMode ? 'No academic staff found' : 'No teachers found'));
+        }
+
+        return ListView.builder(
+          itemCount: filteredList.length,
+          itemBuilder: (context, index) {
+            final teacher = filteredList[index];
+            return _ContactTile(
+              name: teacher.fullName,
+              phone: teacher.phone,
+              subtitle: '${teacher.profession ?? (isSchoolMode ? "Academic Staff" : "Teacher")}',
+              icon: Icons.school_outlined,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildStaffTab(bool isSchoolMode) {
     return BlocBuilder<StaffBloc, StaffState>(
       builder: (context, state) {
         if (state.isLoading) return const Center(child: CircularProgressIndicator());
@@ -105,7 +149,7 @@ class _ContactPageState extends State<ContactPage> {
         }).toList();
 
         if (filteredList.isEmpty) {
-          return const Center(child: Text('No staff found'));
+          return Center(child: Text(isSchoolMode ? 'No management staff found' : 'No staff found'));
         }
 
         return ListView.builder(

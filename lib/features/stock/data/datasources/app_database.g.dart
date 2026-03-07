@@ -3975,6 +3975,22 @@ class $SettingsTable extends Settings
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant('Kobo'));
+  static const VerificationMeta _adminSignatureMeta =
+      const VerificationMeta('adminSignature');
+  @override
+  late final GeneratedColumn<Uint8List> adminSignature =
+      GeneratedColumn<Uint8List>('admin_signature', aliasedName, true,
+          type: DriftSqlType.blob, requiredDuringInsert: false);
+  static const VerificationMeta _showAdminSignatureMeta =
+      const VerificationMeta('showAdminSignature');
+  @override
+  late final GeneratedColumn<bool> showAdminSignature = GeneratedColumn<bool>(
+      'show_admin_signature', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_admin_signature" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4029,7 +4045,9 @@ class $SettingsTable extends Settings
         lastRoute,
         showLogoAsMenuBackground,
         currencyName,
-        currencySubunit
+        currencySubunit,
+        adminSignature,
+        showAdminSignature
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4333,6 +4351,18 @@ class $SettingsTable extends Settings
           currencySubunit.isAcceptableOrUnknown(
               data['currency_subunit']!, _currencySubunitMeta));
     }
+    if (data.containsKey('admin_signature')) {
+      context.handle(
+          _adminSignatureMeta,
+          adminSignature.isAcceptableOrUnknown(
+              data['admin_signature']!, _adminSignatureMeta));
+    }
+    if (data.containsKey('show_admin_signature')) {
+      context.handle(
+          _showAdminSignatureMeta,
+          showAdminSignature.isAcceptableOrUnknown(
+              data['show_admin_signature']!, _showAdminSignatureMeta));
+    }
     return context;
   }
 
@@ -4455,6 +4485,10 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.string, data['${effectivePrefix}currency_name'])!,
       currencySubunit: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}currency_subunit'])!,
+      adminSignature: attachedDatabase.typeMapping
+          .read(DriftSqlType.blob, data['${effectivePrefix}admin_signature']),
+      showAdminSignature: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_admin_signature'])!,
     );
   }
 
@@ -4518,6 +4552,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showLogoAsMenuBackground;
   final String currencyName;
   final String currencySubunit;
+  final Uint8List? adminSignature;
+  final bool showAdminSignature;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -4571,7 +4607,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       this.lastRoute,
       required this.showLogoAsMenuBackground,
       required this.currencyName,
-      required this.currencySubunit});
+      required this.currencySubunit,
+      this.adminSignature,
+      required this.showAdminSignature});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4656,6 +4694,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         Variable<bool>(showLogoAsMenuBackground);
     map['currency_name'] = Variable<String>(currencyName);
     map['currency_subunit'] = Variable<String>(currencySubunit);
+    if (!nullToAbsent || adminSignature != null) {
+      map['admin_signature'] = Variable<Uint8List>(adminSignature);
+    }
+    map['show_admin_signature'] = Variable<bool>(showAdminSignature);
     return map;
   }
 
@@ -4737,6 +4779,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showLogoAsMenuBackground: Value(showLogoAsMenuBackground),
       currencyName: Value(currencyName),
       currencySubunit: Value(currencySubunit),
+      adminSignature: adminSignature == null && nullToAbsent
+          ? const Value.absent()
+          : Value(adminSignature),
+      showAdminSignature: Value(showAdminSignature),
     );
   }
 
@@ -4809,6 +4855,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           serializer.fromJson<bool>(json['showLogoAsMenuBackground']),
       currencyName: serializer.fromJson<String>(json['currencyName']),
       currencySubunit: serializer.fromJson<String>(json['currencySubunit']),
+      adminSignature: serializer.fromJson<Uint8List?>(json['adminSignature']),
+      showAdminSignature: serializer.fromJson<bool>(json['showAdminSignature']),
     );
   }
   @override
@@ -4872,6 +4920,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           serializer.toJson<bool>(showLogoAsMenuBackground),
       'currencyName': serializer.toJson<String>(currencyName),
       'currencySubunit': serializer.toJson<String>(currencySubunit),
+      'adminSignature': serializer.toJson<Uint8List?>(adminSignature),
+      'showAdminSignature': serializer.toJson<bool>(showAdminSignature),
     };
   }
 
@@ -4928,7 +4978,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           Value<String?> lastRoute = const Value.absent(),
           bool? showLogoAsMenuBackground,
           String? currencyName,
-          String? currencySubunit}) =>
+          String? currencySubunit,
+          Value<Uint8List?> adminSignature = const Value.absent(),
+          bool? showAdminSignature}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -4994,6 +5046,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
             showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
         currencyName: currencyName ?? this.currencyName,
         currencySubunit: currencySubunit ?? this.currencySubunit,
+        adminSignature:
+            adminSignature.present ? adminSignature.value : this.adminSignature,
+        showAdminSignature: showAdminSignature ?? this.showAdminSignature,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -5118,6 +5173,12 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       currencySubunit: data.currencySubunit.present
           ? data.currencySubunit.value
           : this.currencySubunit,
+      adminSignature: data.adminSignature.present
+          ? data.adminSignature.value
+          : this.adminSignature,
+      showAdminSignature: data.showAdminSignature.present
+          ? data.showAdminSignature.value
+          : this.showAdminSignature,
     );
   }
 
@@ -5176,7 +5237,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('lastRoute: $lastRoute, ')
           ..write('showLogoAsMenuBackground: $showLogoAsMenuBackground, ')
           ..write('currencyName: $currencyName, ')
-          ..write('currencySubunit: $currencySubunit')
+          ..write('currencySubunit: $currencySubunit, ')
+          ..write('adminSignature: $adminSignature, ')
+          ..write('showAdminSignature: $showAdminSignature')
           ..write(')'))
         .toString();
   }
@@ -5235,7 +5298,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         lastRoute,
         showLogoAsMenuBackground,
         currencyName,
-        currencySubunit
+        currencySubunit,
+        $driftBlobEquality.hash(adminSignature),
+        showAdminSignature
       ]);
   @override
   bool operator ==(Object other) =>
@@ -5294,7 +5359,10 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.lastRoute == this.lastRoute &&
           other.showLogoAsMenuBackground == this.showLogoAsMenuBackground &&
           other.currencyName == this.currencyName &&
-          other.currencySubunit == this.currencySubunit);
+          other.currencySubunit == this.currencySubunit &&
+          $driftBlobEquality.equals(
+              other.adminSignature, this.adminSignature) &&
+          other.showAdminSignature == this.showAdminSignature);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -5351,6 +5419,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showLogoAsMenuBackground;
   final Value<String> currencyName;
   final Value<String> currencySubunit;
+  final Value<Uint8List?> adminSignature;
+  final Value<bool> showAdminSignature;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -5405,6 +5475,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showLogoAsMenuBackground = const Value.absent(),
     this.currencyName = const Value.absent(),
     this.currencySubunit = const Value.absent(),
+    this.adminSignature = const Value.absent(),
+    this.showAdminSignature = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -5460,6 +5532,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showLogoAsMenuBackground = const Value.absent(),
     this.currencyName = const Value.absent(),
     this.currencySubunit = const Value.absent(),
+    this.adminSignature = const Value.absent(),
+    this.showAdminSignature = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -5517,6 +5591,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showLogoAsMenuBackground,
     Expression<String>? currencyName,
     Expression<String>? currencySubunit,
+    Expression<Uint8List>? adminSignature,
+    Expression<bool>? showAdminSignature,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -5588,6 +5664,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
         'show_logo_as_menu_background': showLogoAsMenuBackground,
       if (currencyName != null) 'currency_name': currencyName,
       if (currencySubunit != null) 'currency_subunit': currencySubunit,
+      if (adminSignature != null) 'admin_signature': adminSignature,
+      if (showAdminSignature != null)
+        'show_admin_signature': showAdminSignature,
     });
   }
 
@@ -5644,7 +5723,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String?>? lastRoute,
       Value<bool>? showLogoAsMenuBackground,
       Value<String>? currencyName,
-      Value<String>? currencySubunit}) {
+      Value<String>? currencySubunit,
+      Value<Uint8List?>? adminSignature,
+      Value<bool>? showAdminSignature}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -5706,6 +5787,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           showLogoAsMenuBackground ?? this.showLogoAsMenuBackground,
       currencyName: currencyName ?? this.currencyName,
       currencySubunit: currencySubunit ?? this.currencySubunit,
+      adminSignature: adminSignature ?? this.adminSignature,
+      showAdminSignature: showAdminSignature ?? this.showAdminSignature,
     );
   }
 
@@ -5878,6 +5961,12 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (currencySubunit.present) {
       map['currency_subunit'] = Variable<String>(currencySubunit.value);
     }
+    if (adminSignature.present) {
+      map['admin_signature'] = Variable<Uint8List>(adminSignature.value);
+    }
+    if (showAdminSignature.present) {
+      map['show_admin_signature'] = Variable<bool>(showAdminSignature.value);
+    }
     return map;
   }
 
@@ -5936,7 +6025,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('lastRoute: $lastRoute, ')
           ..write('showLogoAsMenuBackground: $showLogoAsMenuBackground, ')
           ..write('currencyName: $currencyName, ')
-          ..write('currencySubunit: $currencySubunit')
+          ..write('currencySubunit: $currencySubunit, ')
+          ..write('adminSignature: $adminSignature, ')
+          ..write('showAdminSignature: $showAdminSignature')
           ..write(')'))
         .toString();
   }
@@ -16479,6 +16570,8 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showLogoAsMenuBackground,
   Value<String> currencyName,
   Value<String> currencySubunit,
+  Value<Uint8List?> adminSignature,
+  Value<bool> showAdminSignature,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -16534,6 +16627,8 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showLogoAsMenuBackground,
   Value<String> currencyName,
   Value<String> currencySubunit,
+  Value<Uint8List?> adminSignature,
+  Value<bool> showAdminSignature,
 });
 
 class $$SettingsTableFilterComposer
@@ -16726,6 +16821,14 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get currencySubunit => $composableBuilder(
       column: $table.currencySubunit,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<Uint8List> get adminSignature => $composableBuilder(
+      column: $table.adminSignature,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get showAdminSignature => $composableBuilder(
+      column: $table.showAdminSignature,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -16928,6 +17031,14 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<String> get currencySubunit => $composableBuilder(
       column: $table.currencySubunit,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<Uint8List> get adminSignature => $composableBuilder(
+      column: $table.adminSignature,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get showAdminSignature => $composableBuilder(
+      column: $table.showAdminSignature,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -17097,6 +17208,12 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<String> get currencySubunit => $composableBuilder(
       column: $table.currencySubunit, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get adminSignature => $composableBuilder(
+      column: $table.adminSignature, builder: (column) => column);
+
+  GeneratedColumn<bool> get showAdminSignature => $composableBuilder(
+      column: $table.showAdminSignature, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -17178,6 +17295,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showLogoAsMenuBackground = const Value.absent(),
             Value<String> currencyName = const Value.absent(),
             Value<String> currencySubunit = const Value.absent(),
+            Value<Uint8List?> adminSignature = const Value.absent(),
+            Value<bool> showAdminSignature = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -17233,6 +17352,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             showLogoAsMenuBackground: showLogoAsMenuBackground,
             currencyName: currencyName,
             currencySubunit: currencySubunit,
+            adminSignature: adminSignature,
+            showAdminSignature: showAdminSignature,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -17288,6 +17409,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showLogoAsMenuBackground = const Value.absent(),
             Value<String> currencyName = const Value.absent(),
             Value<String> currencySubunit = const Value.absent(),
+            Value<Uint8List?> adminSignature = const Value.absent(),
+            Value<bool> showAdminSignature = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -17343,6 +17466,8 @@ class $$SettingsTableTableManager extends RootTableManager<
             showLogoAsMenuBackground: showLogoAsMenuBackground,
             currencyName: currencyName,
             currencySubunit: currencySubunit,
+            adminSignature: adminSignature,
+            showAdminSignature: showAdminSignature,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

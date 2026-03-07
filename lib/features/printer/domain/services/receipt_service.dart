@@ -36,27 +36,40 @@ class ReceiptService {
       }
     }
 
+    // Decode admin signature if available and enabled
+    pw.ImageProvider? adminSignatureImage;
+    if (settings.showAdminSignature && settings.adminSignature != null && settings.adminSignature!.isNotEmpty) {
+      try {
+        adminSignatureImage = pw.MemoryImage(settings.adminSignature!);
+      } catch (e) {
+        // Ignore signature error
+      }
+    }
+
     if (template == 'classic_a4') {
-      return _generateClassicA4(pdf, invoice, settings, logoImage, useCustomPrices);
+      return _generateClassicA4(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices);
     }
     
     if (template == 'school_teal') {
-      return _generateSchoolTeal(pdf, invoice, settings, logoImage, useCustomPrices, receiptTitle: receiptTitle);
+      return _generateSchoolTeal(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
     }
     if (template == 'school_purple') {
-      return _generateSchoolPurple(pdf, invoice, settings, logoImage, useCustomPrices, receiptTitle: receiptTitle);
+      return _generateSchoolPurple(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
     }
     if (template == 'school_academic') {
-      return _generateSchoolAcademic(pdf, invoice, settings, logoImage, useCustomPrices, receiptTitle: receiptTitle);
+      return _generateSchoolAcademic(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
     }
     if (template == 'school_traditional') {
-      return _generateSchoolTraditional(pdf, invoice, settings, logoImage, useCustomPrices, receiptTitle: receiptTitle);
+      return _generateSchoolTraditional(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
     }
 
-    return _generateThermalRoll(pdf, invoice, settings, logoImage, useCustomPrices, template: template);
+    return _generateThermalRoll(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, template: template, receiptTitle: receiptTitle);
   }
 
-  Future<Uint8List> _generateThermalRoll(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? template}) async {
+  Future<Uint8List> _generateThermalRoll(pw.Document pdf, Invoice invoice, AppSettings settings,    pw.ImageProvider? logoImage, 
+    pw.ImageProvider? adminSignatureImage,
+    bool useCustomPrices, 
+    {String? template, String? receiptTitle}) async {
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 
     pdf.addPage(
@@ -233,6 +246,19 @@ class ReceiptService {
               ],
               
               pw.SizedBox(height: 10),
+              if (adminSignatureImage != null)
+                pw.Column(
+                  children: [
+                    pw.Text('Authorized Signature:', style: const pw.TextStyle(fontSize: 8)),
+                    pw.SizedBox(height: 4),
+                    pw.Container(
+                      height: 40,
+                      width: 80,
+                      child: pw.Image(adminSignatureImage),
+                    ),
+                    pw.SizedBox(height: 10),
+                  ],
+                ),
               pw.Text(settings.receiptFooter, style: const pw.TextStyle(fontSize: 10)),
               pw.Text('Powered by IIPS', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
             ],
@@ -244,7 +270,7 @@ class ReceiptService {
     return pdf.save();
   }
 
-  Future<Uint8List> _generateClassicA4(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices) async {
+  Future<Uint8List> _generateClassicA4(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices) async {
     final dateFormat = DateFormat('dd MMMM, yyyy');
 
     pdf.addPage(
@@ -400,6 +426,27 @@ class ReceiptService {
               pw.Text('1. Make all cheques payable to ${settings.organizationName}'),
               pw.Text('2. If you have any questions concerning this invoice, contact ${settings.phone}'),
               
+              if (adminSignatureImage != null)
+                pw.Padding(
+                  padding: const pw.EdgeInsets.only(top: 20),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.end,
+                    children: [
+                      pw.Column(
+                        children: [
+                          pw.Container(
+                            height: 60,
+                            width: 120,
+                            child: pw.Image(adminSignatureImage, fit: pw.BoxFit.contain),
+                          ),
+                          pw.Container(width: 120, height: 1, color: PdfColors.black),
+                          pw.Text('Authorized Signature', style: const pw.TextStyle(fontSize: 10)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
               pw.SizedBox(height: 30),
               pw.Center(
                 child: pw.Text('THANK YOU FOR YOUR BUSINESS!', 
@@ -451,7 +498,7 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolTeal(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? receiptTitle}) async {
+  Future<Uint8List> _generateSchoolTeal(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
     final dateFormat = DateFormat('dd-MM-yyyy');
     const primaryColor = PdfColor.fromInt(0xFF00796B); // Teal 700
     const secondaryColor = PdfColor.fromInt(0xFF455A64); // Blue Grey 700
@@ -728,7 +775,7 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolPurple(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? receiptTitle}) async {
+  Future<Uint8List> _generateSchoolPurple(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
     // Similar to teal but with purple theme
     final dateFormat = DateFormat('dd-MM-yyyy');
     const primaryColor = PdfColor.fromInt(0xFF7B1FA2); // Purple 700
@@ -979,7 +1026,7 @@ class ReceiptService {
     return pdf.save();
   }
 
-  Future<Uint8List> _generateSchoolAcademic(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? receiptTitle}) async {
+  Future<Uint8List> _generateSchoolAcademic(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
     // Matches university style media__1772443499936.png
     final dateFormat = DateFormat('dd/MM/yyyy');
     
@@ -1146,6 +1193,25 @@ class ReceiptService {
               ),
               pw.Text(invoice.invoiceNumber, style: const pw.TextStyle(fontSize: 8)),
               pw.SizedBox(height: 10),
+              if (adminSignatureImage != null)
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.end,
+                  children: [
+                    pw.Column(
+                      children: [
+                        pw.Container(
+                          height: 50,
+                          width: 100,
+                          child: pw.Image(adminSignatureImage),
+                        ),
+                        pw.Container(width: 120, height: 1, color: PdfColors.black),
+                        pw.Text('Authorized Designatory', style: const pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                    pw.SizedBox(width: 40),
+                  ],
+                ),
+              pw.SizedBox(height: 10),
             ],
           );
         },
@@ -1196,7 +1262,7 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolTraditional(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, bool useCustomPrices, {String? receiptTitle}) async {
+  Future<Uint8List> _generateSchoolTraditional(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
     // Matches horizontal voucher style media__1772443609175.png
     final dateFormat = DateFormat('dd/MM/yyyy');
     const greenTheme = PdfColor.fromInt(0xFF2E7D32); // Green 800
@@ -1329,6 +1395,15 @@ class ReceiptService {
                                ),
                                pw.SizedBox(height: 20),
                                pw.Text('FOR: ${settings.organizationName.toUpperCase()}', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                               if (adminSignatureImage != null)
+                                pw.Padding(
+                                  padding: const pw.EdgeInsets.only(top: 5),
+                                  child: pw.Container(
+                                    height: 40,
+                                    width: 80,
+                                    child: pw.Image(adminSignatureImage),
+                                  ),
+                                ),
                              ],
                           ),
                         ],

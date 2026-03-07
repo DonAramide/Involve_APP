@@ -97,11 +97,13 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                   controller: phoneCtrl,
                   decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()),
                   keyboardType: TextInputType.phone,
+                  maxLength: 15,
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Required';
-                    if (v.length < 11) return 'Min 11 digits';
-                    if (v.length > 15) return 'Max 15 digits';
-                    if (!RegExp(r'^\d+$').hasMatch(v)) return 'Digits only';
+                    final cleanVal = v.replaceAll(' ', '');
+                    if (!RegExp(r'^\d{11,15}$').hasMatch(cleanVal)) {
+                      return 'Enter a valid phone (11-15 digits)';
+                    }
                     return null;
                   },
                 ),

@@ -67,4 +67,7 @@ class Settings extends Table {
   BoolColumn get showLogoAsMenuBackground => boolean().withDefault(const Constant(false))();
   TextColumn get currencyName => text().withDefault(const Constant('Naira'))();
   TextColumn get currencySubunit => text().withDefault(const Constant('Kobo'))();
+  
+  BlobColumn get adminSignature => blob().nullable()();
+  BoolColumn get showAdminSignature => boolean().withDefault(const Constant(false))();
 }

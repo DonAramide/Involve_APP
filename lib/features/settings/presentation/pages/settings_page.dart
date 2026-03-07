@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart'; // For logo picking
+import 'package:image_cropper/image_cropper.dart'; 
+import 'dart:ui' as ui;
 import '../../../../core/utils/validators.dart';
 import '../../../../core/utils/logo_processor.dart';
 import '../bloc/settings_bloc.dart';
@@ -248,6 +251,18 @@ class _SettingsPageState extends State<SettingsPage> {
           if (_matches('Account Name'))
             _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
         ],
+        const Divider(),
+      ],
+      
+      // Admin Signature Section
+      if (_matches('Admin Signature', ['signature', 'upload', 'crop'])) ...[
+        _buildSectionHeader(context, 'Admin Signature'),
+        _buildSignatureSection(context, settings),
+        _buildSwitchTile(
+          'Show Admin Signature on Invoices', 
+          settings.showAdminSignature, 
+          (val) => _update(context, settings.copyWith(showAdminSignature: val))
+        ),
         const Divider(),
       ],
 
@@ -779,31 +794,93 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _pickLogo(BuildContext context, AppSettings settings) async {
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+    );
+    
     if (image != null) {
-      final bytes = await image.readAsBytes();
-      
-      // Process logo to remove background
-      final processedPng = LogoProcessor.processLogoWithTransparency(bytes);
-      if (processedPng != null) {
-        _update(context, settings.copyWith(
-          logo: processedPng,
-          logoSvg: null, // SVG not generated for colored logos
-        ));
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Logo background removed'),
-              backgroundColor: Colors.blue,
+      try {
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: image.path,
+          aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Crop Logo',
+              toolbarColor: Theme.of(context).primaryColor,
+              toolbarWidgetColor: Colors.white,
+              initAspectRatio: CropAspectRatioPreset.original,
+              lockAspectRatio: false,
             ),
+            IOSUiSettings(
+              title: 'Crop Logo',
+              aspectRatioLockEnabled: false,
+            ),
+            WebUiSettings(
+              context: context,
+            ),
+          ],
+        );
+
+        if (croppedFile != null) {
+          if (!mounted) return;
+          _showLoadingDialog(context, 'Removing background...');
+          
+          final bytes = await croppedFile.readAsBytes();
+          
+          // Process logo to remove background in a separate isolate
+          final processedPng = await compute(LogoProcessor.processLogoWithTransparency, bytes);
+          
+          if (!mounted) return;
+          _hideLoadingDialog(context);
+
+          if (processedPng != null) {
+            _update(context, settings.copyWith(
+              logo: processedPng,
+              logoSvg: null,
+            ));
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Logo processed successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            _update(context, settings.copyWith(logo: bytes));
+          }
+        }
+      } catch (e) {
+        if (mounted) _hideLoadingDialog(context);
+        debugPrint('Logo processing error: $e');
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error processing logo: $e')),
           );
         }
-      } else {
-        // Fallback to original if processing fails
-        _update(context, settings.copyWith(logo: bytes));
       }
     }
+  }
+
+  void _showLoadingDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 20),
+            Text(message),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _hideLoadingDialog(BuildContext context) {
+    Navigator.of(context).pop();
   }
 
   Widget _buildActivationHistoryTile(BuildContext context) {
@@ -814,6 +891,170 @@ class _SettingsPageState extends State<SettingsPage> {
       trailing: const Icon(Icons.chevron_right),
       onTap: () => _showActivationHistoryDialog(context),
     );
+  }
+
+  Widget _buildSignatureSection(BuildContext context, AppSettings settings) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Admin Signature',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'This signature will appear at the bottom of all invoices when enabled.',
+            style: TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: InkWell(
+              onTap: () => _showSignaturePicker(context, settings),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 200,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: settings.adminSignature != null
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.memory(
+                          settings.adminSignature!,
+                          fit: BoxFit.contain,
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.edit_note, size: 40, color: Colors.grey[400]),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap to upload signature',
+                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+          if (settings.adminSignature != null)
+            Center(
+              child: TextButton.icon(
+                onPressed: () => _update(context, settings.copyWith(adminSignature: null)),
+                icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                label: const Text('Remove Signature', style: TextStyle(color: Colors.red, fontSize: 12)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showSignaturePicker(BuildContext context, AppSettings settings) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Gallery'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickSignature(context, settings, ImageSource.gallery);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Camera'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickSignature(context, settings, ImageSource.camera);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickSignature(BuildContext context, AppSettings settings, ImageSource source) async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: source,
+      maxWidth: 1024, // High enough for signature but prevents memory issues
+      maxHeight: 1024,
+    );
+    
+    if (image == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No image captured')),
+        );
+      }
+      return;
+    }
+
+    if (image != null) {
+      try {
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: image.path,
+          aspectRatio: const CropAspectRatio(ratioX: 2, ratioY: 1),
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Crop Signature',
+              toolbarColor: Theme.of(context).primaryColor,
+              toolbarWidgetColor: Colors.white,
+              initAspectRatio: CropAspectRatioPreset.original,
+              lockAspectRatio: true,
+            ),
+            IOSUiSettings(
+              title: 'Crop Signature',
+              aspectRatioLockEnabled: true,
+            ),
+            WebUiSettings(
+              context: context,
+            ),
+          ],
+        );
+        
+        if (croppedFile != null) {
+          if (!mounted) return;
+          _showLoadingDialog(context, 'Removing background...');
+          
+          final originalBytes = await croppedFile.readAsBytes();
+          
+          // Process signature to remove background
+          final processedBytes = await compute(LogoProcessor.processLogoWithTransparency, originalBytes);
+          
+          if (!mounted) return;
+          _hideLoadingDialog(context);
+          
+          _update(context, settings.copyWith(adminSignature: processedBytes ?? originalBytes));
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Signature processed successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('Crop error: $e');
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error processing signature: $e')),
+          );
+        }
+      }
+    }
   }
 
   void _showExtendSubscriptionDialog(BuildContext context) {

@@ -441,10 +441,12 @@ class _StudentListPageState extends State<StudentListPage> {
                       controller: parentPhoneController, 
                       decoration: const InputDecoration(labelText: 'Parent Phone *'),
                       keyboardType: TextInputType.phone,
-                      validator: (val) {
-                        if (val == null || val.isEmpty) return 'Phone number is required';
-                        if (!RegExp(r'^\d{10,15}$').hasMatch(val.replaceAll(' ', ''))) {
-                          return 'Enter a valid phone number';
+                      maxLength: 15,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        final cleanVal = v.replaceAll(' ', '');
+                        if (!RegExp(r'^\d{11,15}$').hasMatch(cleanVal)) {
+                          return 'Enter a valid phone (11-15 digits)';
                         }
                         return null;
                       },
