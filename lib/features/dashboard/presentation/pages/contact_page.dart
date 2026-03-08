@@ -164,7 +164,7 @@ class _ContactPageState extends State<ContactPage> {
             return _ContactTile(
               name: staff.name,
               phone: staff.phone,
-              subtitle: 'Staff ID: ${staff.staffCode}',
+              subtitle: 'Staff ID: ${staff.staffId ?? staff.id}',
               icon: Icons.person_outline,
             );
           },

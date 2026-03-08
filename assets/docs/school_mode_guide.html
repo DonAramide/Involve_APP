@@ -226,41 +226,59 @@
                 environment is designed specifically for educational institutions to manage fees, students, academic
                 records, and collection analytics with ease.</p>
 
+            <div class="tip-box" style="background: #fff3e0; border-color: #ff9800;">
+                <strong style="color: #e65100;">🏁 GETTING STARTED CHECKLIST</strong>
+                <ol>
+                    <li><strong>Academic Setup:</strong> Define your current Year and active term.</li>
+                    <li><strong>Classes & Subjects:</strong> Create your grade levels and curriculum subjects.</li>
+                    <li><strong>Grading Rules:</strong> Set up your score ranges (A, B, C, etc.) to enable result entry.
+                    </li>
+                    <li><strong>Fee Catalog:</strong> Add your tuition and other fee items.</li>
+                    <li><strong>Enrolment:</strong> Add students to their respective classes.</li>
+                </ol>
+            </div>
+
             <h2>1. Core Dashboard Functions</h2>
+            <p class="section-intro">Your daily administrative hub for payments and financial tracking.</p>
             <div class="feature-grid">
                 <div class="feature-card">
                     <div class="icon-box icon-add_bill"></div>
                     <div class="feature-details">
-                        <h3>NEW TERM BILL</h3>
-                        <p>The central point for processing student payments. Search for a student by name or ID, select
-                            the applicable fees (Tuition, Books, Uniforms), and generate a professional receipt
-                            instantly.</p>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="icon-box icon-history"></div>
-                    <div class="feature-details">
-                        <h3>BILLING RECORDS</h3>
-                        <p>Access a complete history of every term bill issued. Filter by date, payment status (Paid,
-                            Partial, Unpaid), or specific student. Ideal for daily audits and reconciliation.</p>
+                        <h3>NEW TERM BILL (Generate Bill)</h3>
+                        <p>The primary tool for issuing receipts.
+                            <br><strong>Sub-Buttons & Actions:</strong>
+                        <ul>
+                            <li><strong>Search Bar:</strong> Quickly find students by name or admission number.</li>
+                            <li><strong>Fee Selection:</strong> Tap fees to add them to the bill.</li>
+                            <li><strong>Method Dropdown:</strong> Choose between Cash, POS, or Transfer.</li>
+                            <li><strong>Process Payment:</strong> Finalize and print the receipt.</li>
+                        </ul>
+                        </p>
                     </div>
                 </div>
 
                 <div class="feature-card" style="background: #fff9f0;">
                     <div class="icon-box icon-fees" style="background: #ff9800;"></div>
                     <div class="feature-details">
-                        <h3>FEE STRUCTURE / MANAGEMENT</h3>
-                        <p>Define your school's financial catalog. Create fee types, set their amounts, and mark
-                            essential fees as "Default" to speed up the billing process.</p>
+                        <h3>FEE MANAGEMENT</h3>
+                        <p>Dashboard for all billing activities and bulk operations.
+                            <br><strong>Sub-Buttons & Actions:</strong>
+                        <ul>
+                            <li><strong>(+) Generate Bills Button:</strong> Performs batch billing for an entire class
+                                at once.</li>
+                            <li><strong>Default Toggle:</strong> Set fees as "Default" so they are automatically added
+                                to every student's bill.</li>
+                            <li><strong>Fee History Tab:</strong> View all collections sorted by date.</li>
+                        </ul>
+                        </p>
                     </div>
                 </div>
             </div>
 
             <div class="tip-box">
                 <strong>💡 PRO TIP: Carry Forward Logic</strong>
-                When you generate a new bill for a student who has an outstanding balance from the previous term, the
-                system automatically adds a "Previous Term Balance" item ensuring no revenue is lost.
+                The system automatically detects outstanding balances from previous terms. When generating a new bill,
+                these balances are added as a "Prev. Balance" item to ensure no revenue is lost.
             </div>
 
             <h2>2. Academic & Student Administration</h2>
@@ -268,9 +286,19 @@
                 <div class="feature-card">
                     <div class="icon-box icon-students" style="background: #3f51b5;"></div>
                     <div class="feature-details">
-                        <h3>STUDENT DIRECTORY</h3>
-                        <p>Manage the list of all enrolled students. Store parent contact details, home addresses, and
-                            monitor individual financial balances at a glance.</p>
+                        <h3>STUDENT DIRECTORY / PROFILE</h3>
+                        <p>Comprehensive student management.
+                            <br><strong>Sub-Buttons & Actions (inside Profile):</strong>
+                        <ul>
+                            <li><strong>General Tab:</strong> View parent contacts, DOB, and registration data.</li>
+                            <li><strong>Billing Records Tab:</strong> View all invoices ever issued to this student.
+                            </li>
+                            <li><strong>Results Tab:</strong> Historical view of all academic performance.</li>
+                            <li><strong>Payments Tab:</strong> Ledger of all cash/electronic payments received.</li>
+                            <li><strong>(PAY BALANCE) Button:</strong> Quickly process a payment against an existing
+                                debt.</li>
+                        </ul>
+                        </p>
                     </div>
                 </div>
 
@@ -278,16 +306,15 @@
                     <div class="icon-box icon-setup" style="background: #795548;"></div>
                     <div class="feature-details">
                         <h3>ACADEMIC SETUP</h3>
-                        <p>The foundation of your school year. Setup Academic Years (e.g., 2023/2024), define Terms
-                            within those years, and manage the list of Classes (JSS 1, Primary 2, etc.).</p>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="icon-box icon-teachers" style="background: #673ab7;"></div>
-                    <div class="feature-details">
-                        <h3>TEACHER MANAGEMENT</h3>
-                        <p>Keep a database of your academic staff, their specialized subjects, and contact information.
+                        <p>Configure the structural settings for your school.
+                            <br><strong>Key Manageable Items:</strong>
+                        <ul>
+                            <li><strong>Years/Terms:</strong> Set start/end dates and mark the "Active" term.</li>
+                            <li><strong>Classes:</strong> Add grade levels and assign classroom names.</li>
+                            <li><strong>Grading Rules Button:</strong> Define the percentage ranges for grades (e.g.,
+                                70-100 = A).</li>
+                            <li><strong>Subject Management:</strong> Manage the curriculum list.</li>
+                        </ul>
                         </p>
                     </div>
                 </div>
@@ -296,20 +323,20 @@
             <h2>3. Advanced Academic Tools</h2>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-subjects" style="background: #2196f3;"></div>
-                    <div class="feature-details">
-                        <h3>SUBJECT MANAGEMENT</h3>
-                        <p>Define the curriculum for your school. Organize subjects by department or level to ensure
-                            accurate record-keeping.</p>
-                    </div>
-                </div>
-
-                <div class="feature-card">
                     <div class="icon-box icon-results" style="background: #f44336;"></div>
                     <div class="feature-details">
                         <h3>RESULT ENTRY</h3>
-                        <p>Input student scores for the active term. The system uses your defined "Grading Rules" (found
-                            in Academic Setup actions) to calculate performance bands automatically.</p>
+                        <p>Digitize academic performance records.
+                            <br><strong>Sub-Buttons & Actions:</strong>
+                        <ul>
+                            <li><strong>Class/Subject Filter:</strong> Select the target group for data entry.</li>
+                            <li><strong>CA/Exam Fields:</strong> Dedicated inputs for Assessment and Examination scores.
+                            </li>
+                            <li><strong>Dynamic Calculation:</strong> Total scores and Grades update instantly as you
+                                type.</li>
+                            <li><strong>Save Button:</strong> Commits all class results to the database at once.</li>
+                        </ul>
+                        </p>
                     </div>
                 </div>
 
@@ -317,20 +344,37 @@
                     <div class="icon-box icon-analytics" style="background: #00bcd4;"></div>
                     <div class="feature-details">
                         <h3>STUDENT ANALYTICS</h3>
-                        <p>Powerful visual insights. See the percentage of fully-paid vs. owing students, view revenue
-                            collection trends by month, and compare expected vs. recovered funds per class.</p>
+                        <p>Visual reporting for management decisions.
+                            <br><strong>Functions & Charts:</strong>
+                        <ul>
+                            <li><strong>Payment Status (Pie Chart):</strong> Real-time ratio of Paid vs. Owing students.
+                            </li>
+                            <li><strong>Students per Class (Bar Chart):</strong> Identify overcrowded or empty classes.
+                            </li>
+                            <li><strong>Revenue Trend (Line Graph):</strong> Monthly recovery rates for the academic
+                                year.</li>
+                        </ul>
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <h2>4. Communication & Utilities</h2>
+            <h2>4. Communication & Staff</h2>
             <div class="feature-grid">
                 <div class="feature-card">
                     <div class="icon-box icon-contacts" style="background: #009688;"></div>
                     <div class="feature-details">
                         <h3>CONTACT DIRECTORY</h3>
-                        <p>A unified directory for Management Staff, Academic Staff, and Parents. One-click access to
-                            call or message stakeholders directly from the app.</p>
+                        <p>Single source of truth for school contacts.
+                            <br><strong>Sub-Buttons & Actions:</strong>
+                        <ul>
+                            <li><strong>Management/Academic Tabs:</strong> Switch between office staff and teachers.
+                            </li>
+                            <li><strong>Parents Tab:</strong> Searchable list of all student guardians.</li>
+                            <li><strong>Action Icons:</strong> Direct tap to <strong>Call</strong>, send
+                                <strong>SMS</strong>, or open a <strong>WhatsApp</strong> chat.</li>
+                        </ul>
+                        </p>
                     </div>
                 </div>
             </div>

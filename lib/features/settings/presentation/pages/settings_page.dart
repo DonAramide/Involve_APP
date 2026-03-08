@@ -1423,7 +1423,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ...state.staffList.map((staff) => ListTile(
                     leading: const CircleAvatar(child: Icon(Icons.person)),
                     title: Text(staff.name),
-                    subtitle: Text('Code: ****'),
+                    subtitle: Text('ID: ${staff.staffId ?? "None"} | Code: ****'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1457,7 +1457,9 @@ class _SettingsPageState extends State<SettingsPage> {
     // Don't pre-fill if it's a hash (length > 4)
     final existingCode = staff?.staffCode;
     final isCodeHashed = existingCode != null && existingCode.length > 4;
-    final codeController = TextEditingController(text: isCodeHashed ? '' : existingCode);
+    final pin = isCodeHashed ? '' : existingCode;
+    final codeController = TextEditingController(text: pin);
+    final staffIdController = TextEditingController(text: staff?.staffId);
     final phoneController = TextEditingController(text: staff?.phone);
     final formKey = GlobalKey<FormState>();
 
@@ -1467,33 +1469,44 @@ class _SettingsPageState extends State<SettingsPage> {
         title: Text(staff == null ? 'Add Staff' : 'Edit Staff'),
         content: Form(
           key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(labelText: 'Staff Name'),
-                validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-              ),
-              TextFormField(
-                controller: codeController,
-                decoration: InputDecoration(
-                  labelText: 'Auth Code (4 digits)',
-                  hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Staff Name'),
+                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
                 ),
-                keyboardType: TextInputType.number,
-                maxLength: 4,
-                validator: (val) {
-                  if (staff != null && (val == null || val.isEmpty)) return null; // Optional on edit
-                  return (val?.length != 4) ? 'Must be 4 digits' : null;
-                },
-              ),
-              TextFormField(
-                controller: phoneController,
-                decoration: const InputDecoration(labelText: 'Phone Number'),
-                keyboardType: TextInputType.phone,
-              ),
-            ],
+                TextFormField(
+                  controller: staffIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Staff ID (Optional)',
+                    hintText: 'e.g., MGT-01',
+                  ),
+                  maxLength: 20,
+                  textCapitalization: TextCapitalization.characters,
+                ),
+                TextFormField(
+                  controller: codeController,
+                  decoration: InputDecoration(
+                    labelText: 'Auth Code (4 digits)',
+                    hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  validator: (val) {
+                    if (staff != null && (val == null || val.isEmpty)) return null; // Optional on edit
+                    return (val?.length != 4) ? 'Must be 4 digits' : null;
+                  },
+                ),
+                TextFormField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                  keyboardType: TextInputType.phone,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -1505,6 +1518,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 final newStaff = Staff(
                   id: staff?.id,
                   name: nameController.text.trim(),
+                  staffId: staffIdController.text.trim().isEmpty ? null : staffIdController.text.trim(),
                   staffCode: pin.isEmpty && staff != null 
                       ? staff.staffCode 
                       : pin,

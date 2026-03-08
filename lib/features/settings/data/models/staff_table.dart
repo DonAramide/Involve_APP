@@ -5,6 +5,7 @@ class Staff extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text().withLength(min: 1, max: 100)();
   TextColumn get staffCode => text().withLength(min: 4, max: 100)(); // Supports hashed pins
+  TextColumn get staffId => text().nullable().withLength(min: 1, max: 20)(); // Human-readable ID (e.g., MGT-01)
   TextColumn get phone => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
