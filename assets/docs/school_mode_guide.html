@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invify - School Mode User Guide</title>
+    <style>
+        :root {
+            --primary: #00838f;
+            --secondary: #3949ab;
+            --accent: #ff9800;
+            --text-main: #2c3e50;
+            --text-light: #546e7a;
+            --bg-light: #f4f7f6;
+            --white: #ffffff;
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--white);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
+        }
+
+        header {
+            position: relative;
+            background: var(--secondary);
+            color: var(--white);
+            text-align: center;
+            overflow: hidden;
+        }
+
+        header img.header-img {
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+            opacity: 0.8;
+        }
+
+        .header-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 40px;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+        }
+
+        .header-content h1 {
+            margin: 0;
+            font-size: 2.5em;
+            letter-spacing: 1px;
+        }
+
+        .header-content p {
+            margin: 5px 0 0;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        h2 {
+            border-left: 5px solid var(--primary);
+            padding-left: 15px;
+            color: var(--primary);
+            margin-top: 40px;
+            font-size: 1.8em;
+        }
+
+        .section-intro {
+            font-size: 1.1em;
+            color: var(--text-light);
+            margin-bottom: 30px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .feature-card {
+            display: flex;
+            align-items: flex-start;
+            padding: 20px;
+            border-radius: 12px;
+            background: #fff;
+            border: 1px solid #eee;
+            transition: transform 0.2s;
+        }
+
+        .icon-box {
+            min-width: 60px;
+            height: 60px;
+            background: var(--primary);
+            color: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-right: 20px;
+        }
+
+        .feature-details h3 {
+            margin: 0 0 10px;
+            color: var(--secondary);
+        }
+
+        .feature-details p {
+            margin: 0;
+            color: var(--text-light);
+        }
+
+        .tip-box {
+            background: #e0f2f1;
+            border-left: 5px solid #009688;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 0 12px 12px 0;
+        }
+
+        .tip-box strong {
+            color: #00796b;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px;
+            background: #eee;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        /* Print styling to force PDF layout */
+        @media print {
+            body {
+                background: white;
+            }
+
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+            }
+
+            .feature-card {
+                break-inside: avoid;
+            }
+
+            header img.header-img {
+                height: 200px;
+            }
+        }
+
+        /* Icon Emoji fallbacks */
+        .icon-add_bill::before {
+            content: '🧾';
+        }
+
+        .icon-students::before {
+            content: '🎓';
+        }
+
+        .icon-history::before {
+            content: '📊';
+        }
+
+        .icon-analytics::before {
+            content: '📈';
+        }
+
+        .icon-setup::before {
+            content: '🏛️';
+        }
+
+        .icon-fees::before {
+            content: '💰';
+        }
+
+        .icon-subjects::before {
+            content: '📚';
+        }
+
+        .icon-results::before {
+            content: '📝';
+        }
+
+        .icon-teachers::before {
+            content: '👨‍🏫';
+        }
+
+        .icon-contacts::before {
+            content: '📞';
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <img src="header.png" alt="School Mode Header" class="header-img">
+            <div class="header-content">
+                <h1>Invify School Mode</h1>
+                <p>Comprehensive User Guide & Feature Manual</p>
+            </div>
+        </header>
+
+        <div class="content">
+            <p class="section-intro">Welcome to the Involve App <strong>School Mode</strong>. This specialized
+                environment is designed specifically for educational institutions to manage fees, students, academic
+                records, and collection analytics with ease.</p>
+
+            <h2>1. Core Dashboard Functions</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box icon-add_bill"></div>
+                    <div class="feature-details">
+                        <h3>NEW TERM BILL</h3>
+                        <p>The central point for processing student payments. Search for a student by name or ID, select
+                            the applicable fees (Tuition, Books, Uniforms), and generate a professional receipt
+                            instantly.</p>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box icon-history"></div>
+                    <div class="feature-details">
+                        <h3>BILLING RECORDS</h3>
+                        <p>Access a complete history of every term bill issued. Filter by date, payment status (Paid,
+                            Partial, Unpaid), or specific student. Ideal for daily audits and reconciliation.</p>
+                    </div>
+                </div>
+
+                <div class="feature-card" style="background: #fff9f0;">
+                    <div class="icon-box icon-fees" style="background: #ff9800;"></div>
+                    <div class="feature-details">
+                        <h3>FEE STRUCTURE / MANAGEMENT</h3>
+                        <p>Define your school's financial catalog. Create fee types, set their amounts, and mark
+                            essential fees as "Default" to speed up the billing process.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tip-box">
+                <strong>💡 PRO TIP: Carry Forward Logic</strong>
+                When you generate a new bill for a student who has an outstanding balance from the previous term, the
+                system automatically adds a "Previous Term Balance" item ensuring no revenue is lost.
+            </div>
+
+            <h2>2. Academic & Student Administration</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box icon-students" style="background: #3f51b5;"></div>
+                    <div class="feature-details">
+                        <h3>STUDENT DIRECTORY</h3>
+                        <p>Manage the list of all enrolled students. Store parent contact details, home addresses, and
+                            monitor individual financial balances at a glance.</p>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box icon-setup" style="background: #795548;"></div>
+                    <div class="feature-details">
+                        <h3>ACADEMIC SETUP</h3>
+                        <p>The foundation of your school year. Setup Academic Years (e.g., 2023/2024), define Terms
+                            within those years, and manage the list of Classes (JSS 1, Primary 2, etc.).</p>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box icon-teachers" style="background: #673ab7;"></div>
+                    <div class="feature-details">
+                        <h3>TEACHER MANAGEMENT</h3>
+                        <p>Keep a database of your academic staff, their specialized subjects, and contact information.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <h2>3. Advanced Academic Tools</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box icon-subjects" style="background: #2196f3;"></div>
+                    <div class="feature-details">
+                        <h3>SUBJECT MANAGEMENT</h3>
+                        <p>Define the curriculum for your school. Organize subjects by department or level to ensure
+                            accurate record-keeping.</p>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box icon-results" style="background: #f44336;"></div>
+                    <div class="feature-details">
+                        <h3>RESULT ENTRY</h3>
+                        <p>Input student scores for the active term. The system uses your defined "Grading Rules" (found
+                            in Academic Setup actions) to calculate performance bands automatically.</p>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box icon-analytics" style="background: #00bcd4;"></div>
+                    <div class="feature-details">
+                        <h3>STUDENT ANALYTICS</h3>
+                        <p>Powerful visual insights. See the percentage of fully-paid vs. owing students, view revenue
+                            collection trends by month, and compare expected vs. recovered funds per class.</p>
+                    </div>
+                </div>
+            </div>
+
+            <h2>4. Communication & Utilities</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box icon-contacts" style="background: #009688;"></div>
+                    <div class="feature-details">
+                        <h3>CONTACT DIRECTORY</h3>
+                        <p>A unified directory for Management Staff, Academic Staff, and Parents. One-click access to
+                            call or message stakeholders directly from the app.</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            <p>&copy; 2026 Invify | Innovative School Management Solutions</p>
+            <p><em>Open this file in your browser and press <strong>Ctrl+P</strong> to Save as PDF.</em></p>
+        </footer>
+    </div>
+
+</body>
+
+</html>
