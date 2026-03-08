@@ -4,6 +4,7 @@ class Staff extends Equatable {
   final int? id;
   final String name;
   final String staffCode;
+  final String? staffId;
   final String? phone;
   final bool isActive;
   final String? syncId;

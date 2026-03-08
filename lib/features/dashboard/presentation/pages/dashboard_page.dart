@@ -41,6 +41,7 @@ import 'package:involve_app/features/school/presentation/pages/result_entry_page
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/features/school/presentation/pages/school_user_guide_page.dart';
 
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -207,6 +208,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     case 'help':
                       Navigator.push(context, MaterialPageRoute(builder: (_) => HelpPage()));
                       break;
+                    case 'user_guide':
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolUserGuidePage()));
+                      break;
                   }
                 },
                 itemBuilder: (context) => [
@@ -228,6 +232,16 @@ class _DashboardPageState extends State<DashboardPage> {
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
+                  if (settings?.businessMode == 'school')
+                    const PopupMenuItem(
+                      value: 'user_guide',
+                      child: ListTile(
+                        leading: Icon(Icons.menu_book),
+                        title: Text('User Guide'),
+                        contentPadding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(width: 8),
