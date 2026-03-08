@@ -55,17 +55,24 @@ class UnifiedPrinterService implements IPrinterService {
   Future<bool> connect(PrinterDevice device) async {
     await disconnect(); // Ensure clean state
 
-    if (_isIpAddress(device.address)) {
+    if (device.type == 'wifi' || _isIpAddress(device.address)) {
       return await networkService.connect(device);
     } 
     
     if (kIsWeb) return false; // Native Bluetooth not supported on Web
 
-    // Try BLE first (more modern, usually doesn't prompt for PIN unnecessarily)
+    // Use specific protocol if known
+    if (device.type == 'bluetooth_ble') {
+      return await bleService.connect(device);
+    } else if (device.type == 'bluetooth_spp') {
+      return await sppService.connect(device);
+    }
+
+    // Fallback: Try BLE first (generic for older records)
     final bleSuccess = await bleService.connect(device);
     if (bleSuccess) return true;
 
-    // If BLE fails, try SPP (Classic Bluetooth)
+    // Finally try SPP
     return await sppService.connect(device);
   }
 

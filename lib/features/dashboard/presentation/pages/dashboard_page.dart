@@ -204,9 +204,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     case 'about':
                       Navigator.push(context, MaterialPageRoute(builder: (_) => AboutPage()));
                       break;
-                    case 'contact':
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => ContactPage()));
-                      break;
                     case 'help':
                       Navigator.push(context, MaterialPageRoute(builder: (_) => HelpPage()));
                       break;
@@ -221,15 +218,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       contentPadding: EdgeInsets.zero,
                       visualDensity: VisualDensity.compact,
                       ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'contact',
-                    child: ListTile(
-                      leading: Icon(Icons.contact_support),
-                      title: Text('Contact Us'),
-                      contentPadding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                    ),
                   ),
                   const PopupMenuItem(
                     value: 'help',
@@ -454,6 +442,13 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.blueGrey,
         onTap: () => _verifyAndNavigateToSettings(context),
       ),
+      _DashboardMenuItem(
+        id: 'contacts',
+        title: 'CONTACTS',
+        icon: Icons.contact_phone,
+        color: Colors.teal,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactPage())),
+      ),
     ];
 
     if (isSchool) {
@@ -499,13 +494,6 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.grid_view,
           color: Colors.orange,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
-        ),
-        _DashboardMenuItem(
-          id: 'contacts',
-          title: 'CONTACTS',
-          icon: Icons.contact_phone,
-          color: Colors.teal,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactPage())),
         ),
         _DashboardMenuItem(
           id: 'subjects',

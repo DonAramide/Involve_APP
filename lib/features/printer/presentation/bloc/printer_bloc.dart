@@ -138,10 +138,9 @@ class PrinterBloc extends Bloc<PrinterEvent, PrinterState> {
     try {
       final success = await connectPrinter(event.device);
       if (success) {
-        // Save to repository (last used and type)
-        // Detect type from address (WiFi usually has dots)
-        final type = event.device.address.contains('.') ? 'wifi' : 'bluetooth';
-        final deviceToSave = event.device.copyWith(type: type);
+        // Detect type if not already tagged by scanner
+        String finalType = event.device.type ?? (event.device.address.contains('.') ? 'wifi' : 'bluetooth');
+        final deviceToSave = event.device.copyWith(type: finalType);
         await repository.saveConfig(deviceToSave);
         
         emit(state.copyWith(connectedDevice: deviceToSave, isConnecting: false));

@@ -13,7 +13,7 @@ class PrinterDevice extends Equatable {
   final String name;
   final String address;
   final String? customName;
-  final String? type; // 'bluetooth', 'wifi', 'usb'
+  final String? type; // 'bluetooth_spp', 'bluetooth_ble', 'wifi', 'usb'
   
   const PrinterDevice({
     required this.name, 

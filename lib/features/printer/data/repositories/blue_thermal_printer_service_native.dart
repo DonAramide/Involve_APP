@@ -14,7 +14,11 @@ class BlueThermalPrinterService implements IPrinterService {
     if (kIsWeb) return []; // Supported only on Native
     try {
       final List<btp.BluetoothDevice> devices = await bluetooth.getBondedDevices();
-      return devices.map((d) => PrinterDevice(name: d.name ?? 'Unknown', address: d.address!)).toList();
+      return devices.map((d) => PrinterDevice(
+        name: d.name ?? 'Unknown', 
+        address: d.address!,
+        type: 'bluetooth_spp',
+      )).toList();
     } catch (e) {
       debugPrint('SPP Scan Error: $e');
       return [];
@@ -24,15 +28,31 @@ class BlueThermalPrinterService implements IPrinterService {
   @override
   Future<bool> connect(PrinterDevice device) async {
     if (kIsWeb) return false;
-    try {
-      final btpDevice = btp.BluetoothDevice(device.name, device.address);
-      if (await isConnected()) return true;
-      await bluetooth.connect(btpDevice);
-      return true;
-    } catch (e) {
-      debugPrint('SPP Connect Error: $e');
-      return false;
+    
+    int retryCount = 0;
+    const int maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        final btpDevice = btp.BluetoothDevice(device.name, device.address);
+        if (await isConnected()) return true;
+        
+        await bluetooth.connect(btpDevice);
+        return true;
+      } catch (e) {
+        retryCount++;
+        debugPrint('SPP Connect Attempt $retryCount failed: $e');
+        
+        if (retryCount < maxRetries) {
+          // If it fails with "socket closed" or similar, try to disconnect first to clean up
+          await disconnect();
+          await Future.delayed(const Duration(seconds: 1));
+        } else {
+          debugPrint('SPP Connect Error after $maxRetries attempts: $e');
+        }
+      }
     }
+    return false;
   }
 
   @override

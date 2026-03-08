@@ -44,6 +44,7 @@ class CrossPlatformPrinterService implements IPrinterService {
         devices.add(PrinterDevice(
           name: name,
           address: r.device.remoteId.toString(),
+          type: 'bluetooth_ble',
         ));
       }
     } catch (e) {

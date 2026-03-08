@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:async';
 import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
@@ -7,6 +8,7 @@ import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/admin/presentation/widgets/device_access_dialog.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key});
@@ -73,6 +75,31 @@ class _HelpPageState extends State<HelpPage> {
         );
       }
     });
+  }
+
+  Future<void> _launch(String scheme, String number) async {
+    final cleanNumber = number.replaceAll(RegExp(r'[^0-9+]'), '');
+    Uri uri;
+    if (scheme == 'whatsapp') {
+      uri = Uri.parse('https://wa.me/$cleanNumber');
+    } else {
+      uri = Uri(scheme: scheme, path: cleanNumber);
+    }
+    
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  Future<void> _launchEmail(String email) async {
+    final Uri uri = Uri(
+      scheme: 'mailto',
+      path: email,
+      query: 'subject=Invify Support Request',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 
   @override
@@ -189,18 +216,57 @@ class _HelpPageState extends State<HelpPage> {
             'Contact Support',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const Card(
-            child: ListTile(
-              leading: Icon(Icons.email),
-              title: Text('Email Support'),
-              subtitle: Text('info.iips.ng@gmail.com'),
+          GestureDetector(
+            onTap: () async {
+              final Uri emailUri = Uri.parse('mailto:info.iips.ng@gmail.com?subject=Support Request');
+              if (await canLaunchUrl(emailUri)) {
+                await launchUrl(emailUri);
+              }
+            },
+            child: const Card(
+              child: ListTile(
+                leading: Icon(Icons.email, color: Colors.deepPurple),
+                title: Text('Email Support'),
+                subtitle: Text('info.iips.ng@gmail.com'),
+              ),
             ),
           ),
-          const Card(
+          Card(
             child: ListTile(
-              leading: Icon(Icons.phone),
-              title: Text('Support (WhatsApp/Tel)'),
-              subtitle: Text('08023552282 | 09027033748'),
+              leading: const Icon(Icons.phone, color: Colors.deepPurple),
+              title: const Text('Support (WhatsApp/Tel)'),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Wrap(
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        final Uri telUri = Uri.parse('tel:08023552282');
+                        if (await canLaunchUrl(telUri)) {
+                          await launchUrl(telUri);
+                        }
+                      },
+                      child: const Text(
+                        '08023552282',
+                        style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                    const Text(' | '),
+                    InkWell(
+                      onTap: () async {
+                        final Uri telUri = Uri.parse('tel:09027033748');
+                        if (await canLaunchUrl(telUri)) {
+                          await launchUrl(telUri);
+                        }
+                      },
+                      child: const Text(
+                        '09027033748',
+                        style: TextStyle(color: Colors.blue, decoration: TextDecoration.underline),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 32),

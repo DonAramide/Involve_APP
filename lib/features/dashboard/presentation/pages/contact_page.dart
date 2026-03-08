@@ -33,22 +33,25 @@ class _ContactPageState extends State<ContactPage> {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
         final isSchoolMode = settingsState.settings?.businessMode == 'school';
-        final tabCount = isSchoolMode ? 3 : 2;
+        final tabCount = isSchoolMode ? 3 : 1;
 
         return DefaultTabController(
           length: tabCount,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Contact Directory'),
-              bottom: TabBar(
-                isScrollable: isSchoolMode,
-                tabs: [
-                  Tab(icon: const Icon(Icons.people), text: isSchoolMode ? 'Management Staff' : 'Staff'),
-                  if (isSchoolMode) 
-                    const Tab(icon: Icon(Icons.school), text: 'Academic Staff'),
-                  const Tab(icon: Icon(Icons.family_restroom), text: 'Parents'),
-                ],
-              ),
+              bottom: tabCount > 1 
+                ? TabBar(
+                    isScrollable: isSchoolMode,
+                    tabs: [
+                      Tab(icon: const Icon(Icons.people), text: isSchoolMode ? 'Management Staff' : 'Staff'),
+                      if (isSchoolMode) 
+                        const Tab(icon: Icon(Icons.school), text: 'Academic Staff'),
+                      if (isSchoolMode)
+                        const Tab(icon: Icon(Icons.family_restroom), text: 'Parents'),
+                    ],
+                  )
+                : null,
               actions: [
                 IconButton(
                   onPressed: () {
@@ -90,13 +93,15 @@ class _ContactPageState extends State<ContactPage> {
                   ),
                 ),
                 Expanded(
-                  child: TabBarView(
-                    children: [
-                      _buildStaffTab(isSchoolMode),
-                      if (isSchoolMode) _buildTeachersTab(isSchoolMode),
-                      _buildParentsTab(),
-                    ],
-                  ),
+                  child: tabCount > 1 
+                    ? TabBarView(
+                        children: [
+                          _buildStaffTab(isSchoolMode),
+                          if (isSchoolMode) _buildTeachersTab(isSchoolMode),
+                          if (isSchoolMode) _buildParentsTab(),
+                        ],
+                      )
+                    : _buildStaffTab(isSchoolMode),
                 ),
               ],
             ),
