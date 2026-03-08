@@ -269,6 +269,22 @@ class _HelpPageState extends State<HelpPage> {
               ),
             ),
           ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: () async {
+              final Uri uri = Uri.parse('https://iips.app');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
+            },
+            child: const Card(
+              child: ListTile(
+                leading: Icon(Icons.language, color: Colors.deepPurple),
+                title: Text('Official Website'),
+                subtitle: Text('https://iips.app'),
+              ),
+            ),
+          ),
           const SizedBox(height: 32),
           
           // Powered by

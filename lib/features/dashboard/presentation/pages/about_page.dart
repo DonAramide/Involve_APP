@@ -121,6 +121,23 @@ class AboutPage extends StatelessWidget {
                 color: Colors.blueGrey,
               ),
             ),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () async {
+                final Uri uri = Uri.parse('https://iips.app');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              },
+              child: const Text(
+                'www.iips.app',
+                style: TextStyle(
+                  color: Colors.blue,
+                  decoration: TextDecoration.underline,
+                  fontSize: 14,
+                ),
+              ),
+            ),
             const SizedBox(height: 40),
           ],
         ),
