@@ -17,6 +17,10 @@ class SchoolState extends Equatable {
   final List<AcademicResult> results;
   final List<GradingRule> gradingRules;
   final List<Teacher> teachers;
+  final double? studentAverage;
+  final int? studentPosition;
+  final int? classSize;
+  final String? nextAdmissionNumber;
   final bool isLoading;
   final String? error;
   final SchoolStatus status;
@@ -32,6 +36,10 @@ class SchoolState extends Equatable {
     this.results = const [],
     this.gradingRules = const [],
     this.teachers = const [],
+    this.studentAverage,
+    this.studentPosition,
+    this.classSize,
+    this.nextAdmissionNumber,
     this.isLoading = false,
     this.error,
     this.status = SchoolStatus.initial,
@@ -51,6 +59,10 @@ class SchoolState extends Equatable {
     List<AcademicResult>? results,
     List<GradingRule>? gradingRules,
     List<Teacher>? teachers,
+    double? studentAverage,
+    int? studentPosition,
+    int? classSize,
+    String? nextAdmissionNumber,
     bool? isLoading,
     String? error,
     SchoolStatus? status,
@@ -66,6 +78,10 @@ class SchoolState extends Equatable {
       results: results ?? this.results,
       gradingRules: gradingRules ?? this.gradingRules,
       teachers: teachers ?? this.teachers,
+      studentAverage: studentAverage ?? this.studentAverage,
+      studentPosition: studentPosition ?? this.studentPosition,
+      classSize: classSize ?? this.classSize,
+      nextAdmissionNumber: nextAdmissionNumber ?? this.nextAdmissionNumber,
       isLoading: isLoading ?? this.isLoading,
       error: error,
       status: status ?? this.status,
@@ -73,5 +89,23 @@ class SchoolState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [academicYears, terms, classes, students, items, studentInvoices, subjects, results, gradingRules, teachers, isLoading, error, status];
+  List<Object?> get props => [
+        academicYears,
+        terms,
+        classes,
+        students,
+        items,
+        studentInvoices,
+        subjects,
+        results,
+        gradingRules,
+        teachers,
+        studentAverage,
+        studentPosition,
+        classSize,
+        nextAdmissionNumber,
+        isLoading,
+        error,
+        status
+      ];
 }

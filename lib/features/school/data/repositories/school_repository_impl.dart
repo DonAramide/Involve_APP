@@ -156,6 +156,37 @@ class SchoolRepositoryImpl implements SchoolRepository {
   }
 
   @override
+  Future<List<Student>> getStudentSummaries() async {
+    final query = database.selectOnly(database.students)..addColumns([
+      database.students.id,
+      database.students.admissionNumber,
+      database.students.firstName,
+      database.students.lastName,
+      database.students.classId,
+      database.students.parentName,
+      database.students.parentPhone,
+      database.students.balance,
+      database.students.dateOfBirth,
+      database.students.registrationDate,
+    ]);
+    
+    final rows = await query.get();
+    return rows.map((row) => Student(
+      id: row.read(database.students.id)!,
+      admissionNumber: row.read(database.students.admissionNumber)!,
+      firstName: row.read(database.students.firstName)!,
+      lastName: row.read(database.students.lastName)!,
+      classId: row.read(database.students.classId)!,
+      parentName: row.read(database.students.parentName),
+      parentPhone: row.read(database.students.parentPhone),
+      balance: row.read(database.students.balance)!,
+      dateOfBirth: row.read(database.students.dateOfBirth),
+      registrationDate: row.read(database.students.registrationDate)!,
+      image: null,
+    )).toList();
+  }
+
+  @override
   Future<void> addStudent(Student student) async {
     await database.into(database.students).insert(db.StudentsCompanion.insert(
       admissionNumber: student.admissionNumber,
@@ -200,6 +231,48 @@ class SchoolRepositoryImpl implements SchoolRepository {
         .write(db.StudentsCompanion(
       classId: Value(targetClassId),
     ));
+  }
+
+
+  @override
+  Future<String?> getLastAdmissionNumber() async {
+    final query = database.selectOnly(database.students)..addColumns([database.students.admissionNumber]);
+    final rows = await query.get();
+    
+    if (rows.isEmpty) return null;
+
+    int maxNum = 0;
+    for (final row in rows) {
+      final adm = row.read(database.students.admissionNumber);
+      if (adm != null && adm.isNotEmpty) {
+        final parsed = int.tryParse(adm);
+        if (parsed != null && parsed > maxNum) {
+          maxNum = parsed;
+        }
+      }
+    }
+    
+    return maxNum == 0 ? null : maxNum.toString().padLeft(4, '0');
+  }
+
+  @override
+  Future<Student?> getStudentById(int id) async {
+    final query = database.select(database.students)..where((t) => t.id.equals(id));
+    final row = await query.getSingleOrNull();
+    if (row == null) return null;
+    return Student(
+      id: row.id,
+      admissionNumber: row.admissionNumber,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      classId: row.classId,
+      parentName: row.parentName,
+      parentPhone: row.parentPhone,
+      balance: row.balance,
+      image: row.image,
+      dateOfBirth: row.dateOfBirth,
+      registrationDate: row.registrationDate,
+    );
   }
 
   @override
@@ -278,50 +351,50 @@ class SchoolRepositoryImpl implements SchoolRepository {
 
   @override
   Future<void> saveResults(List<AcademicResult> results) async {
-    for (final res in results) {
-      final existingResult = await (database.select(database.results)
-        ..where((t) => 
-          t.studentId.equals(res.studentId) &
-          t.subjectId.equals(res.subjectId) &
-          t.termId.equals(res.termId) &
-          t.academicYearId.equals(res.academicYearId)
-        )).getSingleOrNull();
+    await database.transaction(() async {
+      for (final res in results) {
+        final existingResult = await (database.select(database.results)
+          ..where((t) => 
+            t.studentId.equals(res.studentId) &
+            t.subjectId.equals(res.subjectId) &
+            t.termId.equals(res.termId) &
+            t.academicYearId.equals(res.academicYearId)
+          )).getSingleOrNull();
 
-      if (existingResult != null) {
-        // Update existing
-        await (database.update(database.results)
-          ..where((t) => t.id.equals(existingResult.id)))
-        .write(
-          db.ResultsCompanion(
-            assessmentScore: Value(res.assessmentScore),
-            examScore: Value(res.examScore),
-            totalScore: Value(res.totalScore),
-            grade: Value(res.grade),
-            remarks: Value(res.remarks),
-            dateEntered: Value(DateTime.now()),
-            updatedAt: Value(DateTime.now()),
-          )
-        );
-      } else {
-        // Insert new
-        await database.into(database.results).insert(
-          db.ResultsCompanion.insert(
-            studentId: res.studentId,
-            subjectId: res.subjectId,
-            termId: res.termId,
-            academicYearId: res.academicYearId,
-            assessmentScore: Value(res.assessmentScore),
-            examScore: Value(res.examScore),
-            totalScore: Value(res.totalScore),
-            grade: Value(res.grade),
-            remarks: Value(res.remarks),
-            dateEntered: Value(DateTime.now()),
-            createdAt: Value(DateTime.now()),
-            updatedAt: Value(DateTime.now()),
-          )
-        );
+        if (existingResult != null) {
+          await (database.update(database.results)
+            ..where((t) => t.id.equals(existingResult.id)))
+          .write(
+            db.ResultsCompanion(
+              assessmentScore: Value(res.assessmentScore),
+              examScore: Value(res.examScore),
+              totalScore: Value(res.totalScore),
+              grade: Value(res.grade),
+              remarks: Value(res.remarks),
+              dateEntered: Value(DateTime.now()),
+              updatedAt: Value(DateTime.now()),
+            )
+          );
+        } else {
+          await database.into(database.results).insert(
+            db.ResultsCompanion.insert(
+              studentId: res.studentId,
+              subjectId: res.subjectId,
+              termId: res.termId,
+              academicYearId: res.academicYearId,
+              assessmentScore: Value(res.assessmentScore),
+              examScore: Value(res.examScore),
+              totalScore: Value(res.totalScore),
+              grade: Value(res.grade),
+              remarks: Value(res.remarks),
+              dateEntered: Value(DateTime.now()),
+              createdAt: Value(DateTime.now()),
+              updatedAt: Value(DateTime.now()),
+            )
+          );
+        }
       }
-    }
+    });
   }
 
   @override

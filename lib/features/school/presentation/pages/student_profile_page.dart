@@ -296,10 +296,15 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
     return BlocBuilder<SchoolBloc, SchoolState>(
       builder: (context, state) {
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: results.length,
-          itemBuilder: (context, index) {
+        return Column(
+          children: [
+            if (state.studentAverage != null || state.studentPosition != null)
+              _buildResultsSummary(state.studentAverage, state.studentPosition, state.classSize),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: results.length,
+                itemBuilder: (context, index) {
             final res = results[index];
             final subject = state.subjects.firstWhereOrNull((s) => s.id == res.subjectId);
             final term = state.terms.firstWhereOrNull((t) => t.id == res.termId);
@@ -360,9 +365,89 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
               ),
             );
           },
-        );
-      },
+        ),
+      ),
+    ],
+  );
+},
+);
+}
+
+  Widget _buildResultsSummary(double? average, int? position, int? classSize) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'ACTIVE TERM SUMMARY',
+            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey, letterSpacing: 1.2),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildSummaryItem(
+                'AVERAGE SCORE',
+                average != null ? '${average.toStringAsFixed(1)}%' : 'N/A',
+                Icons.analytics_outlined,
+                Colors.blue,
+              ),
+              _buildSummaryItem(
+                'CLASS POSITION',
+                position != null ? '${position}${_getOrdinalSuffix(position)}' : 'N/A',
+                Icons.emoji_events_outlined,
+                Colors.orange,
+                subtitle: classSize != null ? 'Out of $classSize' : null,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
+  }
+
+  Widget _buildSummaryItem(String label, String value, IconData icon, Color color, {String? subtitle}) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+        ),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: Colors.grey),
+        ),
+        if (subtitle != null)
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 9, color: Colors.blueGrey),
+          ),
+      ],
+    );
+  }
+
+  String _getOrdinalSuffix(int value) {
+    if (value >= 11 && value <= 13) {
+      return 'th';
+    }
+    switch (value % 10) {
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
+    }
   }
 
   Widget _buildScoreItem(String label, String score, {bool isBold = false}) {

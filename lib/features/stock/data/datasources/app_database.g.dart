@@ -10532,7 +10532,8 @@ class ClassesCompanion extends UpdateCompanion<ClassTable> {
   }
 }
 
-class $StudentsTable extends Students with TableInfo<$StudentsTable, Student> {
+class $StudentsTable extends Students
+    with TableInfo<$StudentsTable, StudentTable> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -10672,7 +10673,7 @@ class $StudentsTable extends Students with TableInfo<$StudentsTable, Student> {
   String get actualTableName => $name;
   static const String $name = 'students';
   @override
-  VerificationContext validateIntegrity(Insertable<Student> instance,
+  VerificationContext validateIntegrity(Insertable<StudentTable> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -10763,9 +10764,9 @@ class $StudentsTable extends Students with TableInfo<$StudentsTable, Student> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Student map(Map<String, dynamic> data, {String? tablePrefix}) {
+  StudentTable map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Student(
+    return StudentTable(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       admissionNumber: attachedDatabase.typeMapping.read(
@@ -10807,7 +10808,7 @@ class $StudentsTable extends Students with TableInfo<$StudentsTable, Student> {
   }
 }
 
-class Student extends DataClass implements Insertable<Student> {
+class StudentTable extends DataClass implements Insertable<StudentTable> {
   final int id;
   final String admissionNumber;
   final String firstName;
@@ -10824,7 +10825,7 @@ class Student extends DataClass implements Insertable<Student> {
   final DateTime? createdAt;
   final String? deviceId;
   final bool isDeleted;
-  const Student(
+  const StudentTable(
       {required this.id,
       required this.admissionNumber,
       required this.firstName,
@@ -10914,10 +10915,10 @@ class Student extends DataClass implements Insertable<Student> {
     );
   }
 
-  factory Student.fromJson(Map<String, dynamic> json,
+  factory StudentTable.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Student(
+    return StudentTable(
       id: serializer.fromJson<int>(json['id']),
       admissionNumber: serializer.fromJson<String>(json['admissionNumber']),
       firstName: serializer.fromJson<String>(json['firstName']),
@@ -10959,7 +10960,7 @@ class Student extends DataClass implements Insertable<Student> {
     };
   }
 
-  Student copyWith(
+  StudentTable copyWith(
           {int? id,
           String? admissionNumber,
           String? firstName,
@@ -10976,7 +10977,7 @@ class Student extends DataClass implements Insertable<Student> {
           Value<DateTime?> createdAt = const Value.absent(),
           Value<String?> deviceId = const Value.absent(),
           bool? isDeleted}) =>
-      Student(
+      StudentTable(
         id: id ?? this.id,
         admissionNumber: admissionNumber ?? this.admissionNumber,
         firstName: firstName ?? this.firstName,
@@ -10994,8 +10995,8 @@ class Student extends DataClass implements Insertable<Student> {
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
         isDeleted: isDeleted ?? this.isDeleted,
       );
-  Student copyWithCompanion(StudentsCompanion data) {
-    return Student(
+  StudentTable copyWithCompanion(StudentsCompanion data) {
+    return StudentTable(
       id: data.id.present ? data.id.value : this.id,
       admissionNumber: data.admissionNumber.present
           ? data.admissionNumber.value
@@ -11024,7 +11025,7 @@ class Student extends DataClass implements Insertable<Student> {
 
   @override
   String toString() {
-    return (StringBuffer('Student(')
+    return (StringBuffer('StudentTable(')
           ..write('id: $id, ')
           ..write('admissionNumber: $admissionNumber, ')
           ..write('firstName: $firstName, ')
@@ -11066,7 +11067,7 @@ class Student extends DataClass implements Insertable<Student> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Student &&
+      (other is StudentTable &&
           other.id == this.id &&
           other.admissionNumber == this.admissionNumber &&
           other.firstName == this.firstName &&
@@ -11085,7 +11086,7 @@ class Student extends DataClass implements Insertable<Student> {
           other.isDeleted == this.isDeleted);
 }
 
-class StudentsCompanion extends UpdateCompanion<Student> {
+class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<int> id;
   final Value<String> admissionNumber;
   final Value<String> firstName;
@@ -11141,7 +11142,7 @@ class StudentsCompanion extends UpdateCompanion<Student> {
         firstName = Value(firstName),
         lastName = Value(lastName),
         classId = Value(classId);
-  static Insertable<Student> custom({
+  static Insertable<StudentTable> custom({
     Expression<int>? id,
     Expression<String>? admissionNumber,
     Expression<String>? firstName,
@@ -11523,7 +11524,8 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSettingTable> {
   }
 }
 
-class $TeachersTable extends Teachers with TableInfo<$TeachersTable, Teacher> {
+class $TeachersTable extends Teachers
+    with TableInfo<$TeachersTable, TeacherTable> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
@@ -11654,7 +11656,7 @@ class $TeachersTable extends Teachers with TableInfo<$TeachersTable, Teacher> {
   String get actualTableName => $name;
   static const String $name = 'teachers';
   @override
-  VerificationContext validateIntegrity(Insertable<Teacher> instance,
+  VerificationContext validateIntegrity(Insertable<TeacherTable> instance,
       {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
@@ -11733,9 +11735,9 @@ class $TeachersTable extends Teachers with TableInfo<$TeachersTable, Teacher> {
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  Teacher map(Map<String, dynamic> data, {String? tablePrefix}) {
+  TeacherTable map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return Teacher(
+    return TeacherTable(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       fullName: attachedDatabase.typeMapping
@@ -11775,7 +11777,7 @@ class $TeachersTable extends Teachers with TableInfo<$TeachersTable, Teacher> {
   }
 }
 
-class Teacher extends DataClass implements Insertable<Teacher> {
+class TeacherTable extends DataClass implements Insertable<TeacherTable> {
   final int id;
   final String fullName;
   final String? phone;
@@ -11791,7 +11793,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
   final DateTime? createdAt;
   final String? deviceId;
   final bool isDeleted;
-  const Teacher(
+  const TeacherTable(
       {required this.id,
       required this.fullName,
       this.phone,
@@ -11881,10 +11883,10 @@ class Teacher extends DataClass implements Insertable<Teacher> {
     );
   }
 
-  factory Teacher.fromJson(Map<String, dynamic> json,
+  factory TeacherTable.fromJson(Map<String, dynamic> json,
       {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return Teacher(
+    return TeacherTable(
       id: serializer.fromJson<int>(json['id']),
       fullName: serializer.fromJson<String>(json['fullName']),
       phone: serializer.fromJson<String?>(json['phone']),
@@ -11924,7 +11926,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
     };
   }
 
-  Teacher copyWith(
+  TeacherTable copyWith(
           {int? id,
           String? fullName,
           Value<String?> phone = const Value.absent(),
@@ -11940,7 +11942,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
           Value<DateTime?> createdAt = const Value.absent(),
           Value<String?> deviceId = const Value.absent(),
           bool? isDeleted}) =>
-      Teacher(
+      TeacherTable(
         id: id ?? this.id,
         fullName: fullName ?? this.fullName,
         phone: phone.present ? phone.value : this.phone,
@@ -11958,8 +11960,8 @@ class Teacher extends DataClass implements Insertable<Teacher> {
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
         isDeleted: isDeleted ?? this.isDeleted,
       );
-  Teacher copyWithCompanion(TeachersCompanion data) {
-    return Teacher(
+  TeacherTable copyWithCompanion(TeachersCompanion data) {
+    return TeacherTable(
       id: data.id.present ? data.id.value : this.id,
       fullName: data.fullName.present ? data.fullName.value : this.fullName,
       phone: data.phone.present ? data.phone.value : this.phone,
@@ -11987,7 +11989,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
 
   @override
   String toString() {
-    return (StringBuffer('Teacher(')
+    return (StringBuffer('TeacherTable(')
           ..write('id: $id, ')
           ..write('fullName: $fullName, ')
           ..write('phone: $phone, ')
@@ -12027,7 +12029,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is Teacher &&
+      (other is TeacherTable &&
           other.id == this.id &&
           other.fullName == this.fullName &&
           other.phone == this.phone &&
@@ -12045,7 +12047,7 @@ class Teacher extends DataClass implements Insertable<Teacher> {
           other.isDeleted == this.isDeleted);
 }
 
-class TeachersCompanion extends UpdateCompanion<Teacher> {
+class TeachersCompanion extends UpdateCompanion<TeacherTable> {
   final Value<int> id;
   final Value<String> fullName;
   final Value<String?> phone;
@@ -12095,7 +12097,7 @@ class TeachersCompanion extends UpdateCompanion<Teacher> {
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
   }) : fullName = Value(fullName);
-  static Insertable<Teacher> custom({
+  static Insertable<TeacherTable> custom({
     Expression<int>? id,
     Expression<String>? fullName,
     Expression<String>? phone,
@@ -20250,9 +20252,9 @@ final class $$ClassesTableReferences
     extends BaseReferences<_$AppDatabase, $ClassesTable, ClassTable> {
   $$ClassesTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static MultiTypedResultKey<$StudentsTable, List<Student>> _studentsRefsTable(
-          _$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(db.students,
+  static MultiTypedResultKey<$StudentsTable, List<StudentTable>>
+      _studentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+          db.students,
           aliasName: $_aliasNameGenerator(db.classes.id, db.students.classId));
 
   $$StudentsTableProcessedTableManager get studentsRefs {
@@ -20264,9 +20266,9 @@ final class $$ClassesTableReferences
         manager.$state.copyWith(prefetchedData: cache));
   }
 
-  static MultiTypedResultKey<$TeachersTable, List<Teacher>> _teachersRefsTable(
-          _$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(db.teachers,
+  static MultiTypedResultKey<$TeachersTable, List<TeacherTable>>
+      _teachersRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+          db.teachers,
           aliasName: $_aliasNameGenerator(db.classes.id, db.teachers.classId));
 
   $$TeachersTableProcessedTableManager get teachersRefs {
@@ -20544,7 +20546,7 @@ class $$ClassesTableTableManager extends RootTableManager<
                 return [
                   if (studentsRefs)
                     await $_getPrefetchedData<ClassTable, $ClassesTable,
-                            Student>(
+                            StudentTable>(
                         currentTable: table,
                         referencedTable:
                             $$ClassesTableReferences._studentsRefsTable(db),
@@ -20557,7 +20559,7 @@ class $$ClassesTableTableManager extends RootTableManager<
                         typedResults: items),
                   if (teachersRefs)
                     await $_getPrefetchedData<ClassTable, $ClassesTable,
-                            Teacher>(
+                            TeacherTable>(
                         currentTable: table,
                         referencedTable:
                             $$ClassesTableReferences._teachersRefsTable(db),
@@ -20625,7 +20627,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
 });
 
 final class $$StudentsTableReferences
-    extends BaseReferences<_$AppDatabase, $StudentsTable, Student> {
+    extends BaseReferences<_$AppDatabase, $StudentsTable, StudentTable> {
   $$StudentsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $ClassesTable _classIdTable(_$AppDatabase db) => db.classes
@@ -20932,14 +20934,14 @@ class $$StudentsTableAnnotationComposer
 class $$StudentsTableTableManager extends RootTableManager<
     _$AppDatabase,
     $StudentsTable,
-    Student,
+    StudentTable,
     $$StudentsTableFilterComposer,
     $$StudentsTableOrderingComposer,
     $$StudentsTableAnnotationComposer,
     $$StudentsTableCreateCompanionBuilder,
     $$StudentsTableUpdateCompanionBuilder,
-    (Student, $$StudentsTableReferences),
-    Student,
+    (StudentTable, $$StudentsTableReferences),
+    StudentTable,
     PrefetchHooks Function({bool classId, bool resultsRefs})> {
   $$StudentsTableTableManager(_$AppDatabase db, $StudentsTable table)
       : super(TableManagerState(
@@ -21060,7 +21062,7 @@ class $$StudentsTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (resultsRefs)
-                    await $_getPrefetchedData<Student, $StudentsTable,
+                    await $_getPrefetchedData<StudentTable, $StudentsTable,
                             ResultTable>(
                         currentTable: table,
                         referencedTable:
@@ -21082,14 +21084,14 @@ class $$StudentsTableTableManager extends RootTableManager<
 typedef $$StudentsTableProcessedTableManager = ProcessedTableManager<
     _$AppDatabase,
     $StudentsTable,
-    Student,
+    StudentTable,
     $$StudentsTableFilterComposer,
     $$StudentsTableOrderingComposer,
     $$StudentsTableAnnotationComposer,
     $$StudentsTableCreateCompanionBuilder,
     $$StudentsTableUpdateCompanionBuilder,
-    (Student, $$StudentsTableReferences),
-    Student,
+    (StudentTable, $$StudentsTableReferences),
+    StudentTable,
     PrefetchHooks Function({bool classId, bool resultsRefs})>;
 typedef $$BusinessSettingsTableCreateCompanionBuilder
     = BusinessSettingsCompanion Function({
@@ -21268,7 +21270,7 @@ typedef $$TeachersTableUpdateCompanionBuilder = TeachersCompanion Function({
 });
 
 final class $$TeachersTableReferences
-    extends BaseReferences<_$AppDatabase, $TeachersTable, Teacher> {
+    extends BaseReferences<_$AppDatabase, $TeachersTable, TeacherTable> {
   $$TeachersTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $ClassesTable _classIdTable(_$AppDatabase db) => db.classes
@@ -21566,14 +21568,14 @@ class $$TeachersTableAnnotationComposer
 class $$TeachersTableTableManager extends RootTableManager<
     _$AppDatabase,
     $TeachersTable,
-    Teacher,
+    TeacherTable,
     $$TeachersTableFilterComposer,
     $$TeachersTableOrderingComposer,
     $$TeachersTableAnnotationComposer,
     $$TeachersTableCreateCompanionBuilder,
     $$TeachersTableUpdateCompanionBuilder,
-    (Teacher, $$TeachersTableReferences),
-    Teacher,
+    (TeacherTable, $$TeachersTableReferences),
+    TeacherTable,
     PrefetchHooks Function({bool classId, bool subjectsRefs})> {
   $$TeachersTableTableManager(_$AppDatabase db, $TeachersTable table)
       : super(TableManagerState(
@@ -21690,7 +21692,7 @@ class $$TeachersTableTableManager extends RootTableManager<
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (subjectsRefs)
-                    await $_getPrefetchedData<Teacher, $TeachersTable,
+                    await $_getPrefetchedData<TeacherTable, $TeachersTable,
                             SubjectTable>(
                         currentTable: table,
                         referencedTable:
@@ -21712,14 +21714,14 @@ class $$TeachersTableTableManager extends RootTableManager<
 typedef $$TeachersTableProcessedTableManager = ProcessedTableManager<
     _$AppDatabase,
     $TeachersTable,
-    Teacher,
+    TeacherTable,
     $$TeachersTableFilterComposer,
     $$TeachersTableOrderingComposer,
     $$TeachersTableAnnotationComposer,
     $$TeachersTableCreateCompanionBuilder,
     $$TeachersTableUpdateCompanionBuilder,
-    (Teacher, $$TeachersTableReferences),
-    Teacher,
+    (TeacherTable, $$TeachersTableReferences),
+    TeacherTable,
     PrefetchHooks Function({bool classId, bool subjectsRefs})>;
 typedef $$SubjectsTableCreateCompanionBuilder = SubjectsCompanion Function({
   Value<int> id,

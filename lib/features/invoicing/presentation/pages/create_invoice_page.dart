@@ -57,6 +57,7 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: BlocBuilder<SettingsBloc, SettingsState>(
           builder: (context, state) => Text(
@@ -730,11 +731,12 @@ class _CartSummary extends StatelessWidget {
       ),
       child: BlocBuilder<InvoiceBloc, InvoiceState>(
         builder: (context, state) {
-          return Column(
+          return ClipRect(
+            child: Column(
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: Colors.grey[50],
                   border: Border(bottom: BorderSide(color: Colors.grey[100]!)),
@@ -899,81 +901,85 @@ class _CartSummary extends StatelessWidget {
                 ),
               ),
               const Divider(height: 1),
-              // Summary Area (Fixed Layout)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildSummaryRow(context, 'Subtotal', state.subtotal, settings?.currency ?? '₦'),
-                      _buildSummaryRow(context, 'Tax (${(state.taxRate * 100).toStringAsFixed(0)}%)', state.tax, settings?.currency ?? '₦'),
-                      if (state.discount > 0)
-                        _buildSummaryRow(context, 'Discount', -state.discount, settings?.currency ?? '₦'),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8.0),
-                        child: Divider(),
-                      ),
-                      if (settings?.discountEnabled == true) ...[
-                        SizedBox(
-                          width: double.infinity,
-                          child: TextButton.icon(
-                            onPressed: () => _showDiscountDialog(context, state.discount, state.discountType),
-                            icon: const Icon(Icons.add_circle_outline, size: 18),
-                            label: Text(state.discount > 0 ? 'CHANGE DISCOUNT' : 'ADD DISCOUNT'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Theme.of(context).colorScheme.primary,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+              // Summary Area (Flexible Layout)
+              Flexible(
+                flex: state.items.isEmpty ? 0 : 1,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildSummaryRow(context, 'Subtotal', state.subtotal, settings?.currency ?? '₦'),
+                        _buildSummaryRow(context, 'Tax (${(state.taxRate * 100).toStringAsFixed(0)}%)', state.tax, settings?.currency ?? '₦'),
+                        if (state.discount > 0)
+                          _buildSummaryRow(context, 'Discount', -state.discount, settings?.currency ?? '₦'),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: Divider(),
+                        ),
+                        if (settings?.discountEnabled == true) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            child: TextButton.icon(
+                              onPressed: () => _showDiscountDialog(context, state.discount, state.discountType),
+                              icon: const Icon(Icons.add_circle_outline, size: 18),
+                              label: Text(state.discount > 0 ? 'CHANGE DISCOUNT' : 'ADD DISCOUNT'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Theme.of(context).colorScheme.primary,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      _buildSummaryRow(context, 'Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
-                      const SizedBox(height: 12),
-                      const Divider(),
-                      ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(
-                          state.customerName != null 
-                            ? '${state.customerName}${state.customerPhone != null ? " (${state.customerPhone})" : ""}'
-                            : (settings?.assignToCustomerLabel ?? 'Add Customer Name & Phone'), 
-                          style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)
-                        ),
-                        subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
-                        leading: Icon(Icons.person_outline, color: state.customerName != null ? Theme.of(context).colorScheme.primary : Colors.grey),
-                        trailing: const Icon(Icons.edit, size: 16),
-                        onTap: () => _showCustomerDialog(context, state.customerName, state.customerPhone, state.customerAddress),
-                      ),
-                      if (settings?.businessMode == 'school') ...[
+                          const SizedBox(height: 8),
+                        ],
+                        _buildSummaryRow(context, 'Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
+                        const SizedBox(height: 12),
                         const Divider(),
-                        _buildSchoolInfoTile(context, state),
-                      ],
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: ElevatedButton(
-                          onPressed: state.items.isEmpty ? null : () => _showPreview(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            state.customerName != null 
+                              ? '${state.customerName}${state.customerPhone != null ? " (${state.customerPhone})" : ""}'
+                              : (settings?.assignToCustomerLabel ?? 'Add Customer Name & Phone'), 
+                            style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)
                           ),
-                          child: const Text('PROCEED TO CHECKOUT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
+                          leading: Icon(Icons.person_outline, color: state.customerName != null ? Theme.of(context).colorScheme.primary : Colors.grey),
+                          trailing: const Icon(Icons.edit, size: 16),
+                          onTap: () => _showCustomerDialog(context, state.customerName, state.customerPhone, state.customerAddress),
                         ),
-                      ),
-                    ],
+                        if (settings?.businessMode == 'school') ...[
+                          const Divider(),
+                          _buildSchoolInfoTile(context, state),
+                        ],
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: ElevatedButton(
+                            onPressed: state.items.isEmpty ? null : () => _showPreview(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            child: const Text('PROCEED TO CHECKOUT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ],
+            ),
           );
         },
       ),

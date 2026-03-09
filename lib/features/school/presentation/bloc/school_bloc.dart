@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:bloc_concurrency/bloc_concurrency.dart';
+import 'package:image/image.dart' as img;
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:involve_app/features/school/domain/entities/grading_rule.dart';
@@ -22,41 +26,41 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     required this.itemRepository,
     required this.invoiceRepository,
   }) : super(const SchoolState()) {
-    on<LoadSchoolData>(_onLoadSchoolData);
-    on<AddAcademicYearEvent>(_onAddAcademicYear);
-    on<UpdateAcademicYearEvent>(_onUpdateAcademicYear);
-    on<SetActiveYearEvent>(_onSetActiveYear);
-    on<AddTermEvent>(_onAddTerm);
-    on<UpdateTermEvent>(_onUpdateTerm);
-    on<SetActiveTermEvent>(_onSetActiveTerm);
-    on<AddClassEvent>(_onAddClass);
-    on<DeleteClassEvent>(_onDeleteClass);
-    on<AddStudentEvent>(_onAddStudent);
-    on<UpdateStudentEvent>(_onUpdateStudent);
-    on<DeleteStudentEvent>(_onDeleteStudent);
-    on<PromoteStudentsEvent>(_onPromoteStudents);
-    on<LoadStudentRecordsEvent>(_onLoadStudentRecords);
-    on<LoadSubjectsEvent>(_onLoadSubjects);
-    on<AddSubjectEvent>(_onAddSubject);
-    on<UpdateSubjectEvent>(_onUpdateSubject);
-    on<DeleteSubjectEvent>(_onDeleteSubject);
-    on<LoadResultsEvent>(_onLoadResults);
-    on<SaveResultsEvent>(_onSaveResults);
+    on<LoadSchoolData>(_onLoadSchoolData, transformer: sequential());
+    on<AddAcademicYearEvent>(_onAddAcademicYear, transformer: sequential());
+    on<UpdateAcademicYearEvent>(_onUpdateAcademicYear, transformer: sequential());
+    on<SetActiveYearEvent>(_onSetActiveYear, transformer: sequential());
+    on<AddTermEvent>(_onAddTerm, transformer: sequential());
+    on<UpdateTermEvent>(_onUpdateTerm, transformer: sequential());
+    on<SetActiveTermEvent>(_onSetActiveTerm, transformer: sequential());
+    on<AddClassEvent>(_onAddClass, transformer: sequential());
+    on<DeleteClassEvent>(_onDeleteClass, transformer: sequential());
+    on<AddStudentEvent>(_onAddStudent, transformer: sequential());
+    on<UpdateStudentEvent>(_onUpdateStudent, transformer: sequential());
+    on<DeleteStudentEvent>(_onDeleteStudent, transformer: sequential());
+    on<PromoteStudentsEvent>(_onPromoteStudents, transformer: sequential());
+    on<LoadStudentRecordsEvent>(_onLoadStudentRecords, transformer: sequential());
+    on<LoadSubjectsEvent>(_onLoadSubjects, transformer: sequential());
+    on<AddSubjectEvent>(_onAddSubject, transformer: sequential());
+    on<UpdateSubjectEvent>(_onUpdateSubject, transformer: sequential());
+    on<DeleteSubjectEvent>(_onDeleteSubject, transformer: sequential());
+    on<LoadResultsEvent>(_onLoadResults, transformer: sequential());
+    on<SaveResultsEvent>(_onSaveResults, transformer: sequential());
 
     // Grading Rules
-    on<LoadGradingRules>(_onLoadGradingRules);
-    on<AddGradingRuleEvent>(_onAddGradingRule);
-    on<UpdateGradingRuleEvent>(_onUpdateGradingRule);
-    on<DeleteGradingRuleEvent>(_onDeleteGradingRule);
+    on<LoadGradingRules>(_onLoadGradingRules, transformer: sequential());
+    on<AddGradingRuleEvent>(_onAddGradingRule, transformer: sequential());
+    on<UpdateGradingRuleEvent>(_onUpdateGradingRule, transformer: sequential());
+    on<DeleteGradingRuleEvent>(_onDeleteGradingRule, transformer: sequential());
 
     // Teachers
-    on<AddTeacherEvent>(_onAddTeacher);
-    on<UpdateTeacherEvent>(_onUpdateTeacher);
-    on<DeleteTeacherEvent>(_onDeleteTeacher);
+    on<AddTeacherEvent>(_onAddTeacher, transformer: sequential());
+    on<UpdateTeacherEvent>(_onUpdateTeacher, transformer: sequential());
+    on<DeleteTeacherEvent>(_onDeleteTeacher, transformer: sequential());
 
-    on<MakeStudentPaymentEvent>(_onMakeStudentPayment);
+    on<MakeStudentPaymentEvent>(_onMakeStudentPayment, transformer: sequential());
 
-    on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null)));
+    on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null)), transformer: sequential());
     
     add(LoadSchoolData());
   }
@@ -66,7 +70,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     try {
       final years = await repository.getAcademicYears();
       final classes = await repository.getClasses();
-      final students = await repository.getStudents();
+      final students = await repository.getStudentSummaries();
       final items = await itemRepository.getAllItems();
       final subjects = await repository.getSubjects();
       final teachers = await repository.getTeachers();
@@ -77,6 +81,9 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         terms = await repository.getTerms(activeYear.id!);
       }
 
+      final lastAdm = await repository.getLastAdmissionNumber();
+      final nextAdm = _formatNextAdmissionNumber(lastAdm);
+
       emit(state.copyWith(
         academicYears: years,
         classes: classes,
@@ -85,9 +92,13 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         items: items,
         subjects: subjects,
         teachers: teachers,
+        nextAdmissionNumber: nextAdm,
         isLoading: false,
         status: SchoolStatus.initial,
       ));
+
+      // Run image cleanup in the background to fix CursorWindow issues for existing students
+      _cleanupLargeImages();
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
     }
@@ -236,12 +247,69 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final results = await repository.getResults(studentId: event.studentId);
       
       // Also refresh the specific student's data to get the latest balance
-      final students = await repository.getStudents();
+      final student = await repository.getStudentById(event.studentId);
+
+      double? studentAverage;
+      int? studentPosition;
+      int? classSize;
+
+      if (student != null) {
+        final activeYear = state.activeYear;
+        final activeTerm = state.activeTerm;
+
+        if (activeYear != null && activeTerm != null) {
+          // Fetch all results for the class to calculate position
+          final classResults = await repository.getResults(
+            classId: student.classId,
+            termId: activeTerm.id,
+            academicYearId: activeYear.id,
+          );
+
+          if (classResults.isNotEmpty) {
+            // Group results by student
+            final resultsByStudent = groupBy(classResults, (AcademicResult r) => r.studentId);
+            
+            // Calculate total scores for each student
+            final studentTotals = <int, double>{};
+            resultsByStudent.forEach((sId, studentResults) {
+              final total = studentResults.fold(0.0, (sum, r) => sum + r.totalScore);
+              studentTotals[sId] = total;
+            });
+
+            // Sort students by total score descending
+            final sortedStudents = studentTotals.entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value));
+
+            // Find current student's position
+            final index = sortedStudents.indexWhere((e) => e.key == event.studentId);
+            if (index != -1) {
+              studentPosition = index + 1;
+            }
+
+            classSize = resultsByStudent.keys.length;
+
+            // Calculate average for current student
+            final currentStudentResults = results.where((r) => 
+              r.termId == activeTerm.id && r.academicYearId == activeYear.id
+            ).toList();
+
+            if (currentStudentResults.isNotEmpty) {
+              final sumOfTotals = currentStudentResults.fold(0.0, (sum, r) => sum + r.totalScore);
+              studentAverage = sumOfTotals / currentStudentResults.length;
+            }
+          }
+        }
+      }
       
       emit(state.copyWith(
         studentInvoices: invoices, 
         results: results,
-        students: students,
+        students: student != null 
+            ? state.students.map((s) => s.id == student.id ? student : s).toList()
+            : state.students,
+        studentAverage: studentAverage,
+        studentPosition: studentPosition,
+        classSize: classSize,
         isLoading: false
       ));
     } catch (e) {
@@ -361,7 +429,14 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   Future<void> _onAddTeacher(AddTeacherEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true, error: null, status: SchoolStatus.loading));
     try {
-      await repository.addTeacher(event.teacher);
+      var teacher = event.teacher;
+      if (teacher.image != null && teacher.image!.length > 200 * 1024) {
+        final resized = await _performResize(teacher.image!);
+        if (resized != null) {
+          teacher = teacher.copyWith(image: resized);
+        }
+      }
+      await repository.addTeacher(teacher);
       final teachers = await repository.getTeachers();
       emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
     } catch (e) {
@@ -372,7 +447,14 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   Future<void> _onUpdateTeacher(UpdateTeacherEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true, error: null, status: SchoolStatus.loading));
     try {
-      await repository.updateTeacher(event.teacher);
+      var teacher = event.teacher;
+      if (teacher.image != null && teacher.image!.length > 200 * 1024) {
+        final resized = await _performResize(teacher.image!);
+        if (resized != null) {
+          teacher = teacher.copyWith(image: resized);
+        }
+      }
+      await repository.updateTeacher(teacher);
       final teachers = await repository.getTeachers();
       emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
     } catch (e) {
@@ -446,6 +528,63 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       add(LoadStudentRecordsEvent(event.studentId)); // Refresh invoices list
     } catch (e) {
       emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  String _formatNextAdmissionNumber(String? lastAdm) {
+    if (lastAdm == null) return '0001';
+    final parsed = int.tryParse(lastAdm);
+    if (parsed == null) return '0001';
+    return (parsed + 1).toString().padLeft(4, '0');
+  }
+
+  Future<void> _cleanupLargeImages() async {
+    try {
+      // 1. Optimize Student Images
+      final summaries = await repository.getStudentSummaries();
+      for (final summary in summaries) {
+        final student = await repository.getStudentById(summary.id!);
+        if (student == null) continue;
+        if (student.image != null && student.image!.length > 200 * 1024) { // > 200KB
+          final resized = await _performResize(student.image!);
+          if (resized != null) {
+            await repository.updateStudent(student.copyWith(image: resized));
+            debugPrint('Optimized image for student: ${student.fullName} (${student.image!.length} -> ${resized.length})');
+          }
+        }
+      }
+
+      // 2. Optimize Teacher Images
+      final teachers = await repository.getTeachers();
+      for (final teacher in teachers) {
+        if (teacher.image != null && teacher.image!.length > 200 * 1024) {
+          final resized = await _performResize(teacher.image!);
+          if (resized != null) {
+            await repository.updateTeacher(teacher.copyWith(image: resized));
+            debugPrint('Optimized image for teacher: ${teacher.fullName} (${teacher.image!.length} -> ${resized.length})');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error during image cleanup: $e');
+    }
+  }
+
+  Future<Uint8List?> _performResize(Uint8List bytes) async {
+    try {
+      final image = img.decodeImage(bytes);
+      if (image == null) return null;
+
+      img.Image resized;
+      if (image.width > image.height) {
+        resized = img.copyResize(image, width: 400);
+      } else {
+        resized = img.copyResize(image, height: 400);
+      }
+
+      return Uint8List.fromList(img.encodeJpg(resized, quality: 70));
+    } catch (_) {
+      return null;
     }
   }
 }

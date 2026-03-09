@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import '../bloc/school_bloc.dart';
@@ -50,10 +51,16 @@ class _StudentListPageState extends State<StudentListPage> {
     return BlocListener<SchoolBloc, SchoolState>(
       listener: (context, state) {
         if (state.error != null) {
+          String message = state.error!;
+          if (message.contains('UNIQUE constraint failed') && message.contains('admission_number')) {
+            message = 'Admission number already exists. Please try a different one.';
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.error!),
+              content: Text(message),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 4),
             ),
           );
         }
@@ -322,7 +329,9 @@ class _StudentListPageState extends State<StudentListPage> {
     final formKey = GlobalKey<FormState>();
     final firstNameController = TextEditingController(text: student?.firstName);
     final lastNameController = TextEditingController(text: student?.lastName);
-    final admissionController = TextEditingController(text: student?.admissionNumber);
+    final admissionController = TextEditingController(
+      text: student?.admissionNumber ?? context.read<SchoolBloc>().state.nextAdmissionNumber
+    );
     final parentNameController = TextEditingController(text: student?.parentName);
     final parentPhoneController = TextEditingController(text: student?.parentPhone);
     int? selectedClassId = student?.classId;
@@ -376,7 +385,8 @@ class _StudentListPageState extends State<StudentListPage> {
                           final XFile? image = await picker.pickImage(source: source, imageQuality: 50);
                           if (image != null) {
                             final bytes = await image.readAsBytes();
-                            setDialogState(() => selectedImage = bytes);
+                            final resizedBytes = await _resizeImage(bytes);
+                            setDialogState(() => selectedImage = resizedBytes);
                           }
                         }
                       },
@@ -507,6 +517,22 @@ class _StudentListPageState extends State<StudentListPage> {
         ),
       ),
     );
+  }
+
+  Future<Uint8List> _resizeImage(Uint8List bytes) async {
+    final image = img.decodeImage(bytes);
+    if (image == null) return bytes;
+
+    // Resize to a maximum dimension of 400px while maintaining aspect ratio
+    img.Image resized;
+    if (image.width > image.height) {
+      resized = img.copyResize(image, width: 400);
+    } else {
+      resized = img.copyResize(image, height: 400);
+    }
+
+    // Encode to JPG with 70% quality to keep it below 100KB typically
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 70));
   }
 
   void _confirmDeleteStudent(BuildContext context, Student student) {

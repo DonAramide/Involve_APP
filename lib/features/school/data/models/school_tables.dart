@@ -52,6 +52,7 @@ class Classes extends Table {
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }
 
+@DataClassName('TeacherTable')
 class Teachers extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get fullName => text()();
@@ -72,6 +73,7 @@ class Teachers extends Table {
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }
 
+@DataClassName('StudentTable')
 class Students extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get admissionNumber => text().unique()();

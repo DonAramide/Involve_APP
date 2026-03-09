@@ -15,12 +15,15 @@ class ResultEntryPage extends StatefulWidget {
 class _ResultEntryPageState extends State<ResultEntryPage> {
   int? _selectedClassId;
   int? _selectedSubjectId;
+  // Controllers keyed by studentId. These are NEVER cleared after a save —
+  // only cleared when class/subject changes. Values are updated via .text= after reload.
   final Map<int, Map<String, TextEditingController>> _controllers = {};
 
   @override
   void initState() {
     super.initState();
     context.read<SchoolBloc>().add(LoadSubjectsEvent());
+    context.read<SchoolBloc>().add(LoadGradingRules());
   }
 
   void _loadExistingResults() {
@@ -35,11 +38,12 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
     }
   }
 
+  /// Only initialises controllers for students not yet in the map.
+  /// Does NOT overwrite controllers the user is actively editing.
   void _initControllers(List<Student> classStudents, List<AcademicResult> existingResults) {
     for (var student in classStudents) {
       if (!_controllers.containsKey(student.id)) {
         final result = existingResults.where((r) => r.studentId == student.id).firstOrNull;
-        
         _controllers[student.id!] = {
           'ca': TextEditingController(text: result?.assessmentScore.toString() ?? '0.0'),
           'exam': TextEditingController(text: result?.examScore.toString() ?? '0.0'),
@@ -49,33 +53,72 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
     }
   }
 
-  @override
-  void dispose() {
+  /// Updates .text on existing controllers from fresh DB results without
+  /// replacing the controller instances (which would lose focus / widget links).
+  void _refreshControllersFromResults(List<AcademicResult> results) {
+    _controllers.forEach((studentId, controllerMap) {
+      final result = results.where((r) => r.studentId == studentId).firstOrNull;
+      if (result != null) {
+        controllerMap['ca']?.text = result.assessmentScore.toString();
+        controllerMap['exam']?.text = result.examScore.toString();
+        controllerMap['remarks']?.text = result.remarks ?? '';
+      }
+    });
+  }
+
+  void _disposeControllers() {
     for (var studentMap in _controllers.values) {
       for (var controller in studentMap.values) {
         controller.dispose();
       }
     }
+    _controllers.clear();
+  }
+
+  @override
+  void dispose() {
+    _disposeControllers();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<SchoolBloc, SchoolState>(
+      listenWhen: (prev, curr) =>
+          prev.status != curr.status ||
+          prev.error != curr.error ||
+          prev.results != curr.results,
       listener: (context, state) {
         if (state.status == SchoolStatus.success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Results saved successfully!'), backgroundColor: Colors.green),
           );
+          
           context.read<SchoolBloc>().add(ResetSchoolStatus());
+          
+          // Reload from DB to confirm persisted values
+          _loadExistingResults();
         }
+        
         if (state.error != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
           );
           context.read<SchoolBloc>().add(ResetSchoolStatus());
         }
+
+        // Always update controllers when results change, not just on initial status
+        if (state.results.isNotEmpty) {
+          _refreshControllersFromResults(state.results);
+        }
       },
+      buildWhen: (prev, curr) =>
+          prev.isLoading != curr.isLoading ||
+          prev.students != curr.students ||
+          prev.subjects != curr.subjects ||
+          prev.classes != curr.classes ||
+          prev.gradingRules != curr.gradingRules ||
+          prev.results != curr.results,
       builder: (context, state) {
         final classStudents = _selectedClassId == null
             ? <Student>[]
@@ -133,9 +176,10 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
                   decoration: const InputDecoration(labelText: 'Class', border: OutlineInputBorder()),
                   items: state.classes.map((c) => DropdownMenuItem(value: c.id!, child: Text(c.name))).toList(),
                   onChanged: (val) {
+                    // Class changed: clear controllers so they reload for the new class
+                    _disposeControllers();
                     setState(() {
                       _selectedClassId = val;
-                      _controllers.clear();
                     });
                     _loadExistingResults();
                   },
@@ -148,9 +192,10 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
                   decoration: const InputDecoration(labelText: 'Subject', border: OutlineInputBorder()),
                   items: state.subjects.map((s) => DropdownMenuItem(value: s.id!, child: Text(s.name))).toList(),
                   onChanged: (val) {
+                    // Subject changed: clear controllers so they reload for the new subject
+                    _disposeControllers();
                     setState(() {
                       _selectedSubjectId = val;
-                      _controllers.clear();
                     });
                     _loadExistingResults();
                   },
@@ -175,9 +220,9 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
       separatorBuilder: (_, __) => const Divider(),
       itemBuilder: (context, index) {
         final student = students[index];
-        final controllers = _controllers[student.id]!;
+        final controllers = _controllers[student.id];
+        if (controllers == null) return const SizedBox.shrink();
         
-        // Listeners for dynamic updates
         return AnimatedBuilder(
           animation: Listenable.merge([controllers['ca'], controllers['exam']]),
           builder: (context, child) {
@@ -249,6 +294,8 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
       final exam = double.tryParse(studentControllers['exam']!.text) ?? 0.0;
       final total = ca + exam;
       
+      debugPrint('Saving result for student $studentId: CA=$ca, Exam=$exam, Total=$total');
+      
       results.add(AcademicResult(
         studentId: studentId,
         subjectId: _selectedSubjectId!,
@@ -263,13 +310,13 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
       ));
     });
 
+    debugPrint('Submitting ${results.length} results to Bloc');
     context.read<SchoolBloc>().add(SaveResultsEvent(results));
   }
 
   String _calculateGrade(double total, List<GradingRule> rules) {
     if (rules.isEmpty) return 'N/A';
     
-    // Sort rules descending by minScore
     final sortedRules = List<GradingRule>.from(rules)
       ..sort((a, b) => b.minScore.compareTo(a.minScore));
 

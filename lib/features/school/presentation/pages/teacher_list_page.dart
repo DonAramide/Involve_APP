@@ -26,48 +26,58 @@ class _TeacherListPageState extends State<TeacherListPage> {
       appBar: AppBar(
         title: const Text('Teachers'),
       ),
-      body: BlocBuilder<SchoolBloc, SchoolState>(
-        builder: (context, state) {
-          if (state.isLoading && state.teachers.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (state.teachers.isEmpty) {
-            return const Center(
-              child: Text('No teachers registered yet.\nTap + to add one.', textAlign: TextAlign.center),
+      body: BlocListener<SchoolBloc, SchoolState>(
+        listener: (context, state) {
+          if (state.error != null && state.error!.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
             );
+            context.read<SchoolBloc>().add(ResetSchoolStatus());
           }
-
-          return ListView.builder(
-            itemCount: state.teachers.length,
-            padding: const EdgeInsets.all(8),
-            itemBuilder: (context, index) {
-              final teacher = state.teachers[index];
-              final assignedClass = state.classes.where((c) => c.id == teacher.classId).firstOrNull?.name ?? 'No Class';
-
-              return Card(
-                elevation: 2,
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: teacher.image != null ? MemoryImage(teacher.image!) : null,
-                    child: teacher.image == null ? const Icon(Icons.person) : null,
-                  ),
-                  title: Text(teacher.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('${teacher.profession ?? 'Staff'}  •  Class: $assignedClass'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TeacherProfilePage(teacher: teacher),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          );
         },
+        child: BlocBuilder<SchoolBloc, SchoolState>(
+          builder: (context, state) {
+            if (state.isLoading && state.teachers.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (state.teachers.isEmpty) {
+              return const Center(
+                child: Text('No teachers registered yet.\nTap + to add one.', textAlign: TextAlign.center),
+              );
+            }
+
+            return ListView.builder(
+              itemCount: state.teachers.length,
+              padding: const EdgeInsets.all(8),
+              itemBuilder: (context, index) {
+                final teacher = state.teachers[index];
+                final assignedClass = state.classes.where((c) => c.id == teacher.classId).firstOrNull?.name ?? 'No Class';
+
+                return Card(
+                  elevation: 2,
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: teacher.image != null ? MemoryImage(teacher.image!) : null,
+                      child: teacher.image == null ? const Icon(Icons.person) : null,
+                    ),
+                    title: Text(teacher.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('${teacher.profession ?? 'Staff'}  •  Class: $assignedClass'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => TeacherProfilePage(teacher: teacher),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            );
+          },
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => TeacherFormDialog.show(context),

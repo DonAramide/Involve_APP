@@ -24,10 +24,13 @@ abstract class SchoolRepository {
 
   // Students
   Future<List<Student>> getStudents();
+  Future<List<Student>> getStudentSummaries();
   Future<void> addStudent(Student student);
   Future<void> updateStudent(Student student);
   Future<void> deleteStudent(int id);
   Future<void> promoteStudents(List<int> studentIds, int targetClassId);
+  Future<String?> getLastAdmissionNumber();
+  Future<Student?> getStudentById(int id);
 
   // Subjects
   Future<List<Subject>> getSubjects();
