@@ -30,6 +30,8 @@ import 'package:involve_app/features/invoicing/domain/entities/stock_return.dart
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
@@ -205,6 +207,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     }
 
     final bool isSmallScreen = constraints.maxWidth < 800;
+    final bool isSchoolMode = context.read<SettingsBloc>().state.settings?.businessMode == 'school';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -218,6 +221,11 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   width: (constraints.maxWidth - 44) / 2, // 2 columns with spacing
                   child: _buildSearchField(context, state, currentAmount),
                 ),
+                if (isSchoolMode)
+                  SizedBox(
+                    width: (constraints.maxWidth - 44) / 2,
+                    child: _buildClassFilter(context, state),
+                  ),
                 SizedBox(
                   width: (constraints.maxWidth - 44) / 2,
                   child: _buildStaffFilter(context, state),
@@ -242,6 +250,13 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   flex: 2,
                   child: _buildSearchField(context, state, currentAmount),
                 ),
+                if (isSchoolMode) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 1,
+                    child: _buildClassFilter(context, state),
+                  ),
+                ],
                 const SizedBox(width: 12),
                 Expanded(
                   flex: 1,
@@ -271,7 +286,9 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     return TextField(
       controller: _searchController,
       decoration: InputDecoration(
-        hintText: 'Search Invoice ID',
+        hintText: context.read<SettingsBloc>().state.settings?.businessMode == 'school' 
+          ? 'Search Invoice ID, Student or Class' 
+          : 'Search Invoice ID',
         prefixIcon: const Icon(Icons.search),
         border: const OutlineInputBorder(),
         filled: true,
@@ -305,6 +322,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
       paymentStatus: state is HistoryLoaded ? state.paymentStatus : null,
       staffId: state is HistoryLoaded ? state.staffId : null,
+      classId: state is HistoryLoaded ? state.classId : null,
     ));
   }
 
@@ -351,6 +369,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       paymentMethod: state is HistoryLoaded ? state.paymentMethod : null,
       paymentStatus: state is HistoryLoaded ? state.paymentStatus : null,
       staffId: state is HistoryLoaded ? state.staffId : null,
+      classId: state is HistoryLoaded ? state.classId : null,
     ));
   }
 
@@ -784,6 +803,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 paymentMethod: value,
                 paymentStatus: state.paymentStatus,
                 staffId: state.staffId,
+                classId: state.classId,
               ));
         }
       },
@@ -817,6 +837,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 paymentMethod: state.paymentMethod,
                 paymentStatus: value,
                 staffId: state.staffId,
+                classId: state.classId,
               ));
         }
       },
@@ -858,6 +879,51 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     paymentMethod: state.paymentMethod,
                     paymentStatus: state.paymentStatus,
                     staffId: value,
+                    classId: state.classId,
+                  ));
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildClassFilter(BuildContext context, HistoryState state) {
+    return BlocBuilder<SchoolBloc, SchoolState>(
+      builder: (context, schoolState) {
+        int? currentClassId;
+        if (state is HistoryLoaded) {
+          currentClassId = state.classId;
+        }
+
+        return DropdownButtonFormField<int?>(
+          value: currentClassId,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            hintText: 'All Classes',
+            border: OutlineInputBorder(),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: EdgeInsets.symmetric(horizontal: 10),
+          ),
+          items: [
+            const DropdownMenuItem<int?>(value: null, child: Text('All Classes', style: TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis)),
+            ...schoolState.classes.map((c) => DropdownMenuItem<int?>(
+              value: c.id,
+              child: Text(c.name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+            )),
+          ],
+          onChanged: (value) {
+            if (state is HistoryLoaded) {
+              context.read<HistoryBloc>().add(LoadHistory(
+                    start: _selectedRange?.start,
+                    end: _selectedRange?.end,
+                    query: state.query,
+                    amount: state.amount,
+                    paymentMethod: state.paymentMethod,
+                    paymentStatus: state.paymentStatus,
+                    staffId: state.staffId,
+                    classId: value,
                   ));
             }
           },

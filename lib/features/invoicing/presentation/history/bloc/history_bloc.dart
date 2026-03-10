@@ -53,7 +53,8 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         final query = event.query!.toLowerCase();
         invoices = invoices.where((inv) => 
           inv.invoiceNumber.toLowerCase().contains(query) ||
-          (inv.customerName?.toLowerCase().contains(query) ?? false)
+          (inv.customerName?.toLowerCase().contains(query) ?? false) ||
+          (inv.className?.toLowerCase().contains(query) ?? false)
         ).toList();
       }
       
@@ -84,6 +85,10 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
       if (event.staffId != null) {
         invoices = invoices.where((inv) => inv.staffId == event.staffId).toList();
       }
+
+      if (event.classId != null) {
+        invoices = invoices.where((inv) => inv.classId == event.classId).toList();
+      }
       
       final totalCollected = invoices.fold<double>(0, (sum, inv) => sum + inv.amountPaid);
       final totalInvoiced = invoices.fold<double>(0, (sum, inv) => sum + inv.totalAmount);
@@ -97,6 +102,7 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         paymentMethod: event.paymentMethod,
         paymentStatus: event.paymentStatus,
         staffId: event.staffId,
+        classId: event.classId,
       ));
     } catch (e) {
       emit(HistoryError('Failed to load history: ${e.toString()}'));
