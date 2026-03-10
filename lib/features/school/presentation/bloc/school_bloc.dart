@@ -203,7 +203,11 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   Future<void> _onAddStudent(AddStudentEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
     try {
-      await repository.addStudent(event.student);
+      var studentToAdd = event.student;
+      if (studentToAdd.academicYearId == null && state.activeYear != null) {
+        studentToAdd = studentToAdd.copyWith(academicYearId: state.activeYear!.id);
+      }
+      await repository.addStudent(studentToAdd);
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
@@ -233,7 +237,11 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
 
   Future<void> _onPromoteStudents(PromoteStudentsEvent event, Emitter<SchoolState> emit) async {
     try {
-      await repository.promoteStudents(event.studentIds, event.targetClassId);
+      await repository.promoteStudents(
+        event.studentIds, 
+        event.targetClassId,
+        academicYearId: state.activeYear?.id,
+      );
       add(LoadSchoolData());
     } catch (e) {
       emit(state.copyWith(error: e.toString()));
@@ -250,6 +258,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final student = await repository.getStudentById(event.studentId);
 
       double? studentAverage;
+      double? classAverage;
       int? studentPosition;
       int? classSize;
 
@@ -269,12 +278,22 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
             // Group results by student
             final resultsByStudent = groupBy(classResults, (AcademicResult r) => r.studentId);
             
-            // Calculate total scores for each student
+            // Calculate total scores AND averages for each student
             final studentTotals = <int, double>{};
+            final studentAverages = <double>[];
+
             resultsByStudent.forEach((sId, studentResults) {
-              final total = studentResults.fold(0.0, (sum, r) => sum + r.totalScore);
-              studentTotals[sId] = total;
+              if (studentResults.isNotEmpty) {
+                final total = studentResults.fold(0.0, (sum, r) => sum + r.totalScore);
+                studentTotals[sId] = total;
+                studentAverages.add(total / studentResults.length);
+              }
             });
+
+            // Class Average = mean of student averages
+            if (studentAverages.isNotEmpty) {
+              classAverage = studentAverages.reduce((a, b) => a + b) / studentAverages.length;
+            }
 
             // Sort students by total score descending
             final sortedStudents = studentTotals.entries.toList()
@@ -308,9 +327,10 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
             ? state.students.map((s) => s.id == student.id ? student : s).toList()
             : state.students,
         studentAverage: studentAverage,
+        classAverage: classAverage,
         studentPosition: studentPosition,
         classSize: classSize,
-        isLoading: false
+        isLoading: false,
       ));
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));

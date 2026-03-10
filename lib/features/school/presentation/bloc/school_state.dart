@@ -18,6 +18,7 @@ class SchoolState extends Equatable {
   final List<GradingRule> gradingRules;
   final List<Teacher> teachers;
   final double? studentAverage;
+  final double? classAverage;
   final int? studentPosition;
   final int? classSize;
   final String? nextAdmissionNumber;
@@ -37,6 +38,7 @@ class SchoolState extends Equatable {
     this.gradingRules = const [],
     this.teachers = const [],
     this.studentAverage,
+    this.classAverage,
     this.studentPosition,
     this.classSize,
     this.nextAdmissionNumber,
@@ -60,6 +62,7 @@ class SchoolState extends Equatable {
     List<GradingRule>? gradingRules,
     List<Teacher>? teachers,
     double? studentAverage,
+    double? classAverage,
     int? studentPosition,
     int? classSize,
     String? nextAdmissionNumber,
@@ -79,6 +82,7 @@ class SchoolState extends Equatable {
       gradingRules: gradingRules ?? this.gradingRules,
       teachers: teachers ?? this.teachers,
       studentAverage: studentAverage ?? this.studentAverage,
+      classAverage: classAverage ?? this.classAverage,
       studentPosition: studentPosition ?? this.studentPosition,
       classSize: classSize ?? this.classSize,
       nextAdmissionNumber: nextAdmissionNumber ?? this.nextAdmissionNumber,
@@ -101,6 +105,7 @@ class SchoolState extends Equatable {
         gradingRules,
         teachers,
         studentAverage,
+        classAverage,
         studentPosition,
         classSize,
         nextAdmissionNumber,

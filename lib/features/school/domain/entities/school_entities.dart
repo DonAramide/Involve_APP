@@ -108,6 +108,7 @@ class Student extends Equatable {
   final String firstName;
   final String lastName;
   final int classId;
+  final int? academicYearId;
   final String? parentName;
   final String? parentPhone;
   final double balance;
@@ -121,6 +122,7 @@ class Student extends Equatable {
     required this.firstName,
     required this.lastName,
     required this.classId,
+    this.academicYearId,
     this.parentName,
     this.parentPhone,
     this.balance = 0.0,
@@ -135,6 +137,7 @@ class Student extends Equatable {
     String? firstName,
     String? lastName,
     int? classId,
+    int? academicYearId,
     String? parentName,
     String? parentPhone,
     double? balance,
@@ -148,6 +151,7 @@ class Student extends Equatable {
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       classId: classId ?? this.classId,
+      academicYearId: academicYearId ?? this.academicYearId,
       parentName: parentName ?? this.parentName,
       parentPhone: parentPhone ?? this.parentPhone,
       balance: balance ?? this.balance,
@@ -160,7 +164,7 @@ class Student extends Equatable {
   String get fullName => '$firstName $lastName';
 
   @override
-  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, parentName, parentPhone, balance, image, dateOfBirth, registrationDate];
+  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, academicYearId, parentName, parentPhone, balance, image, dateOfBirth, registrationDate];
 }
 
 class Subject extends Equatable {

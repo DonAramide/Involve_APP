@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
+import 'result_preview_page.dart';
 
 class StudentProfilePage extends StatefulWidget {
   final int studentId;
@@ -299,7 +300,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         return Column(
           children: [
             if (state.studentAverage != null || state.studentPosition != null)
-              _buildResultsSummary(state.studentAverage, state.studentPosition, state.classSize),
+              _buildResultsSummary(state.studentAverage, state.classAverage, state.studentPosition, state.classSize),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(16),
@@ -373,7 +374,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 );
 }
 
-  Widget _buildResultsSummary(double? average, int? position, int? classSize) {
+  Widget _buildResultsSummary(double? average, double? classAverage, int? position, int? classSize) {
     return Container(
       padding: const EdgeInsets.all(16),
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -393,10 +394,16 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildSummaryItem(
-                'AVERAGE SCORE',
+                'STUDENT AVG',
                 average != null ? '${average.toStringAsFixed(1)}%' : 'N/A',
                 Icons.analytics_outlined,
                 Colors.blue,
+              ),
+              _buildSummaryItem(
+                'CLASS AVG',
+                classAverage != null ? '${classAverage.toStringAsFixed(1)}%' : 'N/A',
+                Icons.waves_outlined,
+                Colors.teal,
               ),
               _buildSummaryItem(
                 'CLASS POSITION',
@@ -407,7 +414,45 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _printResults(context),
+              icon: const Icon(Icons.print_outlined, size: 18),
+              label: const Text('PRINT RESULTS SHEET'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.blue[700],
+                side: BorderSide(color: Colors.blue[200]!),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  void _printResults(BuildContext context) {
+    final state = context.read<SchoolBloc>().state;
+    final student = state.students.firstWhere((s) => s.id == widget.studentId);
+    final results = state.results.where((r) => r.studentId == widget.studentId).toList();
+    final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ResultPreviewPage(
+          student: student,
+          results: results,
+          subjects: state.subjects,
+          academicYear: state.activeYear,
+          term: state.activeTerm,
+          className: sClass?.name,
+          classAverage: state.classAverage,
+          studentPosition: state.studentPosition,
+          classSize: state.classSize,
+        ),
       ),
     );
   }

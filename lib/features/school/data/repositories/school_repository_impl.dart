@@ -149,6 +149,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: row.parentName,
       parentPhone: row.parentPhone,
       balance: row.balance,
+      academicYearId: row.academicYearId,
       image: row.image,
       dateOfBirth: row.dateOfBirth,
       registrationDate: row.registrationDate,
@@ -166,6 +167,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       database.students.parentName,
       database.students.parentPhone,
       database.students.balance,
+      database.students.academicYearId,
       database.students.dateOfBirth,
       database.students.registrationDate,
     ]);
@@ -180,6 +182,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: row.read(database.students.parentName),
       parentPhone: row.read(database.students.parentPhone),
       balance: row.read(database.students.balance)!,
+      academicYearId: row.read(database.students.academicYearId),
       dateOfBirth: row.read(database.students.dateOfBirth),
       registrationDate: row.read(database.students.registrationDate)!,
       image: null,
@@ -196,6 +199,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: Value(student.parentName),
       parentPhone: Value(student.parentPhone),
       balance: Value(student.balance),
+      academicYearId: Value(student.academicYearId),
       image: Value(student.image),
       dateOfBirth: Value(student.dateOfBirth),
       registrationDate: Value(student.registrationDate),
@@ -213,6 +217,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: Value(student.parentName),
       parentPhone: Value(student.parentPhone),
       balance: Value(student.balance),
+      academicYearId: Value(student.academicYearId),
       image: Value(student.image),
       dateOfBirth: Value(student.dateOfBirth),
       registrationDate: Value(student.registrationDate),
@@ -225,11 +230,12 @@ class SchoolRepositoryImpl implements SchoolRepository {
   }
 
   @override
-  Future<void> promoteStudents(List<int> studentIds, int targetClassId) async {
+  Future<void> promoteStudents(List<int> studentIds, int targetClassId, {int? academicYearId}) async {
     await (database.update(database.students)
           ..where((t) => t.id.isIn(studentIds)))
         .write(db.StudentsCompanion(
       classId: Value(targetClassId),
+      academicYearId: academicYearId != null ? Value(academicYearId) : const Value.absent(),
     ));
   }
 
@@ -269,6 +275,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: row.parentName,
       parentPhone: row.parentPhone,
       balance: row.balance,
+      academicYearId: row.academicYearId,
       image: row.image,
       dateOfBirth: row.dateOfBirth,
       registrationDate: row.registrationDate,

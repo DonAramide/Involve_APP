@@ -80,6 +80,7 @@ class Students extends Table {
   TextColumn get firstName => text()();
   TextColumn get lastName => text()();
   IntColumn get classId => integer().references(Classes, #id)();
+  IntColumn get academicYearId => integer().nullable().references(AcademicYears, #id)();
   TextColumn get parentName => text().nullable()();
   TextColumn get parentPhone => text().nullable()();
   RealColumn get balance => real().withDefault(const Constant(0.0))();

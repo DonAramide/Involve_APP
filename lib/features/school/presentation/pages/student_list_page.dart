@@ -182,15 +182,12 @@ class _StudentListPageState extends State<StudentListPage> {
       
       if (_selectedClassFilter != null && s.classId != _selectedClassFilter) return false;
       
+      if (_selectedYearFilter != null && s.academicYearId != _selectedYearFilter) return false;
+
       final isOwing = (s.balance ?? 0) > 0;
       if (_selectedOwingFilter == 'Owing' && !isOwing) return false;
       if (_selectedOwingFilter == 'Not Owing' && isOwing) return false;
 
-      // Note: Student currently doesn't have an explicit academicYearId on the model itself,
-      // but if the backend filtering or future additions require it, this structure is ready.
-      // Assuming students belong to classes mapped to years, or if they have an enrollmentYearId.
-      // Currently bypassing year filter to prevent 0 results until data model supports it directly.
-      
       return true;
     }).toList();
 

@@ -28,7 +28,7 @@ abstract class SchoolRepository {
   Future<void> addStudent(Student student);
   Future<void> updateStudent(Student student);
   Future<void> deleteStudent(int id);
-  Future<void> promoteStudents(List<int> studentIds, int targetClassId);
+  Future<void> promoteStudents(List<int> studentIds, int targetClassId, {int? academicYearId});
   Future<String?> getLastAdmissionNumber();
   Future<Student?> getStudentById(int id);
 

@@ -312,15 +312,30 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       newStatus = 'Unpaid';
     }
 
-    await (db.update(db.invoices)..where((t) => t.id.equals(invoiceId))).write(
-      InvoicesCompanion(
-        amountPaid: Value(newAmountPaid),
-        balanceAmount: Value(newBalance),
-        paymentStatus: Value(newStatus),
-        paymentMethod: Value(method),
-        updatedAt: Value(now),
-      ),
-    );
+    await db.transaction(() async {
+      await (db.update(db.invoices)..where((t) => t.id.equals(invoiceId))).write(
+        InvoicesCompanion(
+          amountPaid: Value(newAmountPaid),
+          balanceAmount: Value(newBalance),
+          paymentStatus: Value(newStatus),
+          paymentMethod: Value(method),
+          updatedAt: Value(now),
+        ),
+      );
+
+      // Propagate balance update to student master balance
+      if (invoice.studentId != null) {
+        await db.customUpdate(
+          'UPDATE students SET balance = balance - ?, updated_at = ? WHERE id = ?',
+          variables: [
+            Variable.withReal(additionalAmount),
+            Variable.withDateTime(now),
+            Variable.withInt(invoice.studentId!)
+          ],
+          updates: {db.students},
+        );
+      }
+    });
   }
 
   @override
@@ -449,6 +464,22 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           updatedAt: Value(now),
         ),
       );
+
+      // Propagate balance update to student master balance
+      if (invoiceRow.studentId != null) {
+        final double balanceChange = newBalance - invoiceRow.balanceAmount;
+        if (balanceChange != 0) {
+          await db.customUpdate(
+            'UPDATE students SET balance = balance + ?, updated_at = ? WHERE id = ?',
+            variables: [
+              Variable.withReal(balanceChange),
+              Variable.withDateTime(now),
+              Variable.withInt(invoiceRow.studentId!)
+            ],
+            updates: {db.students},
+          );
+        }
+      }
     });
   }
 

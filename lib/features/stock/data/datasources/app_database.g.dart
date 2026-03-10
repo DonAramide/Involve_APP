@@ -10576,6 +10576,15 @@ class $StudentsTable extends Students
       requiredDuringInsert: true,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('REFERENCES classes (id)'));
+  static const VerificationMeta _academicYearIdMeta =
+      const VerificationMeta('academicYearId');
+  @override
+  late final GeneratedColumn<int> academicYearId = GeneratedColumn<int>(
+      'academic_year_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES academic_years (id)'));
   static const VerificationMeta _parentNameMeta =
       const VerificationMeta('parentName');
   @override
@@ -10655,6 +10664,7 @@ class $StudentsTable extends Students
         firstName,
         lastName,
         classId,
+        academicYearId,
         parentName,
         parentPhone,
         balance,
@@ -10705,6 +10715,12 @@ class $StudentsTable extends Students
           classId.isAcceptableOrUnknown(data['class_id']!, _classIdMeta));
     } else if (isInserting) {
       context.missing(_classIdMeta);
+    }
+    if (data.containsKey('academic_year_id')) {
+      context.handle(
+          _academicYearIdMeta,
+          academicYearId.isAcceptableOrUnknown(
+              data['academic_year_id']!, _academicYearIdMeta));
     }
     if (data.containsKey('parent_name')) {
       context.handle(
@@ -10777,6 +10793,8 @@ class $StudentsTable extends Students
           .read(DriftSqlType.string, data['${effectivePrefix}last_name'])!,
       classId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}class_id'])!,
+      academicYearId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}academic_year_id']),
       parentName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}parent_name']),
       parentPhone: attachedDatabase.typeMapping
@@ -10814,6 +10832,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   final String firstName;
   final String lastName;
   final int classId;
+  final int? academicYearId;
   final String? parentName;
   final String? parentPhone;
   final double balance;
@@ -10831,6 +10850,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       required this.firstName,
       required this.lastName,
       required this.classId,
+      this.academicYearId,
       this.parentName,
       this.parentPhone,
       required this.balance,
@@ -10850,6 +10870,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
     map['first_name'] = Variable<String>(firstName);
     map['last_name'] = Variable<String>(lastName);
     map['class_id'] = Variable<int>(classId);
+    if (!nullToAbsent || academicYearId != null) {
+      map['academic_year_id'] = Variable<int>(academicYearId);
+    }
     if (!nullToAbsent || parentName != null) {
       map['parent_name'] = Variable<String>(parentName);
     }
@@ -10887,6 +10910,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       firstName: Value(firstName),
       lastName: Value(lastName),
       classId: Value(classId),
+      academicYearId: academicYearId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(academicYearId),
       parentName: parentName == null && nullToAbsent
           ? const Value.absent()
           : Value(parentName),
@@ -10924,6 +10950,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       firstName: serializer.fromJson<String>(json['firstName']),
       lastName: serializer.fromJson<String>(json['lastName']),
       classId: serializer.fromJson<int>(json['classId']),
+      academicYearId: serializer.fromJson<int?>(json['academicYearId']),
       parentName: serializer.fromJson<String?>(json['parentName']),
       parentPhone: serializer.fromJson<String?>(json['parentPhone']),
       balance: serializer.fromJson<double>(json['balance']),
@@ -10946,6 +10973,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'firstName': serializer.toJson<String>(firstName),
       'lastName': serializer.toJson<String>(lastName),
       'classId': serializer.toJson<int>(classId),
+      'academicYearId': serializer.toJson<int?>(academicYearId),
       'parentName': serializer.toJson<String?>(parentName),
       'parentPhone': serializer.toJson<String?>(parentPhone),
       'balance': serializer.toJson<double>(balance),
@@ -10966,6 +10994,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           String? firstName,
           String? lastName,
           int? classId,
+          Value<int?> academicYearId = const Value.absent(),
           Value<String?> parentName = const Value.absent(),
           Value<String?> parentPhone = const Value.absent(),
           double? balance,
@@ -10983,6 +11012,8 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         firstName: firstName ?? this.firstName,
         lastName: lastName ?? this.lastName,
         classId: classId ?? this.classId,
+        academicYearId:
+            academicYearId.present ? academicYearId.value : this.academicYearId,
         parentName: parentName.present ? parentName.value : this.parentName,
         parentPhone: parentPhone.present ? parentPhone.value : this.parentPhone,
         balance: balance ?? this.balance,
@@ -11004,6 +11035,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       firstName: data.firstName.present ? data.firstName.value : this.firstName,
       lastName: data.lastName.present ? data.lastName.value : this.lastName,
       classId: data.classId.present ? data.classId.value : this.classId,
+      academicYearId: data.academicYearId.present
+          ? data.academicYearId.value
+          : this.academicYearId,
       parentName:
           data.parentName.present ? data.parentName.value : this.parentName,
       parentPhone:
@@ -11031,6 +11065,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('firstName: $firstName, ')
           ..write('lastName: $lastName, ')
           ..write('classId: $classId, ')
+          ..write('academicYearId: $academicYearId, ')
           ..write('parentName: $parentName, ')
           ..write('parentPhone: $parentPhone, ')
           ..write('balance: $balance, ')
@@ -11053,6 +11088,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       firstName,
       lastName,
       classId,
+      academicYearId,
       parentName,
       parentPhone,
       balance,
@@ -11073,6 +11109,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.firstName == this.firstName &&
           other.lastName == this.lastName &&
           other.classId == this.classId &&
+          other.academicYearId == this.academicYearId &&
           other.parentName == this.parentName &&
           other.parentPhone == this.parentPhone &&
           other.balance == this.balance &&
@@ -11092,6 +11129,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<String> firstName;
   final Value<String> lastName;
   final Value<int> classId;
+  final Value<int?> academicYearId;
   final Value<String?> parentName;
   final Value<String?> parentPhone;
   final Value<double> balance;
@@ -11109,6 +11147,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.firstName = const Value.absent(),
     this.lastName = const Value.absent(),
     this.classId = const Value.absent(),
+    this.academicYearId = const Value.absent(),
     this.parentName = const Value.absent(),
     this.parentPhone = const Value.absent(),
     this.balance = const Value.absent(),
@@ -11127,6 +11166,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     required String firstName,
     required String lastName,
     required int classId,
+    this.academicYearId = const Value.absent(),
     this.parentName = const Value.absent(),
     this.parentPhone = const Value.absent(),
     this.balance = const Value.absent(),
@@ -11148,6 +11188,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<String>? firstName,
     Expression<String>? lastName,
     Expression<int>? classId,
+    Expression<int>? academicYearId,
     Expression<String>? parentName,
     Expression<String>? parentPhone,
     Expression<double>? balance,
@@ -11166,6 +11207,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       if (firstName != null) 'first_name': firstName,
       if (lastName != null) 'last_name': lastName,
       if (classId != null) 'class_id': classId,
+      if (academicYearId != null) 'academic_year_id': academicYearId,
       if (parentName != null) 'parent_name': parentName,
       if (parentPhone != null) 'parent_phone': parentPhone,
       if (balance != null) 'balance': balance,
@@ -11186,6 +11228,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       Value<String>? firstName,
       Value<String>? lastName,
       Value<int>? classId,
+      Value<int?>? academicYearId,
       Value<String?>? parentName,
       Value<String?>? parentPhone,
       Value<double>? balance,
@@ -11203,6 +11246,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       classId: classId ?? this.classId,
+      academicYearId: academicYearId ?? this.academicYearId,
       parentName: parentName ?? this.parentName,
       parentPhone: parentPhone ?? this.parentPhone,
       balance: balance ?? this.balance,
@@ -11234,6 +11278,9 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     }
     if (classId.present) {
       map['class_id'] = Variable<int>(classId.value);
+    }
+    if (academicYearId.present) {
+      map['academic_year_id'] = Variable<int>(academicYearId.value);
     }
     if (parentName.present) {
       map['parent_name'] = Variable<String>(parentName.value);
@@ -11279,6 +11326,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('firstName: $firstName, ')
           ..write('lastName: $lastName, ')
           ..write('classId: $classId, ')
+          ..write('academicYearId: $academicYearId, ')
           ..write('parentName: $parentName, ')
           ..write('parentPhone: $parentPhone, ')
           ..write('balance: $balance, ')
@@ -19452,6 +19500,21 @@ final class $$AcademicYearsTableReferences extends BaseReferences<_$AppDatabase,
         manager.$state.copyWith(prefetchedData: cache));
   }
 
+  static MultiTypedResultKey<$StudentsTable, List<StudentTable>>
+      _studentsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.students,
+              aliasName: $_aliasNameGenerator(
+                  db.academicYears.id, db.students.academicYearId));
+
+  $$StudentsTableProcessedTableManager get studentsRefs {
+    final manager = $$StudentsTableTableManager($_db, $_db.students)
+        .filter((f) => f.academicYearId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_studentsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
   static MultiTypedResultKey<$ResultsTable, List<ResultTable>>
       _resultsRefsTable(_$AppDatabase db) =>
           MultiTypedResultKey.fromTable(db.results,
@@ -19520,6 +19583,27 @@ class $$AcademicYearsTableFilterComposer
             $$TermsTableFilterComposer(
               $db: $db,
               $table: $db.terms,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> studentsRefs(
+      Expression<bool> Function($$StudentsTableFilterComposer f) f) {
+    final $$StudentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.academicYearId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableFilterComposer(
+              $db: $db,
+              $table: $db.students,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -19650,6 +19734,27 @@ class $$AcademicYearsTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> studentsRefs<T extends Object>(
+      Expression<T> Function($$StudentsTableAnnotationComposer a) f) {
+    final $$StudentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.students,
+        getReferencedColumn: (t) => t.academicYearId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StudentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.students,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
   Expression<T> resultsRefs<T extends Object>(
       Expression<T> Function($$ResultsTableAnnotationComposer a) f) {
     final $$ResultsTableAnnotationComposer composer = $composerBuilder(
@@ -19683,7 +19788,8 @@ class $$AcademicYearsTableTableManager extends RootTableManager<
     $$AcademicYearsTableUpdateCompanionBuilder,
     (AcademicYearTable, $$AcademicYearsTableReferences),
     AcademicYearTable,
-    PrefetchHooks Function({bool termsRefs, bool resultsRefs})> {
+    PrefetchHooks Function(
+        {bool termsRefs, bool studentsRefs, bool resultsRefs})> {
   $$AcademicYearsTableTableManager(_$AppDatabase db, $AcademicYearsTable table)
       : super(TableManagerState(
           db: db,
@@ -19748,11 +19854,13 @@ class $$AcademicYearsTableTableManager extends RootTableManager<
                     $$AcademicYearsTableReferences(db, table, e)
                   ))
               .toList(),
-          prefetchHooksCallback: ({termsRefs = false, resultsRefs = false}) {
+          prefetchHooksCallback: (
+              {termsRefs = false, studentsRefs = false, resultsRefs = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [
                 if (termsRefs) db.terms,
+                if (studentsRefs) db.students,
                 if (resultsRefs) db.results
               ],
               addJoins: null,
@@ -19767,6 +19875,19 @@ class $$AcademicYearsTableTableManager extends RootTableManager<
                         managerFromTypedResult: (p0) =>
                             $$AcademicYearsTableReferences(db, table, p0)
                                 .termsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.academicYearId == item.id),
+                        typedResults: items),
+                  if (studentsRefs)
+                    await $_getPrefetchedData<AcademicYearTable,
+                            $AcademicYearsTable, StudentTable>(
+                        currentTable: table,
+                        referencedTable: $$AcademicYearsTableReferences
+                            ._studentsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$AcademicYearsTableReferences(db, table, p0)
+                                .studentsRefs,
                         referencedItemsForCurrentItem:
                             (item, referencedItems) => referencedItems
                                 .where((e) => e.academicYearId == item.id),
@@ -19802,7 +19923,8 @@ typedef $$AcademicYearsTableProcessedTableManager = ProcessedTableManager<
     $$AcademicYearsTableUpdateCompanionBuilder,
     (AcademicYearTable, $$AcademicYearsTableReferences),
     AcademicYearTable,
-    PrefetchHooks Function({bool termsRefs, bool resultsRefs})>;
+    PrefetchHooks Function(
+        {bool termsRefs, bool studentsRefs, bool resultsRefs})>;
 typedef $$TermsTableCreateCompanionBuilder = TermsCompanion Function({
   Value<int> id,
   required int academicYearId,
@@ -20595,6 +20717,7 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   required String firstName,
   required String lastName,
   required int classId,
+  Value<int?> academicYearId,
   Value<String?> parentName,
   Value<String?> parentPhone,
   Value<double> balance,
@@ -20613,6 +20736,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<String> firstName,
   Value<String> lastName,
   Value<int> classId,
+  Value<int?> academicYearId,
   Value<String?> parentName,
   Value<String?> parentPhone,
   Value<double> balance,
@@ -20639,6 +20763,21 @@ final class $$StudentsTableReferences
     final manager = $$ClassesTableTableManager($_db, $_db.classes)
         .filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_classIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $AcademicYearsTable _academicYearIdTable(_$AppDatabase db) =>
+      db.academicYears.createAlias($_aliasNameGenerator(
+          db.students.academicYearId, db.academicYears.id));
+
+  $$AcademicYearsTableProcessedTableManager? get academicYearId {
+    final $_column = $_itemColumn<int>('academic_year_id');
+    if ($_column == null) return null;
+    final manager = $$AcademicYearsTableTableManager($_db, $_db.academicYears)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_academicYearIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
@@ -20728,6 +20867,26 @@ class $$StudentsTableFilterComposer
             $$ClassesTableFilterComposer(
               $db: $db,
               $table: $db.classes,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$AcademicYearsTableFilterComposer get academicYearId {
+    final $$AcademicYearsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.academicYearId,
+        referencedTable: $db.academicYears,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AcademicYearsTableFilterComposer(
+              $db: $db,
+              $table: $db.academicYears,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -20833,6 +20992,26 @@ class $$StudentsTableOrderingComposer
             ));
     return composer;
   }
+
+  $$AcademicYearsTableOrderingComposer get academicYearId {
+    final $$AcademicYearsTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.academicYearId,
+        referencedTable: $db.academicYears,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AcademicYearsTableOrderingComposer(
+              $db: $db,
+              $table: $db.academicYears,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$StudentsTableAnnotationComposer
@@ -20909,6 +21088,26 @@ class $$StudentsTableAnnotationComposer
     return composer;
   }
 
+  $$AcademicYearsTableAnnotationComposer get academicYearId {
+    final $$AcademicYearsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.academicYearId,
+        referencedTable: $db.academicYears,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$AcademicYearsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.academicYears,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
   Expression<T> resultsRefs<T extends Object>(
       Expression<T> Function($$ResultsTableAnnotationComposer a) f) {
     final $$ResultsTableAnnotationComposer composer = $composerBuilder(
@@ -20942,7 +21141,8 @@ class $$StudentsTableTableManager extends RootTableManager<
     $$StudentsTableUpdateCompanionBuilder,
     (StudentTable, $$StudentsTableReferences),
     StudentTable,
-    PrefetchHooks Function({bool classId, bool resultsRefs})> {
+    PrefetchHooks Function(
+        {bool classId, bool academicYearId, bool resultsRefs})> {
   $$StudentsTableTableManager(_$AppDatabase db, $StudentsTable table)
       : super(TableManagerState(
           db: db,
@@ -20959,6 +21159,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String> firstName = const Value.absent(),
             Value<String> lastName = const Value.absent(),
             Value<int> classId = const Value.absent(),
+            Value<int?> academicYearId = const Value.absent(),
             Value<String?> parentName = const Value.absent(),
             Value<String?> parentPhone = const Value.absent(),
             Value<double> balance = const Value.absent(),
@@ -20977,6 +21178,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             firstName: firstName,
             lastName: lastName,
             classId: classId,
+            academicYearId: academicYearId,
             parentName: parentName,
             parentPhone: parentPhone,
             balance: balance,
@@ -20995,6 +21197,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             required String firstName,
             required String lastName,
             required int classId,
+            Value<int?> academicYearId = const Value.absent(),
             Value<String?> parentName = const Value.absent(),
             Value<String?> parentPhone = const Value.absent(),
             Value<double> balance = const Value.absent(),
@@ -21013,6 +21216,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             firstName: firstName,
             lastName: lastName,
             classId: classId,
+            academicYearId: academicYearId,
             parentName: parentName,
             parentPhone: parentPhone,
             balance: balance,
@@ -21029,7 +21233,8 @@ class $$StudentsTableTableManager extends RootTableManager<
               .map((e) =>
                   (e.readTable(table), $$StudentsTableReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: ({classId = false, resultsRefs = false}) {
+          prefetchHooksCallback: (
+              {classId = false, academicYearId = false, resultsRefs = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [if (resultsRefs) db.results],
@@ -21054,6 +21259,16 @@ class $$StudentsTableTableManager extends RootTableManager<
                         $$StudentsTableReferences._classIdTable(db),
                     referencedColumn:
                         $$StudentsTableReferences._classIdTable(db).id,
+                  ) as T;
+                }
+                if (academicYearId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.academicYearId,
+                    referencedTable:
+                        $$StudentsTableReferences._academicYearIdTable(db),
+                    referencedColumn:
+                        $$StudentsTableReferences._academicYearIdTable(db).id,
                   ) as T;
                 }
 
@@ -21092,7 +21307,8 @@ typedef $$StudentsTableProcessedTableManager = ProcessedTableManager<
     $$StudentsTableUpdateCompanionBuilder,
     (StudentTable, $$StudentsTableReferences),
     StudentTable,
-    PrefetchHooks Function({bool classId, bool resultsRefs})>;
+    PrefetchHooks Function(
+        {bool classId, bool academicYearId, bool resultsRefs})>;
 typedef $$BusinessSettingsTableCreateCompanionBuilder
     = BusinessSettingsCompanion Function({
   Value<int> id,
