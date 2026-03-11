@@ -10611,6 +10611,11 @@ class $StudentsTable extends Students
   late final GeneratedColumn<DateTime> dateOfBirth = GeneratedColumn<DateTime>(
       'date_of_birth', aliasedName, true,
       type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _genderMeta = const VerificationMeta('gender');
+  @override
+  late final GeneratedColumn<String> gender = GeneratedColumn<String>(
+      'gender', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _registrationDateMeta =
       const VerificationMeta('registrationDate');
   @override
@@ -10669,6 +10674,7 @@ class $StudentsTable extends Students
         parentPhone,
         balance,
         dateOfBirth,
+        gender,
         registrationDate,
         image,
         syncId,
@@ -10744,6 +10750,10 @@ class $StudentsTable extends Students
           dateOfBirth.isAcceptableOrUnknown(
               data['date_of_birth']!, _dateOfBirthMeta));
     }
+    if (data.containsKey('gender')) {
+      context.handle(_genderMeta,
+          gender.isAcceptableOrUnknown(data['gender']!, _genderMeta));
+    }
     if (data.containsKey('registration_date')) {
       context.handle(
           _registrationDateMeta,
@@ -10803,6 +10813,8 @@ class $StudentsTable extends Students
           .read(DriftSqlType.double, data['${effectivePrefix}balance'])!,
       dateOfBirth: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date_of_birth']),
+      gender: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}gender']),
       registrationDate: attachedDatabase.typeMapping.read(
           DriftSqlType.dateTime, data['${effectivePrefix}registration_date'])!,
       image: attachedDatabase.typeMapping
@@ -10837,6 +10849,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   final String? parentPhone;
   final double balance;
   final DateTime? dateOfBirth;
+  final String? gender;
   final DateTime registrationDate;
   final Uint8List? image;
   final String? syncId;
@@ -10855,6 +10868,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       this.parentPhone,
       required this.balance,
       this.dateOfBirth,
+      this.gender,
       required this.registrationDate,
       this.image,
       this.syncId,
@@ -10882,6 +10896,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
     map['balance'] = Variable<double>(balance);
     if (!nullToAbsent || dateOfBirth != null) {
       map['date_of_birth'] = Variable<DateTime>(dateOfBirth);
+    }
+    if (!nullToAbsent || gender != null) {
+      map['gender'] = Variable<String>(gender);
     }
     map['registration_date'] = Variable<DateTime>(registrationDate);
     if (!nullToAbsent || image != null) {
@@ -10923,6 +10940,8 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       dateOfBirth: dateOfBirth == null && nullToAbsent
           ? const Value.absent()
           : Value(dateOfBirth),
+      gender:
+          gender == null && nullToAbsent ? const Value.absent() : Value(gender),
       registrationDate: Value(registrationDate),
       image:
           image == null && nullToAbsent ? const Value.absent() : Value(image),
@@ -10955,6 +10974,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       parentPhone: serializer.fromJson<String?>(json['parentPhone']),
       balance: serializer.fromJson<double>(json['balance']),
       dateOfBirth: serializer.fromJson<DateTime?>(json['dateOfBirth']),
+      gender: serializer.fromJson<String?>(json['gender']),
       registrationDate: serializer.fromJson<DateTime>(json['registrationDate']),
       image: serializer.fromJson<Uint8List?>(json['image']),
       syncId: serializer.fromJson<String?>(json['syncId']),
@@ -10978,6 +10998,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'parentPhone': serializer.toJson<String?>(parentPhone),
       'balance': serializer.toJson<double>(balance),
       'dateOfBirth': serializer.toJson<DateTime?>(dateOfBirth),
+      'gender': serializer.toJson<String?>(gender),
       'registrationDate': serializer.toJson<DateTime>(registrationDate),
       'image': serializer.toJson<Uint8List?>(image),
       'syncId': serializer.toJson<String?>(syncId),
@@ -10999,6 +11020,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           Value<String?> parentPhone = const Value.absent(),
           double? balance,
           Value<DateTime?> dateOfBirth = const Value.absent(),
+          Value<String?> gender = const Value.absent(),
           DateTime? registrationDate,
           Value<Uint8List?> image = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
@@ -11018,6 +11040,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         parentPhone: parentPhone.present ? parentPhone.value : this.parentPhone,
         balance: balance ?? this.balance,
         dateOfBirth: dateOfBirth.present ? dateOfBirth.value : this.dateOfBirth,
+        gender: gender.present ? gender.value : this.gender,
         registrationDate: registrationDate ?? this.registrationDate,
         image: image.present ? image.value : this.image,
         syncId: syncId.present ? syncId.value : this.syncId,
@@ -11045,6 +11068,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       balance: data.balance.present ? data.balance.value : this.balance,
       dateOfBirth:
           data.dateOfBirth.present ? data.dateOfBirth.value : this.dateOfBirth,
+      gender: data.gender.present ? data.gender.value : this.gender,
       registrationDate: data.registrationDate.present
           ? data.registrationDate.value
           : this.registrationDate,
@@ -11070,6 +11094,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('parentPhone: $parentPhone, ')
           ..write('balance: $balance, ')
           ..write('dateOfBirth: $dateOfBirth, ')
+          ..write('gender: $gender, ')
           ..write('registrationDate: $registrationDate, ')
           ..write('image: $image, ')
           ..write('syncId: $syncId, ')
@@ -11093,6 +11118,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       parentPhone,
       balance,
       dateOfBirth,
+      gender,
       registrationDate,
       $driftBlobEquality.hash(image),
       syncId,
@@ -11114,6 +11140,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.parentPhone == this.parentPhone &&
           other.balance == this.balance &&
           other.dateOfBirth == this.dateOfBirth &&
+          other.gender == this.gender &&
           other.registrationDate == this.registrationDate &&
           $driftBlobEquality.equals(other.image, this.image) &&
           other.syncId == this.syncId &&
@@ -11134,6 +11161,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<String?> parentPhone;
   final Value<double> balance;
   final Value<DateTime?> dateOfBirth;
+  final Value<String?> gender;
   final Value<DateTime> registrationDate;
   final Value<Uint8List?> image;
   final Value<String?> syncId;
@@ -11152,6 +11180,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.parentPhone = const Value.absent(),
     this.balance = const Value.absent(),
     this.dateOfBirth = const Value.absent(),
+    this.gender = const Value.absent(),
     this.registrationDate = const Value.absent(),
     this.image = const Value.absent(),
     this.syncId = const Value.absent(),
@@ -11171,6 +11200,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.parentPhone = const Value.absent(),
     this.balance = const Value.absent(),
     this.dateOfBirth = const Value.absent(),
+    this.gender = const Value.absent(),
     this.registrationDate = const Value.absent(),
     this.image = const Value.absent(),
     this.syncId = const Value.absent(),
@@ -11193,6 +11223,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<String>? parentPhone,
     Expression<double>? balance,
     Expression<DateTime>? dateOfBirth,
+    Expression<String>? gender,
     Expression<DateTime>? registrationDate,
     Expression<Uint8List>? image,
     Expression<String>? syncId,
@@ -11212,6 +11243,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       if (parentPhone != null) 'parent_phone': parentPhone,
       if (balance != null) 'balance': balance,
       if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
+      if (gender != null) 'gender': gender,
       if (registrationDate != null) 'registration_date': registrationDate,
       if (image != null) 'image': image,
       if (syncId != null) 'sync_id': syncId,
@@ -11233,6 +11265,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       Value<String?>? parentPhone,
       Value<double>? balance,
       Value<DateTime?>? dateOfBirth,
+      Value<String?>? gender,
       Value<DateTime>? registrationDate,
       Value<Uint8List?>? image,
       Value<String?>? syncId,
@@ -11251,6 +11284,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       parentPhone: parentPhone ?? this.parentPhone,
       balance: balance ?? this.balance,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      gender: gender ?? this.gender,
       registrationDate: registrationDate ?? this.registrationDate,
       image: image ?? this.image,
       syncId: syncId ?? this.syncId,
@@ -11294,6 +11328,9 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     if (dateOfBirth.present) {
       map['date_of_birth'] = Variable<DateTime>(dateOfBirth.value);
     }
+    if (gender.present) {
+      map['gender'] = Variable<String>(gender.value);
+    }
     if (registrationDate.present) {
       map['registration_date'] = Variable<DateTime>(registrationDate.value);
     }
@@ -11331,6 +11368,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('parentPhone: $parentPhone, ')
           ..write('balance: $balance, ')
           ..write('dateOfBirth: $dateOfBirth, ')
+          ..write('gender: $gender, ')
           ..write('registrationDate: $registrationDate, ')
           ..write('image: $image, ')
           ..write('syncId: $syncId, ')
@@ -20722,6 +20760,7 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   Value<String?> parentPhone,
   Value<double> balance,
   Value<DateTime?> dateOfBirth,
+  Value<String?> gender,
   Value<DateTime> registrationDate,
   Value<Uint8List?> image,
   Value<String?> syncId,
@@ -20741,6 +20780,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<String?> parentPhone,
   Value<double> balance,
   Value<DateTime?> dateOfBirth,
+  Value<String?> gender,
   Value<DateTime> registrationDate,
   Value<Uint8List?> image,
   Value<String?> syncId,
@@ -20832,6 +20872,9 @@ class $$StudentsTableFilterComposer
 
   ColumnFilters<DateTime> get dateOfBirth => $composableBuilder(
       column: $table.dateOfBirth, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get gender => $composableBuilder(
+      column: $table.gender, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get registrationDate => $composableBuilder(
       column: $table.registrationDate,
@@ -20951,6 +20994,9 @@ class $$StudentsTableOrderingComposer
   ColumnOrderings<DateTime> get dateOfBirth => $composableBuilder(
       column: $table.dateOfBirth, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get gender => $composableBuilder(
+      column: $table.gender, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get registrationDate => $composableBuilder(
       column: $table.registrationDate,
       builder: (column) => ColumnOrderings(column));
@@ -21046,6 +21092,9 @@ class $$StudentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get dateOfBirth => $composableBuilder(
       column: $table.dateOfBirth, builder: (column) => column);
+
+  GeneratedColumn<String> get gender =>
+      $composableBuilder(column: $table.gender, builder: (column) => column);
 
   GeneratedColumn<DateTime> get registrationDate => $composableBuilder(
       column: $table.registrationDate, builder: (column) => column);
@@ -21164,6 +21213,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> parentPhone = const Value.absent(),
             Value<double> balance = const Value.absent(),
             Value<DateTime?> dateOfBirth = const Value.absent(),
+            Value<String?> gender = const Value.absent(),
             Value<DateTime> registrationDate = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
@@ -21183,6 +21233,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             parentPhone: parentPhone,
             balance: balance,
             dateOfBirth: dateOfBirth,
+            gender: gender,
             registrationDate: registrationDate,
             image: image,
             syncId: syncId,
@@ -21202,6 +21253,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> parentPhone = const Value.absent(),
             Value<double> balance = const Value.absent(),
             Value<DateTime?> dateOfBirth = const Value.absent(),
+            Value<String?> gender = const Value.absent(),
             Value<DateTime> registrationDate = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
@@ -21221,6 +21273,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             parentPhone: parentPhone,
             balance: balance,
             dateOfBirth: dateOfBirth,
+            gender: gender,
             registrationDate: registrationDate,
             image: image,
             syncId: syncId,

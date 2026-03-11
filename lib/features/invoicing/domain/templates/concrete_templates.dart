@@ -32,7 +32,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}', align: 'center'),
       TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
       if (invoice.customerName != null) 
-        TextCommand('Customer: ${invoice.customerName}', align: 'center'),
+        TextCommand('${settings.businessMode == 'school' ? 'Student' : 'Customer'}: ${invoice.customerName}', align: 'center'),
       if (invoice.customerPhone != null)
         TextCommand('Tel: ${invoice.customerPhone}', align: 'center'),
       if (invoice.paymentMethod != null) TextCommand('Method: ${invoice.paymentMethod}', align: 'center'),
@@ -125,9 +125,9 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       TextCommand('Number: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}'),
       if (invoice.customerName != null)
-        TextCommand('Customer: ${invoice.customerName}'),
+        TextCommand('${settings.businessMode == 'school' ? 'Student' : 'Customer'}: ${invoice.customerName}'),
       if (invoice.customerPhone != null)
-        TextCommand('Cust. Tel: ${invoice.customerPhone}'),
+        TextCommand('${settings.businessMode == 'school' ? 'Student' : 'Cust.'} Tel: ${invoice.customerPhone}'),
       if (invoice.paymentMethod != null) TextCommand('Payment Method: ${invoice.paymentMethod}'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}'),
       TextCommand('-' * width),
@@ -199,7 +199,7 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Date: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'center'),
       if (invoice.customerName != null)
-        TextCommand('Cust: ${invoice.customerName}', align: 'center'),
+        TextCommand('${settings.businessMode == 'school' ? 'Student' : 'Cust'}: ${invoice.customerName}', align: 'center'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'center'),
       TextCommand('-' * width),
       ...invoice.items.map((item) {
@@ -251,7 +251,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Tel: ${settings.phone}', align: 'center'),
       TextCommand('-' * width),
-      TextCommand('BILL TO:', isBold: true),
+      TextCommand(settings.businessMode == 'school' ? 'STUDENT:' : 'BILL TO:', isBold: true),
       TextCommand(invoice.customerName ?? 'Cash Customer'),
       if (invoice.customerPhone != null) TextCommand('Tel: ${invoice.customerPhone}'),
       if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),
@@ -375,7 +375,7 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
       TextCommand(settings.organizationName.toUpperCase(), isBold: true),
       if (settings.businessDescription != null) TextCommand(settings.businessDescription!),
       TextCommand('-' * width),
-      TextCommand('TO: ${invoice.customerName ?? "Client"}'),
+      TextCommand('${settings.businessMode == 'school' ? 'STUDENT' : 'TO'}: ${invoice.customerName ?? (settings.businessMode == 'school' ? "Student" : "Client")}'),
       if (invoice.customerPhone != null) TextCommand('TEL: ${invoice.customerPhone}'),
       TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}'),
       TextCommand('-' * width),
@@ -446,7 +446,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
         TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
       TextCommand(settings.organizationName.toUpperCase(), isBold: true),
       TextCommand('-' * width),
-      TextCommand('BILL TO:', isBold: true),
+      TextCommand(settings.businessMode == 'school' ? 'STUDENT:' : 'BILL TO:', isBold: true),
       TextCommand(invoice.customerName ?? 'Valued Customer'),
       if (invoice.customerPhone != null) TextCommand('TEL: ${invoice.customerPhone}'),
       if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),

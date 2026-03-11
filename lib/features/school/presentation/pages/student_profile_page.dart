@@ -196,6 +196,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         ),
         const Divider(height: 32),
         _buildInfoTile('Date of Birth', student.dateOfBirth != null ? DateFormat('dd MMM yyyy').format(student.dateOfBirth!) : 'Not Set', Icons.cake_outlined),
+        _buildInfoTile('Gender', student.gender ?? 'Not Set', Icons.transgender_outlined),
         _buildInfoTile('Registration Date', student.registrationDate != null ? DateFormat('dd MMM yyyy').format(student.registrationDate!) : 'Not Set', Icons.calendar_today_outlined),
       ],
     );
@@ -297,16 +298,24 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
     return BlocBuilder<SchoolBloc, SchoolState>(
       builder: (context, state) {
+        final filteredResults = results.where((r) => 
+          r.termId == state.activeTerm?.id && 
+          r.academicYearId == state.activeYear?.id
+        ).toList();
+
         return Column(
           children: [
             if (state.studentAverage != null || state.studentPosition != null)
               _buildResultsSummary(state.studentAverage, state.classAverage, state.studentPosition, state.classSize),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: results.length,
-                itemBuilder: (context, index) {
-            final res = results[index];
+            if (filteredResults.isEmpty)
+              const Expanded(child: Center(child: Text('No academic results for the current term.')))
+            else
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredResults.length,
+                  itemBuilder: (context, index) {
+                    final res = filteredResults[index];
             final subject = state.subjects.firstWhereOrNull((s) => s.id == res.subjectId);
             final term = state.terms.firstWhereOrNull((t) => t.id == res.termId);
             
@@ -436,7 +445,11 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   void _printResults(BuildContext context) {
     final state = context.read<SchoolBloc>().state;
     final student = state.students.firstWhere((s) => s.id == widget.studentId);
-    final results = state.results.where((r) => r.studentId == widget.studentId).toList();
+    final results = state.results.where((r) => 
+      r.studentId == widget.studentId &&
+      r.termId == state.activeTerm?.id &&
+      r.academicYearId == state.activeYear?.id
+    ).toList();
     final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
 
     Navigator.push(

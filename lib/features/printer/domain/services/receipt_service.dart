@@ -101,8 +101,8 @@ class ReceiptService {
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('BILL TO:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                      pw.Text(invoice.customerName ?? 'Valued Customer'),
+                      pw.Text(settings.businessMode == 'school' ? 'STUDENT INFO:' : 'BILL TO:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      pw.Text(invoice.customerName ?? (settings.businessMode == 'school' ? 'N/A' : 'Valued Customer')),
                       if (invoice.customerPhone != null) pw.Text('Tel: ${invoice.customerPhone}'),
                     ],
                   ),
@@ -325,9 +325,9 @@ class ReceiptService {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('BILL TO:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+                  pw.Text(settings.businessMode == 'school' ? 'STUDENT:' : 'BILL TO:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
                   pw.SizedBox(height: 4),
-                  pw.Text(invoice.customerName ?? 'Valued Customer', style: pw.TextStyle(fontSize: 14)),
+                  pw.Text(invoice.customerName ?? (settings.businessMode == 'school' ? 'N/A' : 'Valued Customer'), style: pw.TextStyle(fontSize: 14)),
                   if (invoice.customerAddress != null)
                     pw.Text(invoice.customerAddress!, style: pw.TextStyle(fontSize: 12)),
                 ],
@@ -566,8 +566,8 @@ class ReceiptService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text('Invoice To', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
-                      pw.Text(invoice.customerName ?? 'STUDENT NAME', style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                      pw.Text(settings.businessMode == 'school' ? 'Student Info' : 'Invoice To', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+                      pw.Text(invoice.customerName ?? (settings.businessMode == 'school' ? 'STUDENT NAME' : 'VALUED CUSTOMER'), style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: primaryColor)),
                       pw.Text(invoice.className ?? 'CLASS NAME', style: const pw.TextStyle(fontSize: 12)),
                       if (invoice.customerPhone != null) pw.Text('Phone: ${invoice.customerPhone}', style: const pw.TextStyle(fontSize: 11)),
                     ],
@@ -848,7 +848,7 @@ class ReceiptService {
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
-                        pw.Text('Invoice To', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+                        pw.Text(settings.businessMode == 'school' ? 'Student Info' : 'Invoice To', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
                         pw.Text(invoice.customerName ?? 'STUDENT NAME', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: primaryColor)),
                         pw.Text(invoice.className ?? 'CLASS NAME', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
                         if (invoice.customerPhone != null) pw.Text('Phone: ${invoice.customerPhone}'),

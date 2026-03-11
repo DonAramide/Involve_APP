@@ -152,7 +152,8 @@ class SchoolRepositoryImpl implements SchoolRepository {
       academicYearId: row.academicYearId,
       image: row.image,
       dateOfBirth: row.dateOfBirth,
-      registrationDate: row.registrationDate,
+      gender: row.gender,
+      registrationDate: row.registrationDate!,
     )).toList();
   }
 
@@ -169,6 +170,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       database.students.balance,
       database.students.academicYearId,
       database.students.dateOfBirth,
+      database.students.gender,
       database.students.registrationDate,
     ]);
     
@@ -184,6 +186,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       balance: row.read(database.students.balance)!,
       academicYearId: row.read(database.students.academicYearId),
       dateOfBirth: row.read(database.students.dateOfBirth),
+      gender: row.read(database.students.gender),
       registrationDate: row.read(database.students.registrationDate)!,
       image: null,
     )).toList();
@@ -202,6 +205,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       academicYearId: Value(student.academicYearId),
       image: Value(student.image),
       dateOfBirth: Value(student.dateOfBirth),
+      gender: Value(student.gender),
       registrationDate: Value(student.registrationDate),
     ));
   }
@@ -220,6 +224,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       academicYearId: Value(student.academicYearId),
       image: Value(student.image),
       dateOfBirth: Value(student.dateOfBirth),
+      gender: Value(student.gender),
       registrationDate: Value(student.registrationDate),
     ));
   }
@@ -278,7 +283,8 @@ class SchoolRepositoryImpl implements SchoolRepository {
       academicYearId: row.academicYearId,
       image: row.image,
       dateOfBirth: row.dateOfBirth,
-      registrationDate: row.registrationDate,
+      gender: row.gender,
+      registrationDate: row.registrationDate!,
     );
   }
 

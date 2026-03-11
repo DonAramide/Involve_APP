@@ -86,7 +86,7 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Inventory Report'),
+        title: Text(settings?.businessMode == 'school' ? 'Fee Analysis' : 'Inventory Report'),
         actions: [
           IconButton(
             icon: const Icon(Icons.share),
@@ -227,8 +227,9 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
           child: Row(
             children: [
               Expanded(flex: 3, child: Text(settings?.productLabel ?? 'Product', style: const TextStyle(fontWeight: FontWeight.bold))),
-              Expanded(flex: 2, child: Text('Price', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
-              Expanded(flex: 2, child: Text('Stock', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              Expanded(flex: 2, child: Text(settings?.businessMode == 'school' ? 'Amount' : 'Price', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              if (settings?.businessMode != 'school')
+                Expanded(flex: 2, child: Text('Stock', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
               Expanded(flex: 2, child: Text('Sold', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
               Expanded(flex: 2, child: Text('Revenue', style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
             ],
@@ -246,7 +247,8 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
               children: [
                 Expanded(flex: 3, child: Text(item['name'], style: const TextStyle(fontWeight: FontWeight.w500))),
                 Expanded(flex: 2, child: Text(CurrencyFormatter.formatWithSymbol(item['price'], symbol: currency), textAlign: TextAlign.right)),
-                Expanded(flex: 2, child: Text(item['stockQty'].toString(), textAlign: TextAlign.right)),
+                if (settings?.businessMode != 'school')
+                  Expanded(flex: 2, child: Text(item['stockQty'] >= 999999 ? 'N/A' : item['stockQty'].toString(), textAlign: TextAlign.right)),
                 Expanded(flex: 2, child: Text(item['totalSold'].toString(), textAlign: TextAlign.right)),
                 Expanded(flex: 2, child: Text(CurrencyFormatter.formatWithSymbol(item['totalRevenue'], symbol: currency), textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.bold))),
               ],
@@ -275,7 +277,12 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
       ),
       child: Column(
         children: [
-          const Text('Top Selling Items (Quantity)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text(
+            context.read<SettingsBloc>().state.settings?.businessMode == 'school' 
+              ? 'Top Revenue Fees/Items' 
+              : 'Top Selling Items (Quantity)', 
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)
+          ),
           const SizedBox(height: 20),
           Expanded(
             child: BarChart(
@@ -400,7 +407,12 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Stock Value Analysis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(
+                  context.read<SettingsBloc>().state.settings?.businessMode == 'school' 
+                    ? 'Revenue Analysis' 
+                    : 'Stock Value Analysis', 
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)
+                ),
                 const SizedBox(height: 10),
                 ...top5.asMap().entries.map((e) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),

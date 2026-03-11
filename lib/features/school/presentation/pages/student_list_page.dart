@@ -332,6 +332,7 @@ class _StudentListPageState extends State<StudentListPage> {
     final parentNameController = TextEditingController(text: student?.parentName);
     final parentPhoneController = TextEditingController(text: student?.parentPhone);
     int? selectedClassId = student?.classId;
+    String? selectedGender = student?.gender;
     Uint8List? selectedImage = student?.image;
     DateTime? selectedDob = student?.dateOfBirth;
     final ImagePicker picker = ImagePicker();
@@ -427,6 +428,14 @@ class _StudentListPageState extends State<StudentListPage> {
                       },
                     ),
                     const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: selectedGender,
+                      decoration: const InputDecoration(labelText: 'Gender'),
+                      items: ['Male', 'Female', 'Other']
+                          .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                          .toList(),
+                      onChanged: (val) => setDialogState(() => selectedGender = val),
+                    ),
                     const SizedBox(height: 16),
                     BlocBuilder<SchoolBloc, SchoolState>(
                       builder: (context, state) {
@@ -476,6 +485,7 @@ class _StudentListPageState extends State<StudentListPage> {
                           classId: selectedClassId,
                           image: selectedImage,
                           dateOfBirth: selectedDob,
+                          gender: selectedGender,
                         ) ??
                         Student(
                           firstName: firstNameController.text,
@@ -486,6 +496,7 @@ class _StudentListPageState extends State<StudentListPage> {
                           classId: selectedClassId!,
                           image: selectedImage,
                           dateOfBirth: selectedDob,
+                          gender: selectedGender,
                           registrationDate: DateTime.now(),
                         );
 

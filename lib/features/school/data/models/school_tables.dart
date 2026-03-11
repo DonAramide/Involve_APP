@@ -85,6 +85,7 @@ class Students extends Table {
   TextColumn get parentPhone => text().nullable()();
   RealColumn get balance => real().withDefault(const Constant(0.0))();
   DateTimeColumn get dateOfBirth => dateTime().nullable()();
+  TextColumn get gender => text().nullable()();
   DateTimeColumn get registrationDate => dateTime().withDefault(currentDateAndTime)();
   BlobColumn get image => blob().nullable()();
 

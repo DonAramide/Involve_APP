@@ -114,6 +114,7 @@ class Student extends Equatable {
   final double balance;
   final Uint8List? image;
   final DateTime? dateOfBirth;
+  final String? gender;
   final DateTime registrationDate;
 
   const Student({
@@ -128,6 +129,7 @@ class Student extends Equatable {
     this.balance = 0.0,
     this.image,
     this.dateOfBirth,
+    this.gender,
     required this.registrationDate,
   });
 
@@ -143,6 +145,7 @@ class Student extends Equatable {
     double? balance,
     Uint8List? image,
     DateTime? dateOfBirth,
+    String? gender,
     DateTime? registrationDate,
   }) {
     return Student(
@@ -157,6 +160,7 @@ class Student extends Equatable {
       balance: balance ?? this.balance,
       image: image ?? this.image,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      gender: gender ?? this.gender,
       registrationDate: registrationDate ?? this.registrationDate,
     );
   }
@@ -164,7 +168,7 @@ class Student extends Equatable {
   String get fullName => '$firstName $lastName';
 
   @override
-  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, academicYearId, parentName, parentPhone, balance, image, dateOfBirth, registrationDate];
+  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, academicYearId, parentName, parentPhone, balance, image, dateOfBirth, gender, registrationDate];
 }
 
 class Subject extends Equatable {
