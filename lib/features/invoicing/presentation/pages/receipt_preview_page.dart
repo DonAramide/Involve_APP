@@ -94,7 +94,7 @@ class ReceiptPreviewPage extends StatelessWidget {
         case 'classic': type = TemplateType.classic; break;
         case 'minimalist': type = TemplateType.minimalist; break;
         case 'school_teal': type = TemplateType.schoolTeal; break;
-        case 'school_purple': type = TemplateType.schoolPurple; break;
+        case 'school_color': type = TemplateType.schoolColor; break;
         case 'school_academic': type = TemplateType.schoolAcademic; break;
         case 'school_traditional': type = TemplateType.schoolTraditional; break;
         default: type = TemplateType.compact;

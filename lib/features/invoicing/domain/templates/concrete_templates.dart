@@ -617,11 +617,11 @@ class SchoolTealTemplate extends SchoolBaseTemplate {
   double get columnSpacing => 2.0;
 }
 
-class SchoolPurpleTemplate extends SchoolBaseTemplate {
+class SchoolColorTemplate extends SchoolBaseTemplate {
   @override
-  String get name => 'School Purple';
+  String get name => 'School Color';
   @override
-  TemplateType get type => TemplateType.schoolPurple;
+  TemplateType get type => TemplateType.schoolColor;
   @override
   LogoPlacement get logoPlacement => LogoPlacement.topCenter;
   @override

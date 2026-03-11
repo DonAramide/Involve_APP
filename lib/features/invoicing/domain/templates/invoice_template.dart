@@ -11,7 +11,7 @@ enum TemplateType {
   professional,
   minimalist,
   schoolTeal,
-  schoolPurple,
+  schoolColor,
   schoolAcademic,
   schoolTraditional,
 }

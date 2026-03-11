@@ -212,7 +212,7 @@ class _SettingsPageState extends State<SettingsPage> {
             settings.defaultInvoiceTemplate, 
             [
               'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
-              if (settings.businessMode == 'school') ...['school_teal', 'school_purple', 'school_academic', 'school_traditional']
+              if (settings.businessMode == 'school') ...['school_teal', 'school_color', 'school_academic', 'school_traditional']
             ], 
             (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
           ),

@@ -10,7 +10,7 @@ class TemplateRegistry {
     TemplateType.classic: ClassicBusinessTemplate(),
     TemplateType.minimalist: MinimalistInvoiceTemplate(),
     TemplateType.schoolTeal: SchoolTealTemplate(),
-    TemplateType.schoolPurple: SchoolPurpleTemplate(),
+    TemplateType.schoolColor: SchoolColorTemplate(),
     TemplateType.schoolAcademic: SchoolAcademicTemplate(),
     TemplateType.schoolTraditional: SchoolTraditionalTemplate(),
   };

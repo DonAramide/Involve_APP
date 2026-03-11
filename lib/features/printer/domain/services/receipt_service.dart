@@ -53,8 +53,8 @@ class ReceiptService {
     if (template == 'school_teal') {
       return _generateSchoolTeal(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
     }
-    if (template == 'school_purple') {
-      return _generateSchoolPurple(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
+    if (template == 'school_color') {
+      return _generateSchoolColor(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
     }
     if (template == 'school_academic') {
       return _generateSchoolAcademic(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
@@ -595,7 +595,7 @@ class ReceiptService {
                 },
                 children: [
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: primaryColor),
+                    decoration: pw.BoxDecoration(color: primaryColor),
                     children: [
                       _schoolHeaderCell('NO.'),
                       _schoolHeaderCell('FEE DESCRIPTION'),
@@ -669,7 +669,7 @@ class ReceiptService {
                           height: 40,
                           margin: const pw.EdgeInsets.only(top: 10),
                           padding: const pw.EdgeInsets.symmetric(horizontal: 10),
-                          decoration: const pw.BoxDecoration(color: primaryColor),
+                          decoration: pw.BoxDecoration(color: primaryColor),
                           child: pw.Row(
                             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                             children: [
@@ -775,11 +775,11 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolPurple(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
-    // Similar to teal but with purple theme
+  Future<Uint8List> _generateSchoolColor(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
+    // Uses the primary color from settings for a branded look
     final dateFormat = DateFormat('dd-MM-yyyy');
-    const primaryColor = PdfColor.fromInt(0xFF7B1FA2); // Purple 700
-    const accentColor = PdfColor.fromInt(0xFFF3E5F5); // Purple 50
+    final primaryColor = PdfColor.fromInt(settings.primaryColor);
+    final accentColor = PdfColors.grey100;
 
     pdf.addPage(
       pw.Page(
@@ -868,7 +868,7 @@ class ReceiptService {
                 },
                 children: [
                   pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: primaryColor),
+                    decoration: pw.BoxDecoration(color: primaryColor),
                     children: [
                       _schoolHeaderCell('NO.'),
                       _schoolHeaderCell('FEE DESCRIPTION'),
@@ -881,7 +881,7 @@ class ReceiptService {
                     final usePrint = useCustomPrices && item.printPrice != null;
                     final unitPrice = usePrint ? item.printPrice! : item.unitPrice;
                     return pw.TableRow(
-                      decoration: index % 2 == 1 ? const pw.BoxDecoration(color: accentColor) : null,
+                      decoration: index % 2 == 1 ? pw.BoxDecoration(color: accentColor) : null,
                       children: [
                         _schoolDataCell((index + 1).toString().padLeft(2, '0'), align: pw.Alignment.center),
                         _schoolDataCell(item.item.name),
@@ -892,7 +892,7 @@ class ReceiptService {
                   // Filler rows
                   if (invoice.items.length < 7)
                     ...List.generate(7 - invoice.items.length, (i) => pw.TableRow(
-                      decoration: (i + invoice.items.length) % 2 == 1 ? const pw.BoxDecoration(color: accentColor) : null,
+                      decoration: (i + invoice.items.length) % 2 == 1 ? pw.BoxDecoration(color: accentColor) : null,
                       children: [
                         _schoolDataCell(''),
                         _schoolDataCell(''),
@@ -945,7 +945,7 @@ class ReceiptService {
                           height: 40,
                           margin: const pw.EdgeInsets.only(top: 10),
                           padding: const pw.EdgeInsets.symmetric(horizontal: 10),
-                          decoration: const pw.BoxDecoration(color: primaryColor),
+                          decoration: pw.BoxDecoration(color: primaryColor),
                           child: pw.Row(
                             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                             children: [
