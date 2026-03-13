@@ -205,19 +205,20 @@ class _SettingsPageState extends State<SettingsPage> {
             ['₦', '\$', '€', '£', 'KSh'], 
             (val) => _update(context, settings.copyWith(currency: val)),
           ),
-        if (_matches('Invoice Template')) {
-          final options = [
-            'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
-            if (settings.businessMode == 'school') ...['school_teal', 'school_color', 'school_academic', 'school_traditional']
-          ];
+        if (_matches('Invoice Template'))
           _buildDropdownTile(
             context, 
             'Invoice Template', 
-            options.contains(settings.defaultInvoiceTemplate) ? settings.defaultInvoiceTemplate : options.first, 
-            options, 
+            [
+              'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
+              if (settings.businessMode == 'school') ...['school_teal', 'school_color', 'school_academic', 'school_traditional']
+            ].contains(settings.defaultInvoiceTemplate) ? settings.defaultInvoiceTemplate : 'compact', 
+            [
+              'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
+              if (settings.businessMode == 'school') ...['school_teal', 'school_color', 'school_academic', 'school_traditional']
+            ], 
             (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
-          );
-        }
+          ),
         if (_matches('Theme'))
           _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
         if (_matches('Theme Color'))
