@@ -205,17 +205,19 @@ class _SettingsPageState extends State<SettingsPage> {
             ['₦', '\$', '€', '£', 'KSh'], 
             (val) => _update(context, settings.copyWith(currency: val)),
           ),
-        if (_matches('Invoice Template'))
+        if (_matches('Invoice Template')) {
+          final options = [
+            'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
+            if (settings.businessMode == 'school') ...['school_teal', 'school_color', 'school_academic', 'school_traditional']
+          ];
           _buildDropdownTile(
             context, 
             'Invoice Template', 
-            settings.defaultInvoiceTemplate, 
-            [
-              'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
-              if (settings.businessMode == 'school') ...['school_teal', 'school_color', 'school_academic', 'school_traditional']
-            ], 
+            options.contains(settings.defaultInvoiceTemplate) ? settings.defaultInvoiceTemplate : options.first, 
+            options, 
             (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
-          ),
+          );
+        }
         if (_matches('Theme'))
           _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
         if (_matches('Theme Color'))

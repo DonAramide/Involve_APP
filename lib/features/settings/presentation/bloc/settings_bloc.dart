@@ -168,11 +168,24 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
       // Auto-disable if plan is not eligible
       AppSettings? finalSettings = settings;
-      if (settings != null && settings.serviceBillingEnabled && !plan.isValid) {
-        if (!plan.isLifetime && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
-           debugPrint('SettingsBloc: Auto-disabling service billing due to plan downgrade');
-           finalSettings = settings.copyWith(serviceBillingEnabled: false);
-           await repository.updateSettings(finalSettings);
+      if (settings != null) {
+        // 1. Migration: school_purple -> school_color
+        if (settings.defaultInvoiceTemplate == 'school_purple') {
+          debugPrint('SettingsBloc: Migrating school_purple -> school_color');
+          finalSettings = (finalSettings ?? settings).copyWith(defaultInvoiceTemplate: 'school_color');
+        }
+
+        // 2. Plan check
+        if (settings.serviceBillingEnabled && !plan.isValid) {
+          if (!plan.isLifetime && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
+             debugPrint('SettingsBloc: Auto-disabling service billing due to plan downgrade');
+             finalSettings = (finalSettings ?? settings).copyWith(serviceBillingEnabled: false);
+          }
+        }
+
+        // Save if any changes were made during load/migration
+        if (finalSettings != settings) {
+          await repository.updateSettings(finalSettings!);
         }
       }
 

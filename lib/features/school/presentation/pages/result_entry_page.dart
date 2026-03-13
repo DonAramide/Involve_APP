@@ -239,13 +239,24 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(student.fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text(
-                        'Total: $total | Grade: $gradeStr', 
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold, 
-                          color: total >= 50 ? Colors.green : Colors.red
-                        )
+                      Expanded(
+                        child: Text(
+                          student.fullName, 
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Total: $total | Grade: $gradeStr', 
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold, 
+                            color: total >= 50 ? Colors.green : Colors.red,
+                            fontSize: 13,
+                          ),
+                          textAlign: TextAlign.end,
+                        ),
                       ),
                     ],
                   ),
