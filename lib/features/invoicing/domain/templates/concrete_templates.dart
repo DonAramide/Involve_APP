@@ -68,10 +68,10 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('Subtotal', CurrencyFormatter.format(invoice.subtotal), width)),
       if (invoice.taxAmount > 0) 
         TextCommand(_formatRow('Tax', CurrencyFormatter.format(invoice.taxAmount), width)),
-      TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      TextCommand(_formatRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       if (invoice.amountPaid > 0 && invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
-        TextCommand(_formatRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid), width)),
+        TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
       TextCommand('-' * width),
@@ -149,11 +149,11 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       TextCommand(_formatRow('Tax', CurrencyFormatter.format(invoice.taxAmount), width)),
       if (invoice.discountAmount > 0) 
         TextCommand(_formatRow('Discount', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
-      TextCommand(_formatRow('GRAND TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      TextCommand(_formatRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       if (invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
-        TextCommand(_formatRow('Amount Paid', CurrencyFormatter.format(invoice.amountPaid), width)),
-        TextCommand(_formatRow('Balance Due', CurrencyFormatter.format(invoice.balanceAmount), width)),
+        TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
+        TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
       if (settings.showAccountDetails && settings.bankName != null) ...[
         TextCommand('-' * width),
@@ -207,10 +207,10 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
         return TextCommand('${item.item.name} x${item.quantity}  ${CurrencyFormatter.format(usePrint ? item.totalPrint : item.total)}');
       }),
       TextCommand('-' * width),
-      TextCommand('TOTAL: ${settings.currency}${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', align: 'right', isBold: true),
+      TextCommand('EXPECTED: ${settings.currency}${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', align: 'right', isBold: true),
       if (invoice.balanceAmount > 0) ...[
-        TextCommand('Paid: ${CurrencyFormatter.format(invoice.amountPaid)}', align: 'right'),
-        TextCommand('Bal:  ${CurrencyFormatter.format(invoice.balanceAmount)}', align: 'right'),
+        TextCommand('PAID: ${CurrencyFormatter.format(invoice.amountPaid)}', align: 'right'),
+        TextCommand('BAL:  ${CurrencyFormatter.format(invoice.balanceAmount)}', align: 'right'),
       ],
       if (settings.showAccountDetails && settings.bankName != null) ...[
         TextCommand('-' * width),
@@ -281,10 +281,10 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       if (invoice.discountAmount > 0)
         TextCommand(_formatSummaryRow('DISCOUNT:', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
       TextCommand('-' * width),
-      TextCommand(_formatSummaryRow('TOTAL:', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      TextCommand(_formatSummaryRow('EXPECTED AMOUNT:', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       if (invoice.amountPaid > 0 && invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
-        TextCommand(_formatSummaryRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid), width)),
+        TextCommand(_formatSummaryRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatSummaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
       if (settings.showAccountDetails && settings.bankName != null) ...[
@@ -405,10 +405,10 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
       TextCommand('-' * width),
       SizedBoxCommand(height: 1),
-      TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      TextCommand(_formatRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       if (invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
-        TextCommand(_formatRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid), width)),
+        TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width), isBold: true),
       ],
       SizedBoxCommand(height: 2),
@@ -465,10 +465,10 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('TAX', CurrencyFormatter.format(invoice.taxAmount), width)),
       if (invoice.discountAmount > 0)
         TextCommand(_formatRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
-      TextCommand(_formatRow('TOTAL:', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      TextCommand(_formatRow('EXPECTED AMOUNT:', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       if (invoice.amountPaid > 0 && invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
-        TextCommand(_formatRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid), width)),
+        TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
       TextCommand('-' * width),
@@ -559,7 +559,7 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
       }),
       
       TextCommand('-' * width),
-      TextCommand(_formatRow('TOTAL', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      TextCommand(_formatRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
       if (invoice.amountPaid > 0)
         TextCommand(_formatRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid), width)),
       if (invoice.balanceAmount > 0)

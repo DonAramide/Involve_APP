@@ -183,7 +183,7 @@ class ReceiptService {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('TOTAL', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                  pw.Text('EXPECTED AMOUNT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                   pw.Text('${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', 
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
@@ -232,7 +232,7 @@ class ReceiptService {
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                   children: [
-                    pw.Text('AMOUNT PAID:'),
+                    pw.Text('PAID AMOUNT:'),
                     pw.Text(CurrencyFormatter.format(invoice.amountPaid)),
                   ],
                 ),
@@ -390,9 +390,9 @@ class ReceiptService {
                               _summaryRow('SALES TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%)', CurrencyFormatter.format(invoice.taxAmount)),
                             if (invoice.discountAmount > 0)
                               _summaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}'),
-                            _summaryRow('TOTAL DUE', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
+                            _summaryRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
                             if (invoice.balanceAmount > 0) ...[
-                              _summaryRow('AMOUNT PAID', CurrencyFormatter.format(invoice.amountPaid)),
+                              _summaryRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid)),
                               _summaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), isBold: true),
                             ],
                           ],
@@ -700,7 +700,7 @@ class ReceiptService {
                             pw.Column(
                               crossAxisAlignment: pw.CrossAxisAlignment.end,
                               children: [
-                                _schoolSummaryRow('Paid:', CurrencyFormatter.format(invoice.amountPaid)),
+                                _schoolSummaryRow('PAID AMOUNT:', CurrencyFormatter.format(invoice.amountPaid)),
                                 _schoolSummaryRow('Due:', CurrencyFormatter.format(invoice.balanceAmount)),
                               ],
                             ),
@@ -976,7 +976,7 @@ class ReceiptService {
                             pw.Column(
                               crossAxisAlignment: pw.CrossAxisAlignment.end,
                               children: [
-                                _schoolSummaryRow('Paid:', CurrencyFormatter.format(invoice.amountPaid)),
+                                _schoolSummaryRow('PAID AMOUNT:', CurrencyFormatter.format(invoice.amountPaid)),
                                 _schoolSummaryRow('Due:', CurrencyFormatter.format(invoice.balanceAmount)),
                               ],
                             ),
@@ -1122,7 +1122,7 @@ class ReceiptService {
                     children: [
                       _academicCell(''),
                       _academicCell(''),
-                      _academicCell('TOTAL', isBold: true, align: pw.Alignment.centerRight),
+                      _academicCell('EXPECTED AMOUNT', isBold: true, align: pw.Alignment.centerRight),
                       _academicCell(CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount), isBold: true, align: pw.Alignment.centerRight),
                     ],
                   ),
@@ -1175,7 +1175,7 @@ class ReceiptService {
                           ),
                         ),
                         pw.SizedBox(height: 5),
-                        pw.Text('Paid: ${settings.currency} ${CurrencyFormatter.format(invoice.amountPaid)}', style: const pw.TextStyle(fontSize: 10)),
+                        pw.Text('PAID AMOUNT: ${settings.currency} ${CurrencyFormatter.format(invoice.amountPaid)}', style: const pw.TextStyle(fontSize: 10)),
                         pw.Text('Due: ${settings.currency} ${CurrencyFormatter.format(invoice.balanceAmount)}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: invoice.balanceAmount > 0 ? PdfColors.red : PdfColors.black)),
                       ],
                     ),
@@ -1358,18 +1358,18 @@ class ReceiptService {
                              children: [
                                pw.Text('Cash/Cheque No: _________________'),
                                pw.SizedBox(height: 20),
-                               pw.Row(
-                                 children: [
-                                   pw.Text('ADVANCE ${settings.currency}: ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: greenTheme)),
-                                   pw.Text(CurrencyFormatter.format(invoice.amountPaid)),
-                                 ],
-                               ),
-                               pw.Row(
-                                 children: [
-                                   pw.Text('BALANCE ${settings.currency}: ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: greenTheme)),
-                                   pw.Text(CurrencyFormatter.format(invoice.balanceAmount)),
-                                 ],
-                               ),
+                                pw.Row(
+                                  children: [
+                                    pw.Text('PAID AMOUNT ${settings.currency}: ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: greenTheme)),
+                                    pw.Text(CurrencyFormatter.format(invoice.amountPaid)),
+                                  ],
+                                ),
+                                pw.Row(
+                                  children: [
+                                    pw.Text('BALANCE ${settings.currency}: ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: greenTheme)),
+                                    pw.Text(CurrencyFormatter.format(invoice.balanceAmount)),
+                                  ],
+                                ),
                              ],
                           ),
                           if (settings.showAccountDetails && settings.bankName != null) ...[

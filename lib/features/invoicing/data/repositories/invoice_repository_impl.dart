@@ -116,25 +116,31 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
       // 3. Update Student Balance if student is associated with invoice
       if (invoice.studentId != null) {
-        // Calculate the increment: Balance Amount - Carry Forward amounts
-        // We do this because the UI adds the old balance as a line item ("Previous Term Balance").
-        // If we simply add invoice.balanceAmount to student.balance, we double the debt.
-        double carryForwardAmount = 0.0;
-        for (final item in invoice.items) {
-          if (item.item.name == 'Previous Term Balance') {
-            carryForwardAmount += (item.unitPrice * item.quantity);
+        final double balanceChange;
+        
+        if (invoice.invoiceNumber.startsWith('PMT-')) {
+          // It's a payment receipt - REDUCE the debt
+          balanceChange = -invoice.amountPaid;
+          print('DEBUG: Payment Receipt detected (${invoice.invoiceNumber}). Reducing balance by: ${invoice.amountPaid}');
+        } else {
+          // It's a bill (charge) - INCREASE the debt
+          // Calculate the increment: Balance Amount - Carry Forward amounts
+          // We do this because the UI adds the old balance as a line item ("Previous Term Balance").
+          // If we simply add invoice.balanceAmount to student.balance, we double the debt.
+          double carryForwardAmount = 0.0;
+          for (final item in invoice.items) {
+            if (item.item.name == 'Previous Term Balance') {
+              carryForwardAmount += (item.unitPrice * item.quantity);
+            }
           }
+          balanceChange = invoice.balanceAmount - carryForwardAmount;
+          print('DEBUG: Bill detected (${invoice.invoiceNumber}). Found Carry Forward: $carryForwardAmount. Final increment: $balanceChange');
         }
-
-        final double balanceIncrement = invoice.balanceAmount - carryForwardAmount;
-
-        // Log for debugging
-        print('DEBUG: Found Carry Forward: $carryForwardAmount. Final increment: $balanceIncrement');
         
         await db.customUpdate(
           'UPDATE students SET balance = balance + ?, updated_at = ? WHERE id = ?',
           variables: [
-            Variable.withReal(balanceIncrement),
+            Variable.withReal(balanceChange),
             Variable.withDateTime(now),
             Variable.withInt(invoice.studentId!)
           ],

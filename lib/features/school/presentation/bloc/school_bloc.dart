@@ -499,46 +499,49 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final student = state.students.firstWhere((s) => s.id == event.studentId);
       final newBalance = student.balance - event.amount;
       
-      // 1. Update Student Balance
-      await repository.updateStudent(student.copyWith(balance: newBalance));
-      
-      // 2. Generate Payment Receipt Invoice
+      // 1. Generate Payment Receipt Invoice
       final activeTerm = state.terms.where((t) => t.isActive).firstOrNull ?? state.terms.firstOrNull;
       final activeYear = state.academicYears.where((y) => y.isActive).firstOrNull ?? state.academicYears.firstOrNull;
-      
+
+      final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+
       final invoice = Invoice(
-        invoiceNumber: 'PMT-${student.admissionNumber ?? student.id}-${DateTime.now().millisecondsSinceEpoch}',
+        invoiceNumber: 'PMT-${DateTime.now().millisecondsSinceEpoch}',
         dateCreated: DateTime.now(),
+        customerName: student.fullName,
+        customerPhone: student.parentPhone,
+        studentId: student.id,
+        classId: student.classId,
+        admissionNumber: student.admissionNumber,
+        className: sClass?.name,
+        termId: activeTerm?.id,
+        termName: activeTerm?.name,
+        academicYearId: activeYear?.id,
+        academicYearName: activeYear?.name,
+        subtotal: event.amount,
+        taxAmount: 0,
+        discountAmount: 0,
+        totalAmount: student.balance, // EXPECTED AMOUNT (Total debt before payment)
+        amountPaid: event.amount,      // PAID AMOUNT (Current payment)
+        balanceAmount: newBalance,     // BALANCE DUE (Remaining debt)
+        paymentStatus: newBalance <= 0 ? 'Paid' : 'Partial',
+        paymentMethod: event.method,
+        businessMode: 'school',
         items: [
           InvoiceItem(
             item: Item(
-              id: -99,
               name: 'School Fees Payment ${event.remarks ?? ""}',
-              price: event.amount,
               category: ItemCategory.service,
-              type: 'service',
+              price: event.amount,
               stockQty: 0,
+              type: 'service',
+              businessMode: 'school',
             ),
             quantity: 1,
             unitPrice: event.amount,
             type: 'service',
-          )
+          ),
         ],
-        subtotal: event.amount,
-        taxAmount: 0,
-        discountAmount: 0,
-        totalAmount: event.amount,
-        paymentStatus: 'Paid',
-        amountPaid: event.amount,
-        balanceAmount: 0,
-        customerName: student.fullName,
-        customerPhone: student.parentPhone,
-        paymentMethod: event.method,
-        businessMode: 'school',
-        studentId: student.id,
-        classId: student.classId,
-        termId: activeTerm?.id,
-        academicYearId: activeYear?.id,
       );
       
       await invoiceRepository.saveInvoice(invoice);

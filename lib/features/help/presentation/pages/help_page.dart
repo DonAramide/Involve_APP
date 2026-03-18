@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'dart:async';
-import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
-import 'package:involve_app/features/admin/presentation/widgets/admin_login_dialog.dart';
-import 'package:involve_app/core/license/storage_service.dart';
-import 'package:involve_app/features/admin/presentation/widgets/device_access_dialog.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class HelpPage extends StatefulWidget {
   const HelpPage({super.key});
@@ -18,64 +12,6 @@ class HelpPage extends StatefulWidget {
 }
 
 class _HelpPageState extends State<HelpPage> {
-  int _titleClickCount = 0;
-  Timer? _clickTimer;
-
-  @override
-  void dispose() {
-    _clickTimer?.cancel();
-    super.dispose();
-  }
-
-  void _onTitleTap() {
-    setState(() {
-      _titleClickCount++;
-      
-      // Reset timer on each click
-      _clickTimer?.cancel();
-      _clickTimer = Timer(const Duration(seconds: 3), () {
-        setState(() => _titleClickCount = 0);
-      });
-      
-      // Show super admin dialog on 6th click
-      if (_titleClickCount >= 6) {
-        _titleClickCount = 0;
-        _clickTimer?.cancel();
-        _showSuperAdminAccess();
-      }
-    });
-  }
-
-  Future<void> _showSuperAdminAccess() async {
-    final bool alreadyGranted = await StorageService.isDeviceAccessGranted();
-    
-    if (!alreadyGranted && mounted) {
-      final bool? deviceAccess = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => DeviceAccessDialog(),
-      );
-      
-      if (deviceAccess != true) return;
-      
-      await StorageService.setDeviceAccessGranted(true);
-    }
-
-    if (!mounted) return;
-
-    showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AdminLoginDialog(),
-    ).then((authorized) {
-      if (authorized == true && mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SuperAdminSettingsPage()),
-        );
-      }
-    });
-  }
 
   Future<void> _launch(String scheme, String number) async {
     final cleanNumber = number.replaceAll(RegExp(r'[^0-9+]'), '');
@@ -110,19 +46,9 @@ class _HelpPageState extends State<HelpPage> {
 
         return Scaffold(
           appBar: AppBar(
-        title: GestureDetector(
-          onTap: _onTitleTap,
-          child: Text(
-            'Help & Support',
-            style: TextStyle(
-              color: _titleClickCount > 0 && _titleClickCount < 6
-                  ? Colors.deepPurple.withOpacity(0.5 + (_titleClickCount * 0.08))
-                  : null,
-            ),
+            title: const Text('Help & Support'),
+            centerTitle: true,
           ),
-        ),
-        centerTitle: true,
-      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

@@ -72,7 +72,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   child: TabBarView(
                     children: [
                       _buildGeneralTab(student),
-                      _buildRecordsTab(state.studentInvoices, currency),
+                       _buildRecordsTab(student, state.studentInvoices, currency),
                       _buildResultsTab(state.results),
                       _buildPaymentsTab(state.studentInvoices, currency),
                     ],
@@ -523,7 +523,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  Widget _buildRecordsTab(List<Invoice> invoices, String currency) {
+  Widget _buildRecordsTab(Student student, List<Invoice> invoices, String currency) {
     if (invoices.isEmpty) {
       return const Center(child: Text('No academic records found'));
     }
@@ -543,9 +543,15 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   CurrencyFormatter.formatWithSymbol(inv.totalAmount, symbol: currency),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(width: 8),
+                if (inv.balanceAmount > 0)
+                  IconButton(
+                    icon: const Icon(Icons.payment, color: Colors.green, size: 20),
+                    tooltip: 'Pay Balance',
+                    onPressed: () => _showPaymentDialog(context, student),
+                  ),
                 IconButton(
                   icon: const Icon(Icons.print, color: Colors.blueGrey, size: 20),
+                  tooltip: 'Print Bill',
                   onPressed: () => _openReceipt(context, inv, "ACADEMIC BILL"),
                 ),
               ],
