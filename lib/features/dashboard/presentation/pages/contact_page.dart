@@ -20,6 +20,7 @@ class ContactPage extends StatefulWidget {
 class _ContactPageState extends State<ContactPage> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  int? _selectedClassId;
 
   @override
   void initState() {
@@ -53,11 +54,19 @@ class _ContactPageState extends State<ContactPage> {
                   )
                 : null,
               actions: [
-                IconButton(
-                  onPressed: () {
-                    // Potential addition: Filter by class or department
+                if (isSchoolMode) 
+                BlocBuilder<SchoolBloc, SchoolState>(
+                  builder: (context, state) {
+                    final selectedClass = state.classes.firstWhereOrNull((c) => c.id == _selectedClassId);
+                    return TextButton.icon(
+                      onPressed: () => _showClassFilter(context, state),
+                      icon: Icon(Icons.filter_list, color: _selectedClassId != null ? Colors.cyanAccent : Colors.white),
+                      label: Text(
+                        selectedClass?.name ?? 'ALL CLASSES',
+                        style: TextStyle(color: _selectedClassId != null ? Colors.cyanAccent : Colors.white, fontSize: 12),
+                      ),
+                    );
                   },
-                  icon: const Icon(Icons.filter_list),
                 ),
               ],
             ),
@@ -118,6 +127,9 @@ class _ContactPageState extends State<ContactPage> {
         
         final filteredList = state.teachers.where((teacher) {
           final query = _searchQuery;
+          // APPLY CLASS FILTER
+          if (_selectedClassId != null && teacher.classId != _selectedClassId) return false;
+
           return teacher.fullName.toLowerCase().contains(query) || 
                  (teacher.phone?.contains(query) ?? false);
         }).toList();
@@ -179,12 +191,16 @@ class _ContactPageState extends State<ContactPage> {
         if (state.isLoading) return const Center(child: CircularProgressIndicator());
 
         // Extract unique parents from students
-        final Map<String, Student> parentMap = {};
+        final Map<String, ({Student student, SchoolClass? schoolClass})> parentMap = {};
         for (var student in state.students) {
           if (student.parentName != null && student.parentName!.isNotEmpty) {
+            // APPLY CLASS FILTER
+            if (_selectedClassId != null && student.classId != _selectedClassId) continue;
+
             final key = '${student.parentName}_${student.parentPhone}';
             if (!parentMap.containsKey(key)) {
-              parentMap[key] = student;
+              final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+              parentMap[key] = (student: student, schoolClass: sClass);
             }
           }
         }
@@ -192,27 +208,78 @@ class _ContactPageState extends State<ContactPage> {
         final parentList = parentMap.values.toList();
         final filteredList = parentList.where((p) {
           final query = _searchQuery;
-          return p.parentName!.toLowerCase().contains(query) || 
-                 (p.parentPhone?.contains(query) ?? false);
+          return p.student.parentName!.toLowerCase().contains(query) || 
+                 (p.student.parentPhone?.contains(query) ?? false) ||
+                 p.student.fullName.toLowerCase().contains(query); // SEARCH BY STUDENT NAME
         }).toList();
 
         if (filteredList.isEmpty) {
-          return const Center(child: Text('No parents found'));
+          return Center(child: Text(_selectedClassId != null ? 'No parents found in this class' : 'No parents found'));
         }
 
         return ListView.builder(
           itemCount: filteredList.length,
           itemBuilder: (context, index) {
-            final parent = filteredList[index];
+            final entry = filteredList[index];
+            final parent = entry.student;
+            final className = entry.schoolClass?.name ?? 'Unknown Class';
+            
             return _ContactTile(
               name: parent.parentName!,
               phone: parent.parentPhone,
-              subtitle: 'Parent of: ${parent.fullName}',
+              subtitle: 'Parent of: ${parent.fullName} [$className]',
               icon: Icons.family_restroom_outlined,
             );
           },
         );
       },
+    );
+  }
+
+  void _showClassFilter(BuildContext context, SchoolState state) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Filter by Class'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              ListTile(
+                title: const Text('ALL CLASSES'),
+                leading: Radio<int?>(
+                  value: null,
+                  groupValue: _selectedClassId,
+                  onChanged: (val) {
+                    setState(() => _selectedClassId = val);
+                    Navigator.pop(ctx);
+                  },
+                ),
+                onTap: () {
+                  setState(() => _selectedClassId = null);
+                  Navigator.pop(ctx);
+                },
+              ),
+              ...state.classes.map((c) => ListTile(
+                title: Text(c.name),
+                leading: Radio<int?>(
+                  value: c.id,
+                  groupValue: _selectedClassId,
+                  onChanged: (val) {
+                    setState(() => _selectedClassId = val);
+                    Navigator.pop(ctx);
+                  },
+                ),
+                onTap: () {
+                  setState(() => _selectedClassId = c.id);
+                  Navigator.pop(ctx);
+                },
+              )),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
