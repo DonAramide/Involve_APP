@@ -54,6 +54,7 @@ import 'package:involve_app/core/sync/domain/services/bluetooth_discovery_servic
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/core/utils/route_observer.dart';
 import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/core/widgets/restart_widget.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,134 +62,22 @@ void main() async {
   // Set up global BLoC observer
   Bloc.observer = SimpleBlocObserver();
   
-  // Initialize database
-  final database = AppDatabase();
-  
-  // Initialize License Service
-  LicenseService.init(database);
-  
-  // Initialize repositories
-  final itemRepository = ItemRepositoryImpl(database);
-  final invoiceRepository = InvoiceRepositoryImpl(database);
-  final settingsRepository = SettingsRepositoryImpl(database);
-  final categoryRepository = CategoryRepositoryImpl(database);
-  final staffRepository = StaffRepositoryImpl(database);
-  final schoolRepository = SchoolRepositoryImpl(database);
-  
-  // Initialize services
-  final bleService = CrossPlatformPrinterService();
-  final sppService = BlueThermalPrinterService();
-  final networkService = NetworkPrinterService();
-  final printerService = UnifiedPrinterService(
-    bleService: bleService,
-    sppService: sppService,
-    networkService: networkService,
-  );
-  final printerRepository = PrinterRepositoryImpl(database);
-  final securityService = SecurityService();
-  final calculationService = InvoiceCalculationService();
-  final backupService = BackupService(database: database);
-  
-  // Initialize Sync Infrastructure
-  final syncRepository = SyncRepositoryImpl(database);
-  final discoveryService = DiscoveryService();
-  final deviceId = await DeviceInfoService.getDeviceSuffix();
-  final secretToken = 'PRO-TOKEN-123'; // TODO: Load from secure storage
-  
-  final syncServer = SyncServer(
-    database: database,
-    syncRepository: syncRepository,
-    secretToken: secretToken,
-  );
-
-  final bluetoothDiscoveryService = createBluetoothDiscoveryService();
-  final bluetoothSyncServer = BluetoothSyncServer(
-    syncRepository: syncRepository,
-    deviceId: deviceId,
-  );
-  
-  final syncManager = SyncManager(
-    database: database,
-    discoveryService: discoveryService,
-    syncRepository: syncRepository,
-    deviceId: deviceId,
-    secretToken: secretToken,
-  );
-  
-  // Initialize use cases
-  final getItems = GetItems(itemRepository);
-  final addItem = AddItem(itemRepository);
-  final updateItem = UpdateItem(itemRepository);
-  final deleteItem = DeleteItem(itemRepository);
-  final increaseStock = IncreaseStock(itemRepository);
-  final getStockHistory = GetStockHistory(itemRepository);
-  final getInventoryReport = GetInventoryReport(itemRepository);
-  final getProfitReport = GetProfitReport(itemRepository);
-  final addExpense = AddExpense(itemRepository);
-  final getExpenses = GetExpenses(itemRepository);
-  final getTotalExpenses = GetTotalExpenses(itemRepository);
-
-  // Category Use Cases
-  final getCategories = GetCategories(categoryRepository);
-  final addCategory = AddNewCategory(categoryRepository);
-  final deleteCategory = DeleteCategoryUseCase(categoryRepository);
-  
-  final getDevices = GetBluetoothDevices(printerService);
-  final connectPrinter = ConnectToPrinter(printerService);
-  final printInvoice = PrintInvoiceCommands(printerService);
-  
-  final getInvoiceHistory = GetInvoiceHistory(invoiceRepository);
-  final getInvoiceDetails = GetInvoiceDetails(invoiceRepository);
-  
-  runApp(MyApp(
-    database: database,
-    itemRepository: itemRepository,
-    categoryRepository: categoryRepository,
-    invoiceRepository: invoiceRepository,
-    settingsRepository: settingsRepository,
-    printerService: printerService,
-    securityService: securityService,
-    calculationService: calculationService,
-    backupService: backupService,
-    getItems: getItems,
-    addItem: addItem,
-    updateItem: updateItem,
-    deleteItem: deleteItem,
-    getCategories: getCategories,
-    addCategory: addCategory,
-    deleteCategory: deleteCategory,
-    getDevices: getDevices,
-    connectPrinter: connectPrinter,
-    printInvoice: printInvoice,
-    getInvoiceHistory: getInvoiceHistory,
-    getInvoiceDetails: getInvoiceDetails,
-    increaseStock: increaseStock,
-    getStockHistory: getStockHistory,
-    getInventoryReport: getInventoryReport,
-    getProfitReport: getProfitReport,
-    addExpense: addExpense,
-    getExpenses: getExpenses,
-    getTotalExpenses: getTotalExpenses,
-    printerRepository: printerRepository,
-    staffRepository: staffRepository,
-    syncRepository: syncRepository,
-    discoveryService: discoveryService,
-    syncServer: syncServer,
-    syncManager: syncManager,
-    bluetoothDiscoveryService: bluetoothDiscoveryService,
-    bluetoothSyncServer: bluetoothSyncServer,
-    deviceId: deviceId,
-    schoolRepository: schoolRepository,
+  runApp(RestartWidget<AppDependencies>(
+    initialize: () => AppDependencies.initialize(),
+    childBuilder: (context, deps) => MyApp(dependencies: deps),
   ));
 }
 
-class MyApp extends StatelessWidget {
+/// A container class for all application-wide dependencies.
+/// This allows us to re-initialize everything (including the database)
+/// when the app performs a "Soft Restart".
+class AppDependencies {
   final AppDatabase database;
   final ItemRepositoryImpl itemRepository;
-  final CategoryRepositoryImpl categoryRepository; // NEW
+  final CategoryRepositoryImpl categoryRepository;
   final InvoiceRepositoryImpl invoiceRepository;
   final SettingsRepositoryImpl settingsRepository;
-  final IPrinterService printerService;
+  final UnifiedPrinterService printerService;
   final SecurityService securityService;
   final InvoiceCalculationService calculationService;
   final BackupService backupService;
@@ -196,12 +85,9 @@ class MyApp extends StatelessWidget {
   final AddItem addItem;
   final UpdateItem updateItem;
   final DeleteItem deleteItem;
-  
-  // Category Use Cases
   final GetCategories getCategories;
   final AddNewCategory addCategory;
   final DeleteCategoryUseCase deleteCategory;
-
   final GetBluetoothDevices getDevices;
   final ConnectToPrinter connectPrinter;
   final PrintInvoiceCommands printInvoice;
@@ -225,11 +111,10 @@ class MyApp extends StatelessWidget {
   final SchoolRepositoryImpl schoolRepository;
   final PrinterRepository printerRepository;
 
-  const MyApp({
-    super.key,
+  AppDependencies({
     required this.database,
     required this.itemRepository,
-    required this.categoryRepository, // NEW
+    required this.categoryRepository,
     required this.invoiceRepository,
     required this.settingsRepository,
     required this.printerService,
@@ -267,87 +152,193 @@ class MyApp extends StatelessWidget {
     required this.printerRepository,
   });
 
+  static Future<AppDependencies> initialize() async {
+    // 1. Database
+    final database = AppDatabase();
+    
+    // 2. License Service
+    LicenseService.init(database);
+    
+    // 3. Repositories
+    final itemRepository = ItemRepositoryImpl(database);
+    final invoiceRepository = InvoiceRepositoryImpl(database);
+    final settingsRepository = SettingsRepositoryImpl(database);
+    final categoryRepository = CategoryRepositoryImpl(database);
+    final staffRepository = StaffRepositoryImpl(database);
+    final schoolRepository = SchoolRepositoryImpl(database);
+    final printerRepository = PrinterRepositoryImpl(database);
+    final syncRepository = SyncRepositoryImpl(database);
+    
+    // 4. Services
+    final bleService = CrossPlatformPrinterService();
+    final sppService = BlueThermalPrinterService();
+    final networkService = NetworkPrinterService();
+    final printerService = UnifiedPrinterService(
+      bleService: bleService,
+      sppService: sppService,
+      networkService: networkService,
+    );
+    final securityService = SecurityService();
+    final calculationService = InvoiceCalculationService();
+    final backupService = BackupService(database: database);
+    
+    final discoveryService = DiscoveryService();
+    final deviceId = await DeviceInfoService.getDeviceSuffix();
+    const secretToken = 'PRO-TOKEN-123';
+    
+    final syncServer = SyncServer(
+      database: database,
+      syncRepository: syncRepository,
+      secretToken: secretToken,
+    );
+
+    final bluetoothDiscoveryService = createBluetoothDiscoveryService();
+    final bluetoothSyncServer = BluetoothSyncServer(
+      syncRepository: syncRepository,
+      deviceId: deviceId,
+    );
+    
+    final syncManager = SyncManager(
+      database: database,
+      discoveryService: discoveryService,
+      syncRepository: syncRepository,
+      deviceId: deviceId,
+      secretToken: secretToken,
+    );
+    
+    // 5. Use Cases
+    return AppDependencies(
+      database: database,
+      itemRepository: itemRepository,
+      categoryRepository: categoryRepository,
+      invoiceRepository: invoiceRepository,
+      settingsRepository: settingsRepository,
+      staffRepository: staffRepository,
+      schoolRepository: schoolRepository,
+      printerRepository: printerRepository,
+      syncRepository: syncRepository,
+      printerService: printerService,
+      securityService: securityService,
+      calculationService: calculationService,
+      backupService: backupService,
+      discoveryService: discoveryService,
+      bluetoothDiscoveryService: bluetoothDiscoveryService,
+      syncServer: syncServer,
+      bluetoothSyncServer: bluetoothSyncServer,
+      syncManager: syncManager,
+      deviceId: deviceId,
+      getItems: GetItems(itemRepository),
+      addItem: AddItem(itemRepository),
+      updateItem: UpdateItem(itemRepository),
+      deleteItem: DeleteItem(itemRepository),
+      increaseStock: IncreaseStock(itemRepository),
+      getStockHistory: GetStockHistory(itemRepository),
+      getInventoryReport: GetInventoryReport(itemRepository),
+      getProfitReport: GetProfitReport(itemRepository),
+      addExpense: AddExpense(itemRepository),
+      getExpenses: GetExpenses(itemRepository),
+      getTotalExpenses: GetTotalExpenses(itemRepository),
+      getCategories: GetCategories(categoryRepository),
+      addCategory: AddNewCategory(categoryRepository),
+      deleteCategory: DeleteCategoryUseCase(categoryRepository),
+      getDevices: GetBluetoothDevices(printerService),
+      connectPrinter: ConnectToPrinter(printerService),
+      printInvoice: PrintInvoiceCommands(printerService),
+      getInvoiceHistory: GetInvoiceHistory(invoiceRepository),
+      getInvoiceDetails: GetInvoiceDetails(invoiceRepository),
+    );
+  }
+}
+
+class MyApp extends StatelessWidget {
+  final AppDependencies dependencies;
+
+  const MyApp({
+    super.key,
+    required this.dependencies,
+  });
+
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
-        RepositoryProvider<ItemRepository>(create: (_) => itemRepository),
-        RepositoryProvider<InvoiceRepository>(create: (_) => invoiceRepository),
-        RepositoryProvider<SettingsRepository>(create: (_) => settingsRepository),
-        RepositoryProvider<CategoryRepository>(create: (_) => categoryRepository),
-        RepositoryProvider<StaffRepository>(create: (_) => staffRepository),
-        RepositoryProvider<SchoolRepository>(create: (_) => schoolRepository),
-        RepositoryProvider<SyncRepository>(create: (_) => syncRepository),
+        RepositoryProvider<ItemRepository>(create: (_) => dependencies.itemRepository),
+        RepositoryProvider<InvoiceRepository>(create: (_) => dependencies.invoiceRepository),
+        RepositoryProvider<SettingsRepository>(create: (_) => dependencies.settingsRepository),
+        RepositoryProvider<CategoryRepository>(create: (_) => dependencies.categoryRepository),
+        RepositoryProvider<StaffRepository>(create: (_) => dependencies.staffRepository),
+        RepositoryProvider<SchoolRepository>(create: (_) => dependencies.schoolRepository),
+        RepositoryProvider<SyncRepository>(create: (_) => dependencies.syncRepository),
       ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider(
             create: (_) => StockBloc(
-              getItems: getItems,
-              addItem: addItem,
-              updateItem: updateItem,
-              deleteItem: deleteItem,
-              getCategories: getCategories,
-              addCategory: addCategory,
-              deleteCategory: deleteCategory,
-              increaseStock: increaseStock,
-              getStockHistory: getStockHistory,
-              getInventoryReport: getInventoryReport,
-              getProfitReport: getProfitReport,
-              addExpenseUC: addExpense,
-              getExpensesUC: getExpenses,
-              getTotalExpensesUC: getTotalExpenses,
+              getItems: dependencies.getItems,
+              addItem: dependencies.addItem,
+              updateItem: dependencies.updateItem,
+              deleteItem: dependencies.deleteItem,
+              getCategories: dependencies.getCategories,
+              addCategory: dependencies.addCategory,
+              deleteCategory: dependencies.deleteCategory,
+              increaseStock: dependencies.increaseStock,
+              getStockHistory: dependencies.getStockHistory,
+              getInventoryReport: dependencies.getInventoryReport,
+              getProfitReport: dependencies.getProfitReport,
+              addExpenseUC: dependencies.addExpense,
+              getExpensesUC: dependencies.getExpenses,
+              getTotalExpensesUC: dependencies.getTotalExpenses,
             )..add(LoadItems()),
           ),
           BlocProvider(
             create: (_) => InvoiceBloc(
-              repository: invoiceRepository,
-              calculationService: calculationService,
+              repository: dependencies.invoiceRepository,
+              calculationService: dependencies.calculationService,
             ),
           ),
           BlocProvider(
             create: (_) => HistoryBloc(
-              getHistory: getInvoiceHistory,
-              getInvoiceDetails: getInvoiceDetails,
+              getHistory: dependencies.getInvoiceHistory,
+              getInvoiceDetails: dependencies.getInvoiceDetails,
             ),
           ),
           BlocProvider(
             create: (_) => SettingsBloc(
-              repository: settingsRepository,
-              securityService: securityService,
-              backupService: backupService,
+              repository: dependencies.settingsRepository,
+              securityService: dependencies.securityService,
+              backupService: dependencies.backupService,
             )..add(LoadSettings()),
           ),
           BlocProvider(
             create: (_) => PrinterBloc(
-              getDevices: getDevices,
-              connectPrinter: connectPrinter,
-              printInvoice: printInvoice,
-              repository: printerRepository,
+              getDevices: dependencies.getDevices,
+              connectPrinter: dependencies.connectPrinter,
+              printInvoice: dependencies.printInvoice,
+              repository: dependencies.printerRepository,
             )..add(AutoConnectPrinter()),
           ),
           BlocProvider(
             create: (_) => StaffBloc(
-              repository: staffRepository,
+              repository: dependencies.staffRepository,
             )..add(LoadStaffList()),
           ),
           BlocProvider(
             create: (_) => SyncBloc(
-              discoveryService: discoveryService,
-              bluetoothDiscoveryService: bluetoothDiscoveryService,
-              syncManager: syncManager,
-              syncServer: syncServer,
-              bluetoothSyncServer: bluetoothSyncServer,
-              syncRepository: syncRepository,
-              db: database,
-              deviceId: deviceId,
+              discoveryService: dependencies.discoveryService,
+              bluetoothDiscoveryService: dependencies.bluetoothDiscoveryService,
+              syncManager: dependencies.syncManager,
+              syncServer: dependencies.syncServer,
+              bluetoothSyncServer: dependencies.bluetoothSyncServer,
+              syncRepository: dependencies.syncRepository,
+              db: dependencies.database,
+              deviceId: dependencies.deviceId,
             )..add(InitializeSync()),
           ),
           BlocProvider(
             create: (_) => SchoolBloc(
-              repository: schoolRepository,
-              itemRepository: itemRepository,
-              invoiceRepository: invoiceRepository,
+              repository: dependencies.schoolRepository,
+              itemRepository: dependencies.itemRepository,
+              invoiceRepository: dependencies.invoiceRepository,
             ),
           ),
         ],

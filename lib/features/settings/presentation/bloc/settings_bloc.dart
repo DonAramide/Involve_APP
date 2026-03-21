@@ -81,14 +81,13 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         return;
       }
       
-      final success = await backupService.syncData(bytes);
+      await backupService.syncData(bytes);
       
-      if (success) {
-        emit(state.copyWith(isImporting: false, successMessage: 'Data synchronized successfully!'));
-        add(LoadSettings());
-      } else {
-        emit(state.copyWith(isImporting: false, error: 'Synchronization failed'));
-      }
+      emit(state.copyWith(
+        isImporting: false, 
+        successMessage: 'Data synchronized successfully! App is restarting...',
+        needsRestart: true,
+      ));
     } catch (e) {
       emit(state.copyWith(isImporting: false, error: 'Import failed: $e'));
     }
@@ -97,14 +96,13 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   Future<void> _onRestoreBytes(RestoreFromBytes event, Emitter<SettingsState> emit) async {
     emit(state.copyWith(isImporting: true, error: null, successMessage: null));
     try {
-      final success = await backupService.syncData(event.bytes);
+      await backupService.syncData(event.bytes);
       
-      if (success) {
-        emit(state.copyWith(isImporting: false, successMessage: 'Data synchronized successfully!'));
-        add(LoadSettings());
-      } else {
-        emit(state.copyWith(isImporting: false, error: 'Synchronization failed'));
-      }
+      emit(state.copyWith(
+        isImporting: false, 
+        successMessage: 'Data synchronized successfully! App is restarting...',
+        needsRestart: true,
+      ));
     } catch (e) {
       emit(state.copyWith(isImporting: false, error: 'Import failed: $e'));
     }
@@ -125,12 +123,15 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
   }
 
   Future<void> _onImportFromFile(ImportDatabaseFromFile event, Emitter<SettingsState> emit) async {
-    emit(state.copyWith(isImporting: true, error: null, successMessage: null));
+    emit(state.copyWith(isImporting: true, error: null, successMessage: null, needsRestart: false));
     try {
       final success = await backupService.importDatabase(event.path);
       if (success) {
-        emit(state.copyWith(isImporting: false, successMessage: 'Database restored successfully! App may need restart.'));
-        add(LoadSettings());
+        emit(state.copyWith(
+          isImporting: false, 
+          successMessage: 'Database restored successfully! App is restarting...',
+          needsRestart: true,
+        ));
       } else {
         emit(state.copyWith(isImporting: false, error: 'Restore failed'));
       }

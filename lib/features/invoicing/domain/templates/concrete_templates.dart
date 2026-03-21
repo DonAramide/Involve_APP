@@ -216,6 +216,7 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
         TextCommand('-' * width),
         TextCommand('PAYMENT: ${settings.bankName}', align: 'center'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
+        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
       ],
       if (settings.showSignatureSpace) ...[
         SizedBoxCommand(height: 1),
@@ -292,6 +293,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
         TextCommand('PAYMENT METHODS:', isBold: true),
         TextCommand('Bank: ${settings.bankName}'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}'),
+        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}'),
       ],
       if (settings.showSignatureSpace) ...[
         SizedBoxCommand(height: 2),
@@ -411,6 +413,13 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width), isBold: true),
       ],
+      if (settings.showAccountDetails && settings.bankName != null) ...[
+        TextCommand('-' * width),
+        TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
+        TextCommand('Bank: ${settings.bankName}', align: 'center'),
+        if (settings.accountNumber != null) TextCommand('A/C: ${settings.accountNumber}', align: 'center'),
+        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+      ],
       SizedBoxCommand(height: 2),
       TextCommand('THANK YOU FOR YOUR BUSINESS', align: 'center', isBold: true),
       TextCommand('-' * width),
@@ -470,6 +479,13 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
         TextCommand('-' * width),
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
+      ],
+      if (settings.showAccountDetails && settings.bankName != null) ...[
+        TextCommand('-' * width),
+        TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
+        TextCommand('Bank: ${settings.bankName}', align: 'center'),
+        if (settings.accountNumber != null) TextCommand('A/C: ${settings.accountNumber}', align: 'center'),
+        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
       ],
       TextCommand('-' * width),
       TextCommand('THANK YOU FOR YOUR BUSINESS!', align: 'center'),

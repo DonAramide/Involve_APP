@@ -223,8 +223,8 @@ class ReceiptService {
               if (settings.showAccountDetails && settings.bankName != null) ...[
                 pw.SizedBox(height: 6),
                 pw.Text('Bank: ${settings.bankName}', style: const pw.TextStyle(fontSize: 9)),
-                pw.Text('Acc No: ${settings.accountNumber}', style: const pw.TextStyle(fontSize: 9)),
-                pw.Text('Acc Name: ${settings.accountName}', style: const pw.TextStyle(fontSize: 9)),
+                if (settings.accountNumber != null) pw.Text('Acc No: ${settings.accountNumber}', style: const pw.TextStyle(fontSize: 9)),
+                if (settings.accountName != null) pw.Text('Acc Name: ${settings.accountName}', style: const pw.TextStyle(fontSize: 9)),
               ],
 
               if (invoice.balanceAmount > 0) ...[
@@ -425,6 +425,13 @@ class ReceiptService {
               pw.Text('Notes:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
               pw.Text('1. Make all cheques payable to ${settings.organizationName}'),
               pw.Text('2. If you have any questions concerning this invoice, contact ${settings.phone}'),
+              if (settings.showAccountDetails && settings.bankName != null) ...[
+                pw.SizedBox(height: 10),
+                pw.Text('Payment Details:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                pw.Text('Bank: ${settings.bankName}'),
+                if (settings.accountNumber != null) pw.Text('Acc Number: ${settings.accountNumber}'),
+                if (settings.accountName != null) pw.Text('Acc Name: ${settings.accountName}'),
+              ],
               
               if (adminSignatureImage != null)
                 pw.Padding(

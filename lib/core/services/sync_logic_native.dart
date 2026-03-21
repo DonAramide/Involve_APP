@@ -5,12 +5,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
 Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
+  File? tempFile;
   try {
     // 1. Write bytes to a temporary file
     final tempDir = await getTemporaryDirectory();
-    final tempFile = File(p.join(tempDir.path, 'temp_sync_${DateTime.now().millisecondsSinceEpoch}.sqlite'));
+    tempFile = File(p.join(tempDir.path, 'temp_sync_${DateTime.now().millisecondsSinceEpoch}.sqlite'));
     await tempFile.writeAsBytes(backupBytes);
 
     // 2. Open temporary database
@@ -19,13 +21,14 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
     try {
       await database.transaction(() async {
         // --- Staff Sync ---
+        debugPrint('Syncing Staff...');
         final Map<int, int> staffIdMap = {}; // oldId -> newId
         if (_tableExists(backupDb, 'staff')) {
           final backupStaff = backupDb.select('SELECT * FROM staff');
           for (final row in backupStaff) {
             final oldId = row['id'] as int;
-            final syncId = row['sync_id'] as String?;
-            final name = row['name'] as String;
+            final syncId = _getString(row['sync_id']);
+            final name = _getString(row['name']) ?? '';
 
             // Find match
             StaffTable? existing;
@@ -37,12 +40,12 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
             if (existing != null) {
               staffIdMap[oldId] = existing.id;
               // Update if newer
-              final incomingUpdate = row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null;
+              final incomingUpdate = _getDateTime(row['updated_at']);
               if (incomingUpdate != null && (existing.updatedAt == null || incomingUpdate.isAfter(existing.updatedAt!))) {
                 await (database.update(database.staff)..where((s) => s.id.equals(existing!.id))).write(
                   StaffCompanion(
                     name: Value(name),
-                    staffCode: Value(row['staff_code'] as String),
+                    staffCode: Value(_getString(row['staff_code']) ?? ''),
                     isActive: Value(row['is_active'] == 1),
                     updatedAt: Value(incomingUpdate),
                   )
@@ -52,11 +55,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
               final newId = await database.into(database.staff).insert(
                 StaffCompanion.insert(
                   name: name,
-                  staffCode: row['staff_code'] as String,
+                  staffCode: _getString(row['staff_code']) ?? '',
                   isActive: Value(row['is_active'] == 1),
                   syncId: Value(syncId),
-                  updatedAt: Value(row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null),
-                  createdAt: Value(row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : null),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
+                  createdAt: Value(_getDateTime(row['created_at'])),
                 )
               );
               staffIdMap[oldId] = newId;
@@ -65,13 +68,14 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
         }
 
         // --- Category Sync ---
+        debugPrint('Syncing Categories...');
         final Map<int, int> categoryIdMap = {}; // oldId -> newId
         if (_tableExists(backupDb, 'categories')) {
           final backupCategories = backupDb.select('SELECT * FROM categories');
           for (final row in backupCategories) {
             final oldId = row['id'] as int;
-            final name = row['name'] as String;
-            final syncId = row['sync_id'] as String?; // Note: Older DBs might not have sync_id on Categories
+            final name = _getString(row['name']) ?? '';
+            final syncId = _getString(row['sync_id']); 
 
             CategoryTable? existing;
             if (syncId != null) {
@@ -94,13 +98,14 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
         }
 
         // --- Item Sync ---
+        debugPrint('Syncing Items...');
         final Map<int, int> itemIdMap = {}; // oldId -> newId
         if (_tableExists(backupDb, 'items')) {
           final backupItems = backupDb.select('SELECT * FROM items');
           for (final row in backupItems) {
             final oldId = row['id'] as int;
-            final name = row['name'] as String;
-            final syncId = row['sync_id'] as String?;
+            final name = _getString(row['name']) ?? '';
+            final syncId = _getString(row['sync_id']);
             
             final oldCategoryId = row['category_id'] as int?;
             final newCategoryId = oldCategoryId != null ? categoryIdMap[oldCategoryId] : null;
@@ -114,7 +119,7 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
             if (existing != null) {
               itemIdMap[oldId] = existing.id;
               // Update if newer
-              final incomingUpdate = row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null;
+              final incomingUpdate = _getDateTime(row['updated_at']);
               if (incomingUpdate != null && (existing.updatedAt == null || incomingUpdate.isAfter(existing.updatedAt!))) {
                 await (database.update(database.items)..where((i) => i.id.equals(existing!.id))).write(
                   ItemsCompanion(
@@ -132,7 +137,7 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
               final newId = await database.into(database.items).insert(
                 ItemsCompanion.insert(
                   name: name,
-                  category: row['category'] as String,
+                  category: _getString(row['category']) ?? 'General',
                   price: (row['price'] as num).toDouble(),
                   costPrice: Value((row['cost_price'] as num?)?.toDouble() ?? 0.0),
                   stockQty: Value(row['stock_qty'] as int),
@@ -140,8 +145,8 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                   image: Value(row['image'] as Uint8List?),
                   categoryId: Value(newCategoryId),
                   syncId: Value(syncId),
-                  createdAt: Value(row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : null),
-                  updatedAt: Value(row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null),
+                  createdAt: Value(_getDateTime(row['created_at'])),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
                 )
               );
               itemIdMap[oldId] = newId;
@@ -150,13 +155,14 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
         }
 
         // --- Invoice Sync ---
+        debugPrint('Syncing Invoices...');
         final Map<int, int> invoiceIdMap = {}; // oldId -> newId
         if (_tableExists(backupDb, 'invoices')) {
           final backupInvoices = backupDb.select('SELECT * FROM invoices');
           for (final row in backupInvoices) {
             final oldId = row['id'] as int;
-            final invoiceNumber = row['invoice_number'] as String;
-            final syncId = row['sync_id'] as String?;
+            final invoiceNumber = _getString(row['invoice_number']) ?? '';
+            final syncId = _getString(row['sync_id']);
             
             final oldStaffId = row['staff_id'] as int?;
             final newStaffId = oldStaffId != null ? staffIdMap[oldStaffId] : null;
@@ -169,11 +175,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
             
             if (existing != null) {
               invoiceIdMap[oldId] = existing.id;
-              final incomingUpdate = row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null;
+              final incomingUpdate = _getDateTime(row['updated_at']);
               if (incomingUpdate != null && (existing.updatedAt == null || incomingUpdate.isAfter(existing.updatedAt!))) {
                 await (database.update(database.invoices)..where((inv) => inv.id.equals(existing!.id))).write(
                   InvoicesCompanion(
-                    paymentStatus: Value(row['payment_status'] as String),
+                    paymentStatus: Value(_getString(row['payment_status']) ?? 'Unpaid'),
                     amountPaid: Value((row['amount_paid'] as num).toDouble()),
                     balanceAmount: Value((row['balance_amount'] as num).toDouble()),
                     updatedAt: Value(incomingUpdate),
@@ -188,18 +194,18 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                   taxAmount: (row['tax_amount'] as num).toDouble(),
                   discountAmount: (row['discount_amount'] as num).toDouble(),
                   totalAmount: (row['total_amount'] as num).toDouble(),
-                  paymentStatus: row['payment_status'] as String,
-                  dateCreated: Value(DateTime.parse(row['date_created'] as String)),
+                  paymentStatus: _getString(row['payment_status']) ?? 'Unpaid',
+                  dateCreated: Value(_getDateTime(row['date_created']) ?? DateTime.now()),
                   amountPaid: Value((row['amount_paid'] as num).toDouble()),
                   balanceAmount: Value((row['balance_amount'] as num).toDouble()),
-                  customerName: Value(row['customer_name'] as String?),
-                  customerAddress: Value(row['customer_address'] as String?),
-                  paymentMethod: Value(row['payment_method'] as String?),
+                  customerName: Value(_getString(row['customer_name'])),
+                  customerAddress: Value(_getString(row['customer_address'])),
+                  paymentMethod: Value(_getString(row['payment_method'])),
                   staffId: Value(newStaffId),
-                  staffName: Value(row['staff_name'] as String?),
+                  staffName: Value(_getString(row['staff_name'])),
                   syncId: Value(syncId),
-                  createdAt: Value(row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : null),
-                  updatedAt: Value(row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null),
+                  createdAt: Value(_getDateTime(row['created_at'])),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
                   totalPrintAmount: Value((row['total_print_amount'] as num?)?.toDouble()),
                 )
               );
@@ -212,7 +218,7 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
               for (final itemRow in backupInvItems) {
                 final oldItemId = itemRow['item_id'] as int;
                 final newItemId = itemIdMap[oldItemId];
-                final iSyncId = itemRow['sync_id'] as String?;
+                final iSyncId = _getString(itemRow['sync_id']);
                 
                 if (newItemId != null) {
                   InvoiceItemTable? existingItem;
@@ -227,11 +233,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                         itemId: newItemId,
                         quantity: itemRow['quantity'] as int,
                         unitPrice: (itemRow['unit_price'] as num).toDouble(),
-                        type: Value(itemRow['type'] as String),
-                        serviceMeta: Value(itemRow['service_meta'] as String?),
+                        type: Value(_getString(itemRow['type']) ?? 'product'),
+                        serviceMeta: Value(_getString(itemRow['service_meta'])),
                         syncId: Value(iSyncId),
-                        createdAt: Value(itemRow['created_at'] != null ? DateTime.parse(itemRow['created_at'] as String) : null),
-                        updatedAt: Value(itemRow['updated_at'] != null ? DateTime.parse(itemRow['updated_at'] as String) : null),
+                        createdAt: Value(_getDateTime(itemRow['created_at'])),
+                        updatedAt: Value(_getDateTime(itemRow['updated_at'])),
                         printPrice: Value((itemRow['print_price'] as num?)?.toDouble()),
                         returnedQuantity: Value(itemRow['returned_quantity'] as int),
                         isReplacement: Value(itemRow['is_replacement'] == 1),
@@ -245,10 +251,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
         }
 
         // --- Expense Sync ---
+        debugPrint('Syncing Expenses...');
         if (_tableExists(backupDb, 'expenses')) {
           final backupExpenses = backupDb.select('SELECT * FROM expenses');
           for (final row in backupExpenses) {
-            final syncId = row['sync_id'] as String?;
+            final syncId = _getString(row['sync_id']);
             
             ExpenseTable? existing;
             if (syncId != null) {
@@ -259,12 +266,12 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
               await database.into(database.expenses).insert(
                 ExpensesCompanion.insert(
                   amount: (row['amount'] as num).toDouble(),
-                  description: row['description'] as String,
-                  category: Value(row['category'] as String?),
-                  date: Value(DateTime.parse(row['date'] as String)),
+                  description: _getString(row['description']) ?? '',
+                  category: Value(_getString(row['category'])),
+                  date: Value(_getDateTime(row['date']) ?? DateTime.now()),
                   syncId: Value(syncId),
-                  createdAt: Value(row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : null),
-                  updatedAt: Value(row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null),
+                  createdAt: Value(_getDateTime(row['created_at'])),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
                 )
               );
             }
@@ -272,10 +279,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
         }
 
         // --- Stock Returns Sync ---
+        debugPrint('Syncing Stock Returns...');
         if (_tableExists(backupDb, 'stock_returns')) {
           final backupReturns = backupDb.select('SELECT * FROM stock_returns');
           for (final row in backupReturns) {
-            final syncId = row['sync_id'] as String?;
+            final syncId = _getString(row['sync_id']);
             final oldInvoiceId = row['invoice_id'] as int;
             final oldItemId = row['item_id'] as int;
             
@@ -298,11 +306,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                     itemId: newItemId,
                     quantity: row['quantity'] as int,
                     amountReturned: (row['amount_returned'] as num?)?.toDouble() ?? 0.0,
-                    staffId: newStaffId ?? 0, // Fallback to 0 if not found, but should not happen
-                    dateReturned: Value(DateTime.parse(row['date_returned'] as String)),
+                    staffId: newStaffId ?? 0, 
+                    dateReturned: Value(_getDateTime(row['date_returned']) ?? DateTime.now()),
                     syncId: Value(syncId),
-                    createdAt: Value(row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : null),
-                    updatedAt: Value(row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null),
+                    createdAt: Value(_getDateTime(row['created_at'])),
+                    updatedAt: Value(_getDateTime(row['updated_at'])),
                   )
                 );
               }
@@ -311,10 +319,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
         }
 
         // --- Stock Increments Sync ---
+        debugPrint('Syncing Stock Increments...');
         if (_tableExists(backupDb, 'stock_increments')) {
           final backupIncrements = backupDb.select('SELECT * FROM stock_increments');
           for (final row in backupIncrements) {
-            final syncId = row['sync_id'] as String?;
+            final syncId = _getString(row['sync_id']);
             final oldItemId = row['item_id'] as int;
             final newItemId = itemIdMap[oldItemId];
 
@@ -331,11 +340,11 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                     quantityAdded: row['quantity_added'] as int,
                     quantityBefore: Value(row['quantity_before'] as int),
                     quantityAfter: Value(row['quantity_after'] as int),
-                    dateAdded: Value(DateTime.parse(row['date_added'] as String)),
-                    remarks: Value(row['remarks'] as String?),
+                    dateAdded: Value(_getDateTime(row['date_added']) ?? DateTime.now()),
+                    remarks: Value(_getString(row['remarks'])),
                     syncId: Value(syncId),
-                    createdAt: Value(row['created_at'] != null ? DateTime.parse(row['created_at'] as String) : null),
-                    updatedAt: Value(row['updated_at'] != null ? DateTime.parse(row['updated_at'] as String) : null),
+                    createdAt: Value(_getDateTime(row['created_at'])),
+                    updatedAt: Value(_getDateTime(row['updated_at'])),
                   )
                 );
               }
@@ -343,22 +352,38 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
           }
         }
       });
-      
-      backupDb.dispose();
-      await tempFile.delete();
       return true;
-    } catch (e) {
+    } finally {
       backupDb.dispose();
-      if (await tempFile.exists()) await tempFile.delete();
-      rethrow;
     }
-  } catch (e) {
+  } catch (e, stack) {
     debugPrint('Native Sync failed: $e');
-    return false;
+    debugPrint('Stack trace: $stack');
+    rethrow;
+  } finally {
+    if (tempFile != null && await tempFile.exists()) {
+      await tempFile.delete();
+    }
   }
 }
 
 bool _tableExists(sqlite.Database db, String tableName) {
   final result = db.select("SELECT name FROM sqlite_master WHERE type='table' AND name=?", [tableName]);
   return result.isNotEmpty;
+}
+
+String? _getString(dynamic value) {
+  if (value == null) return null;
+  return value.toString();
+}
+
+DateTime? _getDateTime(dynamic value) {
+  if (value == null) return null;
+  final str = value.toString();
+  try {
+    return DateTime.parse(str);
+  } catch (e) {
+    debugPrint('Failed to parse DateTime: $str');
+    return null;
+  }
 }

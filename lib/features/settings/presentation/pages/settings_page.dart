@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -20,6 +21,7 @@ import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/settings.dart';
 import '../widgets/upgrade_dialog.dart';
+import 'package:involve_app/core/widgets/restart_widget.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../bloc/staff_bloc.dart';
 import '../bloc/staff_state.dart';
@@ -96,10 +98,18 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           body: BlocListener<SettingsBloc, SettingsState>(
             listener: (context, state) {
+              if (state.needsRestart) {
+                 // Restart handles its own cleanup by destroying the UI
+                RestartWidget.restartApp(context);
+              }
+              
               if (state.error != null) {
+                _hideLoadingDialog(context);
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!), backgroundColor: Colors.red));
               }
-              if (state.successMessage != null) {
+              
+              if (state.successMessage != null && !state.needsRestart) {
+                _hideLoadingDialog(context);
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.successMessage!), backgroundColor: Colors.green));
               }
             },
@@ -543,16 +553,33 @@ class _SettingsPageState extends State<SettingsPage> {
     final settingsBloc = context.read<SettingsBloc>();
     
     try {
+      // 1. Generate the backup bytes first (Required for Android/iOS save dialog)
+      final bytes = await settingsBloc.backupService.createBackup();
+      
+      if (bytes == null) {
+        scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Failed to generate backup: Database file not found'), backgroundColor: Colors.red));
+        return;
+      }
+
       final timestamp = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
       final fileName = 'invify_backup_$timestamp.sqlite';
       
+      // 2. Open save dialog with bytes
       final result = await FilePicker.platform.saveFile(
         dialogTitle: 'Select where to save your backup',
         fileName: fileName,
+        bytes: bytes, // MANDATORY for Android & iOS
       );
 
       if (result != null) {
-        settingsBloc.add(ExportDatabaseToFile(result));
+        // On Android/iOS, the file is already saved by the picker because we provided bytes.
+        // On Desktop, depending on the implementation, we might need to write it manually or it's already done.
+        if (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux) {
+           final file = File(result);
+           await file.writeAsBytes(bytes);
+        }
+        
+        scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Database exported successfully!'), backgroundColor: Colors.green));
       }
     } catch (e) {
       scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to export: $e'), backgroundColor: Colors.red));
@@ -569,33 +596,104 @@ class _SettingsPageState extends State<SettingsPage> {
       final filePath = result.files.first.path;
       if (filePath == null) return;
 
-      final proceed = await showDialog<bool>(
+      // Show Choice Dialog
+      final restoreType = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Confirm FULL RESTORE'),
+          title: const Text('Restore Backup'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Restoring "${result.files.first.name}" will REPLACE your current database.'),
-              const SizedBox(height: 8),
-              const Text('⚠️ WARNING: All current records will be lost!', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              Text('How would you like to restore "${result.files.first.name}"?'),
+              const SizedBox(height: 20),
+              
+              // Merge Option
+              _buildRestoreOption(
+                context,
+                title: 'Merge Data (Recommended)',
+                subtitle: 'Add new records and update existing ones. Current data will NOT be deleted.',
+                icon: Icons.merge_type,
+                color: Colors.blue,
+                onTap: () => Navigator.pop(ctx, 'merge'),
+              ),
+              
+              const Divider(height: 24),
+              
+              // Overwrite Option
+              _buildRestoreOption(
+                context,
+                title: 'Full Restore (Overwrite)',
+                subtitle: 'REPLACE everything. All current records will be lost forever!',
+                icon: Icons.warning_amber_rounded,
+                color: Colors.red,
+                onTap: () => Navigator.pop(ctx, 'overwrite'),
+              ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
             TextButton(
-              onPressed: () => Navigator.pop(ctx, true), 
-              child: const Text('RESTORE & OVERWRITE', style: TextStyle(color: Colors.red))
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL'),
             ),
           ],
         ),
       );
+      
+      if (!mounted) return;
 
-      if (proceed == true) {
+      if (restoreType == 'merge') {
+        _showLoadingDialog(context, 'Merging Data...');
+        context.read<SettingsBloc>().add(RestoreFromPath(filePath));
+      } else if (restoreType == 'overwrite') {
+        _showLoadingDialog(context, 'Restoring & Overwriting...');
         context.read<SettingsBloc>().add(ImportDatabaseFromFile(filePath));
       }
     }
+  }
+
+  Widget _buildRestoreOption(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showRestoreDialog(BuildContext context) {

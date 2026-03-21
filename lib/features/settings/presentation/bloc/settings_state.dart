@@ -119,6 +119,7 @@ class SettingsState extends Equatable {
   final bool isSuperAdminAuthorized;
   final bool isBusinessLocked;
   final bool isModeLocked;
+  final bool needsRestart; // Flag to trigger app restart after DB restore
   final String? error;
   final String? successMessage;
   final String? backupPath;
@@ -135,6 +136,7 @@ class SettingsState extends Equatable {
     this.isSuperAdminAuthorized = false,
     this.isBusinessLocked = false,
     this.isModeLocked = false,
+    this.needsRestart = false,
     this.error,
     this.successMessage,
     this.backupPath,
@@ -152,6 +154,7 @@ class SettingsState extends Equatable {
     bool? isSuperAdminAuthorized,
     bool? isBusinessLocked,
     bool? isModeLocked,
+    bool? needsRestart,
     String? error,
     String? successMessage,
     String? backupPath,
@@ -168,6 +171,7 @@ class SettingsState extends Equatable {
       isSuperAdminAuthorized: isSuperAdminAuthorized ?? this.isSuperAdminAuthorized,
       isBusinessLocked: isBusinessLocked ?? this.isBusinessLocked,
       isModeLocked: isModeLocked ?? this.isModeLocked,
+      needsRestart: needsRestart ?? this.needsRestart,
       error: error,
       successMessage: successMessage,
       backupPath: backupPath ?? this.backupPath,
@@ -187,6 +191,7 @@ class SettingsState extends Equatable {
         isSuperAdminAuthorized,
         isBusinessLocked,
         isModeLocked,
+        needsRestart,
         error,
         successMessage,
         backupPath,
