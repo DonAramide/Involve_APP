@@ -499,52 +499,75 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final student = state.students.firstWhere((s) => s.id == event.studentId);
       final newBalance = student.balance - event.amount;
       
-      // 1. Generate Payment Receipt Invoice
+      // 1. Update Student Balance in Students table
+      final updatedStudent = student.copyWith(balance: newBalance);
+      await repository.updateStudent(updatedStudent);
+
+      // 2. Sync with Invoice (Billing Record)
       final activeTerm = state.terms.where((t) => t.isActive).firstOrNull ?? state.terms.firstOrNull;
-      final activeYear = state.academicYears.where((y) => y.isActive).firstOrNull ?? state.academicYears.firstOrNull;
-
-      final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
-
-      final invoice = Invoice(
-        invoiceNumber: 'PMT-${DateTime.now().millisecondsSinceEpoch}',
-        dateCreated: DateTime.now(),
-        customerName: student.fullName,
-        customerPhone: student.parentPhone,
-        studentId: student.id,
-        classId: student.classId,
-        admissionNumber: student.admissionNumber,
-        className: sClass?.name,
-        termId: activeTerm?.id,
-        termName: activeTerm?.name,
-        academicYearId: activeYear?.id,
-        academicYearName: activeYear?.name,
-        subtotal: event.amount,
-        taxAmount: 0,
-        discountAmount: 0,
-        totalAmount: student.balance, // EXPECTED AMOUNT (Total debt before payment)
-        amountPaid: event.amount,      // PAID AMOUNT (Current payment)
-        balanceAmount: newBalance,     // BALANCE DUE (Remaining debt)
-        paymentStatus: newBalance <= 0 ? 'Paid' : 'Partial',
-        paymentMethod: event.method,
-        businessMode: 'school',
-        items: [
-          InvoiceItem(
-            item: Item(
-              name: 'School Fees Payment ${event.remarks ?? ""}',
-              category: ItemCategory.service,
-              price: event.amount,
-              stockQty: 0,
-              type: 'service',
-              businessMode: 'school',
-            ),
-            quantity: 1,
-            unitPrice: event.amount,
-            type: 'service',
-          ),
-        ],
-      );
+      final invoices = await invoiceRepository.getInvoicesByStudentId(student.id!);
       
-      await invoiceRepository.saveInvoice(invoice);
+      // Look for a "BILL-" for the CURRENT TERM that is not fully paid
+      final existingBill = invoices.firstWhereOrNull((inv) => 
+        inv.invoiceNumber.startsWith('BILL-') && 
+        inv.termId == activeTerm?.id &&
+        inv.paymentStatus != 'Paid'
+      );
+
+      if (existingBill != null) {
+        // UPDATE EXISTING BILL
+        final updatedBill = existingBill.copyWith(
+          amountPaid: existingBill.amountPaid + event.amount,
+          balanceAmount: existingBill.balanceAmount - event.amount,
+          paymentStatus: (existingBill.balanceAmount - event.amount) <= 0 ? 'Paid' : 'Partial',
+          paymentMethod: event.method, // Update to latest payment method
+        );
+        await invoiceRepository.updateInvoice(updatedBill);
+      } else {
+        // FALLBACK: CREATE PAYMENT RECEIPT (If no bill found)
+        final activeYear = state.academicYears.where((y) => y.isActive).firstOrNull ?? state.academicYears.firstOrNull;
+        final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+
+        final invoice = Invoice(
+          invoiceNumber: 'PMT-${DateTime.now().millisecondsSinceEpoch}',
+          dateCreated: DateTime.now(),
+          customerName: student.fullName,
+          customerPhone: student.parentPhone,
+          studentId: student.id,
+          classId: student.classId,
+          admissionNumber: student.admissionNumber,
+          className: sClass?.name,
+          termId: activeTerm?.id,
+          termName: activeTerm?.name,
+          academicYearId: activeYear?.id,
+          academicYearName: activeYear?.name,
+          subtotal: event.amount,
+          taxAmount: 0,
+          discountAmount: 0,
+          totalAmount: student.balance,
+          amountPaid: event.amount,
+          balanceAmount: newBalance,
+          paymentStatus: newBalance <= 0 ? 'Paid' : 'Partial',
+          paymentMethod: event.method,
+          businessMode: 'school',
+          items: [
+            InvoiceItem(
+              item: Item(
+                name: 'School Fees Payment ${event.remarks ?? ""}',
+                category: ItemCategory.service,
+                price: event.amount,
+                stockQty: 0,
+                type: 'service',
+                businessMode: 'school',
+              ),
+              quantity: 1,
+              unitPrice: event.amount,
+              type: 'service',
+            ),
+          ],
+        );
+        await invoiceRepository.saveInvoice(invoice);
+      }
       
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());

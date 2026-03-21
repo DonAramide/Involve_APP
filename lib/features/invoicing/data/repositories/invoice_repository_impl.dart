@@ -151,6 +151,25 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
   }
 
   @override
+  Future<void> updateInvoice(Invoice invoice) async {
+    if (invoice.id == null) return;
+    final now = DateTime.now();
+
+    await db.transaction(() async {
+      // 1. Update the main invoice record
+      await (db.update(db.invoices)..where((t) => t.id.equals(invoice.id!)))
+          .write(InvoicesCompanion(
+        totalAmount: Value(invoice.totalAmount),
+        amountPaid: Value(invoice.amountPaid),
+        balanceAmount: Value(invoice.balanceAmount),
+        paymentStatus: Value(invoice.paymentStatus),
+        paymentMethod: Value(invoice.paymentMethod),
+        updatedAt: Value(now),
+      ));
+    });
+  }
+
+  @override
   Future<List<Invoice>> getAllInvoices() async {
     return _getInvoicesWithItems(db.select(db.invoices)
       ..orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]));
