@@ -167,6 +167,15 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
             final oldStaffId = row['staff_id'] as int?;
             final newStaffId = oldStaffId != null ? staffIdMap[oldStaffId] : null;
 
+            final oldStudentId = row['student_id'] as int?;
+            final newStudentId = oldStudentId != null ? studentIdMap[oldStudentId] : null;
+            final oldClassId = row['class_id'] as int?;
+            final newClassId = oldClassId != null ? classIdMap[oldClassId] : null;
+            final oldTermId = row['term_id'] as int?;
+            final newTermId = oldTermId != null ? termIdMap[oldTermId] : null;
+            final oldYearId = row['academic_year_id'] as int?;
+            final newYearId = oldYearId != null ? academicYearIdMap[oldYearId] : null;
+
             InvoiceTable? existing;
             if (syncId != null) {
               existing = await (database.select(database.invoices)..where((inv) => inv.syncId.equals(syncId))).getSingleOrNull();
@@ -182,6 +191,10 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                     paymentStatus: Value(_getString(row['payment_status']) ?? 'Unpaid'),
                     amountPaid: Value((row['amount_paid'] as num).toDouble()),
                     balanceAmount: Value((row['balance_amount'] as num).toDouble()),
+                    studentId: Value(newStudentId),
+                    classId: Value(newClassId),
+                    termId: Value(newTermId),
+                    academicYearId: Value(newYearId),
                     updatedAt: Value(incomingUpdate),
                   )
                 );
@@ -203,6 +216,15 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                   paymentMethod: Value(_getString(row['payment_method'])),
                   staffId: Value(newStaffId),
                   staffName: Value(_getString(row['staff_name'])),
+                  studentId: Value(newStudentId),
+                  classId: Value(newClassId),
+                  termId: Value(newTermId),
+                  academicYearId: Value(newYearId),
+                  businessMode: Value(_getString(row['business_mode'])),
+                  admissionNumber: Value(_getString(row['admission_number'])),
+                  className: Value(_getString(row['class_name'])),
+                  termName: Value(_getString(row['term_name'])),
+                  academicYearName: Value(_getString(row['academic_year_name'])),
                   syncId: Value(syncId),
                   createdAt: Value(_getDateTime(row['created_at'])),
                   updatedAt: Value(_getDateTime(row['updated_at'])),
@@ -678,6 +700,37 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                 )
               );
             }
+          }
+        }
+
+        // --- Business Settings Sync ---
+        debugPrint('Syncing Business Settings...');
+        if (_tableExists(backupDb, 'business_settings')) {
+          final backupSettings = backupDb.select('SELECT * FROM business_settings');
+          for (final row in backupSettings) {
+             final businessMode = _getString(row['business_mode']) ?? 'retail';
+             final incomingUpdate = _getDateTime(row['updated_at']);
+
+             final query = database.select(database.businessSettings)..limit(1);
+             final existing = await query.getSingleOrNull();
+             
+             if (existing != null) {
+               if (incomingUpdate != null && (existing.updatedAt == null || incomingUpdate.isAfter(existing.updatedAt!))) {
+                 await (database.update(database.businessSettings)..where((s) => s.id.equals(existing.id))).write(
+                   BusinessSettingsCompanion(
+                     businessMode: Value(businessMode),
+                     updatedAt: Value(incomingUpdate),
+                   )
+                 );
+               }
+             } else {
+               await database.into(database.businessSettings).insert(
+                 BusinessSettingsCompanion.insert(
+                   businessMode: Value(businessMode),
+                   updatedAt: Value(incomingUpdate),
+                 )
+               );
+             }
           }
         }
       });
