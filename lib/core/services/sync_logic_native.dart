@@ -351,6 +351,335 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
             }
           }
         }
+
+        // --- Academic Year Sync ---
+        debugPrint('Syncing Academic Years...');
+        final Map<int, int> academicYearIdMap = {};
+        if (_tableExists(backupDb, 'academic_years')) {
+          final backupYears = backupDb.select('SELECT * FROM academic_years');
+          for (final row in backupYears) {
+            final oldId = row['id'] as int;
+            final name = _getString(row['name']) ?? '';
+            final syncId = _getString(row['sync_id']);
+
+            AcademicYearTable? existing;
+            if (syncId != null) {
+              existing = await (database.select(database.academicYears)..where((y) => y.syncId.equals(syncId))).getSingleOrNull();
+            }
+            existing ??= await (database.select(database.academicYears)..where((y) => y.name.equals(name))).getSingleOrNull();
+
+            if (existing != null) {
+              academicYearIdMap[oldId] = existing.id;
+            } else {
+              final newId = await database.into(database.academicYears).insert(
+                AcademicYearsCompanion.insert(
+                  name: name,
+                  startDate: _getDateTime(row['start_date']) ?? DateTime.now(),
+                  endDate: _getDateTime(row['end_date']) ?? DateTime.now(),
+                  isCurrent: Value(row['is_current'] == 1),
+                  syncId: Value(syncId),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
+                  createdAt: Value(_getDateTime(row['created_at'])),
+                )
+              );
+              academicYearIdMap[oldId] = newId;
+            }
+          }
+        }
+
+        // --- Terms Sync ---
+        debugPrint('Syncing Terms...');
+        final Map<int, int> termIdMap = {};
+        if (_tableExists(backupDb, 'terms')) {
+          final backupTerms = backupDb.select('SELECT * FROM terms');
+          for (final row in backupTerms) {
+            final oldId = row['id'] as int;
+            final name = _getString(row['name']) ?? '';
+            final syncId = _getString(row['sync_id']);
+            final oldYearId = row['academic_year_id'] as int;
+            final newYearId = academicYearIdMap[oldYearId];
+
+            if (newYearId != null) {
+              TermTable? existing;
+              if (syncId != null) {
+                existing = await (database.select(database.terms)..where((t) => t.syncId.equals(syncId))).getSingleOrNull();
+              }
+              existing ??= await (database.select(database.terms)..where((t) => t.name.equals(name) & t.academicYearId.equals(newYearId))).getSingleOrNull();
+
+              if (existing != null) {
+                termIdMap[oldId] = existing.id;
+              } else {
+                final newId = await database.into(database.terms).insert(
+                  TermsCompanion.insert(
+                    academicYearId: newYearId,
+                    name: name,
+                    startDate: _getDateTime(row['start_date']) ?? DateTime.now(),
+                    endDate: _getDateTime(row['end_date']) ?? DateTime.now(),
+                    isCurrent: Value(row['is_current'] == 1),
+                    syncId: Value(syncId),
+                    updatedAt: Value(_getDateTime(row['updated_at'])),
+                    createdAt: Value(_getDateTime(row['created_at'])),
+                  )
+                );
+                termIdMap[oldId] = newId;
+              }
+            }
+          }
+        }
+
+        // --- Class Sync ---
+        debugPrint('Syncing Classes...');
+        final Map<int, int> classIdMap = {};
+        if (_tableExists(backupDb, 'classes')) {
+          final backupClasses = backupDb.select('SELECT * FROM classes');
+          for (final row in backupClasses) {
+            final oldId = row['id'] as int;
+            final name = _getString(row['name']) ?? '';
+            final syncId = _getString(row['sync_id']);
+
+            ClassTable? existing;
+            if (syncId != null) {
+              existing = await (database.select(database.classes)..where((c) => c.syncId.equals(syncId))).getSingleOrNull();
+            }
+            existing ??= await (database.select(database.classes)..where((c) => c.name.equals(name))).getSingleOrNull();
+
+            if (existing != null) {
+              classIdMap[oldId] = existing.id;
+            } else {
+              final newId = await database.into(database.classes).insert(
+                ClassesCompanion.insert(
+                  name: name,
+                  description: Value(_getString(row['description'])),
+                  syncId: Value(syncId),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
+                  createdAt: Value(_getDateTime(row['created_at'])),
+                )
+              );
+              classIdMap[oldId] = newId;
+            }
+          }
+        }
+
+        // --- Teacher Sync ---
+        debugPrint('Syncing Teachers...');
+        final Map<int, int> teacherIdMap = {};
+        if (_tableExists(backupDb, 'teachers')) {
+          final backupTeachers = backupDb.select('SELECT * FROM teachers');
+          for (final row in backupTeachers) {
+            final oldId = row['id'] as int;
+            final fullName = _getString(row['full_name']) ?? '';
+            final syncId = _getString(row['sync_id']);
+            final oldClassId = row['class_id'] as int?;
+            final newClassId = oldClassId != null ? classIdMap[oldClassId] : null;
+
+            TeacherTable? existing;
+            if (syncId != null) {
+              existing = await (database.select(database.teachers)..where((t) => t.syncId.equals(syncId))).getSingleOrNull();
+            }
+            existing ??= await (database.select(database.teachers)..where((t) => t.fullName.equals(fullName))).getSingleOrNull();
+
+            if (existing != null) {
+              teacherIdMap[oldId] = existing.id;
+            } else {
+              final newId = await database.into(database.teachers).insert(
+                TeachersCompanion.insert(
+                  fullName: fullName,
+                  phone: Value(_getString(row['phone'])),
+                  profession: Value(_getString(row['profession'])),
+                  classId: Value(newClassId),
+                  salary: Value((row['salary'] as num?)?.toDouble() ?? 0.0),
+                  yearsInSchool: Value(row['years_in_school'] as int? ?? 0),
+                  employmentDate: Value(_getDateTime(row['employment_date']) ?? DateTime.now()),
+                  certificates: Value(_getString(row['certificates'])),
+                  image: Value(row['image'] as Uint8List?),
+                  syncId: Value(syncId),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
+                  createdAt: Value(_getDateTime(row['created_at'])),
+                )
+              );
+              teacherIdMap[oldId] = newId;
+            }
+          }
+        }
+
+        // --- Student Sync ---
+        debugPrint('Syncing Students...');
+        final Map<int, int> studentIdMap = {};
+        if (_tableExists(backupDb, 'students')) {
+          final backupStudents = backupDb.select('SELECT * FROM students');
+          for (final row in backupStudents) {
+            final oldId = row['id'] as int;
+            final admissionNumber = _getString(row['admission_number']) ?? '';
+            final syncId = _getString(row['sync_id']);
+            final oldClassId = row['class_id'] as int;
+            final newClassId = classIdMap[oldClassId];
+            final oldYearId = row['academic_year_id'] as int?;
+            final newYearId = oldYearId != null ? academicYearIdMap[oldYearId] : null;
+
+            if (newClassId != null) {
+              StudentTable? existing;
+              if (syncId != null) {
+                existing = await (database.select(database.students)..where((s) => s.syncId.equals(syncId))).getSingleOrNull();
+              }
+              existing ??= await (database.select(database.students)..where((s) => s.admissionNumber.equals(admissionNumber))).getSingleOrNull();
+
+              if (existing != null) {
+                studentIdMap[oldId] = existing.id;
+                // Update balance if newer
+                final incomingUpdate = _getDateTime(row['updated_at']);
+                if (incomingUpdate != null && (existing.updatedAt == null || incomingUpdate.isAfter(existing.updatedAt!))) {
+                  await (database.update(database.students)..where((s) => s.id.equals(existing!.id))).write(
+                    StudentsCompanion(
+                      balance: Value((row['balance'] as num?)?.toDouble() ?? 0.0),
+                      classId: Value(newClassId),
+                      parentName: Value(_getString(row['parent_name'])),
+                      parentPhone: Value(_getString(row['parent_phone'])),
+                      updatedAt: Value(incomingUpdate),
+                    )
+                  );
+                }
+              } else {
+                final newId = await database.into(database.students).insert(
+                  StudentsCompanion.insert(
+                    admissionNumber: admissionNumber,
+                    firstName: _getString(row['first_name']) ?? '',
+                    lastName: _getString(row['last_name']) ?? '',
+                    classId: newClassId,
+                    academicYearId: Value(newYearId),
+                    parentName: Value(_getString(row['parent_name'])),
+                    parentPhone: Value(_getString(row['parent_phone'])),
+                    balance: Value((row['balance'] as num?)?.toDouble() ?? 0.0),
+                    gender: Value(_getString(row['gender'])),
+                    dateOfBirth: Value(_getDateTime(row['date_of_birth'])),
+                    registrationDate: Value(_getDateTime(row['registration_date']) ?? DateTime.now()),
+                    image: Value(row['image'] as Uint8List?),
+                    syncId: Value(syncId),
+                    updatedAt: Value(_getDateTime(row['updated_at'])),
+                    createdAt: Value(_getDateTime(row['created_at'])),
+                  )
+                );
+                studentIdMap[oldId] = newId;
+              }
+            }
+          }
+        }
+
+        // --- Subject Sync ---
+        debugPrint('Syncing Subjects...');
+        final Map<int, int> subjectIdMap = {};
+        if (_tableExists(backupDb, 'subjects')) {
+          final backupSubjects = backupDb.select('SELECT * FROM subjects');
+          for (final row in backupSubjects) {
+            final oldId = row['id'] as int;
+            final name = _getString(row['name']) ?? '';
+            final syncId = _getString(row['sync_id']);
+            final oldTeacherId = row['teacher_id'] as int?;
+            final newTeacherId = oldTeacherId != null ? teacherIdMap[oldTeacherId] : null;
+
+            SubjectTable? existing;
+            if (syncId != null) {
+              existing = await (database.select(database.subjects)..where((s) => s.syncId.equals(syncId))).getSingleOrNull();
+            }
+            existing ??= await (database.select(database.subjects)..where((s) => s.name.equals(name))).getSingleOrNull();
+
+            if (existing != null) {
+              subjectIdMap[oldId] = existing.id;
+            } else {
+              final newId = await database.into(database.subjects).insert(
+                SubjectsCompanion.insert(
+                  name: name,
+                  code: Value(_getString(row['code'])),
+                  teacherId: Value(newTeacherId),
+                  syncId: Value(syncId),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
+                  createdAt: Value(_getDateTime(row['created_at'])),
+                )
+              );
+              subjectIdMap[oldId] = newId;
+            }
+          }
+        }
+
+        // --- Result Sync ---
+        debugPrint('Syncing Results...');
+        if (_tableExists(backupDb, 'results')) {
+          final backupResults = backupDb.select('SELECT * FROM results');
+          for (final row in backupResults) {
+            final oldStudentId = row['student_id'] as int;
+            final oldSubjectId = row['subject_id'] as int;
+            final oldTermId = row['term_id'] as int;
+            final oldYearId = row['academic_year_id'] as int;
+            final syncId = _getString(row['sync_id']);
+
+            final newStudentId = studentIdMap[oldStudentId];
+            final newSubjectId = subjectIdMap[oldSubjectId];
+            final newTermId = termIdMap[oldTermId];
+            final newYearId = academicYearIdMap[oldYearId];
+
+            if (newStudentId != null && newSubjectId != null && newTermId != null && newYearId != null) {
+              ResultTable? existing;
+              if (syncId != null) {
+                existing = await (database.select(database.results)..where((r) => r.syncId.equals(syncId))).getSingleOrNull();
+              }
+              existing ??= await (database.select(database.results)..where((r) => 
+                r.studentId.equals(newStudentId) & 
+                r.subjectId.equals(newSubjectId) & 
+                r.termId.equals(newTermId) & 
+                r.academicYearId.equals(newYearId)
+              )).getSingleOrNull();
+
+              if (existing == null) {
+                await database.into(database.results).insert(
+                  ResultsCompanion.insert(
+                    studentId: newStudentId,
+                    subjectId: newSubjectId,
+                    termId: newTermId,
+                    academicYearId: newYearId,
+                    assessmentScore: Value((row['assessment_score'] as num?)?.toDouble() ?? 0.0),
+                    examScore: Value((row['exam_score'] as num?)?.toDouble() ?? 0.0),
+                    totalScore: Value((row['total_score'] as num?)?.toDouble() ?? 0.0),
+                    grade: Value(_getString(row['grade'])),
+                    remarks: Value(_getString(row['remarks'])),
+                    dateEntered: Value(_getDateTime(row['date_entered']) ?? DateTime.now()),
+                    syncId: Value(syncId),
+                    updatedAt: Value(_getDateTime(row['updated_at'])),
+                    createdAt: Value(_getDateTime(row['created_at'])),
+                  )
+                );
+              }
+            }
+          }
+        }
+
+        // --- Grading Rules Sync ---
+        debugPrint('Syncing Grading Rules...');
+        if (_tableExists(backupDb, 'grading_rules')) {
+          final backupRules = backupDb.select('SELECT * FROM grading_rules');
+          for (final row in backupRules) {
+            final syncId = _getString(row['sync_id']);
+            final grade = _getString(row['grade']) ?? '';
+
+            GradingRuleTable? existing;
+            if (syncId != null) {
+              existing = await (database.select(database.gradingRules)..where((gr) => gr.syncId.equals(syncId))).getSingleOrNull();
+            }
+            existing ??= await (database.select(database.gradingRules)..where((gr) => gr.grade.equals(grade))).getSingleOrNull();
+
+            if (existing == null) {
+              await database.into(database.gradingRules).insert(
+                GradingRulesCompanion.insert(
+                  minScore: (row['min_score'] as num).toDouble(),
+                  maxScore: (row['max_score'] as num).toDouble(),
+                  grade: grade,
+                  remarks: Value(_getString(row['remarks'])),
+                  syncId: Value(syncId),
+                  updatedAt: Value(_getDateTime(row['updated_at'])),
+                  createdAt: Value(_getDateTime(row['created_at'])),
+                )
+              );
+            }
+          }
+        }
       });
       return true;
     } finally {
