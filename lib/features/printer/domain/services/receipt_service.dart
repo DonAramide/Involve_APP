@@ -12,8 +12,8 @@ import 'package:involve_app/core/utils/number_to_words.dart';
 
 class ReceiptService {
   Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride, String? receiptTitle}) async {
-    final font = await PdfGoogleFonts.robotoRegular();
-    final boldFont = await PdfGoogleFonts.robotoBold();
+    final font = await PdfGoogleFonts.notoSansRegular();
+    final boldFont = await PdfGoogleFonts.notoSansBold();
 
     final pdf = pw.Document(
       theme: pw.ThemeData.withFont(
@@ -46,8 +46,8 @@ class ReceiptService {
       }
     }
 
-    if (template == 'classic_a4') {
-      return _generateClassicA4(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices);
+    if (template == 'classic' || template == 'classic_a4' || template == 'professional' || template == 'detailed' || template == 'modern') {
+      return _generateClassicA4(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, template: template);
     }
     
     if (template == 'school_teal') {
@@ -80,7 +80,7 @@ class ReceiptService {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
-              if (logoImage != null)
+              if (logoImage != null && template != 'minimalist')
                 pw.Container(
                   height: 60,
                   width: 60,
@@ -89,7 +89,7 @@ class ReceiptService {
                 ),
               pw.SizedBox(height: 5),
               pw.Text(settings.organizationName, 
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: template == 'compact' ? 14 : 16)),
               pw.Text(settings.address, textAlign: pw.TextAlign.center),
               if (settings.phone.isNotEmpty) pw.Text('Tel: ${settings.phone}'),
               if (settings.taxId != null && settings.taxId!.isNotEmpty) pw.Text('Tax ID: ${settings.taxId}'),
@@ -270,7 +270,7 @@ class ReceiptService {
     return pdf.save();
   }
 
-  Future<Uint8List> _generateClassicA4(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices) async {
+  Future<Uint8List> _generateClassicA4(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? template}) async {
     final dateFormat = DateFormat('dd MMMM, yyyy');
 
     pdf.addPage(
@@ -319,7 +319,7 @@ class ReceiptService {
                   ),
                 ],
               ),
-              pw.SizedBox(height: 40),
+              pw.SizedBox(height: template == 'modern' ? 20 : 40),
 
               // Delivery Address
               pw.Column(
@@ -664,7 +664,7 @@ class ReceiptService {
                   ),
                   // Totals
                   pw.Container(
-                    width: 200,
+                    width: 240,
                     child: pw.Column(
                       children: [
                         _schoolSummaryRow('Subtotal:', CurrencyFormatter.format(invoice.subtotal)),
@@ -700,7 +700,7 @@ class ReceiptService {
                                 style: pw.TextStyle(
                                   color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red,
                                   fontWeight: pw.FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
@@ -811,35 +811,25 @@ class ReceiptService {
 
               // Header Content
               pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Row(
-                    children: [
-                      if (logoImage != null)
-                        pw.Container(
-                          width: 80,
-                          height: 80,
-                          margin: const pw.EdgeInsets.only(right: 15),
-                          child: pw.Image(logoImage),
-                        ),
-                      pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Text(settings.organizationName.toUpperCase(), 
-                              style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                          if (settings.businessDescription != null)
-                            pw.Text(settings.businessDescription!.toUpperCase(), 
-                                style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
-                        ],
-                      ),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text('Invoice No: ${invoice.invoiceNumber}', style: const pw.TextStyle(fontSize: 10)),
-                      pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}', style: const pw.TextStyle(fontSize: 10)),
-                    ],
+                  if (logoImage != null)
+                    pw.Container(
+                      width: 80,
+                      height: 80,
+                      margin: const pw.EdgeInsets.only(right: 15),
+                      child: pw.Image(logoImage),
+                    ),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(settings.organizationName.toUpperCase(), 
+                            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                        if (settings.businessDescription != null)
+                          pw.Text(settings.businessDescription!.toUpperCase(), 
+                              style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -848,17 +838,27 @@ class ReceiptService {
               pw.Text(receiptTitle ?? 'FEE RECEIPT', style: pw.TextStyle(fontSize: 42, fontWeight: pw.FontWeight.bold, color: primaryColor)),
               pw.Container(height: 6, width: 80, color: primaryColor, margin: const pw.EdgeInsets.only(top: 5, bottom: 30)),
 
-              // Student Box
+              // Info Box
               pw.Row(
-                 mainAxisAlignment: pw.MainAxisAlignment.end,
+                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                  children: [
                     pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(settings.businessMode == 'school' ? 'Student Info' : 'Invoice To', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
                         pw.Text(invoice.customerName ?? 'STUDENT NAME', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: primaryColor)),
                         pw.Text(invoice.className ?? 'CLASS NAME', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
                         if (invoice.customerPhone != null) pw.Text('Phone: ${invoice.customerPhone}'),
+                      ],
+                    ),
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.end,
+                      children: [
+                        pw.Text('Invoice No: ${invoice.invoiceNumber}', style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}', style: const pw.TextStyle(fontSize: 11)),
+                        if (invoice.termName != null) pw.Text('Term: ${invoice.termName}', style: const pw.TextStyle(fontSize: 11)),
+                        if (invoice.academicYearName != null) pw.Text('Session: ${invoice.academicYearName}', style: const pw.TextStyle(fontSize: 11)),
                       ],
                     ),
                  ],
@@ -937,7 +937,7 @@ class ReceiptService {
                     ],
                   ),
                   pw.Container(
-                    width: 220,
+                    width: 240,
                     child: pw.Column(
                       children: [
                         _schoolSummaryRow('Subtotal:', CurrencyFormatter.format(invoice.subtotal)),
@@ -976,7 +976,7 @@ class ReceiptService {
                                 style: pw.TextStyle(
                                   color: invoice.balanceAmount <= 0 ? PdfColors.green : PdfColors.red,
                                   fontWeight: pw.FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: 14,
                                 ),
                               ),
                             ),
@@ -1363,7 +1363,7 @@ class ReceiptService {
                           pw.Column(
                              crossAxisAlignment: pw.CrossAxisAlignment.start,
                              children: [
-                               pw.Text('Cash/Cheque No: _________________'),
+                               pw.Text('Cash/Cheque No: ${invoice.paymentMethod ?? "_________________"}'),
                                pw.SizedBox(height: 20),
                                 pw.Row(
                                   children: [

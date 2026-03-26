@@ -60,6 +60,7 @@ class ReceiptPreviewPage extends StatelessWidget {
           receiptTitle: receiptTitle,
         ),
         pdfFileName: 'Invoice-${invoice.id}.pdf',
+        canChangePageFormat: false,
       ),
     );
   }

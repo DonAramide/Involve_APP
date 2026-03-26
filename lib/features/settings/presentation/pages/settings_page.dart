@@ -40,6 +40,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   String _searchQuery = '';
   bool _isSearching = false;
+  bool _isLoadingDialogShowing = false;
   final TextEditingController _searchController = TextEditingController();
 
   bool _matches(String title, [List<String>? keywords]) {
@@ -965,6 +966,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _showLoadingDialog(BuildContext context, String message) {
+    _isLoadingDialogShowing = true;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -977,11 +979,14 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
-    );
+    ).then((_) => _isLoadingDialogShowing = false);
   }
 
   void _hideLoadingDialog(BuildContext context) {
-    Navigator.of(context).pop();
+    if (_isLoadingDialogShowing) {
+      Navigator.of(context).pop();
+      _isLoadingDialogShowing = false;
+    }
   }
 
   Widget _buildActivationHistoryTile(BuildContext context) {
