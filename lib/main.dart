@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:involve_app/features/school/data/repositories/school_repository_impl.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
@@ -55,9 +57,36 @@ import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/core/utils/route_observer.dart';
 import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/core/widgets/restart_widget.dart';
+import 'package:involve_app/features/invoicing/presentation/pages/payment_ledger_test_page.dart';
+import 'package:involve_app/features/school_finance/presentation/pages/school_finance_dashboard.dart';
+
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository.dart';
+import 'package:involve_app/features/school_finance/data/repositories/finance_repository_impl.dart';
+import 'package:involve_app/features/school_finance/data/datasources/finance_remote_data_source.dart';
+import 'package:involve_app/features/school_finance/data/datasources/finance_realtime_data_source.dart';
+import 'package:involve_app/features/school_finance/presentation/bloc/finance_bloc.dart';
+import 'package:involve_app/features/school_billing/domain/repositories/billing_repository.dart';
+import 'package:involve_app/features/school_billing/data/repositories/billing_repository_impl.dart';
+import 'package:involve_app/features/school_billing/presentation/bloc/billing_bloc.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/features/services/data/repositories/services_repository_impl.dart';
+import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
+import 'package:involve_app/features/services/data/services/services_backup_service.dart';
+import 'package:involve_app/features/services/domain/usecases/service_usecases.dart';
+import 'package:involve_app/features/services/presentation/bloc/services_bloc.dart';
+import 'package:involve_app/features/services/domain/usecases/print_job_receipt.dart';
+import 'package:involve_app/features/services/presentation/bloc/services_event.dart';
+import 'package:involve_app/features/services/presentation/pages/services_dashboard_page.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Supabase (User must replace these with real values)
+  await Supabase.initialize(
+    url: 'https://placeholder-project.supabase.co',
+    anonKey: 'placeholder-anon-key',
+  );
   
   // Set up global BLoC observer
   Bloc.observer = SimpleBlocObserver();
@@ -110,6 +139,20 @@ class AppDependencies {
   final String deviceId;
   final SchoolRepositoryImpl schoolRepository;
   final PrinterRepository printerRepository;
+  final IFinanceRepository financeRepository;
+  final IBillingRepository billingRepository;
+  final IServicesRepository servicesRepository;
+  final ServicesBackupService servicesBackupService;
+  final GetJobs getJobsUC;
+  final CreateJob createJobUC;
+  final AddPayment addPaymentUC;
+  final UpdateJobStatus updateJobStatusUC;
+  final GetCustomers getCustomersUC;
+  final CreateCustomer createCustomerUC;
+  final PrintJobReceipt printJobReceiptUC;
+  final GetJobPayments getJobPaymentsUC;
+  final GetServicesAnalytics getServicesAnalyticsUC;
+
 
   AppDependencies({
     required this.database,
@@ -150,7 +193,21 @@ class AppDependencies {
     required this.deviceId,
     required this.schoolRepository,
     required this.printerRepository,
+    required this.financeRepository,
+    required this.billingRepository,
+    required this.servicesRepository,
+    required this.servicesBackupService,
+    required this.getJobsUC,
+    required this.createJobUC,
+    required this.addPaymentUC,
+    required this.updateJobStatusUC,
+    required this.getCustomersUC,
+    required this.createCustomerUC,
+    required this.printJobReceiptUC,
+    required this.getJobPaymentsUC,
+    required this.getServicesAnalyticsUC,
   });
+
 
   static Future<AppDependencies> initialize() async {
     // 1. Database
@@ -168,8 +225,13 @@ class AppDependencies {
     final schoolRepository = SchoolRepositoryImpl(database);
     final printerRepository = PrinterRepositoryImpl(database);
     final syncRepository = SyncRepositoryImpl(database);
+    final deviceId = await DeviceInfoService.getDeviceSuffix();
     
-    // 4. Services
+    // 4. Services Module (100% Offline)
+    final servicesRepo = ServicesRepositoryImpl(db: database);
+    final servicesBackupService = ServicesBackupService(db: database);
+    
+    // 5. Shared Services
     final bleService = CrossPlatformPrinterService();
     final sppService = BlueThermalPrinterService();
     final networkService = NetworkPrinterService();
@@ -183,7 +245,6 @@ class AppDependencies {
     final backupService = BackupService(database: database);
     
     final discoveryService = DiscoveryService();
-    final deviceId = await DeviceInfoService.getDeviceSuffix();
     const secretToken = 'PRO-TOKEN-123';
     
     final syncServer = SyncServer(
@@ -198,15 +259,8 @@ class AppDependencies {
       deviceId: deviceId,
     );
     
-    final syncManager = SyncManager(
-      database: database,
-      discoveryService: discoveryService,
-      syncRepository: syncRepository,
-      deviceId: deviceId,
-      secretToken: secretToken,
-    );
-    
-    // 5. Use Cases
+    final String baseUrl = kDebugMode ? 'http://127.0.0.1:3003' : 'https://api.iips-finance.com';
+
     return AppDependencies(
       database: database,
       itemRepository: itemRepository,
@@ -225,7 +279,13 @@ class AppDependencies {
       bluetoothDiscoveryService: bluetoothDiscoveryService,
       syncServer: syncServer,
       bluetoothSyncServer: bluetoothSyncServer,
-      syncManager: syncManager,
+      syncManager: SyncManager(
+        database: database,
+        syncRepository: syncRepository,
+        discoveryService: discoveryService,
+        deviceId: deviceId,
+        secretToken: secretToken,
+      ),
       deviceId: deviceId,
       getItems: GetItems(itemRepository),
       addItem: AddItem(itemRepository),
@@ -246,6 +306,32 @@ class AppDependencies {
       printInvoice: PrintInvoiceCommands(printerService),
       getInvoiceHistory: GetInvoiceHistory(invoiceRepository),
       getInvoiceDetails: GetInvoiceDetails(invoiceRepository),
+      financeRepository: FinanceRepositoryImpl(
+        remoteDataSource: FinanceRemoteDataSourceImpl(
+          FinanceApiClient(
+            baseUrl: baseUrl,
+            getTenantId: () async => 'demo-school-123',
+          ),
+        ),
+        realtimeDataSource: FinanceRealtimeDataSourceImpl(Supabase.instance.client),
+      ),
+      billingRepository: BillingRepositoryImpl(
+        FinanceApiClient(
+          baseUrl: baseUrl,
+          getTenantId: () async => 'demo-school-123',
+        ),
+      ),
+      servicesRepository: servicesRepo,
+      servicesBackupService: servicesBackupService,
+      getJobsUC: GetJobs(servicesRepo),
+      createJobUC: CreateJob(servicesRepo),
+      addPaymentUC: AddPayment(servicesRepo),
+      updateJobStatusUC: UpdateJobStatus(servicesRepo),
+      getCustomersUC: GetCustomers(servicesRepo),
+      createCustomerUC: CreateCustomer(servicesRepo),
+      printJobReceiptUC: PrintJobReceipt(printerService),
+      getJobPaymentsUC: GetJobPayments(servicesRepo),
+      getServicesAnalyticsUC: GetServicesAnalytics(servicesRepo),
     );
   }
 }
@@ -269,7 +355,11 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<StaffRepository>(create: (_) => dependencies.staffRepository),
         RepositoryProvider<SchoolRepository>(create: (_) => dependencies.schoolRepository),
         RepositoryProvider<SyncRepository>(create: (_) => dependencies.syncRepository),
+        RepositoryProvider<IFinanceRepository>(create: (_) => dependencies.financeRepository),
+        RepositoryProvider<IBillingRepository>(create: (_) => dependencies.billingRepository),
+        RepositoryProvider<IServicesRepository>(create: (_) => dependencies.servicesRepository),
       ],
+
       child: MultiBlocProvider(
         providers: [
           BlocProvider(
@@ -341,7 +431,32 @@ class MyApp extends StatelessWidget {
               invoiceRepository: dependencies.invoiceRepository,
             ),
           ),
+          BlocProvider(
+            create: (context) => FinanceBloc(
+              repository: dependencies.financeRepository,
+            ),
+          ),
+          BlocProvider(
+            create: (context) => BillingBloc(
+              repository: dependencies.billingRepository,
+            ),
+          ),
+          BlocProvider(
+            create: (context) => ServicesBloc(
+              getJobs: dependencies.getJobsUC,
+              createJob: dependencies.createJobUC,
+              addPayment: dependencies.addPaymentUC,
+              updateJobStatus: dependencies.updateJobStatusUC,
+              getCustomers: dependencies.getCustomersUC,
+              createCustomer: dependencies.createCustomerUC,
+              backupService: dependencies.servicesBackupService,
+              printJobReceipt: dependencies.printJobReceiptUC,
+              getJobPayments: dependencies.getJobPaymentsUC,
+              getServicesAnalytics: dependencies.getServicesAnalyticsUC,
+            )..add(const LoadServicesJobs()),
+          ),
         ],
+
         child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {
           final themeMode = state.settings?.themeMode ?? 'system';
@@ -377,7 +492,10 @@ class MyApp extends StatelessWidget {
             routes: {
               DashboardPage.routeName: (_) => const DashboardPage(),
               ActivationPage.routeName: (_) => const ActivationPage(),
+              '/payment_test': (_) => const PaymentLedgerTestPage(),
+              '/school_finance': (_) => const SchoolFinanceDashboardPage(),
             },
+
             );
           },
         ),

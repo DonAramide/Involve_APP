@@ -28,6 +28,7 @@ class _LogExpenseDialogState extends State<LogExpenseDialog> {
     'Transport',
     'Marketing',
     'Maintenance',
+    'Services',
     'Other',
   ];
 

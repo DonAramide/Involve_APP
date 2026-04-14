@@ -12,7 +12,12 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_state.d
 import 'package:involve_app/features/settings/presentation/widgets/password_dialog.dart';
 import 'package:involve_app/features/settings/presentation/widgets/super_admin_password_dialog.dart';
 import 'package:involve_app/core/widgets/live_datetime_widget.dart';
+import 'package:involve_app/features/settings/domain/entities/user_plan.dart';
 import 'package:involve_app/features/help/presentation/pages/help_page.dart';
+import 'package:involve_app/features/services/presentation/pages/services_dashboard_page.dart';
+import 'package:involve_app/features/services/presentation/pages/create_job_page.dart';
+import 'package:involve_app/features/services/presentation/pages/jobs_list_page.dart';
+import 'package:involve_app/features/services/presentation/pages/customers_list_page.dart';
 import 'about_page.dart';
 import 'contact_page.dart';
 import 'calculator_page.dart';
@@ -93,10 +98,21 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 // Organization name
                 Expanded(
-                  child: Text(
-                    settings?.organizationName ?? 'Invify',
-                    style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          settings?.organizationName ?? 'Invify',
+                          style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (settingsState.userPlan?.isValid == true && !settingsState.userPlan!.isBasic) ...[
+                        const SizedBox(width: 8),
+                        _buildPlanBadge(settingsState.userPlan!),
+                      ],
+                    ],
                   ),
                 ),
               ],
@@ -406,6 +422,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState) {
     final isSchool = settings?.businessMode == 'school';
+    final isServices = settings?.businessMode == 'services';
     
     final allItems = <_DashboardMenuItem>[
       _DashboardMenuItem(
@@ -456,14 +473,43 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.blueGrey,
         onTap: () => _verifyAndNavigateToSettings(context),
       ),
-      _DashboardMenuItem(
-        id: 'contacts',
-        title: 'CONTACTS',
-        icon: Icons.contact_phone,
-        color: Colors.teal,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContactPage())),
-      ),
     ];
+
+    if (isServices) {
+      return [
+        _DashboardMenuItem(
+          id: 'services_dashboard',
+          title: 'SERVICES DASHBOARD',
+          icon: Icons.dashboard,
+          color: Colors.blue,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesDashboardPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'new_job',
+          title: 'NEW JOB',
+          icon: Icons.add_task,
+          color: Colors.green,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateJobPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'all_jobs',
+          title: 'ALL JOBS',
+          icon: Icons.list_alt,
+          color: Colors.orange,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JobsListPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'customers',
+          title: 'CUSTOMERS',
+          icon: Icons.people,
+          color: Colors.purple,
+          onTap: () {
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersListPage()));
+          },
+        ),
+        ...allItems.where((i) => ['printer', 'settings', 'calculator'].contains(i.id)),
+      ];
+    }
 
     if (isSchool) {
       allItems.addAll([
@@ -487,6 +533,13 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.assignment_ind,
           color: Colors.deepPurple,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherListPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'finance_dashboard',
+          title: 'FINANCE DASHBOARD',
+          icon: Icons.dashboard_customize,
+          color: Colors.blueGrey,
+          onTap: () => Navigator.pushNamed(context, '/school_finance'),
         ),
         _DashboardMenuItem(
           id: 'academic_setup',
@@ -626,6 +679,51 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlanBadge(UserPlan plan) {
+    final isLifetime = plan.isLifetime;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: isLifetime 
+              ? [const Color(0xFFFFD700), const Color(0xFFFFA500)] // Gold for Lifetime
+              : [const Color(0xFFE0E0E0), const Color(0xFFBDBDBD)], // Silver for Pro
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: (isLifetime ? Colors.orange : Colors.grey).withOpacity(0.3),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isLifetime ? Icons.stars : Icons.verified,
+            size: 10,
+            color: isLifetime ? Colors.brown[900] : Colors.blueGrey[900],
+          ),
+          const SizedBox(width: 4),
+          Text(
+            plan.planType.toUpperCase(),
+            style: TextStyle(
+              color: isLifetime ? Colors.brown[900] : Colors.blueGrey[900],
+              fontSize: 9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
       ),
     );
   }

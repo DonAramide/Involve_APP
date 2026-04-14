@@ -207,7 +207,12 @@ class _SettingsPageState extends State<SettingsPage> {
         if (_matches('Enable Payment Methods'))
           _buildSwitchTile('Enable Payment Methods (Cash/POS/Transfer)', settings.paymentMethodsEnabled, (val) => _update(context, settings.copyWith(paymentMethodsEnabled: val))),
         if (settings.businessMode != 'school' && _matches('Enable Custom Receipt Pricing'))
-          _buildSwitchTile('Enable Custom Receipt Pricing (Inflated Prices)', settings.customReceiptPricingEnabled, (val) => _update(context, settings.copyWith(customReceiptPricingEnabled: val))),
+          _buildSwitchTile(
+            'Enable Custom Receipt Pricing (Inflated Prices)', 
+            settings.customReceiptPricingEnabled, 
+            (val) => _update(context, settings.copyWith(customReceiptPricingEnabled: val)),
+            isPro: state.userPlan?.isBasic == true,
+          ),
         if (_matches('Currency'))
           _buildDropdownTile(
             context, 
@@ -275,12 +280,12 @@ class _SettingsPageState extends State<SettingsPage> {
         _buildSwitchTile(
           'Show Admin Signature on Invoices', 
           settings.showAdminSignature, 
-          (val) => _update(context, settings.copyWith(showAdminSignature: val))
+          (val) => _update(context, settings.copyWith(showAdminSignature: val)),
+          isPro: state.userPlan?.isBasic == true,
         ),
         const Divider(),
       ],
 
-      // Service Billing
       if (_matches('Service Billing', ['config', 'types', 'half day'])) ...[
         _buildServiceBillingTile(context, settings, state),
         if (settings.serviceBillingEnabled) ...[
@@ -292,7 +297,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
       // Staff Management
       if (_matches('Staff Management', ['users', 'roles'])) ...[
-        _buildSectionHeader(context, 'Staff Management'),
+        _buildSectionHeader(context, 'Staff Management', isPro: state.userPlan?.isBasic == true),
         _buildStaffManagementSection(context, settings),
         const Divider(),
       ],
@@ -356,10 +361,26 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         if (_matches('Device Synchronization'))
           ListTile(
-            title: const Text('Device Synchronization'),
+            title: Row(
+              children: [
+                const Text('Device Synchronization'),
+                if (state.userPlan?.isBasic == true) ...[
+                  const SizedBox(width: 8),
+                  _buildProBadge(),
+                ],
+              ],
+            ),
             subtitle: const Text('Connect and sync data with other devices'),
             trailing: const Icon(Icons.sync_alt),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSyncPage())),
+            onTap: () {
+              if (state.userPlan?.isBasic == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Device Synchronization is a Pro Version feature.')),
+                );
+                return;
+              }
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSyncPage()));
+            },
           ),
         if (_matches('Show Date & Time'))
           _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
@@ -442,6 +463,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildActivationBanner(BuildContext context, SettingsState state) {
     final isLocked = state.isBusinessLocked;
+    final plan = state.userPlan;
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -450,42 +472,89 @@ class _SettingsPageState extends State<SettingsPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: isLocked ? Colors.blue[200]! : Colors.orange[200]!),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(
-            isLocked ? Icons.verified_user : Icons.info_outline,
-            color: isLocked ? Colors.blue : Colors.orange,
+          Row(
+            children: [
+              Icon(
+                isLocked ? Icons.verified_user : Icons.info_outline,
+                color: isLocked ? Colors.blue : Colors.orange,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isLocked ? 'Identity Verified' : 'Initial Setup',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isLocked ? Colors.blue[900] : Colors.orange[900],
+                      ),
+                    ),
+                    Text(
+                      isLocked 
+                          ? 'Business identity and operation mode are permanently locked.' 
+                          : 'You can edit your business name and mode once. They will be locked after saving.',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (plan != null) ...[
+            const Divider(height: 24),
+            Row(
               children: [
+                const Icon(Icons.stars, color: Colors.blueGrey, size: 20),
+                const SizedBox(width: 12),
                 Text(
-                  isLocked ? 'Identity Verified' : 'Initial Setup',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isLocked ? Colors.blue[900] : Colors.orange[900],
+                  'Current Plan: ',
+                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.blueGrey[800]),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: plan.isBasic ? Colors.grey[200] : Colors.blueGrey[800],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    plan.planType.toUpperCase(),
+                    style: TextStyle(
+                      color: plan.isBasic ? Colors.grey[800] : Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                Text(
-                  isLocked 
-                      ? 'Business identity and operation mode are permanently locked.' 
-                      : 'You can edit your business name and mode once. They will be locked after saving.',
-                  style: const TextStyle(fontSize: 12),
-                ),
+                if (plan.expiryDate != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    'Expires: ${DateFormat('yyyy-MM-dd').format(plan.expiryDate!)}',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ],
               ],
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
+  Widget _buildSectionHeader(BuildContext context, String title, {bool isPro = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Text(title, style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+      child: Row(
+        children: [
+          Text(title, style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+          if (isPro) ...[
+            const SizedBox(width: 8),
+            _buildProBadge(),
+          ],
+        ],
+      ),
     );
   }
 
@@ -501,8 +570,28 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildSwitchTile(String label, bool value, Function(bool) onChanged) {
-    return SwitchListTile(title: Text(label), value: value, onChanged: onChanged);
+  Widget _buildSwitchTile(String label, bool value, Function(bool) onChanged, {bool isPro = false}) {
+    return SwitchListTile(
+      title: Row(
+        children: [
+          Flexible(child: Text(label)),
+          if (isPro) ...[
+            const SizedBox(width: 8),
+            _buildProBadge(),
+          ],
+        ],
+      ),
+      value: value,
+      onChanged: (val) {
+        if (isPro && val) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('This is a Pro Version feature.')),
+           );
+           return;
+        }
+        onChanged(val);
+      },
+    );
   }
 
   Widget _buildDropdownTile(BuildContext context, String label, String value, List<String> options, Function(String) onChanged) {
@@ -1518,7 +1607,12 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _buildStaffManagementSection(BuildContext context, AppSettings settings) {
     return Column(
       children: [
-        _buildSwitchTile('Enable Staff Tracking (Sold By)', settings.staffManagementEnabled, (val) => _update(context, settings.copyWith(staffManagementEnabled: val))),
+        _buildSwitchTile(
+          'Enable Staff Tracking (Sold By)', 
+          settings.staffManagementEnabled, 
+          (val) => _update(context, settings.copyWith(staffManagementEnabled: val)),
+          isPro: context.read<SettingsBloc>().state.userPlan?.isBasic == true,
+        ),
         if (settings.staffManagementEnabled) ...[
           BlocBuilder<StaffBloc, StaffState>(
             builder: (context, state) {
@@ -1641,6 +1735,24 @@ class _SettingsPageState extends State<SettingsPage> {
             child: const Text('SAVE'),
           ),
         ],
+      ),
+    );
+  }
+  Widget _buildProBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.amber[100],
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.amber[700]!, width: 0.5),
+      ),
+      child: Text(
+        'PRO',
+        style: TextStyle(
+          color: Colors.amber[900],
+          fontSize: 8,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }

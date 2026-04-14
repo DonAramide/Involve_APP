@@ -51,3 +51,10 @@ android/key.properties
 android/upload-keystore.jks
 *.jks
 *.keystore
+
+# Secret files
+.env
+.env.*
+backend/.env
+**/secrets/
+**/credentials*.json

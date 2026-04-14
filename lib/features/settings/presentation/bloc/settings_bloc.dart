@@ -246,13 +246,37 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     if (event.settings.serviceBillingEnabled && !(state.settings?.serviceBillingEnabled ?? false)) {
       // User is trying to ENABLE service billing
       final plan = state.userPlan;
-      if (plan == null || !plan.isValid) {
+      if (plan == null || !plan.isValid || plan.isBasic) {
          // Double check fresh plan to be safe
          final freshPlan = await _loadUserPlan();
-         if (!freshPlan.isValid) {
+         if (!freshPlan.isValid || freshPlan.isBasic) {
             emit(state.copyWith(error: 'Service Billing is available on Pro & Lifetime plans'));
             return;
          }
+      }
+    }
+
+    // Pro validation for Staff Management
+    if (event.settings.staffManagementEnabled && !(state.settings?.staffManagementEnabled ?? false)) {
+      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasic) {
+        emit(state.copyWith(error: 'Staff Management is a Pro Version feature.'));
+        return;
+      }
+    }
+
+    // Pro validation for Custom Receipt Pricing
+    if (event.settings.customReceiptPricingEnabled && !(state.settings?.customReceiptPricingEnabled ?? false)) {
+      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasic) {
+        emit(state.copyWith(error: 'Custom Receipt Pricing is a Pro Version feature.'));
+        return;
+      }
+    }
+
+    // Pro validation for Admin Signature
+    if (event.settings.showAdminSignature && !(state.settings?.showAdminSignature ?? false)) {
+      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasic) {
+        emit(state.copyWith(error: 'Digital Admin Signature is a Pro Version feature.'));
+        return;
       }
     }
 

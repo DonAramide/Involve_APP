@@ -728,6 +728,92 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
              }
           }
         }
+
+        // --- Service Customers Sync ---
+        debugPrint('Syncing Service Customers...');
+        if (_tableExists(backupDb, 'service_customers')) {
+          final backupServiceCustomers = backupDb.select('SELECT * FROM service_customers');
+          for (final row in backupServiceCustomers) {
+            final id = _getString(row['id'])!;
+            final name = _getString(row['name']) ?? '';
+            
+            final existing = await (database.select(database.serviceCustomers)..where((t) => t.id.equals(id))).getSingleOrNull();
+            if (existing == null) {
+              await database.into(database.serviceCustomers).insert(ServiceCustomersCompanion.insert(
+                id: id,
+                name: name,
+                phone: Value(_getString(row['phone'])),
+                email: Value(_getString(row['email'])),
+                createdAt: Value(_getDateTime(row['created_at']) ?? DateTime.now()),
+              ));
+            }
+          }
+        }
+
+        // --- Service Jobs Sync ---
+        debugPrint('Syncing Service Jobs...');
+        if (_tableExists(backupDb, 'service_jobs')) {
+          final backupServiceJobs = backupDb.select('SELECT * FROM service_jobs');
+          for (final row in backupServiceJobs) {
+            final id = _getString(row['id'])!;
+            final jobIdString = _getString(row['job_id']) ?? '';
+            
+            final existing = await (database.select(database.serviceJobs)..where((t) => t.id.equals(id))).getSingleOrNull();
+            if (existing == null) {
+              await database.into(database.serviceJobs).insert(ServiceJobsCompanion.insert(
+                id: id,
+                jobId: jobIdString,
+                customerId: _getString(row['customer_id']) ?? '',
+                title: _getString(row['title']) ?? '',
+                description: Value(_getString(row['description'])),
+                totalAmount: (row['total_amount'] as num).toDouble(),
+                amountPaid: Value((row['amount_paid'] as num).toDouble()),
+                balance: (row['balance'] as num).toDouble(),
+                status: Value(_getString(row['status']) ?? 'pending'),
+                dueDate: Value(_getDateTime(row['due_date'])),
+                createdAt: Value(_getDateTime(row['created_at']) ?? DateTime.now()),
+              ));
+            }
+          }
+        }
+
+        // --- Service Payments Sync ---
+        debugPrint('Syncing Service Payments...');
+        if (_tableExists(backupDb, 'service_payments')) {
+          final backupServicePayments = backupDb.select('SELECT * FROM service_payments');
+          for (final row in backupServicePayments) {
+            final id = _getString(row['id'])!;
+            final existing = await (database.select(database.servicePayments)..where((t) => t.id.equals(id))).getSingleOrNull();
+            if (existing == null) {
+              await database.into(database.servicePayments).insert(ServicePaymentsCompanion.insert(
+                id: id,
+                jobId: _getString(row['job_id']) ?? '',
+                amount: (row['amount'] as num).toDouble(),
+                method: _getString(row['method']) ?? 'Cash',
+                reference: Value(_getString(row['reference'])),
+                createdAt: Value(_getDateTime(row['created_at']) ?? DateTime.now()),
+              ));
+            }
+          }
+        }
+
+        // --- Local Counters Sync (Sanity Check) ---
+        debugPrint('Syncing Local Counters...');
+        if (_tableExists(backupDb, 'local_counters')) {
+          final backupCounters = backupDb.select('SELECT * FROM local_counters');
+          for (final row in backupCounters) {
+            final type = _getString(row['type'])!;
+            final lastValue = row['last_value'] as int;
+            
+            final existing = await (database.select(database.localCounters)..where((t) => t.type.equals(type))).getSingleOrNull();
+            if (existing == null || lastValue > existing.lastValue) {
+               await database.into(database.localCounters).insertOnConflictUpdate(LocalCountersCompanion(
+                 type: Value(type),
+                 lastValue: Value(lastValue),
+               ));
+            }
+          }
+        }
       });
       return true;
     } finally {

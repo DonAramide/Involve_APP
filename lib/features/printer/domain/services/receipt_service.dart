@@ -9,9 +9,10 @@ import '../../../settings/domain/entities/settings.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/utils/number_to_words.dart';
+import '../../../settings/domain/entities/user_plan.dart';
 
 class ReceiptService {
-  Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride, String? receiptTitle}) async {
+  Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride, String? receiptTitle, UserPlan? userPlan}) async {
     final font = await PdfGoogleFonts.notoSansRegular();
     final boldFont = await PdfGoogleFonts.notoSansBold();
 
@@ -47,30 +48,31 @@ class ReceiptService {
     }
 
     if (template == 'classic' || template == 'classic_a4' || template == 'professional' || template == 'detailed' || template == 'modern') {
-      return _generateClassicA4(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, template: template);
+      return _generateClassicA4(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, template: template, userPlan: userPlan);
     }
     
     if (template == 'school_teal') {
-      return _generateSchoolTeal(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
+      return _generateSchoolTeal(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle, userPlan: userPlan);
     }
     if (template == 'school_color') {
-      return _generateSchoolColor(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
+      return _generateSchoolColor(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle, userPlan: userPlan);
     }
     if (template == 'school_academic') {
-      return _generateSchoolAcademic(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
+      return _generateSchoolAcademic(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle, userPlan: userPlan);
     }
     if (template == 'school_traditional') {
-      return _generateSchoolTraditional(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle);
+      return _generateSchoolTraditional(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, receiptTitle: receiptTitle, userPlan: userPlan);
     }
 
-    return _generateThermalRoll(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, template: template, receiptTitle: receiptTitle);
+    return _generateThermalRoll(pdf, invoice, settings, logoImage, adminSignatureImage, useCustomPrices, template: template, receiptTitle: receiptTitle, userPlan: userPlan);
   }
 
-  Future<Uint8List> _generateThermalRoll(pw.Document pdf, Invoice invoice, AppSettings settings,    pw.ImageProvider? logoImage, 
+  Future<Uint8List> _generateThermalRoll(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, 
     pw.ImageProvider? adminSignatureImage,
     bool useCustomPrices, 
-    {String? template, String? receiptTitle}) async {
+    {String? template, String? receiptTitle, UserPlan? userPlan}) async {
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
+    final bool isPro = userPlan?.isValid == true && !userPlan!.isBasic;
 
     pdf.addPage(
       pw.Page(
@@ -260,7 +262,12 @@ class ReceiptService {
                   ],
                 ),
               pw.Text(settings.receiptFooter, style: const pw.TextStyle(fontSize: 10)),
-              pw.Text('Powered by IIPS', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
+              pw.SizedBox(height: 10),
+              pw.Center(
+                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by IIPS', 
+                    style: pw.TextStyle(fontSize: 8, color: isPro ? PdfColors.blue : PdfColors.grey, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
+              ),
+              pw.SizedBox(height: 10),
             ],
           );
         },
@@ -270,8 +277,9 @@ class ReceiptService {
     return pdf.save();
   }
 
-  Future<Uint8List> _generateClassicA4(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? template}) async {
+  Future<Uint8List> _generateClassicA4(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? template, UserPlan? userPlan}) async {
     final dateFormat = DateFormat('dd MMMM, yyyy');
+    final bool isPro = userPlan?.isValid == true && !userPlan!.isBasic;
 
     pdf.addPage(
       pw.Page(
@@ -456,13 +464,8 @@ class ReceiptService {
 
               pw.SizedBox(height: 30),
               pw.Center(
-                child: pw.Text('THANK YOU FOR YOUR BUSINESS!', 
-                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Center(
-                child: pw.Text('Powered by IIPS', 
-                    style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey)),
+                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by IIPS', 
+                    style: pw.TextStyle(fontSize: 10, color: isPro ? PdfColors.blue : PdfColors.grey, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
               ),
             ],
           );
@@ -505,8 +508,9 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolTeal(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
+  Future<Uint8List> _generateSchoolTeal(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle, UserPlan? userPlan}) async {
     final dateFormat = DateFormat('dd-MM-yyyy');
+    final bool isPro = userPlan?.isValid == true && !userPlan!.isBasic;
     const primaryColor = PdfColor.fromInt(0xFF00796B); // Teal 700
     const secondaryColor = PdfColor.fromInt(0xFF455A64); // Blue Grey 700
 
@@ -736,7 +740,8 @@ class ReceiptService {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                   pw.Text('Powered by IIPS', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
+                   pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by IIPS', 
+                       style: pw.TextStyle(fontSize: 8, color: isPro ? PdfColors.blue : PdfColors.grey, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
                    pw.Text(settings.address, style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
                 ],
               ),
@@ -782,9 +787,10 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolColor(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
+  Future<Uint8List> _generateSchoolColor(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle, UserPlan? userPlan}) async {
     // Uses the primary color from settings for a branded look
     final dateFormat = DateFormat('dd-MM-yyyy');
+    final bool isPro = userPlan?.isValid == true && !userPlan!.isBasic;
     final primaryColor = PdfColor.fromInt(settings.primaryColor);
     final accentColor = PdfColors.grey100;
 
@@ -1015,10 +1021,17 @@ class ReceiptService {
                    color: PdfColors.black,
                    borderRadius: pw.BorderRadius.only(topLeft: pw.Radius.circular(40)),
                  ),
-                 alignment: pw.Alignment.centerRight,
-                 padding: const pw.EdgeInsets.only(right: 20),
-                 child: pw.Text('www.involve.com', style: const pw.TextStyle(color: PdfColors.white, fontSize: 8)),
-              ),
+                  alignment: pw.Alignment.centerRight,
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 20),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                       pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by IIPS', 
+                           style: pw.TextStyle(color: isPro ? PdfColors.blue100 : PdfColors.white, fontSize: 8, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
+                       pw.Text('www.involve.com', style: const pw.TextStyle(color: PdfColors.white, fontSize: 8)),
+                    ],
+                  ),
+               ),
               pw.Container(
                 height: 10,
                 width: double.infinity,
@@ -1033,9 +1046,10 @@ class ReceiptService {
     return pdf.save();
   }
 
-  Future<Uint8List> _generateSchoolAcademic(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
+  Future<Uint8List> _generateSchoolAcademic(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle, UserPlan? userPlan}) async {
     // Matches university style media__1772443499936.png
     final dateFormat = DateFormat('dd/MM/yyyy');
+    final bool isPro = userPlan?.isValid == true && !userPlan!.isBasic;
     
     pdf.addPage(
       pw.Page(
@@ -1200,6 +1214,11 @@ class ReceiptService {
               ),
               pw.Text(invoice.invoiceNumber, style: const pw.TextStyle(fontSize: 8)),
               pw.SizedBox(height: 10),
+              pw.Center(
+                child: pw.Text(isPro ? '✨ Invify Pro Edition' : 'Powered by IIPS', 
+                    style: pw.TextStyle(fontSize: 10, color: isPro ? PdfColors.blue : PdfColors.grey, fontWeight: isPro ? pw.FontWeight.bold : pw.FontWeight.normal)),
+              ),
+              pw.SizedBox(height: 10),
               if (adminSignatureImage != null)
                 pw.Row(
                   mainAxisAlignment: pw.MainAxisAlignment.end,
@@ -1269,9 +1288,10 @@ class ReceiptService {
     );
   }
 
-  Future<Uint8List> _generateSchoolTraditional(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle}) async {
+  Future<Uint8List> _generateSchoolTraditional(pw.Document pdf, Invoice invoice, AppSettings settings, pw.ImageProvider? logoImage, pw.ImageProvider? adminSignatureImage, bool useCustomPrices, {String? receiptTitle, UserPlan? userPlan}) async {
     // Matches horizontal voucher style media__1772443609175.png
     final dateFormat = DateFormat('dd/MM/yyyy');
+    final bool isPro = userPlan?.isValid == true && !userPlan!.isBasic;
     const greenTheme = PdfColor.fromInt(0xFF2E7D32); // Green 800
 
     pdf.addPage(
@@ -1394,6 +1414,11 @@ class ReceiptService {
                           pw.Spacer(),
                           pw.Column(
                              children: [
+                               if (isPro)
+                                 pw.Padding(
+                                   padding: const pw.EdgeInsets.only(bottom: 10),
+                                   child: pw.Text('✨ Invify Pro Edition', style: pw.TextStyle(fontSize: 8, color: PdfColors.blue, fontWeight: pw.FontWeight.bold)),
+                                 ),
                                pw.Container(
                                  padding: const pw.EdgeInsets.all(10),
                                  decoration: pw.BoxDecoration(border: pw.Border.all(color: greenTheme, width: 2)),

@@ -15,6 +15,7 @@ import 'package:involve_app/features/stock/data/models/stock_return_table.dart';
 import 'package:involve_app/features/stock/data/models/expense_table.dart';
 import 'package:involve_app/features/school/data/models/school_tables.dart';
 import 'package:involve_app/features/printer/data/models/printer_table.dart';
+import 'package:involve_app/features/services/data/models/services_tables.dart';
 
 part 'app_database.g.dart';
 
@@ -39,13 +40,23 @@ part 'app_database.g.dart';
   Results,
   GradingRules,
   Teachers,
-  PrinterConfigs
+  PrinterConfigs,
+  ServiceCustomers,
+  ServiceJobs,
+  ServicePayments,
+  LocalCounters,
+  ServiceJobPresets,
+  ServiceMaterials,
+  ServiceJobItems,
+  ServiceMaterialCategories,
+  ServiceLaborPresets,
+  ServiceExpenseCategories
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 63;
+  int get schemaVersion => 69;
 
   @override
   MigrationStrategy get migration {
@@ -279,6 +290,37 @@ class AppDatabase extends _$AppDatabase {
         if (from < 63) {
           // Schema V63: Add academicYearId to Students table
           await _safeAddColumn(m, students, students.academicYearId);
+        }
+        if (from < 64) {
+          // Schema V64: Add Services Module tables
+          await _safeCreateTable(m, serviceCustomers);
+          await _safeCreateTable(m, serviceJobs);
+          await _safeCreateTable(m, servicePayments);
+          await _safeCreateTable(m, localCounters);
+        }
+        if (from < 65) {
+          // Schema V65: Add ServiceJobPresets table
+          await _safeCreateTable(m, serviceJobPresets);
+        }
+        if (from < 66) {
+          // Schema V66: Add Materials and Labors tables
+          await _safeCreateTable(m, serviceMaterials);
+          await _safeCreateTable(m, serviceJobItems);
+          await _safeAddColumn(m, serviceJobs, serviceJobs.laborAmount);
+        }
+        if (from < 67) {
+          // Schema V67: Add ServiceMaterialCategories table
+          await _safeCreateTable(m, serviceMaterialCategories);
+        }
+        if (from < 68) {
+          // Schema V68: Add address/image to customers and create LaborPresets table
+          await _safeAddColumn(m, serviceCustomers, serviceCustomers.address);
+          await _safeAddColumn(m, serviceCustomers, serviceCustomers.image);
+          await _safeCreateTable(m, serviceLaborPresets);
+        }
+        if (from < 69) {
+          // Schema V69: Add ServiceExpenseCategories table
+          await _safeCreateTable(m, serviceExpenseCategories);
         }
       },
       beforeOpen: (details) async {

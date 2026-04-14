@@ -65,6 +65,7 @@ class BusinessModeSelector extends StatelessWidget {
                   items: const [
                     DropdownMenuItem(value: 'retail', child: Text('Retail (Default)')),
                     DropdownMenuItem(value: 'school', child: Text('School Mode')),
+                    DropdownMenuItem(value: 'services', child: Text('Services Mode')),
                   ],
                   onChanged: isLocked ? null : (val) {
                     if (val != null) onModeChanged(val);

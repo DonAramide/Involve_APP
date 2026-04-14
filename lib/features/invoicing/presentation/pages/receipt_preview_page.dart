@@ -58,6 +58,7 @@ class ReceiptPreviewPage extends StatelessWidget {
           settings,
           useCustomPricesOverride: actualUseCustom,
           receiptTitle: receiptTitle,
+          userPlan: context.read<SettingsBloc>().state.userPlan,
         ),
         pdfFileName: 'Invoice-${invoice.id}.pdf',
         canChangePageFormat: false,
