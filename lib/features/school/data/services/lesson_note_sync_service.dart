@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import '../repositories/lesson_note_repository.dart';
-import '../../domain/entities/lesson_note_models.dart';
+import 'package:involve_app/features/school/domain/repositories/lesson_note_repository.dart';
+import 'package:involve_app/features/school/domain/entities/lesson_note_models.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 
 class LessonNoteSyncService {

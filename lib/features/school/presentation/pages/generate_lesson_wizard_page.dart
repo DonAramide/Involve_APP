@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/lesson_note_bloc.dart';
-import '../../school/presentation/bloc/school_bloc.dart';
-import '../../school/presentation/bloc/school_state.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'lesson_note_editor_page.dart';
 
 class GenerateLessonWizardPage extends StatefulWidget {

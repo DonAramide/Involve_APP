@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
-import '../../../../stock/data/datasources/app_database.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import '../../domain/entities/lesson_note_models.dart';
 import '../../domain/repositories/lesson_note_repository.dart';
 
@@ -37,36 +37,30 @@ class LessonNoteRepositoryImpl implements ILessonNoteRepository {
     int? lastId,
     int limit = 20,
   }) async {
-    final latestVersionSubquery = db.selectOnly(db.lessonNotes)
-      ..addColumns([db.lessonNotes.contentHash, db.lessonNotes.version.max()])
-      ..where(db.lessonNotes.isDeleted.equals(false))
-      ..groupBy([db.lessonNotes.contentHash]);
-
-    final query = db.select(db.lessonNotes).join([
-      innerJoin(
-        latestVersionSubquery,
-        latestVersionSubquery.contentHash.equalsExp(db.lessonNotes.contentHash) &
-        latestVersionSubquery.version.max().equalsExp(db.lessonNotes.version)
-      )
-    ]);
-
-    Expression<bool> whereClause = db.lessonNotes.isDeleted.equals(false);
+    // To correctly get ONLY the latest version of each note, we filter where version == max(version) for that hash
+    final query = db.select(db.lessonNotes)
+      ..where((t) => t.version.equalsExp(
+        subqueryExpression<int>(
+          db.selectOnly(db.lessonNotes)
+            ..addColumns([db.lessonNotes.version.max()])
+            ..where(db.lessonNotes.contentHash.equalsExp(t.contentHash) & db.lessonNotes.isDeleted.equals(false))
+        )
+      ) & t.isDeleted.equals(false));
 
     if (lastUpdatedAt != null && lastId != null) {
-      whereClause &= (db.lessonNotes.updatedAt.isSmallerThanValue(lastUpdatedAt) |
-          (db.lessonNotes.updatedAt.equalsValue(lastUpdatedAt) &
-              db.lessonNotes.id.isSmallerThanValue(lastId)));
+      query.where((t) => t.updatedAt.isSmallerThan(Variable(lastUpdatedAt)) |
+          (t.updatedAt.equalsExp(Variable(lastUpdatedAt)) &
+              t.id.isSmallerThan(Variable(lastId))));
     }
 
-    query.where(whereClause);
     query.orderBy([
-      OrderingTerm(expression: db.lessonNotes.updatedAt, mode: OrderingMode.desc),
-      OrderingTerm(expression: db.lessonNotes.id, mode: OrderingMode.desc)
+      (t) => OrderingTerm(expression: t.updatedAt, mode: OrderingMode.desc),
+      (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)
     ]);
     query.limit(limit);
 
     final results = await query.get();
-    return results.map((row) => _mapToEntity(row.readTable(db.lessonNotes))).toList();
+    return results.map(_mapToEntity).toList();
   }
 
   @override
@@ -133,6 +127,49 @@ class LessonNoteRepositoryImpl implements ILessonNoteRepository {
             ),
           );
     });
+  }
+
+  @override
+  Future<CurriculumEntry> getOrCreateCurriculumEntry(CurriculumEntry entry) async {
+    final query = db.select(db.curriculumMap)
+      ..where((t) =>
+          t.classId.equals(entry.classId) &
+          t.subjectId.equals(entry.subjectId) &
+          t.termId.equals(entry.termId) &
+          t.week.equals(entry.week) &
+          t.topic.equals(entry.topic))
+      ..limit(1);
+
+    final existing = await query.getSingleOrNull();
+    if (existing != null) {
+      return CurriculumEntry(
+        id: existing.id,
+        classId: existing.classId,
+        subjectId: existing.subjectId,
+        termId: existing.termId,
+        week: existing.week,
+        topic: existing.topic,
+      );
+    }
+
+    final id = await db.into(db.curriculumMap).insert(
+          CurriculumMapCompanion.insert(
+            classId: entry.classId,
+            subjectId: entry.subjectId,
+            termId: entry.termId,
+            week: entry.week,
+            topic: entry.topic,
+          ),
+        );
+
+    return CurriculumEntry(
+      id: id,
+      classId: entry.classId,
+      subjectId: entry.subjectId,
+      termId: entry.termId,
+      week: entry.week,
+      topic: entry.topic,
+    );
   }
 
   @override

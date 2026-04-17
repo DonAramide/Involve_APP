@@ -3,8 +3,8 @@ import 'package:equatable/equatable.dart';
 import '../../domain/entities/lesson_note_models.dart';
 import '../../domain/repositories/lesson_note_repository.dart';
 import '../../domain/services/ai_service_interface.dart';
-import '../../../../settings/domain/services/security_service.dart';
-import '../../../../../core/utils/hashing_utils.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/core/utils/hashing_utils.dart';
 
 // --- Events ---
 abstract class LessonNoteEvent extends Equatable {
@@ -122,6 +122,24 @@ class LessonNoteState extends Equatable {
 }
 
 class LessonNoteInitial extends LessonNoteState {}
+
+class LessonNoteLoading extends LessonNoteState {}
+
+class LessonGenerating extends LessonNoteState {}
+
+class LessonReady extends LessonNoteState {
+  final LessonNote note;
+  const LessonReady(this.note) : super(generatedNote: note);
+  @override
+  List<Object?> get props => [note];
+}
+
+class LessonError extends LessonNoteState {
+  final String message;
+  const LessonError(this.message) : super(error: message);
+  @override
+  List<Object?> get props => [message];
+}
 
 // --- Bloc ---
 class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
@@ -256,7 +274,7 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
   Future<void> _onSaveLessonVersion(SaveLessonVersion event, Emitter<LessonNoteState> emit) async {
     try {
       await repository.saveLessonNote(event.note);
-      add(LoadLessons()); // Reload list
+      add(const LoadLessonNotes()); // Reload list
     } catch (e) {
       emit(LessonError('Failed to save lesson: $e'));
     }
@@ -265,7 +283,7 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
   Future<void> _onDeleteLesson(DeleteLesson event, Emitter<LessonNoteState> emit) async {
     try {
       await repository.deleteLesson(event.hash);
-      add(LoadLessons());
+      add(const LoadLessonNotes());
     } catch (e) {
       emit(LessonError('Failed to delete lesson: $e'));
     }

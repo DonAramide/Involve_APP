@@ -14,11 +14,11 @@ class LicenseValidator {
       // 1. Normalize and Decode Base32
       final raw = Base32Service.normalize(key);
       final bytes = Base32Service.decode(raw);
-      if (bytes.length != 15) return null;
+      if (bytes.length != 17) return null;
 
-      // 2. Split Payload (11) and Signature (4)
-      final payload = bytes.sublist(0, 11);
-      final providedSignature = bytes.sublist(11, 15);
+      // 2. Split Payload (13) and Signature (4)
+      final payload = bytes.sublist(0, 13);
+      final providedSignature = bytes.sublist(13, 17);
 
       // 3. Verify Signature (Integrity)
       final hmac = Hmac(sha256, utf8.encode(_hmacSecret));
@@ -54,10 +54,10 @@ class LicenseValidator {
     try {
       final raw = Base32Service.normalize(key);
       final bytes = Base32Service.decode(raw);
-      if (bytes.length != 15) return null;
+      if (bytes.length != 17) return null;
 
-      final payload = bytes.sublist(0, 11);
-      final signature = bytes.sublist(11, 15);
+      final payload = bytes.sublist(0, 13);
+      final signature = bytes.sublist(13, 17);
       
       // Still verify signature or peek would be misleading
       final hmac = Hmac(sha256, utf8.encode(_hmacSecret));

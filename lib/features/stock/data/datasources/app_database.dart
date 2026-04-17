@@ -16,6 +16,7 @@ import 'package:involve_app/features/stock/data/models/expense_table.dart';
 import 'package:involve_app/features/school/data/models/school_tables.dart';
 import 'package:involve_app/features/printer/data/models/printer_table.dart';
 import 'package:involve_app/features/services/data/models/services_tables.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
 
 part 'app_database.g.dart';
 
@@ -405,7 +406,7 @@ class AppDatabase extends _$AppDatabase {
     try {
       await m.createIndex(index);
     } catch (e) {
-      debugPrint('Migration: Index ${index.name} already exists, skipping: $e');
+      debugPrint('Migration: Index creation failed (possibly already exists), skipping: $e');
     }
   }
 

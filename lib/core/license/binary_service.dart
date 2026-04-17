@@ -4,10 +4,10 @@ import 'dart:convert';
 import 'license_model.dart';
 
 class BinaryService {
-  /// Packs the license data into a 11-byte buffer (before HMAC)
-  /// [Expiry: 4][Plan: 1][BizHash: 4][LicenseID: 2] = 11 bytes
+  /// Packs the license data into a 13-byte buffer (before HMAC)
+  /// [Expiry: 4][Plan: 1][BizHash: 4][LicenseID: 4] = 13 bytes
   static Uint8List pack(LicenseModel license) {
-    final buffer = Uint8List(11);
+    final buffer = Uint8List(13);
     final bdata = ByteData.view(buffer.buffer);
 
     // 1. Expiry (4 bytes - 32-bit Unix timestamp)
@@ -21,8 +21,8 @@ class BinaryService {
     final bizHash = generateBusinessHash(license.businessName);
     bdata.setUint32(5, bizHash);
 
-    // 4. License ID (2 bytes - 16-bit int)
-    bdata.setUint16(9, license.licenseId);
+    // 4. License ID (4 bytes - 32-bit int)
+    bdata.setUint32(9, license.licenseId);
 
     return buffer;
   }
@@ -34,17 +34,17 @@ class BinaryService {
     return ByteData.view(Uint8List.fromList(digest.bytes).buffer).getUint32(0);
   }
 
-  /// Unpacks an 11-byte buffer back into components
+  /// Unpacks a 13-byte buffer back into components
   /// Returns a Map for validation purposes since we don't have the full business name yet
   static Map<String, dynamic> unpack(Uint8List data) {
-    if (data.length != 11) throw Exception("Invalid payload length: ${data.length}");
+    if (data.length != 13) throw Exception("Invalid payload length: ${data.length}");
     final bdata = ByteData.view(data.buffer, data.offsetInBytes, data.length);
 
     return {
       'expiryTs': bdata.getUint32(0),
       'planIndex': bdata.getUint8(4),
       'bizHash': bdata.getUint32(5),
-      'licenseId': bdata.getUint16(9),
+      'licenseId': bdata.getUint32(9),
     };
   }
 }

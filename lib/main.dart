@@ -143,7 +143,6 @@ class AppDependencies {
   final SyncServer syncServer;
   final BluetoothSyncServer bluetoothSyncServer;
   final SyncManager syncManager;
-  final String deviceId;
   final SchoolRepositoryImpl schoolRepository;
   final PrinterRepository printerRepository;
   final IFinanceRepository financeRepository;
@@ -243,7 +242,8 @@ class AppDependencies {
     final staffRepository = StaffRepositoryImpl(database);
     final syncRepository = SyncRepositoryImpl(database);
     final schoolRepository = SchoolRepositoryImpl(database);
-    final lessonNoteRepo = LessonNoteRepositoryImpl(database);
+    final lessonNoteRepository = LessonNoteRepositoryImpl(database);
+    final printerRepository = PrinterRepositoryImpl(database);
     
     // SecurityService must be initialized before deviceId
     final securityServiceForId = SecurityService();
@@ -354,9 +354,9 @@ class AppDependencies {
       printJobReceiptUC: PrintJobReceipt(printerService),
       getJobPaymentsUC: GetJobPayments(servicesRepo),
       getServicesAnalyticsUC: GetServicesAnalytics(servicesRepo),
-      lessonNoteRepository: lessonNoteRepo,
+      lessonNoteRepository: lessonNoteRepository,
       aiService: GeminiAIService(),
-      lessonNoteSyncService: LessonNoteSyncService(lessonNoteRepo),
+      lessonNoteSyncService: LessonNoteSyncService(lessonNoteRepository),
     );
   }
 }

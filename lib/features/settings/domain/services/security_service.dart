@@ -2,6 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:convert';
+import 'package:involve_app/core/utils/device_info_service.dart';
 
 class SecurityService {
   final _storage = const FlutterSecureStorage();
@@ -10,7 +11,7 @@ class SecurityService {
   static const _superAdminKey = 'super_admin_activation_key';
   static const _isAuthorizedKey = 'device_lifetime_authorized';
   static const _aiApiKey = 'gemini_api_key';
-  static const _deviceIdKey = 'persistent_device_id';
+  static const _deviceIdKey = 'persistent_device_id_v2';
 
   // No longer using fixed plaintext passwords. 
   // For emergency/default, we'll hash the expected default strings.
@@ -118,16 +119,22 @@ class SecurityService {
 
   Future<String?> getAiApiKey() async {
     return await _storage.read(key: _aiApiKey);
+  }
+
   // --- Persistent Device ID ---
   Future<String> getPersistentDeviceId() async {
+    // 1. Try secure storage first (for consistency)
     final stored = await _storage.read(key: _deviceIdKey);
-    if (stored != null && stored.isNotEmpty) {
+    // Only accept if it's the new 6-character format
+    if (stored != null && stored.isNotEmpty && stored.length == 6) {
       return stored;
     }
 
-    // Generate a fresh v4 UUID
-    final newId = const Uuid().v4();
-    await _storage.write(key: _deviceIdKey, value: newId);
-    return newId;
+    // 2. Generate from hardware suffix (last 6 chars of unique hardware ID)
+    final hardwareId = await DeviceInfoService.getDeviceSuffix();
+    
+    // 3. Persist for consistency
+    await _storage.write(key: _deviceIdKey, value: hardwareId);
+    return hardwareId;
   }
 }

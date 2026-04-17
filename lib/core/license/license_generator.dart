@@ -11,7 +11,7 @@ class LicenseGenerator {
 
   /// Generates a 24-character Base32 license key
   static String generate(LicenseModel license) {
-    // 1. Pack data into 11 bytes
+    // 1. Pack data into 13 bytes
     final payload = BinaryService.pack(license);
 
     // 2. Calculate HMAC-SHA256
@@ -21,16 +21,16 @@ class LicenseGenerator {
     // 3. Take first 4 bytes of HMAC signature (32-bit security)
     final truncatedSignature = Uint8List.fromList(signature.bytes.sublist(0, 4));
 
-    // 4. Concatenate Payload + Signature (11 + 4 = 15 bytes)
-    final finalBytes = Uint8List(15);
-    finalBytes.setRange(0, 11, payload);
-    finalBytes.setRange(11, 15, truncatedSignature);
+    // 4. Concatenate Payload + Signature (13 + 4 = 17 bytes)
+    final finalBytes = Uint8List(17);
+    finalBytes.setRange(0, 13, payload);
+    finalBytes.setRange(13, 17, truncatedSignature);
 
     // 5. Encode to Base32 and format
     final rawKey = Base32Service.encode(finalBytes);
     
-    // Safety check: Ensure exactly 24 chars
-    if (rawKey.length != 24) {
+    // Safety check: Ensure exactly 28 chars (17 bytes * 8 / 5 = 27.2 -> 28 rounded up)
+    if (rawKey.length != 28) {
       throw Exception("License key generation failed logic check: length is ${rawKey.length}");
     }
 

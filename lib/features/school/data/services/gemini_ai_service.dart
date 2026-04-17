@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import '../services/ai_service_interface.dart';
-import '../entities/lesson_note_models.dart';
-import '../services/lesson_note_validator.dart';
+import 'package:involve_app/features/school/domain/services/ai_service_interface.dart';
+import 'package:involve_app/features/school/domain/entities/lesson_note_models.dart';
+import 'package:involve_app/features/school/domain/services/lesson_note_validator.dart';
 
 class GeminiAIService implements IAIService {
   static const int maxRetries = 3;

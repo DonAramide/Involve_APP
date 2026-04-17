@@ -177,7 +177,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       debugPrint('SettingsBloc: Plan loaded: ${plan.planType}, Expiry: ${plan.expiryDate}');
 
       // Auto-disable if plan is not eligible
-      AppSettings? finalSettings = settings;
       if (settings != null) {
         // 1. Migration: school_purple -> school_color
         if (settings.defaultInvoiceTemplate == 'school_purple') {
