@@ -805,13 +805,19 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
             final type = _getString(row['type'])!;
             final lastValue = row['last_value'] as int;
             
-            final existing = await (database.select(database.localCounters)..where((t) => t.type.equals(type))).getSingleOrNull();
-            if (existing == null || lastValue > existing.lastValue) {
-               await database.into(database.localCounters).insertOnConflictUpdate(LocalCountersCompanion(
+             final existingEntry = await (database.select(database.localCounters)..where((t) => t.type.equals(type))).getSingleOrNull();
+             if (existingEntry != null) {
+               if (lastValue > existingEntry.lastValue) {
+                 await (database.update(database.localCounters)..where((t) => t.type.equals(type))).write(
+                   LocalCountersCompanion(lastValue: Value(lastValue)),
+                 );
+               }
+             } else {
+               await database.into(database.localCounters).insert(LocalCountersCompanion(
                  type: Value(type),
                  lastValue: Value(lastValue),
                ));
-            }
+             }
           }
         }
       });

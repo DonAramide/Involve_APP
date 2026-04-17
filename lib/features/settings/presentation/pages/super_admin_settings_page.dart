@@ -484,9 +484,9 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
             ),
             _buildTextField(
               controller: _deviceSuffixController,
-              label: 'Device Suffix (e.g. 7A2)',
+              label: 'Device Suffix (6-chars)',
               icon: Icons.devices,
-              maxLength: 3,
+              maxLength: 6,
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -539,9 +539,9 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   }
 
   Future<void> _generateLicense() async {
-    if (_licenseBusinessNameController.text.isEmpty || _deviceSuffixController.text.length != 3) {
+    if (_licenseBusinessNameController.text.isEmpty || _deviceSuffixController.text.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter business name and 3-char device suffix')),
+        const SnackBar(content: Text('Please enter business name and 6-char device suffix')),
       );
       return;
     }

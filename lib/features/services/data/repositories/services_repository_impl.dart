@@ -165,7 +165,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
     Uint8List? image,
   }) async {
     final id = const Uuid().v4();
-    final row = await db.into(db.serviceCustomers).insertReturning(ServiceCustomersCompanion.insert(
+    final companion = ServiceCustomersCompanion.insert(
       id: id,
       name: name,
       phone: Value(phone),
@@ -173,7 +173,11 @@ class ServicesRepositoryImpl implements IServicesRepository {
       address: Value(address),
       image: Value(image),
       createdAt: Value(DateTime.now()),
-    ));
+    );
+
+    await db.into(db.serviceCustomers).insert(companion);
+    
+    final row = await (db.select(db.serviceCustomers)..where((t) => t.id.equals(id))).getSingle();
     return _mapCustomer(row);
   }
 
@@ -408,10 +412,16 @@ class ServicesRepositoryImpl implements IServicesRepository {
     
     final nextValue = (existing?.lastValue ?? 0) + 1;
     
-    await db.into(db.localCounters).insertOnConflictUpdate(LocalCountersCompanion(
-      type: const Value(type),
-      lastValue: Value(nextValue),
-    ));
+    if (existing != null) {
+      await (db.update(db.localCounters)..where((t) => t.type.equals(type))).write(
+        LocalCountersCompanion(lastValue: Value(nextValue)),
+      );
+    } else {
+      await db.into(db.localCounters).insert(LocalCountersCompanion(
+        type: Value(type),
+        lastValue: Value(nextValue),
+      ));
+    }
     
     return nextValue;
   }

@@ -21,8 +21,8 @@ class ActivationPage extends StatefulWidget {
 
 class _ActivationPageState extends State<ActivationPage> {
   final _businessNameController = TextEditingController();
-  final List<TextEditingController> _segmentControllers = List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final List<TextEditingController> _segmentControllers = List.generate(7, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(7, (_) => FocusNode());
   bool _isLoading = false;
   String? _errorMessage;
   
@@ -347,10 +347,10 @@ class _ActivationPageState extends State<ActivationPage> {
         ),
         const SizedBox(height: 8),
         Row(
-          children: List.generate(6, (index) {
+          children: List.generate(7, (index) {
             return Expanded(
               child: Padding(
-                padding: EdgeInsets.only(right: index == 5 ? 0 : 4),
+                padding: EdgeInsets.only(right: index == 6 ? 0 : 4),
                 child: TextField(
                   controller: _segmentControllers[index],
                   focusNode: _focusNodes[index],
@@ -369,7 +369,7 @@ class _ActivationPageState extends State<ActivationPage> {
                   onChanged: (value) {
                     if (value.length > 4) {
                       _handlePaste(index, value);
-                    } else if (value.length == 4 && index < 5) {
+                    } else if (value.length == 4 && index < 6) {
                       _focusNodes[index + 1].requestFocus();
                     } else if (value.isEmpty && index > 0) {
                       _focusNodes[index - 1].requestFocus();
@@ -382,7 +382,7 @@ class _ActivationPageState extends State<ActivationPage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX',
+          'Format: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX',
           style: TextStyle(fontSize: 10, color: Colors.grey),
         ),
       ],
@@ -395,7 +395,7 @@ class _ActivationPageState extends State<ActivationPage> {
     
     // Distribute characters starting from the current index
     int charPtr = 0;
-    for (int i = startIndex; i < 6; i++) {
+    for (int i = startIndex; i < 7; i++) {
       if (charPtr >= clean.length) break;
       
       final end = (charPtr + 4).clamp(0, clean.length);
@@ -405,7 +405,7 @@ class _ActivationPageState extends State<ActivationPage> {
     
     // Set focus to the segment where distribution ended
     final segmentsFilled = (clean.length / 4).ceil();
-    final targetIdx = (startIndex + segmentsFilled - 1).clamp(0, 5);
+    final targetIdx = (startIndex + segmentsFilled - 1).clamp(0, 6);
     _focusNodes[targetIdx].requestFocus();
     
     // Move cursor to end of text in the focused box

@@ -144,39 +144,78 @@ class ServicesDashboardPage extends StatelessWidget {
   }
 
   Widget _buildProfitSummary(BuildContext context, double total, double paid, String symbol) {
+    final progress = total > 0 ? (paid / total).clamp(0.0, 1.0) : 0.0;
+    
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesAnalyticsPage())),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Colors.blue.shade800, Colors.blue.shade600],
+            colors: [Colors.blue.shade900, Colors.blue.shade600],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))],
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            )
+          ],
         ),
-        child: Row(
+        child: Column(
           children: [
-            const CircleAvatar(
-              backgroundColor: Colors.white24,
-              child: Icon(Icons.analytics, color: Colors.white),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Profitability Summary', style: TextStyle(color: Colors.white70, fontSize: 13)),
-                  Text(
-                    '${CurrencyFormatter.formatWithSymbol(paid, symbol: symbol)} / ${CurrencyFormatter.formatWithSymbol(total, symbol: symbol)} Collected',
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                ],
+                  child: const Icon(Icons.auto_graph_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Profitability Summary',
+                        style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${CurrencyFormatter.formatWithSymbol(paid, symbol: symbol)} / ${CurrencyFormatter.formatWithSymbol(total, symbol: symbol)} Collected',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 16),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: Colors.white12,
+                valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                minHeight: 8,
               ),
             ),
-            const Icon(Icons.chevron_right, color: Colors.white70),
           ],
         ),
       ),
@@ -184,35 +223,59 @@ class ServicesDashboardPage extends StatelessWidget {
   }
 
   Widget _buildStatsRow(double total, double paid, int active, int ready, String symbol) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _buildStatCard('Revenue', CurrencyFormatter.formatWithSymbol(total, symbol: symbol), Colors.blue),
-          _buildStatCard('Received', CurrencyFormatter.formatWithSymbol(paid, symbol: symbol), Colors.green),
-          _buildStatCard('Active', '$active', Colors.orange),
-          _buildStatCard('Ready', '$ready', Colors.teal),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 600 ? 4 : 2;
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          childAspectRatio: crossAxisCount == 4 ? 1.5 : 1.3,
+          children: [
+            _buildStatCard('Revenue', total, symbol, Colors.blue, Icons.payments_rounded),
+            _buildStatCard('Received', paid, symbol, Colors.green, Icons.check_circle_rounded),
+            _buildStatCard('Active', active.toDouble(), '', Colors.orange, Icons.pending_actions_rounded, isCount: true),
+            _buildStatCard('Ready', ready.toDouble(), '', Colors.teal, Icons.task_alt_rounded, isCount: true),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color) {
+  Widget _buildStatCard(String label, double value, String symbol, Color color, IconData icon, {bool isCount = false}) {
+    final formattedValue = isCount ? value.toInt().toString() : CurrencyFormatter.formatWithSymbol(value, symbol: symbol);
+    
     return Container(
-      width: 140,
-      margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.2), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: TextStyle(color: color.withOpacity(0.8), fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              Icon(icon, color: color.withOpacity(0.5), size: 18),
+            ],
+          ),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.bottomLeft,
+            child: Text(
+              formattedValue,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+            ),
+          ),
         ],
       ),
     );
