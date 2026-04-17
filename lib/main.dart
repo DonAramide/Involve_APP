@@ -59,6 +59,12 @@ import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/core/widgets/restart_widget.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/payment_ledger_test_page.dart';
 import 'package:involve_app/features/school_finance/presentation/pages/school_finance_dashboard.dart';
+import 'package:involve_app/features/school/domain/repositories/lesson_note_repository.dart';
+import 'package:involve_app/features/school/data/repositories/lesson_note_repository_impl.dart';
+import 'package:involve_app/features/school/domain/services/ai_service_interface.dart';
+import 'package:involve_app/features/school/data/services/gemini_ai_service.dart';
+import 'package:involve_app/features/school/presentation/bloc/lesson_note_bloc.dart';
+import 'package:involve_app/features/school/data/services/lesson_note_sync_service.dart';
 
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository.dart';
 import 'package:involve_app/features/school_finance/data/repositories/finance_repository_impl.dart';
@@ -107,6 +113,7 @@ class AppDependencies {
   final InvoiceRepositoryImpl invoiceRepository;
   final SettingsRepositoryImpl settingsRepository;
   final UnifiedPrinterService printerService;
+  final String deviceId;
   final SecurityService securityService;
   final InvoiceCalculationService calculationService;
   final BackupService backupService;
@@ -152,6 +159,9 @@ class AppDependencies {
   final PrintJobReceipt printJobReceiptUC;
   final GetJobPayments getJobPaymentsUC;
   final GetServicesAnalytics getServicesAnalyticsUC;
+  final ILessonNoteRepository lessonNoteRepository;
+  final IAIService aiService;
+  final LessonNoteSyncService lessonNoteSyncService;
 
 
   AppDependencies({
@@ -206,11 +216,20 @@ class AppDependencies {
     required this.printJobReceiptUC,
     required this.getJobPaymentsUC,
     required this.getServicesAnalyticsUC,
+    required this.lessonNoteRepository,
+    required this.aiService,
+    required this.lessonNoteSyncService,
   });
 
 
   static Future<AppDependencies> initialize() async {
-    // 1. Database
+    final deps = await _build();
+    // Cold Start Optimization: Reset stuck syncs
+    await deps.lessonNoteRepository.resetStuckSyncs();
+    return deps;
+  }
+
+  static Future<AppDependencies> _build() async {
     final database = AppDatabase();
     
     // 2. License Service
@@ -222,16 +241,20 @@ class AppDependencies {
     final settingsRepository = SettingsRepositoryImpl(database);
     final categoryRepository = CategoryRepositoryImpl(database);
     final staffRepository = StaffRepositoryImpl(database);
-    final schoolRepository = SchoolRepositoryImpl(database);
-    final printerRepository = PrinterRepositoryImpl(database);
     final syncRepository = SyncRepositoryImpl(database);
-    final deviceId = await DeviceInfoService.getDeviceSuffix();
+    final schoolRepository = SchoolRepositoryImpl(database);
+    final lessonNoteRepo = LessonNoteRepositoryImpl(database);
+    
+    // SecurityService must be initialized before deviceId
+    final securityServiceForId = SecurityService();
+    final deviceId = await securityServiceForId.getPersistentDeviceId();
     
     // 4. Services Module (100% Offline)
     final servicesRepo = ServicesRepositoryImpl(db: database);
     final servicesBackupService = ServicesBackupService(db: database);
     
     // 5. Shared Services
+    final securityService = SecurityService();
     final bleService = CrossPlatformPrinterService();
     final sppService = BlueThermalPrinterService();
     final networkService = NetworkPrinterService();
@@ -240,7 +263,6 @@ class AppDependencies {
       sppService: sppService,
       networkService: networkService,
     );
-    final securityService = SecurityService();
     final calculationService = InvoiceCalculationService();
     final backupService = BackupService(database: database);
     
@@ -332,6 +354,9 @@ class AppDependencies {
       printJobReceiptUC: PrintJobReceipt(printerService),
       getJobPaymentsUC: GetJobPayments(servicesRepo),
       getServicesAnalyticsUC: GetServicesAnalytics(servicesRepo),
+      lessonNoteRepository: lessonNoteRepo,
+      aiService: GeminiAIService(),
+      lessonNoteSyncService: LessonNoteSyncService(lessonNoteRepo),
     );
   }
 }
@@ -358,6 +383,7 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<IFinanceRepository>(create: (_) => dependencies.financeRepository),
         RepositoryProvider<IBillingRepository>(create: (_) => dependencies.billingRepository),
         RepositoryProvider<IServicesRepository>(create: (_) => dependencies.servicesRepository),
+        RepositoryProvider<ILessonNoteRepository>(create: (_) => dependencies.lessonNoteRepository),
       ],
 
       child: MultiBlocProvider(
@@ -454,6 +480,16 @@ class MyApp extends StatelessWidget {
               getJobPayments: dependencies.getJobPaymentsUC,
               getServicesAnalytics: dependencies.getServicesAnalyticsUC,
             )..add(const LoadServicesJobs()),
+          ),
+          BlocProvider(
+            create: (context) => LessonNoteBloc(
+              repository: dependencies.lessonNoteRepository,
+              aiService: dependencies.aiService,
+              securityService: dependencies.securityService,
+            ),
+          ),
+          RepositoryProvider<LessonNoteSyncService>(
+            create: (_) => dependencies.lessonNoteSyncService,
           ),
         ],
 

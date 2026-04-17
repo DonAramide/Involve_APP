@@ -1,5 +1,6 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
+import 'package:uuid/uuid.dart';
 import 'dart:convert';
 
 class SecurityService {
@@ -8,6 +9,8 @@ class SecurityService {
   static const _superAdminPasswordKey = 'super_admin_password'; // NEW: For critical settings
   static const _superAdminKey = 'super_admin_activation_key';
   static const _isAuthorizedKey = 'device_lifetime_authorized';
+  static const _aiApiKey = 'gemini_api_key';
+  static const _deviceIdKey = 'persistent_device_id';
 
   // No longer using fixed plaintext passwords. 
   // For emergency/default, we'll hash the expected default strings.
@@ -106,5 +109,25 @@ class SecurityService {
   Future<bool> hasPassword() async {
     final stored = await _storage.read(key: _passwordKey);
     return stored != null && stored.isNotEmpty;
+  }
+
+  // --- AI API Key Storage ---
+  Future<void> setAiApiKey(String key) async {
+    await _storage.write(key: _aiApiKey, value: key);
+  }
+
+  Future<String?> getAiApiKey() async {
+    return await _storage.read(key: _aiApiKey);
+  // --- Persistent Device ID ---
+  Future<String> getPersistentDeviceId() async {
+    final stored = await _storage.read(key: _deviceIdKey);
+    if (stored != null && stored.isNotEmpty) {
+      return stored;
+    }
+
+    // Generate a fresh v4 UUID
+    final newId = const Uuid().v4();
+    await _storage.write(key: _deviceIdKey, value: newId);
+    return newId;
   }
 }

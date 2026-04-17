@@ -50,13 +50,15 @@ part 'app_database.g.dart';
   ServiceJobItems,
   ServiceMaterialCategories,
   ServiceLaborPresets,
-  ServiceExpenseCategories
+  ServiceExpenseCategories,
+  CurriculumMap,
+  LessonNotes
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 69;
+  int get schemaVersion => 72;
 
   @override
   MigrationStrategy get migration {
@@ -322,6 +324,53 @@ class AppDatabase extends _$AppDatabase {
           // Schema V69: Add ServiceExpenseCategories table
           await _safeCreateTable(m, serviceExpenseCategories);
         }
+        if (from < 70) {
+          // Schema V70: Add CurriculumMap table
+          await _safeCreateTable(m, curriculumMap);
+        }
+        if (from < 71) {
+          // Schema V71: Add LessonNotes table
+          await _safeCreateTable(m, lessonNotes);
+        }
+        if (from < 72) {
+          // Schema V72: Ensure indexes for LessonNotes and CurriculumMap
+          // Plus add geminiApiKey to Settings
+          await _safeAddColumn(m, settings, settings.geminiApiKey);
+        }
+        if (from < 73) {
+          // Schema V73: Harden LessonNotes with sync status, retry, and soft delete
+          await transaction(() async {
+            await _safeAddColumn(m, lessonNotes, lessonNotes.syncStatus);
+            await _safeAddColumn(m, lessonNotes, lessonNotes.syncId);
+            await _safeAddColumn(m, lessonNotes, lessonNotes.retryCount);
+            await _safeAddColumn(m, lessonNotes, lessonNotes.isDeleted);
+            await _safeAddColumn(m, lessonNotes, lessonNotes.deviceId);
+
+            // Force create indices safely
+            await _safeCreateIndex(m, Index('idx_lesson_sync_status', 'sync_status'));
+            await _safeCreateIndex(m, Index('idx_lesson_deleted', 'is_deleted'));
+            await _safeCreateIndex(m, Index('idx_lesson_sync_id', 'sync_id'));
+
+            // Migrate existing data (Idempotent backfill)
+            final sec = SecurityService();
+            final persistentDeviceId = await sec.getPersistentDeviceId();
+            
+            final needsBackfill = await (select(lessonNotes)
+                  ..where((t) => t.syncId.isNull() | t.deviceId.isNull()))
+                .get();
+                
+            for (final lesson in needsBackfill) {
+              final deterministicSyncId = '${lesson.contentHash}-v${lesson.version}';
+              
+              await (update(lessonNotes)..where((t) => t.id.equals(lesson.id)))
+                  .write(LessonNotesCompanion(
+                    syncId: Value(deterministicSyncId),
+                    deviceId: Value(persistentDeviceId),
+                    syncStatus: const Value(0), // Default to pending
+                  ));
+            }
+          });
+        }
       },
       beforeOpen: (details) async {
         // Enforce Foreign Keys (SQLite only, harmless on Web/IndexedDB)
@@ -348,6 +397,15 @@ class AppDatabase extends _$AppDatabase {
       await m.createTable(table);
     } catch (e) {
       debugPrint('Migration: Table ${table.actualTableName} already exists, skipping: $e');
+    }
+  }
+
+  /// Safely creates an index, silently ignoring the error if it already exists.
+  Future<void> _safeCreateIndex(Migrator m, Index index) async {
+    try {
+      await m.createIndex(index);
+    } catch (e) {
+      debugPrint('Migration: Index ${index.name} already exists, skipping: $e');
     }
   }
 

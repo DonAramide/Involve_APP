@@ -163,3 +163,65 @@ class GradingRules extends Table {
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 }
 
+@DataClassName('CurriculumMapTable')
+class CurriculumMap extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get classId => integer().references(Classes, #id, onDelete: OperationAction.cascade)();
+  IntColumn get subjectId => integer().references(Subjects, #id, onDelete: OperationAction.cascade)();
+  IntColumn get termId => integer().references(Terms, #id, onDelete: OperationAction.cascade)();
+  IntColumn get week => integer()();
+  TextColumn get topic => text()();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {classId, subjectId, termId, week, topic}
+  ];
+
+  @override
+  List<Index> get indexes => [
+    Index('idx_curriculum_lookup', 'class_id, subject_id, term_id')
+  ];
+}
+
+@DataClassName('LessonNoteTable')
+class LessonNotes extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get curriculumId => integer().nullable().references(CurriculumMap, #id, onDelete: OperationAction.setNull)();
+  
+  // Basic metadata to ensure identity independent of curriculum_id if needed
+  TextColumn get className => text()();
+  TextColumn get subjectName => text()();
+  TextColumn get term => text()();
+  IntColumn get week => integer()();
+  TextColumn get topic => text()();
+
+  TextColumn get content => text()(); // JSON string
+  TextColumn get contentHash => text()(); // SHA256 of metadata
+  BoolColumn get isAiGenerated => boolean().withDefault(const Constant(true))();
+  IntColumn get version => integer().withDefault(const Constant(1))();
+  
+  // Sync & Lifecycle Columns
+  IntColumn get syncStatus => integer().withDefault(const Constant(0))(); // 0: pending
+  TextColumn get syncId => text().nullable()(); // immutable once set
+  IntColumn get retryCount => integer().withDefault(const Constant(0))();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+  TextColumn get deviceId => text().nullable()();
+  
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {contentHash, version}
+  ];
+
+  @override
+  List<Index> get indexes => [
+    Index('idx_lesson_hash', 'content_hash'),
+    Index('idx_lesson_curriculum', 'curriculum_id'),
+    Index('idx_lesson_created', 'created_at'),
+    Index('idx_lesson_sync_status', 'sync_status'),
+    Index('idx_lesson_deleted', 'is_deleted'),
+    Index('idx_lesson_sync_id', 'sync_id'),
+  ];
+}

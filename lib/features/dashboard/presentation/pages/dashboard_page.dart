@@ -38,6 +38,8 @@ import '../../../../core/utils/terminology.dart';
 import 'package:involve_app/features/stock/presentation/pages/manage_categories_page.dart';
 import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
 import 'package:involve_app/features/school/presentation/pages/teacher_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/lesson_notes_list_page.dart';
+import 'package:involve_app/features/stock/presentation/pages/stock_management_page.dart';
 import 'package:involve_app/features/school/presentation/pages/student_analytics_page.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
 import 'package:involve_app/features/school/presentation/pages/fee_management_page.dart';
@@ -575,6 +577,13 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.edit_note,
           color: Colors.redAccent,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResultEntryPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'lesson_notes',
+          title: 'LESSON NOTES',
+          icon: Icons.note_alt,
+          color: Colors.teal,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LessonNotesListPage())),
         ),
       ]);
     }

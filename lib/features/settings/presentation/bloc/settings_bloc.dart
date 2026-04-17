@@ -163,6 +163,15 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     try {
       final settings = await repository.getSettings();
       final plan = await _loadUserPlan();
+
+      // Check for Gemini API Key in Secure Storage if missing in DB
+      AppSettings? finalSettings = settings;
+      if (finalSettings != null && (finalSettings.geminiApiKey == null || finalSettings.geminiApiKey!.isEmpty)) {
+        final secureKey = await securityService.getAiApiKey();
+        if (secureKey != null && secureKey.isNotEmpty) {
+           finalSettings = finalSettings.copyWith(geminiApiKey: secureKey);
+        }
+      }
       
       debugPrint('SettingsBloc: Settings loaded: ${settings?.organizationName}');
       debugPrint('SettingsBloc: Plan loaded: ${plan.planType}, Expiry: ${plan.expiryDate}');
@@ -283,8 +292,14 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(state.copyWith(isSaving: true, successMessage: null, error: null));
     try {
       final oldName = state.settings?.organizationName;
+      final oldKey = state.settings?.geminiApiKey;
+
       await repository.updateSettings(event.settings);
       
+      // Update Secure Storage if Key changed
+      if (event.settings.geminiApiKey != oldKey) {
+        await securityService.setAiApiKey(event.settings.geminiApiKey ?? '');
+      }
       // If business name changed and it wasn't locked before, lock it now
       if (!state.isBusinessLocked && oldName != event.settings.organizationName) {
         add(LockBusinessName());
