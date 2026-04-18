@@ -22,6 +22,11 @@ class AppSettings extends Equatable {
   final String? bankName;
   final String? accountNumber;
   final String? accountName;
+  
+  final String? bankName2;
+  final String? accountNumber2;
+  final String? accountName2;
+
   final bool showAccountDetails;
   
   // Security lockout fields
@@ -87,6 +92,9 @@ class AppSettings extends Equatable {
     this.bankName,
     this.accountNumber,
     this.accountName,
+    this.bankName2,
+    this.accountNumber2,
+    this.accountName2,
     this.showAccountDetails = false,
     this.failedAttempts = 0,
     this.isLocked = false,
@@ -146,6 +154,9 @@ class AppSettings extends Equatable {
     String? bankName,
     String? accountNumber,
     String? accountName,
+    String? bankName2,
+    String? accountNumber2,
+    String? accountName2,
     bool? showAccountDetails,
     int? failedAttempts,
     bool? isLocked,
@@ -204,6 +215,9 @@ class AppSettings extends Equatable {
       bankName: bankName ?? this.bankName,
       accountNumber: accountNumber ?? this.accountNumber,
       accountName: accountName ?? this.accountName,
+      bankName2: bankName2 ?? this.bankName2,
+      accountNumber2: accountNumber2 ?? this.accountNumber2,
+      accountName2: accountName2 ?? this.accountName2,
       showAccountDetails: showAccountDetails ?? this.showAccountDetails,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
@@ -265,6 +279,9 @@ class AppSettings extends Equatable {
         bankName,
         accountNumber,
         accountName,
+        bankName2,
+        accountNumber2,
+        accountName2,
         showAccountDetails,
         failedAttempts,
         isLocked,

@@ -23,6 +23,11 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42); // Logic for 58, 80, 88
 
+    final isAcc2 = invoice.selectedBankIndex == 1 && settings.bankName2 != null;
+    final bank = isAcc2 ? settings.bankName2 : settings.bankName;
+    final accNo = isAcc2 ? settings.accountNumber2 : settings.accountNumber;
+    final accName = isAcc2 ? settings.accountName2 : settings.accountName;
+
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
@@ -75,11 +80,11 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
       TextCommand('-' * width),
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (settings.showAccountDetails && (settings.bankName != null || settings.bankName2 != null)) ...[
         TextCommand('PAYMENT DETAILS', align: 'center', isBold: true),
-        TextCommand('Bank: ${settings.bankName}', align: 'center'),
-        if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
-        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+        TextCommand('Bank: $bank', align: 'center'),
+        if (accNo != null) TextCommand('Acc: $accNo', align: 'center'),
+        if (accName != null) TextCommand('Name: $accName', align: 'center'),
       ],
       if (settings.showSignatureSpace) ...[
         SizedBoxCommand(height: 1),
@@ -113,6 +118,11 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+
+    final isAcc2 = invoice.selectedBankIndex == 1 && settings.bankName2 != null;
+    final bank = isAcc2 ? settings.bankName2 : settings.bankName;
+    final accNo = isAcc2 ? settings.accountNumber2 : settings.accountNumber;
+    final accName = isAcc2 ? settings.accountName2 : settings.accountName;
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -155,12 +165,12 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (settings.showAccountDetails && (settings.bankName != null || settings.bankName2 != null)) ...[
         TextCommand('-' * width),
         TextCommand('ACCOUNT DETAILS', align: 'center', isBold: true),
-        TextCommand('Bank: ${settings.bankName}'),
-        if (settings.accountNumber != null) TextCommand('Account: ${settings.accountNumber}'),
-        if (settings.accountName != null) TextCommand('Account Name: ${settings.accountName}'),
+        TextCommand('Bank: $bank'),
+        if (accNo != null) TextCommand('Account: $accNo'),
+        if (accName != null) TextCommand('Account Name: $accName'),
       ],
       if (settings.showSignatureSpace) ...[
         SizedBoxCommand(height: 1),
@@ -195,6 +205,11 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
+    final isAcc2 = invoice.selectedBankIndex == 1 && settings.bankName2 != null;
+    final bank = isAcc2 ? settings.bankName2 : settings.bankName;
+    final accNo = isAcc2 ? settings.accountNumber2 : settings.accountNumber;
+    final accName = isAcc2 ? settings.accountName2 : settings.accountName;
+
     return [
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Date: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'center'),
@@ -212,11 +227,11 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
         TextCommand('PAID: ${CurrencyFormatter.format(invoice.amountPaid)}', align: 'right'),
         TextCommand('BAL:  ${CurrencyFormatter.format(invoice.balanceAmount)}', align: 'right'),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (settings.showAccountDetails && (settings.bankName != null || settings.bankName2 != null)) ...[
         TextCommand('-' * width),
-        TextCommand('PAYMENT: ${settings.bankName}', align: 'center'),
-        if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
-        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+        TextCommand('PAYMENT: $bank', align: 'center'),
+        if (accNo != null) TextCommand('Acc: $accNo', align: 'center'),
+        if (accName != null) TextCommand('Name: $accName', align: 'center'),
       ],
       if (settings.showSignatureSpace) ...[
         SizedBoxCommand(height: 1),
@@ -244,6 +259,11 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+
+    final isAcc2 = invoice.selectedBankIndex == 1 && settings.bankName2 != null;
+    final bank = isAcc2 ? settings.bankName2 : settings.bankName;
+    final accNo = isAcc2 ? settings.accountNumber2 : settings.accountNumber;
+    final accName = isAcc2 ? settings.accountName2 : settings.accountName;
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -288,12 +308,12 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
         TextCommand(_formatSummaryRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatSummaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (settings.showAccountDetails && (settings.bankName != null || settings.bankName2 != null)) ...[
         TextCommand('-' * width),
         TextCommand('PAYMENT METHODS:', isBold: true),
-        TextCommand('Bank: ${settings.bankName}'),
-        if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}'),
-        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}'),
+        TextCommand('Bank: $bank'),
+        if (accNo != null) TextCommand('Acc: $accNo'),
+        if (accName != null) TextCommand('Name: $accName'),
       ],
       if (settings.showSignatureSpace) ...[
         SizedBoxCommand(height: 2),
@@ -371,6 +391,11 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
     final settings = orgSettings as AppSettings;
     const int width = 32;
 
+    final isAcc2 = invoice.selectedBankIndex == 1 && settings.bankName2 != null;
+    final bank = isAcc2 ? settings.bankName2 : settings.bankName;
+    final accNo = isAcc2 ? settings.accountNumber2 : settings.accountNumber;
+    final accName = isAcc2 ? settings.accountName2 : settings.accountName;
+
     return [
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
         TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
@@ -413,12 +438,12 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width), isBold: true),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (settings.showAccountDetails && (settings.bankName != null || settings.bankName2 != null)) ...[
         TextCommand('-' * width),
         TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
-        TextCommand('Bank: ${settings.bankName}', align: 'center'),
-        if (settings.accountNumber != null) TextCommand('A/C: ${settings.accountNumber}', align: 'center'),
-        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+        TextCommand('Bank: $bank', align: 'center'),
+        if (accNo != null) TextCommand('A/C: $accNo', align: 'center'),
+        if (accName != null) TextCommand('Name: $accName', align: 'center'),
       ],
       SizedBoxCommand(height: 2),
       TextCommand('THANK YOU FOR YOUR BUSINESS', align: 'center', isBold: true),
@@ -450,6 +475,11 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
+    final isAcc2 = invoice.selectedBankIndex == 1 && settings.bankName2 != null;
+    final bank = isAcc2 ? settings.bankName2 : settings.bankName;
+    final accNo = isAcc2 ? settings.accountNumber2 : settings.accountNumber;
+    final accName = isAcc2 ? settings.accountName2 : settings.accountName;
+
     return [
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
         TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
@@ -480,12 +510,12 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (settings.showAccountDetails && (settings.bankName != null || settings.bankName2 != null)) ...[
         TextCommand('-' * width),
         TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
-        TextCommand('Bank: ${settings.bankName}', align: 'center'),
-        if (settings.accountNumber != null) TextCommand('A/C: ${settings.accountNumber}', align: 'center'),
-        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+        TextCommand('Bank: $bank', align: 'center'),
+        if (accNo != null) TextCommand('A/C: $accNo', align: 'center'),
+        if (accName != null) TextCommand('Name: $accName', align: 'center'),
       ],
       TextCommand('-' * width),
       TextCommand('THANK YOU FOR YOUR BUSINESS!', align: 'center'),
@@ -544,6 +574,11 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
 
+    final isAcc2 = invoice.selectedBankIndex == 1 && settings.bankName2 != null;
+    final bank = isAcc2 ? settings.bankName2 : settings.bankName;
+    final accNo = isAcc2 ? settings.accountNumber2 : settings.accountNumber;
+    final accName = isAcc2 ? settings.accountName2 : settings.accountName;
+
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
@@ -590,11 +625,11 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
       )),
       
       TextCommand('=' * width),
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (settings.showAccountDetails && (settings.bankName != null || settings.bankName2 != null)) ...[
         TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
-        TextCommand('Bank: ${settings.bankName}', align: 'center'),
-        if (settings.accountNumber != null) TextCommand('A/C: ${settings.accountNumber}', align: 'center'),
-        if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
+        TextCommand('Bank: $bank', align: 'center'),
+        if (accNo != null) TextCommand('A/C: $accNo', align: 'center'),
+        if (accName != null) TextCommand('Name: $accName', align: 'center'),
         TextCommand('-' * width),
       ],
       

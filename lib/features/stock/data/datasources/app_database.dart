@@ -59,7 +59,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 72;
+  int get schemaVersion => 76;
 
   @override
   MigrationStrategy get migration {
@@ -370,6 +370,30 @@ class AppDatabase extends _$AppDatabase {
                     syncStatus: const Value(0), // Default to pending
                   ));
             }
+          });
+        }
+        if (from < 74) {
+          // Schema V74: Enhanced Stock History with Supplier and Invoice Note
+          await transaction(() async {
+            await _safeAddColumn(m, stockIncrements, stockIncrements.supplierName);
+            await _safeAddColumn(m, stockIncrements, stockIncrements.supplyInvoiceImage);
+          });
+        }
+        if (from < 75) {
+          // Schema V75: Dual Bank Account Support
+          await transaction(() async {
+            await _safeAddColumn(m, settings, settings.bankName2);
+            await _safeAddColumn(m, settings, settings.accountNumber2);
+            await _safeAddColumn(m, settings, settings.accountName2);
+            await _safeAddColumn(m, invoices, invoices.selectedBankIndex);
+          });
+        }
+        if (from < 76) {
+          // Schema V76: Services Sync Status Support
+          await transaction(() async {
+            await _safeAddColumn(m, serviceCustomers, serviceCustomers.syncStatus);
+            await _safeAddColumn(m, serviceJobs, serviceJobs.syncStatus);
+            await _safeAddColumn(m, servicePayments, servicePayments.syncStatus);
           });
         }
       },

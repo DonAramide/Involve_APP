@@ -22,13 +22,16 @@ class StaffRepositoryImpl implements StaffRepository {
 
   @override
   Future<List<Staff>> getAllStaff() async {
-    final results = await db.select(db.staff).get();
+    final results = await (db.select(db.staff)..where((s) => s.isDeleted.equals(false))).get();
     return results.map(_toEntity).toList();
   }
 
   @override
   Future<Staff?> getStaffById(int id) async {
-    final result = await (db.select(db.staff)..where((s) => s.id.equals(id))).getSingleOrNull();
+    final result = await (db.select(db.staff)
+          ..where((s) => s.id.equals(id))
+          ..where((s) => s.isDeleted.equals(false)))
+        .getSingleOrNull();
     return result != null ? _toEntity(result) : null;
   }
 
@@ -90,6 +93,7 @@ class StaffRepositoryImpl implements StaffRepository {
   Future<Staff?> authenticateStaff(int id, String code) async {
     final result = await (db.select(db.staff)
           ..where((s) => s.id.equals(id))
+          ..where((s) => s.isDeleted.equals(false))
           ..where((s) => s.staffCode.equals(_hash(code)))
           ..where((s) => s.isActive.equals(true)))
         .getSingleOrNull();

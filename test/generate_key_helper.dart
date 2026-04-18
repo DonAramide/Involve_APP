@@ -5,8 +5,8 @@ import 'package:involve_app/core/utils/device_info_service.dart';
 
 void main() {
   test('Generate Key for User', () {
-    final deviceId = "B63F94";
-    final businessName = "Wendy's Gift Store";
+    final deviceId = "9EE820";
+    final businessName = "Oldies Lounge & Bar";
     
     final int licenseId = DeviceInfoService.encodeSuffix(deviceId);
     

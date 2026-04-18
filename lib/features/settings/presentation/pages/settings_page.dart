@@ -263,12 +263,28 @@ class _SettingsPageState extends State<SettingsPage> {
         if (_matches('Show Signature Space on Receipt'))
           _buildSwitchTile('Show Signature Space on Receipt', settings.showSignatureSpace, (val) => _update(context, settings.copyWith(showSignatureSpace: val))),
         if (settings.showAccountDetails) ...[
-          if (_matches('Bank Name'))
-            _buildTextTile(context, 'Bank Name', settings.bankName ?? '', (val) => _update(context, settings.copyWith(bankName: val))),
-          if (_matches('Account Number'))
-            _buildTextTile(context, 'Account Number', settings.accountNumber ?? '', (val) => _update(context, settings.copyWith(accountNumber: val))),
-          if (_matches('Account Name'))
-            _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text('PRIMARY ACCOUNT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+          ),
+          if (_matches('Bank Name (Account 1)'))
+            _buildTextTile(context, 'Bank Name (Account 1)', settings.bankName ?? '', (val) => _update(context, settings.copyWith(bankName: val))),
+          if (_matches('Account Number (Account 1)'))
+            _buildTextTile(context, 'Account Number (Account 1)', settings.accountNumber ?? '', (val) => _update(context, settings.copyWith(accountNumber: val))),
+          if (_matches('Account Name (Account 1)'))
+            _buildTextTile(context, 'Account Name (Account 1)', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
+          
+          const Divider(indent: 16, endIndent: 16),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text('SECONDARY ACCOUNT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+          ),
+          if (_matches('Bank Name (Account 2)'))
+            _buildTextTile(context, 'Bank Name (Account 2)', settings.bankName2 ?? '', (val) => _update(context, settings.copyWith(bankName2: val))),
+          if (_matches('Account Number (Account 2)'))
+            _buildTextTile(context, 'Account Number (Account 2)', settings.accountNumber2 ?? '', (val) => _update(context, settings.copyWith(accountNumber2: val))),
+          if (_matches('Account Name (Account 2)'))
+            _buildTextTile(context, 'Account Name (Account 2)', settings.accountName2 ?? '', (val) => _update(context, settings.copyWith(accountName2: val))),
         ],
         const Divider(),
       ],

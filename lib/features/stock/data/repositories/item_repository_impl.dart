@@ -97,7 +97,7 @@ class ItemRepositoryImpl implements ItemRepository {
   }
 
   @override
-  Future<void> increaseStock(int itemId, int quantity, String? remarks) async {
+  Future<void> increaseStock(int itemId, int quantity, String? remarks, {String? supplierName, Uint8List? supplyInvoiceImage}) async {
     final now = DateTime.now();
     final syncId = 'STK-${now.millisecondsSinceEpoch}';
 
@@ -121,6 +121,8 @@ class ItemRepositoryImpl implements ItemRepository {
               quantityBefore: Value(before),
               quantityAfter: Value(after),
               remarks: Value(remarks),
+              supplierName: Value(supplierName),
+              supplyInvoiceImage: Value(supplyInvoiceImage),
               dateAdded: Value(now),
               syncId: Value(syncId),
               updatedAt: Value(now),
@@ -142,6 +144,8 @@ class ItemRepositoryImpl implements ItemRepository {
       quantityAfter: row.quantityAfter,
       dateAdded: row.dateAdded,
       remarks: row.remarks,
+      supplierName: row.supplierName,
+      supplyInvoiceImage: row.supplyInvoiceImage,
     )).toList();
   }
 

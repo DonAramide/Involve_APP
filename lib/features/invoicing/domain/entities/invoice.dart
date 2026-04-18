@@ -83,6 +83,7 @@ class Invoice extends Equatable {
   final String? staffName;
   final String? syncId;
   final double? totalPrintAmount;
+  final int? selectedBankIndex;
 
   // School Mode Extensions
   final String businessMode;
@@ -117,6 +118,7 @@ class Invoice extends Equatable {
     this.staffName,
     this.syncId,
     this.totalPrintAmount,
+    this.selectedBankIndex,
     this.businessMode = 'retail',
     this.studentId,
     this.classId,
@@ -150,6 +152,7 @@ class Invoice extends Equatable {
         staffName,
         syncId,
         totalPrintAmount,
+        selectedBankIndex,
         businessMode,
         studentId,
         classId,
@@ -183,6 +186,7 @@ class Invoice extends Equatable {
     String? staffName,
     String? syncId,
     double? totalPrintAmount,
+    int? selectedBankIndex,
     String? businessMode,
     int? studentId,
     int? classId,
@@ -215,6 +219,7 @@ class Invoice extends Equatable {
       staffName: staffName ?? this.staffName,
       syncId: syncId ?? this.syncId,
       totalPrintAmount: totalPrintAmount ?? this.totalPrintAmount,
+      selectedBankIndex: selectedBankIndex ?? this.selectedBankIndex,
       businessMode: businessMode ?? this.businessMode,
       studentId: studentId ?? this.studentId,
       classId: classId ?? this.classId,

@@ -172,6 +172,7 @@ class SyncRepositoryImpl implements SyncRepository {
         classId: Value(remote.classId),
         termId: Value(remote.termId),
         academicYearId: Value(remote.academicYearId),
+        selectedBankIndex: Value(remote.selectedBankIndex),
       ));
       return localId;
     } else if (remote.updatedAt?.isAfter(
@@ -206,6 +207,7 @@ class SyncRepositoryImpl implements SyncRepository {
         classId: Value(remote.classId),
         termId: Value(remote.termId),
         academicYearId: Value(remote.academicYearId),
+        selectedBankIndex: Value(remote.selectedBankIndex),
       ));
       return existing.id;
     }

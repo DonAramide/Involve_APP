@@ -1507,6 +1507,12 @@ class $InvoicesTable extends Invoices
   late final GeneratedColumn<double> totalPrintAmount = GeneratedColumn<double>(
       'total_print_amount', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _selectedBankIndexMeta =
+      const VerificationMeta('selectedBankIndex');
+  @override
+  late final GeneratedColumn<int> selectedBankIndex = GeneratedColumn<int>(
+      'selected_bank_index', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   static const VerificationMeta _businessModeMeta =
       const VerificationMeta('businessMode');
   @override
@@ -1592,6 +1598,7 @@ class $InvoicesTable extends Invoices
         deviceId,
         isDeleted,
         totalPrintAmount,
+        selectedBankIndex,
         businessMode,
         studentId,
         classId,
@@ -1736,6 +1743,12 @@ class $InvoicesTable extends Invoices
           totalPrintAmount.isAcceptableOrUnknown(
               data['total_print_amount']!, _totalPrintAmountMeta));
     }
+    if (data.containsKey('selected_bank_index')) {
+      context.handle(
+          _selectedBankIndexMeta,
+          selectedBankIndex.isAcceptableOrUnknown(
+              data['selected_bank_index']!, _selectedBankIndexMeta));
+    }
     if (data.containsKey('business_mode')) {
       context.handle(
           _businessModeMeta,
@@ -1839,6 +1852,8 @@ class $InvoicesTable extends Invoices
           .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
       totalPrintAmount: attachedDatabase.typeMapping.read(
           DriftSqlType.double, data['${effectivePrefix}total_print_amount']),
+      selectedBankIndex: attachedDatabase.typeMapping.read(
+          DriftSqlType.int, data['${effectivePrefix}selected_bank_index']),
       businessMode: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}business_mode'])!,
       studentId: attachedDatabase.typeMapping
@@ -1891,6 +1906,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
   final String? deviceId;
   final bool isDeleted;
   final double? totalPrintAmount;
+  final int? selectedBankIndex;
   final String businessMode;
   final int? studentId;
   final int? classId;
@@ -1924,6 +1940,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       this.deviceId,
       required this.isDeleted,
       this.totalPrintAmount,
+      this.selectedBankIndex,
       required this.businessMode,
       this.studentId,
       this.classId,
@@ -1978,6 +1995,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
     map['is_deleted'] = Variable<bool>(isDeleted);
     if (!nullToAbsent || totalPrintAmount != null) {
       map['total_print_amount'] = Variable<double>(totalPrintAmount);
+    }
+    if (!nullToAbsent || selectedBankIndex != null) {
+      map['selected_bank_index'] = Variable<int>(selectedBankIndex);
     }
     map['business_mode'] = Variable<String>(businessMode);
     if (!nullToAbsent || studentId != null) {
@@ -2053,6 +2073,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       totalPrintAmount: totalPrintAmount == null && nullToAbsent
           ? const Value.absent()
           : Value(totalPrintAmount),
+      selectedBankIndex: selectedBankIndex == null && nullToAbsent
+          ? const Value.absent()
+          : Value(selectedBankIndex),
       businessMode: Value(businessMode),
       studentId: studentId == null && nullToAbsent
           ? const Value.absent()
@@ -2109,6 +2132,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       deviceId: serializer.fromJson<String?>(json['deviceId']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       totalPrintAmount: serializer.fromJson<double?>(json['totalPrintAmount']),
+      selectedBankIndex: serializer.fromJson<int?>(json['selectedBankIndex']),
       businessMode: serializer.fromJson<String>(json['businessMode']),
       studentId: serializer.fromJson<int?>(json['studentId']),
       classId: serializer.fromJson<int?>(json['classId']),
@@ -2147,6 +2171,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       'deviceId': serializer.toJson<String?>(deviceId),
       'isDeleted': serializer.toJson<bool>(isDeleted),
       'totalPrintAmount': serializer.toJson<double?>(totalPrintAmount),
+      'selectedBankIndex': serializer.toJson<int?>(selectedBankIndex),
       'businessMode': serializer.toJson<String>(businessMode),
       'studentId': serializer.toJson<int?>(studentId),
       'classId': serializer.toJson<int?>(classId),
@@ -2183,6 +2208,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           Value<String?> deviceId = const Value.absent(),
           bool? isDeleted,
           Value<double?> totalPrintAmount = const Value.absent(),
+          Value<int?> selectedBankIndex = const Value.absent(),
           String? businessMode,
           Value<int?> studentId = const Value.absent(),
           Value<int?> classId = const Value.absent(),
@@ -2222,6 +2248,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         totalPrintAmount: totalPrintAmount.present
             ? totalPrintAmount.value
             : this.totalPrintAmount,
+        selectedBankIndex: selectedBankIndex.present
+            ? selectedBankIndex.value
+            : this.selectedBankIndex,
         businessMode: businessMode ?? this.businessMode,
         studentId: studentId.present ? studentId.value : this.studentId,
         classId: classId.present ? classId.value : this.classId,
@@ -2284,6 +2313,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       totalPrintAmount: data.totalPrintAmount.present
           ? data.totalPrintAmount.value
           : this.totalPrintAmount,
+      selectedBankIndex: data.selectedBankIndex.present
+          ? data.selectedBankIndex.value
+          : this.selectedBankIndex,
       businessMode: data.businessMode.present
           ? data.businessMode.value
           : this.businessMode,
@@ -2332,6 +2364,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ..write('deviceId: $deviceId, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('totalPrintAmount: $totalPrintAmount, ')
+          ..write('selectedBankIndex: $selectedBankIndex, ')
           ..write('businessMode: $businessMode, ')
           ..write('studentId: $studentId, ')
           ..write('classId: $classId, ')
@@ -2370,6 +2403,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         deviceId,
         isDeleted,
         totalPrintAmount,
+        selectedBankIndex,
         businessMode,
         studentId,
         classId,
@@ -2407,6 +2441,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           other.deviceId == this.deviceId &&
           other.isDeleted == this.isDeleted &&
           other.totalPrintAmount == this.totalPrintAmount &&
+          other.selectedBankIndex == this.selectedBankIndex &&
           other.businessMode == this.businessMode &&
           other.studentId == this.studentId &&
           other.classId == this.classId &&
@@ -2442,6 +2477,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
   final Value<String?> deviceId;
   final Value<bool> isDeleted;
   final Value<double?> totalPrintAmount;
+  final Value<int?> selectedBankIndex;
   final Value<String> businessMode;
   final Value<int?> studentId;
   final Value<int?> classId;
@@ -2475,6 +2511,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.totalPrintAmount = const Value.absent(),
+    this.selectedBankIndex = const Value.absent(),
     this.businessMode = const Value.absent(),
     this.studentId = const Value.absent(),
     this.classId = const Value.absent(),
@@ -2509,6 +2546,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
     this.totalPrintAmount = const Value.absent(),
+    this.selectedBankIndex = const Value.absent(),
     this.businessMode = const Value.absent(),
     this.studentId = const Value.absent(),
     this.classId = const Value.absent(),
@@ -2548,6 +2586,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     Expression<String>? deviceId,
     Expression<bool>? isDeleted,
     Expression<double>? totalPrintAmount,
+    Expression<int>? selectedBankIndex,
     Expression<String>? businessMode,
     Expression<int>? studentId,
     Expression<int>? classId,
@@ -2582,6 +2621,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       if (deviceId != null) 'device_id': deviceId,
       if (isDeleted != null) 'is_deleted': isDeleted,
       if (totalPrintAmount != null) 'total_print_amount': totalPrintAmount,
+      if (selectedBankIndex != null) 'selected_bank_index': selectedBankIndex,
       if (businessMode != null) 'business_mode': businessMode,
       if (studentId != null) 'student_id': studentId,
       if (classId != null) 'class_id': classId,
@@ -2618,6 +2658,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       Value<String?>? deviceId,
       Value<bool>? isDeleted,
       Value<double?>? totalPrintAmount,
+      Value<int?>? selectedBankIndex,
       Value<String>? businessMode,
       Value<int?>? studentId,
       Value<int?>? classId,
@@ -2651,6 +2692,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       deviceId: deviceId ?? this.deviceId,
       isDeleted: isDeleted ?? this.isDeleted,
       totalPrintAmount: totalPrintAmount ?? this.totalPrintAmount,
+      selectedBankIndex: selectedBankIndex ?? this.selectedBankIndex,
       businessMode: businessMode ?? this.businessMode,
       studentId: studentId ?? this.studentId,
       classId: classId ?? this.classId,
@@ -2733,6 +2775,9 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     if (totalPrintAmount.present) {
       map['total_print_amount'] = Variable<double>(totalPrintAmount.value);
     }
+    if (selectedBankIndex.present) {
+      map['selected_bank_index'] = Variable<int>(selectedBankIndex.value);
+    }
     if (businessMode.present) {
       map['business_mode'] = Variable<String>(businessMode.value);
     }
@@ -2791,6 +2836,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
           ..write('deviceId: $deviceId, ')
           ..write('isDeleted: $isDeleted, ')
           ..write('totalPrintAmount: $totalPrintAmount, ')
+          ..write('selectedBankIndex: $selectedBankIndex, ')
           ..write('businessMode: $businessMode, ')
           ..write('studentId: $studentId, ')
           ..write('classId: $classId, ')
@@ -3671,6 +3717,24 @@ class $SettingsTable extends Settings
   late final GeneratedColumn<String> accountName = GeneratedColumn<String>(
       'account_name', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _bankName2Meta =
+      const VerificationMeta('bankName2');
+  @override
+  late final GeneratedColumn<String> bankName2 = GeneratedColumn<String>(
+      'bank_name2', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _accountNumber2Meta =
+      const VerificationMeta('accountNumber2');
+  @override
+  late final GeneratedColumn<String> accountNumber2 = GeneratedColumn<String>(
+      'account_number2', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _accountName2Meta =
+      const VerificationMeta('accountName2');
+  @override
+  late final GeneratedColumn<String> accountName2 = GeneratedColumn<String>(
+      'account_name2', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _showAccountDetailsMeta =
       const VerificationMeta('showAccountDetails');
   @override
@@ -4018,6 +4082,9 @@ class $SettingsTable extends Settings
         bankName,
         accountNumber,
         accountName,
+        bankName2,
+        accountNumber2,
+        accountName2,
         showAccountDetails,
         receiptFooter,
         showSignatureSpace,
@@ -4163,6 +4230,22 @@ class $SettingsTable extends Settings
           _accountNameMeta,
           accountName.isAcceptableOrUnknown(
               data['account_name']!, _accountNameMeta));
+    }
+    if (data.containsKey('bank_name2')) {
+      context.handle(_bankName2Meta,
+          bankName2.isAcceptableOrUnknown(data['bank_name2']!, _bankName2Meta));
+    }
+    if (data.containsKey('account_number2')) {
+      context.handle(
+          _accountNumber2Meta,
+          accountNumber2.isAcceptableOrUnknown(
+              data['account_number2']!, _accountNumber2Meta));
+    }
+    if (data.containsKey('account_name2')) {
+      context.handle(
+          _accountName2Meta,
+          accountName2.isAcceptableOrUnknown(
+              data['account_name2']!, _accountName2Meta));
     }
     if (data.containsKey('show_account_details')) {
       context.handle(
@@ -4425,6 +4508,12 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.string, data['${effectivePrefix}account_number']),
       accountName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}account_name']),
+      bankName2: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}bank_name2']),
+      accountNumber2: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_number2']),
+      accountName2: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}account_name2']),
       showAccountDetails: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}show_account_details'])!,
       receiptFooter: attachedDatabase.typeMapping
@@ -4533,6 +4622,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final String? bankName;
   final String? accountNumber;
   final String? accountName;
+  final String? bankName2;
+  final String? accountNumber2;
+  final String? accountName2;
   final bool showAccountDetails;
   final String receiptFooter;
   final bool showSignatureSpace;
@@ -4590,6 +4682,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       this.bankName,
       this.accountNumber,
       this.accountName,
+      this.bankName2,
+      this.accountNumber2,
+      this.accountName2,
       required this.showAccountDetails,
       required this.receiptFooter,
       required this.showSignatureSpace,
@@ -4664,6 +4759,15 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     }
     if (!nullToAbsent || accountName != null) {
       map['account_name'] = Variable<String>(accountName);
+    }
+    if (!nullToAbsent || bankName2 != null) {
+      map['bank_name2'] = Variable<String>(bankName2);
+    }
+    if (!nullToAbsent || accountNumber2 != null) {
+      map['account_number2'] = Variable<String>(accountNumber2);
+    }
+    if (!nullToAbsent || accountName2 != null) {
+      map['account_name2'] = Variable<String>(accountName2);
     }
     map['show_account_details'] = Variable<bool>(showAccountDetails);
     map['receipt_footer'] = Variable<String>(receiptFooter);
@@ -4755,6 +4859,15 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       accountName: accountName == null && nullToAbsent
           ? const Value.absent()
           : Value(accountName),
+      bankName2: bankName2 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankName2),
+      accountNumber2: accountNumber2 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accountNumber2),
+      accountName2: accountName2 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(accountName2),
       showAccountDetails: Value(showAccountDetails),
       receiptFooter: Value(receiptFooter),
       showSignatureSpace: Value(showSignatureSpace),
@@ -4835,6 +4948,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       bankName: serializer.fromJson<String?>(json['bankName']),
       accountNumber: serializer.fromJson<String?>(json['accountNumber']),
       accountName: serializer.fromJson<String?>(json['accountName']),
+      bankName2: serializer.fromJson<String?>(json['bankName2']),
+      accountNumber2: serializer.fromJson<String?>(json['accountNumber2']),
+      accountName2: serializer.fromJson<String?>(json['accountName2']),
       showAccountDetails: serializer.fromJson<bool>(json['showAccountDetails']),
       receiptFooter: serializer.fromJson<String>(json['receiptFooter']),
       showSignatureSpace: serializer.fromJson<bool>(json['showSignatureSpace']),
@@ -4908,6 +5024,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'bankName': serializer.toJson<String?>(bankName),
       'accountNumber': serializer.toJson<String?>(accountNumber),
       'accountName': serializer.toJson<String?>(accountName),
+      'bankName2': serializer.toJson<String?>(bankName2),
+      'accountNumber2': serializer.toJson<String?>(accountNumber2),
+      'accountName2': serializer.toJson<String?>(accountName2),
       'showAccountDetails': serializer.toJson<bool>(showAccountDetails),
       'receiptFooter': serializer.toJson<String>(receiptFooter),
       'showSignatureSpace': serializer.toJson<bool>(showSignatureSpace),
@@ -4970,6 +5089,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           Value<String?> bankName = const Value.absent(),
           Value<String?> accountNumber = const Value.absent(),
           Value<String?> accountName = const Value.absent(),
+          Value<String?> bankName2 = const Value.absent(),
+          Value<String?> accountNumber2 = const Value.absent(),
+          Value<String?> accountName2 = const Value.absent(),
           bool? showAccountDetails,
           String? receiptFooter,
           bool? showSignatureSpace,
@@ -5032,6 +5154,11 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         accountNumber:
             accountNumber.present ? accountNumber.value : this.accountNumber,
         accountName: accountName.present ? accountName.value : this.accountName,
+        bankName2: bankName2.present ? bankName2.value : this.bankName2,
+        accountNumber2:
+            accountNumber2.present ? accountNumber2.value : this.accountNumber2,
+        accountName2:
+            accountName2.present ? accountName2.value : this.accountName2,
         showAccountDetails: showAccountDetails ?? this.showAccountDetails,
         receiptFooter: receiptFooter ?? this.receiptFooter,
         showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
@@ -5113,6 +5240,13 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           : this.accountNumber,
       accountName:
           data.accountName.present ? data.accountName.value : this.accountName,
+      bankName2: data.bankName2.present ? data.bankName2.value : this.bankName2,
+      accountNumber2: data.accountNumber2.present
+          ? data.accountNumber2.value
+          : this.accountNumber2,
+      accountName2: data.accountName2.present
+          ? data.accountName2.value
+          : this.accountName2,
       showAccountDetails: data.showAccountDetails.present
           ? data.showAccountDetails.value
           : this.showAccountDetails,
@@ -5235,6 +5369,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('bankName: $bankName, ')
           ..write('accountNumber: $accountNumber, ')
           ..write('accountName: $accountName, ')
+          ..write('bankName2: $bankName2, ')
+          ..write('accountNumber2: $accountNumber2, ')
+          ..write('accountName2: $accountName2, ')
           ..write('showAccountDetails: $showAccountDetails, ')
           ..write('receiptFooter: $receiptFooter, ')
           ..write('showSignatureSpace: $showSignatureSpace, ')
@@ -5297,6 +5434,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         bankName,
         accountNumber,
         accountName,
+        bankName2,
+        accountNumber2,
+        accountName2,
         showAccountDetails,
         receiptFooter,
         showSignatureSpace,
@@ -5358,6 +5498,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.bankName == this.bankName &&
           other.accountNumber == this.accountNumber &&
           other.accountName == this.accountName &&
+          other.bankName2 == this.bankName2 &&
+          other.accountNumber2 == this.accountNumber2 &&
+          other.accountName2 == this.accountName2 &&
           other.showAccountDetails == this.showAccountDetails &&
           other.receiptFooter == this.receiptFooter &&
           other.showSignatureSpace == this.showSignatureSpace &&
@@ -5419,6 +5562,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<String?> bankName;
   final Value<String?> accountNumber;
   final Value<String?> accountName;
+  final Value<String?> bankName2;
+  final Value<String?> accountNumber2;
+  final Value<String?> accountName2;
   final Value<bool> showAccountDetails;
   final Value<String> receiptFooter;
   final Value<bool> showSignatureSpace;
@@ -5476,6 +5622,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.bankName = const Value.absent(),
     this.accountNumber = const Value.absent(),
     this.accountName = const Value.absent(),
+    this.bankName2 = const Value.absent(),
+    this.accountNumber2 = const Value.absent(),
+    this.accountName2 = const Value.absent(),
     this.showAccountDetails = const Value.absent(),
     this.receiptFooter = const Value.absent(),
     this.showSignatureSpace = const Value.absent(),
@@ -5534,6 +5683,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.bankName = const Value.absent(),
     this.accountNumber = const Value.absent(),
     this.accountName = const Value.absent(),
+    this.bankName2 = const Value.absent(),
+    this.accountNumber2 = const Value.absent(),
+    this.accountName2 = const Value.absent(),
     this.showAccountDetails = const Value.absent(),
     this.receiptFooter = const Value.absent(),
     this.showSignatureSpace = const Value.absent(),
@@ -5594,6 +5746,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<String>? bankName,
     Expression<String>? accountNumber,
     Expression<String>? accountName,
+    Expression<String>? bankName2,
+    Expression<String>? accountNumber2,
+    Expression<String>? accountName2,
     Expression<bool>? showAccountDetails,
     Expression<String>? receiptFooter,
     Expression<bool>? showSignatureSpace,
@@ -5655,6 +5810,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (bankName != null) 'bank_name': bankName,
       if (accountNumber != null) 'account_number': accountNumber,
       if (accountName != null) 'account_name': accountName,
+      if (bankName2 != null) 'bank_name2': bankName2,
+      if (accountNumber2 != null) 'account_number2': accountNumber2,
+      if (accountName2 != null) 'account_name2': accountName2,
       if (showAccountDetails != null)
         'show_account_details': showAccountDetails,
       if (receiptFooter != null) 'receipt_footer': receiptFooter,
@@ -5729,6 +5887,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String?>? bankName,
       Value<String?>? accountNumber,
       Value<String?>? accountName,
+      Value<String?>? bankName2,
+      Value<String?>? accountNumber2,
+      Value<String?>? accountName2,
       Value<bool>? showAccountDetails,
       Value<String>? receiptFooter,
       Value<bool>? showSignatureSpace,
@@ -5788,6 +5949,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       bankName: bankName ?? this.bankName,
       accountNumber: accountNumber ?? this.accountNumber,
       accountName: accountName ?? this.accountName,
+      bankName2: bankName2 ?? this.bankName2,
+      accountNumber2: accountNumber2 ?? this.accountNumber2,
+      accountName2: accountName2 ?? this.accountName2,
       showAccountDetails: showAccountDetails ?? this.showAccountDetails,
       receiptFooter: receiptFooter ?? this.receiptFooter,
       showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
@@ -5894,6 +6058,15 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     }
     if (accountName.present) {
       map['account_name'] = Variable<String>(accountName.value);
+    }
+    if (bankName2.present) {
+      map['bank_name2'] = Variable<String>(bankName2.value);
+    }
+    if (accountNumber2.present) {
+      map['account_number2'] = Variable<String>(accountNumber2.value);
+    }
+    if (accountName2.present) {
+      map['account_name2'] = Variable<String>(accountName2.value);
     }
     if (showAccountDetails.present) {
       map['show_account_details'] = Variable<bool>(showAccountDetails.value);
@@ -6036,6 +6209,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('bankName: $bankName, ')
           ..write('accountNumber: $accountNumber, ')
           ..write('accountName: $accountName, ')
+          ..write('bankName2: $bankName2, ')
+          ..write('accountNumber2: $accountNumber2, ')
+          ..write('accountName2: $accountName2, ')
           ..write('showAccountDetails: $showAccountDetails, ')
           ..write('receiptFooter: $receiptFooter, ')
           ..write('showSignatureSpace: $showSignatureSpace, ')
@@ -7461,6 +7637,18 @@ class $StockIncrementsTable extends StockIncrements
   late final GeneratedColumn<String> remarks = GeneratedColumn<String>(
       'remarks', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _supplierNameMeta =
+      const VerificationMeta('supplierName');
+  @override
+  late final GeneratedColumn<String> supplierName = GeneratedColumn<String>(
+      'supplier_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _supplyInvoiceImageMeta =
+      const VerificationMeta('supplyInvoiceImage');
+  @override
+  late final GeneratedColumn<Uint8List> supplyInvoiceImage =
+      GeneratedColumn<Uint8List>('supply_invoice_image', aliasedName, true,
+          type: DriftSqlType.blob, requiredDuringInsert: false);
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -7503,6 +7691,8 @@ class $StockIncrementsTable extends StockIncrements
         quantityAfter,
         dateAdded,
         remarks,
+        supplierName,
+        supplyInvoiceImage,
         syncId,
         updatedAt,
         createdAt,
@@ -7557,6 +7747,18 @@ class $StockIncrementsTable extends StockIncrements
       context.handle(_remarksMeta,
           remarks.isAcceptableOrUnknown(data['remarks']!, _remarksMeta));
     }
+    if (data.containsKey('supplier_name')) {
+      context.handle(
+          _supplierNameMeta,
+          supplierName.isAcceptableOrUnknown(
+              data['supplier_name']!, _supplierNameMeta));
+    }
+    if (data.containsKey('supply_invoice_image')) {
+      context.handle(
+          _supplyInvoiceImageMeta,
+          supplyInvoiceImage.isAcceptableOrUnknown(
+              data['supply_invoice_image']!, _supplyInvoiceImageMeta));
+    }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
           syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
@@ -7600,6 +7802,10 @@ class $StockIncrementsTable extends StockIncrements
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date_added'])!,
       remarks: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}remarks']),
+      supplierName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}supplier_name']),
+      supplyInvoiceImage: attachedDatabase.typeMapping.read(
+          DriftSqlType.blob, data['${effectivePrefix}supply_invoice_image']),
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -7628,6 +7834,8 @@ class StockIncrementTable extends DataClass
   final int quantityAfter;
   final DateTime dateAdded;
   final String? remarks;
+  final String? supplierName;
+  final Uint8List? supplyInvoiceImage;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -7641,6 +7849,8 @@ class StockIncrementTable extends DataClass
       required this.quantityAfter,
       required this.dateAdded,
       this.remarks,
+      this.supplierName,
+      this.supplyInvoiceImage,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -7657,6 +7867,12 @@ class StockIncrementTable extends DataClass
     map['date_added'] = Variable<DateTime>(dateAdded);
     if (!nullToAbsent || remarks != null) {
       map['remarks'] = Variable<String>(remarks);
+    }
+    if (!nullToAbsent || supplierName != null) {
+      map['supplier_name'] = Variable<String>(supplierName);
+    }
+    if (!nullToAbsent || supplyInvoiceImage != null) {
+      map['supply_invoice_image'] = Variable<Uint8List>(supplyInvoiceImage);
     }
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
@@ -7685,6 +7901,12 @@ class StockIncrementTable extends DataClass
       remarks: remarks == null && nullToAbsent
           ? const Value.absent()
           : Value(remarks),
+      supplierName: supplierName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(supplierName),
+      supplyInvoiceImage: supplyInvoiceImage == null && nullToAbsent
+          ? const Value.absent()
+          : Value(supplyInvoiceImage),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -7711,6 +7933,9 @@ class StockIncrementTable extends DataClass
       quantityAfter: serializer.fromJson<int>(json['quantityAfter']),
       dateAdded: serializer.fromJson<DateTime>(json['dateAdded']),
       remarks: serializer.fromJson<String?>(json['remarks']),
+      supplierName: serializer.fromJson<String?>(json['supplierName']),
+      supplyInvoiceImage:
+          serializer.fromJson<Uint8List?>(json['supplyInvoiceImage']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -7729,6 +7954,8 @@ class StockIncrementTable extends DataClass
       'quantityAfter': serializer.toJson<int>(quantityAfter),
       'dateAdded': serializer.toJson<DateTime>(dateAdded),
       'remarks': serializer.toJson<String?>(remarks),
+      'supplierName': serializer.toJson<String?>(supplierName),
+      'supplyInvoiceImage': serializer.toJson<Uint8List?>(supplyInvoiceImage),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -7745,6 +7972,8 @@ class StockIncrementTable extends DataClass
           int? quantityAfter,
           DateTime? dateAdded,
           Value<String?> remarks = const Value.absent(),
+          Value<String?> supplierName = const Value.absent(),
+          Value<Uint8List?> supplyInvoiceImage = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -7758,6 +7987,11 @@ class StockIncrementTable extends DataClass
         quantityAfter: quantityAfter ?? this.quantityAfter,
         dateAdded: dateAdded ?? this.dateAdded,
         remarks: remarks.present ? remarks.value : this.remarks,
+        supplierName:
+            supplierName.present ? supplierName.value : this.supplierName,
+        supplyInvoiceImage: supplyInvoiceImage.present
+            ? supplyInvoiceImage.value
+            : this.supplyInvoiceImage,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -7779,6 +8013,12 @@ class StockIncrementTable extends DataClass
           : this.quantityAfter,
       dateAdded: data.dateAdded.present ? data.dateAdded.value : this.dateAdded,
       remarks: data.remarks.present ? data.remarks.value : this.remarks,
+      supplierName: data.supplierName.present
+          ? data.supplierName.value
+          : this.supplierName,
+      supplyInvoiceImage: data.supplyInvoiceImage.present
+          ? data.supplyInvoiceImage.value
+          : this.supplyInvoiceImage,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -7797,6 +8037,8 @@ class StockIncrementTable extends DataClass
           ..write('quantityAfter: $quantityAfter, ')
           ..write('dateAdded: $dateAdded, ')
           ..write('remarks: $remarks, ')
+          ..write('supplierName: $supplierName, ')
+          ..write('supplyInvoiceImage: $supplyInvoiceImage, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -7815,6 +8057,8 @@ class StockIncrementTable extends DataClass
       quantityAfter,
       dateAdded,
       remarks,
+      supplierName,
+      $driftBlobEquality.hash(supplyInvoiceImage),
       syncId,
       updatedAt,
       createdAt,
@@ -7831,6 +8075,9 @@ class StockIncrementTable extends DataClass
           other.quantityAfter == this.quantityAfter &&
           other.dateAdded == this.dateAdded &&
           other.remarks == this.remarks &&
+          other.supplierName == this.supplierName &&
+          $driftBlobEquality.equals(
+              other.supplyInvoiceImage, this.supplyInvoiceImage) &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -7846,6 +8093,8 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
   final Value<int> quantityAfter;
   final Value<DateTime> dateAdded;
   final Value<String?> remarks;
+  final Value<String?> supplierName;
+  final Value<Uint8List?> supplyInvoiceImage;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -7859,6 +8108,8 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
     this.quantityAfter = const Value.absent(),
     this.dateAdded = const Value.absent(),
     this.remarks = const Value.absent(),
+    this.supplierName = const Value.absent(),
+    this.supplyInvoiceImage = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -7873,6 +8124,8 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
     this.quantityAfter = const Value.absent(),
     this.dateAdded = const Value.absent(),
     this.remarks = const Value.absent(),
+    this.supplierName = const Value.absent(),
+    this.supplyInvoiceImage = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -7888,6 +8141,8 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
     Expression<int>? quantityAfter,
     Expression<DateTime>? dateAdded,
     Expression<String>? remarks,
+    Expression<String>? supplierName,
+    Expression<Uint8List>? supplyInvoiceImage,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -7902,6 +8157,9 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
       if (quantityAfter != null) 'quantity_after': quantityAfter,
       if (dateAdded != null) 'date_added': dateAdded,
       if (remarks != null) 'remarks': remarks,
+      if (supplierName != null) 'supplier_name': supplierName,
+      if (supplyInvoiceImage != null)
+        'supply_invoice_image': supplyInvoiceImage,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -7918,6 +8176,8 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
       Value<int>? quantityAfter,
       Value<DateTime>? dateAdded,
       Value<String?>? remarks,
+      Value<String?>? supplierName,
+      Value<Uint8List?>? supplyInvoiceImage,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -7931,6 +8191,8 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
       quantityAfter: quantityAfter ?? this.quantityAfter,
       dateAdded: dateAdded ?? this.dateAdded,
       remarks: remarks ?? this.remarks,
+      supplierName: supplierName ?? this.supplierName,
+      supplyInvoiceImage: supplyInvoiceImage ?? this.supplyInvoiceImage,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -7963,6 +8225,13 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
     if (remarks.present) {
       map['remarks'] = Variable<String>(remarks.value);
     }
+    if (supplierName.present) {
+      map['supplier_name'] = Variable<String>(supplierName.value);
+    }
+    if (supplyInvoiceImage.present) {
+      map['supply_invoice_image'] =
+          Variable<Uint8List>(supplyInvoiceImage.value);
+    }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
     }
@@ -7991,6 +8260,8 @@ class StockIncrementsCompanion extends UpdateCompanion<StockIncrementTable> {
           ..write('quantityAfter: $quantityAfter, ')
           ..write('dateAdded: $dateAdded, ')
           ..write('remarks: $remarks, ')
+          ..write('supplierName: $supplierName, ')
+          ..write('supplyInvoiceImage: $supplyInvoiceImage, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -14429,9 +14700,17 @@ class $ServiceCustomersTable extends ServiceCustomers
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
   @override
   List<GeneratedColumn> get $columns =>
-      [id, name, phone, email, address, image, createdAt];
+      [id, name, phone, email, address, image, createdAt, syncStatus];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -14474,6 +14753,12 @@ class $ServiceCustomersTable extends ServiceCustomers
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
     return context;
   }
 
@@ -14497,6 +14782,8 @@ class $ServiceCustomersTable extends ServiceCustomers
           .read(DriftSqlType.blob, data['${effectivePrefix}image']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
     );
   }
 
@@ -14515,6 +14802,7 @@ class ServiceCustomerTable extends DataClass
   final String? address;
   final Uint8List? image;
   final DateTime createdAt;
+  final String syncStatus;
   const ServiceCustomerTable(
       {required this.id,
       required this.name,
@@ -14522,7 +14810,8 @@ class ServiceCustomerTable extends DataClass
       this.email,
       this.address,
       this.image,
-      required this.createdAt});
+      required this.createdAt,
+      required this.syncStatus});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -14541,6 +14830,7 @@ class ServiceCustomerTable extends DataClass
       map['image'] = Variable<Uint8List>(image);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['sync_status'] = Variable<String>(syncStatus);
     return map;
   }
 
@@ -14558,6 +14848,7 @@ class ServiceCustomerTable extends DataClass
       image:
           image == null && nullToAbsent ? const Value.absent() : Value(image),
       createdAt: Value(createdAt),
+      syncStatus: Value(syncStatus),
     );
   }
 
@@ -14572,6 +14863,7 @@ class ServiceCustomerTable extends DataClass
       address: serializer.fromJson<String?>(json['address']),
       image: serializer.fromJson<Uint8List?>(json['image']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
     );
   }
   @override
@@ -14585,6 +14877,7 @@ class ServiceCustomerTable extends DataClass
       'address': serializer.toJson<String?>(address),
       'image': serializer.toJson<Uint8List?>(image),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
     };
   }
 
@@ -14595,7 +14888,8 @@ class ServiceCustomerTable extends DataClass
           Value<String?> email = const Value.absent(),
           Value<String?> address = const Value.absent(),
           Value<Uint8List?> image = const Value.absent(),
-          DateTime? createdAt}) =>
+          DateTime? createdAt,
+          String? syncStatus}) =>
       ServiceCustomerTable(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -14604,6 +14898,7 @@ class ServiceCustomerTable extends DataClass
         address: address.present ? address.value : this.address,
         image: image.present ? image.value : this.image,
         createdAt: createdAt ?? this.createdAt,
+        syncStatus: syncStatus ?? this.syncStatus,
       );
   ServiceCustomerTable copyWithCompanion(ServiceCustomersCompanion data) {
     return ServiceCustomerTable(
@@ -14614,6 +14909,8 @@ class ServiceCustomerTable extends DataClass
       address: data.address.present ? data.address.value : this.address,
       image: data.image.present ? data.image.value : this.image,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
     );
   }
 
@@ -14626,14 +14923,15 @@ class ServiceCustomerTable extends DataClass
           ..write('email: $email, ')
           ..write('address: $address, ')
           ..write('image: $image, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('syncStatus: $syncStatus')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(id, name, phone, email, address,
-      $driftBlobEquality.hash(image), createdAt);
+      $driftBlobEquality.hash(image), createdAt, syncStatus);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -14644,7 +14942,8 @@ class ServiceCustomerTable extends DataClass
           other.email == this.email &&
           other.address == this.address &&
           $driftBlobEquality.equals(other.image, this.image) &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.syncStatus == this.syncStatus);
 }
 
 class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
@@ -14655,6 +14954,7 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
   final Value<String?> address;
   final Value<Uint8List?> image;
   final Value<DateTime> createdAt;
+  final Value<String> syncStatus;
   final Value<int> rowid;
   const ServiceCustomersCompanion({
     this.id = const Value.absent(),
@@ -14664,6 +14964,7 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
     this.address = const Value.absent(),
     this.image = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ServiceCustomersCompanion.insert({
@@ -14674,6 +14975,7 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
     this.address = const Value.absent(),
     this.image = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name);
@@ -14685,6 +14987,7 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
     Expression<String>? address,
     Expression<Uint8List>? image,
     Expression<DateTime>? createdAt,
+    Expression<String>? syncStatus,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -14695,6 +14998,7 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
       if (address != null) 'address': address,
       if (image != null) 'image': image,
       if (createdAt != null) 'created_at': createdAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -14707,6 +15011,7 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
       Value<String?>? address,
       Value<Uint8List?>? image,
       Value<DateTime>? createdAt,
+      Value<String>? syncStatus,
       Value<int>? rowid}) {
     return ServiceCustomersCompanion(
       id: id ?? this.id,
@@ -14716,6 +15021,7 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
       address: address ?? this.address,
       image: image ?? this.image,
       createdAt: createdAt ?? this.createdAt,
+      syncStatus: syncStatus ?? this.syncStatus,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -14744,6 +15050,9 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -14760,6 +15069,7 @@ class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
           ..write('address: $address, ')
           ..write('image: $image, ')
           ..write('createdAt: $createdAt, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -14858,6 +15168,14 @@ class $ServiceJobsTable extends ServiceJobs
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -14872,7 +15190,8 @@ class $ServiceJobsTable extends ServiceJobs
         status,
         dueDate,
         image,
-        createdAt
+        createdAt,
+        syncStatus
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -14957,6 +15276,12 @@ class $ServiceJobsTable extends ServiceJobs
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
     return context;
   }
 
@@ -14992,6 +15317,8 @@ class $ServiceJobsTable extends ServiceJobs
           .read(DriftSqlType.blob, data['${effectivePrefix}image']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
     );
   }
 
@@ -15015,6 +15342,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
   final DateTime? dueDate;
   final Uint8List? image;
   final DateTime createdAt;
+  final String syncStatus;
   const ServiceJobTable(
       {required this.id,
       required this.jobId,
@@ -15028,7 +15356,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       required this.status,
       this.dueDate,
       this.image,
-      required this.createdAt});
+      required this.createdAt,
+      required this.syncStatus});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -15051,6 +15380,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       map['image'] = Variable<Uint8List>(image);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['sync_status'] = Variable<String>(syncStatus);
     return map;
   }
 
@@ -15074,6 +15404,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       image:
           image == null && nullToAbsent ? const Value.absent() : Value(image),
       createdAt: Value(createdAt),
+      syncStatus: Value(syncStatus),
     );
   }
 
@@ -15094,6 +15425,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       dueDate: serializer.fromJson<DateTime?>(json['dueDate']),
       image: serializer.fromJson<Uint8List?>(json['image']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
     );
   }
   @override
@@ -15113,6 +15445,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       'dueDate': serializer.toJson<DateTime?>(dueDate),
       'image': serializer.toJson<Uint8List?>(image),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
     };
   }
 
@@ -15129,7 +15462,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
           String? status,
           Value<DateTime?> dueDate = const Value.absent(),
           Value<Uint8List?> image = const Value.absent(),
-          DateTime? createdAt}) =>
+          DateTime? createdAt,
+          String? syncStatus}) =>
       ServiceJobTable(
         id: id ?? this.id,
         jobId: jobId ?? this.jobId,
@@ -15144,6 +15478,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
         dueDate: dueDate.present ? dueDate.value : this.dueDate,
         image: image.present ? image.value : this.image,
         createdAt: createdAt ?? this.createdAt,
+        syncStatus: syncStatus ?? this.syncStatus,
       );
   ServiceJobTable copyWithCompanion(ServiceJobsCompanion data) {
     return ServiceJobTable(
@@ -15165,6 +15500,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       dueDate: data.dueDate.present ? data.dueDate.value : this.dueDate,
       image: data.image.present ? data.image.value : this.image,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
     );
   }
 
@@ -15183,7 +15520,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
           ..write('status: $status, ')
           ..write('dueDate: $dueDate, ')
           ..write('image: $image, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('syncStatus: $syncStatus')
           ..write(')'))
         .toString();
   }
@@ -15202,7 +15540,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       status,
       dueDate,
       $driftBlobEquality.hash(image),
-      createdAt);
+      createdAt,
+      syncStatus);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -15219,7 +15558,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
           other.status == this.status &&
           other.dueDate == this.dueDate &&
           $driftBlobEquality.equals(other.image, this.image) &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.syncStatus == this.syncStatus);
 }
 
 class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
@@ -15236,6 +15576,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
   final Value<DateTime?> dueDate;
   final Value<Uint8List?> image;
   final Value<DateTime> createdAt;
+  final Value<String> syncStatus;
   final Value<int> rowid;
   const ServiceJobsCompanion({
     this.id = const Value.absent(),
@@ -15251,6 +15592,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
     this.dueDate = const Value.absent(),
     this.image = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ServiceJobsCompanion.insert({
@@ -15267,6 +15609,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
     this.dueDate = const Value.absent(),
     this.image = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         jobId = Value(jobId),
@@ -15288,6 +15631,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
     Expression<DateTime>? dueDate,
     Expression<Uint8List>? image,
     Expression<DateTime>? createdAt,
+    Expression<String>? syncStatus,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -15304,6 +15648,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
       if (dueDate != null) 'due_date': dueDate,
       if (image != null) 'image': image,
       if (createdAt != null) 'created_at': createdAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -15322,6 +15667,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
       Value<DateTime?>? dueDate,
       Value<Uint8List?>? image,
       Value<DateTime>? createdAt,
+      Value<String>? syncStatus,
       Value<int>? rowid}) {
     return ServiceJobsCompanion(
       id: id ?? this.id,
@@ -15337,6 +15683,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
       dueDate: dueDate ?? this.dueDate,
       image: image ?? this.image,
       createdAt: createdAt ?? this.createdAt,
+      syncStatus: syncStatus ?? this.syncStatus,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -15383,6 +15730,9 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -15405,6 +15755,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
           ..write('dueDate: $dueDate, ')
           ..write('image: $image, ')
           ..write('createdAt: $createdAt, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -15454,9 +15805,17 @@ class $ServicePaymentsTable extends ServicePayments
       type: DriftSqlType.dateTime,
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
   @override
   List<GeneratedColumn> get $columns =>
-      [id, jobId, amount, method, reference, createdAt];
+      [id, jobId, amount, method, reference, createdAt, syncStatus];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -15499,6 +15858,12 @@ class $ServicePaymentsTable extends ServicePayments
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
     return context;
   }
 
@@ -15520,6 +15885,8 @@ class $ServicePaymentsTable extends ServicePayments
           .read(DriftSqlType.string, data['${effectivePrefix}reference']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
     );
   }
 
@@ -15537,13 +15904,15 @@ class ServicePaymentTable extends DataClass
   final String method;
   final String? reference;
   final DateTime createdAt;
+  final String syncStatus;
   const ServicePaymentTable(
       {required this.id,
       required this.jobId,
       required this.amount,
       required this.method,
       this.reference,
-      required this.createdAt});
+      required this.createdAt,
+      required this.syncStatus});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -15555,6 +15924,7 @@ class ServicePaymentTable extends DataClass
       map['reference'] = Variable<String>(reference);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['sync_status'] = Variable<String>(syncStatus);
     return map;
   }
 
@@ -15568,6 +15938,7 @@ class ServicePaymentTable extends DataClass
           ? const Value.absent()
           : Value(reference),
       createdAt: Value(createdAt),
+      syncStatus: Value(syncStatus),
     );
   }
 
@@ -15581,6 +15952,7 @@ class ServicePaymentTable extends DataClass
       method: serializer.fromJson<String>(json['method']),
       reference: serializer.fromJson<String?>(json['reference']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
     );
   }
   @override
@@ -15593,6 +15965,7 @@ class ServicePaymentTable extends DataClass
       'method': serializer.toJson<String>(method),
       'reference': serializer.toJson<String?>(reference),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
     };
   }
 
@@ -15602,7 +15975,8 @@ class ServicePaymentTable extends DataClass
           double? amount,
           String? method,
           Value<String?> reference = const Value.absent(),
-          DateTime? createdAt}) =>
+          DateTime? createdAt,
+          String? syncStatus}) =>
       ServicePaymentTable(
         id: id ?? this.id,
         jobId: jobId ?? this.jobId,
@@ -15610,6 +15984,7 @@ class ServicePaymentTable extends DataClass
         method: method ?? this.method,
         reference: reference.present ? reference.value : this.reference,
         createdAt: createdAt ?? this.createdAt,
+        syncStatus: syncStatus ?? this.syncStatus,
       );
   ServicePaymentTable copyWithCompanion(ServicePaymentsCompanion data) {
     return ServicePaymentTable(
@@ -15619,6 +15994,8 @@ class ServicePaymentTable extends DataClass
       method: data.method.present ? data.method.value : this.method,
       reference: data.reference.present ? data.reference.value : this.reference,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
     );
   }
 
@@ -15630,14 +16007,15 @@ class ServicePaymentTable extends DataClass
           ..write('amount: $amount, ')
           ..write('method: $method, ')
           ..write('reference: $reference, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('syncStatus: $syncStatus')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode =>
-      Object.hash(id, jobId, amount, method, reference, createdAt);
+      Object.hash(id, jobId, amount, method, reference, createdAt, syncStatus);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -15647,7 +16025,8 @@ class ServicePaymentTable extends DataClass
           other.amount == this.amount &&
           other.method == this.method &&
           other.reference == this.reference &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.syncStatus == this.syncStatus);
 }
 
 class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
@@ -15657,6 +16036,7 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
   final Value<String> method;
   final Value<String?> reference;
   final Value<DateTime> createdAt;
+  final Value<String> syncStatus;
   final Value<int> rowid;
   const ServicePaymentsCompanion({
     this.id = const Value.absent(),
@@ -15665,6 +16045,7 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
     this.method = const Value.absent(),
     this.reference = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ServicePaymentsCompanion.insert({
@@ -15674,6 +16055,7 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
     required String method,
     this.reference = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         jobId = Value(jobId),
@@ -15686,6 +16068,7 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
     Expression<String>? method,
     Expression<String>? reference,
     Expression<DateTime>? createdAt,
+    Expression<String>? syncStatus,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -15695,6 +16078,7 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
       if (method != null) 'method': method,
       if (reference != null) 'reference': reference,
       if (createdAt != null) 'created_at': createdAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -15706,6 +16090,7 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
       Value<String>? method,
       Value<String?>? reference,
       Value<DateTime>? createdAt,
+      Value<String>? syncStatus,
       Value<int>? rowid}) {
     return ServicePaymentsCompanion(
       id: id ?? this.id,
@@ -15714,6 +16099,7 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
       method: method ?? this.method,
       reference: reference ?? this.reference,
       createdAt: createdAt ?? this.createdAt,
+      syncStatus: syncStatus ?? this.syncStatus,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -15739,6 +16125,9 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -15754,6 +16143,7 @@ class ServicePaymentsCompanion extends UpdateCompanion<ServicePaymentTable> {
           ..write('method: $method, ')
           ..write('reference: $reference, ')
           ..write('createdAt: $createdAt, ')
+          ..write('syncStatus: $syncStatus, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -19829,6 +20219,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> deviceId,
   Value<bool> isDeleted,
   Value<double?> totalPrintAmount,
+  Value<int?> selectedBankIndex,
   Value<String> businessMode,
   Value<int?> studentId,
   Value<int?> classId,
@@ -19863,6 +20254,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> deviceId,
   Value<bool> isDeleted,
   Value<double?> totalPrintAmount,
+  Value<int?> selectedBankIndex,
   Value<String> businessMode,
   Value<int?> studentId,
   Value<int?> classId,
@@ -19986,6 +20378,10 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<double> get totalPrintAmount => $composableBuilder(
       column: $table.totalPrintAmount,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get selectedBankIndex => $composableBuilder(
+      column: $table.selectedBankIndex,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get businessMode => $composableBuilder(
@@ -20148,6 +20544,10 @@ class $$InvoicesTableOrderingComposer
       column: $table.totalPrintAmount,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get selectedBankIndex => $composableBuilder(
+      column: $table.selectedBankIndex,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get businessMode => $composableBuilder(
       column: $table.businessMode,
       builder: (column) => ColumnOrderings(column));
@@ -20258,6 +20658,9 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<double> get totalPrintAmount => $composableBuilder(
       column: $table.totalPrintAmount, builder: (column) => column);
+
+  GeneratedColumn<int> get selectedBankIndex => $composableBuilder(
+      column: $table.selectedBankIndex, builder: (column) => column);
 
   GeneratedColumn<String> get businessMode => $composableBuilder(
       column: $table.businessMode, builder: (column) => column);
@@ -20377,6 +20780,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
             Value<double?> totalPrintAmount = const Value.absent(),
+            Value<int?> selectedBankIndex = const Value.absent(),
             Value<String> businessMode = const Value.absent(),
             Value<int?> studentId = const Value.absent(),
             Value<int?> classId = const Value.absent(),
@@ -20411,6 +20815,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             deviceId: deviceId,
             isDeleted: isDeleted,
             totalPrintAmount: totalPrintAmount,
+            selectedBankIndex: selectedBankIndex,
             businessMode: businessMode,
             studentId: studentId,
             classId: classId,
@@ -20445,6 +20850,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
             Value<double?> totalPrintAmount = const Value.absent(),
+            Value<int?> selectedBankIndex = const Value.absent(),
             Value<String> businessMode = const Value.absent(),
             Value<int?> studentId = const Value.absent(),
             Value<int?> classId = const Value.absent(),
@@ -20479,6 +20885,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             deviceId: deviceId,
             isDeleted: isDeleted,
             totalPrintAmount: totalPrintAmount,
+            selectedBankIndex: selectedBankIndex,
             businessMode: businessMode,
             studentId: studentId,
             classId: classId,
@@ -21065,6 +21472,9 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<String?> bankName,
   Value<String?> accountNumber,
   Value<String?> accountName,
+  Value<String?> bankName2,
+  Value<String?> accountNumber2,
+  Value<String?> accountName2,
   Value<bool> showAccountDetails,
   Value<String> receiptFooter,
   Value<bool> showSignatureSpace,
@@ -21123,6 +21533,9 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String?> bankName,
   Value<String?> accountNumber,
   Value<String?> accountName,
+  Value<String?> bankName2,
+  Value<String?> accountNumber2,
+  Value<String?> accountName2,
   Value<bool> showAccountDetails,
   Value<String> receiptFooter,
   Value<bool> showSignatureSpace,
@@ -21232,6 +21645,16 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get accountName => $composableBuilder(
       column: $table.accountName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get bankName2 => $composableBuilder(
+      column: $table.bankName2, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get accountNumber2 => $composableBuilder(
+      column: $table.accountNumber2,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get accountName2 => $composableBuilder(
+      column: $table.accountName2, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get showAccountDetails => $composableBuilder(
       column: $table.showAccountDetails,
@@ -21437,6 +21860,17 @@ class $$SettingsTableOrderingComposer
 
   ColumnOrderings<String> get accountName => $composableBuilder(
       column: $table.accountName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get bankName2 => $composableBuilder(
+      column: $table.bankName2, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get accountNumber2 => $composableBuilder(
+      column: $table.accountNumber2,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get accountName2 => $composableBuilder(
+      column: $table.accountName2,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get showAccountDetails => $composableBuilder(
       column: $table.showAccountDetails,
@@ -21645,6 +22079,15 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<String> get accountName => $composableBuilder(
       column: $table.accountName, builder: (column) => column);
 
+  GeneratedColumn<String> get bankName2 =>
+      $composableBuilder(column: $table.bankName2, builder: (column) => column);
+
+  GeneratedColumn<String> get accountNumber2 => $composableBuilder(
+      column: $table.accountNumber2, builder: (column) => column);
+
+  GeneratedColumn<String> get accountName2 => $composableBuilder(
+      column: $table.accountName2, builder: (column) => column);
+
   GeneratedColumn<bool> get showAccountDetails => $composableBuilder(
       column: $table.showAccountDetails, builder: (column) => column);
 
@@ -21802,6 +22245,9 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String?> bankName = const Value.absent(),
             Value<String?> accountNumber = const Value.absent(),
             Value<String?> accountName = const Value.absent(),
+            Value<String?> bankName2 = const Value.absent(),
+            Value<String?> accountNumber2 = const Value.absent(),
+            Value<String?> accountName2 = const Value.absent(),
             Value<bool> showAccountDetails = const Value.absent(),
             Value<String> receiptFooter = const Value.absent(),
             Value<bool> showSignatureSpace = const Value.absent(),
@@ -21860,6 +22306,9 @@ class $$SettingsTableTableManager extends RootTableManager<
             bankName: bankName,
             accountNumber: accountNumber,
             accountName: accountName,
+            bankName2: bankName2,
+            accountNumber2: accountNumber2,
+            accountName2: accountName2,
             showAccountDetails: showAccountDetails,
             receiptFooter: receiptFooter,
             showSignatureSpace: showSignatureSpace,
@@ -21918,6 +22367,9 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String?> bankName = const Value.absent(),
             Value<String?> accountNumber = const Value.absent(),
             Value<String?> accountName = const Value.absent(),
+            Value<String?> bankName2 = const Value.absent(),
+            Value<String?> accountNumber2 = const Value.absent(),
+            Value<String?> accountName2 = const Value.absent(),
             Value<bool> showAccountDetails = const Value.absent(),
             Value<String> receiptFooter = const Value.absent(),
             Value<bool> showSignatureSpace = const Value.absent(),
@@ -21976,6 +22428,9 @@ class $$SettingsTableTableManager extends RootTableManager<
             bankName: bankName,
             accountNumber: accountNumber,
             accountName: accountName,
+            bankName2: bankName2,
+            accountNumber2: accountNumber2,
+            accountName2: accountName2,
             showAccountDetails: showAccountDetails,
             receiptFooter: receiptFooter,
             showSignatureSpace: showSignatureSpace,
@@ -22774,6 +23229,8 @@ typedef $$StockIncrementsTableCreateCompanionBuilder = StockIncrementsCompanion
   Value<int> quantityAfter,
   Value<DateTime> dateAdded,
   Value<String?> remarks,
+  Value<String?> supplierName,
+  Value<Uint8List?> supplyInvoiceImage,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -22789,6 +23246,8 @@ typedef $$StockIncrementsTableUpdateCompanionBuilder = StockIncrementsCompanion
   Value<int> quantityAfter,
   Value<DateTime> dateAdded,
   Value<String?> remarks,
+  Value<String?> supplierName,
+  Value<Uint8List?> supplyInvoiceImage,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -22843,6 +23302,13 @@ class $$StockIncrementsTableFilterComposer
 
   ColumnFilters<String> get remarks => $composableBuilder(
       column: $table.remarks, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get supplierName => $composableBuilder(
+      column: $table.supplierName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<Uint8List> get supplyInvoiceImage => $composableBuilder(
+      column: $table.supplyInvoiceImage,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -22910,6 +23376,14 @@ class $$StockIncrementsTableOrderingComposer
   ColumnOrderings<String> get remarks => $composableBuilder(
       column: $table.remarks, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get supplierName => $composableBuilder(
+      column: $table.supplierName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<Uint8List> get supplyInvoiceImage => $composableBuilder(
+      column: $table.supplyInvoiceImage,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
 
@@ -22972,6 +23446,12 @@ class $$StockIncrementsTableAnnotationComposer
 
   GeneratedColumn<String> get remarks =>
       $composableBuilder(column: $table.remarks, builder: (column) => column);
+
+  GeneratedColumn<String> get supplierName => $composableBuilder(
+      column: $table.supplierName, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get supplyInvoiceImage => $composableBuilder(
+      column: $table.supplyInvoiceImage, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -23040,6 +23520,8 @@ class $$StockIncrementsTableTableManager extends RootTableManager<
             Value<int> quantityAfter = const Value.absent(),
             Value<DateTime> dateAdded = const Value.absent(),
             Value<String?> remarks = const Value.absent(),
+            Value<String?> supplierName = const Value.absent(),
+            Value<Uint8List?> supplyInvoiceImage = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -23054,6 +23536,8 @@ class $$StockIncrementsTableTableManager extends RootTableManager<
             quantityAfter: quantityAfter,
             dateAdded: dateAdded,
             remarks: remarks,
+            supplierName: supplierName,
+            supplyInvoiceImage: supplyInvoiceImage,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -23068,6 +23552,8 @@ class $$StockIncrementsTableTableManager extends RootTableManager<
             Value<int> quantityAfter = const Value.absent(),
             Value<DateTime> dateAdded = const Value.absent(),
             Value<String?> remarks = const Value.absent(),
+            Value<String?> supplierName = const Value.absent(),
+            Value<Uint8List?> supplyInvoiceImage = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -23082,6 +23568,8 @@ class $$StockIncrementsTableTableManager extends RootTableManager<
             quantityAfter: quantityAfter,
             dateAdded: dateAdded,
             remarks: remarks,
+            supplierName: supplierName,
+            supplyInvoiceImage: supplyInvoiceImage,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -28106,6 +28594,7 @@ typedef $$ServiceCustomersTableCreateCompanionBuilder
   Value<String?> address,
   Value<Uint8List?> image,
   Value<DateTime> createdAt,
+  Value<String> syncStatus,
   Value<int> rowid,
 });
 typedef $$ServiceCustomersTableUpdateCompanionBuilder
@@ -28117,6 +28606,7 @@ typedef $$ServiceCustomersTableUpdateCompanionBuilder
   Value<String?> address,
   Value<Uint8List?> image,
   Value<DateTime> createdAt,
+  Value<String> syncStatus,
   Value<int> rowid,
 });
 
@@ -28171,6 +28661,9 @@ class $$ServiceCustomersTableFilterComposer
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
   Expression<bool> serviceJobsRefs(
       Expression<bool> Function($$ServiceJobsTableFilterComposer f) f) {
     final $$ServiceJobsTableFilterComposer composer = $composerBuilder(
@@ -28222,6 +28715,9 @@ class $$ServiceCustomersTableOrderingComposer
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
 }
 
 class $$ServiceCustomersTableAnnotationComposer
@@ -28253,6 +28749,9 @@ class $$ServiceCustomersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
 
   Expression<T> serviceJobsRefs<T extends Object>(
       Expression<T> Function($$ServiceJobsTableAnnotationComposer a) f) {
@@ -28307,6 +28806,7 @@ class $$ServiceCustomersTableTableManager extends RootTableManager<
             Value<String?> address = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ServiceCustomersCompanion(
@@ -28317,6 +28817,7 @@ class $$ServiceCustomersTableTableManager extends RootTableManager<
             address: address,
             image: image,
             createdAt: createdAt,
+            syncStatus: syncStatus,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -28327,6 +28828,7 @@ class $$ServiceCustomersTableTableManager extends RootTableManager<
             Value<String?> address = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ServiceCustomersCompanion.insert(
@@ -28337,6 +28839,7 @@ class $$ServiceCustomersTableTableManager extends RootTableManager<
             address: address,
             image: image,
             createdAt: createdAt,
+            syncStatus: syncStatus,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -28399,6 +28902,7 @@ typedef $$ServiceJobsTableCreateCompanionBuilder = ServiceJobsCompanion
   Value<DateTime?> dueDate,
   Value<Uint8List?> image,
   Value<DateTime> createdAt,
+  Value<String> syncStatus,
   Value<int> rowid,
 });
 typedef $$ServiceJobsTableUpdateCompanionBuilder = ServiceJobsCompanion
@@ -28416,6 +28920,7 @@ typedef $$ServiceJobsTableUpdateCompanionBuilder = ServiceJobsCompanion
   Value<DateTime?> dueDate,
   Value<Uint8List?> image,
   Value<DateTime> createdAt,
+  Value<String> syncStatus,
   Value<int> rowid,
 });
 
@@ -28518,6 +29023,9 @@ class $$ServiceJobsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
 
   $$ServiceCustomersTableFilterComposer get customerId {
     final $$ServiceCustomersTableFilterComposer composer = $composerBuilder(
@@ -28627,6 +29135,9 @@ class $$ServiceJobsTableOrderingComposer
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
+
   $$ServiceCustomersTableOrderingComposer get customerId {
     final $$ServiceCustomersTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -28692,6 +29203,9 @@ class $$ServiceJobsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
 
   $$ServiceCustomersTableAnnotationComposer get customerId {
     final $$ServiceCustomersTableAnnotationComposer composer = $composerBuilder(
@@ -28795,6 +29309,7 @@ class $$ServiceJobsTableTableManager extends RootTableManager<
             Value<DateTime?> dueDate = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ServiceJobsCompanion(
@@ -28811,6 +29326,7 @@ class $$ServiceJobsTableTableManager extends RootTableManager<
             dueDate: dueDate,
             image: image,
             createdAt: createdAt,
+            syncStatus: syncStatus,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -28827,6 +29343,7 @@ class $$ServiceJobsTableTableManager extends RootTableManager<
             Value<DateTime?> dueDate = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ServiceJobsCompanion.insert(
@@ -28843,6 +29360,7 @@ class $$ServiceJobsTableTableManager extends RootTableManager<
             dueDate: dueDate,
             image: image,
             createdAt: createdAt,
+            syncStatus: syncStatus,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
@@ -28943,6 +29461,7 @@ typedef $$ServicePaymentsTableCreateCompanionBuilder = ServicePaymentsCompanion
   required String method,
   Value<String?> reference,
   Value<DateTime> createdAt,
+  Value<String> syncStatus,
   Value<int> rowid,
 });
 typedef $$ServicePaymentsTableUpdateCompanionBuilder = ServicePaymentsCompanion
@@ -28953,6 +29472,7 @@ typedef $$ServicePaymentsTableUpdateCompanionBuilder = ServicePaymentsCompanion
   Value<String> method,
   Value<String?> reference,
   Value<DateTime> createdAt,
+  Value<String> syncStatus,
   Value<int> rowid,
 });
 
@@ -29001,6 +29521,9 @@ class $$ServicePaymentsTableFilterComposer
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
   $$ServiceJobsTableFilterComposer get jobId {
     final $$ServiceJobsTableFilterComposer composer = $composerBuilder(
         composer: this,
@@ -29046,6 +29569,9 @@ class $$ServicePaymentsTableOrderingComposer
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
+
   $$ServiceJobsTableOrderingComposer get jobId {
     final $$ServiceJobsTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -29090,6 +29616,9 @@ class $$ServicePaymentsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
 
   $$ServiceJobsTableAnnotationComposer get jobId {
     final $$ServiceJobsTableAnnotationComposer composer = $composerBuilder(
@@ -29142,6 +29671,7 @@ class $$ServicePaymentsTableTableManager extends RootTableManager<
             Value<String> method = const Value.absent(),
             Value<String?> reference = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ServicePaymentsCompanion(
@@ -29151,6 +29681,7 @@ class $$ServicePaymentsTableTableManager extends RootTableManager<
             method: method,
             reference: reference,
             createdAt: createdAt,
+            syncStatus: syncStatus,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -29160,6 +29691,7 @@ class $$ServicePaymentsTableTableManager extends RootTableManager<
             required String method,
             Value<String?> reference = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ServicePaymentsCompanion.insert(
@@ -29169,6 +29701,7 @@ class $$ServicePaymentsTableTableManager extends RootTableManager<
             method: method,
             reference: reference,
             createdAt: createdAt,
+            syncStatus: syncStatus,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

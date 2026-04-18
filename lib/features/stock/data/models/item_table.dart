@@ -40,6 +40,8 @@ class StockIncrements extends Table {
   IntColumn get quantityAfter => integer().withDefault(const Constant(0))();
   DateTimeColumn get dateAdded => dateTime().withDefault(currentDateAndTime)();
   TextColumn get remarks => text().nullable()();
+  TextColumn get supplierName => text().nullable()();
+  BlobColumn get supplyInvoiceImage => blob().nullable()();
   
   // Sync Columns
   TextColumn get syncId => text().nullable()();

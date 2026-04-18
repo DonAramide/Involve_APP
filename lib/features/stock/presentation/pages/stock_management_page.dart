@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
@@ -128,54 +130,59 @@ class _StockManagementPageState extends State<StockManagementPage> {
           return BlocBuilder<StockBloc, StockState>(
             builder: (context, state) {
               // Reload if needed or manually pass mode to events
-              var displayItems = state.items;
-              if (_showLowStockOnly) {
-                displayItems = displayItems.where((item) => 
-                  item.type != 'service' && item.stockQty <= item.minStockQty
-                ).toList();
-              }
-
+              final displayItems = state.items;
               if (displayItems.isNotEmpty) {
-                // Group items by category
-                final groupedItems = groupBy(displayItems, (Item item) {
-                  if (item.categoryId != null) {
-                    final cat = state.categories.firstWhereOrNull((c) => c.id == item.categoryId);
-                    return cat?.name ?? 'Uncategorized';
-                  }
-                  return item.category.name.toUpperCase();
-                });
+                // 1. Efficient Categorization
+                final categoryMap = {for (var c in state.categories) c.id: c.name};
+                
+                // 2. Filter if needed
+                final filteredItems = _showLowStockOnly
+                    ? displayItems.where((item) => item.type != 'service' && item.stockQty <= item.minStockQty).toList()
+                    : displayItems;
 
-                final sortedCategories = groupedItems.keys.toList()..sort();
+                if (filteredItems.isEmpty) return Center(child: Text(_showLowStockOnly ? 'No low stock items!' : 'No items found.'));
+
+                // 3. Group and Flatten for true lazy loading
+                final grouped = groupBy(filteredItems, (Item item) {
+                  return categoryMap[item.categoryId] ?? item.category.name.toUpperCase();
+                });
+                
+                final sortedCategoryNames = grouped.keys.toList()..sort();
+                
+                // Construct a flat list of display elements (Headers and Items)
+                final List<dynamic> flatList = [];
+                for (final catName in sortedCategoryNames) {
+                  flatList.add(catName); // Add header
+                  flatList.addAll(grouped[catName]!); // Add items
+                }
 
                 return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: sortedCategories.length,
-                  itemBuilder: (context, catIndex) {
-                    final categoryName = sortedCategories[catIndex];
-                    final items = groupedItems[categoryName]!;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                          child: Text(
-                            categoryName,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                              letterSpacing: 1.2,
-                            ),
+                  itemCount: flatList.length,
+                  itemBuilder: (context, index) {
+                    final element = flatList[index];
+                    
+                    if (element is String) {
+                      // Category Header
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+                        child: Text(
+                          element,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                            letterSpacing: 1.2,
                           ),
                         ),
-                        ...items.map((item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12.0),
-                          child: _buildItemCard(context, item, settingsState.settings),
-                        )),
-                        const SizedBox(height: 16),
-                      ],
-                    );
+                      );
+                    } else {
+                      // Item Card
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: _buildItemCard(context, element as Item, settingsState.settings),
+                      );
+                    }
                   },
                 );
               }
@@ -220,7 +227,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                       height: 50,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
-                        image: DecorationImage(image: MemoryImage(item.image!), fit: BoxFit.cover),
+                        image: DecorationImage(image: ResizeImage(MemoryImage(item.image!), width: 100), fit: BoxFit.cover),
                       ),
                     )
                   : Container(
@@ -331,51 +338,157 @@ class _StockManagementPageState extends State<StockManagementPage> {
 
   void _showStockUpDialog(BuildContext context, Item item) {
     final qtyController = TextEditingController();
+    final supplierController = TextEditingController();
     final remarksController = TextEditingController();
+    Uint8List? selectedImage;
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Stock Up: ${item.name}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Current Stock: ${item.stockQty}', 
-                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: qtyController,
-              decoration: const InputDecoration(labelText: 'Quantity to Add'),
-              keyboardType: TextInputType.number,
+      barrierDismissible: false, // Prevent accidental dismissal during save
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text('Stock Up: ${item.name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Current Stock: ${item.stockQty}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 16),
+                TextField(
+                  enabled: !isSaving,
+                  controller: qtyController,
+                  decoration: const InputDecoration(labelText: 'Quantity to Add', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  enabled: !isSaving,
+                  controller: supplierController,
+                  decoration: const InputDecoration(labelText: 'Supplier Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.business)),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  enabled: !isSaving,
+                  controller: remarksController,
+                  decoration: const InputDecoration(labelText: 'Remarks (Optional)', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 16),
+                const Text('Supply Invoice/Note', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                InkWell(
+                  onTap: isSaving ? null : () async {
+                    final picker = ImagePicker();
+                    final source = await showDialog<ImageSource>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Select Image Source'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ListTile(
+                              leading: const Icon(Icons.camera_alt),
+                              title: const Text('Camera'),
+                              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                            ),
+                            ListTile(
+                              leading: const Icon(Icons.image),
+                              title: const Text('Gallery'),
+                              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                    
+                    if (source != null) {
+                      final image = await picker.pickImage(source: source, imageQuality: 70);
+                      if (image != null) {
+                        final bytes = await image.readAsBytes();
+                        setState(() => selectedImage = bytes);
+                      }
+                    }
+                  },
+                  child: Container(
+                    height: 120,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      color: isSaving ? Colors.grey.shade200 : Colors.grey.shade50,
+                    ),
+                    child: selectedImage != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.memory(selectedImage!, fit: BoxFit.cover),
+                          )
+                        : const Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.add_a_photo_outlined, size: 32, color: Colors.grey),
+                              SizedBox(height: 4),
+                              Text('Tap to Upload Invoice', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            ],
+                          ),
+                  ),
+                ),
+                if (selectedImage != null && !isSaving)
+                  TextButton.icon(
+                    onPressed: () => setState(() => selectedImage = null),
+                    icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                    label: const Text('Remove Image', style: TextStyle(color: Colors.red, fontSize: 12)),
+                  ),
+                if (isSaving)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 20.0),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(),
+                          SizedBox(height: 8),
+                          Text('Saving Stock Entry...', style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: remarksController,
-              decoration: const InputDecoration(labelText: 'Remarks (Optional)'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(ctx), 
+              child: const Text('CANCEL')
+            ),
+            ElevatedButton(
+              onPressed: isSaving ? null : () async {
+                final qty = int.tryParse(qtyController.text);
+                if (qty != null && qty > 0) {
+                  setState(() => isSaving = true);
+                  
+                  // Allow the UI to update to show loading state
+                  await Future.delayed(const Duration(milliseconds: 500));
+                  
+                  if (!context.mounted) return;
+                  
+                  context.read<StockBloc>().add(StockIncrementRequested(
+                    item.id!,
+                    qty,
+                    remarks: remarksController.text,
+                    supplierName: supplierController.text,
+                    supplyInvoiceImage: selectedImage,
+                  ));
+                  
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added $qty to ${item.name}')),
+                  );
+                }
+              },
+              child: Text(isSaving ? 'UPLOADING...' : 'ADD'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              final qty = int.tryParse(qtyController.text);
-              if (qty != null && qty > 0) {
-                context.read<StockBloc>().add(StockIncrementRequested(
-                      item.id!,
-                      qty,
-                      remarks: remarksController.text,
-                    ));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Added $qty to ${item.name}')),
-                );
-              }
-            },
-            child: const Text('ADD'),
-          ),
-        ],
       ),
     );
   }

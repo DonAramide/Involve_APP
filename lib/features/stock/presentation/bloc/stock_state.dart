@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/item.dart';
 import '../../domain/entities/category.dart';
@@ -41,9 +42,19 @@ class StockIncrementRequested extends StockEvent {
   final int itemId;
   final int quantity;
   final String? remarks;
-  StockIncrementRequested(this.itemId, this.quantity, {this.remarks});
+  final String? supplierName;
+  final Uint8List? supplyInvoiceImage;
+
+  StockIncrementRequested(
+    this.itemId,
+    this.quantity, {
+    this.remarks,
+    this.supplierName,
+    this.supplyInvoiceImage,
+  });
+
   @override
-  List<Object?> get props => [itemId, quantity, remarks];
+  List<Object?> get props => [itemId, quantity, remarks, supplierName, supplyInvoiceImage];
 }
 
 class LoadStockHistoryRequested extends StockEvent {

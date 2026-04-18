@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
 import 'package:involve_app/features/stock/domain/entities/expense.dart';
 import 'package:involve_app/features/stock/domain/repositories/item_repository.dart';
@@ -32,7 +33,8 @@ class DeleteItem {
 class IncreaseStock {
   final ItemRepository repository;
   IncreaseStock(this.repository);
-  Future<void> call(int itemId, int quantity, String? remarks) => repository.increaseStock(itemId, quantity, remarks);
+  Future<void> call(int itemId, int quantity, String? remarks, {String? supplierName, Uint8List? supplyInvoiceImage}) => 
+    repository.increaseStock(itemId, quantity, remarks, supplierName: supplierName, supplyInvoiceImage: supplyInvoiceImage);
 }
 
 class GetStockHistory {

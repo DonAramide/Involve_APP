@@ -133,7 +133,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         const Divider(),
                         _row('Total', invoiceState.total, settings?.currency ?? '₦', isBold: true),
                         
-                        if (settings?.showAccountDetails == true && settings?.bankName != null) ...[
+                        if (settings?.showAccountDetails == true && (settings?.bankName != null || settings?.bankName2 != null)) ...[
                           const SizedBox(height: 12),
                           const Divider(thickness: 1),
                           const Center(
@@ -142,10 +142,54 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Center(child: Text('Bank: ${settings!.bankName}', style: const TextStyle(fontSize: 12))),
-                          Center(child: Text('Account: ${settings.accountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
-                          Center(child: Text('Name: ${settings.accountName ?? ""}', style: const TextStyle(fontSize: 12))),
+                          const SizedBox(height: 8),
+                          
+                          // Account Selection UI (only if both exist)
+                          if (settings?.bankName != null && settings?.bankName2 != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: ChoiceChip(
+                                      label: const Text('Account 1'),
+                                      selected: invoiceState.selectedBankIndex == 0,
+                                      onSelected: (selected) {
+                                        if (selected) context.read<InvoiceBloc>().add(UpdateSelectedBank(0));
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: ChoiceChip(
+                                      label: const Text('Account 2'),
+                                      selected: invoiceState.selectedBankIndex == 1,
+                                      onSelected: (selected) {
+                                        if (selected) context.read<InvoiceBloc>().add(UpdateSelectedBank(1));
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          
+                          const SizedBox(height: 8),
+                          
+                          // Details Preview based on selection
+                          if (invoiceState.selectedBankIndex == 0 && settings?.bankName != null) ...[
+                            Center(child: Text('Bank: ${settings!.bankName}', style: const TextStyle(fontSize: 12))),
+                            Center(child: Text('Account: ${settings.accountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
+                            Center(child: Text('Name: ${settings.accountName ?? ""}', style: const TextStyle(fontSize: 12))),
+                          ] else if (invoiceState.selectedBankIndex == 1 && settings?.bankName2 != null) ...[
+                            Center(child: Text('Bank: ${settings!.bankName2}', style: const TextStyle(fontSize: 12))),
+                            Center(child: Text('Account: ${settings.accountNumber2 ?? ""}', style: const TextStyle(fontSize: 12))),
+                            Center(child: Text('Name: ${settings.accountName2 ?? ""}', style: const TextStyle(fontSize: 12))),
+                          ] else if (settings?.bankName != null) ...[
+                            // Fallback to Account 1 if Account 2 was selected but is empty
+                            Center(child: Text('Bank: ${settings!.bankName}', style: const TextStyle(fontSize: 12))),
+                            Center(child: Text('Account: ${settings.accountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
+                            Center(child: Text('Name: ${settings.accountName ?? ""}', style: const TextStyle(fontSize: 12))),
+                          ],
                         ],
 
                         if (settings?.paymentMethodsEnabled == true) ...[

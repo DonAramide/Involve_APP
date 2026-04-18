@@ -29,6 +29,7 @@ class Invoices extends Table {
   TextColumn get deviceId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
   RealColumn get totalPrintAmount => real().nullable()();
+  IntColumn get selectedBankIndex => integer().nullable()(); // 0 for Account 1, 1 for Account 2
 
   // School Mode Extensions
   TextColumn get businessMode => text().withDefault(const Constant('retail'))(); // 'retail' or 'school'

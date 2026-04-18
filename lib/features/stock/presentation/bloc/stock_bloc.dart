@@ -107,7 +107,13 @@ class StockBloc extends Bloc<StockEvent, StockState> {
 
   Future<void> _onStockIncrementRequested(StockIncrementRequested event, Emitter<StockState> emit) async {
     try {
-      await increaseStock(event.itemId, event.quantity, event.remarks);
+      await increaseStock(
+        event.itemId,
+        event.quantity,
+        event.remarks,
+        supplierName: event.supplierName,
+        supplyInvoiceImage: event.supplyInvoiceImage,
+      );
       add(LoadItems(businessMode: state.businessMode));
     } catch (e) {
       emit(StockError('Failed to increase stock: ${e.toString()}', items: state.items, categories: state.categories));

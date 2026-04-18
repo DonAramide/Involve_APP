@@ -10,6 +10,7 @@ class ServiceCustomers extends Table {
   BlobColumn get image => blob().nullable()();
   
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -31,6 +32,7 @@ class ServiceJobs extends Table {
   BlobColumn get image => blob().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -45,6 +47,7 @@ class ServicePayments extends Table {
   TextColumn get reference => text().nullable()();
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
 
   @override
   Set<Column> get primaryKey => {id};

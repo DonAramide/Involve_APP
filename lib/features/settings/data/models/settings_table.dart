@@ -23,6 +23,12 @@ class Settings extends Table {
   TextColumn get bankName => text().nullable()();
   TextColumn get accountNumber => text().nullable()();
   TextColumn get accountName => text().nullable()();
+
+  // Secondary Account Details
+  TextColumn get bankName2 => text().nullable()();
+  TextColumn get accountNumber2 => text().nullable()();
+  TextColumn get accountName2 => text().nullable()();
+
   BoolColumn get showAccountDetails => boolean().withDefault(const Constant(false))();
   TextColumn get receiptFooter => text().withDefault(const Constant('Thank you!'))();
   BoolColumn get showSignatureSpace => boolean().withDefault(const Constant(false))();

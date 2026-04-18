@@ -111,6 +111,13 @@ class SaveInvoice extends InvoiceEvent {
   List<Object?> get props => [invoiceNumber, amountPaid, paymentStatus];
 }
 
+class UpdateSelectedBank extends InvoiceEvent {
+  final int index;
+  UpdateSelectedBank(this.index);
+  @override
+  List<Object?> get props => [index];
+}
+
 class ResetInvoice extends InvoiceEvent {}
 
 class UpdateInvoiceSettings extends InvoiceEvent {
@@ -156,6 +163,7 @@ class InvoiceState extends Equatable {
   final String? termName;
   final String? academicYearName;
   final Uint8List? studentImage;
+  final int selectedBankIndex; // 0 or 1
 
   const InvoiceState({
     this.items = const [],
@@ -186,6 +194,7 @@ class InvoiceState extends Equatable {
     this.termName,
     this.academicYearName,
     this.studentImage,
+    this.selectedBankIndex = 0,
   });
 
   InvoiceState copyWith({
@@ -217,6 +226,7 @@ class InvoiceState extends Equatable {
     String? termName,
     String? academicYearName,
     Uint8List? studentImage,
+    int? selectedBankIndex,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -247,6 +257,7 @@ class InvoiceState extends Equatable {
       termName: termName ?? this.termName,
       academicYearName: academicYearName ?? this.academicYearName,
       studentImage: studentImage ?? this.studentImage,
+      selectedBankIndex: selectedBankIndex ?? this.selectedBankIndex,
     );
   }
 
@@ -280,5 +291,6 @@ class InvoiceState extends Equatable {
         termName,
         academicYearName,
         studentImage,
+        selectedBankIndex,
       ];
 }
