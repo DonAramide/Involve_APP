@@ -37,7 +37,7 @@ class BackgroundSyncService {
         await remoteDataSource.syncCustomers(pendingCustomers.map((c) => c.toJson()).toList());
         for (final c in pendingCustomers) {
           await (db.update(db.serviceCustomers)..where((t) => t.id.equals(c.id)))
-              .write(const ServiceCustomersCompanion(syncStatus: Value('synced')));
+              .write(ServiceCustomersCompanion(syncStatus: Value('synced')));
         }
       }
 
@@ -49,7 +49,7 @@ class BackgroundSyncService {
         await remoteDataSource.syncJobs(pendingJobs.map((j) => j.toJson()).toList());
         for (final j in pendingJobs) {
           await (db.update(db.serviceJobs)..where((t) => t.id.equals(j.id)))
-              .write(const ServiceJobsCompanion(syncStatus: Value('synced')));
+              .write(ServiceJobsCompanion(syncStatus: Value('synced')));
         }
       }
 
@@ -61,7 +61,7 @@ class BackgroundSyncService {
         await remoteDataSource.syncPayments(pendingPayments.map((p) => p.toJson()).toList());
         for (final p in pendingPayments) {
           await (db.update(db.servicePayments)..where((t) => t.id.equals(p.id)))
-              .write(const ServicePaymentsCompanion(syncStatus: Value('synced')));
+              .write(ServicePaymentsCompanion(syncStatus: Value('synced')));
         }
       }
 

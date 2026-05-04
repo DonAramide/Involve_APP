@@ -1,0 +1,186 @@
+<!-- invify-admin/src/pages/TenantsPage.vue -->
+<template>
+  <q-page class="q-pa-lg bg-dark text-white">
+    <!-- Header -->
+    <div class="row items-center q-mb-lg">
+      <div class="col">
+        <h1 class="text-h4 text-weight-bold q-ma-none text-white">Tenants</h1>
+        <div class="text-grey-6">Manage business organizations and schools.</div>
+      </div>
+      <div class="col-auto">
+        <q-btn 
+          color="indigo-7" 
+          icon="add" 
+          label="Create Tenant" 
+          unelevated 
+          class="q-px-md"
+          @click="openCreateModal"
+        />
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <q-card class="bg-blue-grey-10 q-mb-lg shadow-2 border-indigo">
+      <q-card-section class="row q-col-gutter-md items-center">
+        <div class="col-12 col-md-4">
+          <q-input v-model="filter.name" label="Search by Name" dark filled dense @update:model-value="fetchTenants">
+            <template v-slot:append>
+              <q-icon name="search" />
+            </template>
+          </q-input>
+        </div>
+        <div class="col-12 col-md-3">
+          <q-select 
+            v-model="filter.type" 
+            :options="['all', 'school', 'retail', 'service']" 
+            label="Type" 
+            dark filled dense 
+            emit-value
+            @update:model-value="fetchTenants" 
+          />
+        </div>
+        <div class="col-12 col-md-3">
+          <q-select 
+            v-model="filter.status" 
+            :options="['all', 'active', 'suspended']" 
+            label="Status" 
+            dark filled dense
+            emit-value
+            @update:model-value="fetchTenants" 
+          />
+        </div>
+      </q-card-section>
+    </q-card>
+
+    <!-- Table -->
+    <q-table
+      :rows="rows"
+      :columns="columns"
+      row-key="id"
+      :loading="loading"
+      flat
+      bordered
+      dark
+      class="bg-blue-grey-10 shadow-2"
+      :pagination="pagination"
+    >
+      <template v-slot:body-cell-status="props">
+        <q-td :props="props">
+          <q-chip 
+            :color="props.value === 'active' ? 'green-10' : 'red-10'" 
+            text-color="white" 
+            size="sm"
+            dense
+          >
+            {{ props.value.toUpperCase() }}
+          </q-chip>
+        </q-td>
+      </template>
+
+      <template v-slot:body-cell-actions="props">
+        <q-td :props="props" class="q-gutter-x-sm">
+          <q-btn flat round dense icon="visibility" color="cyan-4" @click="viewDetails(props.row.id)" />
+          <q-btn flat round dense icon="edit" color="indigo-4" @click="openEditModal(props.row)" />
+          <q-btn 
+            flat round dense 
+            :icon="props.row.status === 'active' ? 'block' : 'check_circle'" 
+            :color="props.row.status === 'active' ? 'orange' : 'green'" 
+            @click="toggleStatus(props.row)"
+          />
+        </q-td>
+      </template>
+
+      <template v-slot:loading>
+        <q-inner-loading showing color="indigo-4" />
+      </template>
+
+      <template v-slot:no-data>
+        <div class="full-width row flex-center q-pa-xl text-grey-6">
+          <q-icon size="2em" name="sentiment_dissatisfied" />
+          <span class="q-ml-sm">No tenants found matching your filters.</span>
+        </div>
+      </template>
+    </q-table>
+  </q-page>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
+import { adminApi } from '../api'
+import TenantModal from '../components/modals/TenantModal.vue'
+
+const $q = useQuasar()
+const $router = useRouter()
+
+const loading = ref(false)
+const rows = ref([])
+const filter = ref({ name: '', type: 'all', status: 'all' })
+const pagination = ref({ rowsPerPage: 15 })
+
+const columns = [
+  { name: 'name', label: 'NAME', field: 'name', align: 'left', sortable: true },
+  { name: 'type', label: 'TYPE', field: 'type', align: 'left', sortable: true },
+  { name: 'plan', label: 'PLAN', field: 'plan', align: 'left', sortable: true },
+  { name: 'status', label: 'STATUS', field: 'status', align: 'center', sortable: true },
+  { name: 'created_at', label: 'CREATED AT', field: 'created_at', align: 'left', format: val => new Date(val).toLocaleDateString(), sortable: true },
+  { name: 'actions', label: 'ACTIONS', align: 'center' }
+]
+
+const fetchTenants = async () => {
+  loading.value = true
+  try {
+    const params = {
+      name: filter.value.name,
+      type: filter.value.type !== 'all' ? filter.value.type : undefined,
+      status: filter.value.status !== 'all' ? filter.value.status : undefined
+    }
+    const { data } = await adminApi.getTenants(params)
+    rows.value = data
+  } finally {
+    loading.value = false
+  }
+}
+
+const openCreateModal = () => {
+  $q.dialog({
+    component: TenantModal,
+    componentProps: { isEdit: false }
+  }).onOk(async (formData) => {
+    await adminApi.createTenant(formData)
+    $q.notify({ type: 'positive', message: 'Tenant registered successfully' })
+    fetchTenants()
+  })
+}
+
+const openEditModal = (row) => {
+  $q.dialog({
+    component: TenantModal,
+    componentProps: { isEdit: true, tenant: row }
+  }).onOk(async (formData) => {
+    await adminApi.updateTenant(row.id, formData)
+    $q.notify({ type: 'positive', message: 'Tenant updated successfully' })
+    fetchTenants()
+  })
+}
+
+const toggleStatus = async (row) => {
+  const newStatus = row.status === 'active' ? 'suspended' : 'active'
+  await adminApi.updateTenant(row.id, { status: newStatus })
+  $q.notify({ type: 'positive', message: `Tenant ${newStatus}` })
+  fetchTenants()
+}
+
+const viewDetails = (id) => {
+  $router.push(`/tenants/${id}`)
+}
+
+onMounted(fetchTenants)
+</script>
+
+<style scoped>
+.border-indigo {
+  border-left: 5px solid #3f51b5;
+}
+</style>

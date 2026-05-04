@@ -10,6 +10,8 @@ abstract class InvoiceRepository {
   Future<bool> checkServiceAvailability(int itemId, DateTime start, DateTime end);
   Future<void> updatePaymentInfo(int invoiceId, String method, String status);
   Future<List<Invoice>> getInvoicesByStudentId(int studentId);
+  Future<List<String>> getAllCustomerNames();
+  Future<List<Invoice>> getInvoicesByCustomerName(String customerName, {DateTime? start, DateTime? end});
   
   // Stock Returns & Replacements
   Future<void> returnItems({

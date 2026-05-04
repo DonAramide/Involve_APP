@@ -9,6 +9,8 @@ abstract class IAIService {
     required String term,
     required int week,
     required String topic,
-    required String apiKey,
+    required String schoolId,
+    required String teacherId,
+    bool forceRefresh = false,
   });
 }

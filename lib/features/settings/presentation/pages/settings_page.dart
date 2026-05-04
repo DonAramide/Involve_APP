@@ -406,18 +406,7 @@ class _SettingsPageState extends State<SettingsPage> {
         const Divider(),
       ],
 
-      // AI Services
-      if (settings.businessMode == 'school' && _matches('AI Services', ['gemini', 'apiKey', 'lesson'])) ...[
-        _buildSectionHeader(context, 'AI Services (Beta)'),
-        _buildTextTile(
-          context, 
-          'Gemini AI API Key', 
-          (settings.geminiApiKey == null || settings.geminiApiKey!.isEmpty) ? 'Not Set' : '********', 
-          (val) => _update(context, settings.copyWith(geminiApiKey: val)),
-          validator: (val) => (val == null || val.isEmpty) ? 'Enter API Key' : null,
-        ),
-        const Divider(),
-      ],
+
 
       // Security
       if (_matches('Security', ['password', 'lock'])) ...[

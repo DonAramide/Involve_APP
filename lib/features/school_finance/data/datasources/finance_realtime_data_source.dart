@@ -2,7 +2,13 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/entities/financial_transaction.dart';
 
-enum FinanceEventType { paymentSuccess, walletUpdated }
+enum FinanceEventType { 
+  paymentSuccess, 
+  paymentFailed,
+  payoutSuccess,
+  payoutFailed,
+  walletUpdated 
+}
 
 class FinanceRealtimeEvent {
   final FinanceEventType type;
@@ -29,14 +35,20 @@ class FinanceRealtimeDataSourceImpl implements IFinanceRealtimeDataSource {
       .onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
-        table: 'ledgers',
-        // Filter out in Dart if type system is strict on this version
+        table: 'financial_events',
         callback: (payload) {
           if (payload.newRecord['wallet_id'] == walletId) {
-            controller.add(FinanceRealtimeEvent(
-              FinanceEventType.paymentSuccess,
-              payload.newRecord,
-            ));
+            final typeStr = payload.newRecord['type'] as String;
+            FinanceEventType? type;
+            
+            if (typeStr == 'payment.success') type = FinanceEventType.paymentSuccess;
+            else if (typeStr == 'payment.failed') type = FinanceEventType.paymentFailed;
+            else if (typeStr == 'payout.success') type = FinanceEventType.payoutSuccess;
+            else if (typeStr == 'payout.failed') type = FinanceEventType.payoutFailed;
+            
+            if (type != null) {
+              controller.add(FinanceRealtimeEvent(type, payload.newRecord));
+            }
           }
         },
       )
@@ -69,19 +81,23 @@ class FinanceRealtimeDataSourceImpl implements IFinanceRealtimeDataSource {
   Stream<FinanceRealtimeEvent> watchGlobalEvents() {
     final controller = StreamController<FinanceRealtimeEvent>();
     
-    // Listen to all ledger changes for this school
-    // Note: In a real production setup, we'd add 'school_id=eq.$id' filter.
-    // For now we subscribe to general ledger inserts.
     final channel = supabase.channel('school_global_changes')
       .onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
-        table: 'ledgers',
+        table: 'financial_events',
         callback: (payload) {
-          controller.add(FinanceRealtimeEvent(
-            FinanceEventType.paymentSuccess,
-            payload.newRecord,
-          ));
+          final typeStr = payload.newRecord['type'] as String;
+          FinanceEventType? type;
+          
+          if (typeStr == 'payment.success') type = FinanceEventType.paymentSuccess;
+          else if (typeStr == 'payment.failed') type = FinanceEventType.paymentFailed;
+          else if (typeStr == 'payout.success') type = FinanceEventType.payoutSuccess;
+          else if (typeStr == 'payout.failed') type = FinanceEventType.payoutFailed;
+          
+          if (type != null) {
+            controller.add(FinanceRealtimeEvent(type, payload.newRecord));
+          }
         },
       );
 

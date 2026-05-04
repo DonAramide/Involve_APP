@@ -58,3 +58,9 @@ android/upload-keystore.jks
 backend/.env
 **/secrets/
 **/credentials*.json
+
+# Web / Admin Hub
+**/node_modules/
+**/dist/
+**/.next/
+**/.vite/

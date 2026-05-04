@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:drift/drift.dart';
-import '../../../../stock/data/datasources/app_database.dart';
-import '../../domain/entities/lesson_note_models.dart';
-import '../../domain/repositories/lesson_note_repository.dart';
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:involve_app/features/school/domain/entities/lesson_note_models.dart';
+import 'package:involve_app/features/school/domain/repositories/lesson_note_repository.dart';
 
 class LessonNoteRepositoryImpl implements ILessonNoteRepository {
   final AppDatabase db;
@@ -30,6 +30,48 @@ class LessonNoteRepositoryImpl implements ILessonNoteRepository {
     return rows.map(_mapToEntity).toList();
   }
 
+  @override
+  Future<CurriculumEntry> getOrCreateCurriculumEntry(CurriculumEntry entry) async {
+    final query = db.select(db.curriculumMap)..where((t) => 
+      t.classId.equals(entry.classId) & 
+      t.subjectId.equals(entry.subjectId) & 
+      t.termId.equals(entry.termId) & 
+      t.week.equals(entry.week) & 
+      t.topic.equals(entry.topic)
+    );
+    
+    final existing = await query.getSingleOrNull();
+    if (existing != null) {
+      return CurriculumEntry(
+        id: existing.id,
+        classId: existing.classId,
+        subjectId: existing.subjectId,
+        termId: existing.termId,
+        week: existing.week,
+        topic: existing.topic,
+      );
+    }
+    
+    final id = await db.into(db.curriculumMap).insert(
+      CurriculumMapCompanion.insert(
+        classId: entry.classId,
+        subjectId: entry.subjectId,
+        termId: entry.termId,
+        week: entry.week,
+        topic: entry.topic,
+      )
+    );
+    
+    return entry.id == null ? CurriculumEntry(
+      id: id,
+      classId: entry.classId,
+      subjectId: entry.subjectId,
+      termId: entry.termId,
+      week: entry.week,
+      topic: entry.topic,
+    ) : entry;
+  }
+
 
   @override
   Future<List<LessonNote>> getLatestLessonsCursor({
@@ -37,36 +79,30 @@ class LessonNoteRepositoryImpl implements ILessonNoteRepository {
     int? lastId,
     int limit = 20,
   }) async {
-    final latestVersionSubquery = db.selectOnly(db.lessonNotes)
-      ..addColumns([db.lessonNotes.contentHash, db.lessonNotes.version.max()])
-      ..where(db.lessonNotes.isDeleted.equals(false))
-      ..groupBy([db.lessonNotes.contentHash]);
-
-    final query = db.select(db.lessonNotes).join([
-      innerJoin(
-        latestVersionSubquery,
-        latestVersionSubquery.contentHash.equalsExp(db.lessonNotes.contentHash) &
-        latestVersionSubquery.version.max().equalsExp(db.lessonNotes.version)
+    final results = await db.customSelect(
+      '''
+      SELECT * FROM lesson_notes t1
+      WHERE t1.is_deleted = 0
+      AND t1.version = (
+        SELECT MAX(version) FROM lesson_notes t2
+        WHERE t2.content_hash = t1.content_hash
+        AND t2.is_deleted = 0
       )
-    ]);
+      ${lastUpdatedAt != null && lastId != null ? 'AND (t1.updated_at < ? OR (t1.updated_at = ? AND t1.id < ?))' : ''}
+      ORDER BY t1.updated_at DESC, t1.id DESC
+      LIMIT ?
+      ''',
+      variables: [
+        if (lastUpdatedAt != null && lastId != null) ...[
+          Variable.withDateTime(lastUpdatedAt),
+          Variable.withDateTime(lastUpdatedAt),
+          Variable.withInt(lastId),
+        ],
+        Variable.withInt(limit),
+      ],
+    ).get();
 
-    Expression<bool> whereClause = db.lessonNotes.isDeleted.equals(false);
-
-    if (lastUpdatedAt != null && lastId != null) {
-      whereClause &= (db.lessonNotes.updatedAt.isSmallerThanValue(lastUpdatedAt) |
-          (db.lessonNotes.updatedAt.equalsValue(lastUpdatedAt) &
-              db.lessonNotes.id.isSmallerThanValue(lastId)));
-    }
-
-    query.where(whereClause);
-    query.orderBy([
-      OrderingTerm(expression: db.lessonNotes.updatedAt, mode: OrderingMode.desc),
-      OrderingTerm(expression: db.lessonNotes.id, mode: OrderingMode.desc)
-    ]);
-    query.limit(limit);
-
-    final results = await query.get();
-    return results.map((row) => _mapToEntity(row.readTable(db.lessonNotes))).toList();
+    return results.map((row) => _mapToEntity(db.lessonNotes.map(row.data))).toList();
   }
 
   @override
@@ -115,6 +151,9 @@ class LessonNoteRepositoryImpl implements ILessonNoteRepository {
       await db.into(db.lessonNotes).insert(
             LessonNotesCompanion.insert(
               curriculumId: Value(note.curriculumId),
+              classId: Value(note.classId),
+              subjectId: Value(note.subjectId),
+              termId: Value(note.termId),
               className: note.className,
               subjectName: note.subjectName,
               term: note.term,
@@ -150,6 +189,9 @@ class LessonNoteRepositoryImpl implements ILessonNoteRepository {
     return LessonNote(
       id: data.id,
       curriculumId: data.curriculumId,
+      classId: data.classId,
+      subjectId: data.subjectId,
+      termId: data.termId,
       className: data.className,
       subjectName: data.subjectName,
       term: data.term,

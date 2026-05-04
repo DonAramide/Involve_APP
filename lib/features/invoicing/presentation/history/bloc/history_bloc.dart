@@ -46,7 +46,11 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
   Future<void> _onLoadHistory(LoadHistory event, Emitter<HistoryState> emit) async {
     emit(HistoryLoading());
     try {
-      var invoices = await getHistory(start: event.start, end: event.end);
+      var invoices = await getHistory(
+        start: event.start, 
+        end: event.end,
+        customerName: event.customerName,
+      );
       
       // Apply filters
       if (event.query != null && event.query!.isNotEmpty) {
@@ -103,6 +107,7 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         paymentStatus: event.paymentStatus,
         staffId: event.staffId,
         classId: event.classId,
+        customerName: event.customerName,
       ));
     } catch (e) {
       emit(HistoryError('Failed to load history: ${e.toString()}'));

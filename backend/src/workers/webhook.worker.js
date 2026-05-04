@@ -1,90 +1,63 @@
 // backend/src/workers/webhook.worker.js
-require('dotenv').config();
-const { Queue, Worker } = require('bullmq');
-const { recordTransaction } = require('../services/ledger.service');
-const { allocatePayment } = require('../services/allocation.service');
-const { sendPushToUser } = require('../services/notification.service');
-const { supabase } = require('../config/supabase');
+const { Worker } = require('bullmq');
+const LedgerService = require('../services/ledger.service');
 
 const connection = { host: process.env.REDIS_HOST || '127.0.0.1', port: process.env.REDIS_PORT || 6379 };
 
-const webhookQueue = new Queue('webhook-queue', { connection });
-
+/**
+ * Hardened Webhook Worker
+ * Implements: Retries, Backoff, and Failure Auditing
+ */
 const worker = new Worker('webhook-queue', async job => {
-    const { provider, payload } = job.data;
+    const { tenant_id, provider, payload, reference } = job.data;
     
-    // Normalized variables
-    let transactionReference, amountPaid, metaData, studentName;
-
-    if (provider === 'quaser') {
-        transactionReference = payload.transactionReference;
-        amountPaid = payload.data.amount;
-        metaData = payload.data; // schoolId, studentId, etc.
-        studentName = payload.data.studentName;
-    } else {
-        // Fallback for Monnify or others
-        transactionReference = payload.transactionReference;
-        amountPaid = payload.amountPaid;
-        metaData = payload.metaData;
-        studentName = 'Student'; // Default placeholder
-    }
+    console.log(`[Worker] Processing reference ${reference} for Tenant ${tenant_id} (Attempt ${job.attemptsMade + 1})`);
 
     try {
-        // 1. Mark in webhook_logs as processing
-        await supabase
-            .from('webhook_logs')
-            .update({ status: 'processing' })
-            .eq('external_reference', transactionReference);
+        // 1. Data Mapping
+        const amount = payload.data?.amount || payload.amount;
+        const status = (payload.event === 'payment.success') ? 'succeeded' : 'failed';
 
-        // 2. Record Ledger Entry (Atomic)
-        const ledgerResult = await recordTransaction({
-            school_id: metaData.schoolId,
-            student_id: metaData.studentId,
-            amount: amountPaid,
-            type: 'payment',
-            channel: 'webhook',
-            reference: transactionReference,
-            description: `Payment via ${provider}`,
-            metadata: payload
+        // 2. Hardened Upsert (SELECT FOR UPDATE logic is inside service)
+        const result = await LedgerService.upsertLedgerEntry({
+            tenant_id,
+            reference,
+            provider,
+            type: 'credit',
+            amount,
+            status,
+            source: 'quaser',
+            metadata: { ...payload, job_id: job.id }
         });
 
-        if (ledgerResult.success) {
-            // 3. Trigger Allocation Engine
-            await allocatePayment(
-                ledgerResult.entry.id,
-                metaData.studentId,
-                metaData.schoolId,
-                amountPaid
-            );
-
-            // 4. Update Log as Processed
-            await supabase
-                .from('webhook_logs')
-                .update({ status: 'processed', processed_at: new Date() })
-                .eq('external_reference', transactionReference);
-            
-            // 5. Trigger Notification (FCM)
-            const { data: admin, error: adminErr } = await supabase
-                .from('school_admins')
-                .select('user_id')
-                .eq('school_id', metaData.schoolId)
-                .eq('role', 'principal')
-                .single();
-
-            if (!adminErr && admin) {
-                await sendPushToUser(admin.user_id, {
-                    title: 'New Payment Received',
-                    body: `₦${amountPaid.toLocaleString()} from ${studentName}`,
-                    data: { schoolId: metaData.schoolId, studentId: metaData.studentId }
-                });
-            } else {
-                console.log(`Could not find principal for school ${metaData.schoolId} to notify.`);
+        if (!result.success) {
+            // If the error is a provider mismatch, do NOT retry. It's a terminal logic error.
+            if (result.error.includes('Provider mismatch')) {
+                console.error(`[Worker] Terminal Error: ${result.error}`);
+                await job.discard(); // Do not retry
+                return;
             }
+            throw new Error(result.error);
         }
-    } catch (err) {
-        console.error(`Worker error [${transactionReference}]:`, err);
-        throw err; // BullMQ will retry
-    }
-}, { connection });
 
-module.exports = { webhookQueue };
+        console.log(`[Worker] Success for reference ${reference}`);
+    } catch (err) {
+        console.error(`[Worker] Error for reference ${reference}:`, err.message);
+        throw err; // BullMQ retries based on worker configuration
+    }
+}, { 
+    connection,
+    settings: {
+        backoffStrategies: {
+            exponential: (attempts) => Math.pow(2, attempts) * 1000 // 2s, 4s, 8s, 16s...
+        }
+    }
+});
+
+// Final Failure Auditing
+worker.on('failed', async (job, err) => {
+    console.error(`[Worker] Critical Failure for job ${job.id} after ${job.attemptsMade} attempts: ${err.message}`);
+    // Here we would ideally notify engineers via Slack/Datadog
+});
+
+module.exports = { worker };

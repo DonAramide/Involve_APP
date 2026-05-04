@@ -861,10 +861,10 @@ class ReceiptService {
                     pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.end,
                       children: [
-                        pw.Text('Invoice No: ${invoice.invoiceNumber}', style: const pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
-                        pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}', style: const pw.TextStyle(fontSize: 11)),
-                        if (invoice.termName != null) pw.Text('Term: ${invoice.termName}', style: const pw.TextStyle(fontSize: 11)),
-                        if (invoice.academicYearName != null) pw.Text('Session: ${invoice.academicYearName}', style: const pw.TextStyle(fontSize: 11)),
+                        pw.Text('Invoice No: ${invoice.invoiceNumber}', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Invoice Date: ${dateFormat.format(invoice.dateCreated)}', style: pw.TextStyle(fontSize: 11)),
+                        if (invoice.termName != null) pw.Text('Term: ${invoice.termName}', style: pw.TextStyle(fontSize: 11)),
+                        if (invoice.academicYearName != null) pw.Text('Session: ${invoice.academicYearName}', style: pw.TextStyle(fontSize: 11)),
                       ],
                     ),
                  ],
@@ -1231,7 +1231,7 @@ class ReceiptService {
                           child: pw.Image(adminSignatureImage),
                         ),
                         pw.Container(width: 120, height: 1, color: PdfColors.black),
-                        pw.Text('Authorized Designatory', style: const pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('Authorized Designatory', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
                       ],
                     ),
                     pw.SizedBox(width: 40),

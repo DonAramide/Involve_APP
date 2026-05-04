@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/finance_bloc.dart';
+import '../../domain/repositories/finance_repository_new.dart';
 import '../widgets/summary_stat_card.dart';
 import '../widgets/modern_revenue_chart.dart';
 import '../widgets/global_transaction_tile.dart';
@@ -35,6 +36,15 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
         elevation: 0,
         centerTitle: false,
         actions: [
+          TextButton.icon(
+            onPressed: () => _showWithdrawalModal(),
+            icon: const Icon(Icons.account_balance_rounded, size: 18),
+            label: const Text('Withdraw'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.blue.shade700,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => context.read<FinanceBloc>().add(RefreshDashboardSummary()),
@@ -245,5 +255,165 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
         ),
       ),
     );
+  }
+
+  bool _isWithdrawing = false;
+
+  void _showWithdrawalModal() async {
+    final repo = context.read<FinanceRepository>();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final settings = await repo.getPayoutSettings();
+      final summary = (context.read<FinanceBloc>().state as FinanceDashboardLoaded).summary;
+      
+      if (mounted) Navigator.pop(context); 
+
+      if (settings.isEmpty) {
+        _showError('No bank account configured. Please set one up in Settings.');
+        return;
+      }
+
+      final amountController = TextEditingController();
+
+      if (mounted) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => Container(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Initiate Withdrawal', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
+                  const SizedBox(height: 8),
+                  Text('Funds will be sent to ${settings['bank_name']}', style: const TextStyle(color: Colors.grey)),
+                  const SizedBox(height: 24),
+                  
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.account_balance, color: Colors.blue),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(settings['account_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                            Text('${settings['account_number']} • ${settings['bank_name']}', style: const TextStyle(fontSize: 12)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  Text(
+                    'Available: ₦${NumberFormat('#,###').format(summary.totalRevenue)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    decoration: InputDecoration(
+                      hintText: '0.00',
+                      prefixText: '₦ ',
+                      filled: true,
+                      fillColor: const Color(0xFFF1F3F5),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final amt = double.tryParse(amountController.text) ?? 0;
+                        if (amt <= 0 || amt > summary.totalRevenue) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid amount or insufficient balance')));
+                          return;
+                        }
+                        Navigator.pop(context);
+                        _confirmWithdrawal(amt);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A1C1E),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text('Confirm Withdrawal', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      _showError('Failed to prepare withdrawal: $e');
+    }
+  }
+
+  void _confirmWithdrawal(double amount) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Final Confirmation'),
+        content: Text('Are you sure you want to withdraw ₦${NumberFormat('#,###').format(amount)} to your saved bank account? This action cannot be reversed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _performWithdrawal(amount);
+            },
+            child: const Text('Withdraw Now'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performWithdrawal(double amount) async {
+    setState(() => _isWithdrawing = true);
+    try {
+      await context.read<FinanceRepository>().initiatePayout(amount);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Withdrawal initiated successfully!'), backgroundColor: Colors.green));
+        context.read<FinanceBloc>().add(RefreshDashboardSummary());
+      }
+    } catch (e) {
+      if (mounted) _showError('Withdrawal failed: $e');
+    } finally {
+      if (mounted) setState(() => _isWithdrawing = false);
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
   }
 }

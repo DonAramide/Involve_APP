@@ -5,7 +5,19 @@ import '../../domain/entities/lesson_note_models.dart';
 
 class LessonNoteEditorPage extends StatefulWidget {
   final LessonNote note;
-  const LessonNoteEditorPage({super.key, required this.note});
+  final int classId;
+  final int subjectId;
+  final int termId;
+  final String schoolId;
+
+  const LessonNoteEditorPage({
+    super.key, 
+    required this.note,
+    required this.classId,
+    required this.subjectId,
+    required this.termId,
+    required this.schoolId,
+  });
 
   @override
   State<LessonNoteEditorPage> createState() => _LessonNoteEditorPageState();
@@ -53,6 +65,11 @@ class _LessonNoteEditorPageState extends State<LessonNoteEditorPage> {
       appBar: AppBar(
         title: const Text('Review Lesson Note'),
         actions: [
+          IconButton(
+            onPressed: _onRegenerate,
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Regenerate with AI',
+          ),
           TextButton.icon(
             onPressed: _onSave,
             icon: const Icon(Icons.check, color: Colors.white),
@@ -216,6 +233,47 @@ class _LessonNoteEditorPageState extends State<LessonNoteEditorPage> {
 
     context.read<LessonNoteBloc>().add(SaveLessonVersion(updatedNote));
     Navigator.pop(context); // Back to wizard which will pop to list
+  }
+
+  void _onRegenerate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Regenerate Lesson?'),
+        content: const Text('This will discard your current edits and generate a new version using AI. Continue?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), 
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('REGENERATE'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      // We need schoolId and teacherId. We can get them from the Bloc's state or pass them.
+      // For now, we take from the current note or context. 
+      // Actually, GenerateLessonWizardPage already has them.
+      
+      // We trigger the same generation but with forceRefresh: true
+      context.read<LessonNoteBloc>().add(GenerateLesson(
+        classId: widget.classId,
+        className: widget.note.className,
+        subjectId: widget.subjectId,
+        subjectName: widget.note.subjectName,
+        termId: widget.termId,
+        termName: widget.note.term,
+        week: widget.note.week,
+        topic: widget.note.topic,
+        schoolId: widget.schoolId,
+        teacherId: 'default_teacher',
+        forceRefresh: true,
+      ));
+      
+      Navigator.pop(context); // Go back to loader in Wizard
+    }
   }
 }
 

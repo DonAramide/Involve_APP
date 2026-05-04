@@ -59,4 +59,7 @@ abstract class SchoolRepository {
   Future<void> addTeacher(Teacher teacher);
   Future<void> updateTeacher(Teacher teacher);
   Future<void> deleteTeacher(int id);
+
+  // Curriculum
+  Future<String?> getCurriculumTopic(int classId, int subjectId, int termId, int week);
 }

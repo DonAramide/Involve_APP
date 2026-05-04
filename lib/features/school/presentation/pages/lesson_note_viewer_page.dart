@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/lesson_note_models.dart';
+import '../../presentation/bloc/lesson_note_bloc.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
 import 'lesson_note_editor_page.dart';
 
 class LessonNoteViewerPage extends StatelessWidget {
@@ -14,12 +17,21 @@ class LessonNoteViewerPage extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => LessonNoteEditorPage(note: note),
-              ),
-            ),
+            onPressed: () {
+              final settingsState = context.read<SettingsBloc>().state;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => LessonNoteEditorPage(
+                    note: note,
+                    classId: note.classId,
+                    subjectId: note.subjectId,
+                    termId: note.termId,
+                    schoolId: settingsState.settings?.organizationName ?? 'unknown_school',
+                  ),
+                ),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.share),

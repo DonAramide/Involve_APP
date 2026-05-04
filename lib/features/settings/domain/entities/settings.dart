@@ -66,7 +66,7 @@ class AppSettings extends Equatable {
   final String currencySubunit;
   final Uint8List? adminSignature;
   final bool showAdminSignature;
-  final String? geminiApiKey;
+
 
   const AppSettings({
     this.id,
@@ -124,7 +124,7 @@ class AppSettings extends Equatable {
     this.logoSvg,
     this.adminSignature,
     this.showAdminSignature = false,
-    this.geminiApiKey,
+
   });
 
   AppSettings copyWith({
@@ -183,7 +183,7 @@ class AppSettings extends Equatable {
     String? logoSvg,
     Uint8List? adminSignature,
     bool? showAdminSignature,
-    String? geminiApiKey,
+
   }) {
     return AppSettings(
       id: id ?? this.id,
@@ -241,7 +241,7 @@ class AppSettings extends Equatable {
       logoSvg: logoSvg ?? this.logoSvg,
       adminSignature: adminSignature ?? this.adminSignature,
       showAdminSignature: showAdminSignature ?? this.showAdminSignature,
-      geminiApiKey: geminiApiKey ?? this.geminiApiKey,
+
     );
   }
 
@@ -302,6 +302,6 @@ class AppSettings extends Equatable {
         logoSvg,
         adminSignature,
         showAdminSignature,
-        geminiApiKey,
+
       ];
 }

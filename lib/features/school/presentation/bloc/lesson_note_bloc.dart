@@ -1,10 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import '../../domain/entities/lesson_note_models.dart';
-import '../../domain/repositories/lesson_note_repository.dart';
-import '../../domain/services/ai_service_interface.dart';
-import '../../../../settings/domain/services/security_service.dart';
-import '../../../../../core/utils/hashing_utils.dart';
+import 'package:involve_app/features/school/domain/entities/lesson_note_models.dart';
+import 'package:involve_app/features/school/domain/repositories/lesson_note_repository.dart';
+import 'package:involve_app/features/school/domain/services/ai_service_interface.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/core/utils/hashing_utils.dart';
 
 // --- Events ---
 abstract class LessonNoteEvent extends Equatable {
@@ -30,6 +30,10 @@ class GenerateLesson extends LessonNoteEvent {
   final int week;
   final String topic;
 
+  final String schoolId;
+  final String teacherId;
+  final bool forceRefresh;
+
   const GenerateLesson({
     required this.classId,
     required this.className,
@@ -39,10 +43,13 @@ class GenerateLesson extends LessonNoteEvent {
     required this.termName,
     required this.week,
     required this.topic,
+    required this.schoolId,
+    required this.teacherId,
+    this.forceRefresh = false,
   });
 
   @override
-  List<Object?> get props => [classId, className, subjectId, subjectName, termId, termName, week, topic];
+  List<Object?> get props => [classId, className, subjectId, subjectName, termId, termName, week, topic, schoolId, teacherId, forceRefresh];
 }
 
 class SaveLessonVersion extends LessonNoteEvent {
@@ -121,7 +128,31 @@ class LessonNoteState extends Equatable {
   }
 }
 
-class LessonNoteInitial extends LessonNoteState {}
+class LessonNoteInitial extends LessonNoteState {
+  const LessonNoteInitial() : super();
+}
+
+class LessonNoteLoading extends LessonNoteState {
+  const LessonNoteLoading({super.lessons}) : super(isLoading: true);
+}
+
+class LessonGenerating extends LessonNoteState {
+  const LessonGenerating({super.lessons}) : super(isGenerating: true);
+}
+
+class LessonReady extends LessonNoteState {
+  final LessonNote note;
+  const LessonReady(this.note, {super.lessons}) : super(generatedNote: note);
+  @override
+  List<Object?> get props => [...super.props, note];
+}
+
+class LessonError extends LessonNoteState {
+  final String message;
+  const LessonError(this.message, {super.lessons}) : super(error: message);
+  @override
+  List<Object?> get props => [...super.props, message];
+}
 
 // --- Bloc ---
 class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
@@ -133,7 +164,7 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
     required this.repository,
     required this.aiService,
     required this.securityService,
-  }) : super(LessonNoteInitial()) {
+  }) : super(const LessonNoteInitial()) {
     on<LoadLessonNotes>(_onLoadLessons);
     on<LoadMoreLessons>(_onLoadMore);
     on<GenerateLesson>(_onGenerateLesson);
@@ -195,13 +226,15 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
       topic: event.topic,
     );
 
-    // 1. Check Cache
+    // 1. Check Cache (if not forced)
     emit(LessonNoteLoading());
     try {
-      final existing = await repository.getLatestLessonByHash(hash);
-      if (existing != null) {
-        emit(LessonReady(existing));
-        return;
+      if (!event.forceRefresh) {
+        final existing = await repository.getLatestLessonByHash(hash);
+        if (existing != null) {
+          emit(LessonReady(existing));
+          return;
+        }
       }
     } catch (e) {
       // Log error but continue to AI if possible
@@ -210,19 +243,15 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
     // 2. AI Generation
     emit(LessonGenerating());
     try {
-      final apiKey = await securityService.getAiApiKey();
-      if (apiKey == null || apiKey.isEmpty) {
-        emit(const LessonError('Gemini API Key not found. Please set it in System Settings.'));
-        return;
-      }
-
       final content = await aiService.generateLessonNote(
         className: event.className,
         subjectName: event.subjectName,
         term: event.termName,
         week: event.week,
         topic: event.topic,
-        apiKey: apiKey,
+        schoolId: event.schoolId,
+        teacherId: event.teacherId,
+        forceRefresh: event.forceRefresh,
       );
 
       // Create Curriculum Entry
@@ -236,6 +265,9 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
 
       final newNote = LessonNote(
         curriculumId: curriculum.id,
+        classId: event.classId,
+        subjectId: event.subjectId,
+        termId: event.termId,
         className: event.className,
         subjectName: event.subjectName,
         term: event.termName,
@@ -246,7 +278,10 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
         isAiGenerated: true,
       );
 
-      // Note: We don't save automatically here, we let the user preview/edit first.
+      // 3. Save automatically to local database for offline-first support
+      await repository.saveLessonNote(newNote);
+      add(const LoadLessonNotes()); // Refresh list background
+
       emit(LessonReady(newNote));
     } catch (e) {
       emit(LessonError('Generation failed: $e'));
@@ -256,7 +291,7 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
   Future<void> _onSaveLessonVersion(SaveLessonVersion event, Emitter<LessonNoteState> emit) async {
     try {
       await repository.saveLessonNote(event.note);
-      add(LoadLessons()); // Reload list
+      add(const LoadLessonNotes()); // Reload list
     } catch (e) {
       emit(LessonError('Failed to save lesson: $e'));
     }
@@ -265,7 +300,7 @@ class LessonNoteBloc extends Bloc<LessonNoteEvent, LessonNoteState> {
   Future<void> _onDeleteLesson(DeleteLesson event, Emitter<LessonNoteState> emit) async {
     try {
       await repository.deleteLesson(event.hash);
-      add(LoadLessons());
+      add(const LoadLessonNotes());
     } catch (e) {
       emit(LessonError('Failed to delete lesson: $e'));
     }

@@ -8,6 +8,9 @@ class LessonNote extends Equatable {
   final String className;
   final String subjectName;
   final String term;
+  final int classId;
+  final int subjectId;
+  final int termId;
   final int week;
   final String topic;
   final StructuredNoteContent content;
@@ -28,6 +31,9 @@ class LessonNote extends Equatable {
     required this.className,
     required this.subjectName,
     required this.term,
+    required this.classId,
+    required this.subjectId,
+    required this.termId,
     required this.week,
     required this.topic,
     required this.content,
@@ -50,6 +56,9 @@ class LessonNote extends Equatable {
         className,
         subjectName,
         term,
+        classId,
+        subjectId,
+        termId,
         week,
         topic,
         content,
@@ -71,6 +80,9 @@ class LessonNote extends Equatable {
     String? className,
     String? subjectName,
     String? term,
+    int? classId,
+    int? subjectId,
+    int? termId,
     int? week,
     String? topic,
     StructuredNoteContent? content,
@@ -91,6 +103,9 @@ class LessonNote extends Equatable {
       className: className ?? this.className,
       subjectName: subjectName ?? this.subjectName,
       term: term ?? this.term,
+      classId: classId ?? this.classId,
+      subjectId: subjectId ?? this.subjectId,
+      termId: termId ?? this.termId,
       week: week ?? this.week,
       topic: topic ?? this.topic,
       content: content ?? this.content,

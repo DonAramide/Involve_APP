@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import '../bloc/lesson_note_bloc.dart';
-import '../../domain/entities/lesson_note_models.dart';
-import 'generate_lesson_wizard_page.dart';
-import 'lesson_note_viewer_page.dart';
+import 'package:involve_app/features/school/presentation/bloc/lesson_note_bloc.dart';
+import 'package:involve_app/features/school/domain/entities/lesson_note_models.dart';
+import 'package:involve_app/features/school/presentation/pages/generate_lesson_wizard_page.dart';
+import 'package:involve_app/features/school/presentation/pages/lesson_note_viewer_page.dart';
+import 'package:involve_app/features/school/data/services/lesson_note_sync_service.dart';
 
 class LessonNotesListPage extends StatefulWidget {
   const LessonNotesListPage({super.key});

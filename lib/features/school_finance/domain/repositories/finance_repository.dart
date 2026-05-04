@@ -42,5 +42,13 @@ abstract class IFinanceRepository {
   Stream<FinanceRealtimeEvent> watchFinanceEvents(String walletId);
 
   Stream<FinanceRealtimeEvent> watchGlobalEvents();
+
+  Future<Map<String, dynamic>> initiateQuasarPayment({
+    required String studentId,
+    required String walletId,
+    required double amount,
+    required String studentName,
+  });
 }
+
 

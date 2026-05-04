@@ -33,8 +33,9 @@ class FinanceRepositoryImpl implements IFinanceRepository {
 
   @override
   Future<List<FinancialTransaction>> getTransactions(String walletId) async {
-    return await remoteDataSource.getTransactions(walletId);
+    return await remoteDataSource.getTransactions(walletId: walletId);
   }
+
 
   @override
   Future<StudentFinanceProfile> getFinanceProfile(String studentId) async {
@@ -132,6 +133,21 @@ class FinanceRepositoryImpl implements IFinanceRepository {
   @override
   Stream<FinanceRealtimeEvent> watchGlobalEvents() {
     return realtimeDataSource.watchGlobalEvents();
+  }
+
+  @override
+  Future<Map<String, dynamic>> initiateQuasarPayment({
+    required String studentId,
+    required String walletId,
+    required double amount,
+    required String studentName,
+  }) async {
+    return await remoteDataSource.initiatePayment({
+      'studentId': studentId,
+      'walletId': walletId,
+      'amount': amount,
+      'studentName': studentName,
+    });
   }
 }
 

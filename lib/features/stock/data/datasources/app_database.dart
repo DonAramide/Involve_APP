@@ -16,6 +16,7 @@ import 'package:involve_app/features/stock/data/models/expense_table.dart';
 import 'package:involve_app/features/school/data/models/school_tables.dart';
 import 'package:involve_app/features/printer/data/models/printer_table.dart';
 import 'package:involve_app/features/services/data/models/services_tables.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
 
 part 'app_database.g.dart';
 
@@ -58,7 +59,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 72;
+  int get schemaVersion => 76;
 
   @override
   MigrationStrategy get migration {
@@ -334,8 +335,8 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 72) {
           // Schema V72: Ensure indexes for LessonNotes and CurriculumMap
-          // Plus add geminiApiKey to Settings
-          await _safeAddColumn(m, settings, settings.geminiApiKey);
+          // Index creation is handled in the table definition or via createIndex,
+          // but we previously had geminiApiKey here.
         }
         if (from < 73) {
           // Schema V73: Harden LessonNotes with sync status, retry, and soft delete
@@ -371,6 +372,19 @@ class AppDatabase extends _$AppDatabase {
             }
           });
         }
+        
+        if (from < 74) {
+          // Schema V74: Add syncStatus to ServiceCustomers
+          await _safeAddColumn(m, serviceCustomers, serviceCustomers.syncStatus);
+        }
+        if (from < 75) {
+          // Schema V75: Add syncStatus to ServiceJobs
+          await _safeAddColumn(m, serviceJobs, serviceJobs.syncStatus);
+        }
+        if (from < 76) {
+          // Schema V76: Add syncStatus to ServicePayments
+          await _safeAddColumn(m, servicePayments, servicePayments.syncStatus);
+        }
       },
       beforeOpen: (details) async {
         // Enforce Foreign Keys (SQLite only, harmless on Web/IndexedDB)
@@ -405,7 +419,7 @@ class AppDatabase extends _$AppDatabase {
     try {
       await m.createIndex(index);
     } catch (e) {
-      debugPrint('Migration: Index ${index.name} already exists, skipping: $e');
+      debugPrint('Migration: Index already exists, skipping: $e');
     }
   }
 

@@ -166,9 +166,9 @@ class GradingRules extends Table {
 @DataClassName('CurriculumMapTable')
 class CurriculumMap extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get classId => integer().references(Classes, #id, onDelete: OperationAction.cascade)();
-  IntColumn get subjectId => integer().references(Subjects, #id, onDelete: OperationAction.cascade)();
-  IntColumn get termId => integer().references(Terms, #id, onDelete: OperationAction.cascade)();
+  IntColumn get classId => integer().references(Classes, #id, onDelete: KeyAction.cascade)();
+  IntColumn get subjectId => integer().references(Subjects, #id, onDelete: KeyAction.cascade)();
+  IntColumn get termId => integer().references(Terms, #id, onDelete: KeyAction.cascade)();
   IntColumn get week => integer()();
   TextColumn get topic => text()();
 
@@ -186,9 +186,12 @@ class CurriculumMap extends Table {
 @DataClassName('LessonNoteTable')
 class LessonNotes extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get curriculumId => integer().nullable().references(CurriculumMap, #id, onDelete: OperationAction.setNull)();
+  IntColumn get curriculumId => integer().nullable().references(CurriculumMap, #id, onDelete: KeyAction.setNull)();
   
   // Basic metadata to ensure identity independent of curriculum_id if needed
+  IntColumn get classId => integer().withDefault(const Constant(0))();
+  IntColumn get subjectId => integer().withDefault(const Constant(0))();
+  IntColumn get termId => integer().withDefault(const Constant(0))();
   TextColumn get className => text()();
   TextColumn get subjectName => text()();
   TextColumn get term => text()();

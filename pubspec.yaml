@@ -72,7 +72,12 @@ dependencies:
   image: ^4.5.2
   image_cropper: ^11.0.0
   dio: ^5.9.2
-  google_generative_ai: ^0.4.5
+
+  local_auth: ^3.0.1
+  pinput: ^6.0.2
+  flutter_otp_text_field: ^1.5.1+1
+  jwt_decoder: ^2.0.1
+  dio_cookie_manager: ^3.4.0
 
 dev_dependencies:
   flutter_test:

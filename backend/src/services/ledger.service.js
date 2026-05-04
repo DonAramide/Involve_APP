@@ -1,70 +1,90 @@
 // backend/src/services/ledger.service.js
 const { supabase } = require('../config/supabase');
+const { EventBusService } = require('./event_bus.service');
 
-/**
- * Records a transaction in the ledger with an atomic running balance.
- * Uses a RPC (Stored Procedure) in production to ensure thread safety.
- */
-async function recordTransaction({
-    school_id,
-    student_id,
-    amount,
-    type,
-    channel,
-    reference,
-    description,
-    recorded_by = null,
-    note = null,
-    metadata = {}
-}) {
-    try {
-        // Fetch current running_balance from students table
-        const { data: student, error: fetchError } = await supabase
-            .from('students')
-            .select('running_balance')
-            .eq('id', student_id)
-            .single();
+class LedgerService {
+    /**
+     * Enhanced Lock-Safe Upsert
+     * Invokes PostgreSQL RPC with 5s Lock Timeout
+     */
+    static async upsertLedgerEntry({
+        tenant_id,
+        reference,
+        provider,
+        type, 
+        amount,
+        status, 
+        source, 
+        entry_group_id = null,
+        metadata = {}
+    }) {
+        const idempotency_key = `${provider}:${reference}:${type}`;
 
-        if (fetchError) throw fetchError;
+        try {
+            // CALL DATABASE RPC (Atomic, Monotonic, and Lock-Hardened)
+            const { data, error } = await supabase.rpc('safe_upsert_ledger_entry', {
+                p_tenant_id: tenant_id,
+                p_reference: reference,
+                p_provider: provider,
+                p_type: type,
+                p_amount: amount,
+                p_status: status,
+                p_source: source,
+                p_idempotency_key: idempotency_key,
+                p_metadata: metadata,
+                p_entry_group_id: entry_group_id
+            });
 
-        const newBalance = parseFloat(student.running_balance) + parseFloat(amount);
+            if (error) {
+                // Determine if it's a retryable LOCK_TIMEOUT or a terminal error
+                if (error.message.includes('LOCK_TIMEOUT')) {
+                    console.warn(`[Ledger] Lock contention for ${reference} (Retryable). Error: ${error.message}`);
+                    throw new Error(`RETRYABLE: ${error.message}`);
+                }
+                
+                if (error.message.includes('PROVIDER_MISMATCH')) {
+                    console.error(`[Ledger] Terminal Error: ${error.message}`);
+                    return { success: false, error: error.message };
+                }
 
-        // 2. Insert into ledger
-        const { data: ledgerEntry, error: ledgerError } = await supabase
-            .from('ledgers')
-            .insert([{
-                school_id,
-                student_id,
-                amount,
-                balance_after: newBalance,
-                transaction_type: type,
-                channel,
-                reference,
-                description,
-                recorded_by,
-                note,
-                metadata: JSON.stringify(metadata)
-            }])
-            .select()
-            .single();
+                throw error;
+            }
 
-        if (ledgerError) {
-            if (ledgerError.code === '23505') return { success: false, duplicate: true };
-            throw ledgerError;
+            // Success Handling
+            const result = data;
+            if (result.success && status === 'succeeded' && result.status !== 'succeeded') {
+                await EventBusService.emit('ledger.entry.succeeded', {
+                    tenant_id,
+                    reference,
+                    amount,
+                    idempotency_key
+                });
+            }
+
+            return result;
+        } catch (err) {
+            console.error('[Ledger] RPC Execution Failed:', err.message);
+            // Re-throw so worker handles retry logic
+            throw err;
         }
+    }
 
-        // 3. Update student cached balance
-        await supabase
-            .from('students')
-            .update({ running_balance: newBalance })
-            .eq('id', student_id);
+    /**
+     * Wallet Balance Aggregation (Definitive Source of Truth)
+     */
+    static async getWalletBalance(tenant_id) {
+        const { data, error } = await supabase
+            .from('ledger_entries')
+            .select('amount, type')
+            .eq('tenant_id', tenant_id)
+            .eq('status', 'succeeded');
 
-        return { success: true, entry: ledgerEntry };
-    } catch (err) {
-        console.error('Ledger error:', err);
-        throw err;
+        if (error) throw error;
+
+        return data.reduce((acc, entry) => {
+            return entry.type === 'credit' ? acc + parseFloat(entry.amount) : acc - parseFloat(entry.amount);
+        }, 0);
     }
 }
 
-
-module.exports = { recordTransaction };
+module.exports = LedgerService;

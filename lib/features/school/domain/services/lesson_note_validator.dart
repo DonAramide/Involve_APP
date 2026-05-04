@@ -4,9 +4,16 @@ import '../entities/lesson_note_models.dart';
 class LessonNoteValidator {
   /// Validates the raw AI response and attempts to repair minor issues.
   /// Throws a FormatException if the content is fundamentally invalid.
-  static StructuredNoteContent validateAndRepair(String rawContent) {
+  static StructuredNoteContent validateAndRepair(dynamic content) {
     try {
-      final Map<String, dynamic> json = jsonDecode(rawContent);
+      final Map<String, dynamic> json;
+      if (content is String) {
+        json = jsonDecode(content);
+      } else if (content is Map<String, dynamic>) {
+        json = content;
+      } else {
+        throw const FormatException('Invalid content type for validation');
+      }
       
       // Basic structure validation
       final requiredKeys = [

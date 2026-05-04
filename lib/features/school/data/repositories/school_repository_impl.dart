@@ -500,5 +500,18 @@ class SchoolRepositoryImpl implements SchoolRepository {
   Future<void> deleteTeacher(int id) async {
     await (database.delete(database.teachers)..where((t) => t.id.equals(id))).go();
   }
-}
 
+  // Curriculum
+  @override
+  Future<String?> getCurriculumTopic(int classId, int subjectId, int termId, int week) async {
+    final query = database.select(database.curriculumMap)
+      ..where((t) => 
+          t.classId.equals(classId) &
+          t.subjectId.equals(subjectId) &
+          t.termId.equals(termId) &
+          t.week.equals(week)
+      );
+    final result = await query.getSingleOrNull();
+    return result?.topic;
+  }
+}

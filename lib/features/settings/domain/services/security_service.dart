@@ -9,7 +9,6 @@ class SecurityService {
   static const _superAdminPasswordKey = 'super_admin_password'; // NEW: For critical settings
   static const _superAdminKey = 'super_admin_activation_key';
   static const _isAuthorizedKey = 'device_lifetime_authorized';
-  static const _aiApiKey = 'gemini_api_key';
   static const _deviceIdKey = 'persistent_device_id';
 
   // No longer using fixed plaintext passwords. 
@@ -111,13 +110,8 @@ class SecurityService {
     return stored != null && stored.isNotEmpty;
   }
 
-  // --- AI API Key Storage ---
-  Future<void> setAiApiKey(String key) async {
-    await _storage.write(key: _aiApiKey, value: key);
-  }
 
-  Future<String?> getAiApiKey() async {
-    return await _storage.read(key: _aiApiKey);
+
   // --- Persistent Device ID ---
   Future<String> getPersistentDeviceId() async {
     final stored = await _storage.read(key: _deviceIdKey);

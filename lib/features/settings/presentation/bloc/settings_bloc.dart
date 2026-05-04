@@ -163,44 +163,36 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     try {
       final settings = await repository.getSettings();
       final plan = await _loadUserPlan();
-
-      // Check for Gemini API Key in Secure Storage if missing in DB
-      AppSettings? finalSettings = settings;
-      if (finalSettings != null && (finalSettings.geminiApiKey == null || finalSettings.geminiApiKey!.isEmpty)) {
-        final secureKey = await securityService.getAiApiKey();
-        if (secureKey != null && secureKey.isNotEmpty) {
-           finalSettings = finalSettings.copyWith(geminiApiKey: secureKey);
-        }
-      }
+      
+      var workingSettings = settings;
       
       debugPrint('SettingsBloc: Settings loaded: ${settings?.organizationName}');
       debugPrint('SettingsBloc: Plan loaded: ${plan.planType}, Expiry: ${plan.expiryDate}');
 
       // Auto-disable if plan is not eligible
-      AppSettings? finalSettings = settings;
-      if (settings != null) {
+      if (workingSettings != null) {
         // 1. Migration: school_purple -> school_color
-        if (settings.defaultInvoiceTemplate == 'school_purple') {
+        if (workingSettings.defaultInvoiceTemplate == 'school_purple') {
           debugPrint('SettingsBloc: Migrating school_purple -> school_color');
-          finalSettings = (finalSettings ?? settings).copyWith(defaultInvoiceTemplate: 'school_color');
+          workingSettings = workingSettings.copyWith(defaultInvoiceTemplate: 'school_color');
         }
 
         // 2. Plan check
-        if (settings.serviceBillingEnabled && !plan.isValid) {
+        if (workingSettings.serviceBillingEnabled && !plan.isValid) {
           if (!plan.isLifetime && (plan.expiryDate == null || DateTime.now().isAfter(plan.expiryDate!))) {
              debugPrint('SettingsBloc: Auto-disabling service billing due to plan downgrade');
-             finalSettings = (finalSettings ?? settings).copyWith(serviceBillingEnabled: false);
+             workingSettings = workingSettings.copyWith(serviceBillingEnabled: false);
           }
         }
 
         // Save if any changes were made during load/migration
-        if (finalSettings != settings) {
-          await repository.updateSettings(finalSettings!);
+        if (workingSettings != settings) {
+          await repository.updateSettings(workingSettings!);
         }
       }
 
       emit(state.copyWith(
-        settings: finalSettings, 
+        settings: workingSettings, 
         userPlan: plan,
         isLoading: false
       ));
@@ -292,14 +284,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(state.copyWith(isSaving: true, successMessage: null, error: null));
     try {
       final oldName = state.settings?.organizationName;
-      final oldKey = state.settings?.geminiApiKey;
 
       await repository.updateSettings(event.settings);
       
-      // Update Secure Storage if Key changed
-      if (event.settings.geminiApiKey != oldKey) {
-        await securityService.setAiApiKey(event.settings.geminiApiKey ?? '');
-      }
+
       // If business name changed and it wasn't locked before, lock it now
       if (!state.isBusinessLocked && oldName != event.settings.organizationName) {
         add(LockBusinessName());

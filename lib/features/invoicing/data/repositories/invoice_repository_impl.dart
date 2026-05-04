@@ -199,6 +199,35 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     return _getInvoicesWithItems(query);
   }
 
+  @override
+  Future<List<String>> getAllCustomerNames() async {
+    final query = db.selectOnly(db.invoices, distinct: true)
+      ..addColumns([db.invoices.customerName])
+      ..where(db.invoices.customerName.isNotNull())
+      ..where(db.invoices.isDeleted.equals(false));
+    
+    final rows = await query.get();
+    return rows
+        .map((r) => r.read(db.invoices.customerName)!)
+        .where((name) => name.trim().isNotEmpty)
+        .toList()
+      ..sort();
+  }
+
+  @override
+  Future<List<Invoice>> getInvoicesByCustomerName(String customerName, {DateTime? start, DateTime? end}) async {
+    final query = db.select(db.invoices)
+      ..where((t) => t.customerName.equals(customerName));
+    
+    if (start != null && end != null) {
+      query.where((t) => t.dateCreated.isBetweenValues(start, end));
+    }
+    
+    query.orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]);
+    
+    return _getInvoicesWithItems(query);
+  }
+
   Future<List<Invoice>> _getInvoicesWithItems(SimpleSelectStatement<$InvoicesTable, InvoiceTable> query) async {
     final invoiceRows = await (query..where((t) => t.isDeleted.equals(false))).get();
     final List<Invoice> result = [];

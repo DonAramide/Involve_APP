@@ -49,6 +49,8 @@ import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/school/presentation/pages/school_user_guide_page.dart';
+import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
+import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
 
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -427,6 +429,22 @@ class _DashboardPageState extends State<DashboardPage> {
     final isServices = settings?.businessMode == 'services';
     
     final allItems = <_DashboardMenuItem>[
+      if (!isSchool) ...[
+        _DashboardMenuItem(
+          id: 'inventory_report',
+          title: 'INVENTORY REPORT',
+          icon: Icons.assessment_outlined,
+          color: Colors.indigo,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryReportPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'customer_lookup',
+          title: 'CUSTOMER LOOKUP',
+          icon: Icons.person_search,
+          color: Colors.blueAccent,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerLookupPage())),
+        ),
+      ],
       _DashboardMenuItem(
         id: 'new_sale',
         title: settings?.newSaleLabel.toUpperCase() ?? 'NEW SALE',
@@ -446,7 +464,7 @@ class _DashboardPageState extends State<DashboardPage> {
         indicatorColor: printerState.connectedDevice != null ? Colors.green : Colors.red,
         indicatorTooltip: printerState.connectedDevice != null ? 'Connected' : 'Disconnected',
       ),
-      if (!isSchool)
+      if (!isSchool) ...[
         _DashboardMenuItem(
           id: 'stock',
           title: settings?.stockLabel.toUpperCase() ?? 'STOCK / ITEMS',
@@ -454,6 +472,7 @@ class _DashboardPageState extends State<DashboardPage> {
           color: Colors.orange,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
         ),
+      ],
       _DashboardMenuItem(
         id: 'sales_records',
         title: settings?.salesLabel.toUpperCase() ?? 'SALES RECORDS',
@@ -577,6 +596,20 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.edit_note,
           color: Colors.redAccent,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResultEntryPage())),
+        ),
+        _DashboardMenuItem(
+          id: 'admin_hub',
+          title: 'ADMIN HUB',
+          icon: Icons.admin_panel_settings,
+          color: Colors.deepOrange,
+          onTap: () => Navigator.pushNamed(context, '/admin_hub'),
+        ),
+        _DashboardMenuItem(
+          id: 'finance_analytics',
+          title: 'FINANCE ANALYTICS',
+          icon: Icons.insights,
+          color: Colors.blueAccent,
+          onTap: () => Navigator.pushNamed(context, '/admin_finance'),
         ),
         _DashboardMenuItem(
           id: 'lesson_notes',

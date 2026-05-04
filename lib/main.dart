@@ -3,6 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:get_it/get_it.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/notification_repository.dart';
+
 import 'package:involve_app/features/school/data/repositories/school_repository_impl.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
@@ -62,7 +65,7 @@ import 'package:involve_app/features/school_finance/presentation/pages/school_fi
 import 'package:involve_app/features/school/domain/repositories/lesson_note_repository.dart';
 import 'package:involve_app/features/school/data/repositories/lesson_note_repository_impl.dart';
 import 'package:involve_app/features/school/domain/services/ai_service_interface.dart';
-import 'package:involve_app/features/school/data/services/gemini_ai_service.dart';
+import 'package:involve_app/features/school/data/services/lesson_note_api_service.dart';
 import 'package:involve_app/features/school/presentation/bloc/lesson_note_bloc.dart';
 import 'package:involve_app/features/school/data/services/lesson_note_sync_service.dart';
 
@@ -83,6 +86,19 @@ import 'package:involve_app/features/services/presentation/bloc/services_bloc.da
 import 'package:involve_app/features/services/domain/usecases/print_job_receipt.dart';
 import 'package:involve_app/features/services/presentation/bloc/services_event.dart';
 import 'package:involve_app/features/services/presentation/pages/services_dashboard_page.dart';
+import 'package:involve_app/features/admin/domain/repositories/admin_repository.dart';
+import 'package:involve_app/features/admin/presentation/bloc/admin_bloc.dart';
+import 'package:involve_app/features/admin/presentation/pages/admin_dashboard.dart';
+import 'package:involve_app/features/admin/presentation/pages/admin_finance_dashboard.dart';
+import 'package:involve_app/features/admin/presentation/pages/api_key_management_page.dart';
+import 'package:involve_app/features/school_finance/presentation/bloc/reconciliation_bloc.dart';
+import 'package:involve_app/features/school_finance/presentation/pages/payout_settings_page.dart';
+import 'package:involve_app/features/school_finance/presentation/pages/payout_history_page.dart';
+import 'package:involve_app/features/school_finance/presentation/pages/executive_finance_dashboard.dart';
+import 'package:involve_app/features/school_finance/presentation/pages/defaulters_page.dart';
+import 'package:involve_app/features/school_finance/presentation/bloc/reconciliation_event.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:dio/dio.dart';
 
 
 void main() async {
@@ -143,7 +159,6 @@ class AppDependencies {
   final SyncServer syncServer;
   final BluetoothSyncServer bluetoothSyncServer;
   final SyncManager syncManager;
-  final String deviceId;
   final SchoolRepositoryImpl schoolRepository;
   final PrinterRepository printerRepository;
   final IFinanceRepository financeRepository;
@@ -162,6 +177,9 @@ class AppDependencies {
   final ILessonNoteRepository lessonNoteRepository;
   final IAIService aiService;
   final LessonNoteSyncService lessonNoteSyncService;
+  final IAdminRepository adminRepository;
+  final FinanceRepository financeRepositoryNew;
+  final NotificationRepository notificationRepository;
 
 
   AppDependencies({
@@ -219,6 +237,9 @@ class AppDependencies {
     required this.lessonNoteRepository,
     required this.aiService,
     required this.lessonNoteSyncService,
+    required this.adminRepository,
+    required this.financeRepositoryNew,
+    required this.notificationRepository,
   });
 
 
@@ -244,6 +265,7 @@ class AppDependencies {
     final syncRepository = SyncRepositoryImpl(database);
     final schoolRepository = SchoolRepositoryImpl(database);
     final lessonNoteRepo = LessonNoteRepositoryImpl(database);
+    final printerRepository = PrinterRepositoryImpl(database);
     
     // SecurityService must be initialized before deviceId
     final securityServiceForId = SecurityService();
@@ -281,7 +303,27 @@ class AppDependencies {
       deviceId: deviceId,
     );
     
-    final String baseUrl = kDebugMode ? 'http://127.0.0.1:3003' : 'https://api.iips-finance.com';
+    final String baseUrl = kDebugMode ? 'http://127.0.0.1:3005' : 'https://api.iips-finance.com';
+
+    final financeRepoNew = FinanceRepository(
+      FinanceApiClient(
+        baseUrl: baseUrl,
+        getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
+        getTenantId: () async => 'demo-school-123',
+      ),
+      FinanceRealtimeDataSourceImpl(Supabase.instance.client),
+    );
+
+    final notificationRepo = NotificationRepository(Dio(BaseOptions(baseUrl: baseUrl)));
+
+    // Register in GetIt for legacy sl access
+    final sl = GetIt.instance;
+    if (!sl.isRegistered<FinanceRepository>()) {
+      sl.registerSingleton<FinanceRepository>(financeRepoNew);
+    }
+    if (!sl.isRegistered<NotificationRepository>()) {
+      sl.registerSingleton<NotificationRepository>(notificationRepo);
+    }
 
     return AppDependencies(
       database: database,
@@ -332,14 +374,18 @@ class AppDependencies {
         remoteDataSource: FinanceRemoteDataSourceImpl(
           FinanceApiClient(
             baseUrl: baseUrl,
+            getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
             getTenantId: () async => 'demo-school-123',
           ),
         ),
         realtimeDataSource: FinanceRealtimeDataSourceImpl(Supabase.instance.client),
       ),
+      financeRepositoryNew: financeRepoNew,
+      notificationRepository: notificationRepo,
       billingRepository: BillingRepositoryImpl(
         FinanceApiClient(
           baseUrl: baseUrl,
+          getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
           getTenantId: () async => 'demo-school-123',
         ),
       ),
@@ -355,8 +401,9 @@ class AppDependencies {
       getJobPaymentsUC: GetJobPayments(servicesRepo),
       getServicesAnalyticsUC: GetServicesAnalytics(servicesRepo),
       lessonNoteRepository: lessonNoteRepo,
-      aiService: GeminiAIService(),
+      aiService: LessonNoteApiService(Dio(BaseOptions(baseUrl: baseUrl))),
       lessonNoteSyncService: LessonNoteSyncService(lessonNoteRepo),
+      adminRepository: AdminRepositoryImpl(Dio(BaseOptions(baseUrl: baseUrl))),
     );
   }
 }
@@ -381,9 +428,11 @@ class MyApp extends StatelessWidget {
         RepositoryProvider<SchoolRepository>(create: (_) => dependencies.schoolRepository),
         RepositoryProvider<SyncRepository>(create: (_) => dependencies.syncRepository),
         RepositoryProvider<IFinanceRepository>(create: (_) => dependencies.financeRepository),
+        RepositoryProvider<FinanceRepository>(create: (_) => dependencies.financeRepositoryNew),
         RepositoryProvider<IBillingRepository>(create: (_) => dependencies.billingRepository),
         RepositoryProvider<IServicesRepository>(create: (_) => dependencies.servicesRepository),
         RepositoryProvider<ILessonNoteRepository>(create: (_) => dependencies.lessonNoteRepository),
+        RepositoryProvider<IAdminRepository>(create: (_) => dependencies.adminRepository),
       ],
 
       child: MultiBlocProvider(
@@ -488,6 +537,16 @@ class MyApp extends StatelessWidget {
               securityService: dependencies.securityService,
             ),
           ),
+          BlocProvider(
+            create: (context) => AdminBloc(
+              repository: dependencies.adminRepository,
+            )..add(LoadAuditLogs()),
+          ),
+          BlocProvider(
+            create: (context) => ReconciliationBloc(
+              repository: dependencies.financeRepositoryNew,
+            )..add(const LoadReconciliation()),
+          ),
           RepositoryProvider<LessonNoteSyncService>(
             create: (_) => dependencies.lessonNoteSyncService,
           ),
@@ -530,6 +589,13 @@ class MyApp extends StatelessWidget {
               ActivationPage.routeName: (_) => const ActivationPage(),
               '/payment_test': (_) => const PaymentLedgerTestPage(),
               '/school_finance': (_) => const SchoolFinanceDashboardPage(),
+              '/payout_settings': (_) => const PayoutSettingsPage(),
+              '/payout_history': (_) => const PayoutHistoryPage(),
+              '/executive_finance': (_) => const ExecutiveFinanceDashboard(),
+              '/defaulters': (_) => const DefaultersPage(),
+              '/admin_hub': (_) => const AdminDashboardPage(),
+              '/admin_finance': (_) => const AdminFinanceDashboardPage(),
+              '/admin_api_keys': (_) => const ApiKeyManagementPage(),
             },
 
             );
