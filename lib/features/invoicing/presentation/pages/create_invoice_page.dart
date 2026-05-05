@@ -1235,7 +1235,10 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                 prefixIcon: const Icon(Icons.person),
               ),
               autofocus: true,
-              validator: (val) => (val == null || val.trim().isEmpty) ? 'Please enter customer name' : null,
+              validator: (val) {
+                final label = settings?.customerLabel.toLowerCase() ?? 'customer';
+                return (val == null || val.trim().isEmpty) ? 'Please enter $label name' : null;
+              },
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -1290,6 +1293,7 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
 }
 
 void _showStudentPicker(BuildContext context) {
+  final settings = context.read<SettingsBloc>().state.settings;
   final invoiceBloc = context.read<InvoiceBloc>();
   int? selectedClassId;
   String studentSearchQuery = '';
@@ -1317,7 +1321,7 @@ void _showStudentPicker(BuildContext context) {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const Text('Select Student', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('Select ${settings?.customerLabel ?? "Customer"}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             
             // Search Bar for Students
@@ -1389,7 +1393,7 @@ void _showStudentPicker(BuildContext context) {
                           Icon(Icons.person_off_outlined, size: 64, color: Colors.grey[300]),
                           const SizedBox(height: 16),
                           Text(studentSearchQuery.isEmpty && selectedClassId == null 
-                            ? 'No students found. Add students first.' 
+                            ? 'No ${settings?.customersLabel.toLowerCase() ?? "customers"} found. Add them first.' 
                             : 'No students matching your filters.',
                             style: TextStyle(color: Colors.grey[600]),
                           ),
@@ -1440,12 +1444,13 @@ void _showStudentPicker(BuildContext context) {
                           
                           // Carry Forward Logic
                           if (student.balance > 0) {
-                            final hasBalanceItem = invoiceBloc.state.items.any((i) => i.item.name == 'Previous Term Balance');
+                            final debtLabel = settings?.businessMode == 'school' ? 'Previous Term Balance' : 'Outstanding Balance';
+                            final hasBalanceItem = invoiceBloc.state.items.any((i) => i.item.name == debtLabel);
                             if (!hasBalanceItem) {
                               invoiceBloc.add(AddItemToInvoice(
                                 Item(
                                   id: -1, 
-                                  name: 'Previous Term Balance',
+                                  name: debtLabel,
                                   price: student.balance,
                                   category: ItemCategory.service,
                                   type: 'service',

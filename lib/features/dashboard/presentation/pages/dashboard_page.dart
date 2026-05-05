@@ -48,7 +48,7 @@ import 'package:involve_app/features/school/presentation/pages/result_entry_page
 import 'package:reorderable_grid_view/reorderable_grid_view.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
-import 'package:involve_app/features/school/presentation/pages/school_user_guide_page.dart';
+import 'package:involve_app/features/school/presentation/pages/app_user_guide_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
 
@@ -229,7 +229,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       Navigator.push(context, MaterialPageRoute(builder: (_) => HelpPage()));
                       break;
                     case 'user_guide':
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolUserGuidePage()));
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AppUserGuidePage()));
                       break;
                   }
                 },
@@ -494,6 +494,27 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.blueGrey,
         onTap: () => _verifyAndNavigateToSettings(context),
       ),
+      _DashboardMenuItem(
+        id: 'admin_hub',
+        title: 'ADMIN HUB',
+        icon: Icons.admin_panel_settings,
+        color: Colors.deepOrange,
+        onTap: () => Navigator.pushNamed(context, '/admin_hub'),
+      ),
+      _DashboardMenuItem(
+        id: 'finance_analytics',
+        title: 'FINANCE ANALYTICS',
+        icon: Icons.insights,
+        color: Colors.blueAccent,
+        onTap: () => Navigator.pushNamed(context, '/admin_finance'),
+      ),
+      _DashboardMenuItem(
+        id: 'reconciliation',
+        title: 'RECONCILIATION',
+        icon: Icons.account_balance,
+        color: Colors.teal,
+        onTap: () => Navigator.pushNamed(context, '/executive_finance'),
+      ),
     ];
 
     if (isServices) {
@@ -528,7 +549,14 @@ class _DashboardPageState extends State<DashboardPage> {
             Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersListPage()));
           },
         ),
-        ...allItems.where((i) => ['printer', 'settings', 'calculator'].contains(i.id)),
+        ...allItems.where((i) => [
+          'printer', 
+          'settings', 
+          'calculator',
+          'admin_hub',
+          'finance_analytics',
+          'reconciliation',
+        ].contains(i.id)),
       ];
     }
 

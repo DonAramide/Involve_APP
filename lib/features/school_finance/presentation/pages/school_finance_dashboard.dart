@@ -6,6 +6,10 @@ import '../widgets/summary_stat_card.dart';
 import '../widgets/modern_revenue_chart.dart';
 import '../widgets/global_transaction_tile.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/core/utils/terminology.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
 class SchoolFinanceDashboardPage extends StatefulWidget {
   const SchoolFinanceDashboardPage({super.key});
@@ -25,6 +29,9 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final membersLabel = settings?.customersLabel ?? 'Customers';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -107,16 +114,16 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                           value: '₦${NumberFormat('#,###').format(summary.outstandingFees)}',
                           icon: Icons.warning_amber_rounded,
                           color: Colors.orange,
-                          subtitle: 'Due Fees',
+                          subtitle: settings?.businessMode == 'school' ? 'Due Fees' : 'Pending',
                         ),
                         SummaryStatCard(
-                          title: 'Paid Students',
+                          title: 'Paid $membersLabel',
                           value: summary.paidStudentsCount.toString(),
                           icon: Icons.check_circle_outline,
                           color: Colors.green,
                         ),
                         SummaryStatCard(
-                          title: 'Owing Students',
+                          title: 'Owing $membersLabel',
                           value: summary.owingStudentsCount.toString(),
                           icon: Icons.people_outline,
                           color: Colors.red,

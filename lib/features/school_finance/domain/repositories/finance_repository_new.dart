@@ -97,6 +97,28 @@ class FinanceRepository {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Initiates a generic virtual account payment.
+  /// POST /payments/create
+  Future<Map<String, dynamic>> initiateVirtualAccount({
+    required double amount,
+    String? customerId,
+    String? customerName,
+    String? customerPhone,
+    String? email,
+  }) async {
+    final response = await _client.post(
+      '/payments/create',
+      data: {
+        'customerId': customerId,
+        'amount': amount,
+        'customerName': customerName,
+        'customerPhone': customerPhone,
+        'email': email,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   /// Fetches the reconciliation report for the school.
   /// GET /api/reconciliation
   Future<Map<String, dynamic>> getReconciliationReport({

@@ -22,6 +22,13 @@ abstract class InvoiceRepository {
   });
   Future<List<StockReturn>> getStockReturnsByDateRange(DateTime start, DateTime end);
   Future<List<StockReturn>> getStockReturnsByInvoiceId(int invoiceId);
+  
+  Future<Map<String, dynamic>> initiateVirtualAccount({
+    required double amount,
+    String? customerName,
+    String? customerPhone,
+    String? email,
+  });
 }
 
 class ReturnItem {

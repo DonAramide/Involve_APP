@@ -5,6 +5,10 @@ import '../widgets/finance_summary_card.dart';
 import '../widgets/virtual_account_card.dart';
 import '../widgets/student_transaction_item.dart';
 import '../widgets/record_payment_dialog.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/terminology.dart';
 
 class StudentFinanceProfilePage extends StatefulWidget {
   final String studentId;
@@ -36,10 +40,13 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final memberLabel = settings?.customerLabel ?? 'Customer';
+
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Student Ledger', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text('$memberLabel Ledger', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -91,11 +98,11 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 1. Student Info Header
-                    _buildHeader(),
+                    _buildHeader(settings),
                     const SizedBox(height: 24),
 
                     // 2. Financial Summary row
-                    _buildSummaryCards(state),
+                    _buildSummaryCards(state, settings),
                     const SizedBox(height: 24),
 
                     // 3. Virtual Account (if exists)
@@ -170,7 +177,7 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AppSettings? settings) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -198,10 +205,16 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '${widget.studentClass ?? "Unknown Class"} • ${widget.admissionNumber ?? "No ID"}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                ),
+                if (settings?.businessMode == 'school')
+                  Text(
+                    '${widget.studentClass ?? "Unknown Class"} • ${widget.admissionNumber ?? "No ID"}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  )
+                else
+                  Text(
+                    'Account ID: ${widget.studentId}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                  ),
               ],
             ),
           ),
@@ -225,15 +238,17 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
     );
   }
 
-  Widget _buildSummaryCards(FinanceProfileLoaded state) {
+  Widget _buildSummaryCards(FinanceProfileLoaded state, AppSettings? settings) {
     final outstanding = state.summary.outstandingBalance;
+    final totalLabel = settings?.businessMode == 'school' ? 'Total Fees' : 'Total Billed';
+    
     return Column(
       children: [
         Row(
           children: [
             Expanded(
               child: FinanceSummaryCard(
-                title: 'Total Fees',
+                title: totalLabel,
                 amount: state.summary.totalFees,
                 color: Colors.blue.shade800,
                 icon: Icons.receipt_long_rounded,

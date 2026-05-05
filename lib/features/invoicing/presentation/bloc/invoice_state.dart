@@ -113,6 +113,23 @@ class SaveInvoice extends InvoiceEvent {
 
 class ResetInvoice extends InvoiceEvent {}
 
+class InitiateVirtualAccount extends InvoiceEvent {
+  final double amount;
+  final String? customerName;
+  final String? customerPhone;
+  final String? email;
+
+  InitiateVirtualAccount({
+    required this.amount,
+    this.customerName,
+    this.customerPhone,
+    this.email,
+  });
+
+  @override
+  List<Object?> get props => [amount, customerName, customerPhone, email];
+}
+
 class UpdateInvoiceSettings extends InvoiceEvent {
   final double taxRate;
   final bool taxEnabled;
@@ -140,6 +157,8 @@ class InvoiceState extends Equatable {
   final double taxRate;
   final bool taxEnabled;
   final bool discountEnabled;
+  final bool isGeneratingAccount;
+  final Map<String, dynamic>? paymentIntent;
   final String? customerName;
   final String? customerPhone;
   final String? customerAddress;
@@ -156,6 +175,7 @@ class InvoiceState extends Equatable {
   final String? termName;
   final String? academicYearName;
   final Uint8List? studentImage;
+  final bool paymentSuccess;
 
   const InvoiceState({
     this.items = const [],
@@ -166,6 +186,8 @@ class InvoiceState extends Equatable {
     this.total = 0,
     this.isSaving = false,
     this.isSaved = false,
+    this.isGeneratingAccount = false,
+    this.paymentIntent,
     this.error,
     this.taxRate = 0.0,
     this.taxEnabled = true,
@@ -186,6 +208,7 @@ class InvoiceState extends Equatable {
     this.termName,
     this.academicYearName,
     this.studentImage,
+    this.paymentSuccess = false,
   });
 
   InvoiceState copyWith({
@@ -201,6 +224,8 @@ class InvoiceState extends Equatable {
     double? taxRate,
     bool? taxEnabled,
     bool? discountEnabled,
+    bool? isGeneratingAccount,
+    Map<String, dynamic>? paymentIntent,
     String? customerName,
     String? customerPhone,
     String? customerAddress,
@@ -217,6 +242,7 @@ class InvoiceState extends Equatable {
     String? termName,
     String? academicYearName,
     Uint8List? studentImage,
+    bool? paymentSuccess,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -231,6 +257,8 @@ class InvoiceState extends Equatable {
       taxRate: taxRate ?? this.taxRate,
       taxEnabled: taxEnabled ?? this.taxEnabled,
       discountEnabled: discountEnabled ?? this.discountEnabled,
+      isGeneratingAccount: isGeneratingAccount ?? this.isGeneratingAccount,
+      paymentIntent: paymentIntent ?? this.paymentIntent,
       customerName: customerName ?? this.customerName,
       customerPhone: customerPhone ?? this.customerPhone,
       customerAddress: customerAddress ?? this.customerAddress,
@@ -247,6 +275,7 @@ class InvoiceState extends Equatable {
       termName: termName ?? this.termName,
       academicYearName: academicYearName ?? this.academicYearName,
       studentImage: studentImage ?? this.studentImage,
+      paymentSuccess: paymentSuccess ?? this.paymentSuccess,
     );
   }
 
@@ -264,6 +293,8 @@ class InvoiceState extends Equatable {
         taxRate,
         taxEnabled,
         discountEnabled,
+        isGeneratingAccount,
+        paymentIntent,
         customerName,
         customerPhone,
         customerAddress,
@@ -280,5 +311,6 @@ class InvoiceState extends Equatable {
         termName,
         academicYearName,
         studentImage,
+        paymentSuccess,
       ];
 }

@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/terminology.dart';
 
 class RecordPaymentDialog extends StatefulWidget {
   final String studentId;
@@ -29,13 +34,16 @@ class _RecordPaymentDialogState extends State<RecordPaymentDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final memberLabel = settings?.customerLabel ?? 'Customer';
+
     return AlertDialog(
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('Record Payment', style: TextStyle(fontWeight: FontWeight.bold)),
           Text(
-            widget.studentName,
+            '${widget.studentName} ($memberLabel)',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.normal),
           ),
         ],
@@ -79,7 +87,9 @@ class _RecordPaymentDialogState extends State<RecordPaymentDialog> {
                 decoration: InputDecoration(
                   labelText: 'Note (Optional)',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  hintText: 'e.g. Paid for Term 2',
+                  hintText: settings?.businessMode == 'school' 
+                      ? 'e.g. Paid for Term 2' 
+                      : 'e.g. Partial payment for ${settings?.productLabel.toLowerCase() ?? "goods"}',
                 ),
                 maxLines: 2,
               ),

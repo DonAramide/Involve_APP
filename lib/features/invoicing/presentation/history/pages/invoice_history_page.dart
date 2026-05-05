@@ -33,6 +33,9 @@ import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/terminology.dart';
+
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
 
@@ -283,12 +286,22 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   }
 
   Widget _buildSearchField(BuildContext context, HistoryState state, double? currentAmount) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final mode = settings?.businessMode ?? 'retail';
+    
+    String hint = 'Search Invoice ID';
+    if (mode == 'school') {
+      hint = 'Search Invoice ID, Student or Class';
+    } else if (mode == 'services') {
+      hint = 'Search Invoice ID or Client';
+    } else {
+      hint = 'Search Invoice ID or Customer';
+    }
+
     return TextField(
       controller: _searchController,
       decoration: InputDecoration(
-        hintText: context.read<SettingsBloc>().state.settings?.businessMode == 'school' 
-          ? 'Search Invoice ID, Student or Class' 
-          : 'Search Invoice ID',
+        hintText: hint,
         prefixIcon: const Icon(Icons.search),
         border: const OutlineInputBorder(),
         filled: true,

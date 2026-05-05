@@ -6,6 +6,11 @@ import '../../domain/repositories/finance_repository_new.dart';
 import '../../../../core/services/service_locator.dart';
 import 'package:intl/intl.dart';
 
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import 'package:involve_app/core/utils/terminology.dart';
+
 class DefaultersPage extends StatefulWidget {
   const DefaultersPage({super.key});
 
@@ -50,41 +55,50 @@ class _DefaultersPageState extends State<DefaultersPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('Fee Defaulters', style: TextStyle(fontWeight: FontWeight.w900)),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        actions: [
-          IconButton(icon: const Icon(Icons.sort_rounded), onPressed: () {}),
-        ],
-      ),
-      body: Column(
-        children: [
-          _buildFilters(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: _fetchDefaulters,
-                    child: _defaulters.isEmpty
-                        ? _buildEmptyState()
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _defaulters.length,
-                            itemBuilder: (context, index) => _buildDefaulterCard(_defaulters[index]),
-                          ),
-                  ),
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, state) {
+        final settings = state.settings;
+        final mode = settings?.businessMode ?? 'retail';
+        final isSchool = mode == 'school';
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            title: Text('${settings?.customersLabel ?? "Customer"} Debt Report', style: const TextStyle(fontWeight: FontWeight.w900)),
+            elevation: 0,
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            actions: [
+              IconButton(icon: const Icon(Icons.sort_rounded), onPressed: () {}),
+            ],
           ),
-        ],
-      ),
+          body: Column(
+            children: [
+              if (isSchool) _buildFilters(settings),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(
+                        onRefresh: _fetchDefaulters,
+                        child: _defaulters.isEmpty
+                            ? _buildEmptyState(settings)
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _defaulters.length,
+                                itemBuilder: (context, index) => _buildDefaulterCard(_defaulters[index], settings),
+                              ),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildFilters() {
+  Widget _buildFilters(AppSettings? settings) {
     final classes = ['JSS 1', 'JSS 2', 'JSS 3', 'SSS 1', 'SSS 2', 'SSS 3'];
+    final categoryLabel = settings?.categoryLabel ?? 'Class';
     return Container(
       height: 60,
       color: Colors.white,
@@ -94,7 +108,7 @@ class _DefaultersPageState extends State<DefaultersPage> {
         itemCount: classes.length + 1,
         itemBuilder: (context, index) {
           final isAll = index == 0;
-          final className = isAll ? 'All Classes' : classes[index - 1];
+          final className = isAll ? 'All $categoryLabel' : classes[index - 1];
           final isSelected = isAll ? _selectedClass == null : _selectedClass == className;
 
           return Padding(
@@ -117,7 +131,7 @@ class _DefaultersPageState extends State<DefaultersPage> {
     );
   }
 
-  Widget _buildDefaulterCard(Map<String, dynamic> item) {
+  Widget _buildDefaulterCard(Map<String, dynamic> item, AppSettings? settings) {
     final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
     final outstanding = item['outstanding'] as double;
     
@@ -136,15 +150,15 @@ class _DefaultersPageState extends State<DefaultersPage> {
             children: [
               CircleAvatar(
                 backgroundColor: Colors.red.shade50,
-                child: Text(item['studentName'][0], style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold)),
+                child: Text((item['studentName'] ?? item['customerName'] ?? '?')[0], style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item['studentName'], style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-                    Text(item['class'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(item['studentName'] ?? item['customerName'] ?? 'Unknown', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                    if (item['class'] != null) Text(item['class'], style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   ],
                 ),
               ),
@@ -191,7 +205,7 @@ class _DefaultersPageState extends State<DefaultersPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppSettings? settings) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -199,7 +213,7 @@ class _DefaultersPageState extends State<DefaultersPage> {
           Icon(Icons.check_circle_outline_rounded, size: 64, color: Colors.green.shade200),
           const SizedBox(height: 16),
           const Text('No defaulters found!', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
-          const Text('All students have cleared their fees.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          Text('All ${settings?.customersLabel.toLowerCase() ?? "customers"} have cleared their balances.', style: const TextStyle(color: Colors.grey, fontSize: 12)),
         ],
       ),
     );

@@ -3,9 +3,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/admin_bloc.dart';
 import '../widgets/master_mode_switch.dart';
+import 'system_setup_page.dart';
 
-class AdminDashboardPage extends StatelessWidget {
+import 'package:intl/intl.dart';
+
+class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
+
+  @override
+  State<AdminDashboardPage> createState() => _AdminDashboardPageState();
+}
+
+class _AdminDashboardPageState extends State<AdminDashboardPage> {
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  void _loadData() {
+    context.read<AdminBloc>().add(LoadAdminDashboard());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,13 +38,17 @@ class AdminDashboardPage extends StatelessWidget {
       body: BlocBuilder<AdminBloc, AdminState>(
         builder: (context, state) {
           if (state.isLoading) return const Center(child: CircularProgressIndicator());
+          
+          if (state.error != null && state.metrics.isEmpty) {
+            return _buildErrorState(state.error!);
+          }
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildMetricSection(context),
+                _buildMetricSection(context, state.metrics),
                 const SizedBox(height: 24),
                 _buildQuickActions(context, state.isMasterMode),
                 const SizedBox(height: 24),
@@ -39,13 +61,23 @@ class AdminDashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildMetricSection(BuildContext context) {
+  Widget _buildMetricSection(BuildContext context, Map<String, dynamic> metrics) {
+    final formatter = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
+    
+    // Fallback to defaults if metrics are empty (e.g. backend offline)
+    final walletValue = metrics['internal_wallet'] != null 
+        ? formatter.format(metrics['internal_wallet']) 
+        : '₦0.00';
+    final revenueValue = metrics['monthly_revenue'] != null 
+        ? formatter.format(metrics['monthly_revenue']) 
+        : '₦0.00';
+
     return Row(
       children: [
         Expanded(
           child: _MetricCard(
             title: 'Internal Wallet',
-            value: '₦4,500,000.00',
+            value: walletValue,
             icon: Icons.account_balance_wallet,
             color: Colors.blue,
           ),
@@ -54,7 +86,7 @@ class AdminDashboardPage extends StatelessWidget {
         Expanded(
           child: _MetricCard(
             title: 'Monthly Revenue',
-            value: '₦12,250,500.00',
+            value: revenueValue,
             icon: Icons.trending_up,
             color: Colors.green,
           ),
@@ -78,6 +110,11 @@ class AdminDashboardPage extends StatelessWidget {
               icon: Icons.vpn_key,
               onTap: isMaster ? () => _gotoKeys(context) : null,
               isGated: !isMaster,
+            ),
+            _ActionTile(
+              label: 'System Setup',
+              icon: Icons.settings_applications,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SystemSetupPage())),
             ),
             _ActionTile(
               label: 'Audit Logs',
@@ -127,6 +164,37 @@ class AdminDashboardPage extends StatelessWidget {
   }
   void _gotoLogs(BuildContext context) {
      context.read<AdminBloc>().add(LoadAuditLogs());
+  }
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text('Connection Failed', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(error, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry Connection'),
+            ),
+            const SizedBox(height: 16),
+            if (error.contains('127.0.0.1'))
+              const Text(
+                'Tip: If using an emulator, ensure the backend is running and reach it via host IP.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

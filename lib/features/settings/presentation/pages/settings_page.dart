@@ -138,14 +138,6 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 10),
       ],
       
-      // Branding Section
-      if (_matches('Branding', ['logo', 'name'])) ...[
-         _buildSectionHeader(context, 'Branding'),
-         _buildReadOnlyLogoTile(context, settings),
-         _buildSwitchTile('Print Company Logo on Receipt', settings.showLogo, (val) => _update(context, settings.copyWith(showLogo: val))),
-         const Divider(),
-      ],
-
       // Business Mode
       if (_matches('Business Mode', ['school', 'retail', 'operation'])) ...[
         BusinessModeSelector(
@@ -156,135 +148,11 @@ class _SettingsPageState extends State<SettingsPage> {
         const SizedBox(height: 10),
       ],
 
-      // Organization Detail
-      if (_matches('Organization Detail', ['name', 'address', 'phone', 'cac', 'description', 'tax id'])) ...[
-        _buildSectionHeader(context, 'Organization Detail'),
-        if (_matches('Name', ['organization']))
-          state.isBusinessLocked 
-            ? _buildReadOnlyTile('Name', settings.organizationName, Icons.business)
-            : _buildTextTile(context, 'Name', settings.organizationName, (val) => _update(context, settings.copyWith(organizationName: val))),
-        if (_matches('Address'))
-          _buildTextTile(context, 'Address', settings.address, (val) => _update(context, settings.copyWith(address: val))),
-        if (_matches('Phone'))
-          _buildTextTile(context, 'Phone', settings.phone, (val) => _update(context, settings.copyWith(phone: val))),
-        if (_matches('CAC Number'))
-          _buildTextTile(context, 'CAC Number', settings.cacNumber ?? '', (val) => _update(context, settings.copyWith(cacNumber: val))),
-        if (_matches('Print CAC Number on Receipt'))
-          _buildSwitchTile('Print CAC Number on Receipt', settings.showCacNumber, (val) => _update(context, settings.copyWith(showCacNumber: val))),
-        if (_matches('Description'))
-          _buildTextTile(context, 'Description', settings.businessDescription ?? '', (val) => _update(context, settings.copyWith(businessDescription: val))),
-        if (_matches('Tax ID (VAT/GST)'))
-          _buildTextTile(context, 'Tax ID (VAT/GST)', settings.taxId ?? '', (val) => _update(context, settings.copyWith(taxId: val))),
-        const Divider(),
-      ],
+      // Preferences Section (Moved to Admin Hub)
 
-      // Preferences Section
-      if (_matches('Preferences', ['tax', 'discount', 'confirm price', 'payment', 'custom pricing', 'currency', 'template', 'theme', 'footer', 'paper'])) ...[
-        _buildSectionHeader(context, 'Preferences'),
-        if (_matches('Enable Tax', ['vat']))
-          _buildSwitchTile('Enable Tax', settings.taxEnabled, (val) => _update(context, settings.copyWith(taxEnabled: val))),
-        if (settings.taxEnabled && _matches('Tax Rate'))
-          _buildTextTile(
-            context, 
-            'Tax Rate (%)', 
-            (settings.taxRate * 100).toStringAsFixed(0), 
-            (val) {
-              final rate = double.tryParse(val);
-              if (rate != null) _update(context, settings.copyWith(taxRate: rate / 100));
-            },
-            validator: (val) {
-              final n = double.tryParse(val ?? '');
-              return (n == null || n < 0 || n > 100) ? 'Enter 0-100' : null;
-            },
-          ),
-        if (_matches('Enable Discounts'))
-          _buildSwitchTile('Enable Discounts', settings.discountEnabled, (val) => _update(context, settings.copyWith(discountEnabled: val))),
-        if (_matches('Confirm Item Price on Selection', ['fee', 'confirm']))
-          _buildSwitchTile(
-            settings.businessMode == 'school' ? 'Confirm Fees on Selection' : 'Confirm Item Price on Selection', 
-            settings.confirmPriceOnSelection, (val) => _update(context, settings.copyWith(confirmPriceOnSelection: val))
-          ),
-        if (_matches('Enable Payment Methods'))
-          _buildSwitchTile('Enable Payment Methods (Cash/POS/Transfer)', settings.paymentMethodsEnabled, (val) => _update(context, settings.copyWith(paymentMethodsEnabled: val))),
-        if (settings.businessMode != 'school' && _matches('Enable Custom Receipt Pricing'))
-          _buildSwitchTile(
-            'Enable Custom Receipt Pricing (Inflated Prices)', 
-            settings.customReceiptPricingEnabled, 
-            (val) => _update(context, settings.copyWith(customReceiptPricingEnabled: val)),
-            isPro: state.userPlan?.isBasic == true,
-          ),
-        if (_matches('Currency'))
-          _buildDropdownTile(
-            context, 
-            'Currency', 
-            ['₦', '\$', '€', '£', 'KSh'].contains(settings.currency) ? settings.currency : '₦', 
-            ['₦', '\$', '€', '£', 'KSh'], 
-            (val) => _update(context, settings.copyWith(currency: val)),
-          ),
-        if (_matches('Invoice Template'))
-          _buildDropdownTile(
-            context, 
-            'Invoice Template', 
-            [
-              'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
-              if (settings.businessMode == 'school') ...['school_teal', 'school_color', 'school_academic', 'school_traditional']
-            ].contains(settings.defaultInvoiceTemplate) ? settings.defaultInvoiceTemplate : 'compact', 
-            [
-              'compact', 'detailed', 'minimalist', 'professional', 'modern', 'classic',
-              if (settings.businessMode == 'school') ...['school_teal', 'school_color', 'school_academic', 'school_traditional']
-            ], 
-            (val) => _update(context, settings.copyWith(defaultInvoiceTemplate: val)),
-          ),
-        if (_matches('Theme'))
-          _buildDropdownTile(context, 'Theme', settings.themeMode, ['system', 'light', 'dark'], (val) => _update(context, settings.copyWith(themeMode: val))),
-        if (_matches('Theme Color'))
-          _buildThemeColorSection(context, settings),
-        if (_matches('Receipt Footer'))
-          _buildTextTile(context, 'Receipt Footer', settings.receiptFooter, (val) => _update(context, settings.copyWith(receiptFooter: val))),
-        if (_matches('Thermal Paper Width'))
-          _buildDropdownTile(
-            context, 
-            'Thermal Paper Width', 
-            '${settings.paperWidth}mm', 
-            ['58mm', '80mm', '88mm'], 
-            (val) {
-              final width = int.parse(val.replaceAll('mm', ''));
-              _update(context, settings.copyWith(paperWidth: width));
-            },
-          ),
-        const Divider(),
-      ],
+      // Account Details (Moved to Admin Hub)
 
-      // Account Details
-      if (_matches('Account Details', ['bank', 'number', 'signature'])) ...[
-        _buildSectionHeader(context, 'Account Details'),
-        if (_matches('Show Account Details on Invoice'))
-          _buildSwitchTile('Show Account Details on Invoice', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
-        if (_matches('Show Signature Space on Receipt'))
-          _buildSwitchTile('Show Signature Space on Receipt', settings.showSignatureSpace, (val) => _update(context, settings.copyWith(showSignatureSpace: val))),
-        if (settings.showAccountDetails) ...[
-          if (_matches('Bank Name'))
-            _buildTextTile(context, 'Bank Name', settings.bankName ?? '', (val) => _update(context, settings.copyWith(bankName: val))),
-          if (_matches('Account Number'))
-            _buildTextTile(context, 'Account Number', settings.accountNumber ?? '', (val) => _update(context, settings.copyWith(accountNumber: val))),
-          if (_matches('Account Name'))
-            _buildTextTile(context, 'Account Name', settings.accountName ?? '', (val) => _update(context, settings.copyWith(accountName: val))),
-        ],
-        const Divider(),
-      ],
-      
-      // Admin Signature Section
-      if (_matches('Admin Signature', ['signature', 'upload', 'crop'])) ...[
-        _buildSectionHeader(context, 'Admin Signature'),
-        _buildSignatureSection(context, settings),
-        _buildSwitchTile(
-          'Show Admin Signature on Invoices', 
-          settings.showAdminSignature, 
-          (val) => _update(context, settings.copyWith(showAdminSignature: val)),
-          isPro: state.userPlan?.isBasic == true,
-        ),
-        const Divider(),
-      ],
+      // Service Billing
 
       if (_matches('Service Billing', ['config', 'types', 'half day'])) ...[
         _buildServiceBillingTile(context, settings, state),
@@ -295,38 +163,7 @@ class _SettingsPageState extends State<SettingsPage> {
         const Divider(),
       ],
 
-      // Staff Management
-      if (_matches('Staff Management', ['users', 'roles'])) ...[
-        _buildSectionHeader(context, 'Staff Management', isPro: state.userPlan?.isBasic == true),
-        _buildStaffManagementSection(context, settings),
-        const Divider(),
-      ],
-
-      // Graph Visibility
-      if (_matches('Graph Visibility', ['charts', 'sales trend', 'expense', 'top selling', 'stock value'])) ...[
-        _buildSectionHeader(context, 'Graph Visibility (Admin)'),
-        if (_matches('Show Sales Trend'))
-          _buildSwitchTile(
-            settings.businessMode == 'school' ? 'Show Revenue Trend (Billing History)' : 'Show Sales Trend (Invoice History)', 
-            settings.showSalesTrendChart, (val) => _update(context, settings.copyWith(showSalesTrendChart: val))
-          ),
-        if (_matches('Show Expense Pie Chart'))
-          _buildSwitchTile(
-            settings.businessMode == 'school' ? 'Show Expense Pie Chart (Financial Report)' : 'Show Expense Pie Chart (Profit Report)', 
-            settings.showExpensePieChart, (val) => _update(context, settings.copyWith(showExpensePieChart: val))
-          ),
-        if (_matches('Show Top Selling Bar Chart'))
-          _buildSwitchTile(
-            settings.businessMode == 'school' ? 'Show Top Revenue Sources (Financial Report)' : 'Show Top Selling Bar Chart (Inventory Report)', 
-            settings.showTopSellingChart, (val) => _update(context, settings.copyWith(showTopSellingChart: val))
-          ),
-        if (_matches('Show Stock Value Pie Chart'))
-          _buildSwitchTile(
-            settings.businessMode == 'school' ? 'Show Inventory Value Chart (Financial Report)' : 'Show Stock Value Pie Chart (Inventory Report)', 
-            settings.showStockValueChart, (val) => _update(context, settings.copyWith(showStockValueChart: val))
-          ),
-        const Divider(),
-      ],
+      // Startup & State Persistence
       // Startup & State Persistence
       if (_matches('Startup & State Persistence', ['splash', 'last state', 'restore'])) ...[
         _buildSectionHeader(context, 'Startup & State Persistence'),
@@ -407,17 +244,6 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
 
 
-
-      // Security
-      if (_matches('Security', ['password', 'lock'])) ...[
-        _buildSectionHeader(context, 'Security'),
-        if (_matches('Change System Password'))
-          ListTile(
-            title: const Text('Change System Password'),
-            trailing: const Icon(Icons.lock_outline),
-            onTap: () => _showChangePassword(context),
-          ),
-      ],
 
       const SizedBox(height: 60),
     ];

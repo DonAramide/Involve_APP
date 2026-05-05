@@ -256,9 +256,20 @@ class AppDependencies {
     // 2. License Service
     LicenseService.init(database);
     
+    final String baseUrl = kDebugMode ? 'https://bertie-archegoniate-causelessly.ngrok-free.dev' : 'https://api.iips-finance.com';
+
+    final financeRepoNew = FinanceRepository(
+      FinanceApiClient(
+        baseUrl: baseUrl,
+        getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
+        getTenantId: () async => 'demo-school-123',
+      ),
+      FinanceRealtimeDataSourceImpl(Supabase.instance.client),
+    );
+
     // 3. Repositories
     final itemRepository = ItemRepositoryImpl(database);
-    final invoiceRepository = InvoiceRepositoryImpl(database);
+    final invoiceRepository = InvoiceRepositoryImpl(database, financeRepository: financeRepoNew);
     final settingsRepository = SettingsRepositoryImpl(database);
     final categoryRepository = CategoryRepositoryImpl(database);
     final staffRepository = StaffRepositoryImpl(database);
@@ -301,17 +312,6 @@ class AppDependencies {
     final bluetoothSyncServer = BluetoothSyncServer(
       syncRepository: syncRepository,
       deviceId: deviceId,
-    );
-    
-    final String baseUrl = kDebugMode ? 'http://127.0.0.1:3005' : 'https://api.iips-finance.com';
-
-    final financeRepoNew = FinanceRepository(
-      FinanceApiClient(
-        baseUrl: baseUrl,
-        getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
-        getTenantId: () async => 'demo-school-123',
-      ),
-      FinanceRealtimeDataSourceImpl(Supabase.instance.client),
     );
 
     final notificationRepo = NotificationRepository(Dio(BaseOptions(baseUrl: baseUrl)));
@@ -403,7 +403,13 @@ class AppDependencies {
       lessonNoteRepository: lessonNoteRepo,
       aiService: LessonNoteApiService(Dio(BaseOptions(baseUrl: baseUrl))),
       lessonNoteSyncService: LessonNoteSyncService(lessonNoteRepo),
-      adminRepository: AdminRepositoryImpl(Dio(BaseOptions(baseUrl: baseUrl))),
+      adminRepository: AdminRepositoryImpl(
+        FinanceApiClient(
+          baseUrl: baseUrl,
+          getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
+          getTenantId: () async => 'demo-school-123',
+        ),
+      ),
     );
   }
 }

@@ -1,5 +1,4 @@
-// lib/features/admin/domain/repositories/admin_repository.dart
-import 'package:dio/dio.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
 
 abstract class IAdminRepository {
   Future<String> enterMasterMode(String password, String? otp);
@@ -7,16 +6,17 @@ abstract class IAdminRepository {
   Future<Map<String, dynamic>> createApiKey(String label);
   Future<void> revokeApiKey(String keyId);
   Future<List<Map<String, dynamic>>> getAuditLogs();
+  Future<Map<String, dynamic>> getDashboardStats();
 }
 
 class AdminRepositoryImpl implements IAdminRepository {
-  final Dio dio;
+  final FinanceApiClient client;
 
-  AdminRepositoryImpl(this.dio);
+  AdminRepositoryImpl(this.client);
 
   @override
   Future<String> enterMasterMode(String password, String? otp) async {
-    final response = await dio.post('/api/admin/master-mode/enter', data: {
+    final response = await client.post('/api/admin/master-mode/enter', data: {
       'password': password,
       'otp': otp,
     });
@@ -25,24 +25,30 @@ class AdminRepositoryImpl implements IAdminRepository {
 
   @override
   Future<List<Map<String, dynamic>>> getApiKeys() async {
-    final response = await dio.get('/api/admin/api-keys');
+    final response = await client.get('/api/admin/api-keys');
     return List<Map<String, dynamic>>.from(response.data['keys']);
   }
 
   @override
   Future<Map<String, dynamic>> createApiKey(String label) async {
-    final response = await dio.post('/api/admin/api-keys', data: {'label': label});
-    return response.data;
+    final response = await client.post('/api/admin/api-keys', data: {'label': label});
+    return Map<String, dynamic>.from(response.data);
   }
 
   @override
   Future<void> revokeApiKey(String keyId) async {
-    await dio.post('/api/admin/api-keys/$keyId/revoke');
+    await client.post('/api/admin/api-keys/$keyId/revoke');
   }
 
   @override
   Future<List<Map<String, dynamic>>> getAuditLogs() async {
-    final response = await dio.get('/api/admin/audit-logs');
+    final response = await client.get('/api/admin/audit-logs');
     return List<Map<String, dynamic>>.from(response.data);
+  }
+
+  @override
+  Future<Map<String, dynamic>> getDashboardStats() async {
+    final response = await client.get('/api/admin/dashboard-stats');
+    return Map<String, dynamic>.from(response.data);
   }
 }

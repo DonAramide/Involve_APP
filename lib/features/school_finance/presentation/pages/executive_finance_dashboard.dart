@@ -8,6 +8,10 @@ import '../widgets/summary_stat_card.dart';
 import '../widgets/modern_revenue_chart.dart';
 import '../widgets/global_transaction_tile.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/core/utils/terminology.dart';
+import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
 class ExecutiveFinanceDashboard extends StatefulWidget {
   const ExecutiveFinanceDashboard({super.key});
@@ -21,6 +25,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   Map<String, dynamic>? _summary;
   List<dynamic> _recentActivity = [];
   bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -29,7 +34,10 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
     try {
       final summary = await _repository.getExecutiveSummary();
       // Also fetch recent transactions
@@ -41,99 +49,112 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      setState(() {
+        _isLoading = false;
+        _error = e.toString();
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        title: const Text('Executive Dashboard', style: TextStyle(fontWeight: FontWeight.w900)),
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        actions: [
-          IconButton(icon: const Icon(Icons.tune_rounded), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _loadData),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: CustomScrollView(
-                slivers: [
-                  // 1. Alert Panel (if any)
-                  if (_hasAlerts())
-                    SliverToBoxAdapter(child: _buildAlertPanel()),
-
-                  // 2. Main KPIs
-                  SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 1.5,
-                      ),
-                      delegate: SliverChildListDelegate([
-                        _buildKpiCard('Available Balance', _summary?['walletBalance'], Icons.account_balance_wallet_rounded, Colors.indigo),
-                        _buildKpiCard('Total Collected', _summary?['totalCollected'], Icons.payments_rounded, Colors.green),
-                        _buildKpiCard('Revenue (Range)', _summary?['revenueInRange'], Icons.trending_up_rounded, Colors.blue),
-                        _buildKpiCard('Outstanding', 0, Icons.warning_amber_rounded, Colors.orange),
-                      ]),
-                    ),
-                  ),
-
-                  // 3. Student Metrics
-                  SliverToBoxAdapter(child: _buildStudentMetricsSection()),
-
-                  // 4. Revenue Chart
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Financial Performance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 20),
-                            const AspectRatio(aspectRatio: 1.7, child: Placeholder()), // Chart placeholder
-                          ],
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, state) {
+        final settings = state.settings;
+        final isRetail = settings?.businessMode == 'retail';
+        final customerLabelPlural = settings?.customersLabel ?? 'Customers';
+        final collectedLabel = settings?.collectedLabel ?? 'Total Collected';
+        
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8FAFC),
+          appBar: AppBar(
+            title: const Text('Executive Dashboard', style: TextStyle(fontWeight: FontWeight.w900)),
+            elevation: 0,
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            actions: [
+              IconButton(icon: const Icon(Icons.tune_rounded), onPressed: () {}),
+              IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _loadData),
+            ],
+          ),
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? _buildErrorState()
+                  : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: CustomScrollView(
+                    slivers: [
+                      // 1. Alert Panel (if any)
+                      if (_hasAlerts())
+                        SliverToBoxAdapter(child: _buildAlertPanel()),
+    
+                      // 2. Main KPIs
+                      SliverPadding(
+                        padding: const EdgeInsets.all(16),
+                        sliver: SliverGrid(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1.5,
+                          ),
+                          delegate: SliverChildListDelegate([
+                            _buildKpiCard('Available Balance', _summary?['walletBalance'], Icons.account_balance_wallet_rounded, Colors.indigo),
+                            _buildKpiCard(collectedLabel, _summary?['totalCollected'], Icons.payments_rounded, Colors.green),
+                            _buildKpiCard('Revenue (Range)', _summary?['revenueInRange'], Icons.trending_up_rounded, Colors.blue),
+                            _buildKpiCard('Outstanding', 0, Icons.warning_amber_rounded, Colors.orange),
+                          ]),
                         ),
                       ),
-                    ),
-                  ),
-
-                  // 5. Recent Activity Header
-                  const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
-                      child: Text('Recent Activity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    ),
-                  ),
-
-                  // 6. Recent Activity List
-                  SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) => _buildActivityTile(_recentActivity[index]),
-                        childCount: _recentActivity.length,
+    
+                      // 3. Student Metrics
+                      SliverToBoxAdapter(child: _buildStudentMetricsSection(customerLabelPlural)),
+    
+                      // 4. Revenue Chart
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Financial Performance', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                const SizedBox(height: 20),
+                                const AspectRatio(aspectRatio: 1.7, child: Placeholder()), // Chart placeholder
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+    
+                      // 5. Recent Activity Header
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(16, 24, 16, 12),
+                          child: Text('Recent Activity', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      ),
+    
+                      // 6. Recent Activity List
+                      SliverPadding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) => _buildActivityTile(_recentActivity[index], isRetail),
+                            childCount: _recentActivity.length,
+                          ),
+                        ),
+                      ),
+                      
+                      const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                    ],
                   ),
-                  
-                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
-                ],
-              ),
-            ),
+                ),
+        );
+      },
     );
   }
 
@@ -141,6 +162,37 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
     final alerts = _summary?['alerts'];
     if (alerts == null) return false;
     return alerts['unmatchedCount'] > 0 || alerts['failedPayoutsCount'] > 0;
+  }
+
+  Widget _buildErrorState() {
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to load financial data',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'Unknown error',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry Connection'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildAlertPanel() {
@@ -215,7 +267,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
     );
   }
 
-  Widget _buildStudentMetricsSection() {
+  Widget _buildStudentMetricsSection(String pluralLabel) {
     final metrics = _summary?['studentMetrics'];
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -228,7 +280,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _metricItem('Total Students', metrics?['total'].toString() ?? '0', Colors.white),
+            _metricItem('Total $pluralLabel', metrics?['total'].toString() ?? '0', Colors.white),
             _metricItem('Paid', '0', Colors.greenAccent),
             _metricItem('Owing', '0', Colors.orangeAccent),
           ],
@@ -246,8 +298,12 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
     );
   }
 
-  Widget _buildActivityTile(Map<String, dynamic> item) {
+  Widget _buildActivityTile(Map<String, dynamic> item, bool isRetail) {
     final date = DateTime.parse(item['created_at']);
+    final typeLabel = item['type'] == 'payout' 
+        ? 'Fund Sweep' 
+        : (isRetail ? 'Sales Payment' : 'Fee Payment');
+        
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -264,7 +320,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item['type'] == 'payout' ? 'Fund Sweep' : 'Fee Payment', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(typeLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text(DateFormat('MMM dd, hh:mm a').format(date), style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ],
             ),

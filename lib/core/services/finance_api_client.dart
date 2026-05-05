@@ -31,7 +31,7 @@ class UnauthorizedException extends FinanceApiException {
 
 class NetworkException extends FinanceApiException {
   const NetworkException()
-      : super(message: 'No internet connection. Please check your network.');
+      : super(message: 'No internet connection. Please check your network or API server reachability.');
 }
 
 class ServerException extends FinanceApiException {

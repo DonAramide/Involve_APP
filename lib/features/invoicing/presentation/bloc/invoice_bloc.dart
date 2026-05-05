@@ -24,6 +24,22 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<UpdateItemPrintPrice>(_onUpdateItemPrintPrice);
     on<UpdateSchoolInfo>(_onUpdateSchool);
     on<UpdateBusinessMode>(_onUpdateBusinessMode);
+    on<InitiateVirtualAccount>(_onInitiateVirtualAccount);
+  }
+
+  Future<void> _onInitiateVirtualAccount(InitiateVirtualAccount event, Emitter<InvoiceState> emit) async {
+    emit(state.copyWith(isGeneratingAccount: true, error: null, paymentIntent: null));
+    try {
+      final intent = await repository.initiateVirtualAccount(
+        amount: event.amount,
+        customerName: event.customerName,
+        customerPhone: event.customerPhone,
+        email: event.email,
+      );
+      emit(state.copyWith(isGeneratingAccount: false, paymentIntent: intent));
+    } catch (e) {
+      emit(state.copyWith(isGeneratingAccount: false, error: 'Failed to generate account: $e'));
+    }
   }
 
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {

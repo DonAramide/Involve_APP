@@ -168,6 +168,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             ),
                           ],
                           const Divider(),
+                          if (invoiceState.paymentIntent != null && invoiceState.paymentMethod == 'VirtualAccount') ...[
+                            _buildVirtualAccountDetails(invoiceState.paymentIntent!),
+                          ],
                         ],
                         
                         if (settings?.showSignatureSpace == true) ...[
@@ -190,7 +193,16 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   TextButton(onPressed: () => Navigator.pop(context), child: const Text('EDIT')),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                    onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
+                    onPressed: (invoiceState.isSaving || invoiceState.isGeneratingAccount || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
+                      if (invoiceState.paymentMethod == 'VirtualAccount' && invoiceState.paymentIntent == null) {
+                        widget.invoiceBloc.add(InitiateVirtualAccount(
+                          amount: invoiceState.total,
+                          customerName: invoiceState.customerName,
+                          customerPhone: invoiceState.customerPhone,
+                        ));
+                        return;
+                      }
+
                       final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
                       
                       // Safety check for significant overpayment
@@ -264,9 +276,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                       _printInvoice(context, invoice, settings!);
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Processing... please wait.')));
                     },
-                    child: invoiceState.isSaving 
+                    child: (invoiceState.isSaving || invoiceState.isGeneratingAccount)
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('SAVE & PRINT'),
+                      : Text(invoiceState.paymentMethod == 'VirtualAccount' && invoiceState.paymentIntent == null ? 'GENERATE ACCOUNT' : 'SAVE & PRINT'),
                   ),
                   ElevatedButton(
                     onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
@@ -405,6 +417,17 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           },
         ),
         RadioListTile<String>(
+          title: const Text('Pay with Transfer (Virtual Account)', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+          value: 'VirtualAccount',
+          groupValue: state.paymentMethod,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          onChanged: (val) {
+            context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
+            _amountReceivedController.text = CurrencyFormatter.format(state.total);
+          },
+        ),
+        RadioListTile<String>(
           title: const Text('Pay Later (deferred)/ part payment', style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold)),
           value: 'Deferred',
           groupValue: state.paymentMethod,
@@ -434,6 +457,54 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           Text(
             CurrencyFormatter.formatWithSymbol(value, symbol: currency),
             style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVirtualAccountDetails(Map<String, dynamic> intent) {
+    final account = intent['account'] ?? intent;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'TRANSFER TO THIS ACCOUNT',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.blue),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            account['account_number'] ?? account['accountNumber'] ?? 'N/A',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 2),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            account['bank_name'] ?? account['bankName'] ?? 'N/A',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          Text(
+            account['account_name'] ?? account['accountName'] ?? '',
+            style: const TextStyle(fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+          const Divider(),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+              SizedBox(width: 8),
+              Text('Waiting for payment confirmation...', style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
+            ],
           ),
         ],
       ),

@@ -8,11 +8,32 @@ import '../../../stock/domain/entities/item.dart';
 import '../../domain/repositories/invoice_repository.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+
 class InvoiceRepositoryImpl implements InvoiceRepository {
   final AppDatabase db;
+  final FinanceRepository? financeRepository; // Optional injection for payment logic
   final _uuid = const Uuid();
 
-  InvoiceRepositoryImpl(this.db);
+  InvoiceRepositoryImpl(this.db, {this.financeRepository});
+
+  @override
+  Future<Map<String, dynamic>> initiateVirtualAccount({
+    required double amount,
+    String? customerName,
+    String? customerPhone,
+    String? email,
+  }) async {
+    if (financeRepository == null) {
+      throw Exception('Finance infrastructure not initialized for this repository.');
+    }
+    return await financeRepository!.initiateVirtualAccount(
+      amount: amount,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      email: email,
+    );
+  }
 
   @override
   Future<void> saveInvoice(Invoice invoice) async {

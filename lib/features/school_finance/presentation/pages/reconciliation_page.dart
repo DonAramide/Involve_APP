@@ -232,6 +232,24 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
     );
   }
 
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, size: 48, color: Colors.red),
+          const SizedBox(height: 16),
+          Text(message, style: const TextStyle(color: Colors.red)),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () => context.read<ReconciliationBloc>().add(RefreshReconciliation()),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPaymentCard(Map<String, dynamic> item) {
     final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
     final date = DateTime.parse(item['createdAt']);
@@ -264,7 +282,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item['studentName'] ?? 'Unassigned Payment',
+                      item['studentName'] ?? item['customerName'] ?? 'Unassigned Payment',
                       style: TextStyle(
                         fontWeight: FontWeight.w800, 
                         fontSize: 15,

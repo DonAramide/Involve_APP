@@ -21,6 +21,7 @@ class RevokeApiKey extends AdminEvent {
   RevokeApiKey(this.id);
 }
 class LoadAuditLogs extends AdminEvent {}
+class LoadAdminDashboard extends AdminEvent {}
 
 // State
 class AdminState {
@@ -29,6 +30,7 @@ class AdminState {
   final DateTime? masterExpiry;
   final List<Map<String, dynamic>> apiKeys;
   final List<Map<String, dynamic>> auditLogs;
+  final Map<String, dynamic> metrics;
   final bool isLoading;
   final String? error;
 
@@ -38,6 +40,7 @@ class AdminState {
     this.masterExpiry,
     this.apiKeys = const [],
     this.auditLogs = const [],
+    this.metrics = const {},
     this.isLoading = false,
     this.error,
   });
@@ -48,6 +51,7 @@ class AdminState {
     DateTime? masterExpiry,
     List<Map<String, dynamic>>? apiKeys,
     List<Map<String, dynamic>>? auditLogs,
+    Map<String, dynamic>? metrics,
     bool? isLoading,
     String? error,
   }) {
@@ -57,6 +61,7 @@ class AdminState {
       masterExpiry: masterExpiry ?? this.masterExpiry,
       apiKeys: apiKeys ?? this.apiKeys,
       auditLogs: auditLogs ?? this.auditLogs,
+      metrics: metrics ?? this.metrics,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -74,6 +79,7 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     on<CreateApiKey>(_onCreateApiKey);
     on<RevokeApiKey>(_onRevokeApiKey);
     on<LoadAuditLogs>(_onLoadAuditLogs);
+    on<LoadAdminDashboard>(_onLoadAdminDashboard);
   }
 
   Future<void> _onEnterMasterMode(EnterMasterMode event, Emitter<AdminState> emit) async {
@@ -140,6 +146,16 @@ class AdminBloc extends Bloc<AdminEvent, AdminState> {
     try {
       final logs = await repository.getAuditLogs();
       emit(state.copyWith(auditLogs: logs, isLoading: false));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onLoadAdminDashboard(LoadAdminDashboard event, Emitter<AdminState> emit) async {
+    emit(state.copyWith(isLoading: true, error: null));
+    try {
+      final stats = await repository.getDashboardStats();
+      emit(state.copyWith(metrics: stats, isLoading: false));
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
     }
