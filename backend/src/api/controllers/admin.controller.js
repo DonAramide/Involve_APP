@@ -28,15 +28,35 @@ class AdminController {
             const { data: tenant, error: tError } = await supabase.from('tenants').select('*').eq('id', id).single();
             if (tError) throw tError;
 
-            // 2. Get Devices count (for internal stats)
+            // 2. Get Users for this Tenant
+            const { data: users } = await supabase.from('profiles').select('*').eq('tenant_id', id);
+
+            // 3. Get Devices count (for internal stats)
             const { count: deviceCount } = await supabase.from('devices').select('*', { count: 'exact', head: true }).eq('tenant_id', id);
             
-            // 3. Get recent Activations (used as recentUsage/recentActivations)
+            // 4. Get recent Activations
             const { data: activations } = await supabase.from('device_activations').select('*').eq('tenant_id', id).limit(5).order('created_at', { ascending: false });
 
-            // 4. Get Ledger balance for the wallet
-            const { data: ledger } = await supabase.from('ledger_entries').select('amount').eq('tenant_id', id);
+            // 5. Get Ledger balance for the internal wallet
+            const { data: ledger } = await supabase.from('ledger_entries').select('*').eq('tenant_id', id).limit(20).order('created_at', { ascending: false });
             const balance = ledger ? ledger.reduce((acc, curr) => acc + curr.amount, 0) : 0;
+
+            // 6. Quaser SDK Deep-Dive (Optional/Try-Catch)
+            let quaserData = { subAccount: null, virtualAccounts: [], transactions: [] };
+            try {
+                // Get Quaser ID mapping
+                const { data: mapping } = await supabase.from('tenants').select('quaser_tenant_id').eq('id', id).single();
+                if (mapping?.quaser_tenant_id) {
+                    const [subAcc, vAccs, txns] = await Promise.all([
+                        QuaserService.getSubAccountDetails(mapping.quaser_tenant_id).catch(() => null),
+                        QuaserService.getVirtualAccounts(mapping.quaser_tenant_id).catch(() => []),
+                        QuaserService.getTransactions(mapping.quaser_tenant_id).catch(() => [])
+                    ]);
+                    quaserData = { subAccount: subAcc, virtualAccounts: vAccs, transactions: txns };
+                }
+            } catch (qErr) {
+                console.error('Quaser Sync Error:', qErr.message);
+            }
 
             // Map backend stats to the structure the frontend expects
             res.json({
@@ -47,10 +67,13 @@ class AdminController {
                         activationCount: activations ? activations.length : 0
                     }
                 },
-                users: [], // Coming in Phase 4
+                users: users || [],
                 wallet: {
                     balance: balance,
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
+                    subAccount: quaserData.subAccount,
+                    virtualAccounts: quaserData.virtualAccounts,
+                    transactions: quaserData.transactions.length > 0 ? quaserData.transactions : (ledger || [])
                 },
                 recentUsage: activations ? activations.map(a => ({
                     id: a.id,

@@ -56,6 +56,17 @@ class QuaserService {
     }
 
     /**
+     * Virtual Account & Sub-Account Management
+     */
+    static async getSubAccountDetails(quaserTenantId) {
+        return this.#call('GET', '/admin/subaccount', {}, quaserTenantId);
+    }
+
+    static async getVirtualAccounts(quaserTenantId) {
+        return this.#call('GET', '/admin/virtual-accounts', {}, quaserTenantId);
+    }
+
+    /**
      * Resolve Quaser Tenant ID from Invify Tenant ID
      */
     static async getQuaserId(tenantId) {
