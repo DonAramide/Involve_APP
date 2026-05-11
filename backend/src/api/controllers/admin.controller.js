@@ -18,6 +18,41 @@ class AdminController {
     }
 
     /**
+     * Fetch Single Tenant Deep Details
+     */
+    static async getTenantDetails(req, res) {
+        try {
+            const { id } = req.params;
+            
+            // 1. Get Tenant Profile
+            const { data: tenant, error: tError } = await supabase.from('tenants').select('*').eq('id', id).single();
+            if (tError) throw tError;
+
+            // 2. Get Devices count
+            const { count: deviceCount, error: dError } = await supabase.from('devices').select('*', { count: 'exact', head: true }).eq('tenant_id', id);
+            
+            // 3. Get recent Activations
+            const { data: activations, error: aError } = await supabase.from('device_activations').select('*').eq('tenant_id', id).limit(5).order('created_at', { ascending: false });
+
+            // 4. Get Ledger balance
+            const { data: ledger, error: lError } = await supabase.from('ledger_entries').select('amount').eq('tenant_id', id);
+            const balance = ledger ? ledger.reduce((acc, curr) => acc + curr.amount, 0) : 0;
+
+            res.json({
+                ...tenant,
+                stats: {
+                    deviceCount: deviceCount || 0,
+                    activationCount: activations ? activations.length : 0,
+                    balance: balance
+                },
+                recentActivations: activations || []
+            });
+        } catch (err) {
+            res.status(500).json({ message: err.message });
+        }
+    }
+
+    /**
      * Create new Tenant
      */
     static async createTenant(req, res) {

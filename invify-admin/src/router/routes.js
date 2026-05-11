@@ -17,6 +17,7 @@ const routes = [
       { path: 'curriculum', component: () => import('pages/CurriculumPage.vue') },
       { path: 'notes', component: () => import('pages/LessonNotePage.vue') },
       { path: 'ai-usage', component: () => import('pages/AnalyticsPage.vue') },
+      { path: 'devices', component: () => import('pages/DeviceActivationPage.vue') },
       
       // Teacher Workspace
       { path: 'teacher-workspace', component: () => import('pages/TeacherDashboardPage.vue') },

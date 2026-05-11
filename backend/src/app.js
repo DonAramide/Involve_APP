@@ -24,6 +24,8 @@ const { registerPushToken } = require('./api/controllers/push_token.controller')
 const { triggerMockWebhook } = require('./api/controllers/test.controller');
 const { syncJobs, syncPayments, syncCustomers } = require('./api/controllers/services.controller');
 const AIController = require('./api/controllers/ai.controller');
+const CurriculumController = require('./api/controllers/curriculum.controller');
+const DeviceController = require('./api/controllers/device.controller');
 // middleware
 app.use(bodyParser.json({
     verify: (req, res, buf) => {
@@ -52,6 +54,7 @@ app.post('/api/admin/master-mode/enter', authenticate, AdminController.enterMast
 app.get('/api/admin/api-keys', authenticate, authorize(['SUPER_ADMIN']), AdminController.getApiKeys);
 app.get('/api/admin/users', AdminController.getUsers);
 app.get('/api/admin/tenants', AdminController.getTenants);
+app.get('/api/admin/tenants/:id/details', AdminController.getTenantDetails);
 app.post('/api/admin/tenants', AdminController.createTenant);
 app.get('/api/admin/ledger', AdminController.getLedger);
 app.get('/api/admin/dashboard-stats', AdminController.getDashboardStats);
@@ -97,6 +100,15 @@ app.post('/api/services/sync/customers', authenticate, syncCustomers);
 
 // 9. AI Module
 app.post('/api/ai/lesson-note/generate', AIController.generateLessonNote);
+app.get('/api/curriculum/topics', CurriculumController.getTopics);
+app.get('/api/curriculum/subjects', CurriculumController.getSubjects);
+
+// 10. Device Activation Module
+app.get('/api/devices', DeviceController.getDevices);
+app.get('/api/devices/activations', DeviceController.getActivationHistory);
+app.post('/api/devices/activations', DeviceController.createActivationCode);
+app.post('/api/devices/validate', DeviceController.validateCode);
+app.patch('/api/devices/:id', DeviceController.updateDeviceStatus);
 
 const { scheduleReconciliation } = require('./workers/reconciliation.worker');
 

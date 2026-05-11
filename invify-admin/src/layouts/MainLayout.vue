@@ -138,6 +138,7 @@ const educationLinks = [
 ]
 
 const systemLinks = [
+  { title: 'Device Activation', icon: 'devices_other', link: '/devices', color: 'cyan-3' },
   { title: 'Settings', icon: 'settings', link: '/settings', color: 'grey-4' }
 ]
 </script>

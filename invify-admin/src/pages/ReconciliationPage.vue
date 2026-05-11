@@ -126,7 +126,8 @@
               </q-chip>
             </q-td>
           </template>
-        </q-tab-panel>
+        </q-table>
+      </q-tab-panel>
 
       <!-- MATCHED PANEL -->
       <q-tab-panel name="matched" class="q-pa-none">

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: 'http://localhost:3005/api',
-  timeout: 10000,
+  timeout: 30000,
 });
 
 api.interceptors.request.use((config) => {
@@ -58,8 +58,18 @@ export const adminApi = {
 };
 
 export const aiApi = {
-  generateLessonNote: (data) => api.post('/ai/lesson-note/generate', data),
-  refreshLessonNote: (data) => api.post('/ai/lesson-note/refresh', data),
+  generateLessonNote: (data) => api.post('/ai/lesson-note/generate', data, { timeout: 120000 }),
+  refreshLessonNote: (data) => api.post('/ai/lesson-note/refresh', data, { timeout: 120000 }),
+  getTopics: (params) => api.get('/curriculum/topics', { params }),
+  getSubjects: () => api.get('/curriculum/subjects'),
+};
+
+export const deviceApi = {
+  getDevices: () => api.get('/devices'),
+  getActivations: () => api.get('/devices/activations'),
+  createActivation: (data) => api.post('/devices/activations', data),
+  validateCode: (data) => api.post('/devices/validate', data),
+  updateDevice: (id, data) => api.patch(`/devices/${id}`, data),
 };
 
 export const billingApi = {

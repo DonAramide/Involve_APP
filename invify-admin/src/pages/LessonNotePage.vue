@@ -23,7 +23,17 @@
                 label="Class Level"
                 dark filled dense emit-value map-options
               />
-              <q-input v-model="form.subjectName" label="Subject Name" dark filled dense placeholder="e.g. Mathematics" />
+              <q-select
+                v-model="form.subjectName"
+                :options="filteredSubjectOptions"
+                label="Subject Name"
+                dark filled dense 
+                use-input
+                input-debounce="300"
+                @filter="filterSubjects"
+                emit-value map-options
+              />
+              <q-input v-model="form.topic" label="Specific Topic" dark filled dense placeholder="e.g. Number Systems" />
               <div class="row q-col-gutter-sm">
                 <div class="col-6">
                   <q-select v-model="form.term" :options="termOptions" label="Term" dark filled dense emit-value map-options />
@@ -103,73 +113,118 @@
             <!-- JSON STRUCTURED VIEW -->
             <div v-if="viewMode === 'json'" class="q-gutter-y-lg">
                <!-- Objectives -->
-               <div>
-                  <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">OBECTIVES</div>
-                  <ul class="q-mt-sm q-pl-md custom-list">
-                    <li v-for="(obj, i) in currentNote.structured.objectives" :key="i" class="q-mb-xs">
-                      {{ obj }}
-                    </li>
-                  </ul>
-               </div>
-
-               <!-- Materials -->
-               <div>
-                  <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">INSTRUCTIONAL MATERIALS</div>
-                  <div class="row q-gutter-xs q-mt-sm">
-                    <q-chip v-for="(mat, i) in currentNote.structured.materials" :key="i" color="blue-grey-9" text-color="white" size="sm">
-                      {{ mat }}
-                    </q-chip>
-                  </div>
-               </div>
-
-               <!-- Introduction -->
-               <div>
-                  <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">INTRODUCTION</div>
-                  <p class="q-mt-sm text-body1 text-grey-4 line-height-1-6">{{ currentNote.structured.introduction }}</p>
-               </div>
-
-               <!-- Presentation Steps -->
-               <div>
-                  <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">STEP-BY-STEP PRESENTATION</div>
-                  <div class="q-mt-md">
-                    <div v-for="(step, i) in currentNote.structured.steps" :key="i" class="q-mb-md">
-                        <div class="text-weight-bold text-indigo-2">Step {{ i+1 }}: {{ step.title || 'Introduction' }}</div>
-                        <div class="text-body2 text-grey-5">{{ step.description || step }}</div>
+               <div v-if="currentNote.learning_objectives && currentNote.learning_objectives.length">
+                  <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">LEARNING OBJECTIVES</div>
+                  <div class="q-mt-sm">
+                    <div v-for="(obj, i) in currentNote.learning_objectives" :key="i" class="row no-wrap q-mb-sm">
+                       <q-icon name="check_circle" color="indigo-4" class="q-mr-sm q-mt-xs" size="xs" />
+                       <div class="text-body2 text-grey-3">{{ obj }}</div>
                     </div>
                   </div>
                </div>
 
-               <!-- Evaluation -->
-               <div>
-                  <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">EVALUATION</div>
+               <!-- Examples & Illustrations -->
+               <div v-if="currentNote.examples && currentNote.examples.length">
+                  <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">EXAMPLES & ILLUSTRATIONS</div>
                   <div class="q-mt-sm">
-                     <div v-for="(evalItem, i) in currentNote.structured.evaluation" :key="i" class="row no-wrap q-mb-sm">
-                        <q-icon name="help_outline" color="indigo-4" class="q-mr-sm q-mt-xs" size="xs" />
-                        <div>{{ evalItem }}</div>
-                     </div>
+                    <div v-for="(ex, i) in currentNote.examples" :key="i" class="bg-blue-grey-9 q-pa-md q-mb-sm rounded-borders border-grey-9">
+                       <div class="row no-wrap">
+                          <q-icon name="lightbulb" color="amber-4" class="q-mr-md" size="sm" />
+                          <div class="text-body2 line-height-1-6 text-grey-4">{{ ex }}</div>
+                       </div>
+                    </div>
                   </div>
                </div>
 
-               <!-- Assignment -->
-               <q-banner dense class="bg-blue-grey-9 text-white rounded-borders">
-                  <template v-slot:avatar><q-icon name="assignment" color="indigo-3" /></template>
-                  <div class="text-weight-bold">ASSIGNMENT:</div>
-                  {{ currentNote.structured.assignment }}
-               </q-banner>
-            </div>
+                <!-- Introduction -->
+                <div v-if="currentNote.introduction">
+                   <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">INTRODUCTION</div>
+                   <p class="q-mt-sm text-body1 text-grey-4 line-height-1-6">{{ currentNote.introduction }}</p>
+                </div>
+
+                <!-- Main Content -->
+                <div>
+                   <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">MAIN CONTENT</div>
+                   <div class="q-mt-md">
+                     <div v-for="(item, i) in currentNote.main_content" :key="i" class="q-mb-md">
+                         <div class="text-weight-bold text-indigo-2">{{ item.heading }}</div>
+                         <div class="text-body2 text-grey-5">{{ item.explanation }}</div>
+                     </div>
+                   </div>
+                </div>
+
+                <!-- Evaluation -->
+                <div>
+                   <div class="text-subtitle1 text-weight-bolder text-indigo-3 section-header">ASSESSMENT</div>
+                   <div class="q-mt-sm">
+                      <div v-for="(evalItem, i) in currentNote.assessment" :key="i" class="row no-wrap q-mb-sm">
+                         <q-icon name="help_outline" color="indigo-4" class="q-mr-sm q-mt-xs" size="xs" />
+                         <div>{{ evalItem }}</div>
+                      </div>
+                   </div>
+                </div>
+
+                <!-- Summary -->
+                <q-banner v-if="currentNote.summary" dense class="bg-blue-grey-9 text-white rounded-borders">
+                   <template v-slot:avatar><q-icon name="summarize" color="indigo-3" /></template>
+                   <div class="text-weight-bold">SUMMARY:</div>
+                   {{ currentNote.summary }}
+                </q-banner>
+             </div>
 
             <!-- MARKDOWN VIEW -->
             <div v-else class="markdown-body">
-               <pre class="bg-blue-grey-9 q-pa-md rounded-borders text-caption text-grey-4 overflow-auto">{{ currentNote.markdown }}</pre>
+               <pre class="bg-blue-grey-9 q-pa-md rounded-borders text-caption text-grey-4 overflow-auto">{{ JSON.stringify(currentNote, null, 2) }}</pre>
             </div>
+
+            <!-- LOADING OVERLAY -->
+            <q-inner-loading :showing="generating" class="bg-blue-grey-10" style="z-index: 10">
+               <div class="text-center">
+                 <q-spinner-cube color="indigo-4" size="4em" />
+                 <div class="q-mt-md text-weight-bold text-indigo-3 text-subtitle1">{{ loadingMessage }}</div>
+                 <div class="text-caption text-grey-5 q-mt-xs">This may take a few moments for detailed notes...</div>
+               </div>
+            </q-inner-loading>
           </q-card-section>
         </q-card>
 
-        <q-card v-else class="bg-blue-grey-10 shadow-2 flex flex-center" style="min-height: 400px">
-           <div class="column items-center text-grey-8">
+        <q-card v-else class="bg-blue-grey-10 shadow-2 relative-position" style="min-height: 400px">
+           <q-inner-loading :showing="generating" class="bg-blue-grey-10">
+               <div class="text-center">
+                 <q-spinner-cube color="indigo-4" size="4em" />
+                 <div class="q-mt-md text-weight-bold text-indigo-3 text-subtitle1">{{ loadingMessage }}</div>
+               </div>
+           </q-inner-loading>
+
+           <div v-if="loadingTopics" class="flex flex-center q-pa-xl" style="height: 400px">
+              <q-spinner-dots color="indigo-4" size="3em" />
+           </div>
+           <div v-else-if="topics.length > 0" class="q-pa-lg">
+              <div class="text-h6 q-mb-md text-indigo-3 text-weight-bold">Available Topics for {{ form.term }} Term</div>
+              <div class="row q-col-gutter-sm">
+                 <div v-for="t in topics" :key="t.id" class="col-12 col-md-6">
+                    <q-card 
+                      flat bordered 
+                      class="cursor-pointer topic-card transition-3" 
+                      :class="form.topic === t.topic ? 'border-indigo-bright bg-indigo-10' : 'bg-blue-grey-11 border-grey-9'"
+                      @click="form.topic = t.topic; form.week = t.week"
+                    >
+                       <q-card-section class="q-pa-md">
+                          <div class="row items-center no-wrap">
+                             <div class="week-badge q-mr-md">WK {{ t.week }}</div>
+                             <div class="text-subtitle2 text-weight-bold">{{ t.topic }}</div>
+                             <q-space />
+                             <q-icon v-if="form.topic === t.topic" name="check_circle" color="green-4" />
+                          </div>
+                       </q-card-section>
+                    </q-card>
+                 </div>
+              </div>
+           </div>
+           <div v-else class="column items-center text-grey-8 flex flex-center q-pa-xl" style="height: 400px">
               <q-icon name="auto_awesome" size="4em" class="q-mb-md" />
-              <div class="text-h6">Select a Curriculum Topic to Start</div>
-              <div class="text-caption">The AI will use the standardized Master Curriculum for accurate generation.</div>
+              <div class="text-h6">No Topics Found in Curriculum</div>
+              <div class="text-caption">Try changing the Class, Subject, or Term to see available topics.</div>
            </div>
         </q-card>
       </div>
@@ -179,18 +234,50 @@
 
 <script setup>
 import { ref, inject } from 'vue'
+import { useQuasar } from 'quasar'
 import { aiApi } from '../api'
 import { useUsage } from '../composables/useUsage'
 
+const $q = useQuasar()
 const { isHardLimit, fetchUsage } = useUsage()
 const triggerUpgradeModal = inject('triggerUpgradeModal')
 
 const generating = ref(false)
+const loadingTopics = ref(false)
 const currentNote = ref(null)
 const viewMode = ref('json')
+const topics = ref([])
+const allSubjects = ref([])
+const filteredSubjectOptions = ref([])
+
+const loadingMessage = ref('Initializing AI...')
+const loadingMessages = [
+  'Consulting NERDC Curriculum Standards...',
+  'Analyzing Advanced Academic Requirements...',
+  'Drafting Comprehensive Topic Explanations...',
+  'Applying Masterclass Academic Rigor...',
+  'Generating Technical Illustrations & Examples...',
+  'Finalizing WAEC/NECO Standard Assessments...',
+  'Polishing Pedagogical Delivery Steps...'
+]
+
+let messageInterval = null
+const startLoadingMessages = () => {
+  let index = 0
+  loadingMessage.value = loadingMessages[0]
+  messageInterval = setInterval(() => {
+    index = (index + 1) % loadingMessages.length
+    loadingMessage.value = loadingMessages[index]
+  }, 3500)
+}
+
+const stopLoadingMessages = () => {
+  if (messageInterval) clearInterval(messageInterval)
+}
 
 const form = ref({
   subjectName: 'Mathematics',
+  topic: '',
   class_level: 'JSS 1',
   term: 'First',
   week: 1
@@ -217,13 +304,21 @@ const generateNote = async (refresh = false) => {
     if (triggerUpgradeModal) triggerUpgradeModal()
     return
   }
+  
+  if (!form.value.topic) {
+    $q.notify({ type: 'warning', message: 'Please select a topic first' })
+    return
+  }
 
   generating.value = true
+  startLoadingMessages()
   currentNote.value = null
   try {
     const payload = {
       className: form.value.class_level,
       subjectName: form.value.subjectName,
+      topic: form.value.topic,
+      schoolId: 'admin-global',
       term: form.value.term,
       week: parseInt(form.value.week)
     }
@@ -236,8 +331,63 @@ const generateNote = async (refresh = false) => {
     fetchUsage() // Update quota stats after generation
   } finally {
     generating.value = false
+    stopLoadingMessages()
   }
 }
+const fetchTopics = async () => {
+  if (!form.value.subjectName || !form.value.class_level || !form.value.term) return
+  
+  loadingTopics.value = true
+  try {
+    const { data } = await aiApi.getTopics({
+      subject: form.value.subjectName,
+      classLevel: form.value.class_level,
+      term: form.value.term
+    })
+    topics.value = data
+  } catch (err) {
+    console.error('Failed to load topics:', err)
+  } finally {
+    loadingTopics.value = false
+  }
+}
+
+const fetchSubjects = async () => {
+  try {
+    const { data } = await aiApi.getSubjects()
+    allSubjects.value = data
+    filteredSubjectOptions.value = data
+  } catch (err) {
+    console.error('Failed to load subjects:', err)
+  }
+}
+
+const filterSubjects = (val, update) => {
+  if (val === '') {
+    update(() => {
+      filteredSubjectOptions.value = allSubjects.value
+    })
+    return
+  }
+
+  update(() => {
+    const needle = val.toLowerCase()
+    filteredSubjectOptions.value = allSubjects.value.filter(
+      v => v.toLowerCase().indexOf(needle) > -1
+    )
+  })
+}
+
+import { watch, onMounted } from 'vue'
+
+onMounted(() => {
+  fetchSubjects()
+})
+
+watch(() => [form.value.subjectName, form.value.class_level, form.value.term], () => {
+  form.value.topic = ''
+  fetchTopics()
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -251,4 +401,11 @@ const generateNote = async (refresh = false) => {
 .line-height-1-6 { line-height: 1.6; }
 .animate-pulse { animation: pulse 2s infinite; }
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+.topic-card { border-radius: 8px; border: 1px solid transparent; }
+.topic-card:hover { border-color: #5c6bc0; background: #263238; }
+.border-indigo-bright { border-color: #7986cb !important; }
+.bg-blue-grey-11 { background: #1e2a30; }
+.week-badge { background: #3f51b5; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; }
+.transition-3 { transition: all 0.3s ease; }
 </style>

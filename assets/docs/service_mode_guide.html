@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invify - School Mode User Guide</title>
+    <title>Invify - Service Mode User Guide</title>
     <style>
         :root {
-            --primary: #00838f;
-            --secondary: #3949ab;
-            --accent: #ff9800;
+            --primary: #3949ab;
+            --secondary: #1a1c1e;
+            --accent: #00bcd4;
             --text-main: #2c3e50;
             --text-light: #546e7a;
             --bg-light: #f4f7f6;
@@ -126,15 +126,15 @@
         }
 
         .tip-box {
-            background: #e0f2f1;
-            border-left: 5px solid #009688;
+            background: #e8eaf6;
+            border-left: 5px solid #3949ab;
             padding: 20px;
             margin: 30px 0;
             border-radius: 0 12px 12px 0;
         }
 
         .tip-box strong {
-            color: #00796b;
+            color: #1a237e;
             display: block;
             margin-bottom: 5px;
         }
@@ -173,13 +173,10 @@
         }
 
         /* Icon Emoji fallbacks */
-        .icon-add_bill::before { content: '🧾'; }
-        .icon-students::before { content: '🎓'; }
-        .icon-history::before { content: '📊'; }
-        .icon-analytics::before { content: '📈'; }
-        .icon-setup::before { content: '🏛️'; }
-        .icon-admin::before { content: '🛡️'; }
-        .icon-reconcile::before { content: '⚖️'; }
+        .icon-job::before { content: '🛠️'; }
+        .icon-catalog::before { content: '📋'; }
+        .icon-clients::before { content: '🤝'; }
+        .icon-revenue::before { content: '💸'; }
     </style>
 </head>
 
@@ -187,72 +184,56 @@
 
     <div class="container">
         <header>
-            <img src="school_header_new.png" alt="School Mode Header" class="header-img">
+            <img src="service_header.png" alt="Service Mode Header" class="header-img">
             <div class="header-content">
-                <h1>Invify School Mode</h1>
-                <p>Comprehensive User Guide & Operational Manual</p>
+                <h1>Invify Service Mode</h1>
+                <p>User Guide & Operational Manual</p>
             </div>
         </header>
 
         <div class="content">
-            <p class="section-intro">Welcome to the Involve App **School Mode**. This specialized environment is designed for educational institutions to manage fees, students, academic records, and collection analytics with hardened financial integrity.</p>
+            <p class="section-intro">Welcome to **Service Mode**. This environment is tailored for service providers, consultants, and professionals. Track your jobs, manage client relationships, and streamline your billing workflow.</p>
 
-            <div class="tip-box" style="background: #fff3e0; border-color: #ff9800;">
-                <strong style="color: #e65100;">🏁 GETTING STARTED CHECKLIST</strong>
+            <div class="tip-box" style="background: #e0f7fa; border-color: #00bcd4;">
+                <strong style="color: #006064;">🏁 SERVICE SETUP CHECKLIST</strong>
                 <ol>
-                    <li><strong>Academic Setup:</strong> Define Years and active Terms via the Admin Hub.</li>
-                    <li><strong>Classes & Subjects:</strong> Create grade levels and curriculum items.</li>
-                    <li><strong>Grading Rules:</strong> Set score ranges to enable digital result entry.</li>
-                    <li><strong>Fee Catalog:</strong> Add tuition and other fee items.</li>
-                    <li><strong>Enrolment:</strong> Add students to their respective classes.</li>
+                    <li><strong>Service Catalog:</strong> Define your services and hourly rates/fees.</li>
+                    <li><strong>Client Directory:</strong> Import or add your client database.</li>
+                    <li><strong>Organization Details:</strong> Ensure your professional signature and branding are set.</li>
+                    <li><strong>Work Tracking:</strong> Start issuing Job Invoices for completed tasks.</li>
                 </ol>
             </div>
 
-            <h2>1. Administrative Hub</h2>
-            <p class="section-intro">Your central control center for system-wide configuration.</p>
+            <h2>1. Job & Invoice Management</h2>
+            <p class="section-intro">Your hub for billing professional services.</p>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-admin"></div>
+                    <div class="icon-box icon-job"></div>
                     <div class="feature-details">
-                        <h3>ADMIN HUB (Gated Access)</h3>
-                        <p>Centralized management for school administrators.
+                        <h3>NEW JOB / INVOICE</h3>
+                        <p>Generate professional invoices for services rendered.
                         <ul>
-                            <li><strong>System Setup:</strong> Configure Branding, Organization Details, and Preferences.</li>
-                            <li><strong>Quaser Keys:</strong> Manage secure payment integration keys (Master Mode only).</li>
-                            <li><strong>Audit Logs:</strong> Track all administrative actions for transparency.</li>
-                            <li><strong>Academic Structure:</strong> Manage Terms, Classes, and Grading Rules.</li>
+                            <li><strong>Service Selection:</strong> Pick from your predefined catalog.</li>
+                            <li><strong>Custom Rates:</strong> Adjust fees per job if necessary.</li>
+                            <li><strong>Client Assignment:</strong> Link every job to a specific client profile.</li>
+                            <li><strong>Digital Delivery:</strong> Email or WhatsApp invoices directly to clients.</li>
                         </ul>
                         </p>
                     </div>
                 </div>
             </div>
 
-            <h2>2. Finance & Collection Hub</h2>
-            <p class="section-intro">Hardened financial tools for accurate revenue tracking.</p>
+            <h2>2. Service Catalog</h2>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-add_bill" style="background: #ff9800;"></div>
+                    <div class="icon-box icon-catalog" style="background: #00bcd4;"></div>
                     <div class="feature-details">
-                        <h3>EXECUTIVE FINANCE DASHBOARD</h3>
-                        <p>Real-time visibility into the school's financial health.
+                        <h3>SERVICE DIRECTORY</h3>
+                        <p>Manage what you offer and what it costs.
                         <ul>
-                            <li><strong>Available Balance:</strong> View the current balance in your internal wallet.</li>
-                            <li><strong>Total Collected:</strong> Aggregated revenue across all payment methods.</li>
-                            <li><strong>Revenue Performance:</strong> Trend analysis of collections over time.</li>
-                        </ul>
-                        </p>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="icon-box icon-reconcile" style="background: #43a047;"></div>
-                    <div class="feature-details">
-                        <h3>RECONCILIATION HUB</h3>
-                        <p>Resolve payment discrepancies and unmatched transactions.
-                        <ul>
-                            <li><strong>Manual Assignment:</strong> Assign unmatched automated payments to students.</li>
-                            <li><strong>Issue Tracking:</strong> Identify and resolve duplicate or failed payments.</li>
-                            <li><strong>Matched Records:</strong> Audit trail of verified successful transactions.</li>
+                            <li><strong>Flat Fees vs. Hourly:</strong> Flexible pricing structures.</li>
+                            <li><strong>Categories:</strong> Group services (e.g., Consulting, Maintenance, Delivery).</li>
+                            <li><strong>Rate History:</strong> Track how your service pricing has evolved.</li>
                         </ul>
                         </p>
                     </div>
@@ -260,21 +241,38 @@
             </div>
 
             <div class="tip-box">
-                <strong>💡 PRO TIP: Hardened Ledger</strong>
-                The system uses an idempotent ledger. This means every payment is verified and recorded exactly once, preventing accidental double-counting or lost transactions.
+                <strong>💡 PRO TIP: Client Retention</strong>
+                Use the 'Client Profile' to view the total value of all jobs completed for a specific client. This helps you identify your most valuable professional relationships.
             </div>
 
-            <h2>3. Academic & Student Administration</h2>
+            <h2>3. Client Administration</h2>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-students" style="background: #3f51b5;"></div>
+                    <div class="icon-box icon-clients" style="background: #1a1c1e;"></div>
                     <div class="feature-details">
-                        <h3>STUDENT DIRECTORY / PROFILE</h3>
-                        <p>Comprehensive profile management.
+                        <h3>CLIENT DIRECTORY</h3>
+                        <p>Comprehensive professional relationship management.
                         <ul>
-                            <li><strong>Billing Records:</strong> View the full ledger of invoices and payments for each student.</li>
-                            <li><strong>Results History:</strong> Digital access to academic performance across all terms.</li>
-                            <li><strong>Parent Contacts:</strong> Integrated tools to call or WhatsApp parents directly.</li>
+                            <li><strong>Activity Ledger:</strong> View all invoices and payment history per client.</li>
+                            <li><strong>Communication:</strong> One-tap access to call or message your clients.</li>
+                            <li><strong>Payment Tracking:</strong> Monitor outstanding invoices and pending payments.</li>
+                        </ul>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <h2>4. Financial Performance</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box icon-revenue" style="background: #f44336;"></div>
+                    <div class="feature-details">
+                        <h3>SERVICE ANALYTICS</h3>
+                        <p>Visual reporting for your professional practice.
+                        <ul>
+                            <li><strong>Revenue by Service:</strong> See which service generates the most income.</li>
+                            <li><strong>Client Acquisition:</strong> Track how your client base is growing.</li>
+                            <li><strong>Collection Efficiency:</strong> Monitor how quickly invoices are being paid.</li>
                         </ul>
                         </p>
                     </div>
@@ -284,7 +282,7 @@
         </div>
 
         <footer>
-            <p>&copy; 2026 Invify | Innovative School Management Solutions</p>
+            <p>&copy; 2026 Invify | Empowering Professionals with Smart Tools</p>
             <p><em>Open this file in your browser and press <strong>Ctrl+P</strong> to Save as PDF for Printing.</em></p>
         </footer>
     </div>

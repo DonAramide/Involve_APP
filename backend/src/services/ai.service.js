@@ -31,8 +31,8 @@ class AIService {
             const isFromDb = apiKey && apiKey !== process.env.GEMINI_API_KEY;
             console.log(`[AI Init] Initializing Gemini with ${isFromDb ? 'DB Key' : 'Env Key'} (Length: ${apiKey.length})`);
             this.currentApiKey = apiKey;
-            this.genAI = new GoogleGenerativeAI(apiKey, { apiVersion: 'v1' });
-            this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            this.genAI = new GoogleGenerativeAI(apiKey);
+            this.model = this.genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
         }
     }
 
@@ -79,7 +79,8 @@ class AIService {
         // 1. Generate Metadata Hash for Cache Identification
         const cacheHash = this._generateHash({ className, subjectName, term, week, topic });
 
-        // 2. Check Cache (if not forced)
+        // 2. Check Cache (Disabled for validation)
+        /*
         if (!forceRefresh) {
             const cachedNote = await this._checkCache(cacheHash, schoolId);
             if (cachedNote) {
@@ -87,35 +88,33 @@ class AIService {
                 return cachedNote;
             }
         }
+        */
 
         // 3. AI Generation (Persona: NERDC Expert Teacher)
         console.log(`[AI Gen] Generating for: ${topic} (${className})`);
         
         const systemPrompt = `
-You are an expert Nigerian teacher trained in the NERDC curriculum.
-You generate structured, classroom-ready lesson notes used in Nigerian primary and secondary schools.
+You are an Elite Professor of Education and a Lead Curriculum Developer for the Nigerian National Universities Commission (NUC). 
+Your goal is to produce the absolute most COMPREHENSIVE and EXHAUSTIVE lesson note ever created. It must be so detailed that it could serve as a textbook chapter.
 
-STRICT RULES:
-- No missing sections.
-- No vague explanations.
-- Use clear, simple English suitable for ${className}.
-- Include practical examples relevant to Nigerian students.
-- Do not include explanations outside the lesson note.
-- Do not add commentary.
-
-RESPONSE FORMAT: 
-Return ONLY a valid JSON object matching this schema exactly:
+STRICT MASTERCLASS STANDARDS:
+1. EXTREME LENGTH: The "main_content" must be at least 1,500 words. You must provide a DEEP-DIVE into every sub-topic.
+2. ACADEMIC RIGOR: For SSS subjects, use advanced technical language, complex theories, and university-preparatory depth.
+3. MULTIPLE SUB-HEADINGS: The "main_content" must have at least 6 to 8 distinct sub-headings, each with multiple paragraphs of detailed explanation.
+4. NO SUMMARIES: If a section is brief, you have FAILED. Provide EVERY possible detail about the topic.
+5. PEDAGOGICAL DEPTH: Include the historical background of the topic, its industrial applications in Nigeria, and its theoretical foundations.
+RESPONSE JSON SCHEMA:
 {
   "topic": "string",
-  "learning_objectives": ["string"],
-  "introduction": "string",
+  "learning_objectives": ["string (at least 3-4 detailed objectives)"],
+  "introduction": "string (engaging hook for the students)",
   "main_content": [
-    { "heading": "string", "explanation": "string" }
+    { "heading": "string", "explanation": "string (detailed, multi-paragraph explanation)" }
   ],
-  "examples": ["string"],
-  "class_activity": ["string"],
-  "assessment": ["string"],
-  "summary": "string"
+  "examples": ["string (detailed examples with working steps if math/science)"],
+  "class_activity": ["string (interactive tasks for the classroom)"],
+  "assessment": ["string (at least 5-6 testing questions)"],
+  "summary": "string (comprehensive wrap-up of key points)"
 }
 `;
 
@@ -193,7 +192,7 @@ Topic: ${topic}`;
             .from('ai_generation_logs')
             .insert({
                 school_id: schoolId,
-                teacher_id: teacherId,
+                teacher_id: teacherId || 'admin_system',
                 feature: 'lesson_note',
                 timestamp: new Date().toISOString()
             });

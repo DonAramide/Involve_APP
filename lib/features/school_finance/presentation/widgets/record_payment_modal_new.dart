@@ -6,6 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/finance_new_bloc.dart';
 import '../bloc/finance_new_event.dart';
 import '../bloc/finance_new_state.dart';
+import '../../../../core/utils/terminology.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
 
 class RecordPaymentModal extends StatefulWidget {
   final String studentId;
@@ -57,6 +59,9 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
         }
       },
       builder: (context, state) {
+        final settings = context.watch<SettingsBloc>().state.settings;
+        final customerLabel = settings?.customerLabel ?? 'Student';
+        
         return Container(
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -69,14 +74,14 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
             top: 24,
           ),
           child: state.paymentSuccess 
-            ? _buildSuccessFeedback()
-            : _buildForm(state),
+            ? _buildSuccessFeedback(customerLabel)
+            : _buildForm(state, customerLabel),
         );
       },
     );
   }
 
-  Widget _buildForm(FinanceState state) {
+  Widget _buildForm(FinanceState state, String customerLabel) {
     return Form(
       key: _formKey,
       child: Column(
@@ -98,7 +103,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
             ],
           ),
           Text(
-            'Recording payment for ${widget.studentName}',
+            'Recording payment for ${widget.studentName} ($customerLabel)',
             style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
           ),
           const SizedBox(height: 32),
@@ -197,7 +202,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
     );
   }
 
-  Widget _buildSuccessFeedback() {
+  Widget _buildSuccessFeedback(String customerLabel) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -216,10 +221,10 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        const Text(
-          'The student ledger is being updated in real-time.',
+        Text(
+          'The $customerLabel ledger is being updated in real-time.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey),
+          style: const TextStyle(color: Colors.grey),
         ),
         const SizedBox(height: 48),
       ],

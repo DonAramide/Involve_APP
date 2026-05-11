@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invify - School Mode User Guide</title>
+    <title>Invify - Retail Mode User Guide</title>
     <style>
         :root {
-            --primary: #00838f;
-            --secondary: #3949ab;
-            --accent: #ff9800;
+            --primary: #2e7d32;
+            --secondary: #1a237e;
+            --accent: #f57c00;
             --text-main: #2c3e50;
             --text-light: #546e7a;
             --bg-light: #f4f7f6;
@@ -126,15 +126,15 @@
         }
 
         .tip-box {
-            background: #e0f2f1;
-            border-left: 5px solid #009688;
+            background: #e8f5e9;
+            border-left: 5px solid #43a047;
             padding: 20px;
             margin: 30px 0;
             border-radius: 0 12px 12px 0;
         }
 
         .tip-box strong {
-            color: #00796b;
+            color: #2e7d32;
             display: block;
             margin-bottom: 5px;
         }
@@ -160,26 +160,24 @@
 
             .feature-card {
                 break-inside: avoid;
-                padding: 10px;
+              padding: 10px;
             }
 
             header img.header-img {
                 height: 200px;
             }
-
-            .tip-box {
-                break-inside: avoid;
-            }
+          
+          .tip-box {
+            break-inside: avoid;
+          }
         }
 
         /* Icon Emoji fallbacks */
-        .icon-add_bill::before { content: '🧾'; }
-        .icon-students::before { content: '🎓'; }
-        .icon-history::before { content: '📊'; }
+        .icon-sales::before { content: '🛒'; }
+        .icon-stock::before { content: '📦'; }
+        .icon-customers::before { content: '👥'; }
         .icon-analytics::before { content: '📈'; }
-        .icon-setup::before { content: '🏛️'; }
-        .icon-admin::before { content: '🛡️'; }
-        .icon-reconcile::before { content: '⚖️'; }
+        .icon-setup::before { content: '⚙️'; }
     </style>
 </head>
 
@@ -187,72 +185,57 @@
 
     <div class="container">
         <header>
-            <img src="school_header_new.png" alt="School Mode Header" class="header-img">
+            <img src="retail_header.png" alt="Retail Mode Header" class="header-img">
             <div class="header-content">
-                <h1>Invify School Mode</h1>
-                <p>Comprehensive User Guide & Operational Manual</p>
+                <h1>Invify Retail Mode</h1>
+                <p>User Guide & Operational Manual</p>
             </div>
         </header>
 
         <div class="content">
-            <p class="section-intro">Welcome to the Involve App **School Mode**. This specialized environment is designed for educational institutions to manage fees, students, academic records, and collection analytics with hardened financial integrity.</p>
+            <p class="section-intro">Welcome to **Retail Mode**. This environment is optimized for physical stores and merchandise-based businesses. Manage inventory, track sales, and grow your customer base with precision.</p>
 
             <div class="tip-box" style="background: #fff3e0; border-color: #ff9800;">
-                <strong style="color: #e65100;">🏁 GETTING STARTED CHECKLIST</strong>
+                <strong style="color: #e65100;">🏁 RETAIL SETUP CHECKLIST</strong>
                 <ol>
-                    <li><strong>Academic Setup:</strong> Define Years and active Terms via the Admin Hub.</li>
-                    <li><strong>Classes & Subjects:</strong> Create grade levels and curriculum items.</li>
-                    <li><strong>Grading Rules:</strong> Set score ranges to enable digital result entry.</li>
-                    <li><strong>Fee Catalog:</strong> Add tuition and other fee items.</li>
-                    <li><strong>Enrolment:</strong> Add students to their respective classes.</li>
+                    <li><strong>Product Catalog:</strong> Add your products with selling and cost prices.</li>
+                    <li><strong>Inventory Inflow:</strong> Record your current stock levels.</li>
+                    <li><strong>Customer Directory:</strong> Build your database of frequent shoppers.</li>
+                    <li><strong>Sales Terminal:</strong> Start recording daily transactions.</li>
                 </ol>
             </div>
 
-            <h2>1. Administrative Hub</h2>
-            <p class="section-intro">Your central control center for system-wide configuration.</p>
+            <h2>1. Sales & Transactions</h2>
+            <p class="section-intro">Your point-of-sale hub for daily revenue.</p>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-admin"></div>
+                    <div class="icon-box icon-sales"></div>
                     <div class="feature-details">
-                        <h3>ADMIN HUB (Gated Access)</h3>
-                        <p>Centralized management for school administrators.
+                        <h3>NEW INVOICE / SALE</h3>
+                        <p>Generate receipts for customers.
                         <ul>
-                            <li><strong>System Setup:</strong> Configure Branding, Organization Details, and Preferences.</li>
-                            <li><strong>Quaser Keys:</strong> Manage secure payment integration keys (Master Mode only).</li>
-                            <li><strong>Audit Logs:</strong> Track all administrative actions for transparency.</li>
-                            <li><strong>Academic Structure:</strong> Manage Terms, Classes, and Grading Rules.</li>
+                            <li><strong>Product Search:</strong> Quickly find items by name or category.</li>
+                            <li><strong>Multi-Item Billing:</strong> Add multiple products to a single sale.</li>
+                            <li><strong>Flexible Payment:</strong> Choose Cash, POS, or Bank Transfer.</li>
+                            <li><strong>Instant Receipt:</strong> Print or share the digital invoice.</li>
                         </ul>
                         </p>
                     </div>
                 </div>
             </div>
 
-            <h2>2. Finance & Collection Hub</h2>
-            <p class="section-intro">Hardened financial tools for accurate revenue tracking.</p>
+            <h2>2. Inventory & Stock</h2>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-add_bill" style="background: #ff9800;"></div>
+                    <div class="icon-box icon-stock" style="background: #f57c00;"></div>
                     <div class="feature-details">
-                        <h3>EXECUTIVE FINANCE DASHBOARD</h3>
-                        <p>Real-time visibility into the school's financial health.
+                        <h3>STOCK MANAGEMENT</h3>
+                        <p>Maintain precise control over your merchandise.
                         <ul>
-                            <li><strong>Available Balance:</strong> View the current balance in your internal wallet.</li>
-                            <li><strong>Total Collected:</strong> Aggregated revenue across all payment methods.</li>
-                            <li><strong>Revenue Performance:</strong> Trend analysis of collections over time.</li>
-                        </ul>
-                        </p>
-                    </div>
-                </div>
-
-                <div class="feature-card">
-                    <div class="icon-box icon-reconcile" style="background: #43a047;"></div>
-                    <div class="feature-details">
-                        <h3>RECONCILIATION HUB</h3>
-                        <p>Resolve payment discrepancies and unmatched transactions.
-                        <ul>
-                            <li><strong>Manual Assignment:</strong> Assign unmatched automated payments to students.</li>
-                            <li><strong>Issue Tracking:</strong> Identify and resolve duplicate or failed payments.</li>
-                            <li><strong>Matched Records:</strong> Audit trail of verified successful transactions.</li>
+                            <li><strong>Inventory Tracking:</strong> Automatic deduction of stock upon sale.</li>
+                            <li><strong>Low Stock Alerts:</strong> Get notified when items need replenishment.</li>
+                            <li><strong>Stock History:</strong> Audit trail of additions and adjustments.</li>
+                            <li><strong>Categories:</strong> Organize products for better reporting.</li>
                         </ul>
                         </p>
                     </div>
@@ -260,21 +243,38 @@
             </div>
 
             <div class="tip-box">
-                <strong>💡 PRO TIP: Hardened Ledger</strong>
-                The system uses an idempotent ledger. This means every payment is verified and recorded exactly once, preventing accidental double-counting or lost transactions.
+                <strong>💡 PRO TIP: Cost vs. Profit</strong>
+                Always enter the 'Cost Price' for your products. The system will automatically calculate your real-time gross profit in the Analytics dashboard.
             </div>
 
-            <h2>3. Academic & Student Administration</h2>
+            <h2>3. Customer Relations</h2>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-students" style="background: #3f51b5;"></div>
+                    <div class="icon-box icon-customers" style="background: #1a237e;"></div>
                     <div class="feature-details">
-                        <h3>STUDENT DIRECTORY / PROFILE</h3>
-                        <p>Comprehensive profile management.
+                        <h3>CUSTOMER DIRECTORY</h3>
+                        <p>Keep track of your loyal buyers.
                         <ul>
-                            <li><strong>Billing Records:</strong> View the full ledger of invoices and payments for each student.</li>
-                            <li><strong>Results History:</strong> Digital access to academic performance across all terms.</li>
-                            <li><strong>Parent Contacts:</strong> Integrated tools to call or WhatsApp parents directly.</li>
+                            <li><strong>Purchase History:</strong> View what each customer has bought over time.</li>
+                            <li><strong>Contact Management:</strong> Easy access to phone numbers for marketing.</li>
+                            <li><strong>Outstanding Balances:</strong> Track customers who owe for credit sales.</li>
+                        </ul>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <h2>4. Business Insights</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box icon-analytics" style="background: #00bcd4;"></div>
+                    <div class="feature-details">
+                        <h3>RETAIL ANALYTICS</h3>
+                        <p>Data-driven decisions for your store.
+                        <ul>
+                            <li><strong>Top Selling Items:</strong> Identify your most popular products.</li>
+                            <li><strong>Revenue Trends:</strong> Track daily, weekly, and monthly growth.</li>
+                            <li><strong>Profitability Reports:</strong> See your actual margins after costs.</li>
                         </ul>
                         </p>
                     </div>
@@ -284,7 +284,7 @@
         </div>
 
         <footer>
-            <p>&copy; 2026 Invify | Innovative School Management Solutions</p>
+            <p>&copy; 2026 Invify | Modern Solutions for Modern Retailers</p>
             <p><em>Open this file in your browser and press <strong>Ctrl+P</strong> to Save as PDF for Printing.</em></p>
         </footer>
     </div>

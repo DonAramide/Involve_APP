@@ -79,14 +79,20 @@
 
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="q-gutter-x-sm">
-          <q-btn flat round dense icon="visibility" color="cyan-4" @click="viewDetails(props.row.id)" />
-          <q-btn flat round dense icon="edit" color="indigo-4" @click="openEditModal(props.row)" />
+          <q-btn flat round dense icon="visibility" color="cyan-4" @click="viewDetails(props.row.id)">
+            <q-tooltip>View Details</q-tooltip>
+          </q-btn>
+          <q-btn flat round dense icon="edit" color="indigo-4" @click="openEditModal(props.row)">
+            <q-tooltip>Edit Tenant</q-tooltip>
+          </q-btn>
           <q-btn 
             flat round dense 
             :icon="props.row.status === 'active' ? 'block' : 'check_circle'" 
             :color="props.row.status === 'active' ? 'orange' : 'green'" 
             @click="toggleStatus(props.row)"
-          />
+          >
+            <q-tooltip>{{ props.row.status === 'active' ? 'Suspend Tenant' : 'Activate Tenant' }}</q-tooltip>
+          </q-btn>
         </q-td>
       </template>
 

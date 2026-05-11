@@ -8,6 +8,9 @@ import '../bloc/reconciliation_state.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../../../core/services/service_locator.dart';
 import 'package:intl/intl.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
+import '../../../settings/presentation/bloc/settings_state.dart';
+import '../../../../core/utils/terminology.dart';
 
 class ReconciliationPage extends StatefulWidget {
   const ReconciliationPage({super.key});
@@ -54,16 +57,21 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
           const SizedBox(width: 8),
         ],
       ),
-      body: BlocBuilder<ReconciliationBloc, ReconciliationState>(
-        builder: (context, state) {
-          return Column(
-            children: [
-              _buildSummaryBar(state),
-              _buildTabHeader(),
-              Expanded(
-                child: _buildBody(state),
-              ),
-            ],
+      body: BlocBuilder<SettingsBloc, SettingsState>(
+        builder: (context, settingsState) {
+          final settings = settingsState.settings;
+          return BlocBuilder<ReconciliationBloc, ReconciliationState>(
+            builder: (context, state) {
+              return Column(
+                children: [
+                  _buildSummaryBar(state),
+                  _buildTabHeader(),
+                  Expanded(
+                    child: _buildBody(state, settings),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -197,18 +205,18 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
     );
   }
 
-  Widget _buildBody(ReconciliationState state) {
+  Widget _buildBody(ReconciliationState state, dynamic settings) {
     if (state is ReconciliationLoading) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF3461FF)));
     } else if (state is ReconciliationError) {
       return _buildErrorState(state.message);
     } else if (state is ReconciliationLoaded) {
-      return _buildPaymentList(state.payments);
+      return _buildPaymentList(state.payments, settings);
     }
     return const SizedBox.shrink();
   }
 
-  Widget _buildPaymentList(List<dynamic> data) {
+  Widget _buildPaymentList(List<dynamic> data, dynamic settings) {
     if (data.isEmpty) {
       return Center(
         child: Column(
@@ -227,7 +235,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
       itemCount: data.length,
       itemBuilder: (context, index) {
         final item = data[index];
-        return _buildPaymentCard(item);
+        return _buildPaymentCard(item, settings);
       },
     );
   }
@@ -250,11 +258,13 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
     );
   }
 
-  Widget _buildPaymentCard(Map<String, dynamic> item) {
+  Widget _buildPaymentCard(Map<String, dynamic> item, dynamic settings) {
     final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
     final date = DateTime.parse(item['createdAt']);
     final isIssue = item['issueType'] == 'duplicate_payment' || item['issueType'] == 'provider_mismatch';
     final isUnmatched = item['issueType'] != null && !isIssue;
+    
+    final assignLabel = settings != null ? (settings.assignToCustomerLabel) : 'Assign Entity';
 
     // Color Logic
     Color statusColor = const Color(0xFF34A853); // Default Green (Matched)
@@ -329,7 +339,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
                   if (isUnmatched)
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => _showResolutionDialog(item),
+                        onPressed: () => _showResolutionDialog(item, settings),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFFF9900), // Match Orange
                           foregroundColor: Colors.white,
@@ -337,7 +347,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        child: const Text('Assign Student', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        child: Text(assignLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   if (isIssue)
@@ -407,9 +417,11 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
     }
   }
 
-  void _showResolutionDialog(Map<String, dynamic> item) {
-    final TextEditingController _studentIdController = TextEditingController();
-    
+  void _showResolutionDialog(Map<String, dynamic> item, dynamic settings) {
+    final TextEditingController _entityIdController = TextEditingController();
+    final manualAssignmentLabel = settings?.assignToCustomerLabel ?? 'Manual Assignment';
+    final idHint = settings?.customerLabel ?? 'Entity ID';
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -430,12 +442,12 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
               const SizedBox(height: 8),
               Text('Reference: ${item['reference']}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
               const SizedBox(height: 24),
-              const Text('Manual Student Assignment', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              Text(manualAssignmentLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
               const SizedBox(height: 8),
               TextField(
-                controller: _studentIdController,
+                controller: _entityIdController,
                 decoration: InputDecoration(
-                  hintText: 'Enter Student ID / Admission Number',
+                  hintText: 'Enter $idHint ID',
                   filled: true,
                   fillColor: const Color(0xFFF1F3F5),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -462,7 +474,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
                          try {
                             await context.read<FinanceRepository>().assignToStudent(
                               reference: item['reference'], 
-                              studentId: _studentIdController.text, 
+                              studentId: _entityIdController.text, 
                             );
                             if (mounted) {
                               Navigator.pop(context);
