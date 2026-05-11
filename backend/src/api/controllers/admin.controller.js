@@ -28,24 +28,36 @@ class AdminController {
             const { data: tenant, error: tError } = await supabase.from('tenants').select('*').eq('id', id).single();
             if (tError) throw tError;
 
-            // 2. Get Devices count
-            const { count: deviceCount, error: dError } = await supabase.from('devices').select('*', { count: 'exact', head: true }).eq('tenant_id', id);
+            // 2. Get Devices count (for internal stats)
+            const { count: deviceCount } = await supabase.from('devices').select('*', { count: 'exact', head: true }).eq('tenant_id', id);
             
-            // 3. Get recent Activations
-            const { data: activations, error: aError } = await supabase.from('device_activations').select('*').eq('tenant_id', id).limit(5).order('created_at', { ascending: false });
+            // 3. Get recent Activations (used as recentUsage/recentActivations)
+            const { data: activations } = await supabase.from('device_activations').select('*').eq('tenant_id', id).limit(5).order('created_at', { ascending: false });
 
-            // 4. Get Ledger balance
-            const { data: ledger, error: lError } = await supabase.from('ledger_entries').select('amount').eq('tenant_id', id);
+            // 4. Get Ledger balance for the wallet
+            const { data: ledger } = await supabase.from('ledger_entries').select('amount').eq('tenant_id', id);
             const balance = ledger ? ledger.reduce((acc, curr) => acc + curr.amount, 0) : 0;
 
+            // Map backend stats to the structure the frontend expects
             res.json({
-                ...tenant,
-                stats: {
-                    deviceCount: deviceCount || 0,
-                    activationCount: activations ? activations.length : 0,
-                    balance: balance
+                tenant: {
+                    ...tenant,
+                    stats: {
+                        deviceCount: deviceCount || 0,
+                        activationCount: activations ? activations.length : 0
+                    }
                 },
-                recentActivations: activations || []
+                users: [], // Coming in Phase 4
+                wallet: {
+                    balance: balance,
+                    updated_at: new Date().toISOString()
+                },
+                recentUsage: activations ? activations.map(a => ({
+                    id: a.id,
+                    request_type: `Activation: ${a.activation_code}`,
+                    created_at: a.used_at || a.created_at,
+                    tokens_used: 0
+                })) : []
             });
         } catch (err) {
             res.status(500).json({ message: err.message });

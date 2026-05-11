@@ -62,6 +62,15 @@
                   <q-item-section side class="text-white">{{ new Date(tenant.created_at).toLocaleString() }}</q-item-section>
                 </q-item>
                 <q-item>
+                  <q-item-section class="text-grey-5">Plan Expiry</q-item-section>
+                  <q-item-section side>
+                    <q-chip :color="!tenant.plan_expires_at ? 'grey-9' : (new Date(tenant.plan_expires_at) < new Date() ? 'red-10' : 'indigo-9')" 
+                            text-color="white" dense size="sm">
+                      {{ tenant.plan_expires_at ? new Date(tenant.plan_expires_at).toLocaleDateString() : 'PERMANENT' }}
+                    </q-chip>
+                  </q-item-section>
+                </q-item>
+                <q-item>
                   <q-item-section class="text-grey-5">API Key Status</q-item-section>
                   <q-item-section side>
                     <q-chip :icon="tenant.quaser_api_key ? 'verified' : 'warning'" 

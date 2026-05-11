@@ -6,6 +6,9 @@ const setup = async () => {
   console.log('--- Starting Database Setup ---');
   
   const sql = `
+    -- Ensure Tenants has plan_expires_at
+    ALTER TABLE IF EXISTS public.tenants ADD COLUMN IF NOT EXISTS plan_expires_at timestamptz;
+
     -- Create Devices Table
     CREATE TABLE IF NOT EXISTS public.devices (
       id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -64,6 +64,19 @@
       class="bg-blue-grey-10 shadow-2"
       :pagination="pagination"
     >
+      <template v-slot:body-cell-plan_expires_at="props">
+        <q-td :props="props">
+          <q-chip 
+            :color="!props.value ? 'grey-9' : (new Date(props.value) < new Date() ? 'red-10' : 'indigo-9')" 
+            text-color="white" 
+            size="sm"
+            dense
+          >
+            {{ props.value ? new Date(props.value).toLocaleDateString() : 'PERMANENT' }}
+          </q-chip>
+        </q-td>
+      </template>
+
       <template v-slot:body-cell-status="props">
         <q-td :props="props">
           <q-chip 
@@ -129,6 +142,7 @@ const columns = [
   { name: 'name', label: 'NAME', field: 'name', align: 'left', sortable: true },
   { name: 'type', label: 'TYPE', field: 'type', align: 'left', sortable: true },
   { name: 'plan', label: 'PLAN', field: 'plan', align: 'left', sortable: true },
+  { name: 'plan_expires_at', label: 'EXPIRY DATE', field: 'plan_expires_at', align: 'center', format: val => val ? new Date(val).toLocaleDateString() : 'PERMANENT', sortable: true },
   { name: 'status', label: 'STATUS', field: 'status', align: 'center', sortable: true },
   { name: 'created_at', label: 'CREATED AT', field: 'created_at', align: 'left', format: val => new Date(val).toLocaleDateString(), sortable: true },
   { name: 'actions', label: 'ACTIONS', align: 'center' }
