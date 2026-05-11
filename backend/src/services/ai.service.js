@@ -79,8 +79,7 @@ class AIService {
         // 1. Generate Metadata Hash for Cache Identification
         const cacheHash = this._generateHash({ className, subjectName, term, week, topic });
 
-        // 2. Check Cache (Disabled for validation)
-        /*
+        // 2. Check Cache
         if (!forceRefresh) {
             const cachedNote = await this._checkCache(cacheHash, schoolId);
             if (cachedNote) {
@@ -88,7 +87,6 @@ class AIService {
                 return cachedNote;
             }
         }
-        */
 
         // 3. AI Generation (Persona: NERDC Expert Teacher)
         console.log(`[AI Gen] Generating for: ${topic} (${className})`);
