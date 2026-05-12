@@ -51,17 +51,18 @@
           color="grey-4" 
           icon="view_compact" 
           :label="densityMode.toUpperCase()" 
+          content-style="background-color: #101826; border: 1px solid #1F2D42;"
           class="text-caption"
         >
-          <q-list dark class="bg-[#161b20] text-caption">
-            <q-item clickable v-close-popup @click="setDensity('ultra-dense')">
-              <q-item-section><q-item-label class="text-metric-sm">ULTRA-DENSE (22px)</q-item-label></q-item-section>
+          <q-list dark class="bg-[#101826] text-caption">
+            <q-item clickable v-close-popup @click="setDensity('ultra-dense')" class="hover-bg">
+              <q-item-section><q-item-label class="text-metric-sm text-white">ULTRA-DENSE (22px)</q-item-label></q-item-section>
             </q-item>
-            <q-item clickable v-close-popup @click="setDensity('compact')">
-              <q-item-section><q-item-label class="text-metric-sm">COMPACT (26px)</q-item-label></q-item-section>
+            <q-item clickable v-close-popup @click="setDensity('compact')" class="hover-bg">
+              <q-item-section><q-item-label class="text-metric-sm text-white">COMPACT (26px)</q-item-label></q-item-section>
             </q-item>
-            <q-item clickable v-close-popup @click="setDensity('standard')">
-              <q-item-section><q-item-label class="text-metric-sm">STANDARD (28px)</q-item-label></q-item-section>
+            <q-item clickable v-close-popup @click="setDensity('standard')" class="hover-bg">
+              <q-item-section><q-item-label class="text-metric-sm text-white">STANDARD (28px)</q-item-label></q-item-section>
             </q-item>
           </q-list>
         </q-btn-dropdown>
@@ -74,16 +75,17 @@
           color="indigo-3" 
           icon="bookmarks" 
           label="VIEW PRESET" 
+          content-style="background-color: #101826; border: 1px solid #1F2D42;"
           class="text-caption"
         >
-          <q-list dark class="bg-[#161b20] text-caption">
-            <q-item clickable v-close-popup @click="applyPreset('default')">
-              <q-item-section>Default Topology</q-item-section>
+          <q-list dark class="bg-[#101826] text-caption">
+            <q-item clickable v-close-popup @click="applyPreset('default')" class="hover-bg">
+              <q-item-section class="text-white">Default Topology</q-item-section>
             </q-item>
-            <q-item clickable v-close-popup @click="applyPreset('critical')">
+            <q-item clickable v-close-popup @click="applyPreset('critical')" class="hover-bg">
               <q-item-section class="text-red-4">Critical Exceptions</q-item-section>
             </q-item>
-            <q-item clickable v-close-popup @click="applyPreset('recent')">
+            <q-item clickable v-close-popup @click="applyPreset('recent')" class="hover-bg">
               <q-item-section class="text-cyan-4">Latest Ingestion</q-item-section>
             </q-item>
           </q-list>
