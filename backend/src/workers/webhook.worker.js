@@ -26,7 +26,7 @@ const worker = new Worker('webhook-queue', async job => {
             type: 'credit',
             amount,
             status,
-            source: 'quaser',
+            source: 'quasar',
             metadata: { ...payload, job_id: job.id }
         });
 

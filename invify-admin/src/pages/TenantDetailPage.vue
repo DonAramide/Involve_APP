@@ -73,10 +73,10 @@
                 <q-item>
                   <q-item-section class="text-grey-5">API Key Status</q-item-section>
                   <q-item-section side>
-                    <q-chip :icon="tenant.quaser_api_key ? 'verified' : 'warning'" 
-                            :color="tenant.quaser_api_key ? 'green-9' : 'orange-9'" 
+                    <q-chip :icon="tenant.quasar_api_key ? 'verified' : 'warning'" 
+                            :color="tenant.quasar_api_key ? 'green-9' : 'orange-9'" 
                             dense size="xs" text-color="white">
-                      {{ tenant.quaser_api_key ? 'CONFIGURED' : 'NOT SET' }}
+                      {{ tenant.quasar_api_key ? 'CONFIGURED' : 'NOT SET' }}
                     </q-chip>
                   </q-item-section>
                 </q-item>

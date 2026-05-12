@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@iips/quasar-sdk": "^1.1.0",
     "@supabase/supabase-js": "^2.103.3",
     "axios": "^1.6.2",
     "bcrypt": "^6.0.0",

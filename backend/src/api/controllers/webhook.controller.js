@@ -10,8 +10,8 @@ const webhookQueue = new Queue('webhook-queue', { connection });
  * ⚡ Lightning-Fast Webhook Ingest
  * Pattern: RESPOND IMMEDIATELY after queueing.
  */
-async function quaserWebhook(req, res) {
-    const signature = req.headers['x-quaser-signature'];
+async function quasarWebhook(req, res) {
+    const signature = req.headers['x-quasar-signature'];
     const { reference } = req.body;
     
     if (!reference) return res.status(400).json({ error: 'Missing reference' });
@@ -48,9 +48,9 @@ async function quaserWebhook(req, res) {
 
         // 3. Queue for Idempotent processing
         // DO NOT AWAIT full worker processing - Return 202 immediately.
-        webhookQueue.add('process-quaser-payment', {
+        webhookQueue.add('process-quasar-payment', {
             tenant_id,
-            provider: 'quaser',
+            provider: 'quasar',
             payload: req.body,
             reference
         });
@@ -68,4 +68,4 @@ async function monnifyWebhook(req, res) {
     return res.status(200).send('Event received');
 }
 
-module.exports = { quaserWebhook, monnifyWebhook };
+module.exports = { quasarWebhook, monnifyWebhook };

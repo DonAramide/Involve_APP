@@ -1,6 +1,6 @@
 // backend/src/api/controllers/admin.controller.js
 const AuthService = require('../../services/auth.service');
-const QuaserService = require('../../services/quaser.service');
+const QuasarService = require('../../services/quasar.service');
 const { supabase } = require('../../config/supabase');
 
 class AdminController {
@@ -41,21 +41,32 @@ class AdminController {
             const { data: ledger } = await supabase.from('ledger_entries').select('*').eq('tenant_id', id).limit(20).order('created_at', { ascending: false });
             const balance = ledger ? ledger.reduce((acc, curr) => acc + curr.amount, 0) : 0;
 
-            // 6. Quaser SDK Deep-Dive (Optional/Try-Catch)
-            let quaserData = { subAccount: null, virtualAccounts: [], transactions: [] };
+            // 6. Quasar SDK Deep-Dive (Official @iips/quasar-sdk Integration)
+            let quaserData = { subAccount: null, virtualAccounts: [], transactions: [], wallets: [] };
             try {
-                // Get Quaser ID mapping
-                const { data: mapping } = await supabase.from('tenants').select('quaser_tenant_id').eq('id', id).single();
-                if (mapping?.quaser_tenant_id) {
-                    const [subAcc, vAccs, txns] = await Promise.all([
-                        QuaserService.getSubAccountDetails(mapping.quaser_tenant_id).catch(() => null),
-                        QuaserService.getVirtualAccounts(mapping.quaser_tenant_id).catch(() => []),
-                        QuaserService.getTransactions(mapping.quaser_tenant_id).catch(() => [])
-                    ]);
-                    quaserData = { subAccount: subAcc, virtualAccounts: vAccs, transactions: txns };
+                const qId = await QuasarService.getQuasarId(id).catch(() => null);
+                if (qId) {
+                    const wallets = await QuasarService.listWallets(qId).catch(() => []);
+                    
+                    // Identify Treasury/Parent Wallets (school_wallet, clearing_wallet)
+                    const schoolWallet = wallets.find(w => w.walletType === 'school_wallet');
+                    const clearingWallet = wallets.find(w => w.walletType === 'clearing_wallet');
+                    
+                    // If we have a school wallet, get its transactions for the ledger
+                    let sdkTxns = [];
+                    if (schoolWallet) {
+                        sdkTxns = await QuasarService.getTransactions(qId, schoolWallet.id).catch(() => []);
+                    }
+
+                    quaserData = { 
+                        subAccount: schoolWallet || clearingWallet, // Using school wallet as primary parent
+                        virtualAccounts: [], // SDK doesn't have list-all-VA yet, so we'll show empty or pull per-user later
+                        transactions: sdkTxns,
+                        wallets: wallets
+                    };
                 }
             } catch (qErr) {
-                console.error('Quaser Sync Error:', qErr.message);
+                console.error('Quasar Sync Error:', qErr.message);
             }
 
             // Map backend stats to the structure the frontend expects
@@ -71,9 +82,10 @@ class AdminController {
                 wallet: {
                     balance: balance,
                     updated_at: new Date().toISOString(),
-                    subAccount: quaserData.subAccount,
+                    subAccount: quaserData.subAccount, // This is now the official Parent Account
                     virtualAccounts: quaserData.virtualAccounts,
-                    transactions: quaserData.transactions.length > 0 ? quaserData.transactions : (ledger || [])
+                    transactions: quaserData.transactions.length > 0 ? quaserData.transactions : (ledger || []),
+                    allWallets: quaserData.wallets // Providing full inventory for the UI
                 },
                 recentUsage: activations ? activations.map(a => ({
                     id: a.id,

@@ -1,5 +1,5 @@
 // backend/src/services/reconciliation.service.js
-const QuaserService = require('./quaser.service');
+const QuasarService = require('./quasar.service');
 const LedgerService = require('./ledger.service');
 const { supabase } = require('../config/supabase');
 
@@ -14,14 +14,13 @@ class ReconciliationService {
         console.log(`[Recon] Starting ${tier} sweep for ${tenant_id} (Window: ${windowSize}h)`);
 
         try {
-            const quaserId = await QuaserService.getQuaserId(tenant_id);
-            // In a real Quaser API, we'd pass a time window/limit. 
+            const quasarId = await QuasarService.getQuasarId(tenant_id);
+            // In a real Quasar API, we'd pass a time window/limit. 
             // Here we fetch a limit corresponding to the tier.
             const limit = tier === 'recent' ? 20 : tier === 'daily' ? 100 : 500;
-            const quaserData = await QuaserService.getTransactions(quaserId, limit);
-            const quaserTransactions = quaserData.transactions || [];
+            const quasarTransactions = await QuasarService.getTransactions(quasarId, null, { limit }).catch(() => []);
 
-            for (const qTx of quaserTransactions) {
+            for (const qTx of quasarTransactions) {
                 // Filter by time window if possible
                 const txDate = new Date(qTx.created_at);
                 const now = new Date();
@@ -45,7 +44,7 @@ class ReconciliationService {
 
     static async #processEntry(tenant_id, qTx) {
         const reference = qTx.reference;
-        const provider = 'quaser';
+        const provider = 'quasar';
         const qStatus = this.#mapStatus(qTx.status);
 
         // Idempotent repair attempt
@@ -60,7 +59,7 @@ class ReconciliationService {
             type: qTx.type === 'inbound' ? 'credit' : 'debit',
             amount: qTx.amount,
             status: qStatus,
-            source: 'quaser',
+            source: 'quasar',
             metadata: { reconciliation_tier_repair: true }
         });
 

@@ -9,7 +9,7 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID']
 }));
-const { monnifyWebhook, quaserWebhook } = require('./api/controllers/webhook.controller');
+const { monnifyWebhook, quasarWebhook } = require('./api/controllers/webhook.controller');
 const { 
     createStudent, 
     getDashboardAnalytics, 
@@ -47,7 +47,7 @@ const InsightsController = require('./api/controllers/insights.controller');
 
 // 1. Webhooks (Public with signature verification)
 app.post('/api/webhooks/monnify', monnifyWebhook);
-app.post('/api/webhooks/quaser', quaserWebhook);
+app.post('/api/webhooks/quasar', quasarWebhook);
 
 // 2. Admin Module (Protected)
 app.post('/api/admin/master-mode/enter', authenticate, AdminController.enterMasterMode);
