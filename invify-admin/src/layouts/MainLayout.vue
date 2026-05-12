@@ -30,19 +30,19 @@
           </div>
 
           <!-- Active Multi-Tenant Boundary Identifier Tag -->
-          <q-btn-dropdown dense flat size="sm" color="amber-4" class="text-metric-sm border-amber-left q-ml-xs v-hide-xs">
+          <q-btn-dropdown dense flat size="sm" color="amber-4" content-style="background-color: #101826; border: 1px solid #1F2D42;" class="text-metric-sm border-amber-left q-ml-xs v-hide-xs">
             <template v-slot:label>
               <span class="text-weight-bold">{{ prefs.activeTenantScope.toUpperCase() }}</span>
             </template>
-            <q-list dark class="bg-[#161b20] text-caption">
+            <q-list dark class="bg-[#101826] text-caption">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Tenant Scope Context</q-item-label>
-              <q-item clickable v-close-popup @click="setTenantScope('global')">
-                <q-item-section>Global Master Array</q-item-section>
+              <q-item clickable v-close-popup @click="setTenantScope('global')" class="hover-bg">
+                <q-item-section class="text-white">Global Master Array</q-item-section>
               </q-item>
-              <q-item clickable v-close-popup @click="setTenantScope('tenant-alpha')">
+              <q-item clickable v-close-popup @click="setTenantScope('tenant-alpha')" class="hover-bg">
                 <q-item-section class="text-cyan-3">Tenant Alpha Scope</q-item-section>
               </q-item>
-              <q-item clickable v-close-popup @click="setTenantScope('tenant-omega')">
+              <q-item clickable v-close-popup @click="setTenantScope('tenant-omega')" class="hover-bg">
                 <q-item-section class="text-purple-3">Tenant Omega Scope</q-item-section>
               </q-item>
             </q-list>
@@ -93,7 +93,7 @@
           </div>
 
           <!-- Active Persistent Operator State Hook -->
-          <q-btn-dropdown dense flat size="sm" color="grey-4" class="q-px-xs">
+          <q-btn-dropdown dense flat size="sm" color="grey-4" content-style="background-color: #101826; border: 1px solid #1F2D42;" class="q-px-xs">
             <template v-slot:label>
               <div class="row items-center op-gap-4 no-wrap text-left">
                 <q-icon :name="isSyncingBackend ? 'cloud_sync' : 'shield'" :color="isSyncingBackend ? 'amber-3' : 'indigo-4'" size="xs" />
@@ -105,15 +105,15 @@
                 </div>
               </div>
             </template>
-            <q-list dark class="bg-[#161b20] text-caption">
+            <q-list dark class="bg-[#101826] text-caption">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Backend Continuity Sync</q-item-label>
-              <q-item clickable v-close-popup @click="fetchPreferencesFromBackend">
+              <q-item clickable v-close-popup @click="fetchPreferencesFromBackend" class="hover-bg">
                 <q-item-section avatar><q-icon name="cloud_download" size="xs" color="cyan-3" /></q-item-section>
-                <q-item-section>Pull Cloud Profile Context</q-item-section>
+                <q-item-section class="text-white">Pull Cloud Profile Context</q-item-section>
               </q-item>
-              <q-item clickable v-close-popup @click="clearHistory">
+              <q-item clickable v-close-popup @click="clearHistory" class="hover-bg">
                 <q-item-section avatar><q-icon name="history" size="xs" color="amber-4" /></q-item-section>
-                <q-item-section>Clear Local Session Trace</q-item-section>
+                <q-item-section class="text-white">Clear Local Session Trace</q-item-section>
               </q-item>
             </q-list>
           </q-btn-dropdown>
