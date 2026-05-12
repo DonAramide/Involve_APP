@@ -285,12 +285,16 @@
 <script setup>
 import { ref, computed, watch, provide, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useQuasar } from 'quasar'
 import { useTelemetryStream } from '../composables/useTelemetryStream'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
 import EnterpriseCommandPalette from '../components/navigation/EnterpriseCommandPalette.vue'
+import { connectionManagerSingleton } from '../services/realtime/RealtimeConnectionManager'
+import { operationalEventBusSingleton } from '../services/realtime/OperationalEventBus'
 
 const router = useRouter()
 const route = useRoute()
+const $q = useQuasar()
 
 // Pull enhanced asynchronous persistent storage handlers
 const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, togglePinView, isViewPinned, pushHistory, clearHistory, fetchPreferencesFromBackend } = useOperatorPreferences()
@@ -451,6 +455,17 @@ const activeNavigationTree = computed(() => {
 
 onMounted(() => {
   startCounterThrottler()
+  
+  // Register global UI notification matrices to enable priority desktop toast rendering
+  if ($q) {
+    operationalEventBusSingleton.registerQuasarContext($q)
+  }
+
+  // Boot centralized middleware stream layers targeting upstream core brokers
+  connectionManagerSingleton.connect({
+    tenantId: prefs.value.activeTenantScope,
+    transport: 'websocket'
+  })
 })
 
 onBeforeUnmount(() => {
