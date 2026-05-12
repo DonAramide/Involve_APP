@@ -96,9 +96,9 @@
               flat 
               dense 
               color="cyan-3" 
-              icon="stream" 
-              label="Trace AI Telemetry Streams" 
-              to="/observability/streams" 
+              icon="note_alt" 
+              label="Launch AI Lesson Planner Hub" 
+              to="/notes" 
               class="fit text-weight-bold q-py-xs bg-[#121b2d] hover-scale" 
             />
           </q-card-section>

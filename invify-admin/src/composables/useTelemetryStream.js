@@ -47,16 +47,40 @@ export function useTelemetryStream(topic = 'quasar.global.telemetry') {
       // Fluctuate real-time latency realistically
       latencyMs.value = Math.floor(Math.random() * 8) + 9
 
-      const newEvent = {
-        id: `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        topic: topic,
-        timestamp: new Date().toISOString(),
-        severity: Math.random() > 0.85 ? 'warning' : (Math.random() > 0.95 ? 'critical' : 'healthy'),
-        payload: {
+      // Contextual payloads including highly requested AI Lesson Note curriculum structures
+      const payloads = [
+        {
+          event_class: "AI_LESSON_NOTE_GENERATED",
+          curriculum_standard: "NERDC / Core Academic",
+          subject: "Advanced Physics",
+          topic: "Thermodynamics & Energy States",
+          caching: { hit_ratio: 0.84, tokens_saved: 1420, source: "Edge Core Buffer" },
+          content_structure: ["Objectives", "Introduction", "Core Matrix", "Evaluation Quiz"],
+          verified_ai_signature: "sha256-invify-secure-ai-9884"
+        },
+        {
+          event_class: "CURRICULUM_SYNC_SUCCESS",
+          subject: "Literature in English",
+          topic: "Elizabethan Sonnets",
+          term: 2,
+          week: 4,
+          caching: { hit_ratio: 0.91, tokens_saved: 3850 },
+          compliance_status: "PASSED"
+        },
+        {
           throughput_metric: Math.floor(Math.random() * 100),
           active_nodes: Math.floor(Math.random() * 5) + 2,
-          drift_detected: Math.random() > 0.92
+          drift_detected: false
         }
+      ]
+      const chosenPayload = payloads[messagesIngested.value % payloads.length]
+
+      const newEvent = {
+        id: `evt-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        topic: topic.includes('stream') ? 'quasar.ai_engine.lesson_notes' : topic,
+        timestamp: new Date().toISOString(),
+        severity: Math.random() > 0.85 ? 'warning' : 'healthy',
+        payload: chosenPayload
       }
 
       lastEventPayload.value = newEvent
