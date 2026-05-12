@@ -3,6 +3,7 @@ import { Quasar, Notify, Dialog, Loading } from 'quasar'
 
 import '@quasar/extras/material-icons/material-icons.css'
 import 'quasar/src/css/index.sass'
+import './css/enterprise.css'
 
 import App from './App.vue'
 import router from './router'
@@ -15,15 +16,15 @@ app.use(Quasar, {
   plugins: { Notify, Dialog, Loading },
   config: {
     brand: {
-      primary: '#1976D2',
-      secondary: '#26A69A',
-      accent: '#9C27B0',
-      dark: '#1d1d1d',
-      darkPage: '#121212',
-      positive: '#21BA45',
-      negative: '#C10015',
-      info: '#31CCEC',
-      warning: '#F2C037'
+      primary: '#1864ab',
+      secondary: '#22b8cf',
+      accent: '#7048e8',
+      dark: '#12161a',
+      darkPage: '#0b0f12',
+      positive: '#2b8a3e',
+      negative: '#c92a2a',
+      info: '#339af0',
+      warning: '#fcc419'
     }
   }
 })

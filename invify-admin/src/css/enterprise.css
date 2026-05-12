@@ -1,0 +1,223 @@
+/* invify-admin/src/css/enterprise.css */
+/* Reusable Enterprise Operations Console Design System */
+/* Emulating Datadog, Azure Portal, CrowdStrike, and Grafana restrained operational UX */
+
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* 1. Global Severity Color Tokens */
+  --severity-critical-bg: rgba(201, 42, 42, 0.15);
+  --severity-critical-border: #c92a2a;
+  --severity-critical-text: #ff6b6b;
+
+  --severity-high-bg: rgba(232, 89, 12, 0.15);
+  --severity-high-border: #e8590c;
+  --severity-high-text: #ff922b;
+
+  --severity-warning-bg: rgba(252, 196, 25, 0.15);
+  --severity-warning-border: #fcc419;
+  --severity-warning-text: #ffe066;
+
+  --severity-info-bg: rgba(51, 154, 240, 0.15);
+  --severity-info-border: #339af0;
+  --severity-info-text: #74c0fc;
+
+  --severity-healthy-bg: rgba(43, 138, 62, 0.15);
+  --severity-healthy-border: #2b8a3e;
+  --severity-healthy-text: #51cf66;
+
+  /* 2. Core Operational Theme Surfaces */
+  --enterprise-page-bg: #0b0f12;
+  --enterprise-panel-bg: #12161a;
+  --enterprise-subpanel-bg: #161b20;
+  --enterprise-border: #22282d;
+  --enterprise-border-focus: #333c44;
+  --enterprise-text-main: #e1e7ec;
+  --enterprise-text-muted: #8c9ba5;
+
+  /* 3. Operational Spacing Scale */
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+}
+
+/* Global Shell Normalization */
+body {
+  background-color: var(--enterprise-page-bg) !important;
+  color: var(--enterprise-text-main) !important;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0;
+}
+
+/* 1. Typography Scale */
+.text-metric-mono {
+  font-family: 'Roboto Mono', monospace !important;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.text-metric-sm {
+  font-family: 'Roboto Mono', monospace !important;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.text-operator-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--enterprise-text-muted);
+}
+
+/* 2. Operational Spacing Utility Helpers */
+.op-gap-4 { gap: var(--space-4); }
+.op-gap-8 { gap: var(--space-8); }
+.op-gap-12 { gap: var(--space-12); }
+
+.op-pa-4 { padding: var(--space-4); }
+.op-pa-8 { padding: var(--space-8); }
+.op-pa-12 { padding: var(--space-12); }
+
+/* 3. Severity UI Mappings */
+.severity-critical {
+  background-color: var(--severity-critical-bg) !important;
+  border-left: 3px solid var(--severity-critical-border) !important;
+  color: var(--severity-critical-text) !important;
+}
+
+.severity-high {
+  background-color: var(--severity-high-bg) !important;
+  border-left: 3px solid var(--severity-high-border) !important;
+  color: var(--severity-high-text) !important;
+}
+
+.severity-warning {
+  background-color: var(--severity-warning-bg) !important;
+  border-left: 3px solid var(--severity-warning-border) !important;
+  color: var(--severity-warning-text) !important;
+}
+
+.severity-info {
+  background-color: var(--severity-info-bg) !important;
+  border-left: 3px solid var(--severity-info-border) !important;
+  color: var(--severity-info-text) !important;
+}
+
+.severity-healthy {
+  background-color: var(--severity-healthy-bg) !important;
+  border-left: 3px solid var(--severity-healthy-border) !important;
+  color: var(--severity-healthy-text) !important;
+}
+
+/* 4. Panel/Card Architecture */
+.enterprise-panel {
+  background-color: var(--enterprise-panel-bg) !important;
+  border: 1px solid var(--enterprise-border) !important;
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease;
+}
+
+.enterprise-panel:hover {
+  border-color: var(--enterprise-border-focus) !important;
+}
+
+.enterprise-subpanel {
+  background-color: var(--enterprise-subpanel-bg) !important;
+  border: 1px solid var(--enterprise-border) !important;
+  border-radius: 2px !important;
+}
+
+/* 5. Live Streaming Indicators */
+.live-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.live-indicator-dot.pulse-critical {
+  background-color: var(--severity-critical-border);
+  animation: streamPulseCritical 1.5s infinite;
+}
+
+.live-indicator-dot.pulse-healthy {
+  background-color: var(--severity-healthy-border);
+  animation: streamPulseHealthy 2s infinite;
+}
+
+.live-indicator-dot.pulse-warning {
+  background-color: var(--severity-warning-border);
+  animation: streamPulseWarning 1.5s infinite;
+}
+
+@keyframes streamPulseHealthy {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(43, 138, 62, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(43, 138, 62, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(43, 138, 62, 0); }
+}
+
+@keyframes streamPulseCritical {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(201, 42, 42, 0.8); }
+  50% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(201, 42, 42, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(201, 42, 42, 0); }
+}
+
+@keyframes streamPulseWarning {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(252, 196, 25, 0.7); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 5px rgba(252, 196, 25, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(252, 196, 25, 0); }
+}
+
+/* 6. Data Grid Core Layout Overrides */
+.enterprise-data-grid .q-table th {
+  background-color: var(--enterprise-subpanel-bg) !important;
+  color: var(--enterprise-text-muted) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--enterprise-border) !important;
+  padding: 4px 8px !important;
+  height: 28px !important;
+}
+
+.enterprise-data-grid .q-table td {
+  border-bottom: 1px solid var(--enterprise-border) !important;
+  color: var(--enterprise-text-main);
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+  height: 28px !important;
+}
+
+.enterprise-data-grid--ultra-dense .q-table td {
+  padding: 2px 6px !important;
+  height: 22px !important;
+  font-size: 11px !important;
+}
+
+.enterprise-data-grid--compact .q-table td {
+  padding: 3px 8px !important;
+  height: 26px !important;
+}
+
+/* Custom Webkit Scroller for telemetry panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--enterprise-page-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--enterprise-border-focus);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--enterprise-text-muted);
+}

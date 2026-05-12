@@ -1,249 +1,318 @@
 <!-- invify-admin/src/pages/DashboardPage.vue -->
 <template>
-  <q-page class="q-pa-lg bg-dark text-white">
-    <!-- Header with Quick Actions -->
-    <div class="row items-center q-mb-xl">
-      <div class="col">
-        <h1 class="text-h4 text-weight-bolder q-ma-none text-white letter-spacing-1">School Insights</h1>
-        <div class="text-grey-6">Track teacher adoption and curriculum mastery across your institution.</div>
+  <q-page class="q-pa-md bg-[#0b0f12] text-[#e1e7ec]">
+    
+    <!-- Top Operator Context Overview & Domain Filters Splitter -->
+    <div class="row items-center justify-between q-mb-md no-wrap border-bottom q-pb-sm">
+      <div class="row items-center op-gap-12 no-wrap">
+        <div>
+          <div class="text-operator-title text-grey-5">Operational Context</div>
+          <div class="text-h6 text-white text-weight-bold" style="line-height: 1.2;">
+            {{ activeWorkspaceLabel }} Monitoring Engine
+          </div>
+        </div>
+        <q-chip dense color="blue-grey-10" text-color="cyan-3" class="text-metric-sm q-ma-none v-hide-xs">
+          Stream Topic: <span class="text-white q-ml-xs">quasar.{{ activeWorkspace }}.telemetry.*</span>
+        </q-chip>
       </div>
-      <div class="col-auto q-gutter-sm">
-        <q-btn color="indigo-7" icon="person_add" label="Invite Teacher" to="/users" glossy />
-        <q-btn color="cyan-7" icon="psychology" label="Generate Note" to="/notes" outline />
+
+      <div class="row items-center op-gap-8 no-wrap">
+        <q-btn 
+          outline 
+          size="xs" 
+          color="grey-6" 
+          icon="refresh" 
+          label="Re-Ingest" 
+          @click="refreshTelemetry" 
+          class="text-caption text-weight-bold"
+        />
+        <q-btn 
+          size="xs" 
+          color="cyan-4" 
+          icon="cloud_download" 
+          label="Export Logs" 
+          class="text-caption text-weight-bold text-black"
+        />
       </div>
     </div>
 
-    <!-- KPI Grid -->
-    <div class="row q-col-gutter-lg q-mb-xl">
-      <!-- 1. Active Teachers -->
-      <div class="col-12 col-md-4">
-        <q-card class="bg-blue-grey-10 text-white shadow-2 border-indigo">
-          <q-card-section>
-            <div class="row items-center no-wrap">
-              <div class="col">
-                <div class="text-overline text-grey-6">ACTIVE TEACHERS (7D)</div>
-                <div class="text-h4 text-weight-bolder text-indigo-4">
-                  {{ stats?.metrics?.active_teachers_7d || 0 }} <span class="text-subtitle1 text-grey-7">/ {{ stats?.metrics?.total_teachers || 0 }}</span>
+    <!-- Live Telemetry KPI Flat Panels Grid -->
+    <div class="row q-col-gutter-sm q-mb-md">
+      <!-- KPI 1: Telemetry Ingestion Throughput -->
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between border-cyan-left">
+          <div class="row items-center justify-between no-wrap q-mb-xs">
+            <span class="text-operator-title text-grey-5">Ingestion Rate</span>
+            <span class="live-indicator-dot pulse-healthy"></span>
+          </div>
+          <div class="text-h4 text-metric-mono text-white">
+            {{ throughputEps }} <span class="text-caption text-grey-6">eps</span>
+          </div>
+          <div class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
+            Peak buffer utilization: <span class="text-white">14.2 MB/s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 2: Total Connected Operators & Instances -->
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between border-indigo-left">
+          <div class="row items-center justify-between no-wrap q-mb-xs">
+            <span class="text-operator-title text-grey-5">Active Fleet Nodes</span>
+            <q-icon name="devices" color="indigo-4" size="xs" />
+          </div>
+          <div class="text-h4 text-metric-mono text-cyan-3">
+            {{ activeNodesCount }} <span class="text-caption text-grey-6">/ 18</span>
+          </div>
+          <div class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
+            Edge deployment distribution: <span class="text-white">99.8% stable</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 3: System Drift Exceptions (Severity Warning mapped) -->
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between border-amber-left">
+          <div class="row items-center justify-between no-wrap q-mb-xs">
+            <span class="text-operator-title text-grey-5">Active Warnings</span>
+            <span class="live-indicator-dot pulse-warning"></span>
+          </div>
+          <div class="text-h4 text-metric-mono text-amber-4">
+            {{ warningEventsCount }}
+          </div>
+          <div class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
+            Drift severity index: <span class="text-amber-4">ELEVATED</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 4: Critical Execution Rollbacks (Severity Critical mapped) -->
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between border-red-left">
+          <div class="row items-center justify-between no-wrap q-mb-xs">
+            <span class="text-operator-title text-grey-5">Critical Rollbacks</span>
+            <span class="live-indicator-dot pulse-critical"></span>
+          </div>
+          <div class="text-h4 text-metric-mono" :class="criticalEventsCount > 0 ? 'text-red-4' : 'text-grey-6'">
+            {{ criticalEventsCount }}
+          </div>
+          <div class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
+            Failed Webhook bridges: <span :class="criticalEventsCount > 0 ? 'text-red-4' : 'text-grey-6'">{{ criticalEventsCount }} pipeline locks</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stateful Operational Command Controller Layer -->
+    <div class="row q-mb-md">
+      <div class="col-12">
+        <CommandExecutionMonitor />
+      </div>
+    </div>
+
+    <!-- DOMAIN GRID DOMINANCE: Virtualized streaming enterprise tables -->
+    <div class="row q-col-gutter-md">
+      
+      <!-- Primary Multi-Column Data Grid -->
+      <div class="col-12 col-xl-8">
+        <EnterpriseDataGrid 
+          :title="`${activeWorkspaceLabel} Live Stream Logs Explorer`"
+          subtitle="Incremental WebSocket patching engine active"
+          :rows="filteredGridRows"
+          :columns="gridColumns"
+          row-key="id"
+          @preset-changed="handlePresetChange"
+        />
+      </div>
+
+      <!-- Secondary Split-Pane Subpanel: Real-time Ingested Payload trace tree -->
+      <div class="col-12 col-xl-4">
+        <div class="enterprise-panel full-height column no-wrap bg-[#12161a]">
+          <div class="enterprise-subpanel q-pa-sm row items-center justify-between no-wrap border-bottom">
+            <div class="row items-center op-gap-4">
+              <q-icon name="code" color="cyan-4" size="xs" />
+              <span class="text-operator-title text-white text-weight-bold">Live Stream Event Trace</span>
+            </div>
+            <q-badge color="blue-grey-9" text-color="green-3" class="text-metric-sm" v-if="lastEventPayload">
+              Ingested
+            </q-badge>
+          </div>
+
+          <div class="q-pa-sm col-grow overflow-auto" style="max-height: 440px;">
+            <div v-if="!lastEventPayload" class="text-center q-pa-lg text-grey-7 text-caption italic">
+              Listening for real-time Quasar WebSocket streams... Events will cascade automatically.
+            </div>
+
+            <div v-else class="column op-gap-8">
+              <div class="bg-[#161b20] q-pa-xs rounded-borders row items-center justify-between text-caption border-muted">
+                <span class="text-metric-mono text-grey-4">TOPIC: {{ lastEventPayload.topic }}</span>
+                <span class="text-metric-sm text-grey-5">{{ new Date(lastEventPayload.timestamp).toLocaleTimeString() }}</span>
+              </div>
+
+              <!-- Stateful severity mapping box -->
+              <div class="q-pa-xs rounded-borders text-caption" :class="`severity-${lastEventPayload.severity}`">
+                <div class="text-weight-bold text-uppercase" style="font-size: 11px;">
+                  Severity Event Marker: {{ lastEventPayload.severity }}
                 </div>
               </div>
-              <q-icon name="group" size="md" color="indigo-4" class="opacity-40" />
-            </div>
-            <q-linear-progress :value="(stats?.metrics?.active_teachers_7d / stats?.metrics?.total_teachers) || 0" color="indigo-4" class="q-mt-sm" rounded />
-          </q-card-section>
-        </q-card>
-      </div>
 
-      <!-- 2. Quality/Volume -->
-      <div class="col-12 col-md-4">
-        <q-card class="bg-blue-grey-10 text-white shadow-2 border-green">
-          <q-card-section>
-            <div class="row items-center no-wrap">
-              <div class="col">
-                <div class="text-overline text-grey-6">TOTAL NOTES DIGITIZED</div>
-                <div class="text-h4 text-weight-bolder text-green-4">{{ stats?.metrics?.total_notes || 0 }}</div>
-              </div>
-              <q-icon name="description" size="md" color="green-4" class="opacity-40" />
-            </div>
-          </q-card-section>
-        </q-card>
-      </div>
-
-      <!-- 3. Quota Status -->
-      <div class="col-12 col-md-4">
-        <q-card class="bg-blue-grey-10 text-white shadow-2 border-amber">
-          <q-card-section>
-            <div class="row items-center no-wrap">
-              <div class="col">
-                <div class="text-overline text-grey-6">MONTHLY AI QUOTA</div>
-                <div class="text-h4 text-weight-bolder text-amber-4">{{ stats?.billing?.percentage || 0 }}%</div>
-              </div>
-              <q-btn flat dense icon="upgrade" color="amber-4" to="/admin/billing" label="UPGRADE" />
-            </div>
-            <q-linear-progress :value="(stats?.billing?.percentage / 100) || 0" :color="stats?.billing?.percentage > 80 ? 'red' : 'amber'" class="q-mt-sm" rounded />
-          </q-card-section>
-        </q-card>
-      </div>
-    </div>
-
-    <div class="row q-col-gutter-lg">
-      <!-- Left Column: Trends & Growth -->
-      <div class="col-12 col-md-8">
-        <!-- Daily Note Volume Chart -->
-        <q-card class="bg-blue-grey-10 shadow-2 q-mb-lg">
-          <q-card-section>
-            <div class="text-h6 text-weight-bold text-indigo-3">Daily Note Volume (Engagement)</div>
-            <div class="text-caption text-grey-6">Monitoring daily teacher interaction with the AI Engine.</div>
-          </q-card-section>
-          <q-card-section>
-            <apexchart height="300" type="area" :options="volumeChartOptions" :series="volumeSeries" />
-          </q-card-section>
-        </q-card>
-
-        <!-- Subject Distribution -->
-        <q-card class="bg-blue-grey-10 shadow-2">
-          <q-card-section>
-            <div class="text-h6 text-weight-bold text-green-3">Subject Digitization Mastery</div>
-            <div class="text-caption text-grey-6">Percentage of curriculum digitized by department.</div>
-          </q-card-section>
-          <q-card-section>
-            <apexchart height="300" type="bar" :options="subjectChartOptions" :series="subjectSeries" />
-          </q-card-section>
-        </q-card>
-      </div>
-
-      <!-- Right Column: Motivation & Nudges -->
-      <div class="col-12 col-md-4">
-        <!-- Teacher Leaderboard -->
-        <q-card class="bg-blue-grey-10 shadow-2 q-mb-lg">
-          <q-card-section class="bg-indigo-10">
-             <div class="text-subtitle1 text-weight-bold text-white row items-center">
-                <q-icon name="workspace_premium" color="amber-4" class="q-mr-sm" />
-                Teacher Leaderboard (7D)
-             </div>
-          </q-card-section>
-          <q-list dark separator>
-            <q-item v-for="(leader, index) in stats?.leaderboard" :key="leader.name">
-              <q-item-section avatar>
-                <q-avatar :color="index === 0 ? 'amber-9' : 'blue-grey-9'" text-color="white" size="sm">
-                  {{ index + 1 }}
-                </q-avatar>
-              </q-item-section>
-              <q-item-section>
-                <q-item-label class="text-weight-bold">{{ leader.name }}</q-item-label>
-                <q-item-label caption class="text-grey-6">{{ leader.generations }} notes generated</q-item-label>
-              </q-item-section>
-              <q-item-section side v-if="index === 0">
-                <q-icon name="stars" color="amber-4" />
-              </q-item-section>
-            </q-item>
-            <div v-if="!stats?.leaderboard?.length" class="text-center q-pa-xl text-grey-8">No activity recorded this week.</div>
-          </q-list>
-        </q-card>
-
-        <!-- Dynamic Insights (Nudges) -->
-        <q-card class="bg-blue-grey-10 shadow-2 border-indigo-accent">
-           <q-card-section>
-              <div class="text-subtitle1 text-weight-bold q-mb-md">Action Insights</div>
-              
-              <div class="q-gutter-y-md">
-                 <div class="row no-wrap items-start bg-dark q-pa-sm rounded-borders">
-                    <q-icon name="lightbulb" color="amber-4" class="q-mr-sm q-mt-xs" />
-                    <div class="text-caption text-grey-4">
-                       <span class="text-white text-weight-bold" v-if="inactiveCount > 0">{{ inactiveCount }} teachers</span> have not generated notes this week. Support them in getting started.
-                    </div>
-                 </div>
-
-                 <div class="row no-wrap items-start bg-dark q-pa-sm rounded-borders border-green-faint">
-                    <q-icon name="trending_up" color="green-4" class="q-mr-sm q-mt-xs" />
-                    <div class="text-caption text-grey-4">
-                       <span class="text-white text-weight-bold">{{ stats?.metrics?.most_active_subject || 'N/A' }} usage</span> is highest this term. Well done to that department!
-                    </div>
-                 </div>
-
-                 <div class="row no-wrap items-start bg-dark q-pa-sm rounded-borders">
-                    <q-icon name="stars" color="indigo-4" class="q-mr-sm q-mt-xs" />
-                    <div class="text-caption text-grey-4 italic">
-                       "Schools like yours are actively using Invify weekly to reduce teacher burnout."
-                    </div>
-                 </div>
+              <!-- JSON Stringify payload block formatted perfectly for enterprise readability -->
+              <div class="bg-[#0b0f12] q-pa-xs rounded-borders border-muted text-metric-mono text-grey-4" style="white-space: pre-wrap; font-size: 11px; overflow-x: auto;">
+                {{ JSON.stringify(lastEventPayload.payload, null, 2) }}
               </div>
 
-              <q-btn outline color="indigo-4" label="Invite New Teachers" class="full-width q-mt-lg" to="/admin/users" />
-           </q-card-section>
-        </q-card>
+              <div class="text-operator-title text-grey-6 q-mt-xs">Active Event Pipeline Subscriptions</div>
+              <div class="row op-gap-4 items-center">
+                <q-chip dense size="xs" color="blue-grey-9" text-color="cyan-3" label="quasar.wallet.transfers" />
+                <q-chip dense size="xs" color="blue-grey-9" text-color="indigo-3" label="invify.fleet.telemetry" />
+                <q-chip dense size="xs" color="blue-grey-9" text-color="amber-3" label="quasar.reconciliation.lock" />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-
-    <!-- Classroom Intelligence Advising -->
-    <div class="row q-col-gutter-lg q-mt-md">
-       <div class="col-12">
-          <ClassInsightsCard />
-       </div>
-    </div>
-
-    <!-- Retention/Onboarding Modals -->
-    <SmartNudgeCard class="q-mt-xl" v-if="stats?.metrics?.total_notes < 5" />
-    <WelcomeBackModal v-model="showWelcome" />
   </q-page>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { adminApi } from '../api'
-import SmartNudgeCard from '../components/retention/SmartNudgeCard.vue'
-import WelcomeBackModal from '../components/modals/WelcomeBackModal.vue'
-import ClassInsightsCard from '../components/analytics/ClassInsightsCard.vue'
+import { ref, computed, inject } from 'vue'
+import EnterpriseDataGrid from '../components/grid/EnterpriseDataGrid.vue'
+import CommandExecutionMonitor from '../components/commands/CommandExecutionMonitor.vue'
+import { useTelemetryStream } from '../composables/useTelemetryStream'
 
-const loading = ref(false)
-const stats = ref(null)
-const showWelcome = ref(false)
+// Inject active Workspace context parameter cleanly
+const activeWorkspace = inject('activeWorkspace', ref('observability'))
 
-const inactiveCount = computed(() => {
-  if (!stats.value?.metrics) return 0
-  return stats.value.metrics.total_teachers - stats.value.metrics.active_teachers_7d
+const activeWorkspaceLabel = computed(() => {
+  const map = {
+    observability: 'Observability',
+    fleet: 'Fleet Operations',
+    finance: 'Finance Operations',
+    governance: 'Governance',
+    ai: 'AI Operations'
+  }
+  return map[activeWorkspace.value] || 'Operations'
 })
 
-// Charts Logic
-const volumeSeries = computed(() => [{
-  name: 'Notes Generated',
-  data: stats.value?.timeseries?.map(d => d.notes_count) || []
-}])
+// Hook real-time websocket metrics engine
+const { throughputEps, lastEventPayload } = useTelemetryStream('quasar.stream.telemetry')
 
-const volumeChartOptions = computed(() => ({
-  chart: { toolbar: { show: false }, background: 'transparent' },
-  theme: { mode: 'dark' },
-  colors: ['#3f51b5'],
-  stroke: { curve: 'smooth', width: 3 },
-  xaxis: { categories: stats.value?.timeseries?.map(d => new Date(d.display_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })) || [] },
-  grid: { borderColor: '#1e293b' },
-  fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.1 } }
-}))
+// Dynamic simulated counters reflecting ingestion metrics
+const activeNodesCount = ref(14)
+const warningEventsCount = ref(3)
+const criticalEventsCount = ref(1)
 
-const subjectSeries = computed(() => [{
-  name: 'Notes Count',
-  data: stats.value?.subjects?.map(s => s.note_count) || []
-}])
+const refreshTelemetry = () => {
+  // Rotate counters gently to demonstrate active state updates
+  activeNodesCount.value = Math.floor(Math.random() * 4) + 13
+  warningEventsCount.value = Math.floor(Math.random() * 4) + 1
+  criticalEventsCount.value = Math.random() > 0.5 ? 1 : 0
+}
 
-const subjectChartOptions = computed(() => ({
-  chart: { toolbar: { show: false }, background: 'transparent' },
-  theme: { mode: 'dark' },
-  plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '60%' } },
-  colors: ['#4caf50'],
-  xaxis: { categories: stats.value?.subjects?.map(s => s.subject) || [] },
-  grid: { borderColor: '#1e293b' }
-}))
+// Master grid layout columns configuration
+const gridColumns = [
+  { name: 'timestamp', label: 'INGESTED', field: 'created_at', align: 'left', format: val => new Date(val).toLocaleTimeString() },
+  { name: 'severity', label: 'SEVERITY', field: 'severity', align: 'center' },
+  { name: 'type', label: 'EVENT TYPE', field: 'type', align: 'left' },
+  { name: 'amount', label: 'METRIC / VALUE', field: 'amount', align: 'right' },
+  { name: 'provider', label: 'PROVIDER', field: 'provider', align: 'center' },
+  { name: 'narrative', label: 'LOG TRACE NARRATIVE', field: 'description', align: 'left' }
+]
 
-const initDashboard = async () => {
-  loading.value = true
-  try {
-    const { data } = await adminApi.getDashboardStats()
-    stats.value = data
-    
-    // Check for welcome back
-    handleReturn()
-  } finally {
-    loading.value = false
+// Pure enterprise mock logging entries covering all workspaces robustly
+const allGridRows = ref([
+  {
+    id: 'row-1',
+    created_at: new Date(Date.now() - 4000).toISOString(),
+    severity: 'critical',
+    type: 'webhook_lock_timeout',
+    amount: 5400,
+    provider: 'quasar',
+    description: 'Reconciliation webhook queue execution timed out waiting for state lock confirmation.',
+    workspace: 'observability',
+    operator: 'sysadmin@invify.app'
+  },
+  {
+    id: 'row-2',
+    created_at: new Date(Date.now() - 15000).toISOString(),
+    severity: 'healthy',
+    type: 'device_activation_sync',
+    amount: 1,
+    provider: 'fleet_engine',
+    description: 'Hardware endpoint handshake completed successfully. OTA profile verified.',
+    workspace: 'fleet',
+    operator: 'auto_provisioner'
+  },
+  {
+    id: 'row-3',
+    created_at: new Date(Date.now() - 25000).toISOString(),
+    severity: 'warning',
+    type: 'ledger_drift_detected',
+    amount: 250,
+    provider: 'quasar',
+    description: 'Minor ledger temporal mismatch logged between parent treasury and active subaccount.',
+    workspace: 'finance',
+    operator: 'bursar_daemon'
+  },
+  {
+    id: 'row-4',
+    created_at: new Date(Date.now() - 42000).toISOString(),
+    severity: 'healthy',
+    type: 'virtual_account_inflow',
+    amount: 150000,
+    provider: 'quasar',
+    description: 'Static dedicated virtual account NUBAN registered direct transfer deposit.',
+    workspace: 'finance',
+    operator: 'providus_bridge'
+  },
+  {
+    id: 'row-5',
+    created_at: new Date(Date.now() - 60000).toISOString(),
+    severity: 'info',
+    type: 'tenant_quota_compaction',
+    amount: 12,
+    provider: 'governance',
+    description: 'AI generation metrics archived to block storage layer to preserve active memory arrays.',
+    workspace: 'governance',
+    operator: 'storage_controller'
+  },
+  {
+    id: 'row-6',
+    created_at: new Date(Date.now() - 95000).toISOString(),
+    severity: 'healthy',
+    type: 'note_digitization_batch',
+    amount: 42,
+    provider: 'ai_engine',
+    description: 'Curriculum layout parser finalized markdown syntax conversion strings.',
+    workspace: 'ai',
+    operator: 'teacher_session'
   }
-}
+])
 
-const handleReturn = async () => {
-  // Logic: Use last active temporal signal to fire modal
-  // Implementation already in useUsage/Retention workflows
-}
+// Filter grid rows contextually based on Workspace isolation selection to prevent operator context clash
+const filteredGridRows = computed(() => {
+  // If active Workspace is 'observability', show all system logs for comprehensive oversight
+  if (activeWorkspace.value === 'observability') return allGridRows.value
+  return allGridRows.value.filter(r => r.workspace === activeWorkspace.value)
+})
 
-onMounted(initDashboard)
+const handlePresetChange = (preset) => {
+  // Logic hook if parent needs side-effect tracking
+}
 </script>
 
 <style scoped>
-.letter-spacing-1 { letter-spacing: 1px; }
-.bg-blue-grey-10 { background: #1c262b; }
-.bg-indigo-10 { background: #1e1b4b; }
-.border-indigo { border-left: 5px solid #3f51b5; }
-.border-green { border-left: 5px solid #4caf50; }
-.border-amber { border-left: 5px solid #ffc107; }
-.opacity-40 { opacity: 0.4; }
-.full-width { width: 100%; }
-.border-indigo-accent { border: 1px solid #3f51b5; }
-.bg-dark { background: #12181b; }
-.border-green-faint { border: 1px solid rgba(76, 175, 80, 0.2); }
+.border-bottom { border-bottom: 1px solid var(--enterprise-border); }
+.border-muted { border: 1px solid var(--enterprise-border); }
+
+/* Muted left border flags for KPI readouts */
+.border-cyan-left { border-left: 2px solid #22b8cf !important; }
+.border-indigo-left { border-left: 2px solid #7048e8 !important; }
+.border-amber-left { border-left: 2px solid #fcc419 !important; }
+.border-red-left { border-left: 2px solid #c92a2a !important; }
+
+@media (max-width: 600px) {
+  .v-hide-xs { display: none !important; }
+}
 </style>
