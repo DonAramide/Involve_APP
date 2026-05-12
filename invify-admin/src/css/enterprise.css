@@ -1,39 +1,55 @@
 /* invify-admin/src/css/enterprise.css */
 /* Reusable Enterprise Operations Console Design System */
-/* Emulating Datadog, Azure Portal, CrowdStrike, and Grafana restrained operational UX */
+/* Emulating Datadog, Azure Portal, CrowdStrike, Elastic Observability, and Grafana restrained operational UX */
 
-@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
   /* 1. Global Severity Color Tokens */
-  --severity-critical-bg: rgba(201, 42, 42, 0.15);
-  --severity-critical-border: #c92a2a;
-  --severity-critical-text: #ff6b6b;
+  --severity-critical-bg: rgba(248, 81, 73, 0.15);
+  --severity-critical-border: #F85149;
+  --severity-critical-text: #FF7B72;
 
-  --severity-high-bg: rgba(232, 89, 12, 0.15);
-  --severity-high-border: #e8590c;
-  --severity-high-text: #ff922b;
+  --severity-high-bg: rgba(210, 153, 34, 0.15);
+  --severity-high-border: #D29922;
+  --severity-high-text: #E3B341;
 
-  --severity-warning-bg: rgba(252, 196, 25, 0.15);
-  --severity-warning-border: #fcc419;
-  --severity-warning-text: #ffe066;
+  --severity-warning-bg: rgba(210, 153, 34, 0.15);
+  --severity-warning-border: #D29922;
+  --severity-warning-text: #E3B341;
 
-  --severity-info-bg: rgba(51, 154, 240, 0.15);
-  --severity-info-border: #339af0;
-  --severity-info-text: #74c0fc;
+  --severity-info-bg: rgba(88, 166, 255, 0.15);
+  --severity-info-border: #58A6FF;
+  --severity-info-text: #79C0FF;
 
-  --severity-healthy-bg: rgba(43, 138, 62, 0.15);
-  --severity-healthy-border: #2b8a3e;
-  --severity-healthy-text: #51cf66;
+  --severity-healthy-bg: rgba(63, 185, 80, 0.15);
+  --severity-healthy-border: #3FB950;
+  --severity-healthy-text: #56D364;
 
   /* 2. Core Operational Theme Surfaces */
-  --enterprise-page-bg: #0b0f12;
-  --enterprise-panel-bg: #12161a;
-  --enterprise-subpanel-bg: #161b20;
-  --enterprise-border: #22282d;
-  --enterprise-border-focus: #333c44;
-  --enterprise-text-main: #e1e7ec;
-  --enterprise-text-muted: #8c9ba5;
+  --enterprise-page-bg: #0B1220;
+  --enterprise-panel-bg: #101826;
+  --enterprise-subpanel-bg: #172033;
+  --enterprise-border: #1F2D42;
+  --enterprise-border-focus: #1F6FEB;
+  
+  /* Text Contrast System */
+  --enterprise-text-main: #E6EDF3;
+  --enterprise-text-secondary: #9FB3C8;
+  --enterprise-text-muted: #6B7C93;
+
+  /* Sidebar Tokens */
+  --sidebar-bg: #0B1220;
+  --sidebar-panel-bg: #101826;
+  --sidebar-hover: #172033;
+  --sidebar-active: #1E3A5F;
+  --sidebar-accent: #1F6FEB;
+
+  /* App Bar Tokens */
+  --appbar-bg: linear-gradient(90deg, #0F172A, #132238);
+  --appbar-text-inactive: #A9B8CC;
+  --appbar-text-active: #FFFFFF;
+  --appbar-text-hover: #58A6FF;
 
   /* 3. Operational Spacing Scale */
   --space-2: 2px;
@@ -47,7 +63,7 @@
 body {
   background-color: var(--enterprise-page-bg) !important;
   color: var(--enterprise-text-main) !important;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Inter', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 13px;
   line-height: 1.4;
   margin: 0;
@@ -56,13 +72,13 @@ body {
 
 /* 1. Typography Scale */
 .text-metric-mono {
-  font-family: 'Roboto Mono', monospace !important;
+  font-family: 'JetBrains Mono', monospace !important;
   font-weight: 700;
   letter-spacing: -0.5px;
 }
 
 .text-metric-sm {
-  font-family: 'Roboto Mono', monospace !important;
+  font-family: 'JetBrains Mono', monospace !important;
   font-size: 11px;
   font-weight: 500;
 }
@@ -72,7 +88,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--enterprise-text-muted);
+  color: var(--enterprise-text-secondary);
 }
 
 /* 2. Operational Spacing Utility Helpers */
@@ -89,6 +105,7 @@ body {
   background-color: var(--severity-critical-bg) !important;
   border-left: 3px solid var(--severity-critical-border) !important;
   color: var(--severity-critical-text) !important;
+  box-shadow: inset 1px 0 8px rgba(248, 81, 73, 0.1);
 }
 
 .severity-high {
@@ -115,17 +132,18 @@ body {
   color: var(--severity-healthy-text) !important;
 }
 
-/* 4. Panel/Card Architecture */
+/* 4. Panel/Card Architecture complete with telemetry glow accents */
 .enterprise-panel {
   background-color: var(--enterprise-panel-bg) !important;
   border: 1px solid var(--enterprise-border) !important;
   border-radius: 2px !important;
-  box-shadow: none !important;
-  transition: border-color 0.15s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+  transition: all 0.15s ease;
 }
 
 .enterprise-panel:hover {
   border-color: var(--enterprise-border-focus) !important;
+  box-shadow: 0 0 12px rgba(31, 111, 235, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
 }
 
 .enterprise-subpanel {
@@ -158,27 +176,27 @@ body {
 }
 
 @keyframes streamPulseHealthy {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(43, 138, 62, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(43, 138, 62, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(43, 138, 62, 0); }
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 4px rgba(63, 185, 80, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
 }
 
 @keyframes streamPulseCritical {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(201, 42, 42, 0.8); }
-  50% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(201, 42, 42, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(201, 42, 42, 0); }
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.8); }
+  50% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(248, 81, 73, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
 }
 
 @keyframes streamPulseWarning {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(252, 196, 25, 0.7); }
-  50% { transform: scale(1.05); box-shadow: 0 0 0 5px rgba(252, 196, 25, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(252, 196, 25, 0); }
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.7); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 5px rgba(210, 153, 34, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(210, 153, 34, 0); }
 }
 
 /* 6. Data Grid Core Layout Overrides */
 .enterprise-data-grid .q-table th {
-  background-color: var(--enterprise-subpanel-bg) !important;
-  color: var(--enterprise-text-muted) !important;
+  background-color: var(--enterprise-panel-bg) !important;
+  color: var(--enterprise-text-secondary) !important;
   font-size: 11px !important;
   font-weight: 600 !important;
   text-transform: uppercase;
@@ -215,9 +233,9 @@ body {
   background: var(--enterprise-page-bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--enterprise-border-focus);
+  background: var(--enterprise-border);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--enterprise-text-muted);
+  background: var(--enterprise-border-focus);
 }

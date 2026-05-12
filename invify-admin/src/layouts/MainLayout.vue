@@ -6,7 +6,7 @@
     <EnterpriseCommandPalette ref="paletteRef" />
 
     <!-- Top Operational Command Header Bar -->
-    <q-header elevated class="bg-[#12161a] border-bottom" style="height: 42px;">
+    <q-header elevated class="border-bottom" style="background: var(--appbar-bg); height: 42px;">
       <div class="row items-center justify-between no-wrap fit q-px-sm">
         
         <!-- Left Section: Shell Identity & Workspace router strips -->
@@ -126,7 +126,8 @@
       v-model="drawerVisibility"
       show-if-above
       bordered
-      class="bg-[#12161a] text-[#8c9ba5]"
+      style="background-color: var(--sidebar-panel-bg);"
+      class="text-[#9fb3c8]"
       :width="230"
       :breakpoint="768"
     >
@@ -504,7 +505,9 @@ onBeforeUnmount(() => {
 }
 
 .border-left-active {
-  border-left: 3px solid #22b8cf !important;
+  border-left: 3px solid var(--sidebar-accent) !important;
+  background-color: var(--sidebar-active) !important;
+  box-shadow: inset 1px 0 8px rgba(31, 111, 235, 0.15);
 }
 
 .priority-dot {
@@ -524,14 +527,15 @@ onBeforeUnmount(() => {
 }
 
 .hover-bg:hover {
-  background-color: #1c262b !important;
+  background-color: var(--sidebar-hover) !important;
 }
 
 .nav-item {
-  transition: background-color 0.1s ease;
+  transition: all 0.15s ease;
 }
-.nav-item:hover {
-  background-color: #161b20;
+.nav-item:hover:not(.border-left-active) {
+  background-color: var(--sidebar-hover);
+  color: var(--enterprise-text-main) !important;
 }
 
 @media (max-width: 950px) {
