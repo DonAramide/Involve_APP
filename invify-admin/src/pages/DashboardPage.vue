@@ -223,6 +223,28 @@ const gridColumns = [
 // Pure enterprise mock logging entries covering all workspaces robustly
 const allGridRows = ref([
   {
+    id: 'row-ai-1',
+    created_at: new Date(Date.now() - 1200).toISOString(),
+    severity: 'healthy',
+    type: 'ai_lesson_cache_hit',
+    amount: 1420,
+    provider: 'ai_edge_cache',
+    description: 'AI Lesson Note Generation: Topic "Thermodynamics & Energy States" directly served from global edge cache.\n• Subject: Advanced Physics\n• Class: SS2 Science\n• Bypassed LLM inference layers saving 1,420 tokens.\n• Integrity Verification: AI Signature Validated.',
+    workspace: 'observability',
+    operator: 'cache_router'
+  },
+  {
+    id: 'row-ai-2',
+    created_at: new Date(Date.now() - 2800).toISOString(),
+    severity: 'info',
+    type: 'ai_lesson_generation',
+    amount: 3850,
+    provider: 'ai_engine',
+    description: 'AI Lesson Note Generation: Prompt synthetic pipeline completed successfully.\n• Subject: Literature in English\n• Topic: Elizabethan Sonnets\n• Term: 2 • Week: 4\n• Payload generated with structured curriculum sections, interactive quiz matrices, and strict compliance headers.',
+    workspace: 'observability',
+    operator: 'sysadmin@invify.app'
+  },
+  {
     id: 'row-1',
     created_at: new Date(Date.now() - 4000).toISOString(),
     severity: 'critical',
