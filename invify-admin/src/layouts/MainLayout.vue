@@ -329,6 +329,7 @@ const workspaces = [
   { id: 'deployments', label: 'Deployments', priority: false },
   { id: 'apps', label: 'Applications', priority: false },
   { id: 'incidents', label: 'Incident Response', priority: false },
+  { id: 'automation', label: 'Automation & Policy', priority: false },
   { id: 'admin', label: 'Administration', priority: false }
 ]
 
@@ -347,6 +348,7 @@ const switchWorkspace = (id) => {
     deployments: '/deployments/rollouts',
     apps: '/apps/installed',
     incidents: '/incidents/active',
+    automation: '/automation/policy',
     admin: '/admin/settings'
   }
   
@@ -448,6 +450,13 @@ const activeNavigationTree = computed(() => {
       return [
         { label: 'Active Edge Incidents', path: '/incidents/active', icon: 'warning', color: 'red-4', count: `${throttledCounters.value.incidentCounts} Alert`, motionPulse: throttledCounters.value.incidentCounts > 0 ? 'pulse-critical' : '' }
       ]
+    
+    case 'automation':
+      return [
+        { label: 'Policy Intelligence Center', path: '/automation/policy', icon: 'policy', color: 'cyan-3', badge: 'Pre-flight', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
+        { label: 'Workflow Execution & Audits', path: '/automation/workflows', icon: 'account_tree', color: 'amber-4', badge: '11 States', badgeBg: 'amber-10', badgeColor: 'amber-2' }
+      ]
+
     
     case 'admin':
     default:

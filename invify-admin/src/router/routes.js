@@ -143,6 +143,8 @@ const routes = [
       { path: 'admin/tenants', component: () => import('pages/TenantsPage.vue'), meta: { workspace: 'admin', title: 'Tenants' } },
       { path: 'admin/users', component: () => import('pages/UsersPage.vue'), meta: { workspace: 'admin', title: 'Operators' } },
       { path: 'admin/settings', component: () => import('pages/IndexPage.vue'), meta: { workspace: 'admin', title: 'Global Settings' } },
+      { path: 'automation/policy', component: () => import('pages/automation/PolicyIntelligencePage.vue'), meta: { workspace: 'automation', title: 'Policy Intelligence' } },
+      { path: 'automation/workflows', component: () => import('pages/automation/WorkflowExecutionCenterPage.vue'), meta: { workspace: 'automation', title: 'Workflow Execution & Audit' } },
 
       // ==========================================
       // LEGACY ROOTS & BACKWARD COMPATIBILITY
