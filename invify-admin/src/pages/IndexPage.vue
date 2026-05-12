@@ -91,7 +91,16 @@
               <q-space />
               <div class="text-weight-bold">12.4M</div>
             </div>
-            <q-linear-progress :value="0.84" color="cyan-4" class="q-mt-sm" />
+            <q-linear-progress :value="0.84" color="cyan-4" class="q-mt-sm q-mb-md" />
+            <q-btn 
+              flat 
+              dense 
+              color="cyan-3" 
+              icon="stream" 
+              label="Trace AI Telemetry Streams" 
+              to="/observability/streams" 
+              class="fit text-weight-bold q-py-xs bg-[#121b2d] hover-scale" 
+            />
           </q-card-section>
         </q-card>
       </div>
