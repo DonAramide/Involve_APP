@@ -6,7 +6,7 @@
     <EnterpriseCommandPalette ref="paletteRef" />
 
     <!-- Top Operational Command Header Bar -->
-    <q-header elevated class="bg-[#12161a] border-bottom" style="height: 42px;">
+    <q-header elevated class="border-bottom" style="height: 42px; background: linear-gradient(90deg, #0F172A, #132238);">
       <div class="row items-center justify-between no-wrap fit q-px-sm">
         
         <!-- Left Section: Shell Identity & Workspace router strips -->
@@ -58,8 +58,7 @@
               :label="ws.label"
               :class="[
                 'workspace-tab-btn text-caption q-px-sm',
-                prefs.activeWorkspace === ws.id ? 'workspace-tab-btn--active text-weight-bold' : 'text-grey-6',
-                ws.priority ? 'text-white' : 'text-grey-6'
+                prefs.activeWorkspace === ws.id ? 'workspace-tab-btn--active text-white text-weight-bold' : 'text-[#a9b8cc]'
               ]"
               @click="switchWorkspace(ws.id)"
               :title="ws.priority ? 'Production Priority Workspace' : 'Lightweight Auxiliary Context'"
@@ -126,7 +125,7 @@
       v-model="drawerVisibility"
       show-if-above
       bordered
-      class="bg-[#12161a] text-[#8c9ba5]"
+      class="bg-[#0b1220] text-[#e6edf3]"
       :width="230"
       :breakpoint="768"
     >
@@ -152,8 +151,8 @@
               clickable
               v-ripple
               :to="item.path"
-              active-class="bg-[#161b20] text-white border-left-active"
-              class="q-mx-xs rounded-borders text-grey-4 nav-item column justify-center"
+              active-class="bg-[#1e3a5f] text-white border-left-soc text-weight-bold"
+              class="q-mx-xs rounded-borders nav-item column justify-center"
               style="min-height: 30px; padding: 2px 10px;"
             >
               <div class="row items-center justify-between fit no-wrap">
@@ -436,7 +435,10 @@ const activeNavigationTree = computed(() => {
     
     case 'apps':
       return [
-        { label: 'Installed Application Inventory', path: '/apps/installed', icon: 'apps', color: 'grey-4', count: '142 total' }
+        { label: 'Installed Applications', path: '/apps/installed', icon: 'apps', color: 'cyan-3', count: '142 total' },
+        { label: 'Forbidden Governance', path: '/apps/forbidden', icon: 'block', color: 'red-4', badge: 'Blacklist', badgeBg: 'red-10', badgeColor: 'red-2' },
+        { label: 'Accessibility Abuse', path: '/apps/accessibility', icon: 'touch_app', color: 'amber-4', motionPulse: 'pulse-warning' },
+        { label: 'Sideload Assurance', path: '/apps/sideload', icon: 'verified_user', color: 'purple-3' }
       ]
     
     case 'incidents':
@@ -497,11 +499,12 @@ onBeforeUnmount(() => {
 }
 
 .workspace-tab-btn:hover {
-  background-color: rgba(34, 184, 207, 0.1);
+  background-color: rgba(88, 166, 255, 0.15);
+  color: #58a6ff !important;
 }
 
-.border-left-active {
-  border-left: 3px solid #22b8cf !important;
+.border-left-soc {
+  border-left: 3px solid #1f6feb !important;
 }
 
 .priority-dot {
@@ -521,14 +524,16 @@ onBeforeUnmount(() => {
 }
 
 .hover-bg:hover {
-  background-color: #1c262b !important;
+  background-color: #172033 !important;
 }
 
 .nav-item {
-  transition: background-color 0.1s ease;
+  transition: all 0.15s ease;
+  color: #9fb3c8;
 }
 .nav-item:hover {
-  background-color: #161b20;
+  background-color: #172033 !important;
+  color: #ffffff !important;
 }
 
 @media (max-width: 950px) {

@@ -135,7 +135,10 @@ const routes = [
       // ==========================================
       { path: 'deployments/rollouts', component: () => import('pages/deployments/RolloutControlCenterPage.vue'), meta: { workspace: 'deployments', title: 'Rollout Control Center' } },
       { path: 'deployments/channels', component: () => import('pages/deployments/ReleaseChannelsPage.vue'), meta: { workspace: 'deployments', title: 'Release Channels' } },
-      { path: 'apps/installed', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'apps', title: 'Installed Apps' } },
+      { path: 'apps/installed', component: () => import('pages/applications/InstalledApplicationsPage.vue'), meta: { workspace: 'apps', title: 'Installed Applications' } },
+      { path: 'apps/forbidden', component: () => import('pages/applications/ForbiddenApplicationsPage.vue'), meta: { workspace: 'apps', title: 'Forbidden Governance' } },
+      { path: 'apps/accessibility', component: () => import('pages/applications/AccessibilityAbusePage.vue'), meta: { workspace: 'apps', title: 'Accessibility Abuse' } },
+      { path: 'apps/sideload', component: () => import('pages/applications/SideloadIntegrityPage.vue'), meta: { workspace: 'apps', title: 'Sideload Integrity' } },
       { path: 'incidents/active', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'incidents', title: 'Active Incidents' } },
       { path: 'admin/tenants', component: () => import('pages/TenantsPage.vue'), meta: { workspace: 'admin', title: 'Tenants' } },
       { path: 'admin/users', component: () => import('pages/UsersPage.vue'), meta: { workspace: 'admin', title: 'Operators' } },
