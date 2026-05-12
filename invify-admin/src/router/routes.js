@@ -17,18 +17,18 @@ const routes = [
       // ==========================================
       { 
         path: 'fleet/overview', 
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('pages/fleet/FleetOverviewPage.vue'),
         meta: { title: 'Fleet Overview', workspace: 'fleet', permission: 'read_fleet' }
       },
       { 
         path: 'fleet/devices', 
-        component: () => import('pages/DeviceActivationPage.vue'),
+        component: () => import('pages/fleet/DeviceExplorerPage.vue'),
         meta: { title: 'Device Explorer', workspace: 'fleet', permission: 'read_devices' }
       },
       // Tenant-aware specific routing parameters ensuring early isolation mapping
       { 
         path: 'tenant/:tenantId/fleet/devices', 
-        component: () => import('pages/DeviceActivationPage.vue'),
+        component: () => import('pages/fleet/DeviceExplorerPage.vue'),
         meta: { title: 'Scoped Tenant Devices', workspace: 'fleet', permission: 'read_devices', requireTenantScope: true }
       },
       { 
