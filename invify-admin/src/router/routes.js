@@ -1,16 +1,15 @@
 // invify-admin/src/router/routes.js
 
 /**
- * Enterprise operational infrastructure routing.
- * Avoids generic catch-all sub-route loading to guarantee explicit WebSocket ownership,
- * strict tenant scoping, and fine-grained RBAC permission audits.
+ * Enterprise operational infrastructure routing incorporating multi-tenant isolation boundaries.
+ * Enforces explicit static path definitions alongside tenant-scoped sub-route parameters
+ * to prevent unauthorized horizontal navigation and guarantee clean lazy loading.
  */
 const routes = [
   {
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      // Default entry anchor redirecting directly to primary operational console
       { path: '', redirect: '/fleet/overview' },
 
       // ==========================================
@@ -25,6 +24,12 @@ const routes = [
         path: 'fleet/devices', 
         component: () => import('pages/DeviceActivationPage.vue'),
         meta: { title: 'Device Explorer', workspace: 'fleet', permission: 'read_devices' }
+      },
+      // Tenant-aware specific routing parameters ensuring early isolation mapping
+      { 
+        path: 'tenant/:tenantId/fleet/devices', 
+        component: () => import('pages/DeviceActivationPage.vue'),
+        meta: { title: 'Scoped Tenant Devices', workspace: 'fleet', permission: 'read_devices', requireTenantScope: true }
       },
       { 
         path: 'fleet/presence', 
@@ -59,6 +64,11 @@ const routes = [
         path: 'governance/compliance', 
         component: () => import('pages/DashboardPage.vue'),
         meta: { title: 'Compliance Center', workspace: 'governance', permission: 'read_governance' }
+      },
+      { 
+        path: 'tenant/:tenantId/governance/compliance', 
+        component: () => import('pages/DashboardPage.vue'),
+        meta: { title: 'Tenant Compliance Scope', workspace: 'governance', permission: 'read_governance', requireTenantScope: true }
       },
       { 
         path: 'governance/policy', 
@@ -121,7 +131,7 @@ const routes = [
       },
 
       // ==========================================
-      // AUXILIARY WORKSPACES: LIGHTWEIGHT CONFIGS
+      // LIGHTWEIGHT AUXILIARY WORKSPACES
       // ==========================================
       { path: 'deployments/rollouts', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'deployments', title: 'Rollouts' } },
       { path: 'apps/installed', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'apps', title: 'Installed Apps' } },
@@ -131,7 +141,7 @@ const routes = [
       { path: 'admin/settings', component: () => import('pages/IndexPage.vue'), meta: { workspace: 'admin', title: 'Global Settings' } },
 
       // ==========================================
-      // LEGACY DIRECT & BACKWARD COMPATIBLE MAPPINGS
+      // LEGACY ROOTS & BACKWARD COMPATIBILITY
       // ==========================================
       { path: 'dashboard', component: () => import('pages/DashboardPage.vue') },
       { path: 'tenants', component: () => import('pages/TenantsPage.vue') },
@@ -146,10 +156,7 @@ const routes = [
       { path: 'ai-usage', component: () => import('pages/AnalyticsPage.vue') },
       { path: 'devices', component: () => import('pages/DeviceActivationPage.vue') },
       
-      // Teacher Workspace
       { path: 'teacher-workspace', component: () => import('pages/TeacherDashboardPage.vue') },
-      
-      // Onboarding Flow
       { path: 'onboarding', component: () => import('pages/OnboardingFlow.vue') },
       { path: 'invite/accept', component: () => import('pages/AcceptInvitePage.vue') },
       
@@ -162,7 +169,6 @@ const routes = [
     ]
   },
 
-  // Fallback catch-all error handling routing
   {
     path: '/:catchAll(.*)*',
     component: () => import('pages/ErrorNotFound.vue')
