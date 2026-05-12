@@ -1,132 +1,160 @@
 <!-- invify-admin/src/pages/applications/SideloadIntegrityPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16 fit overflow-hidden" style="height: calc(100vh - 50px);">
     
-    <!-- Title Line -->
-    <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
+    <!-- Header strip -->
+    <div class="row items-center justify-between no-wrap border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="verified_user" size="sm" color="cyan-3" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Sideload Governance & Cryptographic Package Integrity Assurance</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">FORENSIC_LINEAGE_MODELING // DOWNGRADE_ATTACK_PROTECTION</div>
+          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Sideload & Package Cryptographic Integrity Center</div>
+          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">PACKAGE_LINEAGE_MODELING // FORENSIC_ANCESTRY_AUDIT</div>
         </div>
       </div>
       
-      <!-- Tenant Scope selector -->
+      <!-- Temporal Horizon Switch -->
       <div class="row items-center op-gap-8 no-wrap text-caption text-grey-5">
-        <span class="v-hide-xs">Tenant Scope:</span>
-        <q-select
-          v-model="activeTenantScope"
-          :options="['global', 'tenant-alpha', 'tenant-omega', 'tenant-beta']"
-          dense dark filled options-dense
-          @update:model-value="onTenantScopeUpdated"
-          class="bg-[#12161a] text-caption"
-          style="width: 130px;"
+        <span class="v-hide-xs">Forensic Retention:</span>
+        <q-btn-toggle
+          v-model="lineageRetentionHorizon"
+          :options="[
+            { label: '24h', value: '24h' },
+            { label: '7d', value: '7d' },
+            { label: '30d', value: '30d' },
+            { label: 'Forensic Max', value: 'max' }
+          ]"
+          dense flat
+          toggle-color="cyan-4"
+          toggle-text-color="black"
+          class="bg-[#12161a] border-muted text-metric-sm"
         />
       </div>
     </div>
 
-    <!-- UPPER ROW: Cryptographic Package Integrity Distribution Indicators -->
-    <div class="row items-center justify-between text-center bg-[#12161a] q-pa-sm rounded-borders border-muted">
-      
-      <div class="col column">
-        <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 18px;">99.6%</span>
-        <span class="text-caption text-grey-5" style="font-size: 10px;">Lineage Certified</span>
-      </div>
-
-      <div class="col column border-left">
-        <span class="text-metric-mono text-amber-4 text-weight-bold" style="font-size: 18px;">
-          {{ sideloadLogsList.length }} Tracked
-        </span>
-        <span class="text-caption text-grey-5" style="font-size: 10px;">Sideload Incidents</span>
-      </div>
-
-      <div class="col column border-left">
-        <span class="text-metric-mono text-red-4 text-weight-bold" style="font-size: 18px;">1 Blocked</span>
-        <span class="text-caption text-grey-5" style="font-size: 10px;">Downgrade Attacks</span>
-      </div>
-
-      <div class="col column border-left">
-        <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 18px;">SHA-256</span>
-        <span class="text-caption text-grey-5" style="font-size: 10px;">Lineage Trust Standard</span>
-      </div>
-
-    </div>
-
-    <!-- MIDDLE ROW: Sideload Feed & Forensic Package Lineage Modeling Matrix -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
+    <!-- UPPER ROW: Package Assurance Index -->
+    <div class="panel-card bg-[#12161a] border-muted rounded-borders column shrink-0">
       <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="history_edu" size="xs" color="purple-3" />
-          <span class="text-operator-title text-white text-weight-bold">Forensic Package Lineage Modeling & Sideload Origin Trajectories</span>
+          <q-icon name="fingerprint" size="xs" color="cyan-3" />
+          <span class="text-operator-title text-white text-weight-bold">Fleet wide Cryptographic Trust Index Scoring</span>
         </div>
-        <span class="text-metric-mono text-purple-3" style="font-size: 10px;">FORENSIC ANCESTRY LOGS</span>
+        <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">UNAUTHORIZED APK DRIFT TRACE</span>
       </div>
 
-      <div class="panel-body q-pa-xs overflow-y-auto" style="max-height: 420px;">
+      <div class="panel-body q-pa-sm row items-center justify-between op-gap-16 text-center">
+        
+        <div class="col column">
+          <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 18px;">99.91%</span>
+          <span class="text-grey-5" style="font-size: 10px;">Lineage Verification</span>
+        </div>
+
+        <div class="col column border-left">
+          <span class="text-metric-mono text-amber-4 text-weight-bold" style="font-size: 18px;">2 Flagged</span>
+          <span class="text-grey-5" style="font-size: 10px;">Sideload Exceptions</span>
+        </div>
+
+        <div class="col column border-left">
+          <span class="text-metric-mono text-red-4 text-weight-bold" style="font-size: 18px;">0 Downgrades</span>
+          <span class="text-grey-5" style="font-size: 10px;">Rollback Attenuation</span>
+        </div>
+
+        <div class="col column border-left">
+          <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 18px;">256-Bit</span>
+          <span class="text-grey-5" style="font-size: 10px;">ECDSA Chain Base</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MAIN GRID SECTION: FINAL REFINEMENT #3: Forensic-Grade Package Lineage Modeling Matrix -->
+    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col min-h-0 fit">
+      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between shrink-0">
+        <div class="row items-center op-gap-4 no-wrap">
+          <q-icon name="account_tree" size="xs" color="amber-4" />
+          <span class="text-operator-title text-white text-weight-bold">Forensic-Grade Package Lineage Modeling & Ancestry Chains</span>
+        </div>
+        <span class="text-metric-mono text-amber-3" style="font-size: 10px;">TRACKING SIGNING CERTIFICATE TRANSITIONS</span>
+      </div>
+
+      <div class="col overflow-auto q-pa-xs custom-scrollbar">
         <q-list dense class="q-gutter-y-xs">
           <q-item 
-            v-for="s in sideloadLogsList" 
-            :key="s.id" 
-            class="q-px-sm q-py-xs bg-[#161b20] rounded-borders column op-gap-4 border-left-sideload hover-row"
+            v-for="lin in lineageChainsList" 
+            :key="lin.id"
+            class="q-px-sm q-py-xs bg-[#161b20] rounded-borders column op-gap-4 hover-row"
+            :class="lin.riskSeverity === 'CRITICAL' ? 'border-left-critical' : 'border-left-warning'"
           >
-            <!-- Top Strip: Package Info + Trust Score -->
-            <div class="row items-center justify-between fit no-wrap">
+            <!-- Top Lineage Identity -->
+            <div class="row items-center justify-between no-wrap fit">
               <div class="row items-center op-gap-8 no-wrap">
-                <span class="text-white text-weight-bold text-caption">{{ s.appName }}</span>
-                <span class="text-metric-mono text-grey-5" style="font-size: 10px;">{{ s.packageName }}</span>
-              </div>
-
-              <!-- Trust Index Flag -->
-              <div class="row items-center op-gap-4">
-                <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 11px;">Trust Score: {{ s.trustScore }}%</span>
-                <q-chip dense size="xs" :color="s.isTampered ? 'red-10' : 'amber-10'" :text-color="s.isTampered ? 'red-2' : 'amber-2'" class="text-weight-bold">
-                  {{ s.isTampered ? 'TAMPERED' : 'UNVERIFIED LINEAGE' }}
+                <span class="text-white text-weight-bold text-caption">{{ lin.packageName }}</span>
+                <q-chip dense size="xs" :color="lin.riskSeverity === 'CRITICAL' ? 'red-10' : 'amber-10'" :text-color="lin.riskSeverity === 'CRITICAL' ? 'red-2' : 'amber-2'" class="text-weight-bold">
+                  {{ lin.exceptionType }}
                 </q-chip>
               </div>
-            </div>
 
-            <!-- FINAL REFINEMENT #3: Deep Forensic Lineage Ancestry Strip -->
-            <div class="bg-[#101416] q-pa-sm rounded-borders column op-gap-2 text-metric-mono border-muted" style="font-size: 10px;">
-              <span class="text-purple-3 text-weight-bold" style="font-size: 9px;">FORENSIC LINEAGE ANCESTRY CHAIN:</span>
-              
-              <div class="row items-center justify-between text-grey-4">
-                <span>Origin Lineage Source: <span class="text-white">{{ s.originLineage }}</span></span>
-                <span class="text-amber-4">Validation Type: {{ s.validationMethod }}</span>
-              </div>
-
-              <!-- Certificate Swap Trace Matrix -->
-              <div class="row items-center justify-between text-grey-5 border-top q-pt-xs q-mt-xs" style="font-size: 9px;">
-                <span>Authorized Ancestor Cert: <span class="text-green-4">{{ s.ancestorCert }}</span></span>
-                <span>⟶</span>
-                <span>Detected Endpoint Key: <span :class="s.certMismatch ? 'text-red-4 text-weight-bold' : 'text-cyan-3'">{{ s.detectedCert }}</span></span>
-              </div>
-
-              <div v-if="s.downgradeAttack" class="text-red-4 text-weight-bold border-top q-pt-xs q-mt-xs">
-                🚨 Downgrade Attack detected: Package payload executing fallback assembly build signatures mapping below baseline OS requirements
-              </div>
-            </div>
-
-            <!-- Bottom metadata strip -->
-            <div class="row items-center justify-between text-grey-5" style="font-size: 10px;">
-              <div class="row items-center op-gap-6">
-                <span>Target Node: <span class="text-white">{{ s.deviceNode }}</span></span>
-                <span>•</span>
-                <span>Tenant: <span class="text-white">{{ s.tenantScope }}</span></span>
-              </div>
-
-              <!-- Inline Action controls -->
               <div class="row items-center op-gap-4">
-                <span class="text-metric-mono text-grey-6 q-mr-xs" style="font-size: 9px;">{{ s.timestampStr }}</span>
+                <span class="text-metric-mono text-grey-5" style="font-size: 11px;">
+                  Trust Weight: <span :class="lin.trustScore < 50 ? 'text-red-4 text-weight-bold' : 'text-green-4'">{{ lin.trustScore }}/100</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- FORENSIC ANCESTRY TRANSITIONS TIMELINE STRIP -->
+            <div class="bg-[#111417] q-pa-xs rounded-borders column op-gap-2">
+              <span class="text-metric-mono text-grey-6 q-px-xs" style="font-size: 9px;">CRYPTOGRAPHIC ANCESTRY TRAJECTORY:</span>
+              
+              <div class="row items-center justify-between no-wrap q-px-xs text-grey-4" style="font-size: 10px;">
+                <!-- Step 1 -->
+                <div class="column">
+                  <span class="text-grey-6" style="font-size: 9px;">Origin Lineage</span>
+                  <span class="text-metric-mono text-green-4">{{ lin.ancestrySteps.origin }}</span>
+                </div>
+                <q-icon name="arrow_forward" size="xs" color="grey-7" />
+                
+                <!-- Step 2 -->
+                <div class="column">
+                  <span class="text-grey-6" style="font-size: 9px;">Cert Transition</span>
+                  <span class="text-metric-mono text-amber-4">{{ lin.ancestrySteps.transition }}</span>
+                </div>
+                <q-icon name="arrow_forward" size="xs" color="grey-7" />
+
+                <!-- Step 3 Observed State -->
+                <div class="column text-right">
+                  <span class="text-grey-6" style="font-size: 9px;">Observed Status</span>
+                  <span class="text-metric-mono text-white text-weight-bold">{{ lin.ancestrySteps.current }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Context string -->
+            <div class="text-grey-4" style="font-size: 11px;">
+              Sideload Origin Trace: <span class="text-white text-weight-medium">"{{ lin.sideloadOrigin }}"</span> // Lineage Drift: <span class="text-amber-3">{{ lin.driftSummary }}</span>
+            </div>
+
+            <!-- Action Controllers -->
+            <div class="row items-center justify-between border-top q-pt-xs text-grey-5" style="font-size: 10px;">
+              <span>Target Partition Scope: <span class="text-metric-mono text-white">{{ lin.tenantScope }}</span></span>
+              
+              <div class="row items-center op-gap-4">
                 <q-btn 
-                  dense flat size="xs" color="red-4" label="Enforce Sideload Quarantine" 
-                  @click="enforceSideloadQuarantine(s)" 
-                  class="bg-[#241212] q-px-xs text-metric-sm" 
+                  dense flat size="xs" color="amber-3" label="Force Attestation Sync" 
+                  @click="forceAttestationSync(lin.id)" 
+                  class="bg-[#241c12] q-px-xs text-metric-sm" 
+                />
+                <q-btn 
+                  dense flat size="xs" color="red-4" label="Trigger Lineage Rollback" 
+                  @click="triggerLineageRollback(lin)" 
+                  class="bg-[#241212] q-px-xs text-weight-bold text-metric-sm" 
                 />
               </div>
             </div>
           </q-item>
         </q-list>
+      </div>
+
+      <div class="panel-footer bg-[#161b20] q-pa-xs border-top text-center text-grey-6 shrink-0" style="font-size: 10px;">
+        Integrity Center protocol: Bounded packages matching explicit signature downgrade loops trigger auto-quarantine hardware hooks instantaneously.
       </div>
     </div>
 
@@ -135,42 +163,35 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useApplicationEventStore } from '../../stores/realtime/useApplicationEventStore'
-import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
 import { Notify } from 'quasar'
 
-const appStore = useApplicationEventStore()
-const activeTenantScope = ref('global')
+const lineageRetentionHorizon = ref('30d')
 
-const onTenantScopeUpdated = (val) => {
-  appStore.setTenantFilter(val)
-}
-
-// 1. Sideload Logs array incorporating FINAL REFINEMENT #3 Forensic Lineage Modeling metrics
-const sideloadLogsList = ref([
-  { id: 'sdl-01', packageName: 'com.overlay.tools.widget', appName: 'Floating Screen Assist Widget', trustScore: 24, isTampered: true, originLineage: 'Unknown_Browser_Apk_Download', validationMethod: 'Heuristic_Signature_Match', ancestorCert: 'CN=Invify_Root_CA,O=Invify_Systems', detectedCert: 'CN=Untrusted_Proxy_Agent', certMismatch: true, downgradeAttack: false, deviceNode: 'pos-reg-omega-01', tenantScope: 'tenant-alpha', timestampStr: '5m ago' },
-  { id: 'sdl-02', packageName: 'com.malicious.keylogger.sys', appName: 'System Diagnostic Proxy (Unsafe)', trustScore: 12, isTampered: true, originLineage: 'Malicious_Dropper_Service_Vector', validationMethod: 'Binary_Checksum_Fail', ancestorCert: 'CN=Android_Core_Oem', detectedCert: 'CN=Revoked_Dropper_Key', certMismatch: true, downgradeAttack: true, deviceNode: 'kiosk-subfleet-84', tenantScope: 'tenant-beta', timestampStr: '1h ago' },
-  { id: 'sdl-03', packageName: 'com.custom.debug.utility', appName: 'Local Diagnostic Client', trustScore: 68, isTampered: false, originLineage: 'Internal_Mdm_Debug_Bridge', validationMethod: 'Authorized_V2_Signature', ancestorCert: 'CN=Invify_Internal_Dev', detectedCert: 'CN=Invify_Internal_Dev', certMismatch: false, downgradeAttack: false, deviceNode: 'warehouse-sc-01', tenantScope: 'tenant-omega', timestampStr: '3h ago' }
+// 1. Static base arrays complete with FINAL REFINEMENT #3: Forensic-Grade Package Lineage Modeling
+const lineageChainsList = ref([
+  { id: 'lin-01', packageName: 'com.invify.terminal.pos', exceptionType: 'CERTIFICATE_TRANSITION_DRIFT', riskSeverity: 'CRITICAL', trustScore: 24, ancestrySteps: { origin: 'Certified Root v2', transition: 'SHA-1 Weak Chain', current: 'Tampered Bytecode' }, sideloadOrigin: 'adb remote shell script loop', driftSummary: 'Signing keys rotated out-of-order bypassing staged update keys', tenantScope: 'tenant-omega' },
+  { id: 'lin-02', packageName: 'com.thirdparty.scanner.compat', exceptionType: 'VERSION_DOWNGRADE_CHAIN', riskSeverity: 'WARNING', trustScore: 68, ancestrySteps: { origin: 'v4.1 Certified', transition: 'Staged Patch v4.2', current: 'Forced Fallback v3.0' }, sideloadOrigin: 'Local download manifest trigger', driftSummary: 'Attempted to force application parameters backward to exploit legacy permissions', tenantScope: 'warehouse_beta' }
 ])
 
-const enforceSideloadQuarantine = (sideloadObj) => {
-  console.log(`[SideloadEngine] Enforce physical hardware network isolation targeting package sideload drift:`, sideloadObj.packageName)
-  
-  operationalEventBusSingleton.emitUpstream('ENFORCE_SIDELOAD_QUARANTINE', {
-    targetPackageName: sideloadObj.packageName,
-    deviceNode: sideloadObj.deviceNode,
-    lineageOrigin: sideloadObj.originLineage,
-    timestamp: new Date().toISOString()
+const forceAttestationSync = (linId) => {
+  Notify.create({
+    type: 'positive',
+    message: `Forcing immediate cryptographic re-validation sweep targeting chain [${linId}]`,
+    position: 'bottom-right'
   })
+}
+
+const triggerLineageRollback = (linObj) => {
+  if (!linObj) return
 
   Notify.create({
     type: 'negative',
-    message: `Physical hardware network quarantine directive broadcast targeting sideload drift`,
+    message: `Executing deep package lineage rollback targeting root signature [${linObj.packageName}]`,
     position: 'bottom-right'
   })
 
-  // Mutate local array optimistically
-  sideloadLogsList.value = sideloadLogsList.value.filter(s => s.id !== sideloadObj.id)
+  // Drop locally to simulate complete remediation state resolution
+  lineageChainsList.value = lineageChainsList.value.filter(l => l.id !== linObj.id)
 }
 </script>
 
@@ -180,10 +201,26 @@ const enforceSideloadQuarantine = (sideloadObj) => {
 .border-left { border-left: 1px solid var(--enterprise-border); }
 .border-muted { border: 1px solid var(--enterprise-border); }
 
-.border-left-sideload { border-left: 3px solid #862e9c; }
+.border-left-critical { border-left: 3px solid #c92a2a; }
+.border-left-warning { border-left: 3px solid #fcc419; }
 
 .hover-row:hover {
-  background-color: #1a1e22 !important;
+  background-color: #1a2327 !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #0b0f12;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #22282d;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #333a40;
 }
 
 @media (max-width: 600px) {

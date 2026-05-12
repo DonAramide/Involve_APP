@@ -6,7 +6,7 @@
     <EnterpriseCommandPalette ref="paletteRef" />
 
     <!-- Top Operational Command Header Bar -->
-    <q-header elevated class="border-bottom" style="height: 42px; background: linear-gradient(90deg, #0F172A, #132238);">
+    <q-header elevated class="bg-[#12161a] border-bottom" style="height: 42px;">
       <div class="row items-center justify-between no-wrap fit q-px-sm">
         
         <!-- Left Section: Shell Identity & Workspace router strips -->
@@ -58,7 +58,8 @@
               :label="ws.label"
               :class="[
                 'workspace-tab-btn text-caption q-px-sm',
-                prefs.activeWorkspace === ws.id ? 'workspace-tab-btn--active text-white text-weight-bold' : 'text-[#a9b8cc]'
+                prefs.activeWorkspace === ws.id ? 'workspace-tab-btn--active text-weight-bold' : 'text-grey-6',
+                ws.priority ? 'text-white' : 'text-grey-6'
               ]"
               @click="switchWorkspace(ws.id)"
               :title="ws.priority ? 'Production Priority Workspace' : 'Lightweight Auxiliary Context'"
@@ -125,7 +126,7 @@
       v-model="drawerVisibility"
       show-if-above
       bordered
-      class="bg-[#0b1220] text-[#e6edf3]"
+      class="bg-[#12161a] text-[#8c9ba5]"
       :width="230"
       :breakpoint="768"
     >
@@ -151,8 +152,8 @@
               clickable
               v-ripple
               :to="item.path"
-              active-class="bg-[#1e3a5f] text-white border-left-soc text-weight-bold"
-              class="q-mx-xs rounded-borders nav-item column justify-center"
+              active-class="bg-[#161b20] text-white border-left-active"
+              class="q-mx-xs rounded-borders text-grey-4 nav-item column justify-center"
               style="min-height: 30px; padding: 2px 10px;"
             >
               <div class="row items-center justify-between fit no-wrap">
@@ -435,10 +436,10 @@ const activeNavigationTree = computed(() => {
     
     case 'apps':
       return [
-        { label: 'Installed Applications', path: '/apps/installed', icon: 'apps', color: 'cyan-3', count: '142 total' },
-        { label: 'Forbidden Governance', path: '/apps/forbidden', icon: 'block', color: 'red-4', badge: 'Blacklist', badgeBg: 'red-10', badgeColor: 'red-2' },
-        { label: 'Accessibility Abuse', path: '/apps/accessibility', icon: 'touch_app', color: 'amber-4', motionPulse: 'pulse-warning' },
-        { label: 'Sideload Assurance', path: '/apps/sideload', icon: 'verified_user', color: 'purple-3' }
+        { label: 'Installed Applications Explorer', path: '/apps/installed', icon: 'apps', color: 'cyan-3', badge: '12 Cols', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
+        { label: 'Forbidden Apps Governance', path: '/apps/forbidden', icon: 'block', color: 'red-4', badge: 'BLOCKED', badgeBg: 'red-10', badgeColor: 'red-2' },
+        { label: 'Accessibility Abuse Interception', path: '/apps/accessibility', icon: 'visibility_off', color: 'amber-4', badge: 'Confidence %', badgeBg: 'amber-10', badgeColor: 'amber-3', motionPulse: 'pulse-warning' },
+        { label: 'Sideload & Package Lineage', path: '/apps/sideload', icon: 'account_tree', color: 'green-4', badge: 'Forensic Audit', badgeBg: 'green-10', badgeColor: 'green-2' }
       ]
     
     case 'incidents':
@@ -499,12 +500,11 @@ onBeforeUnmount(() => {
 }
 
 .workspace-tab-btn:hover {
-  background-color: rgba(88, 166, 255, 0.15);
-  color: #58a6ff !important;
+  background-color: rgba(34, 184, 207, 0.1);
 }
 
-.border-left-soc {
-  border-left: 3px solid #1f6feb !important;
+.border-left-active {
+  border-left: 3px solid #22b8cf !important;
 }
 
 .priority-dot {
@@ -524,16 +524,14 @@ onBeforeUnmount(() => {
 }
 
 .hover-bg:hover {
-  background-color: #172033 !important;
+  background-color: #1c262b !important;
 }
 
 .nav-item {
-  transition: all 0.15s ease;
-  color: #9fb3c8;
+  transition: background-color 0.1s ease;
 }
 .nav-item:hover {
-  background-color: #172033 !important;
-  color: #ffffff !important;
+  background-color: #161b20;
 }
 
 @media (max-width: 950px) {

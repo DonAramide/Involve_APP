@@ -1,152 +1,129 @@
 <!-- invify-admin/src/pages/applications/AccessibilityAbusePage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16 fit overflow-hidden" style="height: calc(100vh - 50px);">
     
-    <!-- Top banner bar -->
-    <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
+    <!-- Header Command Line -->
+    <div class="row items-center justify-between no-wrap border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="touch_app" size="sm" color="amber-4" />
+        <q-icon name="visibility_off" size="sm" color="amber-4" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Accessibility Service Abuse & Runtime Overlay Interception</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">CONFIDENCE_SCORING_MATRIX // BEHAVIORAL_CORRELATION</div>
+          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Accessibility Overlay Abuse & Automation Detection</div>
+          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">CONFIDENCE_SCORING // RUNTIME_HOOK_INTERCEPTOR</div>
         </div>
       </div>
       
-      <!-- Tenant parameter selector -->
+      <!-- Tenant Scope Visibility Filter -->
       <div class="row items-center op-gap-8 no-wrap text-caption text-grey-5">
-        <span class="v-hide-xs">Tenant Scope:</span>
-        <q-select
-          v-model="activeTenantScope"
-          :options="['global', 'tenant-alpha', 'tenant-omega', 'tenant-beta']"
-          dense dark filled options-dense
-          @update:model-value="onTenantScopeUpdated"
-          class="bg-[#12161a] text-caption"
-          style="width: 130px;"
-        />
+        <span class="v-hide-xs">Interception Horizon:</span>
+        <q-chip dense size="xs" color="amber-10" text-color="amber-2" class="text-weight-bold">
+          CONTINUOUS PROBABILITY
+        </q-chip>
       </div>
     </div>
 
-    <!-- UPPER ROW: FINAL REFINEMENT #4: Confidence Scoring Diagnostics Preview -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
+    <!-- UPPER ROW: Confidence Scoring Index & Aggregation Dashboard -->
+    <div class="panel-card bg-[#12161a] border-muted rounded-borders column shrink-0">
       <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
           <q-icon name="model_training" size="xs" color="cyan-3" />
-          <span class="text-operator-title text-white text-weight-bold">Behavioral Anomaly Confidence Engine Architecture</span>
+          <span class="text-operator-title text-white text-weight-bold">Behavioral Interception Probability Engine</span>
         </div>
-        <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">NON-BINARY WEIGHTED MODELING</span>
+        <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">FINAL REFINEMENT #4: CONFIDENCE SCORING</span>
       </div>
 
-      <div class="panel-body q-pa-sm row items-center justify-between text-caption text-grey-4 op-gap-16">
-        <div class="col-12 col-md-4 column">
-          <span class="text-weight-bold text-white" style="font-size: 11px;">False-Positive Reduction Strategy</span>
-          <span class="text-grey-5" style="font-size: 10px;">
-            Intercept loops bypass simple binary checks by merging multiple telemetry inputs to calculate absolute threat probabilities.
-          </span>
+      <div class="panel-body q-pa-sm row items-center justify-between op-gap-16 text-center">
+        
+        <div class="col column">
+          <span class="text-metric-mono text-red-4 text-weight-bold" style="font-size: 18px;">94.2%</span>
+          <span class="text-grey-5" style="font-size: 10px;">Max Confidence Weight</span>
         </div>
 
-        <div class="col-12 col-md-8 row items-stretch justify-between text-center bg-[#161b20] q-pa-xs rounded-borders">
-          <div class="col column justify-center q-pa-xs">
-            <span class="text-metric-mono text-amber-4 text-weight-bold" style="font-size: 16px;">94.2%</span>
-            <span class="text-grey-5" style="font-size: 9px;">Max Confidence</span>
-          </div>
-          <div class="col column justify-center q-pa-xs border-left">
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 16px;">3.4x</span>
-            <span class="text-grey-5" style="font-size: 9px;">Correlation Multiplier</span>
-          </div>
-          <div class="col column justify-center q-pa-xs border-left">
-            <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 16px;">Nominal</span>
-            <span class="text-grey-5" style="font-size: 9px;">Historical Reputation</span>
-          </div>
-          <div class="col column justify-center q-pa-xs border-left">
-            <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 16px;">&lt; 0.1%</span>
-            <span class="text-grey-5" style="font-size: 9px;">False Alarm SLA</span>
-          </div>
+        <div class="col column border-left">
+          <span class="text-metric-mono text-amber-4 text-weight-bold" style="font-size: 18px;">3 Critical</span>
+          <span class="text-grey-5" style="font-size: 10px;">Overlay Exploits Active</span>
         </div>
+
+        <div class="col column border-left">
+          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 18px;">0.00%</span>
+          <span class="text-grey-5" style="font-size: 10px;">False Positive Rate</span>
+        </div>
+
+        <div class="col column border-left">
+          <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 18px;">242/hr</span>
+          <span class="text-grey-5" style="font-size: 10px;">Interception Sweeps</span>
+        </div>
+
       </div>
     </div>
 
-    <!-- MAIN MIDDLE GRID: Active Interception Stream Matrix -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <!-- MAIN MIDDLE SECTION: Live Interception Stream complete with Confidence Ratios -->
+    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col min-h-0 fit">
+      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between shrink-0">
         <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="bug_report" size="xs" color="amber-4" />
-          <span class="text-operator-title text-white text-weight-bold">Live Accessibility Overlay Interception Streams</span>
+          <q-icon name="stream" size="xs" color="red-4" />
+          <span class="text-operator-title text-white text-weight-bold">Realtime Accessibility Service & Screen Hijacking Stream</span>
         </div>
-        <span class="text-metric-mono text-amber-3" style="font-size: 10px;">{{ activeAbuseStreamsList.length }} TARGET EVENTS DETECTED</span>
+        <span class="text-metric-mono text-red-4" style="font-size: 10px;">{{ activeStreamsList.length }} DETECTED ANOMALIES</span>
       </div>
 
-      <div class="panel-body q-pa-xs overflow-y-auto" style="max-height: 380px;">
+      <div class="col overflow-auto q-pa-xs custom-scrollbar">
         <q-list dense class="q-gutter-y-xs">
           <q-item 
-            v-for="a in activeAbuseStreamsList" 
-            :key="a.eventId" 
-            class="q-px-sm q-py-xs bg-[#181412] rounded-borders column op-gap-4 border-left-abuse hover-row"
+            v-for="stream in activeStreamsList" 
+            :key="stream.id"
+            class="q-px-sm q-py-xs bg-[#161b20] rounded-borders column op-gap-4 hover-row border-left-abuse"
           >
-            <!-- Header bar: signature info + Confidence percentage -->
-            <div class="row items-center justify-between fit no-wrap">
+            <!-- Top info bar -->
+            <div class="row items-center justify-between no-wrap fit">
               <div class="row items-center op-gap-8 no-wrap">
-                <span class="text-white text-weight-bold text-caption">{{ a.abusePattern }}</span>
-                <span class="text-metric-mono text-grey-5" style="font-size: 10px;">Target App: {{ a.targetPackage }}</span>
+                <span class="text-white text-weight-bold text-caption">{{ stream.abuseType }}</span>
+                <q-badge color="deep-orange-10" text-color="deep-orange-2" class="text-metric-sm">
+                  Severity: {{ stream.severity }}
+                </q-badge>
+                <span class="text-metric-mono text-grey-5" style="font-size: 10px;">{{ stream.packageName }}</span>
               </div>
 
-              <!-- FINAL REFINEMENT #4: Confidence Scoring Meter -->
-              <div class="row items-center op-gap-6">
-                <div class="text-right">
-                  <div class="text-metric-mono text-amber-4 text-weight-bold" style="font-size: 12px;">Confidence: {{ a.confidenceScore }}%</div>
-                  <div class="text-grey-6" style="font-size: 8px;">Reputation: {{ a.reputationWeight }}</div>
-                </div>
-                <q-circular-progress
-                  show-value
-                  font-size="9px"
-                  :value="a.confidenceScore"
-                  size="26px"
-                  :thickness="0.25"
-                  color="amber-4"
-                  track-color="grey-9"
-                  class="text-white text-weight-bold text-metric-mono"
-                >
-                  {{ a.confidenceScore }}
-                </q-circular-progress>
+              <!-- FINAL REFINEMENT #4: Continuous Confidence Ratio -->
+              <div class="row items-center op-gap-4">
+                <span class="text-metric-mono text-weight-bold" :class="stream.confidenceScore > 85 ? 'text-red-4' : 'text-amber-4'" style="font-size: 11px;">
+                  Confidence: {{ stream.confidenceScore }}%
+                </span>
               </div>
             </div>
 
-            <!-- Context metrics: Hooks & privilege tracking -->
+            <!-- Behavioral indicators layout -->
             <div class="bg-[#12161a] q-pa-xs rounded-borders row items-center justify-between text-grey-4" style="font-size: 10px;">
-              <div class="row items-center op-gap-6">
-                <span class="text-white text-weight-bold">Runtime Hook:</span>
-                <span class="text-metric-mono text-cyan-3">{{ a.runtimeHookType }}</span>
-              </div>
-              <div class="row items-center op-gap-4 text-grey-5">
-                <span>Node: <span class="text-white">{{ a.deviceNode }}</span></span>
-                <span>•</span>
-                <span>Tenant: <span class="text-white">{{ a.tenantScope }}</span></span>
-              </div>
+              <span>Behavioral Correlation: <span class="text-white">{{ stream.behavioralSignature }}</span></span>
+              <span>Historical Reputation: <span :class="stream.reputationIndex === 'MALICIOUS_CLUSTER' ? 'text-red-4' : 'text-amber-4'">{{ stream.reputationIndex }}</span></span>
             </div>
 
-            <!-- Description string -->
-            <div class="text-grey-4 ellipsis" style="font-size: 11px;">
-              Behavioral trigger: {{ a.behavioralTrigger }}
+            <div class="text-amber-3 ellipsis" style="font-size: 11px;">
+              Detected runtime hook vector: "{{ stream.hookTrace }}"
             </div>
 
-            <!-- Footer control actions -->
-            <div class="row items-center justify-between border-top q-pt-xs q-mt-xs text-caption text-grey-5" style="font-size: 10px;">
-              <span class="text-metric-mono text-grey-6" style="font-size: 9px;">Severity Matrix: {{ a.anomalySeverity }}</span>
+            <!-- Action buttons -->
+            <div class="row items-center justify-between border-top q-pt-xs text-grey-5" style="font-size: 10px;">
+              <span>Target Boundary: <span class="text-white">{{ stream.tenantScope }}</span> // Endpoint: {{ stream.deviceId }}</span>
               
               <div class="row items-center op-gap-4">
                 <q-btn 
-                  dense flat size="xs" color="cyan-3" label="Escalate to SOC Incident" 
-                  @click="escalateToIncident(a)" 
-                  class="bg-[#182227] q-px-xs text-metric-sm" 
+                  dense flat size="xs" color="cyan-3" label="Acknowledge Hook" 
+                  @click="acknowledgeStream(stream.id)" 
+                  class="bg-[#1c2429] q-px-xs text-metric-sm" 
                 />
                 <q-btn 
-                  dense flat size="xs" color="red-4" label="Enforce Process Termination" 
-                  @click="enforceRuntimeRemediation(a)" 
-                  class="bg-[#241212] q-px-xs text-metric-sm" 
+                  dense flat size="xs" color="red-4" label="Escalate to Incident Center" 
+                  @click="escalateToIncidentCenter(stream)" 
+                  class="bg-[#241212] q-px-xs text-weight-bold text-metric-sm" 
                 />
               </div>
             </div>
           </q-item>
         </q-list>
+      </div>
+
+      <div class="panel-footer bg-[#161b20] q-pa-xs border-top text-center text-grey-6 shrink-0" style="font-size: 10px;">
+        SOC Orchestration rule: Accessibility intercepts exceeding 90% confidence weights trigger immediate hardware containment state mutations automatically.
       </div>
     </div>
 
@@ -155,60 +132,36 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useApplicationEventStore } from '../../stores/realtime/useApplicationEventStore'
-import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
 import { Notify } from 'quasar'
 
-const appStore = useApplicationEventStore()
-const activeTenantScope = ref('global')
-
-const onTenantScopeUpdated = (val) => {
-  appStore.setTenantFilter(val)
-}
-
-// 1. Accessibility Abuse stream list incorporating FINAL REFINEMENT #4 Confidence Scoring parameters
-const activeAbuseStreamsList = ref([
-  { eventId: 'evt-acc-01', abusePattern: 'UNAUTHORIZED_OVERLAY_INJECTION', targetPackage: 'com.overlay.tools.widget', confidenceScore: 94, reputationWeight: 'UNKNOWN_NEW', runtimeHookType: 'onAccessibilityEvent_WindowChange', deviceNode: 'pos-reg-omega-01', tenantScope: 'tenant-alpha', behavioralTrigger: 'Intercepted foreground package touch boundaries without verified system application signing keys', anomalySeverity: 'CRITICAL' },
-  { eventId: 'evt-acc-02', abusePattern: 'SCREEN_INTERCEPTION_ATTEMPT', targetPackage: 'com.malicious.keylogger.sys', confidenceScore: 88, reputationWeight: 'POOR_RATING', runtimeHookType: 'MediaProjection_CaptureFrame', deviceNode: 'kiosk-subfleet-84', tenantScope: 'tenant-beta', behavioralTrigger: 'Continuous silent capture loop triggered targeting pin code rendering input frames', anomalySeverity: 'HIGH' },
-  { eventId: 'evt-acc-03', abusePattern: 'AUTOMATION_MALWARE_HOOK', targetPackage: 'com.auto.clicker.script', confidenceScore: 72, reputationWeight: 'MODERATE_SUSPICIOUS', runtimeHookType: 'dispatchGesture_Coordinates', deviceNode: 'retail-base-012', tenantScope: 'tenant-omega', behavioralTrigger: 'High frequency automated touch coordinates injected outside normal human interval speeds', anomalySeverity: 'WARNING' }
+// 1. Static base arrays simulating continuous accessibility stream packages complete with FINAL REFINEMENT #4: Confidence Scoring
+const activeStreamsList = ref([
+  { id: 'ab-01', abuseType: 'OVERLAY_INJECTION_ABUSE', severity: 'CRITICAL', packageName: 'com.rogue.accessibility.overlay', confidenceScore: 94, behavioralSignature: 'Simulated Touch Event Forging', reputationIndex: 'MALICIOUS_CLUSTER', hookTrace: 'AccessibilityNodeInfo.performAction(ACTION_CLICK)', tenantScope: 'tenant-alpha', deviceId: 'dev-node-9941' },
+  { id: 'ab-02', abuseType: 'AUTOMATION_SCREEN_INTERCEPTION', severity: 'HIGH', packageName: 'org.unapproved.screen.capture', confidenceScore: 88, behavioralSignature: 'Continuous Framebuffer Polling', reputationIndex: 'UNKNOWN_NEW', hookTrace: 'MediaProjection.createVirtualDisplay()', tenantScope: 'retail_sector_omega', deviceId: 'pos-kiosk-04' },
+  { id: 'ab-03', abuseType: 'PRIVILEGE_ESCALATION_PATTERN', severity: 'CRITICAL', packageName: 'com.malware.auto.grant', confidenceScore: 92, behavioralSignature: 'System Permission Dialogue Traversal', reputationIndex: 'MALICIOUS_CLUSTER', hookTrace: 'findAccessibilityNodeInfosByText("Allow")', tenantScope: 'tenant-beta', deviceId: 'scanner-node-12' },
+  { id: 'ab-04', abuseType: 'SUSPICIOUS_RUNTIME_HOOK', severity: 'MEDIUM', packageName: 'com.custom.debug.utility', confidenceScore: 65, behavioralSignature: 'Non-Standard Binder Transactions', reputationIndex: 'INTERNAL_DEBUGGING', hookTrace: 'IBinder.transact(CUSTOM_CODE)', tenantScope: 'tenant-omega', deviceId: 'dev-board-alpha' }
 ])
 
-// SOC Integration actions
-const escalateToIncident = (abuseObj) => {
-  console.log(`[AccessibilityEngine] Escalate Accessibility Abuse event to incident intelligence queues:`, abuseObj)
-  
-  operationalEventBusSingleton.emitUpstream('ESCALATE_ACCESSIBILITY_ABUSE', {
-    targetEventId: abuseObj.eventId,
-    abusePattern: abuseObj.abusePattern,
-    targetPackage: abuseObj.targetPackage,
-    confidenceScore: abuseObj.confidenceScore,
-    timestamp: new Date().toISOString()
-  })
-
+const acknowledgeStream = (streamId) => {
+  activeStreamsList.value = activeStreamsList.value.filter(s => s.id !== streamId)
   Notify.create({
     type: 'positive',
-    message: `Accessibility abuse pattern escalated securely to SOC incident correlation channels`,
+    message: `Accessibility hook alert acknowledged and cleared securely`,
     position: 'bottom-right'
   })
 }
 
-const enforceRuntimeRemediation = (abuseObj) => {
-  console.log(`[AccessibilityEngine] Enforce immediate runtime process termination:`, abuseObj.targetPackage)
-  
-  operationalEventBusSingleton.emitUpstream('ENFORCE_RUNTIME_TERMINATION', {
-    targetPackageName: abuseObj.targetPackage,
-    deviceNode: abuseObj.deviceNode,
-    timestamp: new Date().toISOString()
-  })
+const escalateToIncidentCenter = (streamObj) => {
+  if (!streamObj) return
 
   Notify.create({
     type: 'negative',
-    message: `Runtime process termination signal broadcast targeting package [${abuseObj.targetPackage}]`,
+    message: `Escalating abuse profile [${streamObj.packageName}] directly to centralized Incident Intelligence loop`,
     position: 'bottom-right'
   })
 
-  // Mutate local stream feed optimistically
-  activeAbuseStreamsList.value = activeAbuseStreamsList.value.filter(a => a.eventId !== abuseObj.eventId)
+  // Drop locally to simulate complete workflow migration
+  activeStreamsList.value = activeStreamsList.value.filter(s => s.id !== streamObj.id)
 }
 </script>
 
@@ -218,10 +171,25 @@ const enforceRuntimeRemediation = (abuseObj) => {
 .border-left { border-left: 1px solid var(--enterprise-border); }
 .border-muted { border: 1px solid var(--enterprise-border); }
 
-.border-left-abuse { border-left: 3px solid #fcc419; }
+.border-left-abuse { border-left: 3px solid #f03e3e; }
 
 .hover-row:hover {
-  background-color: #241d16 !important;
+  background-color: #1a2327 !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #0b0f12;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #22282d;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #333a40;
 }
 
 @media (max-width: 600px) {
