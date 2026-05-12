@@ -293,14 +293,14 @@ class RealtimeConnectionManager {
         src_dev: `edge-node-${Math.floor(Math.random() * 100)}`,
         ts: new Date().toISOString(),
         t_scope: Math.random() > 0.5 ? 'global' : 'tenant-alpha',
-        raw_sev: Math.random() > 0.85 ? 'CRITICAL' : Math.random() > 0.6 ? 'WARNING' : 'HEALTHY',
+        raw_sev: Math.random() > 0.95 ? 'CRITICAL' : Math.random() > 0.7 ? 'WARNING' : 'HEALTHY',
         type_str: Math.random() > 0.5 ? 'FLEET_HEARTBEAT' : 'POLICY_EVALUATION',
         body: { cpu_usage: Math.floor(Math.random() * 60) + 10, memory_mb: 2048 }
       }
 
       // Route ingress array downward into normalizer pipeline execution layers
       this.onMessageReceived(mockRawPayload)
-    }, 400) // Emit background packets regularly
+    }, 1000) // Emit background packets at a professional, sustained operational cadence
   }
 
   /**

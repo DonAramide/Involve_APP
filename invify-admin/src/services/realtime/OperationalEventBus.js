@@ -14,6 +14,7 @@ class OperationalEventBus {
     // Component-level subscribers grouped by Target Topic keys
     this.subscribers = new Map()
     this.$q = null
+    this.lastAlertToastFiredAt = 0 // Cooldown tracker preventing alert waterfall pile-ups
 
     // Bind normalizer processing bridge directly to upstream raw connection streams
     connectionManagerSingleton.setMessageReceivedHandler((rawPayload) => {
@@ -85,6 +86,12 @@ class OperationalEventBus {
   evaluateAlertPropagation(envelope) {
     // Trigger desktop overlay banners strictly for critical platform state interferences
     if (['CRITICAL', 'HIGH'].includes(envelope.severity)) {
+      // Suppress alert waterfall pile-ups via an 8-second operational cooldown window
+      if (Date.now() - this.lastAlertToastFiredAt < 8000) {
+        return // Silently route to background stores without flooding user viewport
+      }
+
+      this.lastAlertToastFiredAt = Date.now()
       const isCritical = envelope.severity === 'CRITICAL'
       
       // Prevent console crashing if UI framework instance remains unlinked
