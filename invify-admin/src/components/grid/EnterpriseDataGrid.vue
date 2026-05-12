@@ -152,20 +152,20 @@
             <q-td v-for="col in props.cols" :key="col.name" :props="props">
               <!-- Render specialized formats for Severity/Status indicators -->
               <template v-if="col.name === 'severity' || col.name === 'status'">
-                <span class="live-indicator-dot q-mr-xs" :class="getBadgeDotClass(props.value)"></span>
-                <span class="text-metric-sm text-weight-bold" :class="getBadgeTextColor(props.value)">
-                  {{ String(props.value).toUpperCase() }}
+                <span class="live-indicator-dot q-mr-xs" :class="getBadgeDotClass(props.row[col.field])"></span>
+                <span class="text-metric-sm text-weight-bold" :class="getBadgeTextColor(props.row[col.field])">
+                  {{ String(props.row[col.field] || 'UNDEFINED').toUpperCase() }}
                 </span>
               </template>
               
               <!-- Render numeric metrics using Monospace scales -->
-              <template v-else-if="typeof props.value === 'number'">
-                <span class="text-metric-mono">{{ props.value.toLocaleString() }}</span>
+              <template v-else-if="typeof props.row[col.field] === 'number'">
+                <span class="text-metric-mono">{{ props.row[col.field].toLocaleString() }}</span>
               </template>
 
               <!-- Default render -->
               <template v-else>
-                {{ props.value }}
+                {{ col.value !== undefined ? col.value : props.row[col.field] }}
               </template>
             </q-td>
           </q-tr>
