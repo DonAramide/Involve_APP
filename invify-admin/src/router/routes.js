@@ -133,7 +133,8 @@ const routes = [
       // ==========================================
       // LIGHTWEIGHT AUXILIARY WORKSPACES
       // ==========================================
-      { path: 'deployments/rollouts', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'deployments', title: 'Rollouts' } },
+      { path: 'deployments/rollouts', component: () => import('pages/deployments/RolloutControlCenterPage.vue'), meta: { workspace: 'deployments', title: 'Rollout Control Center' } },
+      { path: 'deployments/channels', component: () => import('pages/deployments/ReleaseChannelsPage.vue'), meta: { workspace: 'deployments', title: 'Release Channels' } },
       { path: 'apps/installed', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'apps', title: 'Installed Apps' } },
       { path: 'incidents/active', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'incidents', title: 'Active Incidents' } },
       { path: 'admin/tenants', component: () => import('pages/TenantsPage.vue'), meta: { workspace: 'admin', title: 'Tenants' } },

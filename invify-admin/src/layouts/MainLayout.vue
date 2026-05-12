@@ -429,8 +429,9 @@ const activeNavigationTree = computed(() => {
     
     case 'deployments':
       return [
-        { label: 'Rollouts Framework', path: '/deployments/rollouts', icon: 'system_update_alt', color: 'amber-4', count: 'Active' },
-        { label: 'Rollback Event Matrix', path: '/admin/ledger', icon: 'history', color: 'red-4', badge: '1 Rollback', badgeBg: 'red-10', badgeColor: 'red-2', motionPulse: 'pulse-critical' }
+        { label: 'Rollout Control Center', path: '/deployments/rollouts', icon: 'rocket_launch', color: 'cyan-4', count: 'Active' },
+        { label: 'Release Channels', path: '/deployments/channels', icon: 'alt_route', color: 'amber-4', badge: '5 Tracks', badgeBg: 'amber-10', badgeColor: 'amber-3' },
+        { label: 'Rollback Safeguards', path: '/deployments/rollouts', icon: 'restore', color: 'red-4', badge: 'Dependency-Aware', badgeBg: 'red-10', badgeColor: 'red-2', motionPulse: 'pulse-critical' }
       ]
     
     case 'apps':
