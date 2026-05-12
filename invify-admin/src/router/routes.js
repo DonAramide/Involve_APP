@@ -62,37 +62,37 @@ const routes = [
       // ==========================================
       { 
         path: 'governance/compliance', 
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('pages/governance/ComplianceCenterPage.vue'),
         meta: { title: 'Compliance Center', workspace: 'governance', permission: 'read_governance' }
       },
       { 
         path: 'tenant/:tenantId/governance/compliance', 
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('pages/governance/ComplianceCenterPage.vue'),
         meta: { title: 'Tenant Compliance Scope', workspace: 'governance', permission: 'read_governance', requireTenantScope: true }
       },
       { 
         path: 'governance/policy', 
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('pages/governance/PolicyGovernancePage.vue'),
         meta: { title: 'Policy Governance', workspace: 'governance', permission: 'write_policies' }
       },
       { 
         path: 'governance/integrity', 
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('pages/governance/IntegrityCenterPage.vue'),
         meta: { title: 'Integrity Center', workspace: 'governance', permission: 'read_governance' }
       },
       { 
         path: 'governance/trust', 
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('pages/governance/IntegrityCenterPage.vue'),
         meta: { title: 'Trust Scoring', workspace: 'governance', permission: 'read_governance' }
       },
       { 
         path: 'governance/quarantine', 
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('pages/governance/QuarantineCenterPage.vue'),
         meta: { title: 'Quarantine Center', workspace: 'governance', permission: 'soc_quarantine' }
       },
       { 
         path: 'governance/drift', 
-        component: () => import('pages/DashboardPage.vue'),
+        component: () => import('pages/governance/ComplianceCenterPage.vue'),
         meta: { title: 'Drift Analysis', workspace: 'governance', permission: 'read_governance' }
       },
 

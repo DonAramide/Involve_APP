@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.104.0",
     "apexcharts": "^5.10.6",
     "axios": "^1.6.8",
+    "pinia": "^3.0.4",
     "quasar": "^2.15.1",
     "vue": "^3.4.21",
     "vue-router": "^4.3.0",
