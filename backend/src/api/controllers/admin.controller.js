@@ -46,7 +46,8 @@ class AdminController {
             try {
                 const qId = await QuasarService.getQuasarId(id).catch(() => null);
                 if (qId) {
-                    const wallets = await QuasarService.listWallets(qId).catch(() => []);
+                    const walletsRes = await QuasarService.listWallets(qId).catch(() => []);
+                    const wallets = Array.isArray(walletsRes) ? walletsRes : (walletsRes?.wallets || walletsRes?.data || []);
                     
                     // Identify Treasury/Parent Wallets (school_wallet, clearing_wallet)
                     const schoolWallet = wallets.find(w => w.walletType === 'school_wallet');
@@ -55,13 +56,58 @@ class AdminController {
                     // If we have a school wallet, get its transactions for the ledger
                     let sdkTxns = [];
                     if (schoolWallet) {
-                        sdkTxns = await QuasarService.getTransactions(qId, schoolWallet.id).catch(() => []);
+                        const resTxns = await QuasarService.getTransactions(qId, schoolWallet.id).catch(() => ({}));
+                        sdkTxns = resTxns?.transactions || resTxns || [];
                     }
 
+                    // Iterate known user/student IDs to pull Static Virtual Accounts and Ongoing Activity Inflows
+                    let vAccs = [];
+                    let vaInflows = [];
+                    if (users && users.length > 0) {
+                        // Limit to 10 to ensure lightning-fast dashboard rendering
+                        const targetUsers = users.slice(0, 10);
+                        await Promise.all(targetUsers.map(async u => {
+                            if (!u.id) return;
+                            // Pull Static Dedicated Account (NUBAN) via client.school.getVirtualAccount
+                            const va = await QuasarService.getVirtualAccount(qId, u.id).catch(() => null);
+                            if (va && (va.accountNumber || va.account_number)) {
+                                vAccs.push({
+                                    account_number: va.accountNumber || va.account_number,
+                                    bank_name: va.bankName || va.bank_name || va.provider || 'Providus Bank',
+                                    account_name: va.accountName || va.account_name || u.full_name || u.name || u.email || 'Dedicated Student Account',
+                                    type: 'STATIC NUBAN',
+                                    currency: va.currency || 'NGN',
+                                    owner_id: u.id,
+                                    owner_name: u.full_name || u.name || u.email
+                                });
+                            }
+                            // Pull Ongoing VA Inflows via client.school.listStudentPayments
+                            const paymentsRes = await QuasarService.listStudentPayments(qId, u.id).catch(() => null);
+                            const payments = paymentsRes?.payments || paymentsRes?.data || paymentsRes || [];
+                            if (Array.isArray(payments)) {
+                                payments.forEach(p => {
+                                    vaInflows.push({
+                                        id: p.id || p.reference || Math.random().toString(),
+                                        created_at: p.created_at || p.date || new Date().toISOString(),
+                                        type: 'inflow',
+                                        amount: p.amount || 0,
+                                        description: `VA Inflow (${u.full_name || u.name || u.email}): ${p.narrative || p.description || p.reference || 'Bank Transfer'}`,
+                                        status: p.status || 'succeeded'
+                                    });
+                                });
+                            }
+                        }));
+                    }
+
+                    // Combine Wallet ledger lines with VA side narrative timeline
+                    const allCombinedTxns = [...(Array.isArray(sdkTxns) ? sdkTxns : []), ...vaInflows];
+                    // Sort descending by created_at
+                    allCombinedTxns.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
                     quaserData = { 
-                        subAccount: schoolWallet || clearingWallet, // Using school wallet as primary parent
-                        virtualAccounts: [], // SDK doesn't have list-all-VA yet, so we'll show empty or pull per-user later
-                        transactions: sdkTxns,
+                        subAccount: schoolWallet || clearingWallet || wallets[0], // Using school wallet as primary parent treasury
+                        virtualAccounts: vAccs,
+                        transactions: allCombinedTxns,
                         wallets: wallets
                     };
                 }

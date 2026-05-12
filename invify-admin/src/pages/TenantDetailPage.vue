@@ -126,9 +126,19 @@
                 <q-card-section>
                   <div class="text-overline text-indigo-3">Parent Account (Master)</div>
                   <div v-if="wallet.subAccount">
-                    <div class="text-h6">{{ wallet.subAccount.bank_name }}</div>
-                    <div class="text-h4 text-weight-bold letter-spacing-1 q-my-sm text-cyan-4">{{ wallet.subAccount.account_number }}</div>
-                    <div class="text-caption text-grey-5">Account Name: {{ wallet.subAccount.account_name }}</div>
+                    <!-- Standard Subaccount info if available -->
+                    <div v-if="wallet.subAccount.bank_name || wallet.subAccount.account_number">
+                      <div class="text-h6">{{ wallet.subAccount.bank_name }}</div>
+                      <div class="text-h4 text-weight-bold letter-spacing-1 q-my-sm text-cyan-4">{{ wallet.subAccount.account_number }}</div>
+                      <div class="text-caption text-grey-5">Account Name: {{ wallet.subAccount.account_name }}</div>
+                    </div>
+                    <!-- Quasar SDK Wallet Object info fallback -->
+                    <div v-else>
+                      <div class="text-h6 text-indigo-2">{{ wallet.subAccount.walletType?.toUpperCase() || 'SCHOOL_WALLET' }}</div>
+                      <div class="text-h4 text-weight-bold letter-spacing-1 q-my-sm text-cyan-4">₦{{ (wallet.subAccount.balance || 0).toLocaleString() }}</div>
+                      <div class="text-caption text-grey-5">Wallet ID: <span class="text-grey-4">{{ wallet.subAccount.id }}</span></div>
+                      <div class="text-caption text-grey-6">Owner Type: {{ wallet.subAccount.ownerType?.toUpperCase() || 'SCHOOL' }}</div>
+                    </div>
                   </div>
                   <div v-else class="text-grey-6 q-pa-md">No parent sub-account configured via Quasar SDK.</div>
                 </q-card-section>
@@ -137,16 +147,17 @@
 
             <!-- Virtual Accounts Inventory -->
             <div class="col-12 col-md-8">
-              <div class="text-subtitle2 text-grey-5 q-mb-sm">Generated Virtual Accounts (Static & Ongoing)</div>
+              <div class="text-subtitle2 text-grey-5 q-mb-sm">Generated Virtual Accounts (Static Dedicated NUBAN)</div>
               <div class="row q-col-gutter-sm">
                 <div v-for="acc in wallet.virtualAccounts" :key="acc.account_number" class="col-12 col-sm-6">
                   <q-card flat bordered class="bg-blue-grey-10 border-cyan">
                     <q-card-section class="q-pa-sm">
                       <div class="row items-center no-wrap">
                         <q-avatar icon="account_balance" color="cyan-10" text-color="cyan-3" size="32px" />
-                        <div class="q-ml-sm overflow-hidden">
+                        <div class="q-ml-sm overflow-hidden full-width">
                           <div class="text-weight-bold text-white no-wrap ellipsis">{{ acc.account_number }}</div>
-                          <div class="text-caption text-grey-6 no-wrap ellipsis">{{ acc.bank_name }} • {{ acc.type || 'STATIC' }}</div>
+                          <div class="text-caption text-grey-5 no-wrap ellipsis">{{ acc.bank_name }} • {{ acc.type || 'STATIC' }}</div>
+                          <div class="text-caption text-indigo-3 no-wrap ellipsis">{{ acc.account_name }}</div>
                         </div>
                       </div>
                     </q-card-section>
@@ -154,6 +165,23 @@
                 </div>
                 <div v-if="!wallet.virtualAccounts?.length" class="col-12 text-grey-7 q-pa-lg text-center border-dashed rounded-borders">
                   No virtual accounts generated for this tenant.
+                </div>
+              </div>
+            </div>
+
+            <!-- All Tenant Wallets Inventory -->
+            <div class="col-12 q-mt-md" v-if="wallet.allWallets && wallet.allWallets.length">
+              <div class="text-subtitle2 text-grey-5 q-mb-sm">All Quasar Tenant Wallets</div>
+              <div class="row q-col-gutter-sm">
+                <div v-for="w in wallet.allWallets" :key="w.id" class="col-12 col-sm-6 col-md-3">
+                  <q-card flat bordered class="bg-blue-grey-9 border-indigo">
+                    <q-card-section class="q-pa-sm">
+                      <div class="text-caption text-indigo-3 text-weight-bold">{{ w.walletType?.toUpperCase() || 'WALLET' }}</div>
+                      <div class="text-h6 text-white q-my-xs">₦{{ (w.balance || 0).toLocaleString() }}</div>
+                      <div class="text-caption text-grey-5 ellipsis">Owner: {{ w.ownerType?.toUpperCase() }}</div>
+                      <div class="text-caption text-grey-6 ellipsis" style="font-size: 10px;">{{ w.id }}</div>
+                    </q-card-section>
+                  </q-card>
                 </div>
               </div>
             </div>
@@ -233,7 +261,8 @@ const wallet = ref({
   balance: 0, 
   subAccount: null, 
   virtualAccounts: [], 
-  transactions: [] 
+  transactions: [],
+  allWallets: []
 })
 const recentUsage = ref([])
 
