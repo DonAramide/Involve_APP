@@ -75,6 +75,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               termName: Value(invoice.termName),
               academicYearName: Value(invoice.academicYearName),
               studentImage: Value(invoice.studentImage),
+              warrantyDuration: Value(invoice.warrantyDuration),
             ),
           );
 
@@ -322,6 +323,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         termName: row.termName,
         academicYearName: row.academicYearName,
         studentImage: row.studentImage,
+        warrantyDuration: row.warrantyDuration,
       ));
     }
     return result;

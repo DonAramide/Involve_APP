@@ -130,6 +130,17 @@ class ServiceJobPdfGenerator {
                       _totalRow('Amount Paid', job.amountPaid, symbol),
                       pw.Divider(color: PdfColors.black),
                       _totalRow('Balance Due', job.balance, symbol, isBold: true),
+                      if (job.warrantyDuration != null)
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 2),
+                          child: pw.Row(
+                            mainAxisSize: pw.MainAxisSize.min,
+                            children: [
+                              pw.Text('Warranty: ', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                              pw.Text(job.warrantyDuration!, style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ],

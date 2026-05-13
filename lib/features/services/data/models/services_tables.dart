@@ -33,6 +33,7 @@ class ServiceJobs extends Table {
 
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
+  TextColumn get warrantyDuration => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

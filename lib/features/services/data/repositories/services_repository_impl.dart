@@ -69,6 +69,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
     List<ServiceJobItem>? items,
     DateTime? dueDate,
     Uint8List? image,
+    String? warrantyDuration,
   }) async {
     final id = _uuid.v4();
     final counter = await _getNextJobCounter();
@@ -88,6 +89,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
         dueDate: Value(dueDate),
         image: Value(image),
         createdAt: Value(DateTime.now()),
+        warrantyDuration: Value(warrantyDuration),
       ));
 
       // 2. Insert Items if any
@@ -433,6 +435,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
       dueDate: row.dueDate,
       image: row.image,
       createdAt: row.createdAt,
+      warrantyDuration: row.warrantyDuration,
     );
   }
 

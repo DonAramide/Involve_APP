@@ -94,13 +94,19 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   settings.confirmPriceOnSelection, (val) => _update(context, settings.copyWith(confirmPriceOnSelection: val))
                 ),
                 _buildSwitchTile('Enable Payment Methods (Cash/POS/Transfer)', settings.paymentMethodsEnabled, (val) => _update(context, settings.copyWith(paymentMethodsEnabled: val))),
-                if (settings.businessMode != 'school')
+                if (settings.businessMode != 'school') ...[
                   _buildSwitchTile(
                     'Enable Custom Receipt Pricing', 
                     settings.customReceiptPricingEnabled, 
                     (val) => _update(context, settings.copyWith(customReceiptPricingEnabled: val)),
                     isPro: state.userPlan?.isBasic == true,
                   ),
+                  _buildSwitchTile(
+                    'Enable Warranty Support on Invoices', 
+                    settings.warrantyEnabled, 
+                    (val) => _update(context, settings.copyWith(warrantyEnabled: val)),
+                  ),
+                ],
                 _buildDropdownTile(
                   context, 
                   'Currency', 

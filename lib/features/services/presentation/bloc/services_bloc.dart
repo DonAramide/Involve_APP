@@ -56,6 +56,7 @@ class ServicesBloc extends Bloc<ServicesEvent, ServicesState> {
           items: event.items,
           dueDate: event.dueDate,
           image: event.image,
+          warrantyDuration: event.warrantyDuration,
         );
         add(const LoadServicesJobs());
         emit(state.copyWith(successMessage: 'Job created successfully', status: ServicesStatus.success));

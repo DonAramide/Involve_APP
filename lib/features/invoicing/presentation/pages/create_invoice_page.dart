@@ -958,6 +958,27 @@ class _CartSummary extends StatelessWidget {
                           const Divider(),
                           _buildSchoolInfoTile(context, state),
                         ],
+                        if (settings?.warrantyEnabled == true && settings?.businessMode != 'school') ...[
+                          const Divider(),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: DropdownButtonFormField<String?>(
+                              decoration: InputDecoration(
+                                labelText: 'Warranty Duration',
+                                prefixIcon: const Icon(Icons.security, size: 20),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              value: state.warrantyDuration,
+                              items: [null, '1 Month', '2 Months', '3 Months', '4 Months', '5 Months', '6 Months', '9 Months', '1 Year', '2 Years', '3 Years']
+                                  .map((opt) => DropdownMenuItem<String?>(value: opt, child: Text(opt ?? 'None')))
+                                  .toList(),
+                              onChanged: (val) {
+                                context.read<InvoiceBloc>().add(UpdateWarrantyDuration(val));
+                              },
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,

@@ -132,6 +132,16 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         ],
                         const Divider(),
                         _row('Total', invoiceState.total, settings?.currency ?? '₦', isBold: true),
+                        if (invoiceState.warrantyDuration != null) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Warranty:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              Text(invoiceState.warrantyDuration!, style: const TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        ],
                         
                         if (settings?.showAccountDetails == true && settings?.bankName != null) ...[
                           const SizedBox(height: 12),
@@ -271,6 +281,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         termName: invoiceState.termName,
                         academicYearName: invoiceState.academicYearName,
                         studentImage: invoiceState.studentImage,
+                        warrantyDuration: invoiceState.warrantyDuration,
                       );
 
                       _printInvoice(context, invoice, settings!);
@@ -351,6 +362,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         termName: invoiceState.termName,
                         academicYearName: invoiceState.academicYearName,
                         studentImage: invoiceState.studentImage,
+                        warrantyDuration: invoiceState.warrantyDuration,
                       );
 
                       Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));

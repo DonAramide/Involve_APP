@@ -27,6 +27,7 @@ class CreateJob {
     List<ServiceJobItem>? items,
     DateTime? dueDate,
     Uint8List? image,
+    String? warrantyDuration,
   }) {
     return repository.createJob(
       customerId: customerId,
@@ -37,6 +38,7 @@ class CreateJob {
       items: items,
       dueDate: dueDate,
       image: image,
+      warrantyDuration: warrantyDuration,
     );
   }
 }

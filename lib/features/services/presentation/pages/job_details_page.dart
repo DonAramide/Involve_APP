@@ -77,6 +77,12 @@ class JobDetailsPage extends StatelessWidget {
             const Icon(Icons.calendar_today, size: 16, color: Colors.blue),
             const SizedBox(width: 8),
             Text('Due: ${job.dueDate?.toLocal().toString().split(' ')[0] ?? 'Not Set'}'),
+            if (job.warrantyDuration != null) ...[
+              const SizedBox(width: 16),
+              const Icon(Icons.security, size: 16, color: Colors.green),
+              const SizedBox(width: 4),
+              Text('Warranty: ${job.warrantyDuration}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+            ],
           ],
         ),
       ],

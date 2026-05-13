@@ -95,6 +95,7 @@ class Invoice extends Equatable {
   final String? termName;
   final String? academicYearName;
   final Uint8List? studentImage;
+  final String? warrantyDuration;
 
   const Invoice({
     this.id,
@@ -127,6 +128,7 @@ class Invoice extends Equatable {
     this.termName,
     this.academicYearName,
     this.studentImage,
+    this.warrantyDuration,
   });
 
   @override
@@ -160,6 +162,7 @@ class Invoice extends Equatable {
         termName,
         academicYearName,
         studentImage,
+        warrantyDuration,
       ];
 
   Invoice copyWith({
@@ -193,6 +196,7 @@ class Invoice extends Equatable {
     String? termName,
     String? academicYearName,
     Uint8List? studentImage,
+    String? warrantyDuration,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -225,6 +229,7 @@ class Invoice extends Equatable {
       termName: termName ?? this.termName,
       academicYearName: academicYearName ?? this.academicYearName,
       studentImage: studentImage ?? this.studentImage,
+      warrantyDuration: warrantyDuration ?? this.warrantyDuration,
     );
   }
 }

@@ -25,6 +25,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
     on<UpdateSchoolInfo>(_onUpdateSchool);
     on<UpdateBusinessMode>(_onUpdateBusinessMode);
     on<InitiateVirtualAccount>(_onInitiateVirtualAccount);
+    on<UpdateWarrantyDuration>(_onUpdateWarrantyDuration);
   }
 
   Future<void> _onInitiateVirtualAccount(InitiateVirtualAccount event, Emitter<InvoiceState> emit) async {
@@ -156,6 +157,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         termName: state.termName,
         academicYearName: state.academicYearName,
         studentImage: state.studentImage,
+        warrantyDuration: state.warrantyDuration,
       );
 
       await repository.saveInvoice(invoice);
@@ -235,5 +237,9 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
 
   void _onUpdateBusinessMode(UpdateBusinessMode event, Emitter<InvoiceState> emit) {
     emit(state.copyWith(businessMode: event.businessMode));
+  }
+
+  void _onUpdateWarrantyDuration(UpdateWarrantyDuration event, Emitter<InvoiceState> emit) {
+    emit(state.copyWith(warrantyDuration: event.warrantyDuration));
   }
 }

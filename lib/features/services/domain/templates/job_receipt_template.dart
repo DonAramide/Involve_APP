@@ -39,6 +39,9 @@ class JobReceiptTemplate {
     commands.add(TextCommand('Total Amount: $symbol${job.totalAmount.toStringAsFixed(2)}', isBold: true));
     commands.add(TextCommand('Amount Paid: $symbol${job.amountPaid.toStringAsFixed(2)}', isBold: true));
     commands.add(TextCommand('Balance Due: $symbol${job.balance.toStringAsFixed(2)}', isBold: true));
+    if (job.warrantyDuration != null) {
+      commands.add(TextCommand('Warranty: ${job.warrantyDuration}', isBold: true));
+    }
     commands.add(DividerCommand());
 
     // 4. Payment History (Recent 5)

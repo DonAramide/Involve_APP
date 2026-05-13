@@ -28,6 +28,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
   final _laborAmountController = TextEditingController();
   DateTime? _dueDate;
   Uint8List? _imageBytes;
+  String? _warrantyDuration;
 
   List<String> _jobTitlePresets = [];
   bool _showDetailedBilling = false;
@@ -90,7 +91,8 @@ class _CreateJobPageState extends State<CreateJobPage> {
 
   @override
   Widget build(BuildContext context) {
-    final symbol = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    final settings = context.read<SettingsBloc>().state.settings;
+    final symbol = settings?.currency ?? '₦';
 
     return BlocListener<ServicesBloc, ServicesState>(
       listener: (context, state) {
@@ -348,6 +350,24 @@ class _CreateJobPageState extends State<CreateJobPage> {
                   ),
                 const SizedBox(height: 16),
                 _buildDatePicker(),
+                if (settings?.warrantyEnabled == true) ...[
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String?>(
+                    decoration: InputDecoration(
+                      labelText: 'Warranty Duration',
+                      prefixIcon: const Icon(Icons.security, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    value: _warrantyDuration,
+                    items: [null, '1 Month', '2 Months', '3 Months', '4 Months', '5 Months', '6 Months', '9 Months', '1 Year', '2 Years', '3 Years']
+                        .map((opt) => DropdownMenuItem<String?>(value: opt, child: Text(opt ?? 'None')))
+                        .toList(),
+                    onChanged: (val) {
+                      setState(() => _warrantyDuration = val);
+                    },
+                  ),
+                ],
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
@@ -599,6 +619,7 @@ class _CreateJobPageState extends State<CreateJobPage> {
             items: _selectedItems,
             dueDate: _dueDate,
             image: _imageBytes,
+            warrantyDuration: _warrantyDuration,
           ));
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(

@@ -69,6 +69,8 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       if (invoice.taxAmount > 0) 
         TextCommand(_formatRow('Tax', CurrencyFormatter.format(invoice.taxAmount), width)),
       TextCommand(_formatRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      if (invoice.warrantyDuration != null)
+        TextCommand(_formatRow('WARRANTY', invoice.warrantyDuration!, width)),
       if (invoice.amountPaid > 0 && invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
@@ -150,6 +152,8 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       if (invoice.discountAmount > 0) 
         TextCommand(_formatRow('Discount', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
       TextCommand(_formatRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      if (invoice.warrantyDuration != null)
+        TextCommand(_formatRow('WARRANTY', invoice.warrantyDuration!, width)),
       if (invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
@@ -208,6 +212,8 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
       }),
       TextCommand('-' * width),
       TextCommand('EXPECTED: ${settings.currency}${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', align: 'right', isBold: true),
+      if (invoice.warrantyDuration != null)
+        TextCommand('WARRANTY: ${invoice.warrantyDuration}', align: 'right'),
       if (invoice.balanceAmount > 0) ...[
         TextCommand('PAID: ${CurrencyFormatter.format(invoice.amountPaid)}', align: 'right'),
         TextCommand('BAL:  ${CurrencyFormatter.format(invoice.balanceAmount)}', align: 'right'),
@@ -283,6 +289,8 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
         TextCommand(_formatSummaryRow('DISCOUNT:', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
       TextCommand('-' * width),
       TextCommand(_formatSummaryRow('EXPECTED AMOUNT:', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      if (invoice.warrantyDuration != null)
+        TextCommand(_formatSummaryRow('WARRANTY:', invoice.warrantyDuration!, width)),
       if (invoice.amountPaid > 0 && invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
         TextCommand(_formatSummaryRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
@@ -408,6 +416,8 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
       TextCommand('-' * width),
       SizedBoxCommand(height: 1),
       TextCommand(_formatRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      if (invoice.warrantyDuration != null)
+        TextCommand(_formatRow('WARRANTY', invoice.warrantyDuration!, width)),
       if (invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
@@ -475,6 +485,8 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
       if (invoice.discountAmount > 0)
         TextCommand(_formatRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}', width)),
       TextCommand(_formatRow('EXPECTED AMOUNT:', '${settings.currency} ${CurrencyFormatter.format(settings.customReceiptPricingEnabled && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', width), isBold: true),
+      if (invoice.warrantyDuration != null)
+        TextCommand(_formatRow('WARRANTY:', invoice.warrantyDuration!, width)),
       if (invoice.amountPaid > 0 && invoice.balanceAmount > 0) ...[
         TextCommand('-' * width),
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),

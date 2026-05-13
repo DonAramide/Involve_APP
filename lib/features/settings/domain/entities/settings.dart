@@ -66,6 +66,7 @@ class AppSettings extends Equatable {
   final String currencySubunit;
   final Uint8List? adminSignature;
   final bool showAdminSignature;
+  final bool warrantyEnabled;
 
 
   const AppSettings({
@@ -124,6 +125,7 @@ class AppSettings extends Equatable {
     this.logoSvg,
     this.adminSignature,
     this.showAdminSignature = false,
+    this.warrantyEnabled = false,
 
   });
 
@@ -183,6 +185,7 @@ class AppSettings extends Equatable {
     String? logoSvg,
     Uint8List? adminSignature,
     bool? showAdminSignature,
+    bool? warrantyEnabled,
 
   }) {
     return AppSettings(
@@ -241,6 +244,7 @@ class AppSettings extends Equatable {
       logoSvg: logoSvg ?? this.logoSvg,
       adminSignature: adminSignature ?? this.adminSignature,
       showAdminSignature: showAdminSignature ?? this.showAdminSignature,
+      warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
 
     );
   }
@@ -302,6 +306,7 @@ class AppSettings extends Equatable {
         logoSvg,
         adminSignature,
         showAdminSignature,
+        warrantyEnabled,
 
       ];
 }

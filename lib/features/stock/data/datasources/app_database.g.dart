@@ -1568,6 +1568,12 @@ class $InvoicesTable extends Invoices
   late final GeneratedColumn<Uint8List> studentImage =
       GeneratedColumn<Uint8List>('student_image', aliasedName, true,
           type: DriftSqlType.blob, requiredDuringInsert: false);
+  static const VerificationMeta _warrantyDurationMeta =
+      const VerificationMeta('warrantyDuration');
+  @override
+  late final GeneratedColumn<String> warrantyDuration = GeneratedColumn<String>(
+      'warranty_duration', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -1601,7 +1607,8 @@ class $InvoicesTable extends Invoices
         className,
         termName,
         academicYearName,
-        studentImage
+        studentImage,
+        warrantyDuration
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1786,6 +1793,12 @@ class $InvoicesTable extends Invoices
           studentImage.isAcceptableOrUnknown(
               data['student_image']!, _studentImageMeta));
     }
+    if (data.containsKey('warranty_duration')) {
+      context.handle(
+          _warrantyDurationMeta,
+          warrantyDuration.isAcceptableOrUnknown(
+              data['warranty_duration']!, _warrantyDurationMeta));
+    }
     return context;
   }
 
@@ -1859,6 +1872,8 @@ class $InvoicesTable extends Invoices
           DriftSqlType.string, data['${effectivePrefix}academic_year_name']),
       studentImage: attachedDatabase.typeMapping
           .read(DriftSqlType.blob, data['${effectivePrefix}student_image']),
+      warrantyDuration: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}warranty_duration']),
     );
   }
 
@@ -1901,6 +1916,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
   final String? termName;
   final String? academicYearName;
   final Uint8List? studentImage;
+  final String? warrantyDuration;
   const InvoiceTable(
       {required this.id,
       required this.invoiceNumber,
@@ -1933,7 +1949,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       this.className,
       this.termName,
       this.academicYearName,
-      this.studentImage});
+      this.studentImage,
+      this.warrantyDuration});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2006,6 +2023,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
     }
     if (!nullToAbsent || studentImage != null) {
       map['student_image'] = Variable<Uint8List>(studentImage);
+    }
+    if (!nullToAbsent || warrantyDuration != null) {
+      map['warranty_duration'] = Variable<String>(warrantyDuration);
     }
     return map;
   }
@@ -2080,6 +2100,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       studentImage: studentImage == null && nullToAbsent
           ? const Value.absent()
           : Value(studentImage),
+      warrantyDuration: warrantyDuration == null && nullToAbsent
+          ? const Value.absent()
+          : Value(warrantyDuration),
     );
   }
 
@@ -2119,6 +2142,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       termName: serializer.fromJson<String?>(json['termName']),
       academicYearName: serializer.fromJson<String?>(json['academicYearName']),
       studentImage: serializer.fromJson<Uint8List?>(json['studentImage']),
+      warrantyDuration: serializer.fromJson<String?>(json['warrantyDuration']),
     );
   }
   @override
@@ -2157,6 +2181,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       'termName': serializer.toJson<String?>(termName),
       'academicYearName': serializer.toJson<String?>(academicYearName),
       'studentImage': serializer.toJson<Uint8List?>(studentImage),
+      'warrantyDuration': serializer.toJson<String?>(warrantyDuration),
     };
   }
 
@@ -2192,7 +2217,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           Value<String?> className = const Value.absent(),
           Value<String?> termName = const Value.absent(),
           Value<String?> academicYearName = const Value.absent(),
-          Value<Uint8List?> studentImage = const Value.absent()}) =>
+          Value<Uint8List?> studentImage = const Value.absent(),
+          Value<String?> warrantyDuration = const Value.absent()}) =>
       InvoiceTable(
         id: id ?? this.id,
         invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -2238,6 +2264,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
             : this.academicYearName,
         studentImage:
             studentImage.present ? studentImage.value : this.studentImage,
+        warrantyDuration: warrantyDuration.present
+            ? warrantyDuration.value
+            : this.warrantyDuration,
       );
   InvoiceTable copyWithCompanion(InvoicesCompanion data) {
     return InvoiceTable(
@@ -2304,6 +2333,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       studentImage: data.studentImage.present
           ? data.studentImage.value
           : this.studentImage,
+      warrantyDuration: data.warrantyDuration.present
+          ? data.warrantyDuration.value
+          : this.warrantyDuration,
     );
   }
 
@@ -2341,7 +2373,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ..write('className: $className, ')
           ..write('termName: $termName, ')
           ..write('academicYearName: $academicYearName, ')
-          ..write('studentImage: $studentImage')
+          ..write('studentImage: $studentImage, ')
+          ..write('warrantyDuration: $warrantyDuration')
           ..write(')'))
         .toString();
   }
@@ -2379,7 +2412,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         className,
         termName,
         academicYearName,
-        $driftBlobEquality.hash(studentImage)
+        $driftBlobEquality.hash(studentImage),
+        warrantyDuration
       ]);
   @override
   bool operator ==(Object other) =>
@@ -2416,7 +2450,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           other.className == this.className &&
           other.termName == this.termName &&
           other.academicYearName == this.academicYearName &&
-          $driftBlobEquality.equals(other.studentImage, this.studentImage));
+          $driftBlobEquality.equals(other.studentImage, this.studentImage) &&
+          other.warrantyDuration == this.warrantyDuration);
 }
 
 class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
@@ -2452,6 +2487,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
   final Value<String?> termName;
   final Value<String?> academicYearName;
   final Value<Uint8List?> studentImage;
+  final Value<String?> warrantyDuration;
   const InvoicesCompanion({
     this.id = const Value.absent(),
     this.invoiceNumber = const Value.absent(),
@@ -2485,6 +2521,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.termName = const Value.absent(),
     this.academicYearName = const Value.absent(),
     this.studentImage = const Value.absent(),
+    this.warrantyDuration = const Value.absent(),
   });
   InvoicesCompanion.insert({
     this.id = const Value.absent(),
@@ -2519,6 +2556,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.termName = const Value.absent(),
     this.academicYearName = const Value.absent(),
     this.studentImage = const Value.absent(),
+    this.warrantyDuration = const Value.absent(),
   })  : invoiceNumber = Value(invoiceNumber),
         subtotal = Value(subtotal),
         taxAmount = Value(taxAmount),
@@ -2558,6 +2596,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     Expression<String>? termName,
     Expression<String>? academicYearName,
     Expression<Uint8List>? studentImage,
+    Expression<String>? warrantyDuration,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2592,6 +2631,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       if (termName != null) 'term_name': termName,
       if (academicYearName != null) 'academic_year_name': academicYearName,
       if (studentImage != null) 'student_image': studentImage,
+      if (warrantyDuration != null) 'warranty_duration': warrantyDuration,
     });
   }
 
@@ -2627,7 +2667,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       Value<String?>? className,
       Value<String?>? termName,
       Value<String?>? academicYearName,
-      Value<Uint8List?>? studentImage}) {
+      Value<Uint8List?>? studentImage,
+      Value<String?>? warrantyDuration}) {
     return InvoicesCompanion(
       id: id ?? this.id,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -2661,6 +2702,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       termName: termName ?? this.termName,
       academicYearName: academicYearName ?? this.academicYearName,
       studentImage: studentImage ?? this.studentImage,
+      warrantyDuration: warrantyDuration ?? this.warrantyDuration,
     );
   }
 
@@ -2763,6 +2805,9 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     if (studentImage.present) {
       map['student_image'] = Variable<Uint8List>(studentImage.value);
     }
+    if (warrantyDuration.present) {
+      map['warranty_duration'] = Variable<String>(warrantyDuration.value);
+    }
     return map;
   }
 
@@ -2800,7 +2845,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
           ..write('className: $className, ')
           ..write('termName: $termName, ')
           ..write('academicYearName: $academicYearName, ')
-          ..write('studentImage: $studentImage')
+          ..write('studentImage: $studentImage, ')
+          ..write('warrantyDuration: $warrantyDuration')
           ..write(')'))
         .toString();
   }
@@ -3991,6 +4037,16 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("show_admin_signature" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _warrantyEnabledMeta =
+      const VerificationMeta('warrantyEnabled');
+  @override
+  late final GeneratedColumn<bool> warrantyEnabled = GeneratedColumn<bool>(
+      'warranty_enabled', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("warranty_enabled" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4047,7 +4103,8 @@ class $SettingsTable extends Settings
         currencyName,
         currencySubunit,
         adminSignature,
-        showAdminSignature
+        showAdminSignature,
+        warrantyEnabled
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4363,6 +4420,12 @@ class $SettingsTable extends Settings
           showAdminSignature.isAcceptableOrUnknown(
               data['show_admin_signature']!, _showAdminSignatureMeta));
     }
+    if (data.containsKey('warranty_enabled')) {
+      context.handle(
+          _warrantyEnabledMeta,
+          warrantyEnabled.isAcceptableOrUnknown(
+              data['warranty_enabled']!, _warrantyEnabledMeta));
+    }
     return context;
   }
 
@@ -4489,6 +4552,8 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.blob, data['${effectivePrefix}admin_signature']),
       showAdminSignature: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}show_admin_signature'])!,
+      warrantyEnabled: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}warranty_enabled'])!,
     );
   }
 
@@ -4554,6 +4619,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final String currencySubunit;
   final Uint8List? adminSignature;
   final bool showAdminSignature;
+  final bool warrantyEnabled;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -4609,7 +4675,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.currencyName,
       required this.currencySubunit,
       this.adminSignature,
-      required this.showAdminSignature});
+      required this.showAdminSignature,
+      required this.warrantyEnabled});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4698,6 +4765,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       map['admin_signature'] = Variable<Uint8List>(adminSignature);
     }
     map['show_admin_signature'] = Variable<bool>(showAdminSignature);
+    map['warranty_enabled'] = Variable<bool>(warrantyEnabled);
     return map;
   }
 
@@ -4783,6 +4851,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ? const Value.absent()
           : Value(adminSignature),
       showAdminSignature: Value(showAdminSignature),
+      warrantyEnabled: Value(warrantyEnabled),
     );
   }
 
@@ -4857,6 +4926,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       currencySubunit: serializer.fromJson<String>(json['currencySubunit']),
       adminSignature: serializer.fromJson<Uint8List?>(json['adminSignature']),
       showAdminSignature: serializer.fromJson<bool>(json['showAdminSignature']),
+      warrantyEnabled: serializer.fromJson<bool>(json['warrantyEnabled']),
     );
   }
   @override
@@ -4922,6 +4992,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'currencySubunit': serializer.toJson<String>(currencySubunit),
       'adminSignature': serializer.toJson<Uint8List?>(adminSignature),
       'showAdminSignature': serializer.toJson<bool>(showAdminSignature),
+      'warrantyEnabled': serializer.toJson<bool>(warrantyEnabled),
     };
   }
 
@@ -4980,7 +5051,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           String? currencyName,
           String? currencySubunit,
           Value<Uint8List?> adminSignature = const Value.absent(),
-          bool? showAdminSignature}) =>
+          bool? showAdminSignature,
+          bool? warrantyEnabled}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -5049,6 +5121,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         adminSignature:
             adminSignature.present ? adminSignature.value : this.adminSignature,
         showAdminSignature: showAdminSignature ?? this.showAdminSignature,
+        warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -5179,6 +5252,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showAdminSignature: data.showAdminSignature.present
           ? data.showAdminSignature.value
           : this.showAdminSignature,
+      warrantyEnabled: data.warrantyEnabled.present
+          ? data.warrantyEnabled.value
+          : this.warrantyEnabled,
     );
   }
 
@@ -5239,7 +5315,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('currencyName: $currencyName, ')
           ..write('currencySubunit: $currencySubunit, ')
           ..write('adminSignature: $adminSignature, ')
-          ..write('showAdminSignature: $showAdminSignature')
+          ..write('showAdminSignature: $showAdminSignature, ')
+          ..write('warrantyEnabled: $warrantyEnabled')
           ..write(')'))
         .toString();
   }
@@ -5300,7 +5377,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         currencyName,
         currencySubunit,
         $driftBlobEquality.hash(adminSignature),
-        showAdminSignature
+        showAdminSignature,
+        warrantyEnabled
       ]);
   @override
   bool operator ==(Object other) =>
@@ -5362,7 +5440,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.currencySubunit == this.currencySubunit &&
           $driftBlobEquality.equals(
               other.adminSignature, this.adminSignature) &&
-          other.showAdminSignature == this.showAdminSignature);
+          other.showAdminSignature == this.showAdminSignature &&
+          other.warrantyEnabled == this.warrantyEnabled);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -5421,6 +5500,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<String> currencySubunit;
   final Value<Uint8List?> adminSignature;
   final Value<bool> showAdminSignature;
+  final Value<bool> warrantyEnabled;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -5477,6 +5557,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.currencySubunit = const Value.absent(),
     this.adminSignature = const Value.absent(),
     this.showAdminSignature = const Value.absent(),
+    this.warrantyEnabled = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -5534,6 +5615,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.currencySubunit = const Value.absent(),
     this.adminSignature = const Value.absent(),
     this.showAdminSignature = const Value.absent(),
+    this.warrantyEnabled = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -5593,6 +5675,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<String>? currencySubunit,
     Expression<Uint8List>? adminSignature,
     Expression<bool>? showAdminSignature,
+    Expression<bool>? warrantyEnabled,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -5667,6 +5750,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (adminSignature != null) 'admin_signature': adminSignature,
       if (showAdminSignature != null)
         'show_admin_signature': showAdminSignature,
+      if (warrantyEnabled != null) 'warranty_enabled': warrantyEnabled,
     });
   }
 
@@ -5725,7 +5809,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String>? currencyName,
       Value<String>? currencySubunit,
       Value<Uint8List?>? adminSignature,
-      Value<bool>? showAdminSignature}) {
+      Value<bool>? showAdminSignature,
+      Value<bool>? warrantyEnabled}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -5789,6 +5874,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       currencySubunit: currencySubunit ?? this.currencySubunit,
       adminSignature: adminSignature ?? this.adminSignature,
       showAdminSignature: showAdminSignature ?? this.showAdminSignature,
+      warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
     );
   }
 
@@ -5967,6 +6053,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (showAdminSignature.present) {
       map['show_admin_signature'] = Variable<bool>(showAdminSignature.value);
     }
+    if (warrantyEnabled.present) {
+      map['warranty_enabled'] = Variable<bool>(warrantyEnabled.value);
+    }
     return map;
   }
 
@@ -6027,7 +6116,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('currencyName: $currencyName, ')
           ..write('currencySubunit: $currencySubunit, ')
           ..write('adminSignature: $adminSignature, ')
-          ..write('showAdminSignature: $showAdminSignature')
+          ..write('showAdminSignature: $showAdminSignature, ')
+          ..write('warrantyEnabled: $warrantyEnabled')
           ..write(')'))
         .toString();
   }
@@ -14860,6 +14950,12 @@ class $ServiceJobsTable extends ServiceJobs
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant('pending'));
+  static const VerificationMeta _warrantyDurationMeta =
+      const VerificationMeta('warrantyDuration');
+  @override
+  late final GeneratedColumn<String> warrantyDuration = GeneratedColumn<String>(
+      'warranty_duration', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -14875,7 +14971,8 @@ class $ServiceJobsTable extends ServiceJobs
         dueDate,
         image,
         createdAt,
-        syncStatus
+        syncStatus,
+        warrantyDuration
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -14966,6 +15063,12 @@ class $ServiceJobsTable extends ServiceJobs
           syncStatus.isAcceptableOrUnknown(
               data['sync_status']!, _syncStatusMeta));
     }
+    if (data.containsKey('warranty_duration')) {
+      context.handle(
+          _warrantyDurationMeta,
+          warrantyDuration.isAcceptableOrUnknown(
+              data['warranty_duration']!, _warrantyDurationMeta));
+    }
     return context;
   }
 
@@ -15003,6 +15106,8 @@ class $ServiceJobsTable extends ServiceJobs
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       syncStatus: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+      warrantyDuration: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}warranty_duration']),
     );
   }
 
@@ -15027,6 +15132,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
   final Uint8List? image;
   final DateTime createdAt;
   final String syncStatus;
+  final String? warrantyDuration;
   const ServiceJobTable(
       {required this.id,
       required this.jobId,
@@ -15041,7 +15147,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       this.dueDate,
       this.image,
       required this.createdAt,
-      required this.syncStatus});
+      required this.syncStatus,
+      this.warrantyDuration});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -15065,6 +15172,9 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || warrantyDuration != null) {
+      map['warranty_duration'] = Variable<String>(warrantyDuration);
+    }
     return map;
   }
 
@@ -15089,6 +15199,9 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
           image == null && nullToAbsent ? const Value.absent() : Value(image),
       createdAt: Value(createdAt),
       syncStatus: Value(syncStatus),
+      warrantyDuration: warrantyDuration == null && nullToAbsent
+          ? const Value.absent()
+          : Value(warrantyDuration),
     );
   }
 
@@ -15110,6 +15223,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       image: serializer.fromJson<Uint8List?>(json['image']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      warrantyDuration: serializer.fromJson<String?>(json['warrantyDuration']),
     );
   }
   @override
@@ -15130,6 +15244,7 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       'image': serializer.toJson<Uint8List?>(image),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'syncStatus': serializer.toJson<String>(syncStatus),
+      'warrantyDuration': serializer.toJson<String?>(warrantyDuration),
     };
   }
 
@@ -15147,7 +15262,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
           Value<DateTime?> dueDate = const Value.absent(),
           Value<Uint8List?> image = const Value.absent(),
           DateTime? createdAt,
-          String? syncStatus}) =>
+          String? syncStatus,
+          Value<String?> warrantyDuration = const Value.absent()}) =>
       ServiceJobTable(
         id: id ?? this.id,
         jobId: jobId ?? this.jobId,
@@ -15163,6 +15279,9 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
         image: image.present ? image.value : this.image,
         createdAt: createdAt ?? this.createdAt,
         syncStatus: syncStatus ?? this.syncStatus,
+        warrantyDuration: warrantyDuration.present
+            ? warrantyDuration.value
+            : this.warrantyDuration,
       );
   ServiceJobTable copyWithCompanion(ServiceJobsCompanion data) {
     return ServiceJobTable(
@@ -15186,6 +15305,9 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       syncStatus:
           data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+      warrantyDuration: data.warrantyDuration.present
+          ? data.warrantyDuration.value
+          : this.warrantyDuration,
     );
   }
 
@@ -15205,7 +15327,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
           ..write('dueDate: $dueDate, ')
           ..write('image: $image, ')
           ..write('createdAt: $createdAt, ')
-          ..write('syncStatus: $syncStatus')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('warrantyDuration: $warrantyDuration')
           ..write(')'))
         .toString();
   }
@@ -15225,7 +15348,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
       dueDate,
       $driftBlobEquality.hash(image),
       createdAt,
-      syncStatus);
+      syncStatus,
+      warrantyDuration);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -15243,7 +15367,8 @@ class ServiceJobTable extends DataClass implements Insertable<ServiceJobTable> {
           other.dueDate == this.dueDate &&
           $driftBlobEquality.equals(other.image, this.image) &&
           other.createdAt == this.createdAt &&
-          other.syncStatus == this.syncStatus);
+          other.syncStatus == this.syncStatus &&
+          other.warrantyDuration == this.warrantyDuration);
 }
 
 class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
@@ -15261,6 +15386,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
   final Value<Uint8List?> image;
   final Value<DateTime> createdAt;
   final Value<String> syncStatus;
+  final Value<String?> warrantyDuration;
   final Value<int> rowid;
   const ServiceJobsCompanion({
     this.id = const Value.absent(),
@@ -15277,6 +15403,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
     this.image = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
+    this.warrantyDuration = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ServiceJobsCompanion.insert({
@@ -15294,6 +15421,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
     this.image = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
+    this.warrantyDuration = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         jobId = Value(jobId),
@@ -15316,6 +15444,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
     Expression<Uint8List>? image,
     Expression<DateTime>? createdAt,
     Expression<String>? syncStatus,
+    Expression<String>? warrantyDuration,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -15333,6 +15462,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
       if (image != null) 'image': image,
       if (createdAt != null) 'created_at': createdAt,
       if (syncStatus != null) 'sync_status': syncStatus,
+      if (warrantyDuration != null) 'warranty_duration': warrantyDuration,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -15352,6 +15482,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
       Value<Uint8List?>? image,
       Value<DateTime>? createdAt,
       Value<String>? syncStatus,
+      Value<String?>? warrantyDuration,
       Value<int>? rowid}) {
     return ServiceJobsCompanion(
       id: id ?? this.id,
@@ -15368,6 +15499,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
       image: image ?? this.image,
       createdAt: createdAt ?? this.createdAt,
       syncStatus: syncStatus ?? this.syncStatus,
+      warrantyDuration: warrantyDuration ?? this.warrantyDuration,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -15417,6 +15549,9 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
     if (syncStatus.present) {
       map['sync_status'] = Variable<String>(syncStatus.value);
     }
+    if (warrantyDuration.present) {
+      map['warranty_duration'] = Variable<String>(warrantyDuration.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -15440,6 +15575,7 @@ class ServiceJobsCompanion extends UpdateCompanion<ServiceJobTable> {
           ..write('image: $image, ')
           ..write('createdAt: $createdAt, ')
           ..write('syncStatus: $syncStatus, ')
+          ..write('warrantyDuration: $warrantyDuration, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -20027,6 +20163,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> termName,
   Value<String?> academicYearName,
   Value<Uint8List?> studentImage,
+  Value<String?> warrantyDuration,
 });
 typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<int> id,
@@ -20061,6 +20198,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> termName,
   Value<String?> academicYearName,
   Value<Uint8List?> studentImage,
+  Value<String?> warrantyDuration,
 });
 
 final class $$InvoicesTableReferences
@@ -20208,6 +20346,10 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<Uint8List> get studentImage => $composableBuilder(
       column: $table.studentImage, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get warrantyDuration => $composableBuilder(
+      column: $table.warrantyDuration,
+      builder: (column) => ColumnFilters(column));
 
   Expression<bool> invoiceItemsRefs(
       Expression<bool> Function($$InvoiceItemsTableFilterComposer f) f) {
@@ -20370,6 +20512,10 @@ class $$InvoicesTableOrderingComposer
   ColumnOrderings<Uint8List> get studentImage => $composableBuilder(
       column: $table.studentImage,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get warrantyDuration => $composableBuilder(
+      column: $table.warrantyDuration,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$InvoicesTableAnnotationComposer
@@ -20477,6 +20623,9 @@ class $$InvoicesTableAnnotationComposer
   GeneratedColumn<Uint8List> get studentImage => $composableBuilder(
       column: $table.studentImage, builder: (column) => column);
 
+  GeneratedColumn<String> get warrantyDuration => $composableBuilder(
+      column: $table.warrantyDuration, builder: (column) => column);
+
   Expression<T> invoiceItemsRefs<T extends Object>(
       Expression<T> Function($$InvoiceItemsTableAnnotationComposer a) f) {
     final $$InvoiceItemsTableAnnotationComposer composer = $composerBuilder(
@@ -20575,6 +20724,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<String?> termName = const Value.absent(),
             Value<String?> academicYearName = const Value.absent(),
             Value<Uint8List?> studentImage = const Value.absent(),
+            Value<String?> warrantyDuration = const Value.absent(),
           }) =>
               InvoicesCompanion(
             id: id,
@@ -20609,6 +20759,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             termName: termName,
             academicYearName: academicYearName,
             studentImage: studentImage,
+            warrantyDuration: warrantyDuration,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -20643,6 +20794,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<String?> termName = const Value.absent(),
             Value<String?> academicYearName = const Value.absent(),
             Value<Uint8List?> studentImage = const Value.absent(),
+            Value<String?> warrantyDuration = const Value.absent(),
           }) =>
               InvoicesCompanion.insert(
             id: id,
@@ -20677,6 +20829,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             termName: termName,
             academicYearName: academicYearName,
             studentImage: studentImage,
+            warrantyDuration: warrantyDuration,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -21289,6 +21442,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<String> currencySubunit,
   Value<Uint8List?> adminSignature,
   Value<bool> showAdminSignature,
+  Value<bool> warrantyEnabled,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -21346,6 +21500,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String> currencySubunit,
   Value<Uint8List?> adminSignature,
   Value<bool> showAdminSignature,
+  Value<bool> warrantyEnabled,
 });
 
 class $$SettingsTableFilterComposer
@@ -21546,6 +21701,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get showAdminSignature => $composableBuilder(
       column: $table.showAdminSignature,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get warrantyEnabled => $composableBuilder(
+      column: $table.warrantyEnabled,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -21756,6 +21915,10 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get showAdminSignature => $composableBuilder(
       column: $table.showAdminSignature,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get warrantyEnabled => $composableBuilder(
+      column: $table.warrantyEnabled,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -21931,6 +22094,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get showAdminSignature => $composableBuilder(
       column: $table.showAdminSignature, builder: (column) => column);
+
+  GeneratedColumn<bool> get warrantyEnabled => $composableBuilder(
+      column: $table.warrantyEnabled, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -22014,6 +22180,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String> currencySubunit = const Value.absent(),
             Value<Uint8List?> adminSignature = const Value.absent(),
             Value<bool> showAdminSignature = const Value.absent(),
+            Value<bool> warrantyEnabled = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -22071,6 +22238,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             currencySubunit: currencySubunit,
             adminSignature: adminSignature,
             showAdminSignature: showAdminSignature,
+            warrantyEnabled: warrantyEnabled,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -22128,6 +22296,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String> currencySubunit = const Value.absent(),
             Value<Uint8List?> adminSignature = const Value.absent(),
             Value<bool> showAdminSignature = const Value.absent(),
+            Value<bool> warrantyEnabled = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -22185,6 +22354,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             currencySubunit: currencySubunit,
             adminSignature: adminSignature,
             showAdminSignature: showAdminSignature,
+            warrantyEnabled: warrantyEnabled,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -28587,6 +28757,7 @@ typedef $$ServiceJobsTableCreateCompanionBuilder = ServiceJobsCompanion
   Value<Uint8List?> image,
   Value<DateTime> createdAt,
   Value<String> syncStatus,
+  Value<String?> warrantyDuration,
   Value<int> rowid,
 });
 typedef $$ServiceJobsTableUpdateCompanionBuilder = ServiceJobsCompanion
@@ -28605,6 +28776,7 @@ typedef $$ServiceJobsTableUpdateCompanionBuilder = ServiceJobsCompanion
   Value<Uint8List?> image,
   Value<DateTime> createdAt,
   Value<String> syncStatus,
+  Value<String?> warrantyDuration,
   Value<int> rowid,
 });
 
@@ -28710,6 +28882,10 @@ class $$ServiceJobsTableFilterComposer
 
   ColumnFilters<String> get syncStatus => $composableBuilder(
       column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get warrantyDuration => $composableBuilder(
+      column: $table.warrantyDuration,
+      builder: (column) => ColumnFilters(column));
 
   $$ServiceCustomersTableFilterComposer get customerId {
     final $$ServiceCustomersTableFilterComposer composer = $composerBuilder(
@@ -28822,6 +28998,10 @@ class $$ServiceJobsTableOrderingComposer
   ColumnOrderings<String> get syncStatus => $composableBuilder(
       column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get warrantyDuration => $composableBuilder(
+      column: $table.warrantyDuration,
+      builder: (column) => ColumnOrderings(column));
+
   $$ServiceCustomersTableOrderingComposer get customerId {
     final $$ServiceCustomersTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -28890,6 +29070,9 @@ class $$ServiceJobsTableAnnotationComposer
 
   GeneratedColumn<String> get syncStatus => $composableBuilder(
       column: $table.syncStatus, builder: (column) => column);
+
+  GeneratedColumn<String> get warrantyDuration => $composableBuilder(
+      column: $table.warrantyDuration, builder: (column) => column);
 
   $$ServiceCustomersTableAnnotationComposer get customerId {
     final $$ServiceCustomersTableAnnotationComposer composer = $composerBuilder(
@@ -28994,6 +29177,7 @@ class $$ServiceJobsTableTableManager extends RootTableManager<
             Value<Uint8List?> image = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<String> syncStatus = const Value.absent(),
+            Value<String?> warrantyDuration = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ServiceJobsCompanion(
@@ -29011,6 +29195,7 @@ class $$ServiceJobsTableTableManager extends RootTableManager<
             image: image,
             createdAt: createdAt,
             syncStatus: syncStatus,
+            warrantyDuration: warrantyDuration,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -29028,6 +29213,7 @@ class $$ServiceJobsTableTableManager extends RootTableManager<
             Value<Uint8List?> image = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<String> syncStatus = const Value.absent(),
+            Value<String?> warrantyDuration = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ServiceJobsCompanion.insert(
@@ -29045,6 +29231,7 @@ class $$ServiceJobsTableTableManager extends RootTableManager<
             image: image,
             createdAt: createdAt,
             syncStatus: syncStatus,
+            warrantyDuration: warrantyDuration,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

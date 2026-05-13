@@ -28,6 +28,7 @@ class CreateServiceJob extends ServicesEvent {
   final List<ServiceJobItem> items;
   final DateTime? dueDate;
   final Uint8List? image;
+  final String? warrantyDuration;
 
   const CreateServiceJob({
     required this.customerId,
@@ -38,10 +39,11 @@ class CreateServiceJob extends ServicesEvent {
     this.items = const [],
     this.dueDate,
     this.image,
+    this.warrantyDuration,
   });
 
   @override
-  List<Object?> get props => [customerId, title, description, totalAmount, laborAmount, items, dueDate, image];
+  List<Object?> get props => [customerId, title, description, totalAmount, laborAmount, items, dueDate, image, warrantyDuration];
 }
 
 class AddServicePayment extends ServicesEvent {

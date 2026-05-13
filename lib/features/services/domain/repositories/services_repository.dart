@@ -18,6 +18,7 @@ abstract class IServicesRepository {
     List<ServiceJobItem>? items,
     DateTime? dueDate,
     Uint8List? image,
+    String? warrantyDuration,
   });
   Future<void> addPayment({
     required String jobId,

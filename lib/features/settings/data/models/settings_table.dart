@@ -70,5 +70,6 @@ class Settings extends Table {
   
   BlobColumn get adminSignature => blob().nullable()();
   BoolColumn get showAdminSignature => boolean().withDefault(const Constant(false))();
+  BoolColumn get warrantyEnabled => boolean().withDefault(const Constant(false))();
 
 }

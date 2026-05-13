@@ -127,29 +127,7 @@ ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ledger_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lesson_notes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE ai_usage ENABLE ROW LEVEL SECURITY;
-ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
-
--- Dynamic Policies (Requires auth mapping)
--- Note: Replace 'tenant_id' in JWT claims check with your actual claim path if using custom claims
-CREATE POLICY "Tenants - User View" ON tenants FOR SELECT USING (id IN (SELECT tenant_id FROM users WHERE id = auth.uid()));
-CREATE POLICY "Users - Tenant Isolation" ON users FOR ALL USING (tenant_id IN (SELECT tenant_id FROM users WHERE id = auth.uid()));
-CREATE POLICY "Finance - Tenant Isolation" ON ledger_entries FOR ALL USING (tenant_id IN (SELECT tenant_id FROM users WHERE id = auth.uid()));
-CREATE POLICY "Wallets - Tenant Isolation" ON wallets FOR ALL USING (tenant_id IN (SELECT tenant_id FROM users WHERE id = auth.uid()));
-CREATE POLICY "Notes - Layered Access" ON lesson_notes FOR SELECT USING (tenant_id IN (SELECT tenant_id FROM users WHERE id = auth.uid()) OR is_global = TRUE);
-CREATE POLICY "Subscriptions - Tenant Isolation" ON subscriptions FOR SELECT USING (tenant_id IN (SELECT tenant_id FROM users WHERE id = auth.uid()));
-
--- 12. Helper Functions
-CREATE OR REPLACE FUNCTION update_wallet_balance()
-RETURNS TRIGGER AS $$
-BEGIN
-    UPDATE wallets 
-    SET balance = balance + NEW.amount,
-        updated_at = NOW()
-    WHERE tenant_id = NEW.tenant_id;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+https://api.quaser.io/v1
 
 -- Trigger to auto-update wallet on ledger entry
 CREATE TRIGGER tr_update_wallet_on_ledger

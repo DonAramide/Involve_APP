@@ -17,6 +17,7 @@ class ServiceJob extends Equatable {
   final DateTime? dueDate;
   final Uint8List? image;
   final DateTime createdAt;
+  final String? warrantyDuration;
 
   const ServiceJob({
     required this.id,
@@ -34,6 +35,7 @@ class ServiceJob extends Equatable {
     this.dueDate,
     this.image,
     required this.createdAt,
+    this.warrantyDuration,
   });
 
   @override
@@ -53,6 +55,7 @@ class ServiceJob extends Equatable {
         dueDate,
         image,
         createdAt,
+        warrantyDuration,
       ];
 }
 

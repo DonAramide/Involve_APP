@@ -113,6 +113,13 @@ class SaveInvoice extends InvoiceEvent {
 
 class ResetInvoice extends InvoiceEvent {}
 
+class UpdateWarrantyDuration extends InvoiceEvent {
+  final String? warrantyDuration;
+  UpdateWarrantyDuration(this.warrantyDuration);
+  @override
+  List<Object?> get props => [warrantyDuration];
+}
+
 class InitiateVirtualAccount extends InvoiceEvent {
   final double amount;
   final String? customerName;
@@ -176,6 +183,7 @@ class InvoiceState extends Equatable {
   final String? academicYearName;
   final Uint8List? studentImage;
   final bool paymentSuccess;
+  final String? warrantyDuration;
 
   const InvoiceState({
     this.items = const [],
@@ -209,6 +217,7 @@ class InvoiceState extends Equatable {
     this.academicYearName,
     this.studentImage,
     this.paymentSuccess = false,
+    this.warrantyDuration,
   });
 
   InvoiceState copyWith({
@@ -243,6 +252,7 @@ class InvoiceState extends Equatable {
     String? academicYearName,
     Uint8List? studentImage,
     bool? paymentSuccess,
+    String? warrantyDuration,
   }) {
     return InvoiceState(
       items: items ?? this.items,
@@ -276,6 +286,7 @@ class InvoiceState extends Equatable {
       academicYearName: academicYearName ?? this.academicYearName,
       studentImage: studentImage ?? this.studentImage,
       paymentSuccess: paymentSuccess ?? this.paymentSuccess,
+      warrantyDuration: warrantyDuration ?? this.warrantyDuration,
     );
   }
 
@@ -312,5 +323,6 @@ class InvoiceState extends Equatable {
         academicYearName,
         studentImage,
         paymentSuccess,
+        warrantyDuration,
       ];
 }
