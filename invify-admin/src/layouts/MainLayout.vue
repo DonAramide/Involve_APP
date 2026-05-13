@@ -32,7 +32,7 @@
           <!-- Active Multi-Tenant Boundary Identifier Tag -->
           <q-btn-dropdown dense flat size="sm" color="amber-4" content-style="background-color: #101826; border: 1px solid #1F2D42;" class="text-metric-sm border-amber-left q-ml-xs v-hide-xs">
             <template v-slot:label>
-              <span class="text-weight-bold">{{ prefs.activeTenantScope.toUpperCase() }}</span>
+              <span class="text-weight-bold">{{ (prefs?.activeTenantScope || 'global').toUpperCase() }}</span>
             </template>
             <q-list dark class="bg-[#101826] text-caption">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Tenant Scope Context</q-item-label>
@@ -241,7 +241,7 @@
         <div class="col-auto bg-[#0e1215] q-pa-sm border-top text-caption text-grey-5" style="font-size: 10px;">
           <div class="row items-center justify-between q-mb-xs">
             <span>Tenant Scope Context</span>
-            <span class="text-metric-mono text-amber-3">{{ prefs.activeTenantScope.toUpperCase() }}</span>
+            <span class="text-metric-mono text-amber-3">{{ (prefs?.activeTenantScope || 'global').toUpperCase() }}</span>
           </div>
           <div class="row items-center justify-between">
             <span>Counter Flushing</span>
@@ -478,7 +478,7 @@ onMounted(() => {
 
   // Boot centralized middleware stream layers targeting upstream core brokers
   connectionManagerSingleton.connect({
-    tenantId: prefs.value.activeTenantScope,
+    tenantId: prefs.value.activeTenantScope || 'global',
     transport: 'websocket'
   })
 })

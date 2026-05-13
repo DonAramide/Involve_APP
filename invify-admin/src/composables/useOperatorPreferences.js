@@ -15,13 +15,7 @@ const STORAGE_KEY = 'invify_enterprise_operator_prefs'
 export function useOperatorPreferences() {
   // Load preferences from local persistence layer as Phase 1 fallback cache
   const loadStoredPrefs = () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
-    } catch (e) {
-      console.warn('Unable to load stored operator preferences, loading absolute defaults.')
-    }
-    return {
+    const defaults = {
       activeWorkspace: 'fleet',
       activeTenantScope: 'global', // Multi-tenant isolation boundary identifier ('global' | 'tenant-xyz')
       sidebarCollapsed: false,
@@ -29,6 +23,22 @@ export function useOperatorPreferences() {
       recentHistory: [],
       lastSyncedAt: null
     }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        return {
+          ...defaults,
+          ...parsed,
+          activeTenantScope: parsed.activeTenantScope || 'global',
+          pinnedViews: Array.isArray(parsed.pinnedViews) ? parsed.pinnedViews : defaults.pinnedViews,
+          recentHistory: Array.isArray(parsed.recentHistory) ? parsed.recentHistory : defaults.recentHistory
+        }
+      }
+    } catch (e) {
+      console.warn('Unable to load stored operator preferences, loading absolute defaults.')
+    }
+    return defaults
   }
 
   const prefs = ref(loadStoredPrefs())
