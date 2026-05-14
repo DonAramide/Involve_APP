@@ -217,7 +217,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                       isProTier 
                           ? 'All advanced telemetry clusters, enterprise encryption relays, and cross-device sync channels are unlocked.'
                           : 'Standard operational metrics active. Upgrade to unlock multi-device live sync and enterprise node encryption.',
-                      style: const TextStyle(color: Colors.white90, fontSize: 12, height: 1.4),
+                      style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
                     ),
                   ],
                 ),
