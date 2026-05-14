@@ -9,7 +9,7 @@ import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import 'admin_finance_dashboard.dart';
 import 'account_setup_page.dart';
-import '../../../core/utils/progress_dialog_utils.dart';
+import '../../../../core/utils/progress_dialog_utils.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -42,7 +42,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       body: BlocBuilder<AdminBloc, AdminState>(
         builder: (context, state) {
           if (state.isLoading) {
-            return const Center(
+            return Center(
               child: DancingLogoWidget(message: 'Loading admin hub arrays...'),
             );
           }
