@@ -165,13 +165,19 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [colorScheme.primary, colorScheme.secondary],
+                    colors: isProTier 
+                        ? [colorScheme.primary, colorScheme.secondary]
+                        : [Colors.blueGrey.shade800, Colors.blueGrey.shade900],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
-                    BoxShadow(color: colorScheme.primary.withOpacity(0.2), blurRadius: 12, offset: const Offset(0, 6)),
+                    BoxShadow(
+                      color: (isProTier ? colorScheme.primary : Colors.blueGrey).withOpacity(0.2), 
+                      blurRadius: 12, 
+                      offset: const Offset(0, 6),
+                    ),
                   ],
                 ),
                 child: Column(
@@ -182,14 +188,21 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                       children: [
                         Text(
                           'ACTIVE TIER PROFILE', 
-                          style: TextStyle(color: colorScheme.onPrimary.withOpacity(0.8), fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w600),
+                          style: const TextStyle(color: Colors.white70, fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w600),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(color: Colors.amberAccent, borderRadius: BorderRadius.circular(12)),
-                          child: const Text(
-                            'PREMIUM ENABLED', 
-                            style: TextStyle(color: Colors.black, fontSize: 9, fontWeight: FontWeight.bold),
+                          decoration: BoxDecoration(
+                            color: isProTier ? Colors.amberAccent : Colors.grey.shade300, 
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isProTier ? 'PREMIUM ENABLED' : 'BASIC TIER', 
+                            style: TextStyle(
+                              color: isProTier ? Colors.black : Colors.blueGrey.shade900, 
+                              fontSize: 9, 
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ],
@@ -197,12 +210,14 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                     const SizedBox(height: 12),
                     Text(
                       planName,
-                      style: TextStyle(color: colorScheme.onPrimary, fontSize: 24, fontWeight: FontWeight.w900),
+                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'All advanced telemetry clusters, enterprise encryption relays, and cross-device sync channels are unlocked.',
-                      style: TextStyle(color: colorScheme.onPrimary.withOpacity(0.9), fontSize: 12, height: 1.4),
+                      isProTier 
+                          ? 'All advanced telemetry clusters, enterprise encryption relays, and cross-device sync channels are unlocked.'
+                          : 'Standard operational metrics active. Upgrade to unlock multi-device live sync and enterprise node encryption.',
+                      style: const TextStyle(color: Colors.white90, fontSize: 12, height: 1.4),
                     ),
                   ],
                 ),
