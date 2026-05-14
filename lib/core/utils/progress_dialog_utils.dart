@@ -21,7 +21,7 @@ class ProgressDialogUtils {
           child: Dialog(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            child: _DancingLogoDialogContent(message: message),
+            child: DancingLogoWidget(message: message),
           ),
         );
       },
@@ -39,15 +39,15 @@ class ProgressDialogUtils {
   }
 }
 
-class _DancingLogoDialogContent extends StatefulWidget {
+class DancingLogoWidget extends StatefulWidget {
   final String message;
-  const _DancingLogoDialogContent({required this.message});
+  const DancingLogoWidget({super.key, this.message = 'Loading platform matrices...'});
 
   @override
-  State<_DancingLogoDialogContent> createState() => _DancingLogoDialogContentState();
+  State<DancingLogoWidget> createState() => _DancingLogoWidgetState();
 }
 
-class _DancingLogoDialogContentState extends State<_DancingLogoDialogContent> with SingleTickerProviderStateMixin {
+class _DancingLogoWidgetState extends State<DancingLogoWidget> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _rotateAnimation;
