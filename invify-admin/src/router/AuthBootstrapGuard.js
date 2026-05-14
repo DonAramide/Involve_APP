@@ -46,6 +46,7 @@ export function registerAuthBootstrapGuard(router) {
             apps: '/apps/installed',
             incidents: '/incidents/active',
             automation: '/automation/policy',
+            communications: '/communications/broadcast-center',
             admin: '/admin/settings'
           }
           const landing = wsMap[parsed.activeWorkspace] || '/fleet/overview'
@@ -94,8 +95,8 @@ export function registerAuthBootstrapGuard(router) {
       if (to.meta?.permission) {
         // Simulated validation array matching the primary user tier matrix definitions
         const userScopeMatrix = {
-          SUPER_ADMIN: ['read_fleet', 'read_devices', 'read_tenant', 'soc_analyst', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'admin_deploy', 'write_fleet', 'read_telemetry', 'execute_actions', 'read_audit', 'write_policies', 'read_ai_intelligence'],
-          STAFF: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit'],
+          SUPER_ADMIN: ['read_fleet', 'read_devices', 'read_tenant', 'soc_analyst', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'admin_deploy', 'write_fleet', 'read_telemetry', 'execute_actions', 'read_audit', 'write_policies', 'read_ai_intelligence', 'soc_communications'],
+          STAFF: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications'],
           TENANT_OPERATOR: ['read_fleet', 'read_devices', 'read_streams']
         }
 

@@ -40,14 +40,14 @@
       <!-- LEFT COLUMN: MULTI-MODE COMPOSER & TARGETING CONTROLS -->
       <div class="col-12 col-lg-7 column op-gap-16">
         
-        <!-- COMPOSER CARD -->
-        <q-card flat class="bg-[#12161a] border-muted rounded-borders fit column">
-          <q-card-section class="q-pb-xs row items-center justify-between border-bottom">
+        <!-- COMPOSER PANEL -->
+        <div class="enterprise-panel rounded-borders fit column overflow-hidden" style="background-color: #101826 !important; border-color: #1F2D42 !important;">
+          <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-[#131d2e]">
             <div class="text-operator-title text-white">Broadcast Blueprint Composer</div>
             <q-badge color="cyan-10" text-color="cyan-3" class="text-metric-sm">ENVELOPE v1.0.0</q-badge>
-          </q-card-section>
+          </div>
 
-          <q-card-section class="col column op-gap-12 q-pt-sm">
+          <div class="col column op-gap-12 q-pa-md">
             
             <!-- Type Blueprint & Severity Selection Strips -->
             <div class="row q-col-gutter-sm">
@@ -63,7 +63,7 @@
                   options-dense
                   emit-value
                   map-options
-                  class="bg-[#0b0f12] text-caption"
+                  class="custom-select-dark text-caption"
                   @update:model-value="triggerPreflightSimulation"
                 />
               </div>
@@ -79,7 +79,7 @@
                   options-dense
                   emit-value
                   map-options
-                  class="bg-[#0b0f12] text-caption text-weight-bold"
+                  class="custom-select-dark text-caption text-weight-bold"
                   @update:model-value="applySeverityDefaults"
                 >
                   <template v-slot:selected>
@@ -92,7 +92,7 @@
             </div>
 
             <!-- Priority Lane & Dotroid Launcher Behavior Controls (Refinement 1 & 6) -->
-            <div class="row q-col-gutter-sm border-top q-pt-xs">
+            <div class="row q-col-gutter-sm border-top q-pt-sm">
               <div class="col-12 col-sm-6 column">
                 <label class="text-metric-sm text-grey-5 q-mb-xs">Queue Ingestion Priority (Refinement 1)</label>
                 <q-select
@@ -104,7 +104,7 @@
                   options-dense
                   emit-value
                   map-options
-                  class="bg-[#0b0f12] text-caption"
+                  class="custom-select-dark text-caption"
                   @update:model-value="triggerPreflightSimulation"
                 >
                   <template v-slot:selected>
@@ -124,7 +124,7 @@
                   options-dense
                   emit-value
                   map-options
-                  class="bg-[#0b0f12] text-caption"
+                  class="custom-select-dark text-caption"
                   @update:model-value="triggerPreflightSimulation"
                 />
               </div>
@@ -132,6 +132,7 @@
 
             <!-- Title & Message Text Inputs -->
             <div class="column q-mt-xs">
+              <label class="text-metric-sm text-grey-5 q-mb-xs">Announcement Headline</label>
               <q-input
                 v-model="composerForm.title"
                 outlined
@@ -139,12 +140,13 @@
                 dark
                 color="cyan-4"
                 placeholder="Enter succinct broadcast announcement headline..."
-                class="bg-[#0b0f12] text-caption text-white text-weight-bold"
+                class="custom-input-dark text-caption text-white text-weight-bold"
                 @update:model-value="triggerPreflightSimulation"
               />
             </div>
 
-            <div class="column col flex-grow">
+            <div class="column col flex-grow q-mt-xs">
+              <label class="text-metric-sm text-grey-5 q-mb-xs">Actionable Context & Instructions Payload</label>
               <q-input
                 v-model="composerForm.message"
                 type="textarea"
@@ -154,30 +156,30 @@
                 color="cyan-4"
                 rows="4"
                 placeholder="Provide verbose, actionable operational instructions or deployment context matrices..."
-                class="bg-[#0b0f12] text-caption text-grey-4 font-mono flex-grow"
+                class="custom-input-dark text-caption text-grey-3 font-mono flex-grow"
                 @update:model-value="triggerPreflightSimulation"
               />
             </div>
 
             <!-- Staged Transport Multiplexer & Verification Sub-options -->
-            <div class="row items-center justify-between border-top q-pt-xs">
+            <div class="row items-center justify-between border-top q-pt-sm">
               <div class="column">
                 <label class="text-metric-sm text-grey-5 q-mb-xs">Target Multiplexed Transports</label>
                 <div class="row items-center op-gap-8">
-                  <q-checkbox v-model="composerForm.channels" val="websocket" label="WebSocket" dark dense color="cyan-4" class="text-caption" @update:model-value="triggerPreflightSimulation" />
-                  <q-checkbox v-model="composerForm.channels" val="fcm" label="FCM Layer" dark dense color="amber-4" class="text-caption" @update:model-value="triggerPreflightSimulation" />
-                  <q-checkbox v-model="composerForm.channels" val="offline" label="Offline Stores" dark dense color="green-4" class="text-caption" @update:model-value="triggerPreflightSimulation" />
+                  <q-checkbox v-model="composerForm.channels" val="websocket" label="WebSocket" dark dense color="cyan-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
+                  <q-checkbox v-model="composerForm.channels" val="fcm" label="FCM Layer" dark dense color="amber-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
+                  <q-checkbox v-model="composerForm.channels" val="offline" label="Offline Stores" dark dense color="green-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
                 </div>
               </div>
 
-              <div class="column items-end">
+              <div class="column items-end justify-center">
                 <q-checkbox
                   v-model="composerForm.requiresAck"
                   label="Enforce Explicit Device ACK"
                   dark
                   dense
                   color="red-4"
-                  class="text-caption text-weight-medium"
+                  class="text-caption text-weight-medium text-grey-3"
                   :disable="composerForm.severity === 'EMERGENCY'"
                   @update:model-value="triggerPreflightSimulation"
                 >
@@ -186,14 +188,14 @@
               </div>
             </div>
 
-          </q-card-section>
+          </div>
 
           <!-- Composer Actions Execution Ribbon -->
-          <q-card-actions class="bg-[#0e1215] border-top q-pa-sm row items-center justify-between">
+          <div class="bg-[#0c1421] border-top q-pa-sm row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-btn flat dense size="sm" color="amber-3" label="Load Banner Template" @click="applyTemplate('banner')" />
-              <q-btn flat dense size="sm" color="cyan-3" label="Load OTA Notice" @click="applyTemplate('ota')" />
-              <q-btn flat dense size="sm" color="red-3" label="Load Quarantine" @click="applyTemplate('quarantine')" />
+              <q-btn flat dense size="sm" color="amber-3" label="Load Banner Template" @click="applyTemplate('banner')" class="q-px-xs" />
+              <q-btn flat dense size="sm" color="cyan-3" label="Load OTA Notice" @click="applyTemplate('ota')" class="q-px-xs" />
+              <q-btn flat dense size="sm" color="red-3" label="Load Quarantine" @click="applyTemplate('quarantine')" class="q-px-xs" />
             </div>
 
             <q-btn
@@ -208,62 +210,62 @@
               <q-icon :name="composerForm.severity === 'EMERGENCY' ? 'warning' : 'send'" size="xs" class="q-mr-xs" />
               <span>DISPATCH OPERATIONAL ENVELOPE</span>
             </q-btn>
-          </q-card-actions>
-        </q-card>
+          </div>
+        </div>
       </div>
 
       <!-- RIGHT COLUMN: SIMULATION REPORTING & HISTOGRAM ANALYTICS -->
       <div class="col-12 col-lg-5 column op-gap-16">
         
         <!-- PRE-FLIGHT SIMULATION PANEL (Refinement 7) -->
-        <q-card flat class="bg-[#161a1f] border-amber-left rounded-borders column">
-          <q-card-section class="q-pb-xs row items-center justify-between border-bottom">
+        <div ref="preflightSectionRef" class="enterprise-panel border-amber-left rounded-borders column overflow-hidden" style="background-color: #101826 !important;">
+          <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-[#131d2e]">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="science" color="amber-4" size="xs" />
               <span class="text-operator-title text-amber-3">Pre-Flight Simulation Engine (Dry-Run)</span>
             </div>
             <q-badge color="blue-grey-9" text-color="grey-4" class="text-metric-sm">DETERMINISTIC</q-badge>
-          </q-card-section>
+          </div>
 
-          <q-card-section class="column q-pt-sm op-gap-8">
+          <div class="column q-pa-md op-gap-8">
             <div class="row items-center justify-between text-caption text-grey-4">
               <span>Target Scope Bound Context:</span>
               <span class="text-metric-mono text-cyan-3">{{ (composerForm.tenantScope || 'global').toUpperCase() }}</span>
             </div>
 
-            <div class="bg-[#0b0f12] q-pa-sm rounded-borders border-muted font-mono text-caption text-grey-4 text-pre-wrap" style="min-height: 80px;">
+            <div class="bg-[#070c14] q-pa-sm rounded-borders border-muted font-mono text-caption text-grey-3 text-pre-wrap" style="min-height: 80px;">
               {{ preflightResult.simulationReport }}
             </div>
 
-            <div class="row q-col-gutter-xs">
+            <div class="row q-col-gutter-xs q-mt-xs">
               <div class="col-4 column">
                 <span class="text-metric-sm text-grey-5">REACHABLE DEVICES</span>
-                <span class="text-metric-mono text-white text-weight-bold" style="font-size: 13px;">{{ preflightResult.devicesCount.toLocaleString() }}</span>
+                <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">{{ preflightResult.devicesCount.toLocaleString() }}</span>
               </div>
               <div class="col-4 column text-center">
                 <span class="text-metric-sm text-grey-5">AFFECTED TENANTS</span>
-                <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 13px;">{{ preflightResult.tenantsCount }} Array</span>
+                <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 14px;">{{ preflightResult.tenantsCount }} Array</span>
               </div>
               <div class="col-4 column text-right">
                 <span class="text-metric-sm text-grey-5">REGION FEDERATION</span>
-                <span class="text-metric-mono text-purple-3 text-weight-bold" style="font-size: 13px;">{{ preflightResult.regionsCount }} Nodes</span>
+                <span class="text-metric-mono text-purple-3 text-weight-bold" style="font-size: 14px;">{{ preflightResult.regionsCount }} Nodes</span>
               </div>
             </div>
 
             <div class="q-mt-xs bg-red-10 q-pa-xs rounded-borders text-center text-metric-sm text-white text-weight-bold" v-if="preflightResult.isHighImpact">
               🚨 HIGH FLEET IMPACT WARNING: Exceeds 50,000 Edge Terminals
             </div>
-          </q-card-section>
-        </q-card>
+          </div>
+        </div>
 
         <!-- DELIVERY SLA HISTOGRAMS & ANALYTICS (Refinement 5) -->
-        <q-card flat class="bg-[#12161a] border-muted rounded-borders column col flex-grow">
-          <q-card-section class="q-pb-xs row items-center justify-between border-bottom">
+        <div class="enterprise-panel rounded-borders column col flex-grow overflow-hidden" style="background-color: #101826 !important;">
+          <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-[#131d2e]">
             <div class="text-operator-title text-white">Delivery SLA & Latency Distributions</div>
             <q-btn flat dense size="xs" color="cyan-3" icon="refresh" @click="refreshAnalytics" />
-          </q-card-section>
+          </div>
 
-          <q-card-section class="column col justify-between q-pt-sm op-gap-8 flex-grow">
+          <div class="column col justify-between q-pa-md op-gap-8 flex-grow">
             
             <!-- Latency Bar Strips -->
             <div class="column op-gap-4">
@@ -271,23 +273,23 @@
                 <span class="text-green-4">Fast-Lane Dispatch (&lt;100ms)</span>
                 <span class="text-metric-mono text-white">{{ analyticsData.histograms.under100ms }} pkts</span>
               </div>
-              <q-linear-progress dark :value="0.75" color="green-4" class="rounded-borders" style="height: 6px;" />
+              <q-linear-progress dark :value="0.75" color="green-4" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
 
               <div class="row items-center justify-between text-metric-sm q-mt-xs">
                 <span class="text-cyan-3">Standard Latency Bounds (&lt;500ms)</span>
                 <span class="text-metric-mono text-white">{{ analyticsData.histograms.under500ms }} pkts</span>
               </div>
-              <q-linear-progress dark :value="0.20" color="cyan-4" class="rounded-borders" style="height: 6px;" />
+              <q-linear-progress dark :value="0.20" color="cyan-4" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
 
               <div class="row items-center justify-between text-metric-sm q-mt-xs">
                 <span class="text-red-4">SLA Timeout Breaches (&gt;1000ms)</span>
                 <span class="text-metric-mono text-red-3">{{ analyticsData.histograms.over1000ms }} pkts</span>
               </div>
-              <q-linear-progress dark :value="0.05" color="red-5" class="rounded-borders" style="height: 6px;" />
+              <q-linear-progress dark :value="0.05" color="red-5" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
             </div>
 
             <!-- Convergence Matrix Grid -->
-            <div class="bg-[#0e1215] q-pa-sm rounded-borders border-top column q-mt-xs">
+            <div class="bg-[#070c14] q-pa-sm rounded-borders border-muted column q-mt-xs">
               <span class="text-metric-sm text-grey-5 q-mb-xs">REGIONAL CONVERGENCE VECTORS</span>
               <div class="row items-center justify-between text-caption font-mono" v-for="(ratio, reg) in analyticsData.regionalConvergence" :key="reg">
                 <span class="text-grey-4">Federation Region: [{{ reg }}]</span>
@@ -296,70 +298,73 @@
             </div>
 
             <!-- Global Status SLA Strip -->
-            <div class="row items-center justify-between border-top q-pt-xs text-caption">
+            <div class="row items-center justify-between border-top q-pt-sm text-caption">
               <span class="text-grey-5">Global SLA Adherence Ratio:</span>
-              <span class="text-metric-mono text-green-3 text-weight-bolder" style="font-size: 13px;">{{ analyticsData.slaAdherencePercentage }}% SLA MET</span>
+              <span class="text-metric-mono text-green-3 text-weight-bolder" style="font-size: 14px;">{{ analyticsData.slaAdherencePercentage }}% SLA MET</span>
             </div>
 
-          </q-card-section>
-        </q-card>
+          </div>
+        </div>
 
       </div>
     </div>
 
     <!-- BOTTOM ROW: LIVE MONOSPACE AUDIT LINEAGE ENGINE GRID -->
-    <q-card flat class="bg-[#12161a] border-muted rounded-borders q-mt-md column">
-      <q-card-section class="q-pb-xs row items-center justify-between border-bottom">
+    <div ref="auditSectionRef" class="enterprise-panel rounded-borders q-mt-md column overflow-hidden" style="background-color: #101826 !important;">
+      <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-[#131d2e]">
         <div class="row items-center op-gap-8 no-wrap">
           <q-icon name="receipt_long" color="cyan-3" size="xs" />
           <span class="text-operator-title text-white">Immutable Broadcast Lineage & Execution Audits</span>
         </div>
         <div class="row items-center op-gap-4">
-          <span class="text-metric-mono text-grey-6">SHA-256 INTEGRITY: VERIFIED</span>
+          <span class="text-metric-mono text-grey-4">SHA-256 INTEGRITY: VERIFIED</span>
           <q-btn flat dense size="xs" color="red-3" label="Reset Ledger" @click="clearAuditRecords" />
         </div>
-      </q-card-section>
+      </div>
 
       <!-- Monospace Virtual Terminal Table viewport -->
-      <q-table
-        :rows="auditRecords"
-        :columns="auditColumns"
-        row-key="auditId"
-        flat
-        dark
-        dense
-        hide-bottom
-        :rows-per-page-options="[10]"
-        class="bg-[#0b0f12] text-caption font-mono border-none"
-        card-class="bg-[#0b0f12]"
-      >
-        <template v-slot:body-cell-severity="props">
-          <q-td :props="props">
-            <span :class="getSeverityBadgeClass(props.row.severity)" class="q-px-xs q-py-none rounded-borders text-metric-sm text-weight-bold">
-              {{ props.row.severity }}
-            </span>
-          </q-td>
-        </template>
-        
-        <template v-slot:body-cell-lineageSignature="props">
-          <q-td :props="props" class="text-grey-5 ellipsis font-mono" style="max-width: 150px;" :title="props.row.lineageSignature">
-            {{ props.row.lineageSignature }}
-          </q-td>
-        </template>
+      <div class="enterprise-data-grid full-width overflow-hidden">
+        <q-table
+          :rows="auditRecords"
+          :columns="auditColumns"
+          row-key="auditId"
+          flat
+          dark
+          dense
+          hide-bottom
+          :rows-per-page-options="[10]"
+          class="custom-table-dark text-caption font-mono border-none"
+          card-class="bg-transparent"
+        >
+          <template v-slot:body-cell-severity="props">
+            <q-td :props="props">
+              <span :class="getSeverityBadgeClass(props.row.severity)" class="q-px-xs q-py-none rounded-borders text-metric-sm text-weight-bold">
+                {{ props.row.severity }}
+              </span>
+            </q-td>
+          </template>
+          
+          <template v-slot:body-cell-lineageSignature="props">
+            <q-td :props="props" class="text-grey-4 ellipsis font-mono" style="max-width: 150px;" :title="props.row.lineageSignature">
+              {{ props.row.lineageSignature }}
+            </q-td>
+          </template>
 
-        <template v-slot:body-cell-statusString="props">
-          <q-td :props="props">
-            <span class="text-metric-mono text-cyan-3">{{ props.row.statusString }}</span>
-          </q-td>
-        </template>
-      </q-table>
-    </q-card>
+          <template v-slot:body-cell-statusString="props">
+            <q-td :props="props">
+              <span class="text-metric-mono text-cyan-3">{{ props.row.statusString }}</span>
+            </q-td>
+          </template>
+        </q-table>
+      </div>
+    </div>
 
   </q-page>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { CanonicalBroadcastTypes, DotroidLauncherModes, DeliveryPriorityLanes } from '../../contracts/broadcast'
 import { BroadcastEnvelopeModel, BroadcastFactory } from '../../broadcast-models'
@@ -369,6 +374,11 @@ import { targetingEngineSingleton } from '../../services/broadcast/DeliveryTarge
 import { auditGovernanceSingleton } from '../../services/broadcast/BroadcastAuditGovernance'
 
 const $q = useQuasar()
+const route = useRoute()
+
+// Programmatic DOM targets targeting focus animations
+const preflightSectionRef = ref(null)
+const auditSectionRef = ref(null)
 
 // State variables
 const isOverrideActive = ref(false)
@@ -614,7 +624,32 @@ const clearAuditRecords = () => {
   refreshAuditRecords()
 }
 
+// Programmatic tab anchor scroll routing observer
+const handleTabNavigation = (targetTab) => {
+  if (!targetTab) return
+  setTimeout(() => {
+    if (targetTab === 'preflight' && preflightSectionRef.value) {
+      preflightSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      preflightSectionRef.value.classList.add('nav-highlight-glow')
+      setTimeout(() => preflightSectionRef.value.classList.remove('nav-highlight-glow'), 1800)
+    } else if (targetTab === 'audits' && auditSectionRef.value) {
+      auditSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      auditSectionRef.value.classList.add('nav-highlight-glow')
+      setTimeout(() => auditSectionRef.value.classList.remove('nav-highlight-glow'), 1800)
+    }
+  }, 120)
+}
+
+watch(() => route.query?.tab, (newTab) => {
+  handleTabNavigation(newTab)
+})
+
 onMounted(() => {
+  // Ensure global dark status property enforced natively
+  try {
+    $q.dark.set(true)
+  } catch(e) {}
+  
   triggerPreflightSimulation()
   refreshAuditRecords()
   
@@ -624,6 +659,9 @@ onMounted(() => {
     auditGovernanceSingleton.appendAuditRecord(seedEnv, activeOperator.value, "DELIVERED_STANDARD")
     refreshAuditRecords()
   }
+
+  // Evaluate initial programmatic deep target parameters
+  handleTabNavigation(route.query?.tab)
 })
 </script>
 
@@ -634,4 +672,42 @@ onMounted(() => {
 .border-amber-left { border-left: 3px solid #FBBF24; }
 .text-pre-wrap { white-space: pre-wrap; word-break: break-all; }
 .flex-grow { flex-grow: 1; }
+
+/* Custom Component Theme Normalizations ensuring sleek dark contrast */
+:deep(.custom-select-dark .q-field__control) {
+  background-color: #070c14 !important;
+  border-radius: 2px !important;
+  color: #E6EDF3 !important;
+}
+:deep(.custom-input-dark .q-field__control) {
+  background-color: #070c14 !important;
+  border-radius: 2px !important;
+  color: #E6EDF3 !important;
+}
+
+:deep(.custom-table-dark) {
+  background-color: transparent !important;
+}
+:deep(.custom-table-dark .q-table__container) {
+  background-color: transparent !important;
+}
+:deep(.custom-table-dark th) {
+  background-color: #131d2e !important;
+  color: #9FB3C8 !important;
+  border-bottom: 1px solid #1F2D42 !important;
+}
+:deep(.custom-table-dark td) {
+  border-bottom: 1px solid #1F2D42 !important;
+  color: #E6EDF3 !important;
+}
+
+@keyframes borderGlowPulse {
+  0% { box-shadow: 0 0 0px rgba(88, 166, 255, 0); border-color: #1F2D42 !important; }
+  50% { box-shadow: 0 0 25px rgba(88, 166, 255, 0.7); border-color: #58A6FF !important; }
+  100% { box-shadow: 0 0 0px rgba(88, 166, 255, 0); border-color: #1F2D42 !important; }
+}
+
+.nav-highlight-glow {
+  animation: borderGlowPulse 0.9s ease-in-out 2 !important;
+}
 </style>

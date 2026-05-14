@@ -375,7 +375,7 @@ class AppDependencies {
           FinanceApiClient(
             baseUrl: baseUrl,
             getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
-            getTenantId: () async => 'demo-school-123',
+            getTenantId: () async => await SecurityService().getTenantId(),
           ),
         ),
         realtimeDataSource: FinanceRealtimeDataSourceImpl(Supabase.instance.client),
@@ -386,7 +386,7 @@ class AppDependencies {
         FinanceApiClient(
           baseUrl: baseUrl,
           getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
-          getTenantId: () async => 'demo-school-123',
+          getTenantId: () async => await SecurityService().getTenantId(),
         ),
       ),
       servicesRepository: servicesRepo,
@@ -407,7 +407,7 @@ class AppDependencies {
         FinanceApiClient(
           baseUrl: baseUrl,
           getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
-          getTenantId: () async => 'demo-school-123',
+          getTenantId: () async => await SecurityService().getTenantId(),
         ),
       ),
     );

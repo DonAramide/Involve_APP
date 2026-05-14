@@ -474,8 +474,8 @@ const activeNavigationTree = computed(() => {
     case 'communications':
       return [
         { label: 'Broadcast Center Hub', path: '/communications/broadcast-center', icon: 'podcasts', color: 'cyan-4', badge: 'SOC NOC', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
-        { label: 'Preflight Previews', path: '/communications/broadcast-center', icon: 'science', color: 'amber-4' },
-        { label: 'Lineage Hash Audits', path: '/communications/broadcast-center', icon: 'receipt_long', color: 'indigo-3' }
+        { label: 'Preflight Previews', path: '/communications/broadcast-center?tab=preflight', icon: 'science', color: 'amber-4' },
+        { label: 'Lineage Hash Audits', path: '/communications/broadcast-center?tab=audits', icon: 'receipt_long', color: 'indigo-3' }
       ]
 
     case 'admin':

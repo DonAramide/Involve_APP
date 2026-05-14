@@ -15,7 +15,7 @@ class DeliveryTargetingEngine {
   /**
    * Resolves targeting expression scope models against live fleet telemetry distribution parameters
    */
-  evaluateTarget Footprint(targetScopes = {}) {
+  evaluateTargetFootprint(targetScopes = {}) {
     const tenants = targetScopes.tenants || [];
     const regions = targetScopes.regions || [];
     const deviceTags = targetScopes.deviceTags || [];

@@ -133,7 +133,7 @@ class SecurityService {
       return stored;
     }
     // Dynamic production auto-generation fallback if unassigned
-    return 'demo-school-123';
+    return '';
   }
 
   Future<void> setTenantId(String tenantId) async {
