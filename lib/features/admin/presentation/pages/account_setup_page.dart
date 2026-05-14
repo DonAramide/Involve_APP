@@ -10,6 +10,7 @@ import '../../../settings/domain/services/security_service.dart';
 import '../../../../core/services/service_locator.dart';
 import '../../../school_finance/domain/repositories/finance_repository_new.dart';
 import '../../../../core/utils/progress_dialog_utils.dart';
+import '../../../activation/presentation/pages/activation_page.dart';
 
 class AccountSetupPage extends StatefulWidget {
   const AccountSetupPage({super.key});
@@ -123,7 +124,10 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              _showToast('Redirection sequence to Pro Activation terminal sent.');
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ActivationPage()),
+              );
             },
             child: const Text('Upgrade to Pro Plan', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
@@ -710,12 +714,9 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Redirection sequence to Billing/Subscription matrix activated.'),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ActivationPage()),
               );
             },
             child: const Text('Upgrade Subscription', style: TextStyle(fontWeight: FontWeight.bold)),
