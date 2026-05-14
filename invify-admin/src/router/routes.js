@@ -212,6 +212,7 @@ const routes = [
       { path: 'admin/orchestration', component: () => import('pages/admin/TenantOrchestrationCenterPage.vue'), meta: { workspace: 'admin', title: 'Tenant Orchestration', requiresAuth: true } },
       { path: 'automation/policy', component: () => import('pages/automation/PolicyIntelligencePage.vue'), meta: { workspace: 'automation', title: 'Policy Intelligence', requiresAuth: true } },
       { path: 'automation/workflows', component: () => import('pages/automation/WorkflowExecutionCenterPage.vue'), meta: { workspace: 'automation', title: 'Workflow Execution & Audit', requiresAuth: true } },
+      { path: 'communications/broadcast-center', component: () => import('pages/communications/BroadcastCenterPage.vue'), meta: { workspace: 'communications', title: 'Enterprise Broadcast Center', permission: 'soc_communications', requiresAuth: true } },
 
       // ==========================================
       // LEGACY ROOTS & BACKWARD COMPATIBILITY

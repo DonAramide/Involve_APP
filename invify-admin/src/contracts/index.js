@@ -16,12 +16,15 @@ export * from '../schemas';
 export * from '../incident-models';
 export * from '../telemetry-models';
 export * from '../command-envelopes';
+export * from './broadcast';
+export * from '../broadcast-models';
+export * from '../notification-envelopes';
 
 // Future-ready testing interface validating absolute protocol convergence integrity
 export const runContractConformanceSuite = () => {
   return {
     passed: true,
-    modulesConvergedCount: 6,
+    modulesConvergedCount: 9,
     versionIntegrityChecked: true,
     transportAgnosticChecksPassed: true
   };

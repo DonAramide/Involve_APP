@@ -336,6 +336,7 @@ const workspaces = [
   { id: 'apps', label: 'Applications', priority: false },
   { id: 'incidents', label: 'Incident Response', priority: false },
   { id: 'automation', label: 'Automation & Policy', priority: false },
+  { id: 'communications', label: 'Operational Communications', priority: false },
   { id: 'admin', label: 'Administration', priority: false }
 ]
 
@@ -356,6 +357,7 @@ const switchWorkspace = (id) => {
     apps: '/apps/installed',
     incidents: '/incidents/active',
     automation: '/automation/policy',
+    communications: '/communications/broadcast-center',
     admin: '/admin/settings'
   }
   
@@ -468,8 +470,14 @@ const activeNavigationTree = computed(() => {
       return [
         { label: 'AI Operational Copilot', path: '/ai/copilot', icon: 'psychology', color: 'cyan-3', badge: 'Ground Truth', badgeBg: 'cyan-10', badgeColor: 'cyan-2' }
       ]
-
     
+    case 'communications':
+      return [
+        { label: 'Broadcast Center Hub', path: '/communications/broadcast-center', icon: 'podcasts', color: 'cyan-4', badge: 'SOC NOC', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
+        { label: 'Preflight Previews', path: '/communications/broadcast-center', icon: 'science', color: 'amber-4' },
+        { label: 'Lineage Hash Audits', path: '/communications/broadcast-center', icon: 'receipt_long', color: 'indigo-3' }
+      ]
+
     case 'admin':
     default:
       return [
