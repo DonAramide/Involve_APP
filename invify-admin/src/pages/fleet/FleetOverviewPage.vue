@@ -88,7 +88,7 @@
     </div>
 
     <!-- MAIN OPERATIONAL FEED GRIDS -->
-    <div class="row items-start op-gap-16 full-width">
+    <div class="row q-col-gutter-md items-start full-width">
       
       <!-- LEFT PORTION: 3 Streaming Panels -->
       <div class="col-12 col-md-7 column op-gap-16">
@@ -106,7 +106,7 @@
             </q-badge>
           </div>
 
-          <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 220px;">
+          <div class="panel-body col q-pa-xs scroll overflow-hidden" style="max-height: 220px;">
             <div class="text-center text-grey-6 text-caption q-py-md italic" v-if="presenceStream.length === 0">
               Awaiting ingress presence updates...
             </div>
@@ -148,7 +148,7 @@
             </span>
           </div>
 
-          <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 220px;">
+          <div class="panel-body col q-pa-xs scroll overflow-hidden" style="max-height: 220px;">
             <div class="text-center text-grey-6 text-caption q-py-md italic" v-if="incidentStore.incidents.length === 0">
               No active operational incidents recorded.
             </div>
@@ -200,7 +200,7 @@
             <span class="text-metric-mono text-grey-5" style="font-size: 10px;">OTA Deployments</span>
           </div>
 
-          <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 180px;">
+          <div class="panel-body col q-pa-xs scroll overflow-hidden" style="max-height: 180px;">
             <div class="text-center text-grey-6 text-caption q-py-md italic" v-if="rolloutStore.rollouts.length === 0">
               No continuous OTA batch loops active.
             </div>
@@ -242,7 +242,7 @@
             </span>
           </div>
 
-          <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 280px;">
+          <div class="panel-body col q-pa-xs scroll overflow-hidden" style="max-height: 280px;">
             <div class="text-center text-grey-6 text-caption q-py-md italic" v-if="quarantinedNodesList.length === 0">
               No hardware locked under attestation flags.
             </div>

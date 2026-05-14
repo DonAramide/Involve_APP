@@ -280,13 +280,14 @@ class RealtimeConnectionManager {
    * Internal ingestion driver simulating continuous background hardware packets hitting this middleware layer.
    */
   startSimulatedIngestionDriver() {
-    // Flush steady payloads into this engine to test complete normalizer validation and buffer queueing
+    // Background simulation loop temporarily paused to clean up the workspace console,
+    // ensuring the operational layout strictly reflects authentic live stream data packets.
+    /*
     setInterval(() => {
       if (this.connectionState !== 'CONNECTED' || !this.onMessageReceived) return
 
       this.totalProcessedMessages++
 
-      // Construct randomized heterogeneous event arrays simulating incoming cloud JSON strings
       const mockRawPayload = {
         meta_id: `evt_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
         seq_idx: this.totalProcessedMessages,
@@ -298,9 +299,9 @@ class RealtimeConnectionManager {
         body: { cpu_usage: Math.floor(Math.random() * 60) + 10, memory_mb: 2048 }
       }
 
-      // Route ingress array downward into normalizer pipeline execution layers
       this.onMessageReceived(mockRawPayload)
-    }, 1000) // Emit background packets at a professional, sustained operational cadence
+    }, 1000)
+    */
   }
 
   /**
