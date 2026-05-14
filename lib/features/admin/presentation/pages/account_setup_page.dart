@@ -330,11 +330,24 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                         label: const Text('Confirm Enrollment & Upgrade to Pro Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         onPressed: () async {
                           FocusScope.of(context).unfocus();
+                          
+                          // Save data locally first as per user rule: "if you have gto save data save it"
+                          if (state.settings != null) {
+                            final updatedSettings = state.settings!.copyWith(
+                              organizationName: _businessNameController.text.trim(),
+                              phone: _phoneController.text.trim(),
+                            );
+                            context.read<SettingsBloc>().add(UpdateAppSettings(updatedSettings));
+                          }
+
                           // Derive real live production tenant namespace
                           final cleanOrg = _businessNameController.text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
                           final derivedTenant = '$cleanOrg-$_deviceSuffix';
                           
                           await SecurityService().setTenantId(derivedTenant);
+
+                          bool networkSuccess = false;
+                          String errorMessage = 'Server connection timeout.';
 
                           // Execute live authenticated HTTP post request broadcast to remote server container
                           try {
@@ -359,12 +372,88 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                               () async => await client.post('/api/admin/register-device', data: payload),
                               message: 'Registering edge node identity matrix...',
                             );
+                            networkSuccess = true;
                           } catch (e) {
                             debugPrint('Network Relay caught fallback trace: $e');
+                            errorMessage = e.toString().replaceAll('FinanceApiException', 'Server API Exception');
+                            networkSuccess = false;
                           }
 
                           if (mounted) {
-                            _showUpgradePrompt(derivedTenant);
+                            if (networkSuccess) {
+                              _showUpgradePrompt(derivedTenant);
+                            } else {
+                              // Display lovely server error message dialog as requested
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: Theme.of(context).cardColor,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  title: Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
+                                        child: Icon(Icons.cloud_off_rounded, color: Colors.red.shade700),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Text(
+                                          'Server Connection Error', 
+                                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Unable to establish a real-time secure link with the cloud node cluster. The remote endpoint returned an error or timed out.',
+                                        style: TextStyle(fontSize: 13, height: 1.4),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50, 
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          errorMessage, 
+                                          style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Theme.of(context).colorScheme.error),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.save_alt_rounded, size: 14, color: Colors.green.shade600),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(
+                                              'Data Protected: Entered credentials have been preserved locally.',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green.shade600),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  actions: [
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Theme.of(context).colorScheme.primary,
+                                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('Acknowledge & Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
                           }
                         },
                       ),
