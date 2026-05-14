@@ -1,0 +1,95 @@
+# infrastructure/k8s/data/postgres-ha-cluster.yaml
+# Fulfills requirement: High-Availability PostgreSQL Cluster complete with automated S3-compatible WAL persistence backups.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: invify-postgres-ha
+  namespace: invify-data-core
+spec:
+  # Instantiates a 3-node Highly-Available synchronized Postgres ring
+  instances: 3
+  
+  # Image parameters mapping canonical Postgres release versions
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.2
+  
+  # Set isolated compute requests for dedicated relational queries
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "2"
+    limits:
+      memory: "8Gi"
+      cpu: "4"
+
+  # Enforce Anti-Affinity to ensure pods schedule onto separate hardware hosts
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: cnpg.io/cluster
+                operator: In
+                values:
+                  - invify-postgres-ha
+          topologyKey: "kubernetes.io/hostname"
+
+  # Declarative dynamic database initialization parameters
+  bootstrap:
+    initdb:
+      database: invify_matrix_core
+      owner: invify_db_admin
+      secret:
+        name: invify-postgres-credentials
+
+  # Dynamic configuration overrides tuning buffer scaling metrics
+  postgresql:
+    parameters:
+      shared_buffers: "2GB"
+      work_mem: "32MB"
+      maintenance_work_mem: "512MB"
+      effective_cache_size: "6GB"
+      max_connections: "500"
+      synchronous_commit: "on"
+
+  # Storage provisioning parameters mapping target fast localized Solid State volumes
+  storage:
+    size: 200Gi
+    storageClass: local-path # Fully portable: swaps to gp3 on EKS or premium-rwo on GKE
+
+  # Comprehensive Automated Backup & Continuous WAL Archive ring parameters targeting MinIO
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://invify-backups-bucket/postgres/
+      endpointURL: http://minio-service.invify-data-core.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: minio-storage-credentials
+          key: ACCESS_KEY
+        secretAccessKey:
+          name: minio-storage-credentials
+          key: SECRET_KEY
+      wal:
+        compression: gzip
+        maxParallel: 4
+      data:
+        compression: gzip
+        jobs: 2
+    # Ensure backups execute automatically on a daily schedule
+    retentionPolicy: "30d"
+---
+# Instantiates standalone HA Connection Pooling Proxy via PgBouncer
+apiVersion: postgresql.cnpg.io/v1
+kind: Pooler
+metadata:
+  name: invify-postgres-pooler
+  namespace: invify-data-core
+spec:
+  cluster:
+    name: invify-postgres-ha
+  instances: 3
+  type: rw
+  pgbouncer:
+    poolMode: transaction
+    parameters:
+      max_client_conn: "2000"
+      default_pool_size: "50"

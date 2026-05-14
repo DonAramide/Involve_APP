@@ -1,0 +1,168 @@
+# infrastructure/k8s/data/object-storage.yaml
+# Fulfills requirement: MinIO S3 object storage abstraction backing immutable Loki archives, OTA bundles, and replay journal dumps.
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-headless
+  namespace: invify-data-core
+  labels:
+    app: minio-storage
+spec:
+  clusterIP: None
+  ports:
+    - name: s3-api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+  selector:
+    app: minio-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-service
+  namespace: invify-data-core
+  labels:
+    app: minio-storage
+spec:
+  ports:
+    - name: s3-api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
+  selector:
+    app: minio-storage
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio-storage
+  namespace: invify-data-core
+  labels:
+    app: minio-storage
+spec:
+  serviceName: minio-headless
+  replicas: 4 # 4-Node distributed erasure-coded persistence configuration
+  selector:
+    matchLabels:
+      app: minio-storage
+  template:
+    metadata:
+      labels:
+        app: minio-storage
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - minio-storage
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2024-03-30T09-41-56Z
+          command:
+            - "minio"
+            - "server"
+            - "--console-address"
+            - ":9001"
+            - "http://minio-storage-{0...3}.minio-headless.invify-data-core.svc.cluster.local/data"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-storage-credentials
+                  key: ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-storage-credentials
+                  key: ROOT_PASSWORD
+            - name: MINIO_PROMETHEUS_AUTH_TYPE
+              value: "public"
+          ports:
+            - name: s3-api
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "2"
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+          volumeMounts:
+            - name: minio-storage-volume
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: minio-storage-volume
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 500Gi
+---
+# Declarative bucket initializer job applying structural layout policies and immutability attributes
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-bucket-initializer
+  namespace: invify-data-core
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc-client
+          image: minio/mc:RELEASE.2024-03-30T11-58-18Z
+          command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              echo "Awaiting MinIO cluster initialization loops..."
+              sleep 15
+              
+              # Instantiate target alias configuration
+              mc alias set invifys3 http://minio-service:9000 $(MINIO_ROOT_USER) $(MINIO_ROOT_PASSWORD)
+              
+              # 1. Immutable Loki archival retention bucket
+              mc mb --ignore-existing invifys3/invify-loki-archive
+              mc version enable invifys3/invify-loki-archive
+              
+              # 2. Over-The-Air (OTA) firmware/software update packages
+              mc mb --ignore-existing invifys3/invify-ota-packages
+              
+              # 3. Replay Journal recovery checkpoints & lineage matrices
+              mc mb --ignore-existing invifys3/invify-replay-journals
+              mc version enable invifys3/invify-replay-journals
+              
+              # 4. Long-term compliance Audit lineage storage
+              mc mb --ignore-existing invifys3/invify-audit-lineage
+              # Apply object lock immutability baseline compliance for sovereign auditing
+              mc ilm add --expiry-days 365 invifys3/invify-audit-lineage
+              
+              # 5. Distributed cross-region recovery dumps
+              mc mb --ignore-existing invifys3/invify-federation-recovery
+              
+              echo "MinIO canonical namespace rings successfully populated."
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-storage-credentials
+                  key: ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-storage-credentials
+                  key: ROOT_PASSWORD

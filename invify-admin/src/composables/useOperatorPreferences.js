@@ -23,6 +23,16 @@ export function useOperatorPreferences() {
       recentHistory: [],
       lastSyncedAt: null
     }
+
+    // FINAL REFINEMENT #6: Authoritative Session Restoration Rules
+    // Prevent unauthenticated or unverified multi-factor sessions from loading previous route traces
+    const hasToken = localStorage.getItem('invify_token')
+    const isMfaCleared = localStorage.getItem('mfa_status_verified') !== 'false'
+    
+    if (!hasToken || !isMfaCleared) {
+      return defaults
+    }
+
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (raw) {

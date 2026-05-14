@@ -106,6 +106,11 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     settings.warrantyEnabled, 
                     (val) => _update(context, settings.copyWith(warrantyEnabled: val)),
                   ),
+                  _buildSwitchTile(
+                    'Enable Stock Return & Replace', 
+                    settings.stockReturnEnabled, 
+                    (val) => _update(context, settings.copyWith(stockReturnEnabled: val)),
+                  ),
                 ],
                 _buildDropdownTile(
                   context, 
@@ -159,12 +164,16 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                 const Divider(),
 
                 // 6. Staff Management
-                _buildSectionHeader(context, 'Staff Management', isPro: state.userPlan?.isBasic == true),
+                _buildSectionHeader(context, 'Staff Management'),
                 _buildStaffManagementSection(context, settings),
                 const Divider(),
 
                 // 7. Graph Visibility
                 _buildSectionHeader(context, 'Graph Visibility (Admin)'),
+                _buildSwitchTile(
+                  settings.businessMode == 'school' ? 'Show Total Revenue Card' : 'Show Total Sales Card', 
+                  settings.showTotalSalesCard, (val) => _update(context, settings.copyWith(showTotalSalesCard: val))
+                ),
                 _buildSwitchTile(
                   settings.businessMode == 'school' ? 'Show Revenue Trend' : 'Show Sales Trend', 
                   settings.showSalesTrendChart, (val) => _update(context, settings.copyWith(showSalesTrendChart: val))
@@ -394,15 +403,62 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
   Widget _buildStaffManagementSection(BuildContext context, AppSettings settings) {
     return Column(
       children: [
-        _buildSwitchTile('Enable Staff Tracking', settings.staffManagementEnabled, (val) => _update(context, settings.copyWith(staffManagementEnabled: val))),
+        _buildSwitchTile(
+          'Enable Staff Tracking (Sold By)', 
+          settings.staffManagementEnabled, 
+          (val) => _update(context, settings.copyWith(staffManagementEnabled: val)),
+        ),
         if (settings.staffManagementEnabled)
           BlocBuilder<StaffBloc, StaffState>(
             builder: (context, state) {
-              if (state.isLoading) return const CircularProgressIndicator();
+              if (state.isLoading) return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
+              
+              final userPlan = context.read<SettingsBloc>().state.userPlan;
+              // Force Basic Plan tier evaluation for testing/demonstration purposes
+              final isBasicPlan = true;
+              final canAddStaff = !isBasicPlan || state.staffList.length < 2;
+
               return Column(
                 children: [
-                  ...state.staffList.map((staff) => ListTile(title: Text(staff.name), trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => context.read<StaffBloc>().add(DeleteStaff(staff.id!))))),
-                  ListTile(leading: const Icon(Icons.add), title: const Text('Add Staff'), onTap: () => _showStaffDialog(context)),
+                  ...state.staffList.map((staff) => ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.person)),
+                    title: Text(staff.name),
+                    subtitle: Text('ID: ${staff.staffId ?? "None"} | Code: ****'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () => _showStaffDialog(context, staff: staff),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () => context.read<StaffBloc>().add(DeleteStaff(staff.id!)),
+                        ),
+                      ],
+                    ),
+                  )),
+                  ListTile(
+                    leading: Icon(canAddStaff ? Icons.add : Icons.lock, color: canAddStaff ? Colors.blue : Colors.orange),
+                    title: Text(
+                      canAddStaff ? 'Add Staff' : 'Add Staff (Max 2 reached on Basic Plan)', 
+                      style: TextStyle(color: canAddStaff ? Colors.blue : Colors.orange, fontWeight: FontWeight.bold),
+                    ),
+                    trailing: canAddStaff ? null : _buildProBadge(),
+                    onTap: () {
+                      if (canAddStaff) {
+                        _showStaffDialog(context);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Basic Plan supports a maximum of 2 staff accounts. Please upgrade to add more.'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                        showDialog(context: context, builder: (_) => const UpgradeDialog());
+                      }
+                    },
+                  ),
                 ],
               );
             },
@@ -411,9 +467,88 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     );
   }
 
-  void _showStaffDialog(BuildContext context) {
-    final controller = TextEditingController();
-    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Add Staff'), content: TextField(controller: controller, decoration: const InputDecoration(labelText: 'Name')), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')), TextButton(onPressed: () { context.read<StaffBloc>().add(AddStaff(Staff(name: controller.text, staffCode: '0000'))); Navigator.pop(ctx); }, child: const Text('ADD'))]));
+  void _showStaffDialog(BuildContext context, {Staff? staff}) {
+    final nameController = TextEditingController(text: staff?.name);
+    final existingCode = staff?.staffCode;
+    final isCodeHashed = existingCode != null && existingCode.length > 4;
+    final pin = isCodeHashed ? '' : existingCode;
+    final codeController = TextEditingController(text: pin);
+    final staffIdController = TextEditingController(text: staff?.staffId);
+    final phoneController = TextEditingController(text: staff?.phone);
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(staff == null ? 'Add Staff' : 'Edit Staff'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Staff Name'),
+                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                ),
+                TextFormField(
+                  controller: staffIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Staff ID (Optional)',
+                    hintText: 'e.g., MGT-01',
+                  ),
+                  maxLength: 20,
+                  textCapitalization: TextCapitalization.characters,
+                ),
+                TextFormField(
+                  controller: codeController,
+                  decoration: InputDecoration(
+                    labelText: 'Auth Code (4 digits)',
+                    hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
+                  ),
+                  keyboardType: TextInputType.number,
+                  maxLength: 4,
+                  validator: (val) {
+                    if (staff != null && (val == null || val.isEmpty)) return null;
+                    return (val?.length != 4) ? 'Must be 4 digits' : null;
+                  },
+                ),
+                TextFormField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                  keyboardType: TextInputType.phone,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                final pin = codeController.text.trim();
+                final newStaff = Staff(
+                  id: staff?.id,
+                  name: nameController.text.trim(),
+                  staffId: staffIdController.text.trim().isEmpty ? null : staffIdController.text.trim(),
+                  staffCode: pin.isEmpty && staff != null ? staff.staffCode : pin,
+                  phone: phoneController.text.trim(),
+                );
+                if (staff == null) {
+                  context.read<StaffBloc>().add(AddStaff(newStaff));
+                } else {
+                  context.read<StaffBloc>().add(UpdateStaff(newStaff));
+                }
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildThemeColorSection(BuildContext context, AppSettings settings) {

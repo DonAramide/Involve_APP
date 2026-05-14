@@ -1,0 +1,45 @@
+# infrastructure/k8s/base/ssl-tls-cert-manager.yaml
+# Fulfills requirement: TLS everywhere with automated federation certificate rotation and secure TLS termination.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production
+spec:
+  acme:
+    # The ACME server URL for Let's Encrypt's production endpoint
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # Email address used for ACME registration and expiration notification warnings
+    email: soc-security@invify.app
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-production-account-key
+    # Enable the HTTP-01 challenge provider mapping ingress class directly
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+---
+# Declarative standard TLS certificate definition overriding root Edge endpoints
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: invify-production-tls-cert
+  namespace: invify-production
+spec:
+  secretName: invify-production-tls-cert
+  # Enforce automatic continuous background renewal 20 days prior to physical certificate expiry
+  renewBefore: 480h
+  duration: 2160h # 90 days canonical Let's Encrypt lifecycle bound
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  commonName: api.invify.app
+  dnsNames:
+    - api.invify.app
+    - ops.invify.app
+    - stream.invify.app
+  privateKey:
+    algorithm: RSA
+    encoding: PKCS1
+    size: 4096
+    rotationPolicy: Always

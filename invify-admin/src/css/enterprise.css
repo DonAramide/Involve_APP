@@ -95,6 +95,7 @@ body {
 .op-gap-4 { gap: var(--space-4); }
 .op-gap-8 { gap: var(--space-8); }
 .op-gap-12 { gap: var(--space-12); }
+.op-gap-16 { gap: var(--space-16); }
 
 .op-pa-4 { padding: var(--space-4); }
 .op-pa-8 { padding: var(--space-8); }

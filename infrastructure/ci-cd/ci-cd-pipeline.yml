@@ -1,0 +1,109 @@
+# infrastructure/ci-cd/ci-cd-pipeline.yml
+# Fulfills requirement: CI/CD automation enforcing blocking validation gates against replay contracts, WS protocol schemas, and RBAC rules.
+stages:
+  - lint-and-sast
+  - contract-verification
+  - build-immutable-images
+  - staging-dry-run
+  - production-convergence
+
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  CONTAINER_REGISTRY: "ghcr.io/invify"
+  IMMUTABLE_TAG: "${CI_COMMIT_SHA}"
+
+# ===================================================================
+# STAGE 1: STATIC SECURITY LINTING & SAST
+# ===================================================================
+sast_security_scan:
+  stage: lint-and-sast
+  image: returntocorp/semgrep:latest
+  script:
+    - echo "Executing deep semantic static analysis code checks..."
+    - semgrep ci --config=p/javascript --config=p/security-audit
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ===================================================================
+# STAGE 2: MANDATORY CONTRACT & ISOLATION SAFETY GATES
+# ===================================================================
+# Fulfills requirement: Pipelines must block replay contract violations, WS protocol mismatches, tenant isolation regressions, and schema incompatibilities.
+canonical_contract_gate:
+  stage: contract-verification
+  image: node:20-alpine
+  script:
+    - echo "Validating enterprise platform protocol boundaries..."
+    - cd backend && npm ci
+    
+    # Gate 1: Replay Contract Violations
+    - echo "Executing Replay-Safe Contract Validation suite..."
+    - npx mocha tests/contracts/replay-durability.spec.js --exit
+    
+    # Gate 2: WebSocket Protocol Mismatches
+    - echo "Asserting WebSocket frame compatibility schemas..."
+    - npx tsx scripts/validate-ws-schemas.ts
+    
+    # Gate 3: Tenant Isolation Regressions
+    - echo "Sweeping RBAC cross-tenant logic invariants..."
+    - npx jest tests/security/tenant-isolation-boundaries.test.js
+    
+    # Gate 4: Database Schema Migration Compatibility
+    - echo "Simulating migration delta verification passes..."
+    - npm run db:migrate:status
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ===================================================================
+# STAGE 3: IMMUTABLE DOCKER IMAGE CREATION
+# ===================================================================
+build_backend_image:
+  stage: build-immutable-images
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  script:
+    - echo "Logging into centralized enterprise cloud registries..."
+    - docker login ${CONTAINER_REGISTRY} -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD}
+    - docker build -t ${CONTAINER_REGISTRY}/invify-backend:${IMMUTABLE_TAG} -f backend/Dockerfile .
+    - docker push ${CONTAINER_REGISTRY}/invify-backend:${IMMUTABLE_TAG}
+    # Create companion canonical rollback image mapping tags
+    - docker tag ${CONTAINER_REGISTRY}/invify-backend:${IMMUTABLE_TAG} ${CONTAINER_REGISTRY}/invify-backend:latest-stable
+    - docker push ${CONTAINER_REGISTRY}/invify-backend:latest-stable
+  needs: [ "canonical_contract_gate" ]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ===================================================================
+# STAGE 4: STAGING CONVERGENCE & KUBERNETES DRY-RUN
+# ===================================================================
+k8s_manifests_dry_run:
+  stage: staging-dry-run
+  image: dtzar/helm-kubectl:3.14
+  script:
+    - echo "Compiling target Kubernetes infrastructure manifests..."
+    - cd infrastructure/k8s
+    - kubectl apply --dry-run=client -f base/
+    - kubectl apply --dry-run=client -f apps/
+    - echo "Zero configuration errors intercepted over deployment templates."
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+# ===================================================================
+# STAGE 5: PROGRESSIVE PRODUCTION RELEASE TRIGGERS
+# ===================================================================
+trigger_canary_rollout:
+  stage: production-convergence
+  image: dtzar/helm-kubectl:3.14
+  script:
+    - echo "Initiating Automated Canary Deployment matrix updates..."
+    - sed -i "s|ghcr.io/invify/invify-backend:.*|${CONTAINER_REGISTRY}/invify-backend:${IMMUTABLE_TAG}|g" infrastructure/k8s/apps/backend-deployment.yaml
+    - kubectl apply -f infrastructure/k8s/apps/backend-deployment.yaml --namespace=invify-production
+    - echo "Deployment execution finalized successfully. Active convergence health monitors online."
+  environment:
+    name: production
+    url: https://api.invify.app
+  when: manual
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

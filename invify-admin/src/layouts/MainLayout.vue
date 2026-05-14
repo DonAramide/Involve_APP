@@ -131,7 +131,7 @@
       :width="230"
       :breakpoint="768"
     >
-      <div class="column fit justify-between">
+      <div class="column fit justify-between" style="padding-top: 42px;">
         
         <q-scroll-area class="col">
           <!-- Workspace Overview block -->
@@ -326,6 +326,7 @@ const workspaces = [
   { id: 'fleet', label: 'Fleet Operations', priority: true },
   { id: 'governance', label: 'Governance', priority: true },
   { id: 'observability', label: 'Observability', priority: true },
+  { id: 'ai', label: 'AI Operational Intelligence', priority: true },
   { id: 'deployments', label: 'Deployments', priority: false },
   { id: 'apps', label: 'Applications', priority: false },
   { id: 'incidents', label: 'Incident Response', priority: false },
@@ -345,6 +346,7 @@ const switchWorkspace = (id) => {
     fleet: '/fleet/overview',
     governance: '/governance/compliance',
     observability: '/observability/streams',
+    ai: '/ai/copilot',
     deployments: '/deployments/rollouts',
     apps: '/apps/installed',
     incidents: '/incidents/active',
@@ -456,6 +458,11 @@ const activeNavigationTree = computed(() => {
         { label: 'Policy Intelligence Center', path: '/automation/policy', icon: 'policy', color: 'cyan-3', badge: 'Pre-flight', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
         { label: 'Workflow Execution & Audits', path: '/automation/workflows', icon: 'account_tree', color: 'amber-4', badge: '11 States', badgeBg: 'amber-10', badgeColor: 'amber-2' }
       ]
+    
+    case 'ai':
+      return [
+        { label: 'AI Operational Copilot', path: '/ai/copilot', icon: 'psychology', color: 'cyan-3', badge: 'Ground Truth', badgeBg: 'cyan-10', badgeColor: 'cyan-2' }
+      ]
 
     
     case 'admin':
@@ -463,7 +470,8 @@ const activeNavigationTree = computed(() => {
       return [
         { label: 'Global Setup & RBAC', path: '/admin/settings', icon: 'settings', color: 'grey-4' },
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
-        { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' }
+        { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
+        { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' }
       ]
   }
 })
@@ -476,11 +484,25 @@ onMounted(() => {
     operationalEventBusSingleton.registerQuasarContext($q)
   }
 
-  // Boot centralized middleware stream layers targeting upstream core brokers
-  connectionManagerSingleton.connect({
-    tenantId: prefs.value.activeTenantScope || 'global',
-    transport: 'websocket'
-  })
+  // FINAL REFINEMENT #5: Authoritative WebSocket Security Enforcement
+  // Subscriptions initialize exclusively if session validation parameters are completely cleared
+  const tokenString = localStorage.getItem('invify_token')
+  const operatorClaim = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
+  const isMfaCleared = localStorage.getItem('mfa_status_verified') !== 'false'
+
+  if (tokenString && isMfaCleared) {
+    connectionManagerSingleton.connect({
+      tenantId: prefs.value.activeTenantScope || 'global',
+      transport: 'websocket',
+      authContext: {
+        token: tokenString,
+        operatorRole: operatorClaim,
+        tenantScope: prefs.value.activeTenantScope || 'global'
+      }
+    })
+  } else {
+    console.warn('[WEBSOCKET INTERCEPTOR] Connection sequence halted. Awaiting complete multi-factor session validation verification.')
+  }
 })
 
 onBeforeUnmount(() => {

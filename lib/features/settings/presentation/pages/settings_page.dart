@@ -123,7 +123,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Widget _buildBody(BuildContext context, SettingsState state) {
     if (state.isLoading) return const Center(child: CircularProgressIndicator());
-    if (!state.isAuthorized) return _buildAuthRequired(context);
+    // Authorization check removed per user request for normal settings view
 
     final settings = state.settings!;
     final isSuperAdmin = state.isDeviceAuthorized;
@@ -223,16 +223,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
         if (_matches('Show Sync Status'))
           _buildSwitchTile('Show Sync Status', settings.showSyncStatus, (val) => _update(context, settings.copyWith(showSyncStatus: val))),
-        if (_matches('Show Total Sales Card', ['revenue']))
-          _buildSwitchTile(
-            settings.businessMode == 'school' ? 'Show Total Revenue Card' : 'Show Total Sales Card', 
-            settings.showTotalSalesCard, (val) => _update(context, settings.copyWith(showTotalSalesCard: val))
-          ),
-        if (_matches('Enable Stock Return & Replace', ['refund', 'return']))
-          _buildSwitchTile(
-            settings.businessMode == 'school' ? 'Enable Fee Refunds / Returns' : 'Enable Stock Return & Replace', 
-            settings.stockReturnEnabled, (val) => _update(context, settings.copyWith(stockReturnEnabled: val))
-          ),
+
         if (_matches('Restore Backup'))
           ListTile(
             title: const Text('Restore Backup'),
@@ -1432,140 +1423,7 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildStaffManagementSection(BuildContext context, AppSettings settings) {
-    return Column(
-      children: [
-        _buildSwitchTile(
-          'Enable Staff Tracking (Sold By)', 
-          settings.staffManagementEnabled, 
-          (val) => _update(context, settings.copyWith(staffManagementEnabled: val)),
-          isPro: context.read<SettingsBloc>().state.userPlan?.isBasic == true,
-        ),
-        if (settings.staffManagementEnabled) ...[
-          BlocBuilder<StaffBloc, StaffState>(
-            builder: (context, state) {
-              if (state.isLoading) return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
-              
-              return Column(
-                children: [
-                  ...state.staffList.map((staff) => ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.person)),
-                    title: Text(staff.name),
-                    subtitle: Text('ID: ${staff.staffId ?? "None"} | Code: ****'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit),
-                          onPressed: () => _showStaffDialog(context, staff: staff),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => context.read<StaffBloc>().add(DeleteStaff(staff.id!)),
-                        ),
-                      ],
-                    ),
-                  )),
-                  ListTile(
-                    leading: const Icon(Icons.add, color: Colors.blue),
-                    title: const Text('Add Staff', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-                    onTap: () => _showStaffDialog(context),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ],
-    );
-  }
 
-  void _showStaffDialog(BuildContext context, {Staff? staff}) {
-    final nameController = TextEditingController(text: staff?.name);
-    // Don't pre-fill if it's a hash (length > 4)
-    final existingCode = staff?.staffCode;
-    final isCodeHashed = existingCode != null && existingCode.length > 4;
-    final pin = isCodeHashed ? '' : existingCode;
-    final codeController = TextEditingController(text: pin);
-    final staffIdController = TextEditingController(text: staff?.staffId);
-    final phoneController = TextEditingController(text: staff?.phone);
-    final formKey = GlobalKey<FormState>();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(staff == null ? 'Add Staff' : 'Edit Staff'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Staff Name'),
-                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-                ),
-                TextFormField(
-                  controller: staffIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'Staff ID (Optional)',
-                    hintText: 'e.g., MGT-01',
-                  ),
-                  maxLength: 20,
-                  textCapitalization: TextCapitalization.characters,
-                ),
-                TextFormField(
-                  controller: codeController,
-                  decoration: InputDecoration(
-                    labelText: 'Auth Code (4 digits)',
-                    hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
-                  ),
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  validator: (val) {
-                    if (staff != null && (val == null || val.isEmpty)) return null; // Optional on edit
-                    return (val?.length != 4) ? 'Must be 4 digits' : null;
-                  },
-                ),
-                TextFormField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone Number'),
-                  keyboardType: TextInputType.phone,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                final pin = codeController.text.trim();
-                final newStaff = Staff(
-                  id: staff?.id,
-                  name: nameController.text.trim(),
-                  staffId: staffIdController.text.trim().isEmpty ? null : staffIdController.text.trim(),
-                  staffCode: pin.isEmpty && staff != null 
-                      ? staff.staffCode 
-                      : pin,
-                  phone: phoneController.text.trim(),
-                );
-                if (staff == null) {
-                  context.read<StaffBloc>().add(AddStaff(newStaff));
-                } else {
-                  context.read<StaffBloc>().add(UpdateStaff(newStaff));
-                }
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('SAVE'),
-          ),
-        ],
-      ),
-    );
-  }
   Widget _buildProBadge() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

@@ -257,13 +257,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       }
     }
 
-    // Pro validation for Staff Management
-    if (event.settings.staffManagementEnabled && !(state.settings?.staffManagementEnabled ?? false)) {
-      if (state.userPlan == null || !state.userPlan!.isValid || state.userPlan!.isBasic) {
-        emit(state.copyWith(error: 'Staff Management is a Pro Version feature.'));
-        return;
-      }
-    }
+    // Staff Management tracking is permitted on Basic Plan (capped at 2 accounts) per user request
 
     // Pro validation for Custom Receipt Pricing
     if (event.settings.customReceiptPricingEnabled && !(state.settings?.customReceiptPricingEnabled ?? false)) {

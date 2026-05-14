@@ -51,6 +51,7 @@ import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/school/presentation/pages/app_user_guide_page.dart';
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
+import 'package:involve_app/features/admin/presentation/pages/system_setup_page.dart';
 
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -404,6 +405,34 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _verifyAndNavigateToSettings(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SettingsPage()),
+    );
+  }
+
+  void _verifyAndNavigateToSuperAdmin(BuildContext context) {
+    final settingsBloc = context.read<SettingsBloc>();
+    
+    // Reset auth state to ensure listener catches new success
+    settingsBloc.add(ResetSuperAdminAuth());
+    
+    // Show super admin password dialog
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => SuperAdminPasswordDialog(bloc: settingsBloc),
+    ).then((authorized) {
+      if (authorized == true && context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SuperAdminSettingsPage()),
+        );
+      }
+    });
+  }
+
+  void _verifyAndNavigateToAdminHub(BuildContext context) {
     final settingsBloc = context.read<SettingsBloc>();
     
     // Reset auth state to ensure listener catches new success
@@ -418,7 +447,7 @@ class _DashboardPageState extends State<DashboardPage> {
       if (authorized == true && context.mounted) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const SettingsPage()),
+          MaterialPageRoute(builder: (_) => const SystemSetupPage()),
         );
       }
     });
@@ -499,6 +528,13 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'ADMIN HUB',
         icon: Icons.admin_panel_settings,
         color: Colors.deepOrange,
+        onTap: () => _verifyAndNavigateToAdminHub(context),
+      ),
+      _DashboardMenuItem(
+        id: 'cloud_metrics',
+        title: 'CLOUD METRICS',
+        icon: Icons.cloud_done_outlined,
+        color: Colors.indigo,
         onTap: () => Navigator.pushNamed(context, '/admin_hub'),
       ),
       _DashboardMenuItem(
@@ -554,6 +590,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'settings', 
           'calculator',
           'admin_hub',
+          'cloud_metrics',
           'finance_analytics',
           'reconciliation',
         ].contains(i.id)),
@@ -624,20 +661,6 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.edit_note,
           color: Colors.redAccent,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResultEntryPage())),
-        ),
-        _DashboardMenuItem(
-          id: 'admin_hub',
-          title: 'ADMIN HUB',
-          icon: Icons.admin_panel_settings,
-          color: Colors.deepOrange,
-          onTap: () => Navigator.pushNamed(context, '/admin_hub'),
-        ),
-        _DashboardMenuItem(
-          id: 'finance_analytics',
-          title: 'FINANCE ANALYTICS',
-          icon: Icons.insights,
-          color: Colors.blueAccent,
-          onTap: () => Navigator.pushNamed(context, '/admin_finance'),
         ),
         _DashboardMenuItem(
           id: 'lesson_notes',

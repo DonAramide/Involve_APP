@@ -1,0 +1,110 @@
+# infrastructure/k8s/data/queue-infrastructure.yaml
+# Fulfills requirement: Resilient queue architecture handling telemetry and core orchestration pipelines with dead-letter fallback.
+apiVersion: v1
+kind: Service
+metadata:
+  name: invify-rabbitmq-headless
+  namespace: invify-data-core
+  labels:
+    app: invify-rabbitmq-cluster
+spec:
+  clusterIP: None
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+    - name: clustering
+      port: 25672
+      targetPort: 25672
+  selector:
+    app: invify-rabbitmq-cluster
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: invify-rabbitmq-service
+  namespace: invify-data-core
+  labels:
+    app: invify-rabbitmq-cluster
+spec:
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+  selector:
+    app: invify-rabbitmq-cluster
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: invify-rabbitmq-cluster
+  namespace: invify-data-core
+  labels:
+    app: invify-rabbitmq-cluster
+spec:
+  serviceName: invify-rabbitmq-headless
+  replicas: 3 # 3-Node highly resilient quorum-backed queue cluster
+  selector:
+    matchLabels:
+      app: invify-rabbitmq-cluster
+  template:
+    metadata:
+      labels:
+        app: invify-rabbitmq-cluster
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - invify-rabbitmq-cluster
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.13-management-alpine
+          env:
+            - name: RABBITMQ_ERLANG_COOKIE
+              valueFrom:
+                secretKeyRef:
+                  name: invify-rabbitmq-credentials
+                  key: ERLANG_COOKIE
+            - name: RABBITMQ_DEFAULT_USER
+              value: "invify_queue_admin"
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: invify-rabbitmq-credentials
+                  key: RABBITMQ_PASSWORD
+          ports:
+            - name: amqp
+              containerPort: 5672
+            - name: management
+              containerPort: 15672
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          volumeMounts:
+            - name: rabbitmq-data
+              mountPath: /var/lib/rabbitmq
+  volumeClaimTemplates:
+    - metadata:
+        name: rabbitmq-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 100Gi

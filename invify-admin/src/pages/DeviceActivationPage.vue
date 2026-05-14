@@ -189,8 +189,8 @@
             <div class="col-6">
               <q-input
                 v-model="newCode.deviceSuffix"
-                label="Device Suffix (Hex)"
-                placeholder="e.g. 7A2"
+                label="Device Suffix (6 chars)"
+                placeholder="e.g. 7A2B9C"
                 dark filled
                 class="q-mb-md"
               />

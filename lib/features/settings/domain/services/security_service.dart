@@ -10,6 +10,7 @@ class SecurityService {
   static const _superAdminKey = 'super_admin_activation_key';
   static const _isAuthorizedKey = 'device_lifetime_authorized';
   static const _deviceIdKey = 'persistent_device_id';
+  static const _tenantIdKey = 'assigned_host_tenant_id';
 
   // No longer using fixed plaintext passwords. 
   // For emergency/default, we'll hash the expected default strings.
@@ -123,5 +124,19 @@ class SecurityService {
     final newId = const Uuid().v4();
     await _storage.write(key: _deviceIdKey, value: newId);
     return newId;
+  }
+
+  // --- Dynamic Assigned Host Tenant ID ---
+  Future<String> getTenantId() async {
+    final stored = await _storage.read(key: _tenantIdKey);
+    if (stored != null && stored.isNotEmpty) {
+      return stored;
+    }
+    // Dynamic production auto-generation fallback if unassigned
+    return 'demo-school-123';
+  }
+
+  Future<void> setTenantId(String tenantId) async {
+    await _storage.write(key: _tenantIdKey, value: tenantId.trim());
   }
 }

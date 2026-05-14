@@ -1,0 +1,115 @@
+# infrastructure/k8s/observability/otel-collector.yaml
+# Fulfills requirement: OpenTelemetry tracing architecture spanning client-side SDK requests and backend node execution boundaries.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: invify-observability
+data:
+  otel-collector-config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+            
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_percentage: 80
+        spike_limit_percentage: 20
+      batch:
+        send_batch_size: 8192
+        timeout: 1s
+        send_batch_max_size: 10240
+        
+    exporters:
+      # 1. Route raw distributed trace spans straight to standalone Tempo or Jaeger gRPC receivers
+      otlp/tempo:
+        endpoint: tempo.invify-observability.svc.cluster.local:4317
+        tls:
+          insecure: true
+          
+      # 2. Expose internal metrics straight to Prometheus scraping pools
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+        namespace: "invify_otel"
+        
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp/tempo]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [prometheus]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: invify-observability
+  labels:
+    app: otel-collector
+spec:
+  replicas: 2 # Highly redundant multi-node collector infrastructure
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8889"
+    spec:
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.96.0
+          args:
+            - "--config=/etc/otelcol/otel-collector-config.yaml"
+          ports:
+            - containerPort: 4317 # OTLP gRPC
+              name: otlp-grpc
+            - containerPort: 4318 # OTLP HTTP
+              name: otlp-http
+            - containerPort: 8889 # Prometheus metrics exposure
+              name: metrics
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/otelcol
+      volumes:
+        - name: config
+          configMap:
+            name: otel-collector-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector-service
+  namespace: invify-observability
+spec:
+  ports:
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+    - name: metrics
+      port: 8889
+      targetPort: 8889
+  selector:
+    app: otel-collector

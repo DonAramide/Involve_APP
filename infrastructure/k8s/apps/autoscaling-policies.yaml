@@ -1,0 +1,81 @@
+# infrastructure/k8s/apps/autoscaling-policies.yaml
+# Fulfills requirement: Event-driven autoscaling mechanisms triggered natively by queue backlogs and infrastructure saturation indices.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: invify-queue-worker-scaler
+  namespace: invify-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: invify-backend # Target stateless processing consumers
+  pollingInterval: 10 # Sample backlog sizes every 10 seconds
+  cooldownPeriod: 300 # Wait 5 minutes before terminating provisioned worker nodes
+  minReplicaCount: 4
+  maxReplicaCount: 30
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+  triggers:
+    # 1. Scale out based on unacknowledged messaging depth in core RabbitMQ queues
+    - type: rabbitmq
+      metadata:
+        queueName: invify_telemetry_stream
+        mode: QueueLength
+        value: "500" # Target 500 queued messages per processing replica
+      authenticationRef:
+        name: keda-rabbitmq-auth-trigger
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: invify-redis-stream-scaler
+  namespace: invify-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: invify-websocket-gateway
+  pollingInterval: 5
+  cooldownPeriod: 120
+  minReplicaCount: 3
+  maxReplicaCount: 25
+  triggers:
+    # 2. Scale out based directly on native Redis pending stream memory block lengths
+    - type: redis
+      metadata:
+        address: invify-redis-service.invify-data-core.svc.cluster.local:6379
+        listName: invify:stream:telemetry:backlog
+        listLength: "1000" # Provision gateway layers if buffer strings exceed threshold
+      authenticationRef:
+        name: keda-redis-auth-trigger
+---
+# Declarative trigger authorization providers fetching credential keys securely
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-rabbitmq-auth-trigger
+  namespace: invify-production
+spec:
+  secretTargetRef:
+    - parameter: host
+      name: invify-backend-secrets
+      key: QUEUE_BROKER_URL
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: keda-redis-auth-trigger
+  namespace: invify-production
+spec:
+  secretTargetRef:
+    - parameter: password
+      name: invify-backend-secrets
+      key: REDIS_PASSWORD

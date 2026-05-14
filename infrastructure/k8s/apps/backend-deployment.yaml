@@ -1,0 +1,113 @@
+# infrastructure/k8s/apps/backend-deployment.yaml
+# Fulfills requirement: Zero-downtime deployment convergence mapping resilient API state validation instances.
+apiVersion: v1
+kind: Service
+metadata:
+  name: invify-backend-service
+  namespace: invify-production
+  labels:
+    app: invify-backend
+spec:
+  ports:
+    - port: 3005
+      targetPort: 3005
+      protocol: TCP
+  selector:
+    app: invify-backend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invify-backend
+  namespace: invify-production
+  labels:
+    app: invify-backend
+    tier: stateless-api
+spec:
+  replicas: 4 # Initial baseline replication setup ensuring multi-node round-robin distribution
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: invify-backend
+  template:
+    metadata:
+      labels:
+        app: invify-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3005"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Ensure stateless computing nodes do not share underlying bare-metal machines
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - invify-backend
+                topologyKey: "kubernetes.io/hostname"
+      terminationGracePeriodSeconds: 60 # Allows active long-running connection pools to finalize gracefully
+      containers:
+        - name: backend-api
+          image: ghcr.io/invify/invify-backend:v2.1.0-production
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3005"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: invify-backend-secrets
+                  key: MATRIX_DB_URL
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: invify-backend-secrets
+                  key: REDIS_CLUSTER_URL
+            - name: JWT_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: invify-backend-secrets
+                  key: JWT_MASTER_KEY
+            - name: RABBITMQ_URL
+              valueFrom:
+                secretKeyRef:
+                  name: invify-backend-secrets
+                  key: QUEUE_BROKER_URL
+          ports:
+            - containerPort: 3005
+              name: http-api
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http-api
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http-api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 2

@@ -88,13 +88,13 @@
     </div>
 
     <!-- MAIN OPERATIONAL FEED GRIDS -->
-    <div class="row items-stretch op-gap-16 fit">
+    <div class="row items-start op-gap-16 full-width">
       
       <!-- LEFT PORTION: 3 Streaming Panels -->
       <div class="col-12 col-md-7 column op-gap-16">
         
         <!-- Panel 1: Fleet Presence Stream (Progressive State Aging) -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
+        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
           <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="radar" size="xs" color="cyan-3" />
@@ -137,7 +137,7 @@
         </div>
 
         <!-- Panel 2: Active Incident Feed -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
+        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
           <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="warning" size="xs" color="red-4" />
@@ -191,7 +191,7 @@
         </div>
 
         <!-- Panel 3: Rollout Activity Timeline -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
+        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
           <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="system_update_alt" size="xs" color="amber-4" />
@@ -231,7 +231,7 @@
       <div class="col-12 col-md-5 column op-gap-16">
         
         <!-- Panel 4: Quarantine Activity Panel -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
+        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
           <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="gpp_bad" size="xs" color="red-4" />
@@ -265,7 +265,7 @@
         </div>
 
         <!-- Panel 5: Telemetry Throughput Monitor (Stream SLA visibility) -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
+        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
           <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="analytics" size="xs" color="cyan-3" />

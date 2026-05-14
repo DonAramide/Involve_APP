@@ -1,0 +1,69 @@
+# infrastructure/k8s/base/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: invify-production
+  labels:
+    environment: production
+    security-tier: tier-1-critical
+    compliance: sovereign-tenant-isolated
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: invify-data-core
+  labels:
+    environment: production
+    storage-tier: stateful-ha
+    access-mode: private-internal
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: invify-observability
+  labels:
+    environment: production
+    monitoring-stack: full-stack-telemetry
+---
+# Strict RBAC Isolation Boundaries
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-cross-namespace
+  namespace: invify-production
+spec:
+  podSelector: {} # Selects all pods in invify-production
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow traffic strictly from Ingress controllers and trusted internal services
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              environment: production
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: isolate-data-core
+  namespace: invify-data-core
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    # Data core accepts traffic only from authorized production application nodes
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: invify-production
+        - namespaceSelector:
+            matchLabels:
+              name: invify-observability
+      ports:
+        - protocol: TCP
+          port: 5432 # Postgres
+        - protocol: TCP
+          port: 6379 # Redis Cluster
+        - protocol: TCP
+          port: 5672 # Queue AMQP

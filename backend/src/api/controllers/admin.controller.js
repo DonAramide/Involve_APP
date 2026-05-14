@@ -162,6 +162,96 @@ class AdminController {
     }
 
     /**
+     * Register Client Hardware Node & Upsert Tenant Registry Profile
+     */
+    static async registerDevice(req, res) {
+        try {
+            const { 
+                organization_name, 
+                phone_contact, 
+                device_serial_hash, 
+                persistent_uuid, 
+                derived_tenant_id, 
+                platform,
+                plan,
+                business_mode 
+            } = req.body;
+
+            if (!organization_name || !device_serial_hash) {
+                return res.status(400).json({ message: 'Missing mandatory hardware/tenant registration properties.' });
+            }
+
+            // 1. Check or Upsert the Tenant profile in the super Admin inventory
+            let targetTenantId = null;
+            const { data: existingTenants, error: searchErr } = await supabase
+                .from('tenants')
+                .select('*')
+                .eq('name', organization_name)
+                .limit(1);
+
+            if (searchErr) throw searchErr;
+
+            if (existingTenants && existingTenants.length > 0) {
+                targetTenantId = existingTenants[0].id;
+                // Update plan/type metrics to ensure sync with client local overrides
+                await supabase.from('tenants').update({
+                    type: business_mode || existingTenants[0].type || 'retail',
+                    plan: plan || existingTenants[0].plan || 'basic'
+                }).eq('id', targetTenantId);
+            } else {
+                // Insert brand new tenant node for super admin tracking dashboard
+                const { data: newTenant, error: createErr } = await supabase.from('tenants').insert([{
+                    name: organization_name,
+                    type: business_mode || 'retail',
+                    plan: plan || 'basic'
+                }]).select();
+
+                if (createErr) throw createErr;
+                if (newTenant && newTenant.length > 0) {
+                    targetTenantId = newTenant[0].id;
+                }
+            }
+
+            // 2. Register/Upsert the Hardware Device into the device profiles matrix
+            if (targetTenantId) {
+                const devicePayload = {
+                    tenant_id: targetTenantId,
+                    device_id: persistent_uuid || device_serial_hash || `dev-node-${Date.now()}`,
+                    device_name: organization_name ? `${organization_name} Terminal` : 'Invify Kiosk Node',
+                    status: 'ACTIVE',
+                    platform: platform || 'android',
+                    updated_at: new Date().toISOString()
+                };
+
+                const { data: existingDevices } = await supabase
+                    .from('devices')
+                    .select('id')
+                    .eq('tenant_id', targetTenantId)
+                    .limit(1);
+
+                if (existingDevices && existingDevices.length > 0) {
+                    await supabase.from('devices').update(devicePayload).eq('id', existingDevices[0].id);
+                } else {
+                    await supabase.from('devices').insert([{
+                        ...devicePayload,
+                        created_at: new Date().toISOString()
+                    }]);
+                }
+            }
+
+            res.status(200).json({
+                success: true,
+                message: 'Hardware client payload verified and matrix records registered natively.',
+                registered_tenant_id: targetTenantId,
+                assigned_routing_namespace: derived_tenant_id
+            });
+        } catch (err) {
+            console.error('Device Registration Relay Error:', err.message);
+            res.status(500).json({ success: false, message: err.message });
+        }
+    }
+
+    /**
      * Fetch all Users (Staff) mapped with Tenants
      */
     static async getUsers(req, res) {

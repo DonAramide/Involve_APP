@@ -1,0 +1,79 @@
+# infrastructure/ci-cd/canary-rollouts.yaml
+# Fulfills requirement: Automated canary rollout configuration complete with real-time error burst monitors triggering instant rollbacks.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: invify-websocket-gateway-canary
+  namespace: invify-production
+  labels:
+    app: invify-websocket-gateway
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: invify-websocket-gateway
+  template:
+    metadata:
+      labels:
+        app: invify-websocket-gateway
+    spec:
+      containers:
+        - name: websocket-node
+          image: ghcr.io/invify/invify-websocket-gateway:v2.1.0-production
+          ports:
+            - containerPort: 4000
+              name: ws-port
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+  strategy:
+    canary:
+      # Step-based progression routing weighted fractions of real-time ingress connections
+      steps:
+        - setWeight: 10
+        - pause: { duration: 5m } # Let canary bake for 5 minutes under 10% load
+        - setWeight: 25
+        - pause: { duration: 10m } # Escalate to 25% ingress traffic streams
+        - setWeight: 50
+        - pause: { duration: 15m }
+      # Bind automatic analysis loops driven by Prometheus alerting rule evaluations
+      analysis:
+        templates:
+          - templateName: canary-websocket-latency-verification
+        args:
+          - name: service-name
+            value: invify-websocket-gateway-canary
+---
+# Declarative AnalysisTemplate querying target SLA metrics to intercept anomalies early
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: canary-websocket-latency-verification
+  namespace: invify-production
+spec:
+  metrics:
+    # 1. Verify P95 WebSocket handshake duration remains strictly sub-second
+    - name: verify-p95-handshake-latency
+      interval: 30s
+      successCondition: result[0] < 0.2
+      failureLimit: 2 # Trigger automated abort/rollback if 2 contiguous metrics exceed bound
+      provider:
+        prometheus:
+          address: http://invify-prometheus-stack.invify-observability.svc.cluster.local:9090
+          query: |
+            histogram_quantile(0.95, sum(rate(invify_ws_handshake_duration_seconds_bucket{app="invify-websocket-gateway"}[2m])) by (le))
+            
+    # 2. Verify platform authorization layers intercept zero unexpected scope mismatches during canary stages
+    - name: verify-zero-tenant-isolation-breaches
+      interval: 15s
+      successCondition: result[0] == 0
+      failureLimit: 1 # INSTANT ROLLBACK on the very first multi-tenant isolation breach attempt
+      provider:
+        prometheus:
+          address: http://invify-prometheus-stack.invify-observability.svc.cluster.local:9090
+          query: |
+            sum(increase(invify_security_tenant_isolation_violations_total{app="invify-websocket-gateway"}[1m]))

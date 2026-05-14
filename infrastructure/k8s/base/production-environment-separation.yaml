@@ -1,0 +1,83 @@
+# infrastructure/k8s/base/production-environment-separation.yaml
+# Fulfills mandatory requirement: Production environments must never share secrets, persistence layers, replay journals, or queues.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-quota-production
+  namespace: invify-production
+spec:
+  hard:
+    # Set generous but strict cluster bounds preventing run-away loops
+    requests.cpu: "32"
+    requests.memory: 64Gi
+    limits.cpu: "64"
+    limits.memory: 128Gi
+    pods: "200"
+    services: "100"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute-quota-data-core
+  namespace: invify-data-core
+spec:
+  hard:
+    requests.cpu: "16"
+    requests.memory: 32Gi
+    limits.cpu: "32"
+    limits.memory: 64Gi
+    persistentvolumeclaims: "50"
+    requests.storage: "2Ti"
+---
+# Default Pod Resource Protections
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits-production
+  namespace: invify-production
+spec:
+  limits:
+    - default:
+        cpu: "1"
+        memory: 1Gi
+      defaultRequest:
+        cpu: "100m"
+        memory: 256Mi
+      type: Container
+---
+# Canonical Environment Scheduling Affinity Templates
+# Can be injected via Kustomize patches to enforce dedicated bare-metal/VPS target servers
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority-production-core
+value: 1000000
+globalDefault: false
+description: "Assigned strictly to master runtime logic, session routing controllers, and core Postgres DB shards."
+---
+# Example Pod template configuration snippet showing absolute environment Node isolation
+# nodeAffinity ensures production pods ONLY ever schedule onto designated production nodes
+# tolerations permit scheduling onto dedicated untainted host hardware
+apiVersion: v1
+kind: PodTemplate
+metadata:
+  name: production-node-isolation-template
+  namespace: invify-production
+template:
+  spec:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: environment
+                  operator: In
+                  values:
+                    - production
+                - key: node-role.kubernetes.io/production-compute
+                  operator: Exists
+    tolerations:
+      - key: "dedicated"
+        operator: "Equal"
+        value: "production"
+        effect: "NoSchedule"

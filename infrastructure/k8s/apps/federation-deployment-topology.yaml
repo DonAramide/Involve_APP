@@ -1,0 +1,105 @@
+# infrastructure/k8s/apps/federation-deployment-topology.yaml
+# Fulfills requirement: Localized regional write authority with eventual observability replication and read-only degradation during splits.
+apiVersion: v1
+kind: Service
+metadata:
+  name: invify-federation-gateway-service
+  namespace: invify-production
+  labels:
+    app: invify-federation-gateway
+spec:
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: sync-tunnel
+  selector:
+    app: invify-federation-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invify-federation-gateway
+  namespace: invify-production
+  labels:
+    app: invify-federation-gateway
+    tier: federation-mesh
+spec:
+  replicas: 2 # Resilient multi-instance gateway handling asynchronous regional event logs
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: invify-federation-gateway
+  template:
+    metadata:
+      labels:
+        app: invify-federation-gateway
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - invify-federation-gateway
+                topologyKey: "kubernetes.io/hostname"
+      containers:
+        # 1. Primary synchronization reconciliation logic engine
+        - name: federation-sync-engine
+          image: ghcr.io/invify/invify-federation-gateway:v2.1.0-production
+          env:
+            # Canonical region parameters asserting explicit sovereign isolation limits
+            - name: LOCAL_REGION_ID
+              value: "EU_CENTRAL_01"
+            - name: WRITE_AUTHORITY_MODE
+              value: "LOCAL_OWNED_ONLY"
+            - name: DEGRADE_ON_PARTITION
+              value: "READ_ONLY"
+            - name: REPLAY_VERIFICATION_STRICT
+              value: "true"
+            - name: REMOTE_PEER_ENDPOINTS
+              value: "https://fed-us-east.invify.app/sync,https://fed-ap-south.invify.app/sync"
+            - name: LOCAL_MATRIX_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: invify-backend-secrets
+                  key: MATRIX_DB_URL
+          ports:
+            - containerPort: 5000
+              name: sync-tunnel
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1"
+              
+        # 2. Sidecar proxy handling TLS Mutual Authentication (mTLS) over public cross-region transport routes
+        - name: mtls-tunnel-proxy
+          image: envoyproxy/envoy:v1.29.0
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+            - name: federation-certs
+              mountPath: /etc/ssl/certs/federation
+              readOnly: true
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: federation-envoy-config
+        - name: federation-certs
+          secret:
+            secretName: invify-federation-mtls-certs

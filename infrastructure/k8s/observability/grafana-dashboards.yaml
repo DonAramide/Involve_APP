@@ -1,0 +1,98 @@
+# infrastructure/k8s/observability/grafana-dashboards.yaml
+# Fulfills requirement: Pre-provisioned Grafana dashboards tracking websocket latency, federation lag, and orchestration timing.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: invify-grafana-dashboards-provisioner
+  namespace: invify-observability
+  labels:
+    grafana_dashboard: "true"
+data:
+  invify-enterprise-overview.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": false,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "title": "Invify Enterprise Platform // Operational Convergence Metrics",
+      "uid": "invify-soc-metrics-01",
+      "version": 1,
+      "refresh": "5s",
+      "panels": [
+        {
+          "title": "Realtime Edge // P95 WebSocket Connection Handshake Latency",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(invify_ws_handshake_duration_seconds_bucket[1m])) by (le))",
+              "legendFormat": "P95 Handshake (Seconds)",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "axisPlacement": "left", "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "orange", "value": 0.2 },
+                  { "color": "red", "value": 0.5 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "Messaging Core // RabbitMQ Telemetry Queue Backlog Saturation",
+          "type": "gauge",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "rabbitmq_queue_messages{queue=\"invify_telemetry_stream\"}",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "max": 10000,
+              "min": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1000 },
+                  { "color": "red", "value": 5000 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "Security Authorization Core // Cross-Tenant Boundary Interceptions",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum(increase(invify_security_tenant_isolation_violations_total[5m]))",
+              "refId": "C"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }

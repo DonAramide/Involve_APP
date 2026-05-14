@@ -9,10 +9,10 @@ class LicenseService {
 
     /**
      * Generates a valid license key for the mobile app
-     * [Expiry: 4][Plan: 1][BizHash: 4][LicenseID: 4][HMAC: 4] = 17 bytes
+     * [Expiry: 4][Plan: 1][BizHash: 4][LicenseID: 2][HMAC: 4] = 15 bytes
      */
     generateLicense({ businessName, durationDays, planIndex, licenseId }) {
-        const buffer = Buffer.alloc(13); // Increased from 11 to 13
+        const buffer = Buffer.alloc(11); // Native 11-byte payload
 
         // 1. Expiry (4 bytes - Big Endian)
         const expiryTs = Math.floor(Date.now() / 1000) + (durationDays * 86400);
@@ -25,9 +25,18 @@ class LicenseService {
         const bizHash = this._generateBusinessHash(businessName);
         buffer.writeUInt32BE(bizHash, 5);
 
-        // 4. License ID (4 bytes - Upgraded from 2)
-        const lId = typeof licenseId === 'string' ? parseInt(licenseId, 16) : (licenseId || 0);
-        buffer.writeUInt32BE(lId, 9);
+        // 4. License ID (2 bytes - Native 16-bit integer DJB2 string hashing mapping)
+        let lId = 0;
+        if (typeof licenseId === 'string' && licenseId.length > 0) {
+            let hash = 5381;
+            for (let i = 0; i < licenseId.length; i++) {
+                hash = ((hash << 5) + hash) + licenseId.charCodeAt(i);
+            }
+            lId = hash & 0xFFFF;
+        } else if (typeof licenseId === 'number') {
+            lId = licenseId & 0xFFFF;
+        }
+        buffer.writeUInt16BE(lId, 9);
 
         // 5. Sign (HMAC SHA256 - take first 4 bytes)
         const hmac = crypto.createHmac('sha256', this.hmacSecret);
@@ -52,11 +61,11 @@ class LicenseService {
             const normalized = key.replace(/[-\s]/g, '').toUpperCase();
             const bytes = this._decodeBase32(normalized);
             
-            // Expected length is now 17 bytes (13 payload + 4 HMAC)
-            if (bytes.length !== 17) throw new Error("Invalid license length");
+            // Expected length is natively 15 bytes (11 payload + 4 HMAC)
+            if (bytes.length !== 15) throw new Error("Invalid license length");
 
-            const payload = bytes.subarray(0, 13);
-            const providedSignature = bytes.subarray(13, 17);
+            const payload = bytes.subarray(0, 11);
+            const providedSignature = bytes.subarray(11, 15);
 
             // Verify signature
             const hmac = crypto.createHmac('sha256', this.hmacSecret);
@@ -70,7 +79,7 @@ class LicenseService {
             const expiryTs = payload.readUInt32BE(0);
             const planIndex = payload.readUInt8(4);
             const bizHash = payload.readUInt32BE(5);
-            const licenseId = payload.readUInt32BE(9);
+            const licenseId = payload.readUInt16BE(9);
 
             const planNames = ['BASIC', 'STANDARD', 'PREMIUM', 'ENTERPRISE'];
 

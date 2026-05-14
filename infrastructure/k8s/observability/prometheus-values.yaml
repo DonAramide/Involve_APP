@@ -1,0 +1,111 @@
+# infrastructure/k8s/observability/prometheus-values.yaml
+# Fulfills requirement: Prometheus multi-target scraping configurations establishing alert boundaries for WS latencies and queue saturations.
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: invify-prometheus-stack
+  namespace: invify-observability
+spec:
+  replicas: 2
+  serviceAccountName: prometheus-k8s
+  serviceMonitorSelector:
+    matchExpressions:
+      - key: team
+        operator: In
+        values: [ "observability", "production-edge" ]
+  podMonitorSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: [ "invify-backend", "invify-websocket-gateway" ]
+  resources:
+    requests:
+      memory: 4Gi
+      cpu: 1
+    limits:
+      memory: 8Gi
+      cpu: 2
+  retention: 15d
+  retentionSize: 100GB
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 120Gi
+  ruleSelector:
+    matchLabels:
+      role: alert-rules
+---
+# Declarative scrape mappings capturing live real-time stream state queues
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: invify-edge-pods-monitor
+  namespace: invify-observability
+  labels:
+    team: production-edge
+spec:
+  selector:
+    matchExpressions:
+      - key: tier
+        operator: In
+        values: [ "stateless-api", "real-time-edge" ]
+  namespaceSelector:
+    matchNames:
+      - invify-production
+  podMetricsEndpoints:
+    - port: http-api
+      path: /metrics
+      interval: 10s
+      scrapeTimeout: 5s
+    - port: ws-port
+      path: /metrics
+      interval: 5s # Aggressive sampling intervals monitoring immediate WS transport frames
+      scrapeTimeout: 3s
+---
+# Actionable alerting rules monitoring canonical service level targets
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: invify-sla-alert-rules
+  namespace: invify-observability
+  labels:
+    role: alert-rules
+spec:
+  groups:
+    - name: websocket-gateway.rules
+      rules:
+        # 1. Alert on WebSocket connection handshake latency degradation
+        - alert: WebSocketLatencyDegraded
+          expr: histogram_quantile(0.95, sum(rate(invify_ws_handshake_duration_seconds_bucket[5m])) by (le)) > 0.5
+          for: 1m
+          labels:
+            severity: critical
+            tier: real-time-edge
+          annotations:
+            summary: "High P95 WebSocket connection handshake latency detected."
+            description: "Gateway nodes are requiring >500ms to assign active socket channels. Inspect CPU allocation bounds."
+            
+        # 2. Alert on unhandled active RabbitMQ streaming message queues
+        - alert: QueueSaturationCritical
+          expr: rabbitmq_queue_messages{queue="invify_telemetry_stream"} > 5000
+          for: 2m
+          labels:
+            severity: critical
+            tier: messaging-core
+          annotations:
+            summary: "RabbitMQ Telemetry queue consumer backpressure detected."
+            description: "Message consumption latency is exceeding generation rates. Auto-scaled KEDA worker nodes may be throttling."
+            
+        # 3. Alert on malicious or anomalous Multi-Tenant authorization isolation trace violations
+        - alert: TenantIsolationViolationDetected
+          expr: rate(invify_security_tenant_isolation_violations_total[1m]) > 0
+          for: 0m
+          labels:
+            severity: page-soc
+            tier: security-core
+          annotations:
+            summary: "IMMEDIATE SOC INTERVENTION REQUIRED // Multi-Tenant scope cross-access intercepted."
+            description: "Backend authorization middleware intercepted an unassigned JWT payload crossing logical namespace realms."

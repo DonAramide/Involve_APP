@@ -1,0 +1,131 @@
+# infrastructure/k8s/apps/websocket-gateway-scaling.yaml
+# Fulfills requirement: High-density real-time WebSocket gateway scaling architecture optimized for low latency telemetry processing.
+apiVersion: v1
+kind: Service
+metadata:
+  name: invify-websocket-gateway-service
+  namespace: invify-production
+  labels:
+    app: invify-websocket-gateway
+spec:
+  ports:
+    - port: 4000
+      targetPort: 4000
+      protocol: TCP
+  selector:
+    app: invify-websocket-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invify-websocket-gateway
+  namespace: invify-production
+  labels:
+    app: invify-websocket-gateway
+    tier: real-time-edge
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50% # Generous over-provisioning during rolling releases to transfer long active connections smoothly
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: invify-websocket-gateway
+  template:
+    metadata:
+      labels:
+        app: invify-websocket-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - invify-websocket-gateway
+              topologyKey: "kubernetes.io/hostname"
+      terminationGracePeriodSeconds: 120 # Provide extended drain intervals for thousands of hardware stream handles
+      containers:
+        - name: websocket-node
+          image: ghcr.io/invify/invify-websocket-gateway:v2.1.0-production
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: WS_PORT
+              value: "4000"
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: invify-backend-secrets
+                  key: REDIS_CLUSTER_URL
+          ports:
+            - containerPort: 4000
+              name: ws-port
+          resources:
+            requests:
+              memory: "2Gi" # Pre-allocated memory overhead supporting large concurrent circular telemetry arrays
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: ws-port
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+# Instantiates dynamic autoscaling logic targeting active processing metrics
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: invify-websocket-gateway-hpa
+  namespace: invify-production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: invify-websocket-gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+    # 1. Scale on core Memory consumption buffers preventing JVM/V8 GC pauses
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 65
+    # 2. Scale on physical thread CPU consumption
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleUp:
+      # Aggressive rapid scale-up policies capturing flash traffic reconnect surges
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      # Conservative gradual scale-down windows preserving session consistency
+      stabilizationWindowSeconds: 600
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60

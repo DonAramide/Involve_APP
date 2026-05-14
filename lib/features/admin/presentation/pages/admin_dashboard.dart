@@ -4,8 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/admin_bloc.dart';
 import '../widgets/master_mode_switch.dart';
 import 'system_setup_page.dart';
-
 import 'package:intl/intl.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
+import '../../../settings/presentation/bloc/settings_state.dart';
+import 'admin_finance_dashboard.dart';
+import 'account_setup_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -96,39 +99,52 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   Widget _buildQuickActions(BuildContext context, bool isMaster) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('System Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
+    return BlocBuilder<SettingsBloc, SettingsState>(
+      builder: (context, settingsState) {
+        // Display Account Set up if the user is on a plan that is not free or basic
+        final isAdvancedPlan = settingsState.userPlan?.isBasic != true;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _ActionTile(
-              label: 'Quaser Keys',
-              icon: Icons.vpn_key,
-              onTap: isMaster ? () => _gotoKeys(context) : null,
-              isGated: !isMaster,
-            ),
-            _ActionTile(
-              label: 'System Setup',
-              icon: Icons.settings_applications,
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SystemSetupPage())),
-            ),
-            _ActionTile(
-              label: 'Audit Logs',
-              icon: Icons.history,
-              onTap: () => _gotoLogs(context),
-            ),
-            _ActionTile(
-              label: 'Ledger History',
-              icon: Icons.list_alt,
-              onTap: () {},
+            const Text('System Management', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: [
+                _ActionTile(
+                  label: 'Quaser Keys',
+                  icon: Icons.vpn_key,
+                  onTap: isMaster ? () => _gotoKeys(context) : null,
+                  isGated: !isMaster,
+                ),
+                _ActionTile(
+                  label: 'System Setup',
+                  icon: Icons.settings_applications,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SystemSetupPage())),
+                ),
+                // Visible to all non-free tiers, enabling demo inspection even when simulation flags report basic plan limits
+                _ActionTile(
+                  label: 'Account Set up',
+                  icon: Icons.cloud_sync_rounded,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage())),
+                ),
+                _ActionTile(
+                  label: 'Audit Logs',
+                  icon: Icons.history,
+                  onTap: () => _gotoLogs(context),
+                ),
+                _ActionTile(
+                  label: 'Ledger History',
+                  icon: Icons.list_alt,
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminFinanceDashboardPage())),
+                ),
+              ],
             ),
           ],
-        ),
-      ],
+        );
+      },
     );
   }
 

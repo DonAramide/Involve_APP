@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 class DeviceInfoService {
   static final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
 
-  /// Returns the last 3 uppercase alphanumeric characters of the device ID.
+  /// Returns the last 6 uppercase alphanumeric characters of the device ID.
   /// Uses MachineGUID on Windows/Linux, AndroidID on Android, IdentifierForVendor on iOS.
   static Future<String> getDeviceSuffix() async {
     String deviceId = 'UNKNOWN';
@@ -30,48 +30,29 @@ class DeviceInfoService {
       debugPrint('Error getting device info: $e');
     }
 
-    // Clean and extract last 3 chars
+    // Clean and extract last 6 chars
     final cleanId = deviceId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
-    if (cleanId.length < 3) {
+    if (cleanId.length < 6) {
       // Pad if too short (rare)
-      return cleanId.padLeft(3, 'X');
+      return cleanId.padLeft(6, 'X');
     }
-    return cleanId.substring(cleanId.length - 3);
+    return cleanId.substring(cleanId.length - 6);
   }
 
-  /// Encodes a 3-char suffix (0-9A-Z) into a 16-bit integer (0-46655).
-  /// This fits into the 'licenseId' field of the binary payload.
+  /// Hashes a device suffix string (e.g. 6 chars) into a robust 16-bit integer (0-65535).
+  /// This fits directly into the 'licenseId' field of the binary payload natively.
   static int encodeSuffix(String suffix) {
-    if (suffix.length != 3) throw ArgumentError('Suffix must be exactly 3 characters');
+    if (suffix.isEmpty) return 0;
     
-    final chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'; // Base36
-    int val = 0;
-    
-    for (int i = 0; i < 3; i++) {
-      final char = suffix[i].toUpperCase();
-      final index = chars.indexOf(char);
-      if (index == -1) {
-         // Fallback for unexpected chars: treat as '0'
-         val = val * 36 + 0;
-      } else {
-        val = val * 36 + index;
-      }
+    int hash = 5381;
+    for (int i = 0; i < suffix.length; i++) {
+      hash = ((hash << 5) + hash) + suffix.codeUnitAt(i);
     }
-    
-    return val & 0xFFFF; // Ensure 16-bit
+    return hash & 0xFFFF; // Ensure 16-bit unsigned integer
   }
 
-  /// Decodes a 16-bit integer back to a 3-char suffix.
+  /// Decodes a 16-bit integer representation for viewing purposes.
   static String decodeSuffix(int val) {
-    final chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    String result = '';
-    int temp = val;
-    
-    for (int i = 0; i < 3; i++) {
-      result = chars[temp % 36] + result;
-      temp ~/= 36;
-    }
-    
-    return result;
+    return 'HASH-${val.toRadixString(16).toUpperCase()}';
   }
 }

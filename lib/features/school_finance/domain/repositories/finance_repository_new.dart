@@ -14,6 +14,8 @@ class FinanceRepository {
 
   FinanceRepository(this._client, this._realtime);
 
+  FinanceApiClient get apiClient => _client;
+
   /// Fetches a specific wallet by its ID.
   /// GET /api/finance/wallet/:walletId
   Future<Wallet> getWallet(String walletId) async {

@@ -262,7 +262,7 @@ class AppDependencies {
       FinanceApiClient(
         baseUrl: baseUrl,
         getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
-        getTenantId: () async => 'demo-school-123',
+        getTenantId: () async => await SecurityService().getTenantId(),
       ),
       FinanceRealtimeDataSourceImpl(Supabase.instance.client),
     );

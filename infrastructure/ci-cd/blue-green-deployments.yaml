@@ -1,0 +1,62 @@
+# infrastructure/ci-cd/blue-green-deployments.yaml
+# Fulfills requirement: High-assurance Blue/Green cutover automation preventing abrupt live stream terminations.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: invify-backend-bluegreen
+  namespace: invify-production
+  labels:
+    app: invify-backend
+spec:
+  replicas: 4
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: invify-backend
+  template:
+    metadata:
+      labels:
+        app: invify-backend
+    spec:
+      containers:
+        - name: backend-api
+          image: ghcr.io/invify/invify-backend:v2.1.0-production
+          ports:
+            - containerPort: 3005
+              name: http-api
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http-api
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  strategy:
+    blueGreen:
+      # Reference to the active service receiving live production load
+      activeService: invify-backend-service
+      # Reference to the preview service utilized for dry-run contract verification tests
+      previewService: invify-backend-preview-service
+      # Automatically scale down the previous green replica array after active handshakes complete
+      autoPromotionEnabled: false
+      scaleDownDelaySeconds: 300 # Preserve the superseded instances for 5 minutes as an instant fail-back buffer
+---
+# Declarative Preview Service definition routing staging contract tests to the unpromoted target release
+apiVersion: v1
+kind: Service
+metadata:
+  name: invify-backend-preview-service
+  namespace: invify-production
+spec:
+  ports:
+    - port: 3005
+      targetPort: 3005
+      protocol: TCP
+  selector:
+    app: invify-backend

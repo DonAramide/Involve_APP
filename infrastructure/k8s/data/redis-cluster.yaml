@@ -1,0 +1,116 @@
+# infrastructure/k8s/data/redis-cluster.yaml
+# Fulfills requirement: Highly Available in-memory Redis cluster optimized for sub-millisecond session state governance sweeps.
+apiVersion: v1
+kind: Service
+metadata:
+  name: invify-redis-headless
+  namespace: invify-data-core
+  labels:
+    app: invify-redis-cluster
+spec:
+  clusterIP: None
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+    - name: cluster
+      port: 16379
+      targetPort: 16379
+  selector:
+    app: invify-redis-cluster
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: invify-redis-service
+  namespace: invify-data-core
+  labels:
+    app: invify-redis-cluster
+spec:
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+  selector:
+    app: invify-redis-cluster
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: invify-redis-cluster
+  namespace: invify-data-core
+  labels:
+    app: invify-redis-cluster
+spec:
+  serviceName: invify-redis-headless
+  replicas: 6 # 3 Masters, 3 Replicas canonical Redis clustering ring
+  selector:
+    matchLabels:
+      app: invify-redis-cluster
+  template:
+    metadata:
+      labels:
+        app: invify-redis-cluster
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - invify-redis-cluster
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: redis
+          image: redis:7.2.4-alpine
+          command:
+            - "redis-server"
+          args:
+            - "--protected-mode"
+            - "no"
+            - "--cluster-enabled"
+            - "yes"
+            - "--cluster-config-file"
+            - "nodes.conf"
+            - "--cluster-node-timeout"
+            - "5000"
+            - "--appendonly"
+            - "yes"
+            - "--appendfsync"
+            - "everysec"
+            - "--requirepass"
+            - "$(REDIS_CLUSTER_PASSWORD)"
+            - "--masterauth"
+            - "$(REDIS_CLUSTER_PASSWORD)"
+          env:
+            - name: REDIS_CLUSTER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: invify-redis-credentials
+                  key: REDIS_PASSWORD
+          ports:
+            - name: redis
+              containerPort: 6379
+            - name: cluster
+              containerPort: 16379
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 50Gi
