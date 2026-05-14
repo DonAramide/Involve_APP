@@ -115,6 +115,11 @@
                 <q-item-section avatar><q-icon name="history" size="xs" color="amber-4" /></q-item-section>
                 <q-item-section class="text-white">Clear Local Session Trace</q-item-section>
               </q-item>
+              <q-separator dark class="bg-[#1c2633]" />
+              <q-item clickable v-close-popup @click="executeLogout" class="hover-bg text-red-3">
+                <q-item-section avatar><q-icon name="logout" size="xs" color="red-4" /></q-item-section>
+                <q-item-section class="text-weight-bold">Secure Session Logout</q-item-section>
+              </q-item>
             </q-list>
           </q-btn-dropdown>
         </div>
@@ -298,7 +303,7 @@ const route = useRoute()
 const $q = useQuasar()
 
 // Pull enhanced asynchronous persistent storage handlers
-const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, togglePinView, isViewPinned, pushHistory, clearHistory, fetchPreferencesFromBackend } = useOperatorPreferences()
+const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, togglePinView, isViewPinned, pushHistory, clearHistory, executeLogout, fetchPreferencesFromBackend } = useOperatorPreferences()
 
 const paletteRef = ref(null)
 const openCommandPalette = () => {
