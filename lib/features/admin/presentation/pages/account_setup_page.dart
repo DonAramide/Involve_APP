@@ -9,6 +9,7 @@ import '../../../../core/utils/device_info_service.dart';
 import '../../../settings/domain/services/security_service.dart';
 import '../../../../core/services/service_locator.dart';
 import '../../../school_finance/domain/repositories/finance_repository_new.dart';
+import '../../../../core/utils/progress_dialog_utils.dart';
 
 class AccountSetupPage extends StatefulWidget {
   const AccountSetupPage({super.key});
@@ -338,7 +339,11 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                             debugPrint('POST /api/admin/register-device');
                             debugPrint('Payload: $payload');
                             
-                            await client.post('/api/admin/register-device', data: payload);
+                            await ProgressDialogUtils.showDancingProgress(
+                              context,
+                              () async => await client.post('/api/admin/register-device', data: payload),
+                              message: 'Registering edge node identity matrix...',
+                            );
                           } catch (e) {
                             debugPrint('Network Relay caught fallback trace: $e');
                           }
