@@ -69,7 +69,7 @@ class _OptimizedTransactionListState extends State<OptimizedTransactionList> {
                 return const Center(
                   child: Padding(
                     padding: EdgeInsets.all(16.0),
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: Text('Loading more transactions...', style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic)),
                   ),
                 );
               }

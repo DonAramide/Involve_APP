@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'invify_loading_indicator.dart';
 
 class RestartWidget<T> extends StatefulWidget {
   const RestartWidget({
@@ -58,7 +59,7 @@ class _RestartWidgetState<T> extends State<RestartWidget<T>> {
         return widget.loadingBuilder?.call(context) ?? 
                const MaterialApp(
                  home: Scaffold(
-                   body: Center(child: CircularProgressIndicator()),
+                   body: InvifyLoadingIndicator(message: 'INITIALIZING SYSTEM ARCHITECTURE...'),
                  ),
                );
       },

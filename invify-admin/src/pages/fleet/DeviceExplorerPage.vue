@@ -93,6 +93,7 @@
           <!-- Metadata Summary Strip -->
           <div class="row items-center justify-between bg-[#0b0f12] q-pa-sm rounded-borders border-muted q-mb-md text-caption text-grey-4" style="font-size: 11px;">
             <div><span class="text-grey-6">Agent:</span> <span class="text-metric-mono text-cyan-3">{{ selectedDevice.agentCode }}</span></div>
+            <div><span class="text-grey-6">Location:</span> <span class="text-metric-mono text-cyan-3" v-if="selectedDevice.latitude">{{ selectedDevice.latitude }}, {{ selectedDevice.longitude }}</span><span class="text-grey-7" v-else>N/A</span></div>
             <div><span class="text-grey-6">Battery:</span> <span class="text-metric-mono">{{ selectedDevice.battery }}%</span></div>
             <div><span class="text-grey-6">OS:</span> <span class="text-metric-mono text-white">{{ selectedDevice.androidVersion }}</span></div>
             <div><span class="text-grey-6">OTA:</span> <span class="text-metric-mono text-amber-3">{{ selectedDevice.otaStatus }}</span></div>
@@ -264,6 +265,8 @@ const baseDevicesArray = ref([
     networkState: 'WIFI_5G',
     androidVersion: '13.0',
     dotroidVersion: '4.2.0',
+    latitude: '6.5244',
+    longitude: '3.3792',
     description: 'Hardware stream active. Secure boot attestation verified.',
     apps: ['com.invify.kiosk', 'com.android.settings', 'org.chromium.webview']
   },
@@ -283,6 +286,8 @@ const baseDevicesArray = ref([
     networkState: 'CELL_4G',
     androidVersion: '12.0',
     dotroidVersion: '4.1.8',
+    latitude: '6.4531',
+    longitude: '3.3958',
     description: 'Continuous network packet transmissions nominal.',
     apps: ['com.invify.warehouse', 'com.zebra.scanner']
   },
@@ -344,6 +349,8 @@ for (let i = 5; i <= 65; i++) {
     networkState: 'WIFI_5G',
     androidVersion: '13.0',
     dotroidVersion: '4.2.0',
+    latitude: (6.5 + (Math.random() * 0.1)).toFixed(4),
+    longitude: (3.3 + (Math.random() * 0.1)).toFixed(4),
     description: `Generated stream background row mapping sequence test ${i}.`,
     apps: ['com.invify.kiosk']
   })
@@ -452,7 +459,7 @@ const dispatchAuthorizedCommand = () => {
     targetDeviceId: targetId,
     commandType: actionStr,
     auditAnnotation: auditString,
-    authorizedBy: 'sysadmin@invify.app'
+    authorizedBy: 'sysadmin@IIPS.app'
   })
 
   // Mutate base arrays optimistically

@@ -286,7 +286,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               BlocBuilder<PrinterBloc, PrinterState>(
                 builder: (context, printerState) {
-              final items = _getMenuItems(context, settings, printerState);
+              final items = _getMenuItems(context, settings, printerState, settingsState.userPlan);
               final screenWidth = MediaQuery.of(context).size.width;
               final crossAxisCount = (screenWidth / 180).floor().clamp(2, 6);
               final isTablet = screenWidth >= 900;
@@ -453,9 +453,10 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState) {
+  List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState, UserPlan? userPlan) {
     final isSchool = settings?.businessMode == 'school';
     final isServices = settings?.businessMode == 'services';
+    final isBasicTier = userPlan == null || userPlan.isBasic;
     
     final allItems = <_DashboardMenuItem>[
       if (!isSchool) ...[
@@ -530,27 +531,29 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Colors.deepOrange,
         onTap: () => _verifyAndNavigateToAdminHub(context),
       ),
-      _DashboardMenuItem(
-        id: 'cloud_metrics',
-        title: 'CLOUD METRICS',
-        icon: Icons.cloud_done_outlined,
-        color: Colors.indigo,
-        onTap: () => Navigator.pushNamed(context, '/admin_hub'),
-      ),
-      _DashboardMenuItem(
-        id: 'finance_analytics',
-        title: 'FINANCE ANALYTICS',
-        icon: Icons.insights,
-        color: Colors.blueAccent,
-        onTap: () => Navigator.pushNamed(context, '/admin_finance'),
-      ),
-      _DashboardMenuItem(
-        id: 'reconciliation',
-        title: 'RECONCILIATION',
-        icon: Icons.account_balance,
-        color: Colors.teal,
-        onTap: () => Navigator.pushNamed(context, '/executive_finance'),
-      ),
+      if (!isBasicTier) ...[
+        _DashboardMenuItem(
+          id: 'cloud_metrics',
+          title: 'CLOUD METRICS',
+          icon: Icons.cloud_done_outlined,
+          color: Colors.indigo,
+          onTap: () => Navigator.pushNamed(context, '/admin_hub'),
+        ),
+        _DashboardMenuItem(
+          id: 'finance_analytics',
+          title: 'FINANCE ANALYTICS',
+          icon: Icons.insights,
+          color: Colors.blueAccent,
+          onTap: () => Navigator.pushNamed(context, '/admin_finance'),
+        ),
+        _DashboardMenuItem(
+          id: 'reconciliation',
+          title: 'RECONCILIATION',
+          icon: Icons.account_balance,
+          color: Colors.teal,
+          onTap: () => Navigator.pushNamed(context, '/executive_finance'),
+        ),
+      ],
     ];
 
     if (isServices) {

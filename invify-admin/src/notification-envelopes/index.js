@@ -37,7 +37,8 @@ class LineageSequenceController {
       tenantId: rawPayload.tenantId,
       severity: rawPayload.severity,
       timestamp: rawPayload.timestamp,
-      message: rawPayload.message
+      message: rawPayload.message,
+      locationContext: rawPayload.locationContext || null
     });
 
     const signature = await computeSHA256Sync(canonicalString);
@@ -58,7 +59,8 @@ class LineageSequenceController {
       tenantId: signedPayload.tenantId,
       severity: signedPayload.severity,
       timestamp: signedPayload.timestamp,
-      message: signedPayload.message
+      message: signedPayload.message,
+      locationContext: signedPayload.locationContext || null
     });
 
     const calculatedHash = await computeSHA256Sync(expectedString);

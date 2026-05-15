@@ -9,6 +9,7 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/terminology.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class StudentFinanceProfilePage extends StatefulWidget {
   final String studentId;
@@ -62,7 +63,7 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
       body: BlocBuilder<FinanceBloc, FinanceState>(
         builder: (context, state) {
           if (state is FinanceLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'LOADING LEDGER DETAILS...');
           }
 
           if (state is FinanceError) {

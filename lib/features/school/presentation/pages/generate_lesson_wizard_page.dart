@@ -8,6 +8,7 @@ import 'package:involve_app/features/school/domain/repositories/school_repositor
 
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class GenerateLessonWizardPage extends StatefulWidget {
   const GenerateLessonWizardPage({super.key});
@@ -93,7 +94,13 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
           builder: (context, settingsState) {
             return BlocBuilder<SchoolBloc, SchoolState>(
               builder: (context, schoolState) {
-                return SingleChildScrollView(
+                return BlocBuilder<LessonNoteBloc, LessonNoteState>(
+                  builder: (context, lessonState) {
+                    final isGenerating = lessonState is LessonGenerating || lessonState is LessonNoteLoading;
+                    if (isGenerating) {
+                      return const InvifyLoadingIndicator(message: 'ORCHESTRATING AI LESSON GENERATION...');
+                    }
+                    return SingleChildScrollView(
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -191,7 +198,7 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
                                   child: SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                    child: Icon(Icons.sync, size: 16, color: Colors.blue),
                                   ),
                                 )
                               : null,
@@ -242,17 +249,15 @@ class _GenerateLessonWizardPageState extends State<GenerateLessonWizardPage> {
                               foregroundColor: Colors.white,
                             ),
                             child: isGenerating
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                  )
+                                ? const Text('GENERATING...', style: TextStyle(fontWeight: FontWeight.bold))
                                 : const Text('GENERATE LESSON NOTE', style: TextStyle(fontWeight: FontWeight.bold)),
                           );
                         },
                       ),
                     ],
                   ),
+                );
+                  },
                 );
               },
             );

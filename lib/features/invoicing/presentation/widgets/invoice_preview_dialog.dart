@@ -288,7 +288,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Processing... please wait.')));
                     },
                     child: (invoiceState.isSaving || invoiceState.isGeneratingAccount)
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      ? const Text('PROCESSING...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))
                       : Text(invoiceState.paymentMethod == 'VirtualAccount' && invoiceState.paymentIntent == null ? 'GENERATE ACCOUNT' : 'SAVE & PRINT'),
                   ),
                   ElevatedButton(
@@ -367,7 +367,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
                       Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));
                     },
-                    child: invoiceState.isSaving ? const CircularProgressIndicator() : const Text('SAVE & PREVIEW'),
+                    child: invoiceState.isSaving ? const Text('SAVING...') : const Text('SAVE & PREVIEW'),
                   ),
                 ],
               );
@@ -513,7 +513,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2)),
+              Icon(Icons.sync, size: 12, color: Colors.blue),
               SizedBox(width: 8),
               Text('Waiting for payment confirmation...', style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
             ],

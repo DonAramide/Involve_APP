@@ -10,6 +10,7 @@ import 'package:involve_app/features/school/domain/entities/school_entities.dart
 import 'package:url_launcher/url_launcher.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ContactPage extends StatefulWidget {
   const ContactPage({super.key});
@@ -124,7 +125,7 @@ class _ContactPageState extends State<ContactPage> {
   Widget _buildTeachersTab(bool isSchoolMode) {
     return BlocBuilder<SchoolBloc, SchoolState>(
       builder: (context, state) {
-        if (state.isLoading) return const Center(child: CircularProgressIndicator());
+        if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING ACADEMIC DIRECTORY...');
         
         final filteredList = state.teachers.where((teacher) {
           final query = _searchQuery;
@@ -158,7 +159,7 @@ class _ContactPageState extends State<ContactPage> {
   Widget _buildStaffTab(bool isSchoolMode) {
     return BlocBuilder<StaffBloc, StaffState>(
       builder: (context, state) {
-        if (state.isLoading) return const Center(child: CircularProgressIndicator());
+        if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING MANAGEMENT DIRECTORY...');
         
         final filteredList = state.staffList.where((staff) {
           final query = _searchQuery;
@@ -189,7 +190,7 @@ class _ContactPageState extends State<ContactPage> {
   Widget _buildParentsTab() {
     return BlocBuilder<SchoolBloc, SchoolState>(
       builder: (context, state) {
-        if (state.isLoading) return const Center(child: CircularProgressIndicator());
+        if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING PARENT DIRECTORY...');
 
         // Extract unique parents from students
         final Map<String, ({Student student, SchoolClass? schoolClass})> parentMap = {};

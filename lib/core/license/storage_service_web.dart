@@ -73,6 +73,10 @@ class StorageService {
     return str != null ? DateTime.tryParse(str) : null;
   }
 
+  static Future<void> clearProExpiryDate() async {
+    await _secureStorage.delete(key: _proExpiryKey);
+  }
+
   static Future<void> setDeviceAccessGranted(bool granted) async {
     await _secureStorage.write(key: _deviceAccessKey, value: granted ? 'true' : 'false');
   }

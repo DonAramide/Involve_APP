@@ -383,7 +383,7 @@ const auditSectionRef = ref(null)
 // State variables
 const isOverrideActive = ref(false)
 const isExecutingBroadcast = ref(false)
-const activeOperator = ref("sysadmin@invify.app")
+const activeOperator = ref("sysadmin@IIPS.app")
 
 // Form structures
 const composerForm = reactive({

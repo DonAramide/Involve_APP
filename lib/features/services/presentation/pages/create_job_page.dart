@@ -10,6 +10,7 @@ import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_job.dart';
 import '../../domain/entities/service_material.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class CreateJobPage extends StatefulWidget {
   const CreateJobPage({super.key});
@@ -684,7 +685,7 @@ class _CustomerSearchSheetState extends State<_CustomerSearchSheet> {
                   final customers = state.customers;
 
                   if (state.status == ServicesStatus.loading && customers.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const InvifyLoadingIndicator(message: 'SEARCHING CUSTOMERS...');
                   }
 
                   if (customers.isEmpty) {

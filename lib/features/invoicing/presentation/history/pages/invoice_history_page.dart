@@ -23,6 +23,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:collection/collection.dart';
+import '../../../../../core/widgets/invify_loading_indicator.dart';
 
 // Stock Return Features
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
@@ -119,7 +120,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             barrierDismissible: false,
             builder: (context) => const PopScope(
               canPop: false,
-              child: Center(child: CircularProgressIndicator()),
+              child: InvifyLoadingIndicator(message: 'PREPARING DATA EXPORT...'),
             ),
           );
         } else if (state.successMessage != null && state.successMessage!.contains('Backup')) {
@@ -140,7 +141,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
           return BlocBuilder<HistoryBloc, HistoryState>(
             builder: (context, state) {
               if (state is HistoryLoading) {
-                return const Center(child: CircularProgressIndicator());
+                return const InvifyLoadingIndicator(message: 'LOADING INVOICE HISTORY...');
               } else if (state is HistoryError) {
                 return Center(child: Text(state.message));
               }

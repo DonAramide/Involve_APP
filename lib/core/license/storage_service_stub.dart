@@ -15,6 +15,7 @@ class StorageService {
   static Future<String?> getLastPrinterIp() async => null;
   static Future<void> saveProExpiryDate(DateTime date) async {}
   static Future<DateTime?> getProExpiryDate() async => null;
+  static Future<void> clearProExpiryDate() async {}
   static Future<void> setDeviceAccessGranted(bool granted) async {}
   static Future<bool> isDeviceAccessGranted() async => false;
 }

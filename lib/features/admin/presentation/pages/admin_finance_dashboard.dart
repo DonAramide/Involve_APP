@@ -11,6 +11,7 @@ import 'package:involve_app/features/invoicing/presentation/history/pages/invoic
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class AdminFinanceDashboardPage extends StatefulWidget {
   const AdminFinanceDashboardPage({super.key});
@@ -172,7 +173,7 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
             return BlocBuilder<HistoryBloc, HistoryState>(
               builder: (context, historyState) {
                 if (historyState is HistoryLoading) {
-                  return const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()));
+                  return const InvifyLoadingIndicator(message: 'FETCHING LEDGER ENTRIES...');
                 }
                 
                 final invoices = historyState is HistoryLoaded ? historyState.invoices : [];

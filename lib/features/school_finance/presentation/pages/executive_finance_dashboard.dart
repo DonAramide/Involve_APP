@@ -15,6 +15,7 @@ import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
 import 'reconciliation_page.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ExecutiveFinanceDashboard extends StatefulWidget {
   const ExecutiveFinanceDashboard({super.key});
@@ -132,7 +133,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
             ],
           ),
           body: _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const InvifyLoadingIndicator(message: 'COMPILING EXECUTIVE TELEMETRY...')
               : _error != null
                   ? _buildErrorState()
                   : RefreshIndicator(

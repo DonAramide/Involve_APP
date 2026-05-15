@@ -151,7 +151,7 @@
               dark
               filled
               dense
-              placeholder="e.g. core-operator@invify.app"
+              placeholder="e.g. core-operator@IIPS.app"
               class="bg-[#14191f] text-white rounded-borders"
               required
             />
@@ -228,11 +228,11 @@ const hierarchyRoles = [
 ]
 
 const baseOperatorsList = ref([
-  { id: 'usr-sa-001', email: 'superadmin@invify.app', role: 'SUPER_ADMIN', tenantId: 'global-platform', isMfaEnabled: true, status: 'ACTIVE' },
-  { id: 'usr-st-002', email: 'sec-staff-node@invify.app', role: 'INTERNAL_STAFF', tenantId: 'global-platform', isMfaEnabled: true, status: 'ACTIVE' },
+  { id: 'usr-sa-001', email: 'superadmin@IIPS.app', role: 'SUPER_ADMIN', tenantId: 'global-platform', isMfaEnabled: true, status: 'ACTIVE' },
+  { id: 'usr-st-002', email: 'sec-staff-node@IIPS.app', role: 'INTERNAL_STAFF', tenantId: 'global-platform', isMfaEnabled: true, status: 'ACTIVE' },
   { id: 'usr-ta-003', email: 'admin@fintech-alpha.dev', role: 'TENANT_ADMIN', tenantId: 'tenant-alpha', isMfaEnabled: false, status: 'ACTIVE' },
   { id: 'usr-to-004', email: 'kiosk-agent@fintech-alpha.dev', role: 'TENANT_OPERATOR', tenantId: 'tenant-alpha', isMfaEnabled: false, status: 'ACTIVE' },
-  { id: 'usr-pc-005', email: 'pro-user@invify.pro', role: 'PRO_CUSTOMER', tenantId: 'tenant-beta', isMfaEnabled: true, status: 'ACTIVE' },
+  { id: 'usr-pc-005', email: 'pro-user@IIPS.app', role: 'PRO_CUSTOMER', tenantId: 'tenant-beta', isMfaEnabled: true, status: 'ACTIVE' },
   { id: 'usr-to-006', email: 'suspended-node@omega-retail.com', role: 'TENANT_OPERATOR', tenantId: 'tenant-omega', isMfaEnabled: true, status: 'SUSPENDED' }
 ])
 
@@ -259,7 +259,7 @@ const getRoleBadgeColor = (roleStr) => {
 const executeCreationPipeline = async () => {
   loading.value = true
   try {
-    const res = await axios.post('http://localhost:3005/api/governance/operators', {
+    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/operators', {
       email: newOp.value.email,
       password: newOp.value.password,
       role: newOp.value.role,
@@ -301,7 +301,7 @@ const executeCreationPipeline = async () => {
 const confirmSuspension = async (opNode) => {
   opNode.status = 'SUSPENDED'
   try {
-    await axios.post(`http://localhost:3005/api/governance/operators/${opNode.id}/suspend`, {
+    await axios.post(`https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/operators/${opNode.id}/suspend`, {
       reason: 'Operator intervention trace suspension trigger.'
     }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }

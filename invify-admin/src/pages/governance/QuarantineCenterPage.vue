@@ -96,7 +96,10 @@
                 Tenant Scope: <span class="text-metric-mono text-grey-3">{{ q.tenant }}</span>
               </div>
               <div class="text-grey-6 ellipsis" style="font-size: 9px;">
-                Vector: {{ q.appPackage || 'com.invify.core' }}
+                Vector: {{ q.appPackage || 'com.iips.core' }}
+              </div>
+              <div class="text-cyan-6 text-metric-mono" style="font-size: 9px;" v-if="q.latitude">
+                Loc: {{ q.latitude }}, {{ q.longitude }}
               </div>
             </div>
 
@@ -216,16 +219,16 @@ const autoRemediationConfig = ref({
 // 2. Active Isolated Endpoints Array combining store entries seamlessly
 const quarantinedEndpointsList = computed(() => {
   const base = [
-    { targetId: 'dev-node-delta', tenant: 'tenant-alpha', appPackage: 'com.invify.display', reason: 'Attestation trust vectors breached. Secure signature failed.', durationStr: '12m 42s', lockedTimestamp: '10:04:12 AM', trustScore: 32 },
-    { targetId: 'pos-term-omega-04', tenant: 'tenant-omega', appPackage: 'com.invify.pos', reason: 'Kernel module tampering parameter identified', durationStr: '1h 14m', lockedTimestamp: '08:52:01 AM', trustScore: 12 },
-    { targetId: 'scanner-gamma-12', tenant: 'tenant-gamma', appPackage: 'com.invify.warehouse', reason: 'Play Integrity secure bridge response sequence expired', durationStr: '4h 02m', lockedTimestamp: '06:05:44 AM', trustScore: 45 }
+    { targetId: 'dev-node-delta', tenant: 'tenant-alpha', appPackage: 'com.iips.display', reason: 'Attestation trust vectors breached. Secure signature failed.', durationStr: '12m 42s', lockedTimestamp: '10:04:12 AM', trustScore: 32, latitude: '6.6012', longitude: '3.3514' },
+    { targetId: 'pos-term-omega-04', tenant: 'tenant-omega', appPackage: 'com.iips.pos', reason: 'Kernel module tampering parameter identified', durationStr: '1h 14m', lockedTimestamp: '08:52:01 AM', trustScore: 12, latitude: '6.4531', longitude: '3.3958' },
+    { targetId: 'scanner-gamma-12', tenant: 'tenant-gamma', appPackage: 'com.iips.warehouse', reason: 'Play Integrity secure bridge response sequence expired', durationStr: '4h 02m', lockedTimestamp: '06:05:44 AM', trustScore: 45, latitude: '6.5567', longitude: '3.3421' }
   ]
 
   // Combine dynamically with Pinia incoming buffers
   const incoming = govStore.quarantineList.map((q, idx) => ({
     targetId: q.targetId || `stream-node-${idx}`,
     tenant: q.tenantId || 'global-subfleet',
-    appPackage: 'com.invify.core',
+    appPackage: 'com.iips.core',
     reason: q.reason || 'Anomalous operational stream violation detected',
     durationStr: 'Just Now',
     lockedTimestamp: new Date().toLocaleTimeString(),
@@ -270,7 +273,7 @@ const dispatchTrustRestorationCommand = () => {
   console.log(`[QuarantineManager] Authorizing Trust Restoration Release payload:`, {
     targetId,
     annotation,
-    operator: 'sysadmin@invify.app'
+    operator: 'sysadmin@IIPS.app'
   })
 
   // Broadcast upward via Unified Event Bus
@@ -278,7 +281,7 @@ const dispatchTrustRestorationCommand = () => {
     targetDeviceId: targetId,
     remediationLog: annotation,
     timestamp: new Date().toISOString(),
-    authorizedBy: 'sysadmin@invify.app'
+    authorizedBy: 'sysadmin@IIPS.app'
   })
 
   Notify.create({

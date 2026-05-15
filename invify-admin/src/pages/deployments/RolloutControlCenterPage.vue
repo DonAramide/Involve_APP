@@ -508,7 +508,7 @@ const dispatchAuthorizedRollout = () => {
   console.log(`[RolloutOrchestrator] Authorized deployment stream broadcast:`, {
     targetFirmware: simTargetFirmware.value,
     impactProfile: blastEstimates.value,
-    operator: 'sysadmin@invify.app'
+    operator: 'sysadmin@IIPS.app'
   })
 
   operationalEventBusSingleton.emitUpstream('AUTHORIZE_STAGED_ROLLOUT', {
@@ -561,7 +561,7 @@ const commitTraceableRollback = () => {
   console.log(`[RolloutOrchestrator] Committing Traceable Rollback stream payload:`, {
     targetCohortId: targetId,
     traceabilityLog: traceStr,
-    operator: 'sysadmin@invify.app'
+    operator: 'sysadmin@IIPS.app'
   })
 
   // Broadcast upward via Unified Event Bus
@@ -569,7 +569,7 @@ const commitTraceableRollback = () => {
     targetCohortId: targetId,
     auditTraceabilityLog: traceStr,
     timestamp: new Date().toISOString(),
-    authorizedBy: 'sysadmin@invify.app'
+    authorizedBy: 'sysadmin@IIPS.app'
   })
 
   Notify.create({

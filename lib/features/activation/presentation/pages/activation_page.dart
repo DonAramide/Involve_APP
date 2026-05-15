@@ -290,7 +290,7 @@ class _ActivationPageState extends State<ActivationPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: _isLoading 
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const Text('VERIFYING LICENSE CRYPTOGRAPHY...', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic, color: Colors.white))
                             : const Text('ACTIVATE NOW', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                       ),

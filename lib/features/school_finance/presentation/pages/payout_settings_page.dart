@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../../../core/services/service_locator.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class PayoutSettingsPage extends StatefulWidget {
   const PayoutSettingsPage({super.key});
@@ -76,7 +77,7 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
         foregroundColor: Colors.black,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const InvifyLoadingIndicator(message: 'FETCHING PAYOUT CONFIGURATION...')
           : SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Form(
@@ -132,7 +133,7 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
                           elevation: 0,
                         ),
                         child: _isSaving
-                            ? const CircularProgressIndicator(color: Colors.white)
+                            ? const Text('SAVING CONFIGURATION...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))
                             : const Text('Save Payout Configuration', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),

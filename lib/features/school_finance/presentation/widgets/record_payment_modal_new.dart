@@ -189,11 +189,7 @@ class _RecordPaymentModalState extends State<RecordPaymentModal> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
               child: state.isSubmitting
-                  ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                    )
+                  ? const Text('RECORDING...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))
                   : const Text('Record Payment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ),

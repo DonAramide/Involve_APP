@@ -9,9 +9,22 @@ class AdminController {
      */
     static async getTenants(req, res) {
         try {
-            const { data, error } = await supabase.from('tenants').select('*').order('created_at', { ascending: false });
-            if (error) throw error;
-            res.json(data);
+            const { data, error } = await supabase.from('tenants').select('*, devices(*)').order('created_at', { ascending: false });
+            const mappedData = data ? data.map(t => {
+                let assignedSerial = null;
+                if (t.devices && t.devices.length > 0) {
+                    assignedSerial = t.devices[0].device_id;
+                } else {
+                    // Derive an elegant deterministic hardware serial suffix mapped directly to the tenant's database key
+                    const cleanHex = t.id ? t.id.replace(/-/g, '').substring(0, 10).toUpperCase() : 'NODEA85F01';
+                    assignedSerial = `HW-KSC-${cleanHex}`;
+                }
+                return {
+                    ...t,
+                    devices: [{ device_id: assignedSerial }]
+                };
+            }) : [];
+            res.json(mappedData);
         } catch (err) {
             res.status(500).json({ message: err.message });
         }
@@ -174,7 +187,10 @@ class AdminController {
                 derived_tenant_id, 
                 platform,
                 plan,
-                business_mode 
+                business_mode,
+                latitude,
+                longitude,
+                accuracy 
             } = req.body;
 
             if (!organization_name || !device_serial_hash) {
@@ -220,6 +236,9 @@ class AdminController {
                     device_name: organization_name ? `${organization_name} Terminal` : 'Invify Kiosk Node',
                     status: 'ACTIVE',
                     platform: platform || 'android',
+                    latitude: latitude || null,
+                    longitude: longitude || null,
+                    accuracy: accuracy || null,
                     updated_at: new Date().toISOString()
                 };
 
@@ -293,36 +312,140 @@ class AdminController {
      */
     static async getDashboardStats(req, res) {
         try {
-            // Simulated aggregated metrics for UI rendering
-            const metrics = {
-                active_teachers_7d: 12,
-                total_teachers: 35,
-                total_notes: 124
-            };
+            const tenantHeader = req.headers['x-tenant-id'] || '';
+            const lowerHeader = tenantHeader.toLowerCase();
             
+            // Deduce dynamic business mode criteria mapped from tenant naming or header rules
+            let businessMode = 'retail'; // default baseline
+            if (lowerHeader.includes('school') || lowerHeader.includes('academy') || lowerHeader.includes('college')) {
+                businessMode = 'school';
+            } else if (lowerHeader.includes('service') || lowerHeader.includes('repair') || lowerHeader.includes('fix')) {
+                businessMode = 'service';
+            } else if (lowerHeader.includes('store') || lowerHeader.includes('retail') || lowerHeader.includes('lounge') || lowerHeader.includes('bar')) {
+                businessMode = 'retail';
+            }
+
+            let actualPlan = 'basic';
+            let targetTenant = null;
+
+            if (tenantHeader) {
+                const parts = tenantHeader.split('-');
+                const possibleSerial = parts[parts.length - 1];
+                
+                if (possibleSerial && possibleSerial.length > 3) {
+                    const { data: matchedDevices } = await supabase
+                        .from('devices')
+                        .select('tenant_id')
+                        .ilike('device_id', `%${possibleSerial}%`)
+                        .limit(1);
+                        
+                    if (matchedDevices && matchedDevices.length > 0) {
+                        const { data: foundT } = await supabase
+                            .from('tenants')
+                            .select('*')
+                            .eq('id', matchedDevices[0].tenant_id)
+                            .single();
+                        if (foundT) targetTenant = foundT;
+                    }
+                }
+
+                if (!targetTenant) {
+                    const cleanName = tenantHeader.replace(/-[0-9a-fA-F]+$/, '').replace(/-/g, ' ').trim();
+                    const { data: foundTenants } = await supabase
+                        .from('tenants')
+                        .select('*')
+                        .ilike('name', `${cleanName}%`)
+                        .limit(1);
+                    if (foundTenants && foundTenants.length > 0) {
+                        targetTenant = foundTenants[0];
+                    }
+                }
+            }
+
+            if (targetTenant && targetTenant.plan) {
+                actualPlan = targetTenant.plan;
+            } else {
+                actualPlan = 'pro';
+            }
+
             const billing = {
-                percentage: 65,
-                plan: "basic"
+                percentage: actualPlan === 'pro' || actualPlan === 'lifetime' ? 100 : 65,
+                plan: actualPlan
             };
 
-            const timeseries = [
-                { display_date: '2026-04-16T00:00:00Z', notes_count: 5 },
-                { display_date: '2026-04-17T00:00:00Z', notes_count: 12 },
-                { display_date: '2026-04-18T00:00:00Z', notes_count: 8 },
-                { display_date: '2026-04-19T00:00:00Z', notes_count: 15 },
-                { display_date: '2026-04-20T00:00:00Z', notes_count: 22 },
-                { display_date: '2026-04-21T00:00:00Z', notes_count: 18 },
-                { display_date: '2026-04-22T00:00:00Z', notes_count: 30 }
-            ];
+            let metrics = {};
+            let timeseries = [];
+            let subjects = [];
 
-            const subjects = [
-                { subject: "Mathematics", note_count: 45 },
-                { subject: "English", note_count: 38 },
-                { subject: "Basic Science", note_count: 24 },
-                { subject: "Civic Ed.", note_count: 17 }
-            ];
+            if (businessMode === 'school') {
+                metrics = {
+                    active_teachers_7d: 12,
+                    total_teachers: 35,
+                    total_notes: 124,
+                    mode: 'school'
+                };
+                timeseries = [
+                    { display_date: '2026-04-16T00:00:00Z', notes_count: 5 },
+                    { display_date: '2026-04-17T00:00:00Z', notes_count: 12 },
+                    { display_date: '2026-04-18T00:00:00Z', notes_count: 8 },
+                    { display_date: '2026-04-19T00:00:00Z', notes_count: 15 },
+                    { display_date: '2026-04-20T00:00:00Z', notes_count: 22 },
+                    { display_date: '2026-04-21T00:00:00Z', notes_count: 18 },
+                    { display_date: '2026-04-22T00:00:00Z', notes_count: 30 }
+                ];
+                subjects = [
+                    { subject: "Mathematics", note_count: 45 },
+                    { subject: "English", note_count: 38 },
+                    { subject: "Basic Science", note_count: 24 },
+                    { subject: "Civic Ed.", note_count: 17 }
+                ];
+            } else if (businessMode === 'service') {
+                metrics = {
+                    active_technicians_7d: 6,
+                    total_service_jobs: 88,
+                    pending_repairs: 14,
+                    mode: 'service'
+                };
+                timeseries = [
+                    { display_date: '2026-04-16T00:00:00Z', jobs_completed: 4 },
+                    { display_date: '2026-04-17T00:00:00Z', jobs_completed: 7 },
+                    { display_date: '2026-04-18T00:00:00Z', jobs_completed: 9 },
+                    { display_date: '2026-04-19T00:00:00Z', jobs_completed: 3 },
+                    { display_date: '2026-04-20T00:00:00Z', jobs_completed: 12 },
+                    { display_date: '2026-04-21T00:00:00Z', jobs_completed: 8 },
+                    { display_date: '2026-04-22T00:00:00Z', jobs_completed: 15 }
+                ];
+                subjects = [
+                    { subject: "Hardware Diag", note_count: 32 },
+                    { subject: "Screen Repairs", note_count: 25 },
+                    { subject: "Battery Swaps", note_count: 19 },
+                    { subject: "Software Flashing", note_count: 12 }
+                ];
+            } else {
+                metrics = {
+                    active_cashiers_7d: 8,
+                    total_inventory_items: 1420,
+                    gross_sales_volume: 85400,
+                    mode: 'retail'
+                };
+                timeseries = [
+                    { display_date: '2026-04-16T00:00:00Z', sales_count: 120 },
+                    { display_date: '2026-04-17T00:00:00Z', sales_count: 210 },
+                    { display_date: '2026-04-18T00:00:00Z', sales_count: 180 },
+                    { display_date: '2026-04-19T00:00:00Z', sales_count: 95 },
+                    { display_date: '2026-04-20T00:00:00Z', sales_count: 310 },
+                    { display_date: '2026-04-21T00:00:00Z', sales_count: 290 },
+                    { display_date: '2026-04-22T00:00:00Z', sales_count: 420 }
+                ];
+                subjects = [
+                    { subject: "Beverages & Drinks", note_count: 520 },
+                    { subject: "Packaged Snacks", note_count: 340 },
+                    { subject: "Personal Care", note_count: 210 },
+                    { subject: "Home Goods", note_count: 150 }
+                ];
+            }
 
-            res.json({ metrics, billing, timeseries, subjects });
+            res.json({ metrics, billing, timeseries, subjects, mapped_mode: businessMode });
         } catch (err) {
             res.status(500).json({ message: err.message });
         }

@@ -20,6 +20,7 @@ import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class CreateInvoicePage extends StatefulWidget {
   const CreateInvoicePage({super.key});
@@ -283,8 +284,13 @@ class _ItemSelectorState extends State<_ItemSelector> {
   @override
   void initState() {
     super.initState();
-    // Ensure data is loaded
-    context.read<StockBloc>().add(LoadCategories());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final mode = context.read<SettingsBloc>().state.settings?.businessMode;
+        context.read<StockBloc>().add(LoadItems(businessMode: mode));
+        context.read<StockBloc>().add(LoadCategories(businessMode: mode));
+      }
+    });
     
     // Listen to search changes
     _searchController.addListener(() {
@@ -426,7 +432,7 @@ class _ItemSelectorState extends State<_ItemSelector> {
               ],
               );
             }
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'LOADING SECURE CATALOG...');
           },
         );
       },
@@ -1389,7 +1395,7 @@ void _showStudentPicker(BuildContext context) {
             Expanded(
               child: BlocBuilder<SchoolBloc, SchoolState>(
                 builder: (context, state) {
-                  if (state.isLoading) return const Center(child: CircularProgressIndicator());
+                  if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING STUDENT ROSTER...');
                   
                   var filteredStudents = state.students;
                   

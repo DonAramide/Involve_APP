@@ -152,7 +152,7 @@ const commands = ref([
     action: 'OTA Deployment Trigger',
     targetId: 'target-fleet-us-east',
     state: 'succeeded',
-    operator: 'sysadmin@invify.app',
+    operator: 'sysadmin@IIPS.app',
     timestamp: Date.now() - 45000,
     latency: 340
   },
@@ -161,7 +161,7 @@ const commands = ref([
     action: 'Policy Push Operation',
     targetId: 'tenant-anchor-global',
     state: 'succeeded',
-    operator: 'operator-1@invify.app',
+    operator: 'operator-1@IIPS.app',
     timestamp: Date.now() - 120000,
     latency: 185
   }
@@ -178,7 +178,7 @@ const dispatchCommand = (action, domain) => {
     action: action,
     targetId: `${domain}-target-${Math.floor(Math.random() * 8999 + 1000)}`,
     state: 'queued',
-    operator: 'active_session@invify.app',
+    operator: 'active_session@IIPS.app',
     timestamp: Date.now(),
     latency: 0
   }

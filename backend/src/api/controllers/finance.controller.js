@@ -29,7 +29,9 @@ class FinanceController {
                     recorded_by: recordedBy, 
                     description, 
                     ip: req.ip,
-                    user_agent: req.headers['user-agent']
+                    user_agent: req.headers['user-agent'],
+                    latitude: req.body.latitude || null,
+                    longitude: req.body.longitude || null
                 }
             });
 

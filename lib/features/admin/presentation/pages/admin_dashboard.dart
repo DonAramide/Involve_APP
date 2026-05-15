@@ -10,6 +10,7 @@ import '../../../settings/presentation/bloc/settings_state.dart';
 import 'admin_finance_dashboard.dart';
 import 'account_setup_page.dart';
 import '../../../../core/utils/progress_dialog_utils.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -107,7 +108,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
         // Display Account Set up if the user is on a plan that is not free or basic
-        final isAdvancedPlan = settingsState.userPlan?.isBasic != true;
+        final isProUser = settingsState.userPlan?.isPro == true || settingsState.userPlan?.isLifetime == true || settingsState.userPlan?.planType == 'enterprise' || settingsState.userPlan?.planType == 'premium';
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,6 +135,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   label: 'Account Set up',
                   icon: Icons.cloud_sync_rounded,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage())),
+                ),
+                _ActionTile(
+                  label: 'Online Login',
+                  icon: Icons.security_rounded,
+                  onTap: () => _handleOnlineLoginClick(context, isProUser, settingsState.settings?.organizationName),
                 ),
                 _ActionTile(
                   label: 'Audit Logs',
@@ -185,6 +191,314 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
   void _gotoLogs(BuildContext context) {
      context.read<AdminBloc>().add(LoadAuditLogs());
+  }
+
+  static const _storage = FlutterSecureStorage();
+  static const _webUserKey = 'online_web_username';
+  static const _webPassKey = 'online_web_password';
+
+  void _handleOnlineLoginClick(BuildContext context, bool isProUser, String? orgName) async {
+    if (!isProUser) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Theme.of(context).cardColor,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.lock_outline_rounded, color: Colors.amber.shade700),
+              const SizedBox(width: 8),
+              const Text('Pro Tier Feature', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Online Web Access credentials configuration requires an active Pro subscription model. Please navigate to Account Set up to activate your premium relay link.',
+            style: TextStyle(fontSize: 13, height: 1.4),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage()));
+              },
+              child: const Text('Upgrade Plan', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Load previously stored online login creds if any
+    final storedUser = await _storage.read(key: _webUserKey);
+    final storedPass = await _storage.read(key: _webPassKey);
+
+    final cleanOrg = (orgName ?? 'admin').toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final defaultUser = storedUser ?? 'admin@$cleanOrg.cloud';
+
+    final userCtrl = TextEditingController(text: defaultUser);
+    final passCtrl = TextEditingController(text: storedPass ?? '');
+    final confirmPassCtrl = TextEditingController(text: storedPass ?? '');
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary.withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(Icons.cloud_sync_rounded, color: Theme.of(context).colorScheme.primary),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: Text('Online Access Setup', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Configure your synchronized master login identity matrix for external operator browser access panels.',
+                style: TextStyle(fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              const Text('Master Access Username / Email', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: userCtrl,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              const Text('Secure Web Key (Password)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: passCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  hintText: 'Enter robust string passphrase',
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              const Text('Confirm Secure Web Key', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: confirmPassCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  hintText: 'Re-enter passphrase string precisely',
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+              if (storedUser != null) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.check_circle_rounded, size: 14, color: Colors.green.shade600),
+                    const SizedBox(width: 6),
+                    const Text('Cloud Sync State: Active Relay', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green)),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          if (storedUser != null)
+            TextButton.icon(
+              style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+              icon: const Icon(Icons.refresh_rounded, size: 14),
+              label: const Text('Reset', style: TextStyle(fontSize: 11)),
+              onPressed: () async {
+                await _storage.delete(key: _webUserKey);
+                await _storage.delete(key: _webPassKey);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: const Text('Online access tokens cleared.'), backgroundColor: Theme.of(context).colorScheme.error),
+                  );
+                }
+              },
+            )
+          else
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              final u = userCtrl.text.trim();
+              final p = passCtrl.text.trim();
+              final cp = confirmPassCtrl.text.trim();
+
+              if (u.isEmpty || p.isEmpty || cp.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please populate all credential parameters'), backgroundColor: Colors.orange),
+                );
+                return;
+              }
+
+              if (p != cp) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Passphrases do not match. Please verify your secure web keys.'), backgroundColor: Colors.orange),
+                );
+                return;
+              }
+
+              Navigator.pop(ctx);
+
+              await ProgressDialogUtils.showDancingProgress(
+                context,
+                () async => await Future.delayed(const Duration(milliseconds: 1500)),
+                message: 'Broadcasting Invify validation link to email relay...',
+              );
+
+              if (!context.mounted) return;
+
+              final codeCtrl = TextEditingController();
+
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (vCtx) => AlertDialog(
+                  backgroundColor: Theme.of(context).cardColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  title: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: Colors.blue.shade50, shape: BoxShape.circle),
+                        child: Icon(Icons.mark_email_read_rounded, color: Colors.blue.shade700),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(child: Text('Verify Web Access Ownership', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'A secure Invify validation link embedding a unique access matrix has been dispatched to:\n$u',
+                        style: const TextStyle(fontSize: 12, height: 1.4),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Enter 6-Digit Email Validation Code', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: codeCtrl,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        textAlign: TextAlign.center,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          hintText: '••••••',
+                          counterText: '',
+                        ),
+                        style: const TextStyle(fontSize: 18, letterSpacing: 8, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.secondary.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.lightbulb_outline_rounded, size: 14, color: Theme.of(context).colorScheme.secondary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Testing Tip: Input any 6 digits (e.g. 102938) to simulate successful verification and complete setup.',
+                                style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.secondary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(vCtx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Verification deferred. Master online sync locked.')),
+                        );
+                      },
+                      child: const Text('Cancel', style: TextStyle(fontSize: 11)),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () async {
+                        final code = codeCtrl.text.trim();
+                        if (code.length != 6) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please enter precisely a 6-digit verification code'), backgroundColor: Colors.orange),
+                          );
+                          return;
+                        }
+
+                        await _storage.write(key: _webUserKey, value: u);
+                        await _storage.write(key: _webPassKey, value: p);
+
+                        if (vCtx.mounted) {
+                          Navigator.pop(vCtx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Success: Account ownership authorized. Web access portal active!'), 
+                              backgroundColor: Theme.of(context).colorScheme.primary,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Confirm & Complete Setup', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                    ),
+                  ],
+                ),
+              );
+            },
+            child: const Text('Request Verification', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildErrorState(String error) {

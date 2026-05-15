@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/customer_history_page.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class CustomerLookupPage extends StatefulWidget {
   const CustomerLookupPage({super.key});
@@ -112,7 +113,7 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
             ),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const InvifyLoadingIndicator(message: 'FETCHING CUSTOMER PROFILES...')
                 : _filteredCustomers.isEmpty
                     ? Center(
                         child: Column(

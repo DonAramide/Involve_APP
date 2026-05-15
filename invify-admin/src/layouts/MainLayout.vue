@@ -101,7 +101,7 @@
                   <div class="text-operator-title text-white" style="font-size: 9px; line-height: 1;">
                     {{ isSyncingBackend ? 'SYNCING...' : 'Operator Node' }}
                   </div>
-                  <div class="text-metric-sm text-cyan-3" style="font-size: 10px;">sysadmin@invify.app</div>
+                  <div class="text-metric-sm text-cyan-3" style="font-size: 10px;">sysadmin@IIPS.app</div>
                 </div>
               </div>
             </template>

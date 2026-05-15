@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../bloc/finance_new_bloc.dart';
 import '../bloc/finance_new_event.dart';
 import '../bloc/finance_new_state.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ExternalPaymentModal extends StatefulWidget {
   final String studentId;
@@ -132,13 +133,7 @@ class _ExternalPaymentModalState extends State<ExternalPaymentModal> {
   }
 
   Widget _buildLoadingState() {
-    return const Column(
-      children: [
-        CircularProgressIndicator(),
-        SizedBox(height: 16),
-        Text('Initializing secure checkout...', style: TextStyle(color: Colors.grey)),
-      ],
-    );
+    return const InvifyLoadingIndicator(message: 'INITIALIZING SECURE CHECKOUT...');
   }
 
   Widget _buildErrorState(String error) {
@@ -168,7 +163,7 @@ class _ExternalPaymentModalState extends State<ExternalPaymentModal> {
           ),
           child: const Column(
             children: [
-              CircularProgressIndicator(valueColor: AlwaysStoppedAnimation(Color(0xFFFBBC05))),
+              Icon(Icons.sync, size: 28, color: Color(0xFFFBBC05)),
               SizedBox(height: 16),
               Text(
                 'Waiting for confirmation',

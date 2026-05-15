@@ -216,7 +216,7 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                         }
                       },
                 child: state.isLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold))
                     : const Text('Save'),
               ),
             ],

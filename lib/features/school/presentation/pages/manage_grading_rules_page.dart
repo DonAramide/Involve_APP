@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/grading_rule.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ManageGradingRulesPage extends StatefulWidget {
   const ManageGradingRulesPage({super.key});
@@ -40,7 +41,7 @@ class _ManageGradingRulesPageState extends State<ManageGradingRulesPage> {
         },
         builder: (context, state) {
           if (state.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'LOADING GRADING SCHEMAS...');
           }
 
           if (state.gradingRules.isEmpty) {

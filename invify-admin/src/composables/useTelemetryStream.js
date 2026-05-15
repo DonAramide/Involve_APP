@@ -25,7 +25,7 @@ export function useTelemetryStream(topic = 'quasar.global.telemetry') {
     
     // Abstract backend WebSocket connector targeting active environment channels
     try {
-      // In production, this bridges directly to wss://api.invify.app/v1/stream?topic=...
+      // In production, this bridges directly to wss://api.IIPS.app/v1/stream?topic=...
       // For immediate validation, we setup a fully compliant mock protocol adapter
       setTimeout(() => {
         isConnected.value = true

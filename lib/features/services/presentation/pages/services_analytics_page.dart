@@ -7,6 +7,7 @@ import '../bloc/services_event.dart';
 import '../bloc/services_state.dart';
 import '../../domain/entities/service_analytics.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ServicesAnalyticsPage extends StatefulWidget {
   const ServicesAnalyticsPage({super.key});
@@ -53,7 +54,7 @@ class _ServicesAnalyticsPageState extends State<ServicesAnalyticsPage> {
       body: BlocBuilder<ServicesBloc, ServicesState>(
         builder: (context, state) {
           if (state.status == ServicesStatus.loading && state.analytics == null) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'ANALYZING SERVICE MATRICES...');
           }
 
           if (state.analytics != null) {

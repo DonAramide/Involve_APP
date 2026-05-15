@@ -242,7 +242,7 @@ const allGridRows = ref([
     provider: 'ai_engine',
     description: 'AI Lesson Note Generation: Prompt synthetic pipeline completed successfully.\n• Subject: Literature in English\n• Topic: Elizabethan Sonnets\n• Term: 2 • Week: 4\n• Payload generated with structured curriculum sections, interactive quiz matrices, and strict compliance headers.',
     workspace: 'observability',
-    operator: 'sysadmin@invify.app'
+    operator: 'sysadmin@IIPS.app'
   },
   {
     id: 'row-1',
@@ -253,7 +253,7 @@ const allGridRows = ref([
     provider: 'quasar',
     description: 'Reconciliation webhook queue execution timed out waiting for state lock confirmation.',
     workspace: 'observability',
-    operator: 'sysadmin@invify.app'
+    operator: 'sysadmin@IIPS.app'
   },
   {
     id: 'row-2',

@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import '../widgets/invify_loading_indicator.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -119,16 +120,7 @@ class _LandingPageState extends State<LandingPage> {
                 ),
               );
             },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images/logo.png',
-                  width: 220,
-                  height: 220,
-                ),
-              ],
-            ),
+            child: const InvifyLoadingIndicator(message: 'INITIALIZING INVIFY SYSTEM...'),
           ),
         ),
       ),

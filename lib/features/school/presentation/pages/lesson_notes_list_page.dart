@@ -6,6 +6,7 @@ import 'package:involve_app/features/school/domain/entities/lesson_note_models.d
 import 'package:involve_app/features/school/presentation/pages/generate_lesson_wizard_page.dart';
 import 'package:involve_app/features/school/presentation/pages/lesson_note_viewer_page.dart';
 import 'package:involve_app/features/school/data/services/lesson_note_sync_service.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class LessonNotesListPage extends StatefulWidget {
   const LessonNotesListPage({super.key});
@@ -67,7 +68,7 @@ class _LessonNotesListPageState extends State<LessonNotesListPage> {
       body: BlocBuilder<LessonNoteBloc, LessonNoteState>(
         builder: (context, state) {
           if (state.isLoading && state.lessons.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'SYNCING LESSON NOTES...');
           }
 
           if (state.error != null && state.lessons.isEmpty) {
@@ -122,7 +123,7 @@ class _LessonNotesListPageState extends State<LessonNotesListPage> {
                       child: SizedBox(
                         width: 24,
                         height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: Text('Loading more...', style: TextStyle(color: Colors.grey, fontSize: 12)),
                       ),
                     ),
                   );
@@ -212,7 +213,7 @@ class _LessonNotesListPageState extends State<LessonNotesListPage> {
         return const SizedBox(
           width: 12,
           height: 12,
-          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.blue),
+          child: Icon(Icons.sync, size: 12, color: Colors.blue),
         );
       case SyncStatus.failed:
         return const Icon(Icons.cloud_off, size: 14, color: Colors.red);

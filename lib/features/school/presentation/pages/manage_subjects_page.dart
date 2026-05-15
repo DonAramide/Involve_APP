@@ -4,6 +4,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:collection/collection.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ManageSubjectsPage extends StatefulWidget {
   const ManageSubjectsPage({super.key});
@@ -40,7 +41,7 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
         },
         builder: (context, state) {
           if (state.isLoading && state.subjects.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'FETCHING ACADEMIC SUBJECTS...');
           }
 
           if (state.subjects.isEmpty) {
@@ -152,7 +153,7 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
               child: BlocBuilder<SchoolBloc, SchoolState>(
                 builder: (context, state) {
                   if (state.isLoading && state.status == SchoolStatus.loading) {
-                    return const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2));
+                    return const Text('SAVING...', style: TextStyle(fontWeight: FontWeight.bold));
                   }
                   return Text(subject == null ? 'ADD' : 'SAVE');
                 },

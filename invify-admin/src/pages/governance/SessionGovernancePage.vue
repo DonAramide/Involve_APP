@@ -228,9 +228,9 @@ const apiForm = ref({
 })
 
 const activeSessionsList = ref([
-  { tokenKey: 'token:jti-uuid-alpha-001', userId: 'superadmin@invify.app', tenantId: 'global-platform', fingerprint: 'Mozilla/5.0 SFOS Hub Desktop', isMasterMode: true, isImpersonating: false, expiresInSeconds: 840 },
+  { tokenKey: 'token:jti-uuid-alpha-001', userId: 'superadmin@IIPS.app', tenantId: 'global-platform', fingerprint: 'Mozilla/5.0 SFOS Hub Desktop', isMasterMode: true, isImpersonating: false, expiresInSeconds: 840 },
   { tokenKey: 'token:jti-uuid-beta-002', userId: 'staff-terminal-node', tenantId: 'global-platform', fingerprint: 'Invify Native Flutter POS Bridge', isMasterMode: false, isImpersonating: false, expiresInSeconds: 6120 },
-  { tokenKey: 'token:jti-uuid-gamma-003', userId: 'superadmin@invify.app', tenantId: 'tenant-omega', fingerprint: 'Impersonation Stream Channel Overrider', isMasterMode: false, isImpersonating: true, expiresInSeconds: 780 },
+  { tokenKey: 'token:jti-uuid-gamma-003', userId: 'superadmin@IIPS.app', tenantId: 'tenant-omega', fingerprint: 'Impersonation Stream Channel Overrider', isMasterMode: false, isImpersonating: true, expiresInSeconds: 780 },
   { tokenKey: 'token:jti-uuid-delta-004', userId: 'kiosk-agent@fintech-alpha.dev', tenantId: 'tenant-alpha', fingerprint: 'Android Embedded Kiosk Core App', isMasterMode: false, isImpersonating: false, expiresInSeconds: 3420 }
 ])
 
@@ -240,7 +240,7 @@ onMounted(() => {
 
 const fetchLiveSessions = async () => {
   try {
-    const res = await axios.get('http://localhost:3005/api/governance/sessions', {
+    const res = await axios.get('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/sessions', {
       headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
     })
     if (res.data?.sessions && Array.isArray(res.data.sessions)) {
@@ -257,7 +257,7 @@ const fetchLiveSessions = async () => {
 const revokeSessionStream = async (keyStr) => {
   loadingTarget.value = keyStr
   try {
-    await axios.post('http://localhost:3005/api/governance/sessions/revoke', { tokenKey: keyStr }, {
+    await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/sessions/revoke', { tokenKey: keyStr }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
     })
     // Remove element instantly
@@ -274,7 +274,7 @@ const executeApiKeyProvision = async () => {
   loadingApi.value = true
   lastApiKeyPlaintext.value = ''
   try {
-    const res = await axios.post('http://localhost:3005/api/governance/api-keys', {
+    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/api-keys', {
       targetTenantId: apiForm.value.targetTenantId,
       label: apiForm.value.label
     }, {
@@ -296,7 +296,7 @@ const executeApiKeyProvision = async () => {
 const executePlatformLockdown = async () => {
   loadingKillSwitch.value = true
   try {
-    await axios.post('http://localhost:3005/api/governance/emergency/kill-switch', {
+    await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/emergency/kill-switch', {
       masterConfirmationCode: killSwitchInput.value
     }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }

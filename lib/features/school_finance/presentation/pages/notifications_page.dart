@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../domain/repositories/notification_repository.dart';
 import '../../../../core/services/service_locator.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -68,7 +69,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const InvifyLoadingIndicator(message: 'FETCHING SECURE NOTIFICATIONS...')
           : RefreshIndicator(
               onRefresh: _loadNotifications,
               child: _notifications.isEmpty

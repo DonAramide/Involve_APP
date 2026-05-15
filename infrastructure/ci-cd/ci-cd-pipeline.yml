@@ -103,7 +103,7 @@ trigger_canary_rollout:
     - echo "Deployment execution finalized successfully. Active convergence health monitors online."
   environment:
     name: production
-    url: https://api.invify.app
+    url: https://api.IIPS.app
   when: manual
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'

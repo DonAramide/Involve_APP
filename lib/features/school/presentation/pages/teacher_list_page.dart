@@ -4,6 +4,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/school/presentation/pages/teacher_profile_page.dart';
 import '../widgets/teacher_form_dialog.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class TeacherListPage extends StatefulWidget {
   const TeacherListPage({super.key});
@@ -38,7 +39,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
         child: BlocBuilder<SchoolBloc, SchoolState>(
           builder: (context, state) {
             if (state.isLoading && state.teachers.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const InvifyLoadingIndicator(message: 'FETCHING TEACHERS DIRECTORY...');
             }
 
             if (state.teachers.isEmpty) {

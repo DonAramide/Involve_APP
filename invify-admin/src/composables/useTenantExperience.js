@@ -55,7 +55,7 @@ export function useTenantExperience() {
     isLoadingContext.value = true
     try {
       const operatorRole = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
-      const res = await axios.get('http://localhost:3005/api/orchestration/context', {
+      const res = await axios.get('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/orchestration/context', {
         params: { tenantId: targetTenantId },
         headers: {
           'X-Tenant-ID': targetTenantId,

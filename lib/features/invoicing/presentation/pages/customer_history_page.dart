@@ -7,6 +7,7 @@ import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:collection/collection.dart';
+import '../../../../../core/widgets/invify_loading_indicator.dart';
 
 class CustomerHistoryPage extends StatefulWidget {
   final String customerName;
@@ -79,7 +80,7 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage> {
       body: BlocBuilder<HistoryBloc, HistoryState>(
         builder: (context, state) {
           if (state is HistoryLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'RETRIEVING TRANSACTION LEDGERS...');
           } else if (state is HistoryError) {
             return Center(child: Text(state.message));
           } else if (state is HistoryLoaded) {

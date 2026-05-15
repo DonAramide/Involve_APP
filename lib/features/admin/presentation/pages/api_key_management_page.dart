@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/admin_bloc.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ApiKeyManagementPage extends StatefulWidget {
   const ApiKeyManagementPage({super.key});
@@ -23,7 +24,7 @@ class _ApiKeyManagementPageState extends State<ApiKeyManagementPage> {
       appBar: AppBar(title: const Text('Quaser API Keys')),
       body: BlocBuilder<AdminBloc, AdminState>(
         builder: (context, state) {
-          if (state.isLoading) return const Center(child: CircularProgressIndicator());
+          if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING SECURE CREDENTIALS...');
 
           return ListView.separated(
             padding: const EdgeInsets.all(20),

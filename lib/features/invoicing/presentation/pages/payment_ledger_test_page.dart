@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class PaymentLedgerTestPage extends StatefulWidget {
   const PaymentLedgerTestPage({super.key});
@@ -67,7 +68,7 @@ class _PaymentLedgerTestPageState extends State<PaymentLedgerTestPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (context) => const InvifyLoadingIndicator(message: 'TRIGGERING MOCK WEBHOOK...'),
     );
 
     try {
@@ -113,7 +114,7 @@ class _PaymentLedgerTestPageState extends State<PaymentLedgerTestPage> {
         ],
       ),
       body: isLoading 
-        ? const Center(child: CircularProgressIndicator())
+        ? const InvifyLoadingIndicator(message: 'LOADING LEDGER ENTRIES...')
         : Column(
             children: [
               // 1. Students List

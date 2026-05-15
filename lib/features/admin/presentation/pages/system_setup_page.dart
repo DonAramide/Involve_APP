@@ -17,6 +17,7 @@ import '../../../settings/domain/entities/staff.dart';
 import '../../../settings/presentation/widgets/upgrade_dialog.dart';
 import '../../../settings/presentation/widgets/super_admin_password_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});
@@ -33,7 +34,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, state) {
         if (state.isLoading || state.settings == null) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(body: InvifyLoadingIndicator(message: 'FETCHING SYSTEM SETUP PARAMETERS...'));
         }
 
         final settings = state.settings!;
@@ -362,7 +363,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
 
   void _showLoadingDialog(BuildContext context, String message) {
     _isLoadingDialogShowing = true;
-    showDialog(context: context, barrierDismissible: false, builder: (ctx) => AlertDialog(content: Row(children: [const CircularProgressIndicator(), const SizedBox(width: 20), Text(message)]))).then((_) => _isLoadingDialogShowing = false);
+    showDialog(context: context, barrierDismissible: false, builder: (ctx) => AlertDialog(content: Row(children: [const Icon(Icons.sync, color: Colors.blue), const SizedBox(width: 20), Text(message)]))).then((_) => _isLoadingDialogShowing = false);
   }
 
   void _hideLoadingDialog(BuildContext context) {
@@ -411,7 +412,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
         if (settings.staffManagementEnabled)
           BlocBuilder<StaffBloc, StaffState>(
             builder: (context, state) {
-              if (state.isLoading) return const Center(child: Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator()));
+              if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING STAFF CONFIGURATION...');
               
               final userPlan = context.read<SettingsBloc>().state.userPlan;
               // Force Basic Plan tier evaluation for testing/demonstration purposes

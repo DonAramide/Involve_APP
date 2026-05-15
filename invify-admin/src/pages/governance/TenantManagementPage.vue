@@ -239,7 +239,7 @@ const promptImpersonationHandshake = (tenantNode) => {
 const executeImpersonationHandshake = async () => {
   loadingImpersonate.value = true
   try {
-    const res = await axios.post('http://localhost:3005/api/auth/impersonate', {
+    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/impersonate', {
       targetTenantId: targetTenantRecord.value.id,
       auditReason: auditReasonInput.value
     }, {
@@ -255,7 +255,7 @@ const executeImpersonationHandshake = async () => {
     const expiry = Date.now() + 900000 // 15m cap exactly
     const ctx = {
       targetTenantId: targetTenantRecord.value.id,
-      originalAdminId: localStorage.getItem('operator_email') || 'superadmin@invify.app',
+      originalAdminId: localStorage.getItem('operator_email') || 'superadmin@IIPS.app',
       expiresAt: expiry,
       reason: auditReasonInput.value
     }
@@ -270,7 +270,7 @@ const executeImpersonationHandshake = async () => {
     const expiry = Date.now() + 900000
     const ctx = {
       targetTenantId: targetTenantRecord.value.id,
-      originalAdminId: localStorage.getItem('operator_email') || 'superadmin@invify.app',
+      originalAdminId: localStorage.getItem('operator_email') || 'superadmin@IIPS.app',
       expiresAt: expiry,
       reason: auditReasonInput.value
     }

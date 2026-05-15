@@ -178,6 +178,17 @@ class StorageService {
     return dateStr != null ? DateTime.tryParse(dateStr) : null;
   }
 
+  static Future<void> clearProExpiryDate() async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.delete(key: _proExpiryKey);
+    } else {
+      final file = await _getDesktopFile('pro_expiry.dat');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
+  }
+
   static Future<void> setDeviceAccessGranted(bool granted) async {
     final value = granted ? 'true' : 'false';
     if (Platform.isAndroid || Platform.isIOS) {

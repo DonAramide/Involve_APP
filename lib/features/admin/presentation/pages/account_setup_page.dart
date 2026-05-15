@@ -11,6 +11,8 @@ import '../../../../core/services/service_locator.dart';
 import '../../../school_finance/domain/repositories/finance_repository_new.dart';
 import '../../../../core/utils/progress_dialog_utils.dart';
 import '../../../activation/presentation/pages/activation_page.dart';
+import '../../../../core/license/storage_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class AccountSetupPage extends StatefulWidget {
   const AccountSetupPage({super.key});
@@ -30,15 +32,34 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
   
   late TextEditingController _businessNameController;
   late TextEditingController _phoneController;
+  late TextEditingController _cacController;
 
   bool _initializedControllers = false;
+  static const _storage = FlutterSecureStorage();
 
   @override
   void initState() {
     super.initState();
     _businessNameController = TextEditingController();
     _phoneController = TextEditingController();
+    _cacController = TextEditingController();
     _loadHardwareTelemetry();
+    _loadPersistedToggles();
+  }
+
+  Future<void> _loadPersistedToggles() async {
+    final cbe = await _storage.read(key: 'toggle_claude_backup');
+    final vae = await _storage.read(key: 'toggle_virtual_account');
+    final mdl = await _storage.read(key: 'toggle_multi_device');
+    final asl = await _storage.read(key: 'toggle_auto_sync');
+    if (mounted) {
+      setState(() {
+        _claudeBackupEnabled = cbe == 'true';
+        _virtualAccountsEnabled = vae == 'true';
+        _multiDeviceLinkage = mdl == 'true';
+        _autoSyncLedger = asl == 'true';
+      });
+    }
   }
 
   Future<void> _loadHardwareTelemetry() async {
@@ -57,6 +78,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
   void dispose() {
     _businessNameController.dispose();
     _phoneController.dispose();
+    _cacController.dispose();
     super.dispose();
   }
 
@@ -158,6 +180,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
           if (!_initializedControllers) {
             _businessNameController.text = state.settings?.organizationName ?? 'Invify Enterprise Node';
             _phoneController.text = state.settings?.phone ?? '+234 800 000 0000';
+            _cacController.text = state.settings?.cacNumber ?? '';
             _initializedControllers = true;
           }
 
@@ -292,14 +315,19 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: _businessNameController,
+                      readOnly: isProTier,
                       decoration: InputDecoration(
                         filled: true,
-                        fillColor: isDark ? Colors.white10 : Colors.grey.shade50,
+                        fillColor: isProTier ? (isDark ? Colors.white12 : Colors.grey.shade200) : (isDark ? Colors.white10 : Colors.grey.shade50),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.1))),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.05))),
+                        suffixIcon: isProTier ? Tooltip(
+                          message: 'Organization bound permanently under Pro Cloud Linkage relay.',
+                          child: Icon(Icons.lock_rounded, size: 16, color: Colors.amber.shade700),
+                        ) : null,
                       ),
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isProTier ? colorScheme.onSurface.withOpacity(0.5) : colorScheme.onSurface),
                     ),
                     const SizedBox(height: 12),
 
@@ -318,150 +346,307 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                       ),
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                     ),
+                    const SizedBox(height: 12),
+
+                    // CAC registration input
+                    Text('CAC Registration Number', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _cacController,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: isDark ? Colors.white10 : Colors.grey.shade50,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.1))),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: colorScheme.onSurface.withOpacity(0.05))),
+                        hintText: 'e.g. BN-123456 or RC-987654',
+                        hintStyle: TextStyle(fontSize: 11, color: colorScheme.onSurface.withOpacity(0.3)),
+                      ),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+                    ),
                     const SizedBox(height: 20),
 
-                    // Enrollment broadcast actions
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    // Enrollment broadcast actions & Premium Status Renewal View
+                    if (isProTier) ...[
+                      // Next Activation Date View
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
                         ),
-                        icon: const Icon(Icons.cloud_done_rounded, size: 18),
-                        label: const Text('Confirm Enrollment & Upgrade to Pro Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                        onPressed: () async {
-                          FocusScope.of(context).unfocus();
-                          
-                          // Save data locally first as per user rule: "if you have gto save data save it"
-                          if (state.settings != null) {
-                            final updatedSettings = state.settings!.copyWith(
-                              organizationName: _businessNameController.text.trim(),
-                              phone: _phoneController.text.trim(),
-                            );
-                            context.read<SettingsBloc>().add(UpdateAppSettings(updatedSettings));
-                          }
-
-                          // Derive real live production tenant namespace
-                          final cleanOrg = _businessNameController.text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-                          final derivedTenant = '$cleanOrg-$_deviceSuffix';
-                          
-                          await SecurityService().setTenantId(derivedTenant);
-
-                          bool networkSuccess = false;
-                          String errorMessage = 'Server connection timeout.';
-
-                          // Execute live authenticated HTTP post request broadcast to remote server container
-                          try {
-                            final client = sl<FinanceRepository>().apiClient;
-                            final payload = {
-                              'organization_name': _businessNameController.text.trim(),
-                              'phone_contact': _phoneController.text.trim(),
-                              'device_serial_hash': _deviceSuffix,
-                              'persistent_uuid': _persistentId,
-                              'derived_tenant_id': derivedTenant,
-                              'platform': kIsWeb ? 'web' : Platform.operatingSystem,
-                              'plan': state.userPlan?.planType ?? 'pro',
-                              'business_mode': state.settings?.businessMode ?? 'retail',
-                            };
-                            
-                            debugPrint('*** Executing Live Network Handshake Dispatch ***');
-                            debugPrint('POST /api/admin/register-device');
-                            debugPrint('Payload: $payload');
-                            
-                            await ProgressDialogUtils.showDancingProgress(
-                              context,
-                              () async => await client.post('/api/admin/register-device', data: payload),
-                              message: 'Registering edge node identity matrix...',
-                            );
-                            networkSuccess = true;
-                          } catch (e) {
-                            debugPrint('Network Relay caught fallback trace: $e');
-                            errorMessage = e.toString().replaceAll('FinanceApiException', 'Server API Exception');
-                            networkSuccess = false;
-                          }
-
-                          if (mounted) {
-                            if (networkSuccess) {
-                              _showUpgradePrompt(derivedTenant);
-                            } else {
-                              // Display lovely server error message dialog as requested
-                              showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  backgroundColor: Theme.of(context).cardColor,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                  title: Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
-                                        child: Icon(Icons.cloud_off_rounded, color: Colors.red.shade700),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      const Expanded(
-                                        child: Text(
-                                          'Server Connection Error', 
-                                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                    ],
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: colorScheme.primary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.event_available_rounded, color: colorScheme.primary, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Next Plan Expected Renewal',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: colorScheme.primary),
                                   ),
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Unable to establish a real-time secure link with the cloud node cluster. The remote endpoint returned an error or timed out.',
-                                        style: TextStyle(fontSize: 13, height: 1.4),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Container(
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50, 
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          errorMessage, 
-                                          style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Theme.of(context).colorScheme.error),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.save_alt_rounded, size: 14, color: Colors.green.shade600),
-                                          const SizedBox(width: 6),
-                                          Expanded(
-                                            child: Text(
-                                              'Data Protected: Entered credentials have been preserved locally.',
-                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green.shade600),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    state.userPlan?.expiryDate != null 
+                                        ? '${state.userPlan!.expiryDate!.toLocal().toString().split(' ')[0]} (Active Relay)'
+                                        : 'Lifetime / Unrestricted Node Relay',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: colorScheme.onSurface),
                                   ),
-                                  actions: [
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Theme.of(context).colorScheme.primary,
-                                        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
-                                      onPressed: () => Navigator.pop(ctx),
-                                      child: const Text('Acknowledge & Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          }
-                        },
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      
+                      // Save Profile Updates & Downgrade Actions
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: colorScheme.error,
+                                side: BorderSide(color: colorScheme.error.withOpacity(0.3)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon: const Icon(Icons.arrow_downward_rounded, size: 16),
+                              label: const Text('Downgrade Plan', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              onPressed: () {
+                                FocusScope.of(context).unfocus();
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: Theme.of(context).cardColor,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    title: Row(
+                                      children: [
+                                        Icon(Icons.warning_amber_rounded, color: colorScheme.error),
+                                        const SizedBox(width: 8),
+                                        const Text('Confirm Downgrade', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                    content: const Text(
+                                      'Are you sure you want to downgrade your active subscription profile to Basic Tier? Enterprise telemetry channels and encryption keys will transition to local sandbox boundaries.',
+                                      style: TextStyle(fontSize: 13, height: 1.4),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: colorScheme.error,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onPressed: () async {
+                                          Navigator.pop(ctx);
+                                          await StorageService.clearProExpiryDate();
+                                          if (mounted) {
+                                            context.read<SettingsBloc>().add(LoadSettings());
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: const Text('Plan profile transitioned to Basic Tier.'),
+                                                backgroundColor: colorScheme.secondary,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                        child: const Text('Confirm Downgrade', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              icon: const Icon(Icons.save_rounded, size: 16),
+                              label: const Text('Save Profile Updates', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              onPressed: () {
+                                FocusScope.of(context).unfocus();
+                                if (state.settings != null) {
+                                  final updatedSettings = state.settings!.copyWith(
+                                    organizationName: _businessNameController.text.trim(),
+                                    phone: _phoneController.text.trim(),
+                                    cacNumber: _cacController.text.trim(),
+                                  );
+                                  context.read<SettingsBloc>().add(UpdateAppSettings(updatedSettings));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: const Text('Organization credentials saved locally.'), backgroundColor: colorScheme.primary),
+                                  );
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.cloud_done_rounded, size: 18),
+                          label: const Text('Confirm Enrollment & Upgrade to Pro Plan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: () async {
+                            FocusScope.of(context).unfocus();
+                            
+                            // Save data locally first as per user rule: "if you have gto save data save it"
+                            if (state.settings != null) {
+                              final updatedSettings = state.settings!.copyWith(
+                                organizationName: _businessNameController.text.trim(),
+                                phone: _phoneController.text.trim(),
+                                cacNumber: _cacController.text.trim(),
+                              );
+                              context.read<SettingsBloc>().add(UpdateAppSettings(updatedSettings));
+                            }
+
+                            // Derive real live production tenant namespace
+                            final cleanOrg = _businessNameController.text.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
+                            final derivedTenant = '$cleanOrg-$_deviceSuffix';
+                            
+                            await SecurityService().setTenantId(derivedTenant);
+
+                            bool networkSuccess = false;
+                            String errorMessage = 'Server connection timeout.';
+
+                            // Execute live authenticated HTTP post request broadcast to remote server container
+                            try {
+                              final client = sl<FinanceRepository>().apiClient;
+                              final payload = {
+                                'organization_name': _businessNameController.text.trim(),
+                                'phone_contact': _phoneController.text.trim(),
+                                'cac_number': _cacController.text.trim(),
+                                'device_serial_hash': _deviceSuffix,
+                                'persistent_uuid': _persistentId,
+                                'derived_tenant_id': derivedTenant,
+                                'platform': kIsWeb ? 'web' : Platform.operatingSystem,
+                                'plan': state.userPlan?.planType ?? 'pro',
+                                'business_mode': state.settings?.businessMode ?? 'retail',
+                              };
+                              
+                              debugPrint('*** Executing Live Network Handshake Dispatch ***');
+                              debugPrint('POST /api/admin/register-device');
+                              debugPrint('Payload: $payload');
+                              
+                              await ProgressDialogUtils.showDancingProgress(
+                                context,
+                                () async => await client.post('/api/admin/register-device', data: payload),
+                                message: 'Registering edge node identity matrix...',
+                              );
+                              networkSuccess = true;
+                            } catch (e) {
+                              debugPrint('Network Relay caught fallback trace: $e');
+                              errorMessage = e.toString().replaceAll('FinanceApiException', 'Server API Exception');
+                              networkSuccess = false;
+                            }
+
+                            if (mounted) {
+                              if (networkSuccess) {
+                                _showUpgradePrompt(derivedTenant);
+                              } else {
+                                // Display lovely server error message dialog as requested
+                                showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: Theme.of(context).cardColor,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    title: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(color: Colors.red.shade50, shape: BoxShape.circle),
+                                          child: Icon(Icons.cloud_off_rounded, color: Colors.red.shade700),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        const Expanded(
+                                          child: Text(
+                                            'Server Connection Error', 
+                                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Unable to establish a real-time secure link with the cloud node cluster. The remote endpoint returned an error or timed out.',
+                                          style: TextStyle(fontSize: 13, height: 1.4),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          padding: const EdgeInsets.all(10),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white10 : Colors.grey.shade50, 
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            errorMessage, 
+                                            style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Theme.of(context).colorScheme.error),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Row(
+                                          children: [
+                                            Icon(Icons.save_alt_rounded, size: 14, color: Colors.green.shade600),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                'Data Protected: Entered credentials have been preserved locally.',
+                                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.green.shade600),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    actions: [
+                                      ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Theme.of(context).colorScheme.primary,
+                                          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('Acknowledge & Close', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -485,6 +670,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                   requestedValue: val,
                   isProTier: isProTier,
                   featureName: 'Claude Backup Engine',
+                  storageKey: 'toggle_claude_backup',
                   onUpdateState: (updated) {
                     setState(() => _claudeBackupEnabled = updated);
                     _showToast(updated ? 'Claude backup engine armed.' : 'Claude backup paused.');
@@ -506,6 +692,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                   requestedValue: val,
                   isProTier: isProTier,
                   featureName: 'Virtual Account Engine',
+                  storageKey: 'toggle_virtual_account',
                   onUpdateState: (updated) {
                     setState(() => _virtualAccountsEnabled = updated);
                     _showToast(updated ? 'Virtual Account dispatch initialized.' : 'Virtual accounts deactivated.');
@@ -532,6 +719,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                   requestedValue: val,
                   isProTier: isProTier,
                   featureName: 'Multi-Device Linkage Relay',
+                  storageKey: 'toggle_multi_device',
                   onUpdateState: (updated) {
                     setState(() => _multiDeviceLinkage = updated);
                     _showToast(updated ? 'Multi-device handshakes accepting.' : 'Terminal routing locked to primary display.');
@@ -553,6 +741,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                   requestedValue: val,
                   isProTier: isProTier,
                   featureName: 'Continuous Background Stream',
+                  storageKey: 'toggle_auto_sync',
                   onUpdateState: (updated) {
                     setState(() => _autoSyncLedger = updated);
                     _showToast(updated ? 'Background polling continuous.' : 'Manual telemetry index selected.');
@@ -636,13 +825,15 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     required bool requestedValue,
     required bool isProTier,
     required String featureName,
+    required String storageKey,
     required ValueChanged<bool> onUpdateState,
-  }) {
+  }) async {
     if (requestedValue && !isProTier) {
       // Trigger Pro Plan Upgrade Gate Dialog
       _showFeatureUpgradePrompt(featureName);
       return; // Leave the toggle in the OFF state!
     }
+    await _storage.write(key: storageKey, value: requestedValue ? 'true' : 'false');
     onUpdateState(requestedValue);
   }
 

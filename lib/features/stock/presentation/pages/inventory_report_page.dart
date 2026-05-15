@@ -13,6 +13,7 @@ import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/core/utils/terminology.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class InventoryReportPage extends StatefulWidget {
   const InventoryReportPage({super.key});
@@ -27,6 +28,11 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _dateRange = DateTimeRange(
+      start: DateTime(now.year, now.month, now.day),
+      end: DateTime(now.year, now.month, now.day, 23, 59, 59),
+    );
     _loadReport();
   }
 
@@ -184,7 +190,7 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
             child: BlocBuilder<StockBloc, StockState>(
               builder: (context, state) {
                 if (state is StockLoading) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const InvifyLoadingIndicator(message: 'CALCULATING INVENTORY METRICS...');
                 } else if (state is InventoryReportLoaded) {
                   return SingleChildScrollView(
                     child: Column(
@@ -205,7 +211,7 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
                 } else if (state is StockError) {
                   return Center(child: Text(state.message));
                 }
-                return const SizedBox();
+                return const Center(child: Text('Select date range to view inventory metrics'));
               },
             ),
           ),

@@ -31,7 +31,7 @@ class AuthService {
 
         // Mock static offline user record if live database link is pending synchronization
         if (!user) {
-            if (email.includes('superadmin') || email === 'admin@invify.app') {
+            if (email.includes('superadmin') || email === 'admin@IIPS.app') {
                 user = {
                     id: 'usr-super-admin-999',
                     email,

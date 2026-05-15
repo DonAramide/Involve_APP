@@ -15,6 +15,7 @@ import '../../domain/entities/expense.dart';
 import '../../../invoicing/domain/services/report_generator.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ProfitReportPage extends StatefulWidget {
   const ProfitReportPage({super.key});
@@ -133,7 +134,7 @@ class _ProfitReportPageState extends State<ProfitReportPage> {
           body: BlocBuilder<StockBloc, StockState>(
             builder: (context, state) {
               if (state is StockLoading) {
-                return const Center(child: CircularProgressIndicator());
+                return const InvifyLoadingIndicator(message: 'CALCULATING PROFIT MATRICES...');
               }
 
               if (state is ProfitReportLoaded) {

@@ -11,6 +11,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class FeeManagementPage extends StatefulWidget {
   const FeeManagementPage({super.key});
@@ -62,7 +63,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
             return BlocBuilder<StockBloc, StockState>(
               builder: (context, stockState) {
                 if (schoolState.isLoading || stockState.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const InvifyLoadingIndicator(message: 'LOADING FEE STRUCTURES...');
                 }
 
                 // Auto-select defaults if list is empty (first load)
@@ -159,7 +160,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: _isGenerating 
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                            ? const Text('GENERATING BILLS...', style: TextStyle(fontWeight: FontWeight.bold)) 
                             : const Text('GENERATE BILLS FOR CLASS', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),

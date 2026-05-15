@@ -10,6 +10,7 @@ import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class SchoolFinanceDashboardPage extends StatefulWidget {
   const SchoolFinanceDashboardPage({super.key});
@@ -62,7 +63,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
       body: BlocBuilder<FinanceBloc, FinanceState>(
         builder: (context, state) {
           if (state is FinanceLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'GATHERING FINANCE LEDGERS...');
           }
 
           if (state is FinanceError) {
@@ -271,8 +272,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
     
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => const InvifyLoadingIndicator(message: 'PREPARING SECURE PAYOUT...'),
     );
 
     try {

@@ -140,11 +140,7 @@ class _NetworkPrinterConfigDialogState extends State<NetworkPrinterConfigDialog>
               child: ElevatedButton.icon(
                 onPressed: _isTesting ? null : _testConnection,
                 icon: _isTesting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const Icon(Icons.sync, size: 16)
                     : const Icon(Icons.network_check),
                 label: Text(_isTesting ? 'Testing...' : 'Test Connection'),
               ),

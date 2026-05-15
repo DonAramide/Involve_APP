@@ -117,7 +117,7 @@
                 Permitted Package: <span class="text-white">com.invify.hw.serial.debug</span>
               </div>
               <div class="row justify-between text-grey-6 border-top q-pt-xs q-mt-xs" style="font-size: 9px;">
-                <span>Authorized by: secops@invify.app</span>
+                <span>Authorized by: secops@IIPS.app</span>
                 <span class="text-green-4">Audited Rule</span>
               </div>
             </div>
@@ -279,7 +279,7 @@ const commitForcedUninstall = () => {
   console.log(`[RuntimeGovernance] Dispatched forced remote uninstall broadcast:`, {
     targetSignature: targetPatternStr,
     reasonString: reason,
-    operator: 'secops@invify.app'
+    operator: 'secops@IIPS.app'
   })
 
   Notify.create({

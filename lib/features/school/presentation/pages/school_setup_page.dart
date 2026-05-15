@@ -5,6 +5,7 @@ import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
 import 'manage_grading_rules_page.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class SchoolSetupPage extends StatelessWidget {
   const SchoolSetupPage({super.key});
@@ -49,7 +50,7 @@ class SchoolSetupPage extends StatelessWidget {
           },
           child: BlocBuilder<SchoolBloc, SchoolState>(
             builder: (context, state) {
-              if (state.isLoading) return const Center(child: CircularProgressIndicator());
+              if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING ACADEMIC SETUP DATA...');
               
               return TabBarView(
                 children: [
@@ -154,11 +155,7 @@ class _YearsTab extends StatelessWidget {
               child: BlocBuilder<SchoolBloc, SchoolState>(
                 builder: (context, state) {
                   if (state.isLoading && state.status == SchoolStatus.loading) {
-                    return const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    );
+                    return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
                   }
                   return Text(isEdit ? 'Update' : 'Add');
                 },
@@ -275,11 +272,7 @@ class _TermsTab extends StatelessWidget {
               child: BlocBuilder<SchoolBloc, SchoolState>(
                 builder: (context, state) {
                   if (state.isLoading && state.status == SchoolStatus.loading) {
-                    return const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    );
+                    return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
                   }
                   return Text(isEdit ? 'Update' : 'Add');
                 },
@@ -354,11 +347,7 @@ class _ClassesTab extends StatelessWidget {
               child: BlocBuilder<SchoolBloc, SchoolState>(
                 builder: (context, state) {
                   if (state.isLoading && state.status == SchoolStatus.loading) {
-                    return const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    );
+                    return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
                   }
                   return const Text('Add');
                 },

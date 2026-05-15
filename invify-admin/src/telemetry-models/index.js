@@ -26,6 +26,7 @@ export const createTelemetryEnvelope = (params) => {
     workspace: params?.workspace || 'observability',
     streamLatencyMs: params?.streamLatencyMs || Math.floor(Math.random() * 45) + 5,
     payloadSummary: params?.payloadSummary || 'Canonical event packet transmission complete.',
+    location: params?.location || null,
     payload: params?.payload || { rawBytesDecoded: true, standardSchemaEnforced: true }
   };
 };

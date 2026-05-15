@@ -88,7 +88,7 @@ class _PayoutHistoryPageState extends State<PayoutHistoryPage> {
                 itemCount: _payouts.length + (_isLoading ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index == _payouts.length) {
-                    return const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()));
+                    return const Center(child: Padding(padding: EdgeInsets.all(16.0), child: Text('Loading older records...', style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic))));
                   }
                   return _buildPayoutCard(_payouts[index]);
                 },

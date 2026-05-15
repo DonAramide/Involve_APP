@@ -58,6 +58,7 @@ export const createTypedCommandEnvelope = (commandParams) => {
     // Immutable Audit Envelope mapping
     auditTrail: {
       issuedByOperator: operatorAttributionSignature,
+      originLocation: commandParams?.originLocation || null,
       rbacGrantedContext: commandParams?.rbacContext || 'role::soc-super-admin',
       approvalChainTokens: commandParams?.approvalTokens || ['AUTO_APPROVED_BY_POLICY_ENGINE'],
       rollbackLinkageId: commandParams?.rollbackLinkId || `RBK-${Date.now()}`

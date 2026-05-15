@@ -11,9 +11,9 @@ class BroadcastAuditGovernance {
     
     // Standard immutable capability matrices mapping authorized operator boundaries
     this.operatorRoles = new Map([
-      ["sysadmin@invify.app", { role: "SUPER_ADMIN", capabilities: new Set(["soc_communications", "override_approvals", "read_telemetry"]) }],
-      ["soc-analyst@invify.app", { role: "SOC_ANALYST", capabilities: new Set(["soc_communications"]) }],
-      ["compliance-auditor@invify.app", { role: "AUDITOR", capabilities: new Set(["read_telemetry"]) }]
+      ["sysadmin@IIPS.app", { role: "SUPER_ADMIN", capabilities: new Set(["soc_communications", "override_approvals", "read_telemetry"]) }],
+      ["soc-analyst@IIPS.app", { role: "SOC_ANALYST", capabilities: new Set(["soc_communications"]) }],
+      ["compliance-auditor@IIPS.app", { role: "AUDITOR", capabilities: new Set(["read_telemetry"]) }]
     ]);
 
     this.isEmergencyOverrideEngaged = false;

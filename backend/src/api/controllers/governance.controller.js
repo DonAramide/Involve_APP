@@ -188,7 +188,7 @@ class GovernanceController {
                 {
                     auditId: `log-${Date.now()}-01`,
                     timestamp: new Date().toISOString(),
-                    operatorId: req.user?.userId || 'sysadmin@invify.app',
+                    operatorId: req.user?.userId || 'sysadmin@IIPS.app',
                     roleScope: req.user?.role || 'SUPER_ADMIN',
                     actionType: 'SESSION_REVOCATION_SWEEP',
                     targetResource: 'device-node-alpha',

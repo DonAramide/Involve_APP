@@ -355,7 +355,7 @@ const triggerDriftRemediation = (polId) => {
   operationalEventBusSingleton.emitUpstream('POLICY_DRIFT_REMEDIATION', {
     targetPolicyId: polId,
     timestamp: new Date().toISOString(),
-    operatorStr: 'sysadmin@invify.app'
+    operatorStr: 'sysadmin@IIPS.app'
   })
   Notify.create({
     type: 'positive',
@@ -392,7 +392,7 @@ const publishSimulatedBlueprint = () => {
   operationalEventBusSingleton.emitUpstream('PUBLISH_VERSIONED_POLICY', {
     blueprintData: profile,
     timestamp: new Date().toISOString(),
-    authorizedBy: 'sysadmin@invify.app'
+    authorizedBy: 'sysadmin@IIPS.app'
   })
 
   Notify.create({

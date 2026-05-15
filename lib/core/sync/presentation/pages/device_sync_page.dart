@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import '../bloc/sync_bloc.dart';
 import '../../domain/models/peer_device.dart';
+import '../../../core/widgets/invify_loading_indicator.dart';
 
 class DeviceSyncPage extends StatelessWidget {
   const DeviceSyncPage({super.key});
@@ -19,7 +20,7 @@ class DeviceSyncPage extends StatelessWidget {
             builder: (context, state) {
               return IconButton(
                 icon: state.isDiscoveryRunning && state.peers.isEmpty 
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const Icon(Icons.sync, color: Colors.white)
                     : const Icon(Icons.refresh),
                 onPressed: () => context.read<SyncBloc>().add(RestartDiscovery()),
                 tooltip: 'Refresh / Restart Discovery',
@@ -115,7 +116,7 @@ class DeviceSyncPage extends StatelessWidget {
                           ),
                           if (state.isDiscoveryRunning) ...[
                             const SizedBox(height: 24),
-                            const CircularProgressIndicator(strokeWidth: 3),
+                            const InvifyLoadingIndicator(message: 'SCANNING FOR PEER DEVICES...'),
                             const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -253,7 +254,7 @@ class DeviceSyncPage extends StatelessWidget {
                     ? () => context.read<SyncBloc>().add(ManualSyncTriggered())
                     : null,
                 icon: state.isSyncing 
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const Icon(Icons.sync, size: 18)
                   : const Icon(Icons.sync),
                 label: Text(state.isSyncing ? 'Syncing...' : 'Auto Sync Now'),
                 style: ElevatedButton.styleFrom(

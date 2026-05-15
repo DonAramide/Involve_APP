@@ -42,13 +42,13 @@ metadata:
 spec:
   tls:
     - hosts:
-        - api.invify.app
-        - ops.invify.app
-        - stream.invify.app
+        - api.IIPS.app
+        - ops.IIPS.app
+        - stream.IIPS.app
       secretName: invify-production-tls-cert
   rules:
     # 1. Primary API Gateway routing
-    - host: api.invify.app
+    - host: api.IIPS.app
       http:
         paths:
           - path: /api
@@ -60,7 +60,7 @@ spec:
                   number: 3005
                   
     # 2. Operator Governance & Fleet Monitoring UI Hub
-    - host: ops.invify.app
+    - host: ops.IIPS.app
       http:
         paths:
           - path: /
@@ -72,7 +72,7 @@ spec:
                   number: 80
                   
     # 3. High-Throughput Realtime WebSocket Edge Subsystem
-    - host: stream.invify.app
+    - host: stream.IIPS.app
       http:
         paths:
           - path: /ws

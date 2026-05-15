@@ -130,18 +130,18 @@ const baseLogsArray = ref([
   {
     auditId: 'log-001',
     timestamp: new Date().toISOString(),
-    operatorId: 'superadmin@invify.app',
+    operatorId: 'superadmin@IIPS.app',
     roleScope: 'SUPER_ADMIN',
     actionType: 'WORKSPACE_IMPERSONATION',
     targetResource: 'oldies-lounge---bar-610011',
     ipOrigin: '192.168.1.14',
     auditAnnotation: 'Elevated operator context -> target namespace for RCA verification pass.',
-    originalSuperAdminId: 'sysadmin@invify.app'
+    originalSuperAdminId: 'sysadmin@IIPS.app'
   },
   {
     auditId: 'log-002',
     timestamp: new Date(Date.now() - 420000).toISOString(),
-    operatorId: 'sec-staff-node@invify.app',
+    operatorId: 'sec-staff-node@IIPS.app',
     roleScope: 'INTERNAL_STAFF',
     actionType: 'SESSION_REVOCATION_SWEEP',
     targetResource: 'token:jti-uuid-beta-002',
@@ -151,7 +151,7 @@ const baseLogsArray = ref([
   {
     auditId: 'log-003',
     timestamp: new Date(Date.now() - 890000).toISOString(),
-    operatorId: 'superadmin@invify.app',
+    operatorId: 'superadmin@IIPS.app',
     roleScope: 'SUPER_ADMIN',
     actionType: 'POLICY_DRIFT_REMEDIATION',
     targetResource: 'tenant-omega',
@@ -187,7 +187,7 @@ onMounted(() => {
 const fetchAuditLogs = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:3005/api/governance/audit-lineage', {
+    const res = await axios.get('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/audit-lineage', {
       headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
     })
     if (res.data?.logs && Array.isArray(res.data.logs)) {

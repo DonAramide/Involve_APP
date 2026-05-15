@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import '../../../../core/utils/terminology.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ReconciliationPage extends StatefulWidget {
   const ReconciliationPage({super.key});
@@ -207,7 +208,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
 
   Widget _buildBody(ReconciliationState state, dynamic settings) {
     if (state is ReconciliationLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF3461FF)));
+      return const InvifyLoadingIndicator(message: 'RECONCILING PAYMENT LEDGERS...');
     } else if (state is ReconciliationError) {
       return _buildErrorState(state.message);
     } else if (state is ReconciliationLoaded) {

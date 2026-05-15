@@ -62,7 +62,7 @@
               dark
               filled
               dense
-              :placeholder="activeTier === 'pro' ? 'customer@invify.pro' : 'e.g. sysadmin@invify.app'"
+              :placeholder="activeTier === 'pro' ? 'customer@IIPS.app' : 'e.g. sysadmin@IIPS.app'"
               class="bg-[#14191f] text-white rounded-borders"
               autofocus
               lazy-rules
@@ -110,9 +110,9 @@
           <div class="column op-gap-4 q-pt-xs">
             <span class="text-metric-mono text-grey-6" style="font-size: 9px;">PRESETS FOR ISOLATED ENVIRONMENT TESTING:</span>
             <div class="row op-gap-4">
-              <q-btn dense flat size="xs" color="cyan-3" label="[Tier: Super Admin]" @click="fillPreset('superadmin@invify.app', 'AdminPass123!', 'SUPER_ADMIN')" class="bg-[#1a1f26] q-px-xs text-metric-sm" />
-              <q-btn dense flat size="xs" color="amber-3" label="[Tier: Staff Tier]" @click="fillPreset('staff@invify.app', 'StaffPass123!', 'STAFF')" class="bg-[#1a1f26] q-px-xs text-metric-sm" />
-              <q-btn dense flat size="xs" color="grey-4" label="[Tier: Tenant Op]" @click="fillPreset('operator@invify.app', 'UserPass123!', 'TENANT_OPERATOR')" class="bg-[#1a1f26] q-px-xs text-metric-sm" />
+              <q-btn dense flat size="xs" color="cyan-3" label="[Tier: Super Admin]" @click="fillPreset('superadmin@IIPS.app', 'AdminPass123!', 'SUPER_ADMIN')" class="bg-[#1a1f26] q-px-xs text-metric-sm" />
+              <q-btn dense flat size="xs" color="amber-3" label="[Tier: Staff Tier]" @click="fillPreset('staff@IIPS.app', 'StaffPass123!', 'STAFF')" class="bg-[#1a1f26] q-px-xs text-metric-sm" />
+              <q-btn dense flat size="xs" color="grey-4" label="[Tier: Tenant Op]" @click="fillPreset('operator@IIPS.app', 'UserPass123!', 'TENANT_OPERATOR')" class="bg-[#1a1f26] q-px-xs text-metric-sm" />
             </div>
           </div>
 
@@ -298,7 +298,7 @@ const simulateSsoFlow = (providerName) => {
     finalizeAuthenticatedSession({
       token: `sso_mock_jwt_${Date.now()}`,
       refreshToken: `sso_refresh_${Date.now()}`,
-      user: { role: 'SUPER_ADMIN', email: `federated_operator@invify.sso` }
+      user: { role: 'SUPER_ADMIN', email: `federated_operator@IIPS.app` }
     })
   }, 800)
 }
@@ -312,7 +312,7 @@ const executeLoginPass = async () => {
 
   try {
     // Dispatch network request natively targeting backend API
-    const res = await axios.post('http://localhost:3005/api/auth/login', {
+    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/login', {
       email: form.value.email,
       password: form.value.password,
       isolationTier: activeTier.value
@@ -365,7 +365,7 @@ const executeMfaVerification = async () => {
   errorMessage.value = ''
 
   try {
-    const res = await axios.post('http://localhost:3005/api/auth/mfa/verify', {
+    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/mfa/verify', {
       userId: activeUserId.value,
       tokenCode: form.value.totpCode,
       role: activeUserRole.value
@@ -396,7 +396,7 @@ const finalizeAuthenticatedSession = (tokenData) => {
   
   // Set explicit attribution storage values
   localStorage.setItem('operator_role', tokenData.user?.role || activeUserRole.value || 'SUPER_ADMIN')
-  localStorage.setItem('operator_email', form.value.email || 'federated@invify.app')
+  localStorage.setItem('operator_email', form.value.email || 'federated@IIPS.app')
   localStorage.setItem('mfa_status_verified', 'true')
   
   successMessage.value = 'Identity verified successfully. Traversing authorized RBAC operational matrix...'

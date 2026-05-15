@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../domain/entities/daily_revenue.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 
 class ModernRevenueChart extends StatelessWidget {
@@ -16,7 +17,7 @@ class ModernRevenueChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const InvifyLoadingIndicator(message: 'PLOTTING REVENUE DATA...');
     }
 
     if (data.isEmpty) {

@@ -6,6 +6,7 @@ import '../bloc/stock_state.dart';
 import '../../domain/entities/item.dart';
 import '../../../../core/utils/terminology.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class StockHistoryPage extends StatefulWidget {
   final Item item;
@@ -33,7 +34,7 @@ class _StockHistoryPageState extends State<StockHistoryPage> {
       body: BlocBuilder<StockBloc, StockState>(
         builder: (context, state) {
           if (state is StockLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'LOADING STOCK TIMELINE...');
           } else if (state is StockHistoryLoaded) {
             if (state.history.isEmpty) {
               return Center(child: Text(settings?.stockAdditionsLabel ?? 'No stock additions recorded yet.'));

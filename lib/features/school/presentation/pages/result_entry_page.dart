@@ -4,6 +4,7 @@ import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ResultEntryPage extends StatefulWidget {
   const ResultEntryPage({super.key});
@@ -146,7 +147,7 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
               if (_selectedClassId != null && _selectedSubjectId != null)
                 Expanded(
                   child: state.isLoading
-                      ? const Center(child: CircularProgressIndicator())
+                      ? const InvifyLoadingIndicator(message: 'LOADING STUDENT RESULTS...')
                       : classStudents.isEmpty
                           ? const Center(child: Text('No students in this class.'))
                           : _buildResultGrid(classStudents, state.gradingRules),

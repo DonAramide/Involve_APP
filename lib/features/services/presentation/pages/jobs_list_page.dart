@@ -6,6 +6,7 @@ import '../bloc/services_bloc.dart';
 import '../bloc/services_event.dart';
 import '../bloc/services_state.dart';
 import 'job_details_page.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class JobsListPage extends StatefulWidget {
   const JobsListPage({super.key});
@@ -75,7 +76,7 @@ class _JobsListPageState extends State<JobsListPage> {
       body: BlocBuilder<ServicesBloc, ServicesState>(
         builder: (context, state) {
           if (state.status == ServicesStatus.loading && state.jobs.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const InvifyLoadingIndicator(message: 'FETCHING REGISTERED JOBS...');
           }
 
           if (state.jobs.isNotEmpty || state.status == ServicesStatus.success) {

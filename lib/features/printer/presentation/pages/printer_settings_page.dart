@@ -7,6 +7,7 @@ import '../widgets/network_printer_config_dialog.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 import '../../domain/repositories/printer_service.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class PrinterSettingsPage extends StatefulWidget {
   const PrinterSettingsPage({super.key});
@@ -47,7 +48,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                   padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   child: const Row(
                     children: [
-                      SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                      Icon(Icons.sync, size: 16, color: Colors.blue),
                       SizedBox(width: 12),
                       Text('Auto-connecting to last used printer...', style: TextStyle(fontSize: 13, color: Colors.blue)),
                     ],
@@ -108,33 +109,26 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
               // Device List
               Expanded(
                 child: state.devices.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.print_disabled, size: 64, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No printers found',
-                              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    ? (state.isScanning
+                        ? const InvifyLoadingIndicator(message: 'SCANNING FOR PRINTERS...')
+                        : Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.print_disabled, size: 64, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No printers found',
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Tap WiFi or Bluetooth to connect',
+                                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Tap WiFi or Bluetooth to connect',
-                              style: TextStyle(color: Colors.grey, fontSize: 12),
-                            ),
-                            if (state.isScanning) ...[
-                              const SizedBox(height: 24),
-                              const CircularProgressIndicator(strokeWidth: 3),
-                              const SizedBox(height: 12),
-                              const Text(
-                                'Scanning for printers...',
-                                style: TextStyle(fontSize: 12, color: Colors.purple, fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ],
-                        ),
-                      )
+                          ))
                     : ListView.builder(
                         itemCount: state.devices.length,
                         itemBuilder: (context, index) {
@@ -182,11 +176,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
+                      Icon(Icons.bluetooth_searching, size: 20, color: Colors.purple),
                       SizedBox(width: 12),
                       Text('Scanning for Bluetooth printers...'),
                     ],

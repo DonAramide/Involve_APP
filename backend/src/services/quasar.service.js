@@ -24,7 +24,7 @@ class QuasarService {
         
         return new QuasarClient({ 
             apiKey: apiKey,
-            baseUrl: process.env.QUASAR_BASE_URL || 'https://api.invify.app'
+            baseUrl: process.env.QUASAR_BASE_URL || 'https://api.IIPS.app'
         });
     }
 

@@ -11,6 +11,7 @@ import 'job_details_page.dart';
 import 'customers_list_page.dart';
 import 'services_analytics_page.dart';
 import 'services_setup_page.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ServicesDashboardPage extends StatelessWidget {
   static const routeName = '/services-dashboard';
@@ -42,7 +43,7 @@ class ServicesDashboardPage extends StatelessWidget {
           child: BlocBuilder<ServicesBloc, ServicesState>(
             builder: (context, state) {
               if (state.status == ServicesStatus.loading && state.jobs.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
+                return const InvifyLoadingIndicator(message: 'LOADING SERVICE PIPELINE...');
               }
 
               if (state.jobs.isNotEmpty || state.status == ServicesStatus.success) {

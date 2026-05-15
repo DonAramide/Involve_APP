@@ -10,6 +10,7 @@ import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import './student_profile_page.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class StudentListPage extends StatefulWidget {
   final int? initialClassFilter;
@@ -92,7 +93,7 @@ class _StudentListPageState extends State<StudentListPage> {
             child: const Icon(Icons.person_add),
           ),
           body: state.isLoading 
-            ? const Center(child: CircularProgressIndicator())
+            ? const InvifyLoadingIndicator(message: 'FETCHING STUDENT DIRECTORY...')
             : Column(
                 children: [
                   _buildFilterBar(state),
@@ -510,11 +511,7 @@ class _StudentListPageState extends State<StudentListPage> {
                 child: BlocBuilder<SchoolBloc, SchoolState>(
                   builder: (context, state) {
                     if (state.isLoading && state.status == SchoolStatus.loading) {
-                      return const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      );
+                      return const Text('Saving...', style: TextStyle(fontWeight: FontWeight.bold));
                     }
                     return Text(student == null ? 'Add' : 'Save');
                   },

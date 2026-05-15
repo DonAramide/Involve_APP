@@ -17,6 +17,7 @@ import 'package:involve_app/features/stock/presentation/widgets/log_expense_dial
 import 'package:collection/collection.dart';
 import '../../../../core/utils/terminology.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class StockManagementPage extends StatefulWidget {
   const StockManagementPage({super.key});
@@ -31,8 +32,12 @@ class _StockManagementPageState extends State<StockManagementPage> {
   @override
   void initState() {
     super.initState();
-    final businessMode = context.read<SettingsBloc>().state.settings?.businessMode;
-    context.read<StockBloc>().add(LoadItems(businessMode: businessMode));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final businessMode = context.read<SettingsBloc>().state.settings?.businessMode;
+        context.read<StockBloc>().add(LoadItems(businessMode: businessMode));
+      }
+    });
   }
 
   @override
@@ -127,6 +132,10 @@ class _StockManagementPageState extends State<StockManagementPage> {
           final businessMode = settingsState.settings?.businessMode;
           return BlocBuilder<StockBloc, StockState>(
             builder: (context, state) {
+              if (state is StockLoading) {
+                return const InvifyLoadingIndicator(message: 'BACKGROUND SYNCING STOCK...');
+              }
+
               // Reload if needed or manually pass mode to events
               var displayItems = state.items;
               if (_showLowStockOnly) {
@@ -180,10 +189,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
                 );
               }
 
-              // Fallback if no items
-              if (state is StockLoading && state.items.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (state is StockError && state.items.isEmpty) {
+              if (state is StockError && state.items.isEmpty) {
                 return Center(child: Text(state.message));
               }
 

@@ -34,7 +34,7 @@ export const DeliveryPriorityLanes = {
  * Base abstract canonical blueprint required across all message serialization payloads
  */
 export const CanonicalEnvelopeSchema = {
-  $id: "https://schemas.invify.app/broadcast/canonical-envelope.v1.json",
+  $id: "https://schemas.IIPS.app/broadcast/canonical-envelope.v1.json",
   title: "Canonical Broadcast Envelope Schema",
   type: "object",
   required: [
@@ -51,7 +51,8 @@ export const CanonicalEnvelopeSchema = {
     "targetScopes",
     "replayEligible",
     "launcherMode",
-    "priorityLane"
+    "priorityLane",
+    "locationContext"
   ],
   properties: {
     broadcastId: { type: "string", format: "uuid" },
@@ -63,6 +64,17 @@ export const CanonicalEnvelopeSchema = {
     issuedBy: { type: "string" },
     timestamp: { type: "integer", minimum: 0 },
     requiresAcknowledgement: { type: "boolean" },
+    locationContext: {
+      type: "object",
+      properties: {
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+        accuracy: { type: "number" },
+        altitude: { type: "number" },
+        timestamp: { type: "integer" }
+      },
+      required: ["latitude", "longitude"]
+    },
     expiryAt: { type: "integer", minimum: 0 },
     deliveryChannels: {
       type: "array",

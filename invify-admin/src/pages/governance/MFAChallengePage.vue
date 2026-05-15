@@ -166,7 +166,7 @@ onMounted(() => {
 
 const triggerRemoteSetupGeneration = async (uId) => {
   try {
-    const res = await axios.post('http://localhost:3005/api/auth/mfa/setup', { userId: uId })
+    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/mfa/setup', { userId: uId })
     if (res.data?.qrCodeUrl) {
       qrCodeDataUrl.value = res.data.qrCodeUrl
       setupSecretString.value = res.data.secret
@@ -184,7 +184,7 @@ const executeMfaSetupVerification = async () => {
   successMessage.value = ''
 
   try {
-    const res = await axios.post('http://localhost:3005/api/auth/mfa/verify', {
+    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/mfa/verify', {
       userId: targetUserId.value,
       tokenCode: totpInput.value,
       pendingSetup: true,
@@ -207,7 +207,7 @@ const executeStandardVerification = async () => {
   successMessage.value = ''
 
   try {
-    const res = await axios.post('http://localhost:3005/api/auth/mfa/verify', {
+    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/mfa/verify', {
       userId: targetUserId.value,
       tokenCode: totpInput.value,
       role: localStorage.getItem('operator_role') || 'SUPER_ADMIN'

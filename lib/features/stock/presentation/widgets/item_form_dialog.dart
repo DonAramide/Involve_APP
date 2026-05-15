@@ -356,11 +356,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
             bloc: widget.stockBloc,
             builder: (context, state) {
               if (state.status == StockStatus.loading) {
-                return const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                );
+                return const Text('SAVING...', style: TextStyle(fontWeight: FontWeight.bold));
               }
               return Text(widget.item == null ? 'ADD' : 'SAVE');
             },

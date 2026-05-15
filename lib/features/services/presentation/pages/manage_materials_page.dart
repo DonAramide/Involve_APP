@@ -5,6 +5,7 @@ import '../../domain/entities/service_material.dart';
 import '../bloc/services_bloc.dart';
 import '../bloc/services_event.dart';
 import '../bloc/services_state.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 
 class ManageMaterialsPage extends StatefulWidget {
   const ManageMaterialsPage({super.key});
@@ -57,7 +58,7 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
             child: BlocBuilder<ServicesBloc, ServicesState>(
               builder: (context, state) {
                 if (state.status == ServicesStatus.loading && state.materials.isEmpty) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const InvifyLoadingIndicator(message: 'SYNCING SERVICE MATERIALS...');
                 }
 
                 if (state.materials.isEmpty) {

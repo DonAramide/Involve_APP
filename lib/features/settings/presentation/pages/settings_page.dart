@@ -19,6 +19,7 @@ import '../../../../core/license/license_history_table.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/widgets/invify_loading_indicator.dart';
 import '../../domain/entities/settings.dart';
 import '../widgets/upgrade_dialog.dart';
 import 'package:involve_app/core/widgets/restart_widget.dart';
@@ -122,7 +123,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildBody(BuildContext context, SettingsState state) {
-    if (state.isLoading) return const Center(child: CircularProgressIndicator());
+    if (state.isLoading) return const InvifyLoadingIndicator(message: 'LOADING SYSTEM SETTINGS...');
     // Authorization check removed per user request for normal settings view
 
     final settings = state.settings!;
@@ -193,7 +194,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             title: const Text('Export/Local Backup'),
             subtitle: const Text('Save or share database backup'),
-            trailing: state.isExporting ? const CircularProgressIndicator() : const Icon(Icons.backup),
+            trailing: state.isExporting ? const Text('Exporting...', style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold)) : const Icon(Icons.backup),
             onTap: () => _showBackupOptions(context, state),
           ),
         if (_matches('Device Synchronization'))
@@ -228,7 +229,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ListTile(
             title: const Text('Restore Backup'),
             subtitle: const Text('Import database from a file'),
-            trailing: state.isImporting ? const CircularProgressIndicator() : const Icon(Icons.restore),
+            trailing: state.isImporting ? const Text('Restoring...', style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold)) : const Icon(Icons.restore),
             onTap: () => _handleRestore(context),
           ),
         const Divider(),
@@ -878,14 +879,10 @@ class _SettingsPageState extends State<SettingsPage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        content: Row(
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(width: 20),
-            Text(message),
-          ],
-        ),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: InvifyLoadingIndicator(message: message.toUpperCase()),
       ),
     ).then((_) => _isLoadingDialogShowing = false);
   }
@@ -1126,7 +1123,7 @@ class _SettingsPageState extends State<SettingsPage> {
             future: LicenseService.getActivationHistory(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
+                return const SizedBox(height: 120, child: InvifyLoadingIndicator(message: 'FETCHING SUBSCRIPTIONS...'));
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return ListTile(
