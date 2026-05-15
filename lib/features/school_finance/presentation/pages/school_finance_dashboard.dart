@@ -10,7 +10,7 @@ import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class SchoolFinanceDashboardPage extends StatefulWidget {
   const SchoolFinanceDashboardPage({super.key});

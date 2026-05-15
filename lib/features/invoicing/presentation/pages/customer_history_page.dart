@@ -7,7 +7,7 @@ import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:collection/collection.dart';
-import '../../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class CustomerHistoryPage extends StatefulWidget {
   final String customerName;

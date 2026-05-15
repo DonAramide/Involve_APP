@@ -10,7 +10,7 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/terminology.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class DefaultersPage extends StatefulWidget {
   const DefaultersPage({super.key});

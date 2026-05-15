@@ -10,7 +10,7 @@ import '../../domain/entities/service_customer.dart';
 import '../../domain/entities/service_job.dart';
 import '../../domain/entities/service_material.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class CreateJobPage extends StatefulWidget {
   const CreateJobPage({super.key});

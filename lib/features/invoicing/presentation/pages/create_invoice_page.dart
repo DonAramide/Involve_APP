@@ -20,7 +20,7 @@ import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class CreateInvoicePage extends StatefulWidget {
   const CreateInvoicePage({super.key});

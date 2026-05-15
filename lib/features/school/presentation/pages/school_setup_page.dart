@@ -5,7 +5,7 @@ import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
 import 'manage_grading_rules_page.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class SchoolSetupPage extends StatelessWidget {
   const SchoolSetupPage({super.key});

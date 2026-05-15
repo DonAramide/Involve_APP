@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class RestartWidget<T> extends StatefulWidget {
   const RestartWidget({

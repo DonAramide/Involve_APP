@@ -10,7 +10,7 @@ import 'package:involve_app/features/school/domain/entities/school_entities.dart
 import 'package:url_launcher/url_launcher.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ContactPage extends StatefulWidget {
   const ContactPage({super.key});

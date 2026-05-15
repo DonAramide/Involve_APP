@@ -6,7 +6,7 @@ import 'package:involve_app/features/school/domain/entities/lesson_note_models.d
 import 'package:involve_app/features/school/presentation/pages/generate_lesson_wizard_page.dart';
 import 'package:involve_app/features/school/presentation/pages/lesson_note_viewer_page.dart';
 import 'package:involve_app/features/school/data/services/lesson_note_sync_service.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class LessonNotesListPage extends StatefulWidget {
   const LessonNotesListPage({super.key});

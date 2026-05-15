@@ -17,7 +17,7 @@ import 'package:involve_app/features/stock/presentation/widgets/log_expense_dial
 import 'package:collection/collection.dart';
 import '../../../../core/utils/terminology.dart';
 import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class StockManagementPage extends StatefulWidget {
   const StockManagementPage({super.key});

@@ -1,7 +1,7 @@
 // lib/core/utils/progress_dialog_utils.dart
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-import '../widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ProgressDialogUtils {
   /// Executes any asynchronous Future task while rendering an immersive, barrier-locked

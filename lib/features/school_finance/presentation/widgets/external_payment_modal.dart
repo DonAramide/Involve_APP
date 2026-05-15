@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../bloc/finance_new_bloc.dart';
 import '../bloc/finance_new_event.dart';
 import '../bloc/finance_new_state.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ExternalPaymentModal extends StatefulWidget {
   final String studentId;

@@ -8,7 +8,7 @@ import '../bloc/finance_new_bloc.dart';
 import '../bloc/finance_new_event.dart';
 import '../bloc/finance_new_state.dart';
 import '../../data/models/finance_models.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class StudentFinanceProfileScreen extends StatelessWidget {
   final String studentId;

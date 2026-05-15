@@ -13,7 +13,7 @@ import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:collection/collection.dart';
 import 'package:involve_app/core/utils/terminology.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class InventoryReportPage extends StatefulWidget {
   const InventoryReportPage({super.key});

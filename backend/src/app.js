@@ -7,7 +7,7 @@ const app = express();
 app.use(cors({
     origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-ID', 'ngrok-skip-browser-warning']
 }));
 const { monnifyWebhook, quasarWebhook } = require('./api/controllers/webhook.controller');
 const { 

@@ -11,7 +11,7 @@ import 'package:involve_app/features/invoicing/presentation/history/pages/invoic
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class AdminFinanceDashboardPage extends StatefulWidget {
   const AdminFinanceDashboardPage({super.key});

@@ -7,7 +7,7 @@ import '../widgets/network_printer_config_dialog.dart';
 import '../../../invoicing/domain/templates/invoice_template.dart';
 import '../../domain/repositories/printer_service.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class PrinterSettingsPage extends StatefulWidget {
   const PrinterSettingsPage({super.key});

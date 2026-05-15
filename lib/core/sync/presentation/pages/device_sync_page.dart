@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import '../bloc/sync_bloc.dart';
 import '../../domain/models/peer_device.dart';
-import '../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class DeviceSyncPage extends StatelessWidget {
   const DeviceSyncPage({super.key});

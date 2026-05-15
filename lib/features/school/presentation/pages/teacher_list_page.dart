@@ -4,7 +4,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/school/presentation/pages/teacher_profile_page.dart';
 import '../widgets/teacher_form_dialog.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class TeacherListPage extends StatefulWidget {
   const TeacherListPage({super.key});

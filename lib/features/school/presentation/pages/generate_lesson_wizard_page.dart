@@ -8,7 +8,7 @@ import 'package:involve_app/features/school/domain/repositories/school_repositor
 
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class GenerateLessonWizardPage extends StatefulWidget {
   const GenerateLessonWizardPage({super.key});

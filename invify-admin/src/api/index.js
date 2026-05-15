@@ -3,6 +3,9 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: 'https://bertie-archegoniate-causelessly.ngrok-free.dev/api',
   timeout: 30000,
+  headers: {
+    'ngrok-skip-browser-warning': 'true'
+  }
 });
 
 api.interceptors.request.use((config) => {

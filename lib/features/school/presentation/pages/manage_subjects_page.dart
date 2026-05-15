@@ -4,7 +4,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:collection/collection.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ManageSubjectsPage extends StatefulWidget {
   const ManageSubjectsPage({super.key});

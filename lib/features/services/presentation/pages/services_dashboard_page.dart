@@ -11,7 +11,7 @@ import 'job_details_page.dart';
 import 'customers_list_page.dart';
 import 'services_analytics_page.dart';
 import 'services_setup_page.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ServicesDashboardPage extends StatelessWidget {
   static const routeName = '/services-dashboard';

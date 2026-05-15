@@ -19,7 +19,7 @@ import '../../../../core/license/license_history_table.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import '../../domain/entities/settings.dart';
 import '../widgets/upgrade_dialog.dart';
 import 'package:involve_app/core/widgets/restart_widget.dart';

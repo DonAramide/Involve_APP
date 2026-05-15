@@ -5,7 +5,7 @@ import '../../domain/entities/service_material.dart';
 import '../bloc/services_bloc.dart';
 import '../bloc/services_event.dart';
 import '../bloc/services_state.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ManageMaterialsPage extends StatefulWidget {
   const ManageMaterialsPage({super.key});

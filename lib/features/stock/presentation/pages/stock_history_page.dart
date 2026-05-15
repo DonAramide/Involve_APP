@@ -6,7 +6,7 @@ import '../bloc/stock_state.dart';
 import '../../domain/entities/item.dart';
 import '../../../../core/utils/terminology.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class StockHistoryPage extends StatefulWidget {
   final Item item;

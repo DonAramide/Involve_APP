@@ -8,7 +8,7 @@ import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:collection/collection.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class StudentAnalyticsPage extends StatefulWidget {
   const StudentAnalyticsPage({super.key});

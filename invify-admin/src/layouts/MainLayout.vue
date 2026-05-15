@@ -7,10 +7,10 @@
 
     <!-- Top Operational Command Header Bar -->
     <q-header elevated class="border-bottom" style="background: var(--appbar-bg); height: 42px;">
-      <div class="row items-center justify-between no-wrap fit q-px-sm">
+      <div class="row items-center no-wrap fit q-px-sm">
         
-        <!-- Left Section: Shell Identity & Workspace router strips -->
-        <div class="row items-center op-gap-12 no-wrap h-full">
+        <!-- SECTION 1: Identity & Static Navigation (Left) -->
+        <div class="row items-center op-gap-12 no-wrap h-full flex-shrink-0">
           <q-btn
             flat
             dense
@@ -24,9 +24,9 @@
           />
 
           <!-- Monospace Console Engine Branding -->
-          <div class="row items-center no-wrap cursor-pointer" @click="$router.push('/')">
-            <span class="text-metric-mono text-white text-weight-bolder" style="font-size: 14px;">INVIFY</span>
-            <span class="text-metric-mono text-cyan-4 q-ml-xs" style="font-size: 11px; padding-top: 2px;">OPS_CORE</span>
+          <div class="row items-center no-wrap cursor-pointer h-full" @click="$router.push('/')">
+            <span class="text-metric-mono text-white text-weight-bolder" style="font-size: 14px; line-height: 1;">INVIFY</span>
+            <span class="text-metric-mono text-cyan-4 q-ml-xs" style="font-size: 11px; line-height: 1; padding-top: 2px;">OPS_CORE</span>
           </div>
 
           <!-- Active Multi-Tenant Boundary Identifier Tag -->
@@ -47,30 +47,36 @@
               </q-item>
             </q-list>
           </q-btn-dropdown>
-
-          <!-- 7-DOMAIN ISOLATION WORKSPACE ROUTER STRIP -->
-          <div class="row items-center no-wrap q-ml-sm op-gap-2 h-full workspace-tabs overflow-x-auto">
-            <q-btn
-              v-for="ws in workspaces"
-              :key="ws.id"
-              flat
-              dense
-              :label="ws.label"
-              :class="[
-                'workspace-tab-btn text-caption q-px-sm',
-                prefs.activeWorkspace === ws.id ? 'workspace-tab-btn--active text-weight-bold' : 'text-grey-6',
-                ws.priority ? 'text-white' : 'text-grey-6'
-              ]"
-              @click="switchWorkspace(ws.id)"
-              :title="ws.priority ? 'Production Priority Workspace' : 'Lightweight Auxiliary Context'"
-            >
-              <div class="priority-dot bg-cyan-4" v-if="ws.priority && prefs.activeWorkspace !== ws.id"></div>
-            </q-btn>
-          </div>
         </div>
 
-        <!-- Right Section: Command overlays, Stream-throttled tickers, Operator Sync state -->
-        <div class="row items-center op-gap-8 no-wrap">
+        <!-- SECTION 2: Dynamic Workspace Strip (Center - Scrolling) -->
+        <div class="col h-full min-width-0 q-mx-sm overflow-hidden">
+          <q-tabs
+            v-model="prefs.activeWorkspace"
+            dense
+            align="left"
+            class="text-grey-6 workspace-tabs h-full"
+            active-color="white"
+            indicator-color="cyan-4"
+            breakpoint="0"
+            outside-arrows
+            mobile-arrows
+          >
+            <q-tab
+              v-for="ws in workspaces"
+              :key="ws.id"
+              :name="ws.id"
+              :label="ws.label"
+              class="workspace-tab-item text-caption q-px-md"
+              @click="switchWorkspace(ws.id)"
+            >
+              <div v-if="ws.priority" class="priority-dot bg-cyan-4"></div>
+            </q-tab>
+          </q-tabs>
+        </div>
+
+        <!-- SECTION 3: Operations & Identity (Right) -->
+        <div class="row items-center op-gap-8 no-wrap flex-shrink-0">
           
           <!-- Universal Command Palette Launcher Action -->
           <div 
@@ -136,9 +142,9 @@
       :width="230"
       :breakpoint="768"
     >
-      <div class="column fit justify-between" style="padding-top: 42px;">
+      <div class="column fit" style="padding-top: 42px; overflow: hidden;">
         
-        <q-scroll-area class="col">
+        <q-scroll-area class="col overflow-hidden">
           <!-- Workspace Overview block -->
           <div class="q-px-md q-pt-md q-pb-xs row items-center justify-between no-wrap">
             <div class="row items-center op-gap-4 no-wrap">
@@ -530,7 +536,15 @@ onBeforeUnmount(() => {
 .border-amber-left { border-left: 2px solid #fcc419; }
 
 .workspace-tabs {
+  height: 100%;
+}
+
+.workspace-tab-item {
   height: 42px;
+  min-height: 42px;
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 .workspace-tab-btn {
@@ -538,6 +552,23 @@ onBeforeUnmount(() => {
   border-radius: 0;
   transition: all 0.15s ease;
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+
+.scroll-hide::-webkit-scrollbar {
+  display: none;
+}
+.scroll-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0 !important;
+}
+
+.min-width-0 {
+  min-width: 0 !important;
 }
 
 .workspace-tab-btn--active {

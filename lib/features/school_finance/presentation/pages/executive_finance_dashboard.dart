@@ -15,7 +15,7 @@ import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
 import 'reconciliation_page.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ExecutiveFinanceDashboard extends StatefulWidget {
   const ExecutiveFinanceDashboard({super.key});

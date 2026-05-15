@@ -13,7 +13,7 @@ import 'package:printing/printing.dart';
 import '../../../invoicing/domain/services/report_generator.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ExpenseLogsPage extends StatefulWidget {
   final DateTime? initialStart;

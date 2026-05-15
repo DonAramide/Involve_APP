@@ -17,7 +17,7 @@ import '../../../settings/domain/entities/staff.dart';
 import '../../../settings/presentation/widgets/upgrade_dialog.dart';
 import '../../../settings/presentation/widgets/super_admin_password_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});

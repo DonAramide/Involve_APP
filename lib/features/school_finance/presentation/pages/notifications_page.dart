@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../domain/repositories/notification_repository.dart';
 import '../../../../core/services/service_locator.dart';
 import 'package:intl/intl.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});

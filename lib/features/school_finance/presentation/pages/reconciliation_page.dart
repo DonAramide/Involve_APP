@@ -11,7 +11,7 @@ import 'package:intl/intl.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import '../../../../core/utils/terminology.dart';
-import '../../../../core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ReconciliationPage extends StatefulWidget {
   const ReconciliationPage({super.key});
