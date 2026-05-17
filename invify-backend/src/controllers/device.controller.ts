@@ -25,6 +25,7 @@ interface MockActivation {
   duration_days: number;
   plan_index: number;
   device_suffix: string;
+  device_id?: string;
   status: string;
   is_used: boolean;
   created_at: string;
@@ -95,6 +96,12 @@ export class DeviceController {
    * Retrieves all hardware devices
    */
   static async getDevices(req: Request, res: Response) {
+    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      console.log('[DeviceController] Serving local mock devices immediately (OFFLINE_MOCK_AUTH active).');
+      const local = DeviceController.getLocalData();
+      return res.status(200).json(local.devices);
+    }
+
     try {
       const { data, error } = await supabase
         .from('devices')
@@ -119,6 +126,12 @@ export class DeviceController {
    * Retrieves all generated activation codes
    */
   static async getActivations(req: Request, res: Response) {
+    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      console.log('[DeviceController] Serving local mock activations immediately (OFFLINE_MOCK_AUTH active).');
+      const local = DeviceController.getLocalData();
+      return res.status(200).json(local.activations);
+    }
+
     try {
       const { data, error } = await supabase
         .from('device_activations')
@@ -152,6 +165,34 @@ export class DeviceController {
       // Generate a cryptographically premium, secure key
       const randStr = () => Math.random().toString(36).substring(2, 6).toUpperCase();
       const code = `INV-${randStr()}-${randStr()}`;
+      const generatedDeviceId = `DSPREAD-POS-${deviceSuffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        console.log('[DeviceController] Creating activation locally immediately (OFFLINE_MOCK_AUTH active).');
+        const local = DeviceController.getLocalData();
+        
+        // Try to lookup mock tenant name
+        const tenantName = tenantId === '00000000-0000-0000-0000-000000000001' ? 'Lagos Academy School' : 'Invify Retail Business';
+        
+        const newAct: MockActivation = {
+          id: `act-${Date.now()}`,
+          activation_code: code,
+          tenant_id: tenantId,
+          duration_days: Number(durationDays) || 30,
+          plan_index: Number(planIndex) || 0,
+          device_suffix: deviceSuffix || '0',
+          device_id: generatedDeviceId,
+          status: 'pending',
+          is_used: false,
+          created_at: new Date().toISOString(),
+          tenants: { name: tenantName, plan: 'standard' }
+        };
+
+        local.activations.unshift(newAct);
+        DeviceController.saveLocalData(local);
+
+        return res.status(201).json({ activation_code: code });
+      }
 
       try {
         const { data, error } = await supabase
@@ -162,6 +203,7 @@ export class DeviceController {
             duration_days: durationDays || 30,
             plan_index: planIndex || 0,
             device_suffix: deviceSuffix || '0',
+            device_id: generatedDeviceId,
             is_used: false,
             status: 'pending'
           })
@@ -185,6 +227,7 @@ export class DeviceController {
             duration_days: Number(durationDays) || 30,
             plan_index: Number(planIndex) || 0,
             device_suffix: deviceSuffix || '0',
+            device_id: generatedDeviceId,
             status: 'pending',
             is_used: false,
             created_at: new Date().toISOString(),
@@ -213,6 +256,46 @@ export class DeviceController {
       const { code } = req.body;
       if (!code) {
         return res.status(400).json({ error: 'code is required' });
+      }
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        console.log('[DeviceController] Validating code locally immediately (OFFLINE_MOCK_AUTH active).');
+        const local = DeviceController.getLocalData();
+        const match = local.activations.find((a: any) => a.activation_code === code);
+
+        if (!match) {
+          return res.status(400).json({ error: 'Invalid activation code' });
+        }
+
+        if (match.is_used) {
+          return res.status(400).json({ error: 'Activation code has already been used' });
+        }
+
+        // Mark it used locally
+        match.is_used = true;
+        match.status = 'used';
+        
+        // Provision a mock device for this code
+        const newDev: MockDevice = {
+          id: `dev-${Date.now()}`,
+          device_id: match.device_id || `DSPREAD-POS-${match.device_suffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`,
+          tenant_id: match.tenant_id,
+          status: 'active',
+          last_seen: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          tenants: match.tenants
+        };
+        local.devices.unshift(newDev);
+        
+        DeviceController.saveLocalData(local);
+
+        return res.status(200).json({
+          valid: true,
+          activation_code: match.activation_code,
+          duration_days: match.duration_days,
+          tenant_id: match.tenant_id,
+          device_id: newDev.device_id
+        });
       }
 
       try {
@@ -257,7 +340,7 @@ export class DeviceController {
           // Provision a mock device for this code
           const newDev: MockDevice = {
             id: `dev-${Date.now()}`,
-            device_id: `DSPREAD-POS-${match.device_suffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`,
+            device_id: match.device_id || `DSPREAD-POS-${match.device_suffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`,
             tenant_id: match.tenant_id,
             status: 'active',
             last_seen: new Date().toISOString(),

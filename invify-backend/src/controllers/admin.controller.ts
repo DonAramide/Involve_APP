@@ -11,6 +11,15 @@ export class AdminController {
    * Lists all tenants with optional filtering.
    */
   static async listTenants(req: Request, res: Response) {
+    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      console.log('[AdminController] Serving local mock tenants immediately (OFFLINE_MOCK_AUTH active).');
+      return res.status(200).json([
+        { id: '00000000-0000-0000-0000-000000000001', name: 'Lagos Academy School', type: 'school', plan: 'standard', status: 'active', created_at: new Date().toISOString() },
+        { id: '00000000-0000-0000-0000-000000000002', name: 'Elite Retail Hub', type: 'retail', plan: 'premium', status: 'active', created_at: new Date().toISOString() },
+        { id: '00000000-0000-0000-0000-000000000003', name: 'City Hospital Clinic', type: 'healthcare', plan: 'enterprise', status: 'active', created_at: new Date().toISOString() }
+      ]);
+    }
+
     try {
       const { type, status, name } = req.query;
 
@@ -104,6 +113,19 @@ export class AdminController {
    * Fetches detailed data for the Tenant Detail Page.
    */
   static async getTenantDetails(req: Request, res: Response) {
+    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      const { id } = req.params;
+      const tenantName = id === '00000000-0000-0000-0000-000000000001' ? 'Lagos Academy School' : 'Invify Retail Business';
+      return res.status(200).json({
+        tenant: { id, name: tenantName, type: 'retail', plan: 'standard', status: 'active' },
+        users: [
+          { id: 'usr-1', name: 'Admin User', role: 'admin' }
+        ],
+        wallet: { balance: 1500 },
+        recentUsage: []
+      });
+    }
+
     try {
       const { id } = req.params;
 
