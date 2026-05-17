@@ -34,6 +34,7 @@ import { NotificationController } from './controllers/notification.controller';
 import { OTPController } from './controllers/otp.controller';
 import { AuthController } from './controllers/auth.controller';
 import { DeviceController } from './controllers/device.controller';
+import { LookupController } from './controllers/lookup.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
@@ -68,7 +69,9 @@ app.get('/health', (req: Request, res: Response) => {
 app.post('/payments/create', PaymentController.createPayment);
 app.post('/payments/initialize', PaymentController.initializeGatewayCheckout);
 
-// Public Onboarding
+// Public Onboarding & System Lookup Data
+app.get('/public/lookup', LookupController.getLookup);
+app.post('/admin/lookup', LookupController.saveLookup);
 app.post('/public/otp/send', OTPController.sendOTP);
 app.post('/public/otp/verify', OTPController.verifyOTP);
 app.post('/public/onboarding/signup', OnboardingController.signup);
