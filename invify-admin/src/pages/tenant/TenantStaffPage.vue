@@ -3,19 +3,68 @@
   <q-page class="q-pa-lg text-white" style="background: #05070d; min-height: 100vh;">
     
     <!-- Top Header -->
-    <div class="row items-center justify-between q-mb-xl">
+    <div class="row items-center justify-between q-mb-md">
       <div>
         <div class="row items-center op-gap-8 no-wrap">
           <q-icon name="people_outline" color="cyan-4" size="md" />
           <h1 class="text-h4 text-weight-bolder text-white q-my-none letter-spacing-1">Staff Governance</h1>
         </div>
         <div class="text-caption text-grey-5 q-mt-xs">
-          Manage staff accounts, assign granular RBAC roles, track operator lineages, and enforce MFA compliance.
+          Manage staff accounts, assign granular identity scopes, and enforce permission compliance.
         </div>
       </div>
 
-      <q-btn unelevated color="cyan-9" text-color="black" icon="person_add" label="Onboard Operator" @click="showAddDialog = true" class="text-weight-bold text-caption text-black" />
+      <!-- Action Button - Disabled if active identity is Finance (Read-only) -->
+      <div>
+        <q-btn 
+          unelevated 
+          color="cyan-9" 
+          text-color="black" 
+          icon="person_add" 
+          label="Onboard Operator" 
+          @click="showAddDialog = true" 
+          :disabled="activeUserRole === 'FINANCE'"
+          class="text-weight-bold text-caption text-black"
+        >
+          <q-tooltip v-if="activeUserRole === 'FINANCE'" class="bg-red-10 text-white font-mono">
+            FINANCE COMPLIANCE: Onboarding disabled in Read-Only mode.
+          </q-tooltip>
+        </q-btn>
+      </div>
     </div>
+
+    <!-- Dynamic Identity Scope Switcher (For live testing of permissions!) -->
+    <q-card class="bg-card-dark border-grey-9 q-pa-md q-mb-lg">
+      <div class="row items-center justify-between">
+        <div>
+          <div class="text-operator-title text-grey-4 text-weight-bold" style="font-size: 11px; letter-spacing: 1px;">ACTIVE WORKSPACE IDENTITY (WHO I AM)</div>
+          <div class="text-caption text-grey-6 q-mt-xs">Toggle roles below to dynamically test portal-wide permissions.</div>
+        </div>
+        <q-btn-toggle
+          v-model="activeUserRole"
+          toggle-color="cyan-9"
+          color="black"
+          dense
+          flat
+          text-color="grey-4"
+          toggle-text-color="black"
+          class="border-grey-9 q-px-sm font-mono text-caption"
+          :options="[
+            {label: 'ADMIN (FULL ACCESS)', value: 'ADMIN'},
+            {label: 'FINANCE (READ ONLY)', value: 'FINANCE'},
+            {label: 'STAFF (OPERATIONAL)', value: 'STAFF'}
+          ]"
+        />
+      </div>
+
+      <!-- Interactive Banner for Finance Compliance Mode -->
+      <transition enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
+        <div v-if="activeUserRole === 'FINANCE'" class="q-mt-md q-pa-sm border-red rounded-borders bg-red-10 text-red-3 row items-center op-gap-8 text-caption font-mono">
+          <q-icon name="security" size="sm" />
+          <span><strong>FINANCE COMPLIANCE MODE ACTIVE:</strong> You can read all staff registries, logs, and telemetry, but all modification and onboarding controls are strictly locked.</span>
+        </div>
+      </transition>
+    </q-card>
 
     <!-- 1. Operational Staff Grid & RBAC Details -->
     <div class="row q-col-gutter-lg q-mb-lg">
@@ -36,7 +85,11 @@
           >
             <template v-slot:body-cell-role="props">
               <q-td :props="props">
-                <q-badge color="indigo-10" text-color="indigo-3" class="text-weight-bold font-mono">
+                <q-badge 
+                  :color="props.value === 'ADMIN' ? 'red-10' : (props.value === 'FINANCE' ? 'amber-10' : 'indigo-10')" 
+                  :text-color="props.value === 'ADMIN' ? 'red-3' : (props.value === 'FINANCE' ? 'amber-3' : 'indigo-3')" 
+                  class="text-weight-bold font-mono"
+                >
                   {{ props.value }}
                 </q-badge>
               </q-td>
@@ -58,18 +111,20 @@
 
             <template v-slot:body-cell-actions="props">
               <q-td :props="props" class="text-center">
-                <!-- Suspend / Activate Toggle -->
+                <!-- Suspend / Activate Toggle - Disabled if logged-in user is Finance -->
                 <q-btn 
                   flat 
                   dense 
                   round 
                   size="sm" 
-                  :color="props.row.status === 'ACTIVE' ? 'red-4' : 'green-4'" 
+                  :color="activeUserRole === 'FINANCE' ? 'grey-7' : (props.row.status === 'ACTIVE' ? 'red-4' : 'green-4')" 
                   :icon="props.row.status === 'ACTIVE' ? 'block' : 'lock_open'"
+                  :disabled="activeUserRole === 'FINANCE'"
                   @click="toggleOperatorState(props.row)"
                 >
-                  <q-tooltip class="bg-indigo-10 text-white">
-                    {{ props.row.status === 'ACTIVE' ? 'Suspend Account' : 'Re-Activate Account' }}
+                  <q-tooltip class="bg-indigo-10 text-white font-mono">
+                    <span v-if="activeUserRole === 'FINANCE'">Finance Viewport: Mutate blocked</span>
+                    <span v-else>{{ props.row.status === 'ACTIVE' ? 'Suspend Account' : 'Re-Activate Account' }}</span>
                   </q-tooltip>
                 </q-btn>
               </q-td>
@@ -101,41 +156,101 @@
 
     </div>
 
-    <!-- Onboard Operator Dialog -->
+    <!-- Onboard / Add Staff Dialog (Strictly matches the Mobile App screen layout!) -->
     <q-dialog v-model="showAddDialog" backdrop-filter="blur(10px)">
-      <q-card class="bg-card-dark border-indigo q-pa-md" style="min-width: 400px; border-radius: 16px;">
-        <q-card-section>
-          <div class="text-h6 text-weight-bold text-white">Onboard Operator Node</div>
-          <div class="text-caption text-grey-5">Create credentials for a new business team member.</div>
+      <q-card class="bg-card-dark border-indigo q-pa-md" style="width: 440px; border-radius: 24px; background: #0b0f19;">
+        
+        <q-card-section class="q-pb-none">
+          <div class="text-h5 text-weight-bold text-white font-mono text-center q-my-sm">Add Staff</div>
         </q-card-section>
 
-        <q-card-section class="column q-gutter-y-md">
-          <q-input v-model="newOperator.name" dark outlined dense label="Operator Full Name" color="cyan-4" />
-          <q-input v-model="newOperator.email" dark outlined dense type="email" label="Operator Email Address" color="cyan-4" />
+        <q-card-section class="column q-gutter-y-md text-left">
+          <!-- 1. Staff Name Input -->
+          <q-input 
+            v-model="newOperator.name" 
+            dark 
+            filled
+            dense 
+            label="Staff Name" 
+            color="cyan-4" 
+            class="bg-black-transparent rounded-borders" 
+          />
+
+          <!-- 2. Staff ID (Optional) Input with max counter -->
+          <q-input 
+            v-model="newOperator.staffId" 
+            dark 
+            filled
+            dense 
+            label="Staff ID (Optional)" 
+            placeholder="e.g., MGT-01" 
+            color="cyan-4" 
+            maxlength="20"
+            counter
+            class="bg-black-transparent rounded-borders" 
+          />
+
+          <!-- 3. Auth Code (4 digits) password mask with counter -->
+          <q-input 
+            v-model="newOperator.authCode" 
+            dark 
+            filled
+            dense 
+            type="password"
+            label="Auth Code (4 digits)" 
+            color="cyan-4" 
+            maxlength="4"
+            counter
+            class="bg-black-transparent rounded-borders" 
+          />
+
+          <!-- 4. Phone Number Input -->
+          <q-input 
+            v-model="newOperator.phone" 
+            dark 
+            filled
+            dense 
+            type="tel"
+            label="Phone Number" 
+            color="cyan-4" 
+            class="bg-black-transparent rounded-borders" 
+          />
           
-          <!-- Explicit 3-Radio Role Selector block designating Identity Scope -->
-          <div>
-            <div class="text-operator-title text-grey-5 q-mb-sm" style="font-size: 9px; letter-spacing: 1px;">DESIGNATE STAFF IDENTITY (WHO I AM)</div>
+          <!-- Elegant 3-Radio Identity Selector block designating permissions scope -->
+          <div class="q-mt-sm">
+            <div class="text-operator-title text-grey-5 q-mb-sm" style="font-size: 9.5px; letter-spacing: 1px; font-weight: bold;">IDENTITY SCOPE ACCESS LIMITATIONS</div>
             <div class="row q-col-gutter-sm">
-              <div class="col-4" v-for="opt in [{label: 'Staff', value: 'STAFF', desc: 'Operational Access'}, {label: 'Admin', value: 'ADMIN', desc: 'Global Control'}, {label: 'Finance', value: 'FINANCE', desc: 'Treasury Sweeps'}]" :key="opt.value">
+              <div 
+                class="col-4" 
+                v-for="opt in [
+                  {label: 'Staff', value: 'STAFF', desc: 'Operational Scope'}, 
+                  {label: 'Admin', value: 'ADMIN', desc: 'Full Read/Write'}, 
+                  {label: 'Finance', value: 'FINANCE', desc: 'Read-Only View'}
+                ]" 
+                :key="opt.value"
+              >
                 <q-card 
                   clickable 
                   @click="newOperator.role = opt.value"
                   :class="newOperator.role === opt.value ? 'border-active bg-cyan-10 text-cyan-3' : 'border-grey-9'"
-                  class="q-pa-sm text-center cursor-pointer transition-2 rounded-borders hover-bg"
+                  class="q-pa-sm text-center cursor-pointer transition-2 rounded-borders hover-bg fit column justify-between"
+                  style="min-height: 85px;"
                 >
-                  <q-radio v-model="newOperator.role" :val="opt.value" dark color="cyan-4" size="sm" class="q-mr-none" />
-                  <div class="text-caption font-mono text-weight-bold text-white q-mt-xs">{{ opt.label }}</div>
-                  <div class="text-grey-6 font-mono" style="font-size: 8px;">{{ opt.desc }}</div>
+                  <div class="row justify-center">
+                    <q-radio v-model="newOperator.role" :val="opt.value" dark color="cyan-4" size="sm" class="q-mr-none" />
+                  </div>
+                  <div class="text-caption font-mono text-weight-bold text-white">{{ opt.label }}</div>
+                  <div class="text-grey-6 font-mono" style="font-size: 8px; line-height: 1.1;">{{ opt.desc }}</div>
                 </q-card>
               </div>
             </div>
           </div>
         </q-card-section>
 
-        <q-card-actions align="right" class="q-mt-md">
-          <q-btn flat color="grey-5" label="Cancel" v-close-popup class="text-weight-bold font-mono" />
-          <q-btn unelevated color="cyan-9" label="Provision Account" @click="provisionOperator" class="text-weight-bold font-mono text-black" />
+        <!-- Standard Mobile Actions: Cancel and Save -->
+        <q-card-actions class="row justify-between q-px-md q-pb-md q-pt-none">
+          <q-btn flat color="grey-5" label="CANCEL" v-close-popup class="text-weight-bold font-mono text-caption" style="border-radius: 12px; width: 45%;" />
+          <q-btn unelevated color="white" text-color="black" label="SAVE" @click="provisionOperator" class="text-weight-bold font-mono text-caption text-black" style="border-radius: 12px; width: 45%;" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -149,25 +264,29 @@ import { useQuasar } from 'quasar'
 
 const $q = useQuasar()
 const showAddDialog = ref(false)
+const activeUserRole = ref('ADMIN') // Interactive tester role (ADMIN / FINANCE / STAFF)
 
 const newOperator = ref({
   name: '',
-  email: '',
+  staffId: '',
+  authCode: '',
+  phone: '',
   role: 'STAFF'
 })
 
 const columns = [
-  { name: 'name', label: 'OPERATOR NAME', field: 'name', align: 'left', sortable: true },
-  { name: 'email', label: 'EMAIL NODE', field: 'email', align: 'left' },
-  { name: 'role', label: 'RBAC SCOPE (IDENTITY)', field: 'role', align: 'center' },
+  { name: 'name', label: 'STAFF OPERATOR', field: 'name', align: 'left', sortable: true },
+  { name: 'staffId', label: 'STAFF ID', field: 'staffId', align: 'left' },
+  { name: 'phone', label: 'PHONE LINK', field: 'phone', align: 'left' },
+  { name: 'role', label: 'SECURITY IDENTITY', field: 'role', align: 'center' },
   { name: 'status', label: 'OPERATIONAL STATE', field: 'status', align: 'center' },
   { name: 'actions', label: 'OVERSIGHT ACTIONS', align: 'center' }
 ]
 
 const operators = ref([
-  { id: 1, name: 'Olive Invify', email: 'olive@invify.com', role: 'ADMIN', status: 'ACTIVE' },
-  { id: 2, name: 'Samuel Staff', email: 'sam@invify.com', role: 'STAFF', status: 'ACTIVE' },
-  { id: 3, name: 'Victoria Finance', email: 'victoria@invify.com', role: 'FINANCE', status: 'ACTIVE' }
+  { id: 1, name: 'Olive Invify', staffId: 'MGT-01', phone: '+234 803 111 2222', role: 'ADMIN', status: 'ACTIVE' },
+  { id: 2, name: 'Samuel Staff', staffId: 'OPS-12', phone: '+234 809 333 4444', role: 'STAFF', status: 'ACTIVE' },
+  { id: 3, name: 'Victoria Finance', staffId: 'FIN-02', phone: '+234 812 555 6666', role: 'FINANCE', status: 'ACTIVE' }
 ])
 
 const auditLogs = ref([
@@ -177,6 +296,12 @@ const auditLogs = ref([
 ])
 
 const toggleOperatorState = (row) => {
+  // Strict check on mutability permissions
+  if (activeUserRole.value === 'FINANCE') {
+    $q.notify({ type: 'negative', message: 'Action Rejected: Finance Scope is read-only compliant.' })
+    return
+  }
+
   const nextStatus = row.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
   $q.dialog({
     title: `${nextStatus === 'SUSPENDED' ? 'Suspend' : 'Reactivate'} Operator Account?`,
@@ -192,22 +317,29 @@ const toggleOperatorState = (row) => {
       id: Date.now(),
       operator: 'owner@business.com',
       time: 'Just now',
-      action: `Modified status of ${row.email} to ${nextStatus}.`,
+      action: `Modified status of ${row.staffId} to ${nextStatus}.`,
       ip: '197.210.8.44'
     })
   })
 }
 
 const provisionOperator = () => {
-  if (!newOperator.value.name || !newOperator.value.email) {
-    $q.notify({ type: 'negative', message: 'Specify all operator configuration values.' })
+  // Strict check on mutability permissions
+  if (activeUserRole.value === 'FINANCE') {
+    $q.notify({ type: 'negative', message: 'Action Rejected: Finance Scope is read-only compliant.' })
+    return
+  }
+
+  if (!newOperator.value.name || !newOperator.value.authCode) {
+    $q.notify({ type: 'negative', message: 'Staff Name and Auth Code are required.' })
     return
   }
 
   operators.value.push({
     id: Date.now(),
     name: newOperator.value.name,
-    email: newOperator.value.email,
+    staffId: newOperator.value.staffId || 'OPT-MEMBER',
+    phone: newOperator.value.phone || 'Unlinked',
     role: newOperator.value.role,
     status: 'ACTIVE'
   })
@@ -217,18 +349,19 @@ const provisionOperator = () => {
     id: Date.now(),
     operator: 'owner@business.com',
     time: 'Just now',
-    action: `Created new ${newOperator.value.role} profile: ${newOperator.value.email}.`,
+    action: `Created new ${newOperator.value.role} profile: ${newOperator.value.name}.`,
     ip: '197.210.8.44'
   })
 
-  $q.notify({ type: 'positive', message: `Operator profile for ${newOperator.value.name} created successfully.` })
+  $q.notify({ type: 'positive', message: `Staff profile for ${newOperator.value.name} created successfully.` })
   showAddDialog.value = false
-  newOperator.value = { name: '', email: '', role: 'STAFF' }
+  newOperator.value = { name: '', staffId: '', authCode: '', phone: '', role: 'STAFF' }
 }
 </script>
 
 <style scoped>
 .border-indigo { border: 1px solid #00acc1; }
+.border-red { border: 1px solid rgba(239, 68, 68, 0.3); }
 .border-grey-9 { border: 1px solid rgba(255,255,255,0.06); }
 .border-active { border: 1px solid #00acc1 !important; }
 .bg-card-dark { background: #0b0f19; }
