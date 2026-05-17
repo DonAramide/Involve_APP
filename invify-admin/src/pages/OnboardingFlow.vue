@@ -116,9 +116,9 @@
               <div v-for="mode in industries" :key="mode.id" class="col-12 col-sm-4">
                 <q-card 
                   @click="form.industry = mode.id" 
-                  class="cursor-pointer transition-3 border-grey-9 q-pa-md h-full column justify-between"
-                  :class="form.industry === mode.id ? 'bg-indigo-10 border-indigo-4' : 'bg-[#101625]'"
-                  style="border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);"
+                  class="cursor-pointer transition-3 q-pa-md h-full column justify-between"
+                  :class="form.industry === mode.id ? 'card-active' : 'card-dark'"
+                  style="border-radius: 8px;"
                 >
                   <div>
                     <div class="row items-center justify-between q-mb-sm">
@@ -142,7 +142,7 @@
             <div class="text-caption text-indigo-4 text-weight-bold q-mb-sm text-uppercase font-mono">Provision Operational Sub-Modules</div>
             <div class="row q-col-gutter-md q-mb-lg">
               <div v-for="mod in modulePresets" :key="mod.id" class="col-12 col-sm-6">
-                <q-card class="bg-[#101625] border-grey-9 q-pa-md rounded-borders">
+                <q-card class="card-dark q-pa-md rounded-borders">
                   <div class="row items-center no-wrap">
                     <q-checkbox v-model="form.modules" :val="mod.id" dark color="indigo-4" />
                     <div class="q-ml-sm">
@@ -156,7 +156,7 @@
 
             <!-- Sliders for Quotas -->
             <div class="text-caption text-indigo-4 text-weight-bold q-mb-sm text-uppercase font-mono">Adjust Provisioned Limits</div>
-            <div class="bg-[#101625] border-grey-9 q-pa-lg rounded-borders">
+            <div class="card-dark q-pa-lg rounded-borders">
               <div class="row q-col-gutter-lg">
                 <div class="col-12 col-sm-6">
                   <div class="row items-center justify-between text-caption font-mono text-grey-4">
@@ -276,9 +276,9 @@
               <div v-for="tier in plans" :key="tier.id" class="col-12 col-sm-4">
                 <q-card 
                   @click="form.plan = tier.id" 
-                  class="cursor-pointer transition-3 border-grey-9 q-pa-md h-full column justify-between"
-                  :class="form.plan === tier.id ? 'bg-indigo-10 border-indigo-4' : 'bg-[#101625]'"
-                  style="border-radius: 8px; border: 1px solid rgba(255,255,255,0.04);"
+                  class="cursor-pointer transition-3 q-pa-md h-full column justify-between"
+                  :class="form.plan === tier.id ? 'card-active' : 'card-dark'"
+                  style="border-radius: 8px;"
                 >
                   <div>
                     <div class="row items-center justify-between q-mb-sm">
@@ -299,8 +299,8 @@
               <div v-for="gw in gateways" :key="gw.id" class="col-12 col-sm-4">
                 <q-card 
                   @click="form.paymentMethod = gw.id" 
-                  class="cursor-pointer transition-3 border-grey-9 q-pa-md h-full row items-center justify-between"
-                  :class="form.paymentMethod === gw.id ? 'bg-indigo-10 border-indigo-4' : 'bg-[#101625]'"
+                  class="cursor-pointer transition-3 q-pa-md h-full row items-center justify-between"
+                  :class="form.paymentMethod === gw.id ? 'card-active' : 'card-dark'"
                   style="border-radius: 8px;"
                 >
                   <div class="row items-center op-gap-8">
@@ -519,6 +519,24 @@ const gateways = ref([
   { id: 'flutterwave', label: 'Flutterwave Web', icon: 'payments' }
 ])
 
+const loadLookupData = async () => {
+  try {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const res = await axios.get(`${API_BASE}/public/lookup`)
+    if (res.data) {
+      if (res.data.gateways && res.data.gateways.length > 0) {
+        gateways.value = res.data.gateways
+      }
+      if (res.data.industries && res.data.industries.length > 0) {
+        industries.value = res.data.industries
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load system lookup data from backend:', err)
+  }
+}
+loadLookupData()
+
 // Provisioning cli terminal screen simulated console logs
 const provisioningLogs = ref([])
 const progress = computed(() => (step.value - 1) / 5)
@@ -632,6 +650,16 @@ const testNewTenantLogin = () => {
 .border-indigo-4 { border: 1px solid #818cf8 !important; }
 .border-grey-9 { border: 1px solid rgba(255,255,255,0.06); }
 .bg-indigo-10 { background: #0b0f19; }
+.card-dark {
+  background: #101625 !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  color: #ffffff !important;
+}
+.card-active {
+  background: #0b0f19 !important;
+  border: 1px solid #818cf8 !important;
+  color: #ffffff !important;
+}
 
 .swatch-bubble {
   width: 24px;

@@ -105,11 +105,98 @@
         </q-card>
       </div>
     </div>
+
+    <!-- Enterprise SaaS Configuration Lookup Matrix -->
+    <div class="row q-col-gutter-lg q-mt-lg">
+      <div class="col-12">
+        <q-card class="bg-[#0b0f19] text-white border-indigo shadow-2 no-shadow" style="border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 12px;">
+          <q-card-section class="row items-center justify-between q-pb-none">
+            <div>
+              <div class="text-h6 text-indigo-3 text-weight-bold">
+                <q-icon name="dns" class="q-mr-xs" /> SaaS Configuration Lookup Matrix
+              </div>
+              <div class="text-caption text-grey-5">Maintain global gateway integrations, industry modes, and core dropdown values.</div>
+            </div>
+            <q-btn color="indigo-7" icon="save" label="Publish Changes" @click="saveLookupData" :loading="saving" class="font-mono text-weight-bold" />
+          </q-card-section>
+
+          <q-card-section class="row q-col-gutter-md q-pt-md">
+            <!-- Selectable Integration Gateways -->
+            <div class="col-12 col-md-6">
+              <div class="bg-[#101625] border-grey-9 q-pa-md rounded-borders h-full" style="border: 1px solid rgba(255, 255, 255, 0.04);">
+                <div class="row items-center justify-between q-mb-md">
+                  <span class="text-subtitle2 text-weight-bold text-indigo-4"><q-icon name="credit_card" /> Payment Integration Gateways</span>
+                  <q-btn size="xs" color="indigo-6" icon="add" label="Add Gateway" @click="addGateway" />
+                </div>
+                <q-list separator dark class="rounded-borders" style="background: rgba(0,0,0,0.15);">
+                  <q-item v-for="(gw, index) in gateways" :key="index" class="q-py-sm">
+                    <q-item-section avatar>
+                      <q-icon :name="gw.icon || 'credit_card'" color="indigo-3" size="sm" />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-input v-model="gw.label" dark dense label="Gateway Display Name" class="font-mono text-caption" />
+                    </q-item-section>
+                    <q-item-section>
+                      <q-input v-model="gw.id" dark dense label="System Identifier" class="font-mono text-caption" />
+                    </q-item-section>
+                    <q-item-section side>
+                      <q-btn flat round color="red-4" icon="delete" size="sm" @click="removeGateway(index)" />
+                    </q-item-section>
+                  </q-item>
+                  <q-item v-if="gateways.length === 0">
+                    <q-item-section class="text-center text-grey-6 text-caption q-py-md">No gateways configured.</q-item-section>
+                  </q-item>
+                </q-list>
+              </div>
+            </div>
+
+            <!-- Core Industry Operating Modes -->
+            <div class="col-12 col-md-6">
+              <div class="bg-[#101625] border-grey-9 q-pa-md rounded-borders h-full" style="border: 1px solid rgba(255, 255, 255, 0.04);">
+                <div class="row items-center justify-between q-mb-md">
+                  <span class="text-subtitle2 text-weight-bold text-indigo-4"><q-icon name="corporate_fare" /> Active Industry Modes</span>
+                  <q-btn size="xs" color="indigo-6" icon="add" label="Add Industry" @click="addIndustry" />
+                </div>
+                <q-list separator dark class="rounded-borders" style="background: rgba(0,0,0,0.15);">
+                  <q-item v-for="(ind, index) in industries" :key="index" class="q-py-sm column">
+                    <div class="row items-center full-width no-wrap">
+                      <q-item-section avatar>
+                        <q-icon :name="ind.icon || 'business'" color="indigo-3" size="sm" />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-input v-model="ind.label" dark dense label="Industry Name" class="font-mono text-caption" />
+                      </q-item-section>
+                      <q-item-section>
+                        <q-input v-model="ind.id" dark dense label="System ID" class="font-mono text-caption" />
+                      </q-item-section>
+                      <q-item-section side>
+                        <q-btn flat round color="red-4" icon="delete" size="sm" @click="removeIndustry(index)" />
+                      </q-item-section>
+                    </div>
+                    <div class="full-width q-mt-xs q-px-sm">
+                      <q-input v-model="ind.desc" dark dense label="Detailed Description (visible to tenant during onboarding)" class="font-mono text-caption" />
+                    </div>
+                  </q-item>
+                  <q-item v-if="industries.length === 0">
+                    <q-item-section class="text-center text-grey-6 text-caption q-py-md">No industries configured.</q-item-section>
+                  </q-item>
+                </q-list>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
+    </div>
   </q-page>
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
+
+const $q = useQuasar()
 const { prefs } = useOperatorPreferences()
 
 const stats = [
@@ -125,6 +212,69 @@ const recentTransactions = [
   { tenant: 'St. Jude Academy', ref: 'QU-847244', date: '1 hour ago', amount: 25000 },
   { tenant: 'BlueWave Services', ref: 'QU-847212', date: '3 hours ago', amount: 15000 }
 ]
+
+const gateways = ref([])
+const industries = ref([])
+const saving = ref(false)
+
+const loadLookupConfig = async () => {
+  try {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const res = await axios.get(`${API_BASE}/public/lookup`)
+    if (res.data) {
+      gateways.value = res.data.gateways || []
+      industries.value = res.data.industries || []
+    }
+  } catch (err) {
+    console.error('Failed to load lookup configurations:', err)
+  }
+}
+
+onMounted(() => {
+  loadLookupConfig()
+})
+
+const addGateway = () => {
+  gateways.value.push({ id: 'new_gateway', label: 'New Payment Provider', icon: 'payments' })
+}
+
+const removeGateway = (index) => {
+  gateways.value.splice(index, 1)
+}
+
+const addIndustry = () => {
+  industries.value.push({ id: 'new_industry', label: 'New Business Sector', icon: 'business', desc: 'Custom configured SaaS modules and checkout flows.' })
+}
+
+const removeIndustry = (index) => {
+  industries.value.splice(index, 1)
+}
+
+const saveLookupData = async () => {
+  saving.value = true
+  try {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const res = await axios.post(`${API_BASE}/admin/lookup`, {
+      gateways: gateways.value,
+      industries: industries.value
+    })
+    if (res.status === 200) {
+      $q.notify({
+        type: 'positive',
+        message: 'Platform Lookup Matrix published successfully!'
+      })
+      loadLookupConfig()
+    }
+  } catch (err) {
+    console.error(err)
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to publish lookup configurations: ' + (err.response?.data?.error || err.message)
+    })
+  } finally {
+    saving.value = false
+  }
+}
 </script>
 
 <style scoped>
