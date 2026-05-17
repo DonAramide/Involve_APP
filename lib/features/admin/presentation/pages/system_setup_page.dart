@@ -477,77 +477,207 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     final staffIdController = TextEditingController(text: staff?.staffId);
     final phoneController = TextEditingController(text: staff?.phone);
     final formKey = GlobalKey<FormState>();
+    
+    // Default or load role
+    String selectedRole = staff?.role ?? 'STAFF';
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(staff == null ? 'Add Staff' : 'Edit Staff'),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: 'Staff Name'),
-                  validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-                ),
-                TextFormField(
-                  controller: staffIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'Staff ID (Optional)',
-                    hintText: 'e.g., MGT-01',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, dialogSetState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+          backgroundColor: Colors.white,
+          title: Text(
+            staff == null ? 'Add Staff' : 'Edit Staff',
+            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: const InputDecoration(
+                      labelText: 'Staff Name',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    ),
+                    validator: (val) => val == null || val.isEmpty ? 'Required' : null,
                   ),
-                  maxLength: 20,
-                  textCapitalization: TextCapitalization.characters,
-                ),
-                TextFormField(
-                  controller: codeController,
-                  decoration: InputDecoration(
-                    labelText: 'Auth Code (4 digits)',
-                    hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: staffIdController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: const InputDecoration(
+                      labelText: 'Staff ID (Optional)',
+                      hintText: 'e.g., MGT-01',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    ),
+                    maxLength: 20,
+                    textCapitalization: TextCapitalization.characters,
                   ),
-                  keyboardType: TextInputType.number,
-                  maxLength: 4,
-                  validator: (val) {
-                    if (staff != null && (val == null || val.isEmpty)) return null;
-                    return (val?.length != 4) ? 'Must be 4 digits' : null;
-                  },
-                ),
-                TextFormField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(labelText: 'Phone Number'),
-                  keyboardType: TextInputType.phone,
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: codeController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: InputDecoration(
+                      labelText: 'Auth Code (4 digits)',
+                      hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
+                      labelStyle: const TextStyle(color: Colors.grey),
+                      focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    ),
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                    validator: (val) {
+                      if (staff != null && (val == null || val.isEmpty)) return null;
+                      return (val?.length != 4) ? 'Must be 4 digits' : null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: phoneController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: const InputDecoration(
+                      labelText: 'Phone Number',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    ),
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Elegant 3-Radio Identity Selector Block
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'SECURITY ROLE IDENTITY',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      _buildRoleCard(dialogSetState, 'Staff', 'STAFF', 'Operational', selectedRole, (val) => selectedRole = val),
+                      const SizedBox(width: 6),
+                      _buildRoleCard(dialogSetState, 'Admin', 'ADMIN', 'Full Access', selectedRole, (val) => selectedRole = val),
+                      const SizedBox(width: 6),
+                      _buildRoleCard(dialogSetState, 'Finance', 'FINANCE', 'Read-Only', selectedRole, (val) => selectedRole = val),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                final pin = codeController.text.trim();
-                final newStaff = Staff(
-                  id: staff?.id,
-                  name: nameController.text.trim(),
-                  staffId: staffIdController.text.trim().isEmpty ? null : staffIdController.text.trim(),
-                  staffCode: pin.isEmpty && staff != null ? staff.staffCode : pin,
-                  phone: phoneController.text.trim(),
-                );
-                if (staff == null) {
-                  context.read<StaffBloc>().add(AddStaff(newStaff));
-                } else {
-                  context.read<StaffBloc>().add(UpdateStaff(newStaff));
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEEF2F6),
+                foregroundColor: Colors.blue,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  final pin = codeController.text.trim();
+                  final newStaff = Staff(
+                    id: staff?.id,
+                    name: nameController.text.trim(),
+                    staffId: staffIdController.text.trim().isEmpty ? null : staffIdController.text.trim(),
+                    staffCode: pin.isEmpty && staff != null ? staff.staffCode : pin,
+                    phone: phoneController.text.trim(),
+                    role: selectedRole,
+                  );
+                  if (staff == null) {
+                    context.read<StaffBloc>().add(AddStaff(newStaff));
+                  } else {
+                    context.read<StaffBloc>().add(UpdateStaff(newStaff));
+                  }
+                  Navigator.pop(ctx);
                 }
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('SAVE'),
+              },
+              child: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleCard(
+    StateSetter dialogSetState,
+    String title,
+    String value,
+    String subtitle,
+    String currentSelected,
+    Function(String) onSelect,
+  ) {
+    final isSelected = currentSelected == value;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          dialogSetState(() {
+            onSelect(value);
+          });
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFE0F2FE) : const Color(0xFFF3F4F6),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF0288D1) : const Color(0xFFE5E7EB),
+              width: isSelected ? 1.5 : 1.0,
+            ),
           ),
-        ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Radio<String>(
+                value: value,
+                groupValue: currentSelected,
+                activeColor: const Color(0xFF0288D1),
+                visualDensity: VisualDensity.compact,
+                onChanged: (val) {
+                  dialogSetState(() {
+                    onSelect(val!);
+                  });
+                },
+              ),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? const Color(0xFF01579B) : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 8,
+                  color: isSelected ? const Color(0xFF0288D1) : Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

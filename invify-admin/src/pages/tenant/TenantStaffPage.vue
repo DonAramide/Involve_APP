@@ -156,101 +156,120 @@
 
     </div>
 
-    <!-- Onboard / Add Staff Dialog (Strictly matches the Mobile App screen layout!) -->
+    <!-- Onboard / Add Staff Dialog (100% Matches Mobile App Mockup Screen & Enforces RBAC!) -->
     <q-dialog v-model="showAddDialog" backdrop-filter="blur(10px)">
-      <q-card class="bg-card-dark border-indigo q-pa-md" style="width: 440px; border-radius: 24px; background: #0b0f19;">
+      <q-card class="q-pa-lg text-black" style="width: 400px; border-radius: 28px; background: #ffffff; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
         
-        <q-card-section class="q-pb-none">
-          <div class="text-h5 text-weight-bold text-white font-mono text-center q-my-sm">Add Staff</div>
+        <!-- Dialog Title -->
+        <q-card-section class="q-pb-none q-pt-sm text-left">
+          <div class="text-h5 text-weight-bold text-grey-9 q-mb-xs">Add Staff</div>
         </q-card-section>
 
-        <q-card-section class="column q-gutter-y-md text-left">
+        <!-- Form Inputs (Standard Material Line Inputs as seen in Screenshot) -->
+        <q-card-section class="column q-gutter-y-md text-left q-pt-sm">
+          
           <!-- 1. Staff Name Input -->
           <q-input 
             v-model="newOperator.name" 
-            dark 
-            filled
+            standard
             dense 
             label="Staff Name" 
-            color="cyan-4" 
-            class="bg-black-transparent rounded-borders" 
+            color="primary"
+            label-color="grey-6"
+            input-class="text-black"
           />
 
-          <!-- 2. Staff ID (Optional) Input with max counter -->
+          <!-- 2. Staff ID Input with counter -->
           <q-input 
             v-model="newOperator.staffId" 
-            dark 
-            filled
+            standard
             dense 
             label="Staff ID (Optional)" 
             placeholder="e.g., MGT-01" 
-            color="cyan-4" 
+            color="primary" 
+            label-color="grey-6"
             maxlength="20"
             counter
-            class="bg-black-transparent rounded-borders" 
+            input-class="text-black"
           />
 
-          <!-- 3. Auth Code (4 digits) password mask with counter -->
+          <!-- 3. Auth Code Input with counter -->
           <q-input 
             v-model="newOperator.authCode" 
-            dark 
-            filled
+            standard
             dense 
             type="password"
             label="Auth Code (4 digits)" 
-            color="cyan-4" 
+            color="primary" 
+            label-color="grey-6"
             maxlength="4"
             counter
-            class="bg-black-transparent rounded-borders" 
+            input-class="text-black"
           />
 
           <!-- 4. Phone Number Input -->
           <q-input 
             v-model="newOperator.phone" 
-            dark 
-            filled
+            standard
             dense 
             type="tel"
             label="Phone Number" 
-            color="cyan-4" 
-            class="bg-black-transparent rounded-borders" 
+            color="primary" 
+            label-color="grey-6"
+            input-class="text-black"
           />
           
-          <!-- Elegant 3-Radio Identity Selector block designating permissions scope -->
-          <div class="q-mt-sm">
-            <div class="text-operator-title text-grey-5 q-mb-sm" style="font-size: 9.5px; letter-spacing: 1px; font-weight: bold;">IDENTITY SCOPE ACCESS LIMITATIONS</div>
-            <div class="row q-col-gutter-sm">
+          <!-- Elegant 3-Radio Identity Selector Block (Staff, Admin, Finance) -->
+          <div class="q-mt-lg">
+            <div class="text-operator-title text-grey-7 q-mb-sm text-weight-bold" style="font-size: 10px; letter-spacing: 0.5px;">SECURITY ROLE IDENTITY (WHO I AM)</div>
+            <div class="row q-col-gutter-xs">
               <div 
                 class="col-4" 
                 v-for="opt in [
-                  {label: 'Staff', value: 'STAFF', desc: 'Operational Scope'}, 
-                  {label: 'Admin', value: 'ADMIN', desc: 'Full Read/Write'}, 
-                  {label: 'Finance', value: 'FINANCE', desc: 'Read-Only View'}
+                  {label: 'Staff 👤', value: 'STAFF', desc: 'Standard operational'}, 
+                  {label: 'Admin 🔑', value: 'ADMIN', desc: 'Full Read/Write'}, 
+                  {label: 'Finance 💰', value: 'FINANCE', desc: 'Read-Only audit'}
                 ]" 
                 :key="opt.value"
               >
                 <q-card 
                   clickable 
                   @click="newOperator.role = opt.value"
-                  :class="newOperator.role === opt.value ? 'border-active bg-cyan-10 text-cyan-3' : 'border-grey-9'"
-                  class="q-pa-sm text-center cursor-pointer transition-2 rounded-borders hover-bg fit column justify-between"
-                  style="min-height: 85px;"
+                  :class="newOperator.role === opt.value ? 'bg-blue-5 border-blue text-primary' : 'bg-grey-2 text-grey-8'"
+                  class="q-pa-xs text-center cursor-pointer transition-2 rounded-borders column justify-between hover-bg-light border-grey-light"
+                  style="min-height: 80px; box-shadow: none;"
                 >
-                  <div class="row justify-center">
-                    <q-radio v-model="newOperator.role" :val="opt.value" dark color="cyan-4" size="sm" class="q-mr-none" />
+                  <div class="row justify-center q-pt-xs">
+                    <q-radio v-model="newOperator.role" :val="opt.value" color="primary" size="xs" class="q-mr-none" />
                   </div>
-                  <div class="text-caption font-mono text-weight-bold text-white">{{ opt.label }}</div>
-                  <div class="text-grey-6 font-mono" style="font-size: 8px; line-height: 1.1;">{{ opt.desc }}</div>
+                  <div class="text-caption font-mono text-weight-bold" style="font-size: 10.5px;">{{ opt.label }}</div>
+                  <div class="text-grey-6" style="font-size: 8px; line-height: 1.1; margin-bottom: 4px;">{{ opt.desc }}</div>
                 </q-card>
               </div>
             </div>
           </div>
+
         </q-card-section>
 
-        <!-- Standard Mobile Actions: Cancel and Save -->
-        <q-card-actions class="row justify-between q-px-md q-pb-md q-pt-none">
-          <q-btn flat color="grey-5" label="CANCEL" v-close-popup class="text-weight-bold font-mono text-caption" style="border-radius: 12px; width: 45%;" />
-          <q-btn unelevated color="white" text-color="black" label="SAVE" @click="provisionOperator" class="text-weight-bold font-mono text-caption text-black" style="border-radius: 12px; width: 45%;" />
+        <!-- Dialog Action Buttons (Matches Mobile CANCEL & SAVE perfectly) -->
+        <q-card-actions class="row justify-end q-px-md q-pb-sm q-pt-md">
+          <q-btn 
+            flat 
+            color="primary" 
+            label="CANCEL" 
+            v-close-popup 
+            class="text-weight-bold font-mono text-caption q-mr-sm" 
+            style="border-radius: 100px;" 
+          />
+          <q-btn 
+            unelevated 
+            color="grey-2" 
+            text-color="primary" 
+            label="SAVE" 
+            @click="provisionOperator" 
+            class="text-weight-bold font-mono text-caption" 
+            style="border-radius: 100px; padding: 6px 20px; background: #eef2f6;" 
+          />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -370,4 +389,11 @@ const provisionOperator = () => {
 .letter-spacing-1 { letter-spacing: 1px; }
 .font-mono { font-family: 'Courier New', Courier, monospace; }
 .transition-2 { transition: all 0.2s ease; }
+
+/* Light Theme Mockup Dialog Selectors styles */
+.bg-blue-5 { background: #e0f2fe !important; }
+.border-blue { border: 1.5px solid #0288d1 !important; }
+.bg-grey-2 { background: #f3f4f6 !important; }
+.border-grey-light { border: 1px solid #e5e7eb !important; }
+.hover-bg-light:hover { background: #f9fafb !important; }
 </style>

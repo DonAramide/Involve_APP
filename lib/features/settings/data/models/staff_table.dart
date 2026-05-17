@@ -7,6 +7,7 @@ class Staff extends Table {
   TextColumn get staffCode => text().withLength(min: 4, max: 100)(); // Supports hashed pins
   TextColumn get staffId => text().nullable().withLength(min: 1, max: 20)(); // Human-readable ID (e.g., MGT-01)
   TextColumn get phone => text().nullable()();
+  TextColumn get role => text().withDefault(const Constant('STAFF'))(); // 'STAFF' | 'ADMIN' | 'FINANCE'
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
 
   // Sync Columns

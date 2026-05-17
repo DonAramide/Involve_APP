@@ -6597,6 +6597,13 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
   late final GeneratedColumn<String> phone = GeneratedColumn<String>(
       'phone', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+      'role', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('STAFF'));
   static const VerificationMeta _isActiveMeta =
       const VerificationMeta('isActive');
   @override
@@ -6647,6 +6654,7 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
         staffCode,
         staffId,
         phone,
+        role,
         isActive,
         syncId,
         updatedAt,
@@ -6686,6 +6694,10 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
     if (data.containsKey('phone')) {
       context.handle(
           _phoneMeta, phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta));
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+          _roleMeta, role.isAcceptableOrUnknown(data['role']!, _roleMeta));
     }
     if (data.containsKey('is_active')) {
       context.handle(_isActiveMeta,
@@ -6730,6 +6742,8 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
           .read(DriftSqlType.string, data['${effectivePrefix}staff_id']),
       phone: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}phone']),
+      role: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}role'])!,
       isActive: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
       syncId: attachedDatabase.typeMapping
@@ -6757,6 +6771,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
   final String staffCode;
   final String? staffId;
   final String? phone;
+  final String role;
   final bool isActive;
   final String? syncId;
   final DateTime? updatedAt;
@@ -6769,6 +6784,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       required this.staffCode,
       this.staffId,
       this.phone,
+      required this.role,
       required this.isActive,
       this.syncId,
       this.updatedAt,
@@ -6787,6 +6803,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
     if (!nullToAbsent || phone != null) {
       map['phone'] = Variable<String>(phone);
     }
+    map['role'] = Variable<String>(role);
     map['is_active'] = Variable<bool>(isActive);
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
@@ -6814,6 +6831,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           : Value(staffId),
       phone:
           phone == null && nullToAbsent ? const Value.absent() : Value(phone),
+      role: Value(role),
       isActive: Value(isActive),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
@@ -6839,6 +6857,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       staffCode: serializer.fromJson<String>(json['staffCode']),
       staffId: serializer.fromJson<String?>(json['staffId']),
       phone: serializer.fromJson<String?>(json['phone']),
+      role: serializer.fromJson<String>(json['role']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
@@ -6856,6 +6875,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       'staffCode': serializer.toJson<String>(staffCode),
       'staffId': serializer.toJson<String?>(staffId),
       'phone': serializer.toJson<String?>(phone),
+      'role': serializer.toJson<String>(role),
       'isActive': serializer.toJson<bool>(isActive),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
@@ -6871,6 +6891,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           String? staffCode,
           Value<String?> staffId = const Value.absent(),
           Value<String?> phone = const Value.absent(),
+          String? role,
           bool? isActive,
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
@@ -6883,6 +6904,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
         staffCode: staffCode ?? this.staffCode,
         staffId: staffId.present ? staffId.value : this.staffId,
         phone: phone.present ? phone.value : this.phone,
+        role: role ?? this.role,
         isActive: isActive ?? this.isActive,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
@@ -6897,6 +6919,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       staffCode: data.staffCode.present ? data.staffCode.value : this.staffCode,
       staffId: data.staffId.present ? data.staffId.value : this.staffId,
       phone: data.phone.present ? data.phone.value : this.phone,
+      role: data.role.present ? data.role.value : this.role,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -6914,6 +6937,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           ..write('staffCode: $staffCode, ')
           ..write('staffId: $staffId, ')
           ..write('phone: $phone, ')
+          ..write('role: $role, ')
           ..write('isActive: $isActive, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
@@ -6925,8 +6949,8 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
   }
 
   @override
-  int get hashCode => Object.hash(id, name, staffCode, staffId, phone, isActive,
-      syncId, updatedAt, createdAt, deviceId, isDeleted);
+  int get hashCode => Object.hash(id, name, staffCode, staffId, phone, role,
+      isActive, syncId, updatedAt, createdAt, deviceId, isDeleted);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -6936,6 +6960,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           other.staffCode == this.staffCode &&
           other.staffId == this.staffId &&
           other.phone == this.phone &&
+          other.role == this.role &&
           other.isActive == this.isActive &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
@@ -6950,6 +6975,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
   final Value<String> staffCode;
   final Value<String?> staffId;
   final Value<String?> phone;
+  final Value<String> role;
   final Value<bool> isActive;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
@@ -6962,6 +6988,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     this.staffCode = const Value.absent(),
     this.staffId = const Value.absent(),
     this.phone = const Value.absent(),
+    this.role = const Value.absent(),
     this.isActive = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -6975,6 +7002,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     required String staffCode,
     this.staffId = const Value.absent(),
     this.phone = const Value.absent(),
+    this.role = const Value.absent(),
     this.isActive = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -6989,6 +7017,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     Expression<String>? staffCode,
     Expression<String>? staffId,
     Expression<String>? phone,
+    Expression<String>? role,
     Expression<bool>? isActive,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
@@ -7002,6 +7031,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
       if (staffCode != null) 'staff_code': staffCode,
       if (staffId != null) 'staff_id': staffId,
       if (phone != null) 'phone': phone,
+      if (role != null) 'role': role,
       if (isActive != null) 'is_active': isActive,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -7017,6 +7047,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
       Value<String>? staffCode,
       Value<String?>? staffId,
       Value<String?>? phone,
+      Value<String>? role,
       Value<bool>? isActive,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
@@ -7029,6 +7060,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
       staffCode: staffCode ?? this.staffCode,
       staffId: staffId ?? this.staffId,
       phone: phone ?? this.phone,
+      role: role ?? this.role,
       isActive: isActive ?? this.isActive,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -7055,6 +7087,9 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     }
     if (phone.present) {
       map['phone'] = Variable<String>(phone.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -7085,6 +7120,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
           ..write('staffCode: $staffCode, ')
           ..write('staffId: $staffId, ')
           ..write('phone: $phone, ')
+          ..write('role: $role, ')
           ..write('isActive: $isActive, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
@@ -22598,6 +22634,7 @@ typedef $$StaffTableCreateCompanionBuilder = StaffCompanion Function({
   required String staffCode,
   Value<String?> staffId,
   Value<String?> phone,
+  Value<String> role,
   Value<bool> isActive,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
@@ -22611,6 +22648,7 @@ typedef $$StaffTableUpdateCompanionBuilder = StaffCompanion Function({
   Value<String> staffCode,
   Value<String?> staffId,
   Value<String?> phone,
+  Value<String> role,
   Value<bool> isActive,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
@@ -22661,6 +22699,9 @@ class $$StaffTableFilterComposer extends Composer<_$AppDatabase, $StaffTable> {
 
   ColumnFilters<String> get phone => $composableBuilder(
       column: $table.phone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get role => $composableBuilder(
+      column: $table.role, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnFilters(column));
@@ -22726,6 +22767,9 @@ class $$StaffTableOrderingComposer
   ColumnOrderings<String> get phone => $composableBuilder(
       column: $table.phone, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get role => $composableBuilder(
+      column: $table.role, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnOrderings(column));
 
@@ -22768,6 +22812,9 @@ class $$StaffTableAnnotationComposer
 
   GeneratedColumn<String> get phone =>
       $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -22837,6 +22884,7 @@ class $$StaffTableTableManager extends RootTableManager<
             Value<String> staffCode = const Value.absent(),
             Value<String?> staffId = const Value.absent(),
             Value<String?> phone = const Value.absent(),
+            Value<String> role = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
@@ -22850,6 +22898,7 @@ class $$StaffTableTableManager extends RootTableManager<
             staffCode: staffCode,
             staffId: staffId,
             phone: phone,
+            role: role,
             isActive: isActive,
             syncId: syncId,
             updatedAt: updatedAt,
@@ -22863,6 +22912,7 @@ class $$StaffTableTableManager extends RootTableManager<
             required String staffCode,
             Value<String?> staffId = const Value.absent(),
             Value<String?> phone = const Value.absent(),
+            Value<String> role = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
@@ -22876,6 +22926,7 @@ class $$StaffTableTableManager extends RootTableManager<
             staffCode: staffCode,
             staffId: staffId,
             phone: phone,
+            role: role,
             isActive: isActive,
             syncId: syncId,
             updatedAt: updatedAt,

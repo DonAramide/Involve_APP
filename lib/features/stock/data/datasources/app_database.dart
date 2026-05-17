@@ -59,7 +59,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 77;
+  int get schemaVersion => 78;
 
   @override
   MigrationStrategy get migration {
@@ -390,6 +390,10 @@ class AppDatabase extends _$AppDatabase {
           await _safeAddColumn(m, settings, settings.warrantyEnabled);
           await _safeAddColumn(m, invoices, invoices.warrantyDuration);
           await _safeAddColumn(m, serviceJobs, serviceJobs.warrantyDuration);
+        }
+        if (from < 78) {
+          // Schema V78: Add role to Staff table
+          await _safeAddColumn(m, staff, staff.role);
         }
       },
       beforeOpen: (details) async {

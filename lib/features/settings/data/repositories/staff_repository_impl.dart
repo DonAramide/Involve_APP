@@ -42,6 +42,7 @@ class StaffRepositoryImpl implements StaffRepository {
             staffCode: _hash(staff.staffCode),
             staffId: Value(staff.staffId),
             phone: Value(staff.phone),
+            role: Value(staff.role),
             isActive: Value(staff.isActive),
             syncId: Value(staff.syncId ?? const Uuid().v4()),
             updatedAt: Value(now),
@@ -68,6 +69,7 @@ class StaffRepositoryImpl implements StaffRepository {
             staffCode: Value(finalizedCode),
             staffId: Value(staff.staffId),
             phone: Value(staff.phone),
+            role: Value(staff.role),
             isActive: Value(staff.isActive),
             updatedAt: Value(DateTime.now()),
             isDeleted: const Value(false),
@@ -97,12 +99,19 @@ class StaffRepositoryImpl implements StaffRepository {
   }
 
   Staff _toEntity(StaffTable row) {
+    // Safely fallback in case role is absent or null in SQLite result
+    String roleVal = 'STAFF';
+    try {
+      roleVal = (row as dynamic).role ?? 'STAFF';
+    } catch (_) {}
+
     return Staff(
       id: row.id,
       name: row.name,
       staffCode: row.staffCode,
       staffId: row.staffId,
       phone: row.phone,
+      role: roleVal,
       isActive: row.isActive,
       syncId: row.syncId,
     );

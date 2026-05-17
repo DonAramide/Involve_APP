@@ -6,6 +6,7 @@ class Staff extends Equatable {
   final String staffCode;
   final String? staffId;
   final String? phone;
+  final String role; // 'STAFF' | 'ADMIN' | 'FINANCE'
   final bool isActive;
   final String? syncId;
 
@@ -15,6 +16,7 @@ class Staff extends Equatable {
     required this.staffCode,
     this.staffId,
     this.phone,
+    this.role = 'STAFF',
     this.isActive = true,
     this.syncId,
   });
@@ -25,6 +27,7 @@ class Staff extends Equatable {
     String? staffCode,
     String? staffId,
     String? phone,
+    String? role,
     bool? isActive,
     String? syncId,
   }) {
@@ -34,11 +37,12 @@ class Staff extends Equatable {
       staffCode: staffCode ?? this.staffCode,
       staffId: staffId ?? this.staffId,
       phone: phone ?? this.phone,
+      role: role ?? this.role,
       isActive: isActive ?? this.isActive,
       syncId: syncId ?? this.syncId,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, staffCode, staffId, phone, isActive, syncId];
+  List<Object?> get props => [id, name, staffCode, staffId, phone, role, isActive, syncId];
 }
