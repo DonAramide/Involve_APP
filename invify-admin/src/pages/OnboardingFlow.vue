@@ -13,11 +13,11 @@
       <!-- Top Branding Strip -->
       <q-card-section class="q-px-xl q-pt-xl q-pb-none">
         <div class="row items-center justify-between">
-          <div class="row items-center op-gap-8 no-wrap">
-            <q-icon name="rocket_launch" color="indigo-4" size="md" />
+          <div class="row items-center op-gap-8 no-wrap bg-indigo-10 border-indigo q-px-md q-py-xs rounded-borders" style="border: 1px solid rgba(99, 102, 241, 0.25);">
+            <q-icon name="rocket_launch" color="indigo-4" size="sm" />
             <div>
-              <span class="text-metric-mono text-white text-weight-bolder text-uppercase tracking-wider" style="font-size: 15px;">INVIFY</span>
-              <span class="text-metric-mono text-indigo-4 q-ml-xs" style="font-size: 11px;">ATLAS PROVISIONING</span>
+              <span class="text-metric-mono text-white text-weight-bolder text-uppercase tracking-wider" style="font-size: 13px; letter-spacing: 1px;">INVIFY</span>
+              <span class="text-metric-mono text-indigo-4 q-ml-xs" style="font-size: 10px;">ATLAS PROVISIONING</span>
             </div>
           </div>
           
