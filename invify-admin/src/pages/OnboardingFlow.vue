@@ -1,6 +1,8 @@
 <!-- invify-admin/src/pages/OnboardingFlow.vue -->
 <template>
-  <q-page class="flex flex-center q-pa-xl" style="background: #05070d; min-height: 100vh;">
+  <q-layout view="lHh Lpr lFf" style="background: #05070d; min-height: 100vh;">
+    <q-page-container>
+      <q-page class="flex flex-center q-pa-xl">
     
     <!-- Stripe Atlas-Grade Setup Main Container -->
     <q-card style="width: 850px; max-width: 95vw; background: #0b0f19; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; overflow: hidden;" class="shadow-24 text-white">
@@ -455,6 +457,8 @@
       </q-card-section>
     </q-card>
   </q-page>
+  </q-page-container>
+  </q-layout>
 </template>
 
 <script setup>
