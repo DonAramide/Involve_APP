@@ -1,0 +1,49 @@
+{
+  "devices": [
+    {
+      "id": "mock-device-1",
+      "device_id": "DSPREAD-POS-80MM-0091",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "status": "active",
+      "last_seen": "2026-05-17T09:03:14.649Z",
+      "created_at": "2026-05-17T09:03:14.649Z",
+      "tenants": {
+        "name": "Lagos Academy School",
+        "plan": "standard"
+      }
+    }
+  ],
+  "activations": [
+    {
+      "id": "act-1779008594650",
+      "activation_code": "INV-WH04-DLYB",
+      "tenant_id": "81fe1d64-e602-443b-8cef-5e15885b5931",
+      "duration_days": 30,
+      "plan_index": 0,
+      "device_suffix": "610011",
+      "device_id": "DSPREAD-POS-6100118MM-8315",
+      "status": "pending",
+      "is_used": false,
+      "created_at": "2026-05-17T09:03:14.650Z",
+      "tenants": {
+        "name": "Invify Retail Business",
+        "plan": "standard"
+      }
+    },
+    {
+      "id": "mock-activation-1",
+      "activation_code": "INV-7X9B-K4M2",
+      "tenant_id": "00000000-0000-0000-0000-000000000001",
+      "duration_days": 90,
+      "plan_index": 1,
+      "device_suffix": "0",
+      "status": "pending",
+      "is_used": false,
+      "created_at": "2026-05-17T09:03:14.649Z",
+      "tenants": {
+        "name": "Lagos Academy School",
+        "plan": "standard"
+      }
+    }
+  ]
+}

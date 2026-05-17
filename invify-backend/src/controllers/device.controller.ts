@@ -162,9 +162,16 @@ export class DeviceController {
         return res.status(400).json({ error: 'tenantId is required' });
       }
 
-      // Generate a cryptographically premium, secure key
-      const randStr = () => Math.random().toString(36).substring(2, 6).toUpperCase();
-      const code = `INV-${randStr()}-${randStr()}`;
+      // Generate a cryptographically premium, secure 6-group key (XXXX-XXXX-XXXX-XXXX-XXXX-XXXX)
+      const randStr = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let str = '';
+        for (let i = 0; i < 4; i++) {
+          str += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return str;
+      };
+      const code = `${randStr()}-${randStr()}-${randStr()}-${randStr()}-${randStr()}-${randStr()}`;
       const generatedDeviceId = `DSPREAD-POS-${deviceSuffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`;
 
       if (process.env.OFFLINE_MOCK_AUTH === 'true') {
