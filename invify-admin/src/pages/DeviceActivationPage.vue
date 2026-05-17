@@ -337,7 +337,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { deviceApi, adminApi } from '../api'
-import { date, useQuasar } from 'quasar'
+import { date, useQuasar, copyToClipboard } from 'quasar'
 import logo from '../assets/logo.png'
 
 const $q = useQuasar()
@@ -400,13 +400,13 @@ const certificateData = ref({
 })
 
 const copyCode = () => {
-  const el = document.createElement('textarea')
-  el.value = lastGeneratedCode.value
-  document.body.appendChild(el)
-  el.select()
-  document.execCommand('copy')
-  document.body.removeChild(el)
-  $q.notify({ type: 'positive', message: 'Activation code copied to clipboard!' })
+  copyToClipboard(lastGeneratedCode.value)
+    .then(() => {
+      $q.notify({ type: 'positive', message: 'Activation code copied to clipboard!' })
+    })
+    .catch(() => {
+      $q.notify({ type: 'negative', message: 'Failed to copy activation code.' })
+    })
 }
 
 const printCertificate = () => {
