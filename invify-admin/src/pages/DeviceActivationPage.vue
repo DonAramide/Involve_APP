@@ -1,17 +1,17 @@
 <template>
-  <q-page class="q-pa-md bg-dark text-white">
+  <q-page class="q-pa-md bg-grey-1 text-grey-9">
     <div class="row items-center q-mb-lg">
       <div class="col">
-        <div class="text-h4 text-weight-bold text-indigo-3">Device Activation Hub</div>
-        <div class="text-caption text-grey-5">Manage hardware terminals and generate secure activation codes.</div>
+        <div class="text-h4 text-weight-bold text-indigo-9">Device Activation Hub</div>
+        <div class="text-caption text-grey-7">Manage hardware terminals and generate secure activation codes.</div>
       </div>
       <div class="col-auto">
         <q-btn 
-          color="indigo-6" 
+          color="indigo-7" 
           icon="add_circle" 
           label="New Activation Code" 
           unelevated 
-          class="q-px-md"
+          class="q-px-md text-weight-bold"
           @click="showCodeDialog = true"
         />
       </div>
@@ -20,30 +20,30 @@
     <!-- STATS CARDS -->
     <div class="row q-col-gutter-md q-mb-xl">
       <div class="col-12 col-sm-6 col-md-3">
-        <q-card class="bg-blue-grey-10 shadow-2 border-indigo">
+        <q-card class="bg-white shadow-1 border-grey-3 rounded-borders">
           <q-card-section class="q-pa-md">
             <div class="row items-center no-wrap">
               <div class="col">
-                <div class="text-caption text-grey-5">Active Devices</div>
-                <div class="text-h5 text-weight-bold">{{ activeCount }}</div>
+                <div class="text-caption text-grey-7 text-weight-medium">Active Devices</div>
+                <div class="text-h5 text-weight-bold text-grey-9">{{ activeCount }}</div>
               </div>
               <div class="col-auto">
-                <q-icon name="devices" color="indigo-4" size="2em" />
+                <q-icon name="devices" color="indigo-7" size="2em" />
               </div>
             </div>
           </q-card-section>
         </q-card>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
-        <q-card class="bg-blue-grey-10 shadow-2 border-indigo">
+        <q-card class="bg-white shadow-1 border-grey-3 rounded-borders">
           <q-card-section class="q-pa-md">
             <div class="row items-center no-wrap">
               <div class="col">
-                <div class="text-caption text-grey-5">Pending Codes</div>
-                <div class="text-h5 text-weight-bold">{{ pendingCount }}</div>
+                <div class="text-caption text-grey-7 text-weight-medium">Pending Codes</div>
+                <div class="text-h5 text-weight-bold text-grey-9">{{ pendingCount }}</div>
               </div>
               <div class="col-auto">
-                <q-icon name="vpn_key" color="amber-4" size="2em" />
+                <q-icon name="vpn_key" color="amber-8" size="2em" />
               </div>
             </div>
           </q-card-section>
@@ -55,9 +55,9 @@
     <q-tabs
       v-model="tab"
       dense
-      class="text-grey-5 q-mb-md"
-      active-color="indigo-3"
-      indicator-color="indigo-3"
+      class="text-grey-7 q-mb-md"
+      active-color="indigo-8"
+      indicator-color="indigo-8"
       align="left"
       narrow-indicator
     >
@@ -73,22 +73,21 @@
           row-key="id"
           flat
           bordered
-          class="bg-blue-grey-10 text-white border-indigo-10"
-          card-class="bg-blue-grey-10"
-          table-header-class="bg-indigo-10 text-white text-weight-bold"
-          dark
+          class="bg-white text-grey-9 border-grey-3 shadow-1"
+          card-class="bg-white"
+          table-header-class="bg-indigo-1 text-indigo-10 text-weight-bold"
           :loading="loading"
         >
           <template v-slot:body-cell-status="props">
             <q-td :props="props">
-              <q-badge :color="props.value === 'active' ? 'green-6' : 'red-6'">
+              <q-badge color="green-2" text-color="green-9" class="text-weight-bold">
                 {{ props.value.toUpperCase() }}
               </q-badge>
             </q-td>
           </template>
           <template v-slot:body-cell-plan="props">
             <q-td :props="props">
-              <div class="text-weight-bold text-indigo-3">{{ props.value.toUpperCase() }}</div>
+              <div class="text-weight-bold text-indigo-8">{{ props.value.toUpperCase() }}</div>
             </q-td>
           </template>
         </q-table>
@@ -101,27 +100,33 @@
           row-key="id"
           flat
           bordered
-          class="bg-blue-grey-10 text-white border-indigo-10"
-          card-class="bg-blue-grey-10"
-          table-header-class="bg-indigo-10 text-white text-weight-bold"
-          dark
+          class="bg-white text-grey-9 border-grey-3 shadow-1"
+          card-class="bg-white"
+          table-header-class="bg-indigo-1 text-indigo-10 text-weight-bold"
           :loading="loading"
         >
           <template v-slot:body-cell-code="props">
             <q-td :props="props">
-              <div class="text-h6 text-weight-bolder text-amber-5">{{ props.value }}</div>
+              <div class="text-subtitle1 text-weight-bolder text-amber-9 font-mono">{{ props.value }}</div>
+            </q-td>
+          </template>
+          <template v-slot:body-cell-device_id="props">
+            <q-td :props="props">
+              <div class="text-caption font-mono" :class="props.value === 'Not Yet Activated' ? 'text-grey-5' : 'text-indigo-8 text-weight-bold'">
+                {{ props.value }}
+              </div>
             </q-td>
           </template>
           <template v-slot:body-cell-status="props">
             <q-td :props="props">
-              <q-badge :color="props.row.is_used ? 'green-6' : 'blue-6'">
+              <q-badge :color="props.row.is_used ? 'green-2' : 'blue-2'" :text-color="props.row.is_used ? 'green-9' : 'blue-9'" class="text-weight-bold">
                 {{ props.row.is_used ? 'ACTIVATED' : 'PENDING' }}
               </q-badge>
             </q-td>
           </template>
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
-              <q-btn flat round dense icon="card_membership" color="amber-5" @click="reviewCertificate(props.row)">
+              <q-btn flat round dense icon="card_membership" color="amber-8" @click="reviewCertificate(props.row)">
                 <q-tooltip>Review Certificate</q-tooltip>
               </q-btn>
             </q-td>
@@ -132,12 +137,12 @@
 
     <!-- NEW CODE DIALOG -->
     <q-dialog v-model="showCodeDialog" persistent>
-      <q-card style="min-width: 400px" class="bg-blue-grey-10 text-white border-indigo">
-        <q-card-section>
-          <div class="text-h6">Create Activation Code</div>
+      <q-card style="min-width: 400px" class="bg-white text-grey-9 border-grey-3">
+        <q-card-section class="bg-indigo-1 text-indigo-10">
+          <div class="text-h6 text-weight-bold">Create Activation Code</div>
         </q-card-section>
 
-        <q-card-section class="q-pt-none">
+        <q-card-section class="q-pt-md">
           <q-select
             v-if="isPlatformAdmin"
             v-model="newCode.tenantId"
@@ -146,13 +151,13 @@
             input-debounce="300"
             @filter="filterTenants"
             label="Target School/Business"
-            dark filled 
+            filled 
             emit-value map-options
             class="q-mb-md"
             @update:model-value="onTenantChange"
           >
             <template v-slot:after>
-              <q-btn round flat icon="refresh" color="indigo-3" @click="loadData" :loading="loading">
+              <q-btn round flat icon="refresh" color="indigo-7" @click="loadData" :loading="loading">
                 <q-tooltip>Reload Businesses</q-tooltip>
               </q-btn>
             </template>
@@ -169,7 +174,7 @@
             v-else
             :model-value="myTenantName"
             label="Target School/Business"
-            dark filled readonly
+            filled readonly
             class="q-mb-md"
           />
 
@@ -177,11 +182,11 @@
             v-model="newCode.serviceMode"
             :options="['School', 'Retail', 'Service']"
             label="Service Mode"
-            dark filled 
+            filled 
             class="q-mb-md"
           />
 
-          <div class="text-caption text-indigo-3 q-mb-sm" v-if="isPlatformAdmin && tenants.length > 0">
+          <div class="text-caption text-indigo-8 q-mb-sm" v-if="isPlatformAdmin && tenants.length > 0">
             {{ tenants.length }} businesses found in database.
           </div>
           <div class="row q-col-gutter-md">
@@ -190,7 +195,7 @@
                 v-model="newCode.planIndex"
                 :options="planOptions"
                 label="Plan Type"
-                dark filled 
+                filled 
                 emit-value map-options
                 class="q-mb-md"
               />
@@ -200,7 +205,7 @@
                 v-model="newCode.deviceSuffix"
                 label="Device Suffix (6 chars)"
                 placeholder="e.g. 7A2B9C"
-                dark filled
+                filled
                 class="q-mb-md"
               />
             </div>
@@ -209,36 +214,36 @@
             v-model="newCode.duration"
             :options="durationOptions"
             label="Duration"
-            dark filled 
+            filled 
             emit-value map-options
             class="q-mb-md"
           />
         </q-card-section>
 
-        <q-card-actions align="right" class="text-indigo-3">
-          <q-btn flat label="Cancel" v-close-popup />
-          <q-btn color="indigo-6" label="Generate Code" @click="generateCode" :loading="generating" />
+        <q-card-actions align="right" class="bg-grey-2 q-pa-sm">
+          <q-btn flat label="Cancel" color="grey-7" class="text-weight-bold" v-close-popup />
+          <q-btn color="indigo-7" label="Generate Code" class="text-weight-bold" @click="generateCode" :loading="generating" />
         </q-card-actions>
       </q-card>
     </q-dialog>
 
     <!-- LICENSE VALIDATOR SECTION -->
     <div class="q-mt-xl">
-      <div class="text-h6 text-indigo-3 q-mb-md">License Validator</div>
-      <q-card class="bg-blue-grey-10 border-indigo">
+      <div class="text-h6 text-indigo-9 q-mb-md">License Validator</div>
+      <q-card class="bg-white border-grey-3 shadow-1 rounded-borders">
         <q-card-section class="q-pa-lg">
           <div class="row q-col-gutter-md items-center">
             <div class="col">
               <q-input
                 v-model="validationCode"
                 label="Paste activation code here..."
-                dark filled
+                filled
                 placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
               />
             </div>
             <div class="col-auto">
               <q-btn 
-                color="indigo-6" 
+                color="indigo-7" 
                 round 
                 icon="search" 
                 size="lg"
@@ -248,19 +253,19 @@
             </div>
           </div>
 
-          <div v-if="validationResult" class="q-mt-lg q-pa-md bg-blue-grey-11 rounded-borders border-grey-9">
+          <div v-if="validationResult" class="q-mt-lg q-pa-md bg-grey-2 rounded-borders border-grey-3">
             <div class="row q-col-gutter-md">
               <div class="col-12 col-md-4">
-                <div class="text-caption text-grey-5">Business Name Hash</div>
-                <div class="text-subtitle1 text-weight-bold">{{ validationResult.bizHash }}</div>
+                <div class="text-caption text-grey-7">Business Name Hash</div>
+                <div class="text-subtitle1 text-weight-bold text-grey-9">{{ validationResult.bizHash }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <div class="text-caption text-grey-5">Plan Type</div>
-                <div class="text-subtitle1 text-weight-bold text-indigo-3">{{ validationResult.planType }}</div>
+                <div class="text-caption text-grey-7">Plan Type</div>
+                <div class="text-subtitle1 text-weight-bold text-indigo-8">{{ validationResult.planType }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <div class="text-caption text-grey-5">Expiry Date</div>
-                <div class="text-subtitle1 text-weight-bold">{{ validationResult.expiryDate }}</div>
+                <div class="text-caption text-grey-7">Expiry Date</div>
+                <div class="text-subtitle1 text-weight-bold text-grey-9">{{ validationResult.expiryDate }}</div>
               </div>
             </div>
           </div>
@@ -557,6 +562,7 @@ const deviceColumns = [
 const activationColumns = [
   { name: 'code', label: 'Activation Code', field: 'activation_code', align: 'left' },
   { name: 'tenant', label: 'Target', field: row => row.tenants?.name, align: 'left' },
+  { name: 'device_id', label: 'Device ID', field: row => row.device_id || 'Not Yet Activated', align: 'left' },
   { name: 'duration', label: 'Duration', field: row => `${row.duration_days} Days`, align: 'center' },
   { name: 'status', label: 'Status', field: 'status', align: 'center' },
   { name: 'created', label: 'Created At', field: row => date.formatDate(row.created_at, 'YYYY-MM-DD HH:mm'), align: 'right' },
