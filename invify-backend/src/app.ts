@@ -33,6 +33,7 @@ import { IntegrityController } from './controllers/integrity.controller';
 import { NotificationController } from './controllers/notification.controller';
 import { OTPController } from './controllers/otp.controller';
 import { AuthController } from './controllers/auth.controller';
+import { DeviceController } from './controllers/device.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
@@ -93,6 +94,13 @@ app.post('/admin/tenants', authenticate, checkRole(['super_admin']), AdminContro
 app.patch('/admin/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
 app.get('/admin/dashboard-stats', authenticate, checkRole(['super_admin']), AdminController.getDashboardStats);
 app.patch('/admin/profile', authenticate, AdminController.updateProfile);
+
+// Device Activation Hub Endpoints
+app.get('/devices', authenticate, DeviceController.getDevices);
+app.get('/devices/activations', authenticate, DeviceController.getActivations);
+app.post('/devices/activations', authenticate, DeviceController.createActivation);
+app.post('/devices/validate', authenticate, DeviceController.validateCode);
+app.patch('/devices/:id', authenticate, DeviceController.updateDevice);
 
 
 // Usage + Growth Intelligence
