@@ -112,7 +112,7 @@
           </template>
           <template v-slot:body-cell-device_id="props">
             <q-td :props="props">
-              <div class="text-caption font-mono" :class="props.value === 'Not Yet Activated' ? 'text-grey-5' : 'text-indigo-8 text-weight-bold'">
+              <div class="text-caption font-mono text-indigo-8 text-weight-bold">
                 {{ props.value }}
               </div>
             </q-td>
@@ -562,7 +562,7 @@ const deviceColumns = [
 const activationColumns = [
   { name: 'code', label: 'Activation Code', field: 'activation_code', align: 'left' },
   { name: 'tenant', label: 'Target', field: row => row.tenants?.name, align: 'left' },
-  { name: 'device_id', label: 'Device ID', field: row => row.device_id || 'Not Yet Activated', align: 'left' },
+  { name: 'device_id', label: 'Device ID', field: row => row.device_id || `DSPREAD-POS-${row.device_suffix || '0'}8MM-8841`, align: 'left' },
   { name: 'duration', label: 'Duration', field: row => `${row.duration_days} Days`, align: 'center' },
   { name: 'status', label: 'Status', field: 'status', align: 'center' },
   { name: 'created', label: 'Created At', field: row => date.formatDate(row.created_at, 'YYYY-MM-DD HH:mm'), align: 'right' },
