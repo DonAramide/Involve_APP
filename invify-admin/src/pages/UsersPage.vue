@@ -102,6 +102,9 @@
 
       <template v-slot:body-cell-actions="props">
         <q-td :props="props" class="text-right">
+          <q-btn flat round dense color="amber-4" icon="lock_reset" @click="forceResetPassword(props.row)">
+            <q-tooltip class="bg-indigo-10 text-white">Direct Admin Passphrase Reset (No OTP)</q-tooltip>
+          </q-btn>
           <q-btn flat round dense color="indigo-3" icon="edit" @click="openModal(props.row)" />
           <q-btn 
             flat round dense 
@@ -158,7 +161,11 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useQuasar } from 'quasar'
 import { adminApi } from '../api'
+import axios from 'axios'
+
+const $q = useQuasar()
 
 // Auth Context Mock (To be replaced by real auth store)
 const isSuperAdmin = ref(true) 
@@ -273,6 +280,36 @@ const toggleStatus = async (user) => {
     await adminApi.updateUser(user.id, { is_active: !user.is_active })
     fetchUsers()
   } catch (error) {}
+}
+
+const forceResetPassword = (user) => {
+  $q.dialog({
+    title: 'Direct Passphrase Reset',
+    message: `Enter the new secure passphrase for ${user.name} (${user.email}). No OTP verification code required.`,
+    prompt: {
+      model: '',
+      type: 'password',
+      placeholder: '••••••••••••'
+    },
+    cancel: true,
+    dark: true,
+    persistent: true
+  }).onOk(async (newPassword) => {
+    if (!newPassword || newPassword.length < 6) {
+      $q.notify({ type: 'negative', message: 'Passphrase must be at least 6 characters.' })
+      return
+    }
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+      await axios.post(`${API_BASE}/api/auth/reset-password`, {
+        userId: user.id,
+        newPassword: newPassword
+      })
+      $q.notify({ type: 'positive', message: `Password for ${user.name} has been successfully force-reset.` })
+    } catch (err) {
+      $q.notify({ type: 'negative', message: 'Failed to reset passphrase directly.' })
+    }
+  })
 }
 
 onMounted(async () => {

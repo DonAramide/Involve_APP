@@ -1,20 +1,20 @@
 <!-- invify-admin/src/pages/communications/BroadcastCenterPage.vue -->
 <template>
-  <q-page class="q-pa-md bg-[#0b0f12] text-[#e1e7ec]">
+  <q-page class="q-pa-md bg-main text-main">
     
     <!-- SOC-Grade Operational Command Banner -->
     <div class="row items-center justify-between q-mb-md q-pb-sm border-bottom">
       <div class="row items-center op-gap-12 no-wrap">
         <q-icon name="podcasts" size="md" color="cyan-4" />
         <div>
-          <div class="text-h6 text-white text-weight-bold" style="line-height: 1.2;">Enterprise Broadcast & Operational Communications</div>
-          <div class="text-caption text-grey-5">Multi-tenant fleet transmission hub complete with deterministic pre-flight simulations and offline retention bounds.</div>
+          <div class="text-h6 text-main text-weight-bold" style="line-height: 1.2;">Enterprise Broadcast & Operational Communications</div>
+          <div class="text-caption text-muted">Multi-tenant fleet transmission hub complete with deterministic pre-flight simulations and offline retention bounds.</div>
         </div>
       </div>
       
       <!-- Top Action Strip & Emergency Engagement Controls -->
       <div class="row items-center op-gap-8">
-        <div class="bg-[#12181f] q-px-sm q-py-xs rounded-borders border-muted text-metric-mono text-grey-4 text-caption row items-center op-gap-4">
+        <div class="bg-panel-darker q-px-sm q-py-xs rounded-borders border-muted text-metric-mono text-secondary text-caption row items-center op-gap-4">
           <span class="inline-box" :class="isOverrideActive ? 'bg-red-5' : 'bg-cyan-4'"></span>
           <span>SLA TIMEOUT MONITOR: ACTIVE</span>
         </div>
@@ -41,9 +41,9 @@
       <div class="col-12 col-lg-7 column op-gap-16">
         
         <!-- COMPOSER PANEL -->
-        <div class="enterprise-panel rounded-borders fit column overflow-hidden" style="background-color: #101826 !important; border-color: #1F2D42 !important;">
-          <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-[#131d2e]">
-            <div class="text-operator-title text-white">Broadcast Blueprint Composer</div>
+        <div class="enterprise-panel rounded-borders fit column overflow-hidden no-shadow">
+          <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-panel-darker">
+            <div class="text-operator-title text-main">Broadcast Blueprint Composer</div>
             <q-badge color="cyan-10" text-color="cyan-3" class="text-metric-sm">ENVELOPE v1.0.0</q-badge>
           </div>
 
@@ -58,12 +58,12 @@
                   :options="broadcastTypeOptions"
                   dense
                   outlined
-                  dark
+                  :dark="prefs.isDarkMode"
                   color="cyan-4"
                   options-dense
                   emit-value
                   map-options
-                  class="custom-select-dark text-caption"
+                  class="text-caption"
                   @update:model-value="triggerPreflightSimulation"
                 />
               </div>
@@ -75,11 +75,11 @@
                   :options="severityOptions"
                   dense
                   outlined
-                  dark
+                  :dark="prefs.isDarkMode"
                   options-dense
                   emit-value
                   map-options
-                  class="custom-select-dark text-caption text-weight-bold"
+                  class="text-caption text-weight-bold"
                   @update:model-value="applySeverityDefaults"
                 >
                   <template v-slot:selected>
@@ -100,11 +100,11 @@
                   :options="priorityOptions"
                   dense
                   outlined
-                  dark
+                  :dark="prefs.isDarkMode"
                   options-dense
                   emit-value
                   map-options
-                  class="custom-select-dark text-caption"
+                  class="text-caption"
                   @update:model-value="triggerPreflightSimulation"
                 >
                   <template v-slot:selected>
@@ -120,11 +120,11 @@
                   :options="launcherModeOptions"
                   dense
                   outlined
-                  dark
+                  :dark="prefs.isDarkMode"
                   options-dense
                   emit-value
                   map-options
-                  class="custom-select-dark text-caption"
+                  class="text-caption"
                   @update:model-value="triggerPreflightSimulation"
                 />
               </div>
@@ -137,10 +137,10 @@
                 v-model="composerForm.title"
                 outlined
                 dense
-                dark
+                :dark="prefs.isDarkMode"
                 color="cyan-4"
                 placeholder="Enter succinct broadcast announcement headline..."
-                class="custom-input-dark text-caption text-white text-weight-bold"
+                class="text-caption"
                 @update:model-value="triggerPreflightSimulation"
               />
             </div>
@@ -152,11 +152,11 @@
                 type="textarea"
                 outlined
                 dense
-                dark
+                :dark="prefs.isDarkMode"
                 color="cyan-4"
                 rows="4"
                 placeholder="Provide verbose, actionable operational instructions or deployment context matrices..."
-                class="custom-input-dark text-caption text-grey-3 font-mono flex-grow"
+                class="text-caption"
                 @update:model-value="triggerPreflightSimulation"
               />
             </div>
@@ -166,9 +166,9 @@
               <div class="column">
                 <label class="text-metric-sm text-grey-5 q-mb-xs">Target Multiplexed Transports</label>
                 <div class="row items-center op-gap-8">
-                  <q-checkbox v-model="composerForm.channels" val="websocket" label="WebSocket" dark dense color="cyan-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
-                  <q-checkbox v-model="composerForm.channels" val="fcm" label="FCM Layer" dark dense color="amber-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
-                  <q-checkbox v-model="composerForm.channels" val="offline" label="Offline Stores" dark dense color="green-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
+                  <q-checkbox v-model="composerForm.channels" val="websocket" label="WebSocket" :dark="prefs.isDarkMode" dense color="cyan-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
+                  <q-checkbox v-model="composerForm.channels" val="fcm" label="FCM Layer" :dark="prefs.isDarkMode" dense color="amber-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
+                  <q-checkbox v-model="composerForm.channels" val="offline" label="Offline Stores" :dark="prefs.isDarkMode" dense color="green-4" class="text-caption text-grey-4" @update:model-value="triggerPreflightSimulation" />
                 </div>
               </div>
 
@@ -176,7 +176,7 @@
                 <q-checkbox
                   v-model="composerForm.requiresAck"
                   label="Enforce Explicit Device ACK"
-                  dark
+                  :dark="prefs.isDarkMode"
                   dense
                   color="red-4"
                   class="text-caption text-weight-medium text-grey-3"
@@ -218,8 +218,8 @@
       <div class="col-12 col-lg-5 column op-gap-16">
         
         <!-- PRE-FLIGHT SIMULATION PANEL (Refinement 7) -->
-        <div ref="preflightSectionRef" class="enterprise-panel border-amber-left rounded-borders column overflow-hidden" style="background-color: #101826 !important;">
-          <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-[#131d2e]">
+        <div ref="preflightSectionRef" class="enterprise-panel border-amber-left rounded-borders column overflow-hidden no-shadow">
+          <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-panel-darker">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="science" color="amber-4" size="xs" />
               <span class="text-operator-title text-amber-3">Pre-Flight Simulation Engine (Dry-Run)</span>
@@ -233,7 +233,7 @@
               <span class="text-metric-mono text-cyan-3">{{ (composerForm.tenantScope || 'global').toUpperCase() }}</span>
             </div>
 
-            <div class="bg-[#070c14] q-pa-sm rounded-borders border-muted font-mono text-caption text-grey-3 text-pre-wrap" style="min-height: 80px;">
+            <div class="bg-panel-darker q-pa-sm rounded-borders border-muted font-mono text-caption text-secondary text-pre-wrap" style="min-height: 80px;">
               {{ preflightResult.simulationReport }}
             </div>
 
@@ -310,8 +310,8 @@
     </div>
 
     <!-- BOTTOM ROW: LIVE MONOSPACE AUDIT LINEAGE ENGINE GRID -->
-    <div ref="auditSectionRef" class="enterprise-panel rounded-borders q-mt-md column overflow-hidden" style="background-color: #101826 !important;">
-      <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-[#131d2e]">
+    <div ref="auditSectionRef" class="enterprise-panel rounded-borders q-mt-md column overflow-hidden no-shadow">
+      <div class="q-px-md q-py-sm row items-center justify-between border-bottom bg-panel-darker">
         <div class="row items-center op-gap-8 no-wrap">
           <q-icon name="receipt_long" color="cyan-3" size="xs" />
           <span class="text-operator-title text-white">Immutable Broadcast Lineage & Execution Audits</span>
@@ -366,6 +366,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { CanonicalBroadcastTypes, DotroidLauncherModes, DeliveryPriorityLanes } from '../../contracts/broadcast'
 import { BroadcastEnvelopeModel, BroadcastFactory } from '../../broadcast-models'
 import { broadcastEngineSingleton } from '../../services/broadcast/BroadcastOrchestrationEngine'
@@ -373,6 +374,7 @@ import { deliveryTrackerSingleton, TrackingStates } from '../../services/broadca
 import { targetingEngineSingleton } from '../../services/broadcast/DeliveryTargetingEngine'
 import { auditGovernanceSingleton } from '../../services/broadcast/BroadcastAuditGovernance'
 
+const { prefs } = useOperatorPreferences()
 const $q = useQuasar()
 const route = useRoute()
 
@@ -645,11 +647,6 @@ watch(() => route.query?.tab, (newTab) => {
 })
 
 onMounted(() => {
-  // Ensure global dark status property enforced natively
-  try {
-    $q.dark.set(true)
-  } catch(e) {}
-  
   triggerPreflightSimulation()
   refreshAuditRecords()
   
@@ -674,15 +671,11 @@ onMounted(() => {
 .flex-grow { flex-grow: 1; }
 
 /* Custom Component Theme Normalizations ensuring sleek dark contrast */
-:deep(.custom-select-dark .q-field__control) {
-  background-color: #070c14 !important;
-  border-radius: 2px !important;
-  color: #E6EDF3 !important;
-}
+:deep(.custom-select-dark .q-field__control),
 :deep(.custom-input-dark .q-field__control) {
-  background-color: #070c14 !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
   border-radius: 2px !important;
-  color: #E6EDF3 !important;
+  color: var(--enterprise-text-main) !important;
 }
 
 :deep(.custom-table-dark) {

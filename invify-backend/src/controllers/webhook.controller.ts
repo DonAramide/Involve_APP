@@ -6,6 +6,7 @@ import { LedgerService } from '../services/ledger.service';
 import { NotificationService } from '../services/notification.service';
 import { FinancialEventService } from '../services/event.service';
 import { AuditService } from '../services/audit.service';
+import { PaymentGatewayConvergenceService } from '../services/gateway.service';
 
 
 
@@ -86,6 +87,62 @@ export class WebhookController {
       console.error('[Webhook Critical Error]', error.message);
       return res.status(500).json({ error: 'Internal server error' });
     }
+  }
+
+  /**
+   * POST /webhooks/paystack
+   * Real Paystack webhook listener verifying HMAC SHA256 signatures.
+   */
+  static async handlePaystackWebhook(req: Request, res: Response) {
+    const signature = req.headers['x-paystack-signature'] as string;
+    const secret = process.env.PAYSTACK_SECRET_KEY || "sk_test_mock_paystack_key_quasar";
+    const rawBody = (req as any).rawBody?.toString() || JSON.stringify(req.body);
+
+    const isValid = PaymentGatewayConvergenceService.verifyWebhookHMAC(rawBody, signature, secret, "paystack");
+    if (!isValid) {
+      console.error('[Security] Paystack Webhook HMAC verification failed.');
+      return res.status(401).json({ error: 'Signature mismatch' });
+    }
+
+    const result = await PaymentGatewayConvergenceService.processSettlementWebhook("paystack", signature, req.body);
+    return res.status(200).json(result);
+  }
+
+  /**
+   * POST /webhooks/flutterwave
+   * Real Flutterwave webhook listener.
+   */
+  static async handleFlutterwaveWebhook(req: Request, res: Response) {
+    const signature = req.headers['verif-hash'] as string;
+    const secret = process.env.FLW_SECRET_KEY || "flwseck_test_mock_key_quasar";
+
+    const isValid = PaymentGatewayConvergenceService.verifyWebhookHMAC("", signature, secret, "flutterwave");
+    if (!isValid) {
+      console.error('[Security] Flutterwave Webhook signature mismatch.');
+      return res.status(401).json({ error: 'Signature mismatch' });
+    }
+
+    const result = await PaymentGatewayConvergenceService.processSettlementWebhook("flutterwave", signature, req.body);
+    return res.status(200).json(result);
+  }
+
+  /**
+   * POST /webhooks/stripe
+   * Real Stripe webhook listener verifying Stripe-Signature HMAC SHA256 header.
+   */
+  static async handleStripeWebhook(req: Request, res: Response) {
+    const signature = req.headers['stripe-signature'] as string;
+    const secret = process.env.STRIPE_WEBHOOK_SECRET || "whsec_mock_secret_quasar";
+    const rawBody = (req as any).rawBody?.toString() || JSON.stringify(req.body);
+
+    const isValid = PaymentGatewayConvergenceService.verifyWebhookHMAC(rawBody, signature, secret, "stripe");
+    if (!isValid) {
+      console.error('[Security] Stripe Webhook HMAC verification failed.');
+      return res.status(401).json({ error: 'Signature mismatch' });
+    }
+
+    const result = await PaymentGatewayConvergenceService.processSettlementWebhook("stripe", signature, req.body);
+    return res.status(200).json(result);
   }
 
   /**

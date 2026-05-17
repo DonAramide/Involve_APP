@@ -1,18 +1,18 @@
 <!-- invify-admin/src/pages/DashboardPage.vue -->
 <template>
-  <q-page class="q-pa-md bg-[#0b0f12] text-[#e1e7ec]">
+  <q-page class="q-pa-md bg-main text-main">
     
     <!-- Top Operator Context Overview & Domain Filters Splitter -->
     <div class="row items-center justify-between q-mb-md no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-12 no-wrap">
         <div>
-          <div class="text-operator-title text-grey-5">Operational Context</div>
-          <div class="text-h6 text-white text-weight-bold" style="line-height: 1.2;">
+          <div class="text-operator-title text-muted">Operational Context</div>
+          <div class="text-h6 text-main text-weight-bold" style="line-height: 1.2;">
             {{ activeWorkspaceLabel }} Monitoring Engine
           </div>
         </div>
-        <q-chip dense color="blue-grey-10" text-color="cyan-3" class="text-metric-sm q-ma-none v-hide-xs">
-          Stream Topic: <span class="text-white q-ml-xs">quasar.{{ activeWorkspace }}.telemetry.*</span>
+        <q-chip dense color="blue-grey-10" text-color="blue-5" class="text-metric-sm q-ma-none v-hide-xs">
+          Stream Topic: <span class="text-main q-ml-xs">quasar.{{ activeWorkspace }}.telemetry.*</span>
         </q-chip>
       </div>
 
@@ -40,64 +40,64 @@
     <div class="row q-col-gutter-sm q-mb-md">
       <!-- KPI 1: Telemetry Ingestion Throughput -->
       <div class="col-12 col-sm-6 col-md-3">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between border-cyan-left">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between border-cyan-left bg-panel">
           <div class="row items-center justify-between no-wrap q-mb-xs">
-            <span class="text-operator-title text-grey-5">Ingestion Rate</span>
+            <span class="text-operator-title text-muted">Ingestion Rate</span>
             <span class="live-indicator-dot pulse-healthy"></span>
           </div>
-          <div class="text-h4 text-metric-mono text-white">
-            {{ throughputEps }} <span class="text-caption text-grey-6">eps</span>
+          <div class="text-h4 text-metric-mono text-main">
+            {{ throughputEps }} <span class="text-caption text-muted">eps</span>
           </div>
-          <div class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
-            Peak buffer utilization: <span class="text-white">14.2 MB/s</span>
+          <div class="text-caption text-muted q-mt-xs" style="font-size: 10px;">
+            Peak buffer utilization: <span class="text-main">14.2 MB/s</span>
           </div>
         </div>
       </div>
 
       <!-- KPI 2: Total Connected Operators & Instances -->
       <div class="col-12 col-sm-6 col-md-3">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between border-indigo-left">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between border-indigo-left bg-panel">
           <div class="row items-center justify-between no-wrap q-mb-xs">
-            <span class="text-operator-title text-grey-5">Active Fleet Nodes</span>
+            <span class="text-operator-title text-muted">Active Fleet Nodes</span>
             <q-icon name="devices" color="indigo-4" size="xs" />
           </div>
-          <div class="text-h4 text-metric-mono text-cyan-3">
-            {{ activeNodesCount }} <span class="text-caption text-grey-6">/ 18</span>
+          <div class="text-h4 text-metric-mono text-blue-5">
+            {{ activeNodesCount }} <span class="text-caption text-muted">/ 18</span>
           </div>
-          <div class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
-            Edge deployment distribution: <span class="text-white">99.8% stable</span>
+          <div class="text-caption text-muted q-mt-xs" style="font-size: 10px;">
+            Edge deployment distribution: <span class="text-main">99.8% stable</span>
           </div>
         </div>
       </div>
 
       <!-- KPI 3: System Drift Exceptions (Severity Warning mapped) -->
       <div class="col-12 col-sm-6 col-md-3">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between border-amber-left">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between border-amber-left bg-panel">
           <div class="row items-center justify-between no-wrap q-mb-xs">
-            <span class="text-operator-title text-grey-5">Active Warnings</span>
+            <span class="text-operator-title text-muted">Active Warnings</span>
             <span class="live-indicator-dot pulse-warning"></span>
           </div>
-          <div class="text-h4 text-metric-mono text-amber-4">
+          <div class="text-h4 text-metric-mono text-amber-5">
             {{ warningEventsCount }}
           </div>
-          <div class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
-            Drift severity index: <span class="text-amber-4">ELEVATED</span>
+          <div class="text-caption text-muted q-mt-xs" style="font-size: 10px;">
+            Drift severity index: <span class="text-amber-5">ELEVATED</span>
           </div>
         </div>
       </div>
 
       <!-- KPI 4: Critical Execution Rollbacks (Severity Critical mapped) -->
       <div class="col-12 col-sm-6 col-md-3">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between border-red-left">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between border-red-left bg-panel">
           <div class="row items-center justify-between no-wrap q-mb-xs">
-            <span class="text-operator-title text-grey-5">Critical Rollbacks</span>
+            <span class="text-operator-title text-muted">Critical Rollbacks</span>
             <span class="live-indicator-dot pulse-critical"></span>
           </div>
-          <div class="text-h4 text-metric-mono" :class="criticalEventsCount > 0 ? 'text-red-4' : 'text-grey-6'">
+          <div class="text-h4 text-metric-mono" :class="criticalEventsCount > 0 ? 'text-red-5' : 'text-muted'">
             {{ criticalEventsCount }}
           </div>
-          <div class="text-caption text-grey-6 q-mt-xs" style="font-size: 10px;">
-            Failed Webhook bridges: <span :class="criticalEventsCount > 0 ? 'text-red-4' : 'text-grey-6'">{{ criticalEventsCount }} pipeline locks</span>
+          <div class="text-caption text-muted q-mt-xs" style="font-size: 10px;">
+            Failed Webhook bridges: <span :class="criticalEventsCount > 0 ? 'text-red-5' : 'text-muted'">{{ criticalEventsCount }} pipeline locks</span>
           </div>
         </div>
       </div>
@@ -127,11 +127,11 @@
 
       <!-- Secondary Split-Pane Subpanel: Real-time Ingested Payload trace tree -->
       <div class="col-12 col-xl-4">
-        <div class="enterprise-panel full-height column no-wrap bg-[#12161a]">
+        <div class="enterprise-panel full-height column no-wrap bg-panel">
           <div class="enterprise-subpanel q-pa-sm row items-center justify-between no-wrap border-bottom">
             <div class="row items-center op-gap-4">
-              <q-icon name="code" color="cyan-4" size="xs" />
-              <span class="text-operator-title text-white text-weight-bold">Live Stream Event Trace</span>
+              <q-icon name="code" color="blue-5" size="xs" />
+              <span class="text-operator-title text-main text-weight-bold">Live Stream Event Trace</span>
             </div>
             <q-badge color="blue-grey-9" text-color="green-3" class="text-metric-sm" v-if="lastEventPayload">
               Ingested
@@ -139,14 +139,14 @@
           </div>
 
           <div class="q-pa-sm col-grow overflow-auto" style="max-height: 440px;">
-            <div v-if="!lastEventPayload" class="text-center q-pa-lg text-grey-7 text-caption italic">
+            <div v-if="!lastEventPayload" class="text-center q-pa-lg text-muted text-caption italic">
               Listening for real-time Quasar WebSocket streams... Events will cascade automatically.
             </div>
 
             <div v-else class="column op-gap-8">
-              <div class="bg-[#161b20] q-pa-xs rounded-borders row items-center justify-between text-caption border-muted">
-                <span class="text-metric-mono text-grey-4">TOPIC: {{ lastEventPayload.topic }}</span>
-                <span class="text-metric-sm text-grey-5">{{ new Date(lastEventPayload.timestamp).toLocaleTimeString() }}</span>
+              <div class="bg-subpanel q-pa-xs rounded-borders row items-center justify-between text-caption border-main">
+                <span class="text-metric-mono text-secondary">TOPIC: {{ lastEventPayload.topic }}</span>
+                <span class="text-metric-sm text-muted">{{ new Date(lastEventPayload.timestamp).toLocaleTimeString() }}</span>
               </div>
 
               <!-- Stateful severity mapping box -->
@@ -157,11 +157,11 @@
               </div>
 
               <!-- JSON Stringify payload block formatted perfectly for enterprise readability -->
-              <div class="bg-[#0b0f12] q-pa-xs rounded-borders border-muted text-metric-mono text-grey-4" style="white-space: pre-wrap; font-size: 11px; overflow-x: auto;">
+              <div class="bg-main q-pa-xs rounded-borders border-main text-metric-mono text-secondary" style="white-space: pre-wrap; font-size: 11px; overflow-x: auto;">
                 {{ JSON.stringify(lastEventPayload.payload, null, 2) }}
               </div>
 
-              <div class="text-operator-title text-grey-6 q-mt-xs">Active Event Pipeline Subscriptions</div>
+              <div class="text-operator-title text-muted q-mt-xs">Active Event Pipeline Subscriptions</div>
               <div class="row op-gap-4 items-center">
                 <q-chip dense size="xs" color="blue-grey-9" text-color="cyan-3" label="quasar.wallet.transfers" />
                 <q-chip dense size="xs" color="blue-grey-9" text-color="indigo-3" label="invify.fleet.telemetry" />

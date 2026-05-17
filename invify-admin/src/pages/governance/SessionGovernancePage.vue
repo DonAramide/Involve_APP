@@ -1,14 +1,14 @@
 <!-- invify-admin/src/pages/governance/SessionGovernancePage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Title Configuration Header -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="device_hub" size="sm" color="cyan-3" />
+        <q-icon name="device_hub" size="sm" color="blue-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Real-Time Session & WebSocket Governance Suite</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">REDIS_IN_MEMORY_STATE // IMMEDIATE_REVOCATION_PROPAGATION</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Real-Time Session & WebSocket Governance Suite</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">REDIS_IN_MEMORY_STATE // IMMEDIATE_REVOCATION_PROPAGATION</div>
         </div>
       </div>
       
@@ -29,14 +29,14 @@
     </div>
 
     <!-- INTERNAL SEGMENT SWITCHER -->
-    <div class="row items-center justify-between no-wrap border-muted bg-[#12161a] rounded-borders q-pa-xs">
+    <div class="row items-center justify-between no-wrap border-main bg-panel rounded-borders q-pa-xs">
       <q-tabs
         v-model="activeViewTab"
         dense
-        dark
-        class="text-grey-5"
-        active-color="cyan-3"
-        indicator-color="cyan-3"
+        :dark="true"
+        class="text-muted"
+        active-color="blue-5"
+        indicator-color="blue-5"
         align="left"
         narrow-indicator
       >
@@ -44,14 +44,14 @@
         <q-tab name="API_KEYS" label="Encrypted API Credentials" />
       </q-tabs>
       
-      <span class="text-metric-mono text-grey-6 q-px-sm text-metric-sm" v-if="activeViewTab === 'SESSIONS'">
+      <span class="text-metric-mono text-muted q-px-sm text-metric-sm" v-if="activeViewTab === 'SESSIONS'">
         Active Swept References: {{ activeSessionsList.length }} Streams
       </span>
     </div>
 
     <!-- VIEW 1: ACTIVE SESSIONS & WEBSOCKET STREAMS DIRECTORY -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col" v-if="activeViewTab === 'SESSIONS'">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-grey-5">
+    <div class="enterprise-panel bg-panel column col" v-if="activeViewTab === 'SESSIONS'">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-muted">
         <span class="col-3">Operator Identifier Context</span>
         <span class="col-2">Device Fingerprint / OS</span>
         <span class="col-2">Assigned Workspace Namespace</span>
@@ -65,38 +65,38 @@
           <q-item
             v-for="sess in activeSessionsList"
             :key="sess.tokenKey"
-            class="q-px-sm q-py-sm bg-[#161b20] rounded-borders row items-center justify-between no-wrap hover-row"
+            class="q-px-sm q-py-sm bg-subpanel rounded-borders row items-center justify-between no-wrap hover-row"
           >
             <!-- 1. Operator Identifier -->
             <div class="column col-3 no-wrap ellipsis">
               <div class="row items-center op-gap-4 no-wrap">
-                <span class="text-white text-weight-bold text-caption">{{ sess.userId }}</span>
+                <span class="text-main text-weight-bold text-caption">{{ sess.userId }}</span>
                 <q-badge color="amber-10" text-color="amber-2" class="text-metric-sm" v-if="sess.isMasterMode">MASTER</q-badge>
                 <q-badge color="purple-10" text-color="purple-2" class="text-metric-sm" v-if="sess.isImpersonating">IMPERSONATING</q-badge>
               </div>
-              <span class="text-metric-mono text-grey-6" style="font-size: 9px;">Key Hash: {{ sess.tokenKey }}</span>
+              <span class="text-metric-mono text-muted" style="font-size: 9px;">Key Hash: {{ sess.tokenKey }}</span>
             </div>
 
             <!-- 2. Fingerprint -->
-            <div class="col-2 text-metric-mono text-grey-4 ellipsis" style="font-size: 11px;">
+            <div class="col-2 text-metric-mono text-secondary ellipsis" style="font-size: 11px;">
               {{ sess.fingerprint }}
             </div>
 
             <!-- 3. Namespace -->
-            <div class="col-2 text-metric-mono text-cyan-3" style="font-size: 11px;">
+            <div class="col-2 text-metric-mono text-blue-5" style="font-size: 11px;">
               {{ sess.tenantId }}
             </div>
 
             <!-- 4. State -->
             <div class="col-2 text-center">
-              <span class="text-metric-mono text-green-4 text-weight-bold row items-center justify-center op-gap-4" style="font-size: 10px;">
-                <span class="inline-pulse-dot bg-green-4"></span>
+              <span class="text-metric-mono text-green-5 text-weight-bold row items-center justify-center op-gap-4" style="font-size: 10px;">
+                <span class="inline-pulse-dot bg-green-5"></span>
                 ACTIVE_STREAM
               </span>
             </div>
 
             <!-- 5. TTL -->
-            <div class="col-1 text-center text-metric-mono text-grey-5" style="font-size: 10px;">
+            <div class="col-1 text-center text-metric-mono text-muted" style="font-size: 10px;">
               {{ sess.expiresInSeconds }}s
             </div>
 
@@ -106,9 +106,9 @@
                 dense
                 flat
                 size="xs"
-                color="red-4"
+                color="red-5"
                 label="Terminate Session"
-                class="bg-[#241a1a] q-px-xs text-weight-bold text-metric-sm"
+                class="bg-red-focus q-px-xs text-weight-bold text-metric-sm"
                 @click="revokeSessionStream(sess.tokenKey)"
                 :loading="loadingTarget === sess.tokenKey"
               />
@@ -119,43 +119,43 @@
     </div>
 
     <!-- VIEW 2: API KEYS PROVISIONING RING -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col q-pa-md justify-between" v-else>
+    <div class="enterprise-panel bg-panel column col q-pa-md justify-between" v-else>
       <div class="column op-gap-16 max-w-md" style="max-width: 480px;">
         <div class="column op-gap-4">
-          <span class="text-white text-weight-bold text-caption row items-center op-gap-4">
-            <q-icon name="key" color="amber-4" size="xs" />
+          <span class="text-main text-weight-bold text-caption row items-center op-gap-4">
+            <q-icon name="key" color="amber-5" size="xs" />
             Provision Permanent Namespace API Access Bearer
           </span>
-          <span class="text-metric-sm text-grey-5">
+          <span class="text-metric-sm text-muted">
             Generates unprivileged, non-expiring cryptographically bound credentials strictly confined to target workload boundaries.
           </span>
         </div>
 
         <q-form @submit.prevent="executeApiKeyProvision" class="column op-gap-12">
           <div>
-            <div class="text-caption text-grey-5 q-mb-xs">Key Identification Label *</div>
-            <q-input v-model="apiForm.label" dark filled dense placeholder="e.g. CI_CD_AUTOMATION_SERVICE" class="bg-[#161b20] text-white rounded-borders" required />
+            <div class="text-caption text-muted q-mb-xs">Key Identification Label *</div>
+            <q-input v-model="apiForm.label" :dark="true" filled dense placeholder="e.g. CI_CD_AUTOMATION_SERVICE" class="bg-subpanel text-main rounded-borders" required />
           </div>
 
           <div>
-            <div class="text-caption text-grey-5 q-mb-xs">Target Sovereign Namespace Scope *</div>
-            <q-input v-model="apiForm.targetTenantId" dark filled dense placeholder="e.g. tenant-default-01" class="bg-[#161b20] text-white rounded-borders" required />
+            <div class="text-caption text-muted q-mb-xs">Target Sovereign Namespace Scope *</div>
+            <q-input v-model="apiForm.targetTenantId" :dark="true" filled dense placeholder="e.g. tenant-default-01" class="bg-subpanel text-main rounded-borders" required />
           </div>
 
-          <q-btn type="submit" color="amber-4" text-color="black" label="Generate Encrypted Bearer Token" dense unelevated class="q-px-sm text-weight-bold q-py-xs" :loading="loadingApi" />
+          <q-btn type="submit" color="amber-5" label="Generate Encrypted Bearer Token" dense unelevated class="q-px-sm text-weight-bold q-py-xs" :loading="loadingApi" />
         </q-form>
 
         <!-- Dynamic Success Reveal Toast -->
-        <div class="bg-[#1c1811] border-amber rounded-borders q-pa-sm column op-gap-4 q-mt-sm" v-if="lastApiKeyPlaintext">
-          <span class="text-amber-3 text-weight-bold text-metric-sm">CREDENTIALS MATRIX ALLOCATED SUCCESSFULLY</span>
-          <span class="text-white text-metric-mono select-all text-weight-bold bg-black q-pa-xs rounded-borders" style="font-size: 11px;">
+        <div class="bg-panel border-amber rounded-borders q-pa-sm column op-gap-4 q-mt-sm" v-if="lastApiKeyPlaintext">
+          <span class="text-amber-5 text-weight-bold text-metric-sm">CREDENTIALS MATRIX ALLOCATED SUCCESSFULLY</span>
+          <span class="text-main text-metric-mono select-all text-weight-bold bg-subpanel q-pa-xs rounded-borders" style="font-size: 11px;">
             {{ lastApiKeyPlaintext }}
           </span>
-          <span class="text-grey-5" style="font-size: 9px;">Copy values immediately. Un-hashed parameters will drop permanently post window blur.</span>
+          <span class="text-muted" style="font-size: 9px;">Copy values immediately. Un-hashed parameters will drop permanently post window blur.</span>
         </div>
       </div>
 
-      <div class="border-top q-pt-xs text-metric-sm text-grey-6 row justify-between">
+      <div class="border-top q-pt-xs text-metric-sm text-muted row justify-between">
         <span>HMAC-SHA256 Encrypted Verification Checkpoints Active</span>
         <span>Scope Matrix: [read, metrics]</span>
       </div>
@@ -163,32 +163,32 @@
 
     <!-- EMERGENCY KILL SWITCH DIALOG OVERLAY -->
     <q-dialog v-model="openKillSwitchDialog" persistent>
-      <q-card class="bg-[#1c1111] text-white border-red" style="width: 100%; max-width: 440px;">
-        <q-card-section class="column items-center text-center op-gap-8 q-pb-md bg-[#241212] border-bottom">
-          <q-icon name="crisis_alert" color="red-4" size="lg" />
-          <span class="text-h6 text-red-2 text-weight-bold tracking-wide">CONFIRM CATASTROPHIC LOCKDOWN</span>
+      <q-card class="bg-panel text-main border-red" style="width: 100%; max-width: 440px;">
+        <q-card-section class="column items-center text-center op-gap-8 q-pb-md bg-red-focus border-bottom">
+          <q-icon name="crisis_alert" color="red-5" size="lg" />
+          <span class="text-h6 text-red-5 text-weight-bold tracking-wide">CONFIRM CATASTROPHIC LOCKDOWN</span>
         </q-card-section>
 
-        <q-card-section class="column op-gap-12 text-metric-sm text-grey-3 q-pt-md">
+        <q-card-section class="column op-gap-12 text-metric-sm text-secondary q-pt-md">
           <p>
-            Triggering the <span class="text-white text-weight-bold">Emergency Global Kill-Switch</span> instantly invalidates all distributed Redis authorization tokens, closes real-time WebSocket channels platform-wide, and blocks all subsequent non-master handshakes.
+            Triggering the <span class="text-main text-weight-bold">Emergency Global Kill-Switch</span> instantly invalidates all distributed Redis authorization tokens, closes real-time WebSocket channels platform-wide, and blocks all subsequent non-master handshakes.
           </p>
-          <div class="bg-black q-pa-sm rounded-borders border-red text-center">
-            <span class="text-grey-5" style="font-size: 10px;">MANDATORY CONFIRMATION AUTHORIZATION PASS:</span>
-            <div class="text-metric-mono text-red-4 text-weight-bold select-all">CONFIRM_LOCKDOWN_NOW</div>
+          <div class="bg-subpanel q-pa-sm rounded-borders border-red text-center">
+            <span class="text-muted" style="font-size: 10px;">MANDATORY CONFIRMATION AUTHORIZATION PASS:</span>
+            <div class="text-metric-mono text-red-5 text-weight-bold select-all">CONFIRM_LOCKDOWN_NOW</div>
           </div>
           <q-input
             v-model="killSwitchInput"
-            dark
+            :dark="true"
             filled
             dense
             placeholder="Type verification pass string exact"
-            class="bg-[#12161a] text-white rounded-borders q-mt-xs"
+            class="bg-subpanel text-main rounded-borders q-mt-xs"
             autofocus
           />
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-[#12161a] q-pa-sm border-top">
+        <q-card-actions align="right" class="bg-subpanel q-pa-sm border-top">
           <q-btn flat label="Abort Action" color="grey-5" v-close-popup class="q-px-sm" />
           <q-btn
             color="red-10"
@@ -342,6 +342,6 @@ const executePlatformLockdown = async () => {
 }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 </style>

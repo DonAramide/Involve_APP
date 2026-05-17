@@ -1,12 +1,12 @@
 <!-- invify-admin/src/components/grid/EnterpriseDataGrid.vue -->
 <template>
-  <div class="enterprise-panel full-width overflow-hidden bg-[#12161a]">
+  <div class="enterprise-panel full-width overflow-hidden bg-panel">
     <!-- Grid Control Command Bar -->
     <div class="enterprise-subpanel q-pa-sm row items-center justify-between no-wrap border-bottom">
       <!-- Left side: Title, Live Ticker, Counters -->
       <div class="row items-center op-gap-8 no-wrap">
-        <div class="text-operator-title text-white text-weight-bold q-mr-xs">{{ title }}</div>
-        <div class="text-caption text-grey-6 v-hide-sm" v-if="subtitle">| {{ subtitle }}</div>
+        <div class="text-operator-title text-main text-weight-bold q-mr-xs">{{ title }}</div>
+        <div class="text-secondary text-caption v-hide-sm" v-if="subtitle">| {{ subtitle }}</div>
         
         <!-- Live Stream Status Patch Dot -->
         <q-chip 
@@ -32,10 +32,10 @@
         <q-input 
           v-model="filter" 
           dense 
-          dark 
+          :dark="prefs.isDarkMode" 
           filled 
           placeholder="Filter grid..." 
-          class="bg-[#161b20]"
+          class="bg-subpanel"
           style="width: 140px; font-size: 11px;"
         >
           <template v-slot:append>
@@ -48,21 +48,21 @@
           dense 
           flat 
           size="sm" 
-          color="grey-4" 
+          color="grey-5" 
           icon="view_compact" 
           :label="densityMode.toUpperCase()" 
-          content-style="background-color: #101826; border: 1px solid #1F2D42;"
+          :content-style="`background-color: var(--enterprise-panel-bg); border: 1px solid var(--enterprise-border);`"
           class="text-caption"
         >
-          <q-list dark class="bg-[#101826] text-caption">
+          <q-list :dark="prefs.isDarkMode" class="bg-panel text-caption">
             <q-item clickable v-close-popup @click="setDensity('ultra-dense')" class="hover-bg">
-              <q-item-section><q-item-label class="text-metric-sm text-white">ULTRA-DENSE (22px)</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-metric-sm text-main">ULTRA-DENSE (22px)</q-item-label></q-item-section>
             </q-item>
             <q-item clickable v-close-popup @click="setDensity('compact')" class="hover-bg">
-              <q-item-section><q-item-label class="text-metric-sm text-white">COMPACT (26px)</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-metric-sm text-main">COMPACT (26px)</q-item-label></q-item-section>
             </q-item>
             <q-item clickable v-close-popup @click="setDensity('standard')" class="hover-bg">
-              <q-item-section><q-item-label class="text-metric-sm text-white">STANDARD (28px)</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-metric-sm text-main">STANDARD (28px)</q-item-label></q-item-section>
             </q-item>
           </q-list>
         </q-btn-dropdown>
@@ -72,21 +72,21 @@
           dense 
           flat 
           size="sm" 
-          color="indigo-3" 
+          color="blue-5" 
           icon="bookmarks" 
           label="VIEW PRESET" 
-          content-style="background-color: #101826; border: 1px solid #1F2D42;"
+          :content-style="`background-color: var(--enterprise-panel-bg); border: 1px solid var(--enterprise-border);`"
           class="text-caption"
         >
-          <q-list dark class="bg-[#101826] text-caption">
+          <q-list :dark="prefs.isDarkMode" class="bg-panel text-caption">
             <q-item clickable v-close-popup @click="applyPreset('default')" class="hover-bg">
-              <q-item-section class="text-white">Default Topology</q-item-section>
+              <q-item-section class="text-main">Default Topology</q-item-section>
             </q-item>
             <q-item clickable v-close-popup @click="applyPreset('critical')" class="hover-bg">
               <q-item-section class="text-red-4">Critical Exceptions</q-item-section>
             </q-item>
             <q-item clickable v-close-popup @click="applyPreset('recent')" class="hover-bg">
-              <q-item-section class="text-cyan-4">Latest Ingestion</q-item-section>
+              <q-item-section class="text-blue-4">Latest Ingestion</q-item-section>
             </q-item>
           </q-list>
         </q-btn-dropdown>
@@ -114,13 +114,13 @@
         :loading="loading"
         :filter="filter"
         flat
-        dark
+        :dark="prefs.isDarkMode"
         dense
         virtual-scroll
         :virtual-scroll-item-size="virtualSize"
         :virtual-scroll-sticky-size-start="28"
         :pagination="initialPagination"
-        class="bg-[#12161a] full-width"
+        class="bg-panel full-width"
         style="max-height: 480px;"
       >
         <!-- Custom Row Rendering enabling inline sub-row timeline expansion -->
@@ -171,9 +171,9 @@
           </q-tr>
 
           <!-- Inline Expandable Timeline Sub-row Panel -->
-          <q-tr v-show="props.expand" :props="props" class="bg-[#161b20]">
+          <q-tr v-show="props.expand" :props="props" class="bg-subpanel">
             <q-td colspan="100%" class="q-pa-sm">
-              <div class="row op-gap-12 items-start text-caption text-grey-4">
+              <div class="row op-gap-12 items-start text-caption text-secondary">
                 <!-- Trace Event metadata -->
                 <div class="col-auto border-right q-pr-md">
                   <div class="text-operator-title text-indigo-3 q-mb-xs">Stream Narrative trace</div>
@@ -182,8 +182,8 @@
                 </div>
                 <!-- Payload string -->
                 <div class="col">
-                  <div class="text-operator-title text-cyan-3 q-mb-xs">Event Detail / Log Timeline</div>
-                  <div class="text-metric-mono text-grey-3" style="white-space: pre-wrap; font-size: 11px;">
+                  <div class="text-operator-title text-blue-5 q-mb-xs">Event Detail / Log Timeline</div>
+                  <div class="text-metric-mono text-main" style="white-space: pre-wrap; font-size: 11px;">
                     {{ props.row.description || props.row.narrative || JSON.stringify(props.row, null, 2) }}
                   </div>
                   <div class="q-mt-xs row items-center op-gap-8" v-if="props.row.operator || props.row.provider">
@@ -206,6 +206,9 @@
 
 <script setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+
+const { prefs } = useOperatorPreferences()
 
 const props = defineProps({
   title: { type: String, default: 'Telemetry Data Grid' },

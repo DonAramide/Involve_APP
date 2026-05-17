@@ -1,30 +1,30 @@
 <!-- invify-admin/src/pages/governance/MFAChallengePage.vue -->
 <template>
-  <q-layout class="bg-[#07090b] text-[#e1e7ec] row items-center justify-center fit" style="min-height: 100vh;">
+  <q-layout class="bg-main text-main row items-center justify-center fit" style="min-height: 100vh;">
     <q-page-container class="fit row items-center justify-center q-pa-md">
       
-      <div class="auth-card bg-[#0e1216] border-premium rounded-borders q-pa-xl column op-gap-24 shadow-2" style="width: 100%; max-width: 460px;">
+      <div class="auth-card bg-panel enterprise-panel q-pa-xl column op-gap-24 shadow-2" style="width: 100%; max-width: 460px;">
         
         <!-- Header Banner -->
         <div class="column items-center text-center op-gap-4">
-          <q-icon name="enhanced_encryption" size="md" color="amber-4" />
-          <div class="text-h6 text-white text-weight-bold tracking-wide">MANDATORY MFA GATEWAY</div>
-          <div class="text-caption text-grey-5">
+          <q-icon name="enhanced_encryption" size="md" color="amber-5" />
+          <div class="text-h6 text-main text-weight-bold tracking-wide">MANDATORY MFA GATEWAY</div>
+          <div class="text-caption text-muted">
             {{ isSetupMode ? 'Configure Continuous Time-Based Authenticator' : 'Authorize Single-Use Envelope Signature' }}
           </div>
         </div>
 
         <!-- Global Alert Status Bar -->
-        <q-banner dense class="bg-[#181111] text-red-3 border-red rounded-borders q-pa-sm text-caption" v-if="errorMessage">
+        <q-banner dense class="bg-red-focus text-red-5 border-red rounded-borders q-pa-sm text-caption" v-if="errorMessage">
           <template v-slot:avatar>
-            <q-icon name="warning" color="red-4" size="xs" />
+            <q-icon name="warning" color="red-5" size="xs" />
           </template>
           {{ errorMessage }}
         </q-banner>
 
-        <q-banner dense class="bg-[#111611] text-green-3 border-green rounded-borders q-pa-sm text-caption" v-if="successMessage">
+        <q-banner dense class="bg-green-focus text-green-5 border-green rounded-borders q-pa-sm text-caption" v-if="successMessage">
           <template v-slot:avatar>
-            <q-icon name="check_circle" color="green-4" size="xs" />
+            <q-icon name="check_circle" color="green-5" size="xs" />
           </template>
           {{ successMessage }}
         </q-banner>
@@ -32,16 +32,16 @@
         <!-- STATE 1: INITIAL TOTP CONFIGURATION SETUP -->
         <div class="column op-gap-16 items-center full-width" v-if="isSetupMode">
           
-          <div class="bg-[#13171c] q-pa-md rounded-borders border-muted text-center full-width column op-gap-8">
-            <span class="text-metric-sm text-grey-4 text-weight-bold">Scan Cryptographic Matrix using Authenticator App</span>
+          <div class="bg-subpanel q-pa-md rounded-borders border-main text-center full-width column op-gap-8">
+            <span class="text-metric-sm text-secondary text-weight-bold">Scan Cryptographic Matrix using Authenticator App</span>
             <div class="qr-placeholder bg-white q-pa-sm rounded-borders self-center" style="width: 160px; height: 160px; display: grid; place-items: center;">
               <img :src="qrCodeDataUrl" v-if="qrCodeDataUrl" class="fit" alt="TOTP Setup QR Code" />
               <q-spinner-dots color="black" size="md" v-else />
             </div>
             
             <div class="column op-gap-2 q-mt-xs">
-              <span class="text-grey-6" style="font-size: 10px;">Manual Base32 Secret Key Entry:</span>
-              <span class="text-metric-mono text-cyan-3 text-weight-bold select-all" style="font-size: 11px;">
+              <span class="text-muted" style="font-size: 10px;">Manual Base32 Secret Key Entry:</span>
+              <span class="text-metric-mono text-blue-5 text-weight-bold select-all" style="font-size: 11px;">
                 {{ setupSecretString || 'GENERATING_SECURE_HASH_RING...' }}
               </span>
             </div>
@@ -49,28 +49,27 @@
 
           <q-form @submit.prevent="executeMfaSetupVerification" class="column op-gap-16 full-width">
             <div>
-              <div class="text-caption text-grey-5 q-mb-xs text-center">Verify 6-Digit Generated Signature Code *</div>
+              <div class="text-caption text-muted q-mb-xs text-center">Verify 6-Digit Generated Signature Code *</div>
               <q-input
                 v-model="totpInput"
-                dark
+                :dark="true"
                 filled
                 dense
                 placeholder="000000"
                 mask="######"
-                class="bg-[#14191f] text-white rounded-borders text-center text-metric-mono text-weight-bold"
+                class="bg-subpanel text-main rounded-borders text-center text-metric-mono text-weight-bold"
                 style="font-size: 18px;"
                 autofocus
                 :rules="[val => val.length === 6 || 'Verification format must equal exactly 6 digits']"
               />
-              <div class="text-center text-metric-sm text-grey-6 q-mt-xs">
-                Simulated passing setup tokens: <span class="text-cyan-4 cursor-pointer" @click="totpInput = '000000'">000000</span> or <span class="text-cyan-4 cursor-pointer" @click="totpInput = '123456'">123456</span>
+              <div class="text-center text-metric-sm text-muted q-mt-xs">
+                Simulated passing setup tokens: <span class="text-blue-5 cursor-pointer" @click="totpInput = '000000'">000000</span> or <span class="text-blue-5 cursor-pointer" @click="totpInput = '123456'">123456</span>
               </div>
             </div>
 
             <q-btn
               type="submit"
-              color="amber-4"
-              text-color="black"
+              color="amber-5"
               label="Confirm & Bind Hardware Authenticator"
               class="full-width text-weight-bold tracking-wide"
               unelevated
@@ -83,34 +82,33 @@
         <!-- STATE 2: STANDARD TOTP CHALLENGE PASS -->
         <q-form @submit.prevent="executeStandardVerification" class="column op-gap-16 full-width" v-else>
           
-          <div class="bg-[#13171c] q-pa-md rounded-borders border-muted text-center column op-gap-4">
-            <span class="text-white text-weight-bold text-caption">Identity Boundary Elevation Guard</span>
-            <span class="text-metric-sm text-grey-5">Provide short-lived cryptographic one-time token pass to verify operator access attestation.</span>
+          <div class="bg-subpanel q-pa-md rounded-borders border-main text-center column op-gap-4">
+            <span class="text-main text-weight-bold text-caption">Identity Boundary Elevation Guard</span>
+            <span class="text-metric-sm text-muted">Provide short-lived cryptographic one-time token pass to verify operator access attestation.</span>
           </div>
 
           <div>
-            <div class="text-caption text-grey-5 q-mb-xs text-center">Enter 6-Digit Verification Code *</div>
+            <div class="text-caption text-muted q-mb-xs text-center">Enter 6-Digit Verification Code *</div>
             <q-input
               v-model="totpInput"
-              dark
+              :dark="true"
               filled
               dense
               placeholder="000000"
               mask="######"
-              class="bg-[#14191f] text-white rounded-borders text-center text-metric-mono text-weight-bold"
+              class="bg-subpanel text-main rounded-borders text-center text-metric-mono text-weight-bold"
               style="font-size: 18px;"
               autofocus
               :rules="[val => val.length === 6 || 'Verification code must equal exactly 6 digits']"
             />
-            <div class="text-center text-metric-sm text-grey-6 q-mt-xs">
-              Simulated validation keys: <span class="text-cyan-4 cursor-pointer" @click="totpInput = '000000'">000000</span> or <span class="text-cyan-4 cursor-pointer" @click="totpInput = '123456'">123456</span>
+            <div class="text-center text-metric-sm text-muted q-mt-xs">
+              Simulated validation keys: <span class="text-blue-5 cursor-pointer" @click="totpInput = '000000'">000000</span> or <span class="text-blue-5 cursor-pointer" @click="totpInput = '123456'">123456</span>
             </div>
           </div>
 
           <q-btn
             type="submit"
-            color="amber-4"
-            text-color="black"
+            color="amber-5"
             label="Authorize Session Boundary"
             class="full-width text-weight-bold tracking-wide"
             unelevated
@@ -120,8 +118,8 @@
         </q-form>
 
         <!-- Actions footer -->
-        <div class="row items-center justify-between border-top q-pt-md text-metric-sm text-grey-6">
-          <a href="#" class="text-grey-5 hover-cyan" @click.prevent="returnToRootAuth">← Switch Operator Profile</a>
+        <div class="row items-center justify-between border-top q-pt-md text-metric-sm text-muted">
+          <a href="#" class="text-secondary hover-cyan" @click.prevent="returnToRootAuth">← Switch Operator Profile</a>
           <span>Lineage Audit Source Active</span>
         </div>
 
@@ -270,6 +268,6 @@ const returnToRootAuth = () => {
   letter-spacing: 0.05em;
 }
 .hover-cyan:hover {
-  color: #22b8cf !important;
+  color: var(--enterprise-blue) !important;
 }
 </style>

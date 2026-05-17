@@ -1,11 +1,19 @@
 <!-- invify-admin/src/pages/TenantsPage.vue -->
 <template>
-  <q-page class="q-pa-lg bg-dark text-white">
+  <q-page class="q-pa-lg bg-main text-main">
     <!-- Header -->
     <div class="row items-center q-mb-lg">
       <div class="col">
-        <h1 class="text-h4 text-weight-bold q-ma-none text-white">Tenants</h1>
-        <div class="text-grey-6">Manage business organizations and schools.</div>
+        <h1 class="text-h4 text-weight-bold q-ma-none text-main cursor-help">
+          Tenants Identity Matrix
+          <EnterpriseManualTooltip 
+            title="Tenants Identity Matrix"
+            icon="corporate_fare"
+            description="The master record of all businesses, schools, and organizations onboarded into the ecosystem. This view allows for global oversight of activation states and plan expiration lineage."
+            impact="READ_ONLY: Primary operational record."
+          />
+        </h1>
+        <div class="text-muted">Manage business organizations and schools.</div>
       </div>
       <div class="col-auto">
         <q-btn 
@@ -20,10 +28,10 @@
     </div>
 
     <!-- Filters -->
-    <q-card class="bg-blue-grey-10 q-mb-lg shadow-2 border-indigo">
+    <q-card class="bg-panel q-mb-lg shadow-2 border-indigo no-shadow">
       <q-card-section class="row q-col-gutter-md items-center">
         <div class="col-12 col-md-4">
-          <q-input v-model="filter.name" label="Search by Name" dark filled dense @update:model-value="fetchTenants">
+          <q-input v-model="filter.name" label="Search by Name" :dark="prefs.isDarkMode" filled dense @update:model-value="fetchTenants">
             <template v-slot:append>
               <q-icon name="search" />
             </template>
@@ -34,7 +42,7 @@
             v-model="filter.type" 
             :options="['all', 'school', 'retail', 'service']" 
             label="Type" 
-            dark filled dense 
+            :dark="prefs.isDarkMode" filled dense 
             emit-value
             @update:model-value="fetchTenants" 
           />
@@ -42,9 +50,9 @@
         <div class="col-12 col-md-3">
           <q-select 
             v-model="filter.status" 
-            :options="['all', 'active', 'suspended']" 
+            :options="['all', 'pending', 'active', 'suspended']" 
             label="Status" 
-            dark filled dense
+            :dark="prefs.isDarkMode" filled dense
             emit-value
             @update:model-value="fetchTenants" 
           />
@@ -60,13 +68,13 @@
       :loading="loading"
       flat
       bordered
-      dark
-      class="bg-blue-grey-10 shadow-2"
+      :dark="prefs.isDarkMode"
+      class="bg-panel shadow-2 no-shadow"
       :pagination="pagination"
     >
       <template v-slot:body-cell-device_serial="props">
         <q-td :props="props">
-          <span class="text-grey-4 text-weight-medium" style="font-family: monospace; font-size: 11px;">
+          <span class="text-muted text-weight-medium" style="font-family: monospace; font-size: 11px;">
             {{ props.value }}
           </span>
         </q-td>
@@ -88,7 +96,7 @@
       <template v-slot:body-cell-status="props">
         <q-td :props="props">
           <q-chip 
-            :color="props.value === 'active' ? 'green-10' : 'red-10'" 
+            :color="props.value === 'active' ? 'green-10' : (props.value === 'pending' ? 'amber-10' : 'red-10')" 
             text-color="white" 
             size="sm"
             dense
@@ -137,7 +145,10 @@ import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../api'
 import TenantModal from '../components/modals/TenantModal.vue'
+import { useOperatorPreferences } from '../composables/useOperatorPreferences'
+import EnterpriseManualTooltip from '../components/common/EnterpriseManualTooltip.vue'
 
+const { prefs } = useOperatorPreferences()
 const $q = useQuasar()
 const $router = useRouter()
 

@@ -1,6 +1,6 @@
 <!-- invify-admin/src/layouts/MainLayout.vue -->
 <template>
-  <q-layout view="hHh Lpr lFf" class="bg-[#0b0f12] text-[#e1e7ec]">
+  <q-layout view="hHh Lpr lFf" :class="prefs.isDarkMode ? 'theme-dark' : 'theme-light'">
     
     <!-- Universal Extensible Command Palette Shell -->
     <EnterpriseCommandPalette ref="paletteRef" />
@@ -30,14 +30,14 @@
           </div>
 
           <!-- Active Multi-Tenant Boundary Identifier Tag -->
-          <q-btn-dropdown dense flat size="sm" color="amber-4" content-style="background-color: #101826; border: 1px solid #1F2D42;" class="text-metric-sm border-amber-left q-ml-xs v-hide-xs">
+          <q-btn-dropdown dense flat size="sm" color="amber-4" :content-style="prefs.isDarkMode ? 'background-color: #101826; border: 1px solid #1F2D42;' : 'background-color: #FFFFFF; border: 1px solid #D1D5DB;'" class="text-metric-sm border-amber-left q-ml-xs v-hide-xs">
             <template v-slot:label>
               <span class="text-weight-bold">{{ (prefs?.activeTenantScope || 'global').toUpperCase() }}</span>
             </template>
-            <q-list dark class="bg-[#101826] text-caption">
+            <q-list :dark="prefs.isDarkMode" class="bg-panel text-caption">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Tenant Scope Context</q-item-label>
               <q-item clickable v-close-popup @click="setTenantScope('global')" class="hover-bg">
-                <q-item-section class="text-white">Global Master Array</q-item-section>
+                <q-item-section :class="prefs.isDarkMode ? 'text-white' : 'text-main'">Global Master Array</q-item-section>
               </q-item>
               <q-item clickable v-close-popup @click="setTenantScope('tenant-alpha')" class="hover-bg">
                 <q-item-section class="text-cyan-3">Tenant Alpha Scope</q-item-section>
@@ -52,12 +52,13 @@
         <!-- SECTION 2: Dynamic Workspace Strip (Center - Scrolling) -->
         <div class="col h-full min-width-0 q-mx-sm overflow-hidden">
           <q-tabs
-            v-model="prefs.activeWorkspace"
+            :model-value="prefs.activeWorkspace"
+            @update:model-value="switchWorkspace"
             dense
             align="left"
-            class="text-grey-6 workspace-tabs h-full"
+            class="text-appbar-inactive workspace-tabs h-full"
             active-color="white"
-            indicator-color="cyan-4"
+            indicator-color="blue-5"
             breakpoint="0"
             outside-arrows
             mobile-arrows
@@ -68,9 +69,8 @@
               :name="ws.id"
               :label="ws.label"
               class="workspace-tab-item text-caption q-px-md"
-              @click="switchWorkspace(ws.id)"
             >
-              <div v-if="ws.priority" class="priority-dot bg-cyan-4"></div>
+              <div v-if="ws.priority" class="priority-dot bg-blue-5"></div>
             </q-tab>
           </q-tabs>
         </div>
@@ -80,48 +80,62 @@
           
           <!-- Universal Command Palette Launcher Action -->
           <div 
-            class="bg-[#161b20] q-px-sm q-py-xs rounded-borders border-muted row items-center op-gap-4 text-grey-5 text-caption cursor-pointer no-wrap hover-bg"
+            class="enterprise-subpanel q-px-sm q-py-xs rounded-borders row items-center op-gap-4 text-grey-5 text-caption cursor-pointer no-wrap hover-bg"
             @click="openCommandPalette"
             style="height: 28px;"
           >
-            <q-icon name="terminal" size="xs" color="cyan-3" />
+            <q-icon name="terminal" size="xs" color="blue-5" />
             <span style="font-size: 11px;" class="v-hide-sm">Command Index...</span>
             <q-badge color="blue-grey-9" text-color="grey-4" label="Ctrl+K" class="text-metric-sm q-ml-xs" />
           </div>
 
-          <!-- Throttled WebSocket Diagnostic View -->
-          <div class="row items-center op-gap-8 no-wrap bg-[#161b20] q-px-sm q-py-xs rounded-borders border-muted v-hide-md" style="height: 28px;">
-            <span class="live-indicator-dot" :class="isConnected ? 'bg-green-5' : 'pulse-critical'"></span>
-            <div class="text-right">
-              <div class="text-metric-mono text-grey-4" style="font-size: 10px; line-height: 1;">{{ throttledThroughput }} eps</div>
-              <div class="text-grey-6" style="font-size: 9px; line-height: 1; margin-top: 2px;">{{ latencyMs }}ms WS</div>
-            </div>
+          <!-- Theme Toggle & Diagnostic View -->
+          <div class="row items-center op-gap-8 no-wrap enterprise-subpanel q-px-sm q-py-xs rounded-borders" style="height: 28px;">
+             <q-btn 
+               flat 
+               dense 
+               round 
+               size="xs" 
+               :icon="prefs.isDarkMode ? 'light_mode' : 'dark_mode'" 
+               :color="prefs.isDarkMode ? 'amber-5' : 'blue-5'"
+               @click="toggleTheme"
+             />
+             <q-separator vertical dark class="q-mx-xs bg-[#22282d]" />
+             <span class="live-indicator-dot" :class="isConnected ? 'bg-green-5' : 'pulse-critical'"></span>
+             <div class="text-right">
+               <div class="text-metric-mono text-grey-4" style="font-size: 10px; line-height: 1;">{{ throttledThroughput }} eps</div>
+               <div class="text-grey-6" style="font-size: 9px; line-height: 1; margin-top: 2px;">{{ latencyMs }}ms WS</div>
+             </div>
           </div>
 
           <!-- Active Persistent Operator State Hook -->
-          <q-btn-dropdown dense flat size="sm" color="grey-4" content-style="background-color: #101826; border: 1px solid #1F2D42;" class="q-px-xs">
+          <q-btn-dropdown dense flat size="sm" color="grey-4" :content-style="prefs.isDarkMode ? 'background-color: #101826; border: 1px solid #1F2D42;' : 'background-color: #FFFFFF; border: 1px solid #D1D5DB;'" class="q-px-xs">
             <template v-slot:label>
               <div class="row items-center op-gap-4 no-wrap text-left">
-                <q-icon :name="isSyncingBackend ? 'cloud_sync' : 'shield'" :color="isSyncingBackend ? 'amber-3' : 'indigo-4'" size="xs" />
+                <q-icon :name="isSyncingBackend ? 'cloud_sync' : 'shield'" :color="isSyncingBackend ? 'amber-5' : 'blue-5'" size="xs" />
                 <div class="v-hide-xs">
                   <div class="text-operator-title text-white" style="font-size: 9px; line-height: 1;">
-                    {{ isSyncingBackend ? 'SYNCING...' : 'Operator Node' }}
+                    {{ isSyncingBackend ? 'SYNCING...' : (operatorRole === 'SUPER_ADMIN' ? 'Operator Node' : (operatorRole === 'OWNER' ? 'Tenant Owner' : 'Workspace Node')) }}
                   </div>
-                  <div class="text-metric-sm text-cyan-3" style="font-size: 10px;">sysadmin@IIPS.app</div>
+                  <div class="text-metric-sm text-blue-3" style="font-size: 10px;">{{ operatorEmail }}</div>
                 </div>
               </div>
             </template>
-            <q-list dark class="bg-[#101826] text-caption">
+            <q-list :dark="prefs.isDarkMode" class="bg-panel text-caption">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Backend Continuity Sync</q-item-label>
               <q-item clickable v-close-popup @click="fetchPreferencesFromBackend" class="hover-bg">
-                <q-item-section avatar><q-icon name="cloud_download" size="xs" color="cyan-3" /></q-item-section>
+                <q-item-section avatar><q-icon name="cloud_download" size="xs" color="blue-5" /></q-item-section>
                 <q-item-section class="text-white">Pull Cloud Profile Context</q-item-section>
+              </q-item>
+              <q-item clickable v-close-popup to="/onboarding" class="hover-bg">
+                <q-item-section avatar><q-icon name="rocket_launch" size="xs" color="amber-4" /></q-item-section>
+                <q-item-section class="text-white text-weight-bold">🧪 Onboarding Testing Flow</q-item-section>
               </q-item>
               <q-item clickable v-close-popup @click="clearHistory" class="hover-bg">
                 <q-item-section avatar><q-icon name="history" size="xs" color="amber-4" /></q-item-section>
                 <q-item-section class="text-white">Clear Local Session Trace</q-item-section>
               </q-item>
-              <q-separator dark class="bg-[#1c2633]" />
+              <q-separator :dark="prefs.isDarkMode" />
               <q-item clickable v-close-popup @click="executeLogout" class="hover-bg text-red-3">
                 <q-item-section avatar><q-icon name="logout" size="xs" color="red-4" /></q-item-section>
                 <q-item-section class="text-weight-bold">Secure Session Logout</q-item-section>
@@ -137,8 +151,8 @@
       v-model="drawerVisibility"
       show-if-above
       bordered
-      style="background-color: var(--sidebar-panel-bg);"
-      class="text-[#9fb3c8]"
+      style="background-color: var(--sidebar-panel-bg); color: var(--enterprise-text-secondary);"
+      class="sidebar-drawer"
       :width="230"
       :breakpoint="768"
     >
@@ -148,12 +162,12 @@
           <!-- Workspace Overview block -->
           <div class="q-px-md q-pt-md q-pb-xs row items-center justify-between no-wrap">
             <div class="row items-center op-gap-4 no-wrap">
-              <span class="text-operator-title text-white">{{ activeWorkspaceObj?.label }}</span>
-              <q-badge color="blue-grey-9" text-color="cyan-3" class="text-metric-sm" v-if="activeWorkspaceObj?.priority">
+              <span class="text-operator-title text-main">{{ activeWorkspaceObj?.label }}</span>
+              <q-badge :color="prefs.isDarkMode ? 'blue-grey-10' : 'blue-1'" :text-color="prefs.isDarkMode ? 'cyan-3' : 'blue-8'" class="text-metric-sm" v-if="activeWorkspaceObj?.priority">
                 PRIORITY
               </q-badge>
             </div>
-            <span class="text-metric-mono text-grey-6" style="font-size: 10px;">THROTTLED</span>
+            <span class="text-metric-mono text-muted" style="font-size: 10px;">THROTTLED</span>
           </div>
 
           <!-- Dynamic Sidebar Tree (Restrained Motion + Throttled Aggregated Counters) -->
@@ -164,20 +178,20 @@
               clickable
               v-ripple
               :to="item.path"
-              active-class="bg-[#161b20] text-white border-left-active"
-              class="q-mx-xs rounded-borders text-grey-4 nav-item column justify-center"
+              active-class="sidebar-item-active"
+              class="q-mx-xs rounded-borders text-secondary nav-item column justify-center"
               style="min-height: 30px; padding: 2px 10px;"
             >
               <div class="row items-center justify-between fit no-wrap">
                 <div class="row items-center op-gap-8 no-wrap overflow-hidden">
-                  <q-icon :name="item.icon" size="xs" :class="`text-${item.color || 'grey-5'}`" style="min-width: 16px;" />
-                  <span class="text-caption text-weight-medium ellipsis" style="font-size: 12px;">{{ item.label }}</span>
+                  <q-icon :name="item.icon" size="xs" :class="`text-${item.color || 'secondary'}`" style="min-width: 16px;" />
+                  <span class="text-caption text-weight-medium ellipsis" style="font-size: 12px; color: inherit;">{{ item.label }}</span>
                 </div>
 
                 <!-- Throttled Counter strings & Restrained Warning state indicators -->
                 <div class="row items-center op-gap-4 no-wrap">
                   <!-- Counters updated inside batched 2000ms execution aggregation windows -->
-                  <span class="text-metric-mono text-grey-5" style="font-size: 11px;" v-if="item.count">{{ item.count }}</span>
+                  <span class="text-metric-mono text-muted" style="font-size: 11px;" v-if="item.count">{{ item.count }}</span>
                   
                   <q-badge 
                     :color="item.badgeBg || 'blue-grey-9'" 
@@ -200,15 +214,15 @@
             </q-item>
           </q-list>
 
-          <q-separator dark class="q-my-md q-mx-sm bg-[#22282d]" />
+          <q-separator :dark="prefs.isDarkMode" class="q-my-md q-mx-sm opacity-10" />
 
           <!-- Pinned View Shortcuts -->
-          <div class="q-px-md q-py-xs row items-center justify-between text-operator-title text-grey-6">
+          <div class="q-px-md q-py-xs row items-center justify-between text-operator-title">
             <span>Operator Pinned Layouts</span>
-            <q-icon name="push_pin" size="xs" color="cyan-4" />
+            <q-icon name="push_pin" size="xs" color="amber-5" />
           </div>
 
-          <div class="q-px-md q-py-xs text-grey-5 text-caption italic" style="font-size: 11px;" v-if="prefs.pinnedViews.length === 0">
+          <div class="q-px-md q-py-xs text-muted text-caption italic" style="font-size: 11px;" v-if="prefs.pinnedViews.length === 0">
             No pinned items.
           </div>
           <q-list dense class="q-gutter-y-xs" v-else>
@@ -217,19 +231,19 @@
               :key="pin" 
               clickable 
               :to="pin" 
-              class="q-mx-xs rounded-borders text-grey-5" 
+              class="q-mx-xs rounded-borders text-secondary" 
               style="min-height: 24px; padding: 0 10px;"
             >
-              <q-item-section avatar style="min-width: 20px;"><q-icon name="bookmark" size="xs" color="cyan-5" /></q-item-section>
+              <q-item-section avatar style="min-width: 20px;"><q-icon name="bookmark" size="xs" color="blue-5" /></q-item-section>
               <q-item-section><q-item-label style="font-size: 11px;" class="ellipsis">{{ pin }}</q-item-label></q-item-section>
               <q-item-section side>
-                <q-icon name="close" size="xs" class="cursor-pointer text-grey-6" @click.prevent="togglePinView(pin)" />
+                <q-icon name="close" size="xs" class="cursor-pointer text-muted" @click.prevent="togglePinView(pin)" />
               </q-item-section>
             </q-item>
           </q-list>
 
           <!-- History Traversal log string -->
-          <div class="q-px-md q-pt-sm q-pb-xs text-operator-title text-grey-6 q-mt-sm" v-if="prefs.recentHistory.length > 0">
+          <div class="q-px-md q-pt-sm q-pb-xs text-operator-title q-mt-sm" v-if="prefs.recentHistory.length > 0">
             Session History
           </div>
           <q-list dense class="q-gutter-y-xs">
@@ -238,7 +252,7 @@
               :key="hist.timestamp" 
               clickable 
               :to="hist.path" 
-              class="q-mx-xs rounded-borders text-grey-6" 
+              class="q-mx-xs rounded-borders text-muted" 
               style="min-height: 22px; padding: 0 10px;"
             >
               <q-item-section avatar style="min-width: 16px;"><q-icon name="history" size="xs" style="font-size: 11px;" /></q-item-section>
@@ -249,14 +263,14 @@
         </q-scroll-area>
 
         <!-- Throttled Context State Indicator Box -->
-        <div class="col-auto bg-[#0e1215] q-pa-sm border-top text-caption text-grey-5" style="font-size: 10px;">
+        <div class="col-auto enterprise-panel q-pa-sm border-top text-caption text-secondary" style="font-size: 10px;">
           <div class="row items-center justify-between q-mb-xs">
-            <span>Tenant Scope Context</span>
+            <span class="text-secondary">Tenant Scope Context</span>
             <span class="text-metric-mono text-amber-3">{{ (prefs?.activeTenantScope || 'global').toUpperCase() }}</span>
           </div>
           <div class="row items-center justify-between">
-            <span>Counter Flushing</span>
-            <span class="text-metric-sm text-cyan-4">2000ms BATCHED</span>
+            <span class="text-secondary">Counter Flushing</span>
+            <span class="text-metric-sm text-blue-5">2000ms BATCHED</span>
           </div>
         </div>
 
@@ -264,20 +278,23 @@
     </q-drawer>
 
     <!-- Master Sub-frame page layer -->
-    <q-page-container class="bg-[#0b0f12]">
+    <q-page-container class="relative-position" style="background-color: var(--enterprise-page-bg);">
+      <!-- Ambient Branding Watermark -->
+      <div class="watermark-bg" />
+
       <!-- Route trace info header -->
-      <div class="bg-[#12161a] q-px-md q-py-xs row items-center justify-between border-bottom text-grey-5" style="font-size: 11px;">
+      <div class="enterprise-panel q-px-md q-py-xs row items-center justify-between border-bottom text-grey-5" style="font-size: 11px;">
         <div class="row items-center op-gap-8 no-wrap overflow-hidden">
-          <q-icon name="route" color="cyan-3" size="xs" />
-          <span class="text-white text-weight-medium ellipsis">Explicit Route Pathway: {{ $route.fullPath }}</span>
+          <q-icon name="route" color="blue-5" size="xs" />
+          <span class="text-main text-weight-medium ellipsis">Explicit Route Pathway: {{ $route.fullPath }}</span>
           <span>|</span>
-          <span class="text-metric-mono text-grey-6">RBAC Scope Check: Passed</span>
+          <span class="text-metric-mono text-muted">RBAC Scope Check: Passed</span>
         </div>
         <q-btn 
           flat 
           dense 
           size="xs" 
-          :color="isViewPinned($route.path) ? 'cyan-3' : 'grey-6'" 
+          :color="isViewPinned($route.path) ? 'amber-5' : 'grey-6'" 
           :icon="isViewPinned($route.path) ? 'push_pin' : 'push_pin'" 
           :label="isViewPinned($route.path) ? 'Pinned' : 'Pin View'" 
           @click="togglePinView($route.path)" 
@@ -309,7 +326,10 @@ const route = useRoute()
 const $q = useQuasar()
 
 // Pull enhanced asynchronous persistent storage handlers
-const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, togglePinView, isViewPinned, pushHistory, clearHistory, executeLogout, fetchPreferencesFromBackend } = useOperatorPreferences()
+const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, toggleTheme, togglePinView, isViewPinned, pushHistory, clearHistory, executeLogout, fetchPreferencesFromBackend } = useOperatorPreferences()
+
+const operatorEmail = ref(localStorage.getItem('operator_email') || 'sysadmin@IIPS.app')
+const operatorRole = ref(localStorage.getItem('operator_role') || 'SUPER_ADMIN')
 
 const paletteRef = ref(null)
 const openCommandPalette = () => {
@@ -333,27 +353,70 @@ watch(() => route.path, () => {
   }
 }, { immediate: true })
 
-const workspaces = [
-  { id: 'fleet', label: 'Fleet Operations', priority: true },
-  { id: 'governance', label: 'Governance', priority: true },
-  { id: 'observability', label: 'Observability', priority: true },
-  { id: 'ai', label: 'AI Operational Intelligence', priority: true },
-  { id: 'deployments', label: 'Deployments', priority: false },
-  { id: 'apps', label: 'Applications', priority: false },
-  { id: 'incidents', label: 'Incident Response', priority: false },
-  { id: 'automation', label: 'Automation & Policy', priority: false },
-  { id: 'communications', label: 'Operational Communications', priority: false },
-  { id: 'admin', label: 'Administration', priority: false }
-]
+const workspaces = computed(() => {
+  const list = []
+  
+  // 1. Fleet Operations (accessible to all)
+  list.push({ id: 'fleet', label: 'Fleet Operations', priority: true })
+  
+  // 2. Governance (accessible to SUPER_ADMIN and STAFF)
+  if (['SUPER_ADMIN', 'STAFF'].includes(operatorRole.value)) {
+    list.push({ id: 'governance', label: 'Governance', priority: true })
+  }
+  
+  // 3. Observability (accessible to all)
+  list.push({ id: 'observability', label: 'Observability', priority: true })
+  
+  // 4. AI Operational Intelligence (accessible exclusively to SUPER_ADMIN)
+  if (operatorRole.value === 'SUPER_ADMIN') {
+    list.push({ id: 'ai', label: 'AI Operational Intelligence', priority: true })
+  }
+  
+  // 5. Deployments (accessible exclusively to SUPER_ADMIN)
+  if (operatorRole.value === 'SUPER_ADMIN') {
+    list.push({ id: 'deployments', label: 'Deployments', priority: false })
+  }
+  
+  // 6. Applications (accessible exclusively to SUPER_ADMIN)
+  if (operatorRole.value === 'SUPER_ADMIN') {
+    list.push({ id: 'apps', label: 'Applications', priority: false })
+  }
+  
+  // 7. Incident Response (accessible exclusively to SUPER_ADMIN)
+  if (operatorRole.value === 'SUPER_ADMIN') {
+    list.push({ id: 'incidents', label: 'Incident Response', priority: false })
+  }
+  
+  // 8. Automation & Policy (accessible exclusively to SUPER_ADMIN)
+  if (operatorRole.value === 'SUPER_ADMIN') {
+    list.push({ id: 'automation', label: 'Automation & Policy', priority: false })
+  }
+  
+  // 9. Operational Communications (accessible to SUPER_ADMIN and STAFF)
+  if (['SUPER_ADMIN', 'STAFF'].includes(operatorRole.value)) {
+    list.push({ id: 'communications', label: 'Operational Communications', priority: false })
+  }
+  
+  // 10. Administration (accessible exclusively to SUPER_ADMIN)
+  if (operatorRole.value === 'SUPER_ADMIN') {
+    list.push({ id: 'admin', label: 'Administration', priority: false })
+  }
+  
+  return list
+})
 
+// Centralized Workspace Switching Logic
 const activeWorkspaceObj = computed(() => {
-  return workspaces.find(w => w.id === prefs.value.activeWorkspace) || workspaces[0]
+  return workspaces.value.find(w => w.id === prefs.value.activeWorkspace) || workspaces.value[0]
 })
 
 const switchWorkspace = (id) => {
+  if (prefs.value.activeWorkspace === id) return
   setActiveWorkspace(id)
-  
-  // Scoped landing pages preserving absolute explicit path structures
+}
+
+// Watch for workspace changes to handle routing (Single Source of Truth)
+watch(() => prefs.value.activeWorkspace, (newId) => {
   const targetMap = {
     fleet: '/fleet/overview',
     governance: '/governance/compliance',
@@ -367,10 +430,10 @@ const switchWorkspace = (id) => {
     admin: '/admin/settings'
   }
   
-  if (targetMap[id]) {
-    router.push(targetMap[id]).catch(() => {})
+  if (targetMap[newId]) {
+    router.push(targetMap[newId]).catch(() => {})
   }
-}
+})
 
 /**
  * FINAL REFINEMENT #4: Stream-Throttled Counter Mechanisms.
@@ -539,6 +602,27 @@ onBeforeUnmount(() => {
   height: 100%;
 }
 
+.watermark-bg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px;
+  height: 500px;
+  background-image: url('../assets/logo_transparent.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.theme-dark .watermark-bg {
+  opacity: 0.12;
+  filter: brightness(1.6) contrast(1.1);
+}
+
 .workspace-tab-item {
   height: 42px;
   min-height: 42px;
@@ -580,10 +664,15 @@ onBeforeUnmount(() => {
   background-color: rgba(34, 184, 207, 0.1);
 }
 
-.border-left-active {
+.sidebar-item-active {
   border-left: 3px solid var(--sidebar-accent) !important;
   background-color: var(--sidebar-active) !important;
-  box-shadow: inset 1px 0 8px rgba(31, 111, 235, 0.15);
+  color: var(--enterprise-text-main) !important;
+  box-shadow: inset 1px 0 8px rgba(31, 111, 235, 0.08);
+}
+
+.bg-muted {
+  background-color: var(--enterprise-text-muted) !important;
 }
 
 .priority-dot {

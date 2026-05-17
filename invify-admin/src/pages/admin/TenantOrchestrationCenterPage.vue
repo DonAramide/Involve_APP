@@ -1,11 +1,11 @@
 <template>
-  <q-page class="q-pa-md invify-dark-bg text-white">
+  <q-page class="q-pa-md bg-main text-main">
     <!-- Premium Experience Top Header -->
     <div class="row items-center justify-between q-mb-lg">
       <div>
-        <div class="text-overline text-primary">Multi-Tenant Module Experience Ecosystem</div>
+        <div class="text-overline text-blue-5">Multi-Tenant Module Experience Ecosystem</div>
         <h1 class="text-h4 text-weight-bold q-my-none">Tenant Orchestration Center</h1>
-        <p class="text-caption text-grey-4 q-mt-xs">
+        <p class="text-caption text-muted q-mt-xs">
           Granularly manage backend-authoritative module visibility, reactive JSON branding tokens, feature flags, and subscription tier consumption indices.
         </p>
       </div>
@@ -13,7 +13,7 @@
       <div class="row q-gutter-sm">
         <q-select
           filled
-          dark
+          :dark="prefs.isDarkMode"
           v-model="selectedTenantId"
           :options="tenantOptions"
           label="Active Execution Context"
@@ -23,7 +23,7 @@
           @update:model-value="onTenantContextChanged"
         />
         <q-btn
-          color="primary"
+          color="blue-5"
           icon="refresh"
           label="Re-Hydrate Context"
           :loading="isLoadingContext"
@@ -39,7 +39,7 @@
       inline-actions
       rounded
       :class="bannerBgClass"
-      class="q-mb-md text-white border-radius-md"
+      class="q-mb-md text-main border-radius-md"
     >
       <template v-slot:avatar>
         <q-icon :name="bannerIcon" size="sm" />
@@ -51,17 +51,23 @@
     <div class="row q-col-gutter-md">
       <!-- COLUMN 1: Baseline Onboarding Presets & Subscription Plans -->
       <div class="col-12 col-md-4">
-        <q-card dark bordered class="invify-card-bg q-pa-md border-radius-md no-shadow">
-          <div class="text-subtitle1 text-weight-bold text-primary q-mb-sm">
+        <q-card bordered class="enterprise-panel bg-panel q-pa-md border-radius-md no-shadow">
+          <div class="text-subtitle1 text-weight-bold text-blue-5 q-mb-sm cursor-help">
             <q-icon name="rocket_launch" class="q-mr-xs" /> Automated Hybrid Onboarding
+            <EnterpriseManualTooltip 
+              title="Automated Hybrid Onboarding"
+              icon="rocket_launch"
+              description="A one-click orchestration engine that provisions a baseline set of modules based on industry verticals. It automatically sets up the theme, navigation menu, and database schemas required for the specific business type."
+              impact="HIGH: Generates multiple records across tenant and module tables."
+            />
           </div>
-          <p class="text-caption text-grey-4">
+          <p class="text-caption text-muted">
             Provisions lightweight mandatory functional cores immediately to accelerate first-login retention flows.
           </p>
 
           <q-select
             filled
-            dark
+            :dark="prefs.isDarkMode"
             dense
             v-model="onboardingIndustry"
             :options="industryOptions"
@@ -71,7 +77,7 @@
 
           <q-select
             filled
-            dark
+            :dark="prefs.isDarkMode"
             dense
             v-model="onboardingTier"
             :options="['FREE', 'PRO', 'ENTERPRISE', 'CUSTOM_FEDERATION']"
@@ -81,17 +87,25 @@
 
           <q-btn
             unelevated
-            color="primary"
+            color="blue-5"
             class="full-width"
             label="Execute Onboarding Provisioning"
             :loading="isProvisioning"
             @click="executeBaselineProvisioning"
           />
 
-          <q-separator dark class="q-my-md" />
+          <q-separator class="q-my-md border-main" />
 
-          <div class="text-subtitle2 text-weight-bold q-mb-xs">Elevate Subscription Tier Limits</div>
-          <p class="text-caption text-grey-4">Synchronously re-scales operational resource threshold boundaries.</p>
+          <div class="text-subtitle2 text-weight-bold q-mb-xs cursor-help">
+            Elevate Subscription Tier Limits
+            <EnterpriseManualTooltip 
+              title="Subscription Scaling"
+              icon="upgrade"
+              description="Dynamically re-calculates resource boundaries for the tenant. Elevating to PRO or ENTERPRISE increases API quotas, AI token limits, and unlocks advanced modules like GPS tracking or SSO."
+              impact="MODERATE: Updates plan status and resets usage counters."
+            />
+          </div>
+          <p class="text-caption text-muted">Synchronously re-scales operational resource threshold boundaries.</p>
 
           <div class="row q-gutter-xs justify-between">
             <q-btn size="sm" outline color="info" label="PRO" @click="elevatePlanTier('PRO')" />
@@ -101,27 +115,27 @@
         </q-card>
 
         <!-- Dynamic Branding Tokens Customizer -->
-        <q-card dark bordered class="invify-card-bg q-pa-md border-radius-md no-shadow q-mt-md">
-          <div class="text-subtitle1 text-weight-bold text-accent q-mb-sm">
+        <q-card bordered class="enterprise-panel bg-panel q-pa-md border-radius-md no-shadow q-mt-md">
+          <div class="text-subtitle1 text-weight-bold text-amber-5 q-mb-sm">
             <q-icon name="palette" class="q-mr-xs" /> Dynamic JSON Theme System
           </div>
-          <p class="text-caption text-grey-4">Hydrates client viewport palettes natively using compiled styling tokens.</p>
+          <p class="text-caption text-muted">Hydrates client viewport palettes natively using compiled styling tokens.</p>
 
-          <q-input filled dark dense v-model="customBrandPrimary" label="Primary Token (Hex)" class="q-mb-xs">
+          <q-input filled :dark="prefs.isDarkMode" dense v-model="customBrandPrimary" label="Primary Token (Hex)" class="q-mb-xs">
             <template v-slot:append>
               <q-icon name="colorize" class="cursor-pointer">
                 <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                  <q-color v-model="customBrandPrimary" dark />
+                  <q-color v-model="customBrandPrimary" :dark="prefs.isDarkMode" />
                 </q-popup-proxy>
               </q-icon>
             </template>
           </q-input>
 
-          <q-input filled dark dense v-model="customBrandSecondary" label="Secondary Token (Hex)" class="q-mb-xs">
+          <q-input filled :dark="prefs.isDarkMode" dense v-model="customBrandSecondary" label="Secondary Token (Hex)" class="q-mb-xs">
             <template v-slot:append>
               <q-icon name="colorize" class="cursor-pointer">
                 <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                  <q-color v-model="customBrandSecondary" dark />
+                  <q-color v-model="customBrandSecondary" :dark="prefs.isDarkMode" />
                 </q-popup-proxy>
               </q-icon>
             </template>
@@ -130,7 +144,7 @@
           <q-btn
             unelevated
             size="sm"
-            color="accent"
+            color="amber-5"
             class="full-width q-mt-sm"
             label="Inject Dynamic Overrides Locally"
             @click="triggerLiveBrandingUpdate"
@@ -140,19 +154,25 @@
 
       <!-- COLUMN 2: Granular Module Governance Controls -->
       <div class="col-12 col-md-4">
-        <q-card dark bordered class="invify-card-bg q-pa-md border-radius-md no-shadow full-height">
-          <div class="text-subtitle1 text-weight-bold text-secondary q-mb-sm">
+        <q-card bordered class="enterprise-panel bg-panel q-pa-md border-radius-md no-shadow full-height">
+          <div class="text-subtitle1 text-weight-bold text-secondary q-mb-sm cursor-help">
             <q-icon name="settings_input_component" class="q-mr-xs" /> Backend-Governed Modules
+            <EnterpriseManualTooltip 
+              title="Module Gatekeeper"
+              icon="security"
+              description="Enables or disables core functional blocks at the API gateway level. Even if a user has the mobile app, they cannot access these features unless the switch is ON here."
+              impact="CRITICAL: Affects real-time feature availability for all operators in the tenant."
+            />
           </div>
-          <p class="text-caption text-grey-4">
+          <p class="text-caption text-muted">
             Toggle functional module availability arrays. RBAC filters assert access rules natively prior to stream transport handshakes.
           </p>
 
-          <q-list dark separator class="border-radius-xs">
+          <q-list separator class="border-radius-xs">
             <q-item v-for="mod in availableModules" :key="mod.id" class="q-px-none">
               <q-item-section>
                 <q-item-label class="text-weight-medium">{{ mod.label }}</q-item-label>
-                <q-item-label caption class="text-grey-5">Scoped Array: {{ mod.id }}</q-item-label>
+                <q-item-label caption class="text-muted">Scoped Array: {{ mod.id }}</q-item-label>
               </q-item-section>
               <q-item-section side>
                 <q-toggle
@@ -164,55 +184,73 @@
             </q-item>
           </q-list>
 
-          <q-separator dark class="q-my-md" />
+          <q-separator class="q-my-md border-main" />
 
-          <div class="text-subtitle2 text-weight-bold text-grey-3 q-mb-xs">Extensible Feature Flags</div>
+          <div class="text-subtitle2 text-weight-bold text-secondary q-mb-xs">Extensible Feature Flags</div>
           <div class="column q-gutter-y-xs">
-            <q-checkbox dark dense :model-value="isFeatureFlagEnabled('enable_realtime_gps')" label="Real-time GPS Tracking" disable />
-            <q-checkbox dark dense :model-value="isFeatureFlagEnabled('enable_offline_pos_sync')" label="Offline-Ready POS Sync" disable />
-            <q-checkbox dark dense :model-value="isFeatureFlagEnabled('enable_sso_federation')" label="SSO/Federation Credentials" disable />
+            <q-checkbox :dark="prefs.isDarkMode" dense :model-value="isFeatureFlagEnabled('enable_realtime_gps')" label="Real-time GPS Tracking" disable />
+            <q-checkbox :dark="prefs.isDarkMode" dense :model-value="isFeatureFlagEnabled('enable_offline_pos_sync')" label="Offline-Ready POS Sync" disable />
+            <q-checkbox :dark="prefs.isDarkMode" dense :model-value="isFeatureFlagEnabled('enable_sso_federation')" label="SSO/Federation Credentials" disable />
           </div>
         </q-card>
       </div>
 
       <!-- COLUMN 3: Active Experience State Matrix & Realtime Consumption -->
       <div class="col-12 col-md-4">
-        <q-card dark bordered class="invify-card-bg q-pa-md border-radius-md no-shadow full-height column justify-between">
+        <q-card bordered class="enterprise-panel bg-panel q-pa-md border-radius-md no-shadow full-height column justify-between">
           <div>
             <div class="text-subtitle1 text-weight-bold text-info q-mb-sm">
               <q-icon name="insights" class="q-mr-xs" /> Active Viewport Hydration Profile
             </div>
 
-            <div class="bg-black q-pa-sm border-radius-xs font-monospace text-caption text-grey-3 q-mb-md" style="word-break: break-all;">
-              <div><span class="text-primary">Tenant ID:</span> {{ experienceContext.tenantId }}</div>
+            <div class="bg-subpanel q-pa-sm border-radius-xs font-monospace text-caption text-secondary q-mb-md" style="word-break: break-all;">
+              <div><span class="text-blue-5">Tenant ID:</span> {{ experienceContext.tenantId }}</div>
               <div><span class="text-secondary">Industry Spec:</span> {{ experienceContext.industryType }}</div>
-              <div><span class="text-accent">Plan Model:</span> {{ experienceContext.subscriptionTier }}</div>
+              <div><span class="text-amber-5">Plan Model:</span> {{ experienceContext.subscriptionTier }}</div>
               <div><span class="text-info">Mobile Preset Map:</span> {{ activeMobilePreset }}</div>
-              <div><span class="text-positive">Verified Modules:</span> {{ experienceContext.enabledModules?.length || 0 }} Loaded</div>
+              <div><span class="text-green-5">Verified Modules:</span> {{ experienceContext.enabledModules?.length || 0 }} Loaded</div>
             </div>
 
             <div class="text-subtitle2 text-weight-bold q-mb-xs">Real-time Usage Quota Gauges</div>
-            <p class="text-caption text-grey-5">Monthly operational transaction depth sweeps.</p>
+            <p class="text-caption text-muted">Monthly operational transaction depth sweeps.</p>
 
             <div v-for="(val, key) in activeQuotaGauges" :key="key" class="q-mb-sm">
               <div class="row justify-between text-caption q-mb-xs">
-                <span class="text-grey-3 font-monospace">{{ key }}</span>
-                <span class="text-weight-bold" :class="val.ratio > 0.85 ? 'text-negative' : 'text-primary'">
+                <span class="text-secondary font-monospace">{{ key }}</span>
+                <span class="text-weight-bold" :class="val.ratio > 0.85 ? 'text-red-5' : 'text-blue-5'">
                   {{ val.current }} / {{ val.limit }}
                 </span>
               </div>
               <q-linear-progress
-                dark
+                :dark="prefs.isDarkMode"
                 rounded
                 :value="val.ratio"
-                :color="val.ratio > 0.85 ? 'negative' : (val.ratio > 0.7 ? 'warning' : 'primary')"
+                :color="val.ratio > 0.85 ? 'red-5' : (val.ratio > 0.7 ? 'amber-5' : 'blue-5')"
                 size="6px"
               />
             </div>
           </div>
 
-          <div class="bg-dark q-pa-sm border-radius-xs text-center text-caption text-grey-5">
-            <q-icon name="verified" color="positive" class="q-mr-xs" /> Absolute Dynamic Multi-Tenant Domain Boundary Isolation Enforced.
+          <div class="bg-subpanel q-pa-sm border-radius-xs text-center text-caption text-muted">
+            <q-icon name="verified" color="green-5" class="q-mr-xs" /> Absolute Dynamic Multi-Tenant Domain Boundary Isolation Enforced.
+          </div>
+
+          <q-separator :dark="prefs.isDarkMode" class="q-my-md border-main" />
+          
+          <div class="bg-panel-darker q-pa-sm border-radius-md border-left-blue cursor-help">
+            <div class="text-subtitle2 text-blue-5 text-weight-bold row items-center q-mb-xs">
+              <q-icon name="hub" class="q-mr-xs" /> Domain Association Intelligence
+            </div>
+            <EnterpriseManualTooltip 
+              title="Identity & Context Mapping"
+              icon="hub"
+              description="The 'Tie' between your admin actions and the customer. This logic ensures that modifications are only applied to the selected Business (Tenant) and verified via the backend Multi-Tenant Isolation layer."
+              impact="SYSTEMIC: Ensures data integrity and tenant isolation."
+            />
+            <p class="text-caption text-secondary q-mb-none" style="font-size: 11px;">
+              Active controls are cryptographically tied to <span class="text-amber-5 text-weight-bold">{{ selectedTenantId }}</span>. 
+              Modifications are persisted to the Master Multi-Tenant Registry and enforced via backend RBAC middleware during mobile gateway handshakes.
+            </p>
           </div>
         </q-card>
       </div>
@@ -221,15 +259,15 @@
     <!-- ROW 2: Web Access Authorization Hub & Verification Telemetry -->
     <div class="row q-mt-md">
       <div class="col-12">
-        <q-card dark bordered class="invify-card-bg q-pa-md border-radius-md no-shadow" style="border-color: rgba(34, 184, 207, 0.3)">
+        <q-card bordered class="enterprise-panel bg-panel q-pa-md border-radius-md no-shadow" style="border-color: var(--enterprise-blue-focus)">
           <div class="row items-center justify-between q-mb-md">
             <div class="row items-center">
-              <q-avatar size="md" color="primary" text-color="white" class="q-mr-sm">
+              <q-avatar size="md" color="blue-5" text-color="white" class="q-mr-sm">
                 <q-icon name="admin_panel_settings" size="xs" />
               </q-avatar>
               <div>
-                <div class="text-subtitle1 text-weight-bold text-primary q-my-none">Web Access Synchronization & Verification Hub</div>
-                <div class="text-caption text-grey-4">Retrieve live real-time dynamic challenge pins and auto-approve connected operators instantly.</div>
+                <div class="text-subtitle1 text-weight-bold text-blue-5 q-my-none">Web Access Synchronization & Verification Hub</div>
+                <div class="text-caption text-muted">Retrieve live real-time dynamic challenge pins and auto-approve connected operators instantly.</div>
               </div>
             </div>
             <q-badge color="positive" outline class="q-pa-xs font-monospace">SOC Telemetry: ONLINE_SYNC_GATEWAY</q-badge>
@@ -238,24 +276,24 @@
           <div class="row q-col-gutter-md items-center">
             <!-- Left block: Dispatched challenge preview -->
             <div class="col-12 col-md-6">
-              <div class="bg-black q-pa-md border-radius-xs font-monospace relative-position" style="border: 1px solid rgba(255, 255, 255, 0.05)">
+              <div class="bg-subpanel q-pa-md border-radius-xs font-monospace relative-position border-main">
                 <div class="text-caption text-secondary q-mb-xs">PENDING CREDENTIAL MATRIX TARGET:</div>
-                <div class="text-subtitle2 text-white">Target Relay: <span class="text-accent">{{ pendingVerificationTarget }}</span></div>
-                <div class="text-caption text-grey-5 q-mt-xs">Validation Handshake Algorithm: HMAC_SHA256_PIN</div>
+                <div class="text-subtitle2 text-main">Target Relay: <span class="text-amber-5">{{ pendingVerificationTarget }}</span></div>
+                <div class="text-caption text-muted q-mt-xs">Validation Handshake Algorithm: HMAC_SHA256_PIN</div>
 
-                <q-separator dark class="q-my-sm" />
+                <q-separator :dark="prefs.isDarkMode" class="q-my-sm" />
 
                 <div class="row items-center justify-between">
                   <div>
-                    <div class="text-caption text-grey-4">Dispatched 6-Digit Challenge Pin:</div>
-                    <div class="text-h5 text-weight-bold text-primary letter-spacing-md font-monospace q-mt-xs">
+                    <div class="text-caption text-muted">Dispatched 6-Digit Challenge Pin:</div>
+                    <div class="text-h5 text-weight-bold text-blue-5 letter-spacing-md font-monospace q-mt-xs">
                       {{ isPinExposed ? liveChallengePin : '••••••' }}
                     </div>
                   </div>
                   <q-btn
                     size="sm"
                     outline
-                    :color="isPinExposed ? 'warning' : 'info'"
+                    :color="isPinExposed ? 'amber-5' : 'info'"
                     :icon="isPinExposed ? 'visibility_off' : 'visibility'"
                     :label="isPinExposed ? 'Conceal Code' : 'Retrieve Code'"
                     @click="isPinExposed = !isPinExposed"
@@ -267,13 +305,13 @@
             <!-- Right block: Auto-Approve controls -->
             <div class="col-12 col-md-6 column justify-between full-height">
               <div>
-                <div class="text-subtitle2 text-weight-bold text-grey-3 q-mb-xs">Automated Remote Operator Verification</div>
-                <p class="text-caption text-grey-4">
+                <div class="text-subtitle2 text-weight-bold text-secondary q-mb-xs">Automated Remote Operator Verification</div>
+                <p class="text-caption text-muted">
                   Injects validated authority claims straight into active redis session clusters, unblocking mobile operator interfaces autonomously.
                 </p>
 
                 <div class="row q-gutter-sm q-mt-xs items-center">
-                  <q-input filled dark dense v-model="customChallengeOverride" label="Override Sent Pin" class="col font-monospace" style="max-width: 160px" />
+                  <q-input filled :dark="prefs.isDarkMode" dense v-model="customChallengeOverride" label="Override Sent Pin" class="col font-monospace" style="max-width: 160px" />
                   <q-btn
                     size="sm"
                     color="secondary"
@@ -308,8 +346,11 @@ import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 import { useTenantExperience } from '../../composables/useTenantExperience'
+import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import EnterpriseManualTooltip from '../../components/common/EnterpriseManualTooltip.vue'
 
 const $q = useQuasar()
+const { prefs } = useOperatorPreferences()
 const {
   experienceContext,
   isLoadingContext,
@@ -376,9 +417,9 @@ const activeQuotaGauges = computed(() => {
 })
 
 const bannerBgClass = computed(() => {
-  if (activeQuotaSeverity.value === 'DOWNGRADE_READONLY') return 'bg-negative'
-  if (activeQuotaSeverity.value?.includes('WARNING')) return 'bg-warning text-black'
-  return 'bg-secondary'
+  if (activeQuotaSeverity.value === 'DOWNGRADE_READONLY') return 'bg-red-focus'
+  if (activeQuotaSeverity.value?.includes('WARNING')) return 'bg-amber-focus text-main'
+  return 'bg-blue-focus'
 })
 
 const bannerIcon = computed(() => {

@@ -12,6 +12,14 @@
  *    exclusively after token verification and RBAC assertion pipelines complete cleanly.
  */
 export function registerAuthBootstrapGuard(router) {
+  // Helper to determine role-based home landing path
+  const getHomePath = (role) => {
+    if (['SUPER_ADMIN', 'STAFF'].includes(role)) {
+      return '/fleet/overview'
+    }
+    return '/tenant/dashboard'
+  }
+
   router.beforeEach(async (to, from, next) => {
     // 1. Extract state storage parameters
     const token = localStorage.getItem('invify_token')
@@ -32,6 +40,11 @@ export function registerAuthBootstrapGuard(router) {
         return next('/mfa/challenge')
       }
       
+      // Strict Tenant Isolation redirection
+      if (!['SUPER_ADMIN', 'STAFF'].includes(operatorRole)) {
+        return next('/tenant/dashboard')
+      }
+
       // Fully validated session context -> Restore explicit target or cached preference
       try {
         const rawPrefs = localStorage.getItem('invify_enterprise_operator_prefs')
@@ -55,13 +68,13 @@ export function registerAuthBootstrapGuard(router) {
       } catch (e) {
         // Fallback gracefully
       }
-      return next('/fleet/overview')
+      return next(getHomePath(operatorRole))
     }
 
     // 3. Guest route rules (e.g., /login)
     if (to.meta?.isGuest) {
       if (isVerifiedSession) {
-        return next('/fleet/overview')
+        return next(getHomePath(operatorRole))
       }
       return next()
     }
@@ -74,7 +87,7 @@ export function registerAuthBootstrapGuard(router) {
       }
       if (isVerifiedSession) {
         // If MFA status already validated perfectly, restore main workspace access
-        return next('/fleet/overview')
+        return next(getHomePath(operatorRole))
       }
       return next()
     }
@@ -91,6 +104,20 @@ export function registerAuthBootstrapGuard(router) {
         return next('/mfa/challenge')
       }
 
+      // Gate 2.5: Platform Administration Layout Isolation (Strict Tenant Redirection)
+      if (!['SUPER_ADMIN', 'STAFF'].includes(operatorRole)) {
+        const adminPathPrefixes = [
+          '/fleet', '/governance', '/observability', '/ai', 
+          '/deployments', '/apps', '/incidents', '/admin', 
+          '/automation', '/communications'
+        ]
+        const pathLower = to.path.toLowerCase()
+        if (to.path === '/' || adminPathPrefixes.some(prefix => pathLower.startsWith(prefix))) {
+          console.warn(`[TENANT ISOLATION ENFORCED] Standard tenant operator [${operatorRole}] attempted global administration workspace traversal to [${to.path}]. Redirection to tenant hub initialized.`)
+          return next('/tenant/dashboard')
+        }
+      }
+
       // Gate 3: Native RBAC Claim evaluations
       if (to.meta?.permission) {
         // Simulated validation array matching the primary user tier matrix definitions
@@ -104,7 +131,7 @@ export function registerAuthBootstrapGuard(router) {
         if (!activePermissions.includes(to.meta.permission)) {
           console.warn(`[RBAC GATEWAY DENIAL] Operator scope [${operatorRole}] missing required capability claim: [${to.meta.permission}]`)
           // Deny lateral traversal directly to quarantine fallback screens or return to safe workspace base
-          return next('/fleet/overview')
+          return next(getHomePath(operatorRole))
         }
       }
 

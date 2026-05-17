@@ -1,27 +1,27 @@
 <!-- invify-admin/src/pages/governance/TenantManagementPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16 relative-position">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16 relative-position">
     
     <!-- PERSISTENT VISUAL WARNING BANNER DURING ACTIVE IMPERSONATION -->
     <!-- (Satisfies user requirement: display persistent visual warning banners during impersonation mode) -->
-    <div class="persistent-impersonation-banner bg-[#24111d] border-purple rounded-borders q-pa-sm row items-center justify-between shadow-5" v-if="activeImpersonationContext">
+    <div class="persistent-impersonation-banner bg-panel border-purple rounded-borders q-pa-sm row items-center justify-between shadow-5" v-if="activeImpersonationContext">
       <div class="row items-center op-gap-8 no-wrap">
-        <span class="inline-pulse-dot bg-purple-4"></span>
-        <q-icon name="admin_panel_settings" color="purple-3" size="sm" />
+        <span class="inline-pulse-dot bg-purple-5"></span>
+        <q-icon name="admin_panel_settings" color="purple-5" size="sm" />
         <div>
-          <div class="text-white text-weight-bold text-caption tracking-wide">
+          <div class="text-main text-weight-bold text-caption tracking-wide">
             SUPER ADMIN MASTER-MODE ELEVATION // TENANT IMPERSONATION ACTIVE
           </div>
-          <div class="text-purple-2" style="font-size: 10px;">
-            Target Namespace: <span class="text-white text-weight-bold">{{ activeImpersonationContext.targetTenantId }}</span> | Original Operator Attribution: <span class="text-white">{{ activeImpersonationContext.originalAdminId }}</span>
+          <div class="text-purple-5" style="font-size: 10px;">
+            Target Namespace: <span class="text-main text-weight-bold">{{ activeImpersonationContext.targetTenantId }}</span> | Original Operator Attribution: <span class="text-main">{{ activeImpersonationContext.originalAdminId }}</span>
           </div>
         </div>
       </div>
 
       <div class="row items-center op-gap-12 no-wrap">
         <div class="column items-end">
-          <span class="text-purple-3" style="font-size: 9px;">AUTOMATIC RUNTIME CAP:</span>
-          <span class="text-metric-mono text-white text-weight-bold">{{ remainingImpersonationTimeStr }}</span>
+          <span class="text-purple-5" style="font-size: 9px;">AUTOMATIC RUNTIME CAP:</span>
+          <span class="text-metric-mono text-main text-weight-bold">{{ remainingImpersonationTimeStr }}</span>
         </div>
         <q-btn
           color="purple-10"
@@ -39,17 +39,16 @@
     <!-- Title Configuration Header -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="corporate_fare" size="sm" color="cyan-3" />
+        <q-icon name="corporate_fare" size="sm" color="blue-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Multi-Tenant Namespace Allocation & Elevation Suite</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">DUAL_IDENTITY_AUDITING // 15M_RUNTIME_LIMIT_ENFORCED</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Multi-Tenant Namespace Allocation & Elevation Suite</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">DUAL_IDENTITY_AUDITING // 15M_RUNTIME_LIMIT_ENFORCED</div>
         </div>
       </div>
       
       <div class="row items-center op-gap-8 no-wrap">
         <q-btn
-          color="cyan-4"
-          text-color="black"
+          color="blue-5"
           label="Synchronize Cloud Namespaces"
           icon="sync"
           dense
@@ -63,8 +62,8 @@
     </div>
 
     <!-- MAIN TENANTS DIRECTORY MATRIX -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-grey-5">
+    <div class="enterprise-panel bg-panel column col">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-muted">
         <span class="col-4">Canonical Organization Title</span>
         <span class="col-2">Derived Realm UUID</span>
         <span class="col-2">Subsystem Modality</span>
@@ -77,16 +76,16 @@
           <q-item
             v-for="t in tenantsList"
             :key="t.id"
-            class="q-px-sm q-py-sm bg-[#161b20] rounded-borders row items-center justify-between no-wrap hover-row"
+            class="q-px-sm q-py-sm bg-subpanel rounded-borders row items-center justify-between no-wrap hover-row"
           >
             <!-- 1. Title -->
             <div class="column col-4 no-wrap ellipsis">
-              <span class="text-white text-weight-bold text-caption">{{ t.name }}</span>
-              <span class="text-metric-mono text-grey-6" style="font-size: 9px;">Routing Token: {{ t.id }}</span>
+              <span class="text-main text-weight-bold text-caption">{{ t.name }}</span>
+              <span class="text-metric-mono text-muted" style="font-size: 9px;">Routing Token: {{ t.id }}</span>
             </div>
 
             <!-- 2. UUID -->
-            <div class="col-2 text-metric-mono text-grey-5 ellipsis" style="font-size: 10px;">
+            <div class="col-2 text-metric-mono text-muted ellipsis" style="font-size: 10px;">
               {{ t.persistentUuid || t.id }}
             </div>
 
@@ -99,7 +98,7 @@
 
             <!-- 4. Status -->
             <div class="col-1 text-center">
-              <span class="text-metric-mono text-weight-bold" :class="t.status === 'active' ? 'text-green-4' : 'text-amber-4'" style="font-size: 10px;">
+              <span class="text-metric-mono text-weight-bold" :class="t.status === 'active' ? 'text-green-5' : 'text-amber-5'" style="font-size: 10px;">
                 {{ (t.status || 'ACTIVE').toUpperCase() }}
               </span>
             </div>
@@ -110,10 +109,10 @@
                 dense
                 flat
                 size="xs"
-                color="purple-3"
+                color="purple-5"
                 icon="admin_panel_settings"
                 label="Impersonate Tenant"
-                class="bg-[#261522] q-px-xs text-weight-bold text-metric-sm border-purple-muted"
+                class="bg-purple-focus q-px-xs text-weight-bold text-metric-sm border-purple-muted"
                 @click="promptImpersonationHandshake(t)"
               >
                 <q-tooltip class="bg-black text-purple-2 text-caption">Grant temporary 15m dual-attribution override context</q-tooltip>
@@ -126,36 +125,36 @@
 
     <!-- MANDATORY IMPERSONATION HANDSHAKE DIALOG OVERLAY -->
     <q-dialog v-model="openImpersonateDialog" persistent>
-      <q-card class="bg-[#191118] text-white border-purple" style="width: 100%; max-width: 440px;">
-        <q-card-section class="row items-center justify-between border-bottom q-pb-sm bg-[#22131e]">
+      <q-card class="bg-panel text-main border-purple" style="width: 100%; max-width: 440px;">
+        <q-card-section class="row items-center justify-between border-bottom q-pb-sm bg-purple-focus">
           <div class="row items-center op-gap-8">
-            <q-icon name="admin_panel_settings" color="purple-3" size="sm" />
-            <span class="text-weight-bold text-caption text-purple-2">Elevate Operator Boundary Scope</span>
+            <q-icon name="admin_panel_settings" color="purple-5" size="sm" />
+            <span class="text-weight-bold text-caption text-purple-5">Elevate Operator Boundary Scope</span>
           </div>
           <q-btn icon="close" flat dense round v-close-popup />
         </q-card-section>
 
         <q-form @submit.prevent="executeImpersonationHandshake" class="column op-gap-16 q-pa-md">
           
-          <div class="bg-black q-pa-sm rounded-borders border-purple text-metric-sm text-grey-4 column op-gap-2">
+          <div class="bg-subpanel q-pa-sm rounded-borders border-purple text-metric-sm text-secondary column op-gap-2">
             <span>Target Sovereign Namespace:</span>
-            <span class="text-white text-metric-mono text-weight-bold">{{ targetTenantRecord?.name }}</span>
-            <span class="text-purple-3" style="font-size: 9px;">ID: {{ targetTenantRecord?.id }}</span>
+            <span class="text-main text-metric-mono text-weight-bold">{{ targetTenantRecord?.name }}</span>
+            <span class="text-purple-5" style="font-size: 9px;">ID: {{ targetTenantRecord?.id }}</span>
           </div>
 
           <div>
-            <div class="text-caption text-purple-2 q-mb-xs">Mandatory Forensic Attribution Reason *</div>
+            <div class="text-caption text-purple-5 q-mb-xs">Mandatory Forensic Attribution Reason *</div>
             <q-input
               v-model="auditReasonInput"
-              dark
+              :dark="true"
               filled
               dense
               placeholder="e.g. SOC-RCA investigation trace validation sweeps"
-              class="bg-[#12161a] text-white rounded-borders"
+              class="bg-subpanel text-main rounded-borders"
               required
               autofocus
             />
-            <span class="text-grey-6" style="font-size: 9px;">
+            <span class="text-muted" style="font-size: 9px;">
               Lineage matrix natively logs both origin Super Admin hash parameters alongside target tenant blocks. Destructive writes require explicit session re-confirmation.
             </span>
           </div>
@@ -164,8 +163,7 @@
             <q-btn flat dense label="Cancel" color="grey-5" v-close-popup class="q-px-sm" />
             <q-btn
               type="submit"
-              color="purple-4"
-              text-color="black"
+              color="purple-5"
               label="Initialize 15m Master Elevation"
               dense
               unelevated
@@ -354,6 +352,6 @@ const revokeImpersonationSession = () => {
 }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 </style>

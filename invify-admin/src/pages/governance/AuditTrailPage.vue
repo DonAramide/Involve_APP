@@ -1,21 +1,20 @@
 <!-- invify-admin/src/pages/governance/AuditTrailPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Title Configuration Header -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="history_edu" size="sm" color="cyan-3" />
+        <q-icon name="history_edu" size="sm" color="blue-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Immutable Operator Lineage Audit Logs</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">DUAL_ATTRIBUTION_TRACING // CRYPTOGRAPHICALLY_VERIFIED_SOURCING</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Immutable Operator Lineage Audit Logs</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">DUAL_ATTRIBUTION_TRACING // CRYPTOGRAPHICALLY_VERIFIED_SOURCING</div>
         </div>
       </div>
       
       <div class="row items-center op-gap-8 no-wrap">
         <q-btn
-          color="cyan-4"
-          text-color="black"
+          color="blue-5"
           label="Pull Active Log Matrices"
           icon="refresh"
           dense
@@ -29,15 +28,15 @@
     </div>
 
     <!-- FILTER BAR -->
-    <div class="row items-center justify-between no-wrap border-muted bg-[#12161a] rounded-borders q-pa-xs">
+    <div class="row items-center justify-between no-wrap border-main bg-panel rounded-borders q-pa-xs">
       <div class="row items-center op-gap-8 col-6">
         <q-input
           v-model="searchOperator"
-          dark
+          :dark="true"
           filled
           dense
           placeholder="Filter by specific operator email or unique identifier..."
-          class="bg-[#161b20] text-white rounded-borders col"
+          class="bg-subpanel text-main rounded-borders col"
         >
           <template v-slot:prepend>
             <q-icon name="search" size="xs" color="grey-6" />
@@ -45,14 +44,14 @@
         </q-input>
       </div>
       
-      <span class="text-metric-mono text-grey-6 q-px-sm text-metric-sm">
+      <span class="text-metric-mono text-muted q-px-sm text-metric-sm">
         Displaying Lineage Array: {{ filteredLogs.length }} Immutable Records
       </span>
     </div>
 
     <!-- AUDIT TRAIL LOG DIRECTORY GRID -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-grey-5">
+    <div class="enterprise-panel bg-panel column col">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-muted">
         <span class="col-2">Timestamp Context</span>
         <span class="col-3">Authoritative Operator Attribution</span>
         <span class="col-2">Action Vector</span>
@@ -65,25 +64,25 @@
           <q-item
             v-for="log in filteredLogs"
             :key="log.auditId"
-            class="q-px-sm q-py-sm bg-[#161b20] rounded-borders row items-start justify-between no-wrap hover-row"
+            class="q-px-sm q-py-sm bg-subpanel rounded-borders row items-start justify-between no-wrap hover-row"
           >
             <!-- 1. Timestamp -->
-            <div class="col-2 text-metric-mono text-grey-5" style="font-size: 11px;">
+            <div class="col-2 text-metric-mono text-muted" style="font-size: 11px;">
               {{ formatLogTime(log.timestamp) }}
             </div>
 
             <!-- 2. Attribution -->
             <div class="column col-3 no-wrap ellipsis">
               <div class="row items-center op-gap-4 no-wrap">
-                <span class="text-white text-weight-bold text-caption">{{ log.operatorId }}</span>
+                <span class="text-main text-weight-bold text-caption">{{ log.operatorId }}</span>
                 <q-badge :color="getRoleBadgeColor(log.roleScope)" text-color="black" class="text-weight-bold" style="font-size: 8px;">
                   {{ log.roleScope }}
                 </q-badge>
               </div>
-              <span class="text-metric-mono text-grey-6" style="font-size: 9px;" v-if="log.originalSuperAdminId">
-                Master Impersonator: <span class="text-purple-3">{{ log.originalSuperAdminId }}</span>
+              <span class="text-metric-mono text-muted" style="font-size: 9px;" v-if="log.originalSuperAdminId">
+                Master Impersonator: <span class="text-purple-5">{{ log.originalSuperAdminId }}</span>
               </span>
-              <span class="text-metric-mono text-grey-6" style="font-size: 9px;" v-else>
+              <span class="text-metric-mono text-muted" style="font-size: 9px;" v-else>
                 Native Platform Sourcing
               </span>
             </div>
@@ -93,16 +92,16 @@
               <span class="text-metric-mono text-weight-bold" :class="getActionColor(log.actionType)" style="font-size: 10px;">
                 {{ log.actionType }}
               </span>
-              <div class="text-grey-6 ellipsis" style="font-size: 9px;">Target: {{ log.targetResource }}</div>
+              <div class="text-muted ellipsis" style="font-size: 9px;">Target: {{ log.targetResource }}</div>
             </div>
 
             <!-- 4. Origin IP -->
-            <div class="col-2 text-metric-mono text-grey-4" style="font-size: 11px;">
+            <div class="col-2 text-metric-mono text-secondary" style="font-size: 11px;">
               {{ log.ipOrigin }}
             </div>
 
             <!-- 5. Annotation Narrative -->
-            <div class="col-3 text-right text-metric-sm text-grey-4 ellipsis-2-lines" style="font-size: 11px;">
+            <div class="col-3 text-right text-metric-sm text-secondary ellipsis-2-lines" style="font-size: 11px;">
               {{ log.auditAnnotation }}
             </div>
           </q-item>
@@ -111,7 +110,7 @@
     </div>
 
     <!-- Verification Footer -->
-    <div class="border-top q-pt-xs text-metric-sm text-grey-6 row justify-between">
+    <div class="border-top q-pt-xs text-metric-sm text-muted row justify-between">
       <span>Lineage metadata signed securely via active Postgres connection pools</span>
       <span>Post-Quantum Ready Lineage Signatures</span>
     </div>
@@ -215,10 +214,10 @@ const getRoleBadgeColor = (roleStr) => {
 }
 
 const getActionColor = (actionStr) => {
-  if (actionStr.includes('IMPERSONATION')) return 'text-purple-4'
-  if (actionStr.includes('REVOCATION')) return 'text-red-4'
-  if (actionStr.includes('REMEDIATION')) return 'text-green-4'
-  return 'text-cyan-4'
+  if (actionStr.includes('IMPERSONATION')) return 'text-purple-5'
+  if (actionStr.includes('REVOCATION')) return 'text-red-5'
+  if (actionStr.includes('REMEDIATION')) return 'text-green-5'
+  return 'text-blue-5'
 }
 </script>
 
@@ -235,6 +234,6 @@ const getActionColor = (actionStr) => {
 }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 </style>

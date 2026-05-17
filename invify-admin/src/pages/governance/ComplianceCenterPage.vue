@@ -1,30 +1,30 @@
 <!-- invify-admin/src/pages/governance/ComplianceCenterPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Top Configuration Header Bar -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="fact_check" size="sm" color="green-4" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Fleet Compliance Intelligence Center</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">PROGRESSIVE_STATE_ENGINE // ZERO_FRONTEND_DUPLICATION</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Fleet Compliance Intelligence Center</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">PROGRESSIVE_STATE_ENGINE // ZERO_FRONTEND_DUPLICATION</div>
         </div>
       </div>
       
       <!-- FINAL REFINEMENT #5: Historical Governance Retention Windows -->
       <div class="row items-center op-gap-8 no-wrap">
-        <span class="text-caption text-grey-6 v-hide-xs">Retention Horizon:</span>
-        <q-btn-group flat dense class="border-muted bg-[#12161a]">
+        <span class="text-caption text-muted v-hide-xs">Retention Horizon:</span>
+        <q-btn-group flat dense class="border-main bg-subpanel">
           <q-btn 
             v-for="h in retentionHorizons" 
             :key="h.id"
             dense 
             size="xs" 
-            :color="activeHorizon === h.id ? 'cyan-3' : 'grey-5'" 
+            :color="activeHorizon === h.id ? 'blue-5' : 'grey-5'" 
             :label="h.label" 
             @click="activeHorizon = h.id" 
-            :class="['q-px-sm text-metric-sm', activeHorizon === h.id ? 'bg-[#161b20] text-weight-bold' : '']"
+            :class="['q-px-sm text-metric-sm', activeHorizon === h.id ? 'bg-panel text-weight-bold' : '']"
           />
         </q-btn-group>
       </div>
@@ -35,66 +35,66 @@
     <div class="grid-states op-gap-8">
       
       <!-- 1. HEALTHY -->
-      <div class="state-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-healthy">
-        <div class="row items-center justify-between text-caption text-grey-5">
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-healthy">
+        <div class="row items-center justify-between text-caption text-muted">
           <span class="text-weight-bold text-green-4">HEALTHY</span>
           <q-icon name="check_circle" size="xs" color="green-4" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 18px;">{{ stateCounts.healthy }}</span>
-          <span class="text-metric-sm text-grey-6">nodes</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.healthy }}</span>
+          <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-grey-5 q-mt-xs">Nominal secure boot signatures</div>
+        <div class="text-metric-sm text-muted q-mt-xs">Nominal secure boot signatures</div>
       </div>
 
       <!-- 2. WARNING -->
-      <div class="state-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-warning">
-        <div class="row items-center justify-between text-caption text-grey-5">
-          <span class="text-weight-bold text-amber-4">WARNING</span>
-          <q-icon name="warning_amber" size="xs" color="amber-4" />
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-warning">
+        <div class="row items-center justify-between text-caption text-muted">
+          <span class="text-weight-bold text-amber-5">WARNING</span>
+          <q-icon name="warning_amber" size="xs" color="amber-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 18px;">{{ stateCounts.warning }}</span>
-          <span class="text-metric-sm text-grey-6">nodes</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.warning }}</span>
+          <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-amber-3 q-mt-xs">Minor config drift detected</div>
+        <div class="text-metric-sm text-amber-5 q-mt-xs">Minor config drift detected</div>
       </div>
 
       <!-- 3. DEGRADED -->
-      <div class="state-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-degraded">
-        <div class="row items-center justify-between text-caption text-grey-5">
-          <span class="text-weight-bold text-deep-orange-4">DEGRADED</span>
-          <q-icon name="trending_down" size="xs" color="deep-orange-4" />
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-degraded">
+        <div class="row items-center justify-between text-caption text-muted">
+          <span class="text-weight-bold text-deep-orange-5">DEGRADED</span>
+          <q-icon name="trending_down" size="xs" color="deep-orange-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 18px;">{{ stateCounts.degraded }}</span>
-          <span class="text-metric-sm text-grey-6">nodes</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.degraded }}</span>
+          <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-deep-orange-3 q-mt-xs">Repeating operational violations</div>
+        <div class="text-metric-sm text-deep-orange-5 q-mt-xs">Repeating operational violations</div>
       </div>
 
       <!-- 4. NON_COMPLIANT -->
-      <div class="state-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-noncompliant">
-        <div class="row items-center justify-between text-caption text-grey-5">
-          <span class="text-weight-bold text-red-4">NON_COMPLIANT</span>
-          <q-icon name="gpp_bad" size="xs" color="red-4" />
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-noncompliant">
+        <div class="row items-center justify-between text-caption text-muted">
+          <span class="text-weight-bold text-red-5">NON_COMPLIANT</span>
+          <q-icon name="gpp_bad" size="xs" color="red-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 18px;">{{ stateCounts.nonCompliant }}</span>
-          <span class="text-metric-sm text-grey-6">nodes</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.nonCompliant }}</span>
+          <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-red-3 q-mt-xs">Attestation trust metrics failed</div>
+        <div class="text-metric-sm text-red-5 q-mt-xs">Attestation trust metrics failed</div>
       </div>
 
       <!-- 5. CRITICAL -->
-      <div class="state-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-critical">
-        <div class="row items-center justify-between text-caption text-grey-5">
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-critical">
+        <div class="row items-center justify-between text-caption text-muted">
           <span class="text-weight-bold text-purple-4">CRITICAL</span>
           <q-icon name="security" size="xs" color="purple-4" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 18px;">{{ stateCounts.critical }}</span>
-          <span class="text-metric-sm text-grey-6">nodes</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.critical }}</span>
+          <span class="text-metric-sm text-muted">nodes</span>
         </div>
         <div class="text-metric-sm text-purple-3 q-mt-xs">Active SOC quarantine lock applied</div>
       </div>
@@ -108,13 +108,13 @@
       <div class="col-12 col-md-7 column op-gap-16">
         
         <!-- Tenant Compliance Rankings Table -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="corporate_fare" size="xs" color="cyan-3" />
-              <span class="text-operator-title text-white text-weight-bold">Tenant Compliance Performance Matrix</span>
+              <q-icon name="corporate_fare" size="xs" color="blue-5" />
+              <span class="text-operator-title text-main text-weight-bold">Tenant Compliance Performance Matrix</span>
             </div>
-            <span class="text-metric-mono text-grey-5" style="font-size: 10px;">SORTED_STABILITY_INDEX</span>
+            <span class="text-metric-mono text-muted" style="font-size: 10px;">SORTED_STABILITY_INDEX</span>
           </div>
 
           <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 240px;">
@@ -122,31 +122,31 @@
               <q-item 
                 v-for="t in tenantRankings" 
                 :key="t.tenantId" 
-                class="q-px-sm q-py-xs bg-[#161b20] rounded-borders row items-center justify-between no-wrap cursor-pointer hover-row"
+                class="q-px-sm q-py-xs bg-subpanel rounded-borders row items-center justify-between no-wrap cursor-pointer hover-row"
                 @click="drilldownToTenant(t.tenantId)"
               >
                 <div class="row items-center op-gap-8 no-wrap col-5">
-                  <span class="text-metric-mono text-grey-5" style="font-size: 10px; width: 14px;">{{ t.rank }}</span>
+                  <span class="text-metric-mono text-muted" style="font-size: 10px; width: 14px;">{{ t.rank }}</span>
                   <div class="ellipsis">
-                    <div class="text-white text-weight-bold text-caption">{{ t.tenantName }}</div>
-                    <div class="text-grey-6" style="font-size: 9px;">ID: {{ t.tenantId }}</div>
+                    <div class="text-main text-weight-bold text-caption">{{ t.tenantName }}</div>
+                    <div class="text-muted" style="font-size: 9px;">ID: {{ t.tenantId }}</div>
                   </div>
                 </div>
 
                 <!-- Inline capacity map rendering absolute percentage ratios -->
                 <div class="col-4 q-px-sm">
-                  <div class="row items-center justify-between text-metric-sm text-grey-4 q-mb-xs" style="font-size: 9px;">
+                  <div class="row items-center justify-between text-metric-sm text-secondary q-mb-xs" style="font-size: 9px;">
                     <span>Compliance Weight</span>
-                    <span class="text-metric-mono text-white text-weight-bold">{{ t.complianceRatio }}%</span>
+                    <span class="text-metric-mono text-main text-weight-bold">{{ t.complianceRatio }}%</span>
                   </div>
-                  <q-linear-progress dark :value="t.complianceRatio / 100" :color="getRatioBarColor(t.complianceRatio)" track-color="grey-9" size="xs" />
+                  <q-linear-progress :dark="true" :value="t.complianceRatio / 100" :color="getRatioBarColor(t.complianceRatio)" track-color="grey-9" size="xs" />
                 </div>
 
                 <div class="column items-end col-2">
-                  <span class="text-metric-mono" :class="t.driftCount > 0 ? 'text-amber-4' : 'text-grey-6'" style="font-size: 11px;">
+                  <span class="text-metric-mono" :class="t.driftCount > 0 ? 'text-amber-5' : 'text-muted'" style="font-size: 11px;">
                     {{ t.driftCount }} Drift
                   </span>
-                  <span class="text-metric-mono text-red-4" style="font-size: 9px;" v-if="t.criticalNodes > 0">
+                  <span class="text-metric-mono text-red-5" style="font-size: 9px;" v-if="t.criticalNodes > 0">
                     {{ t.criticalNodes }} Critical
                   </span>
                   <span class="text-metric-mono text-green-5" style="font-size: 9px;" v-else>STABLE</span>
@@ -157,13 +157,13 @@
         </div>
 
         <!-- Policy Drift Structural Analysis -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="timeline" size="xs" color="amber-4" />
-              <span class="text-operator-title text-white text-weight-bold">Multi-Tenant Policy Drift Analysis</span>
+              <q-icon name="timeline" size="xs" color="amber-5" />
+              <span class="text-operator-title text-main text-weight-bold">Multi-Tenant Policy Drift Analysis</span>
             </div>
-            <span class="text-metric-mono text-amber-3" style="font-size: 10px;">{{ driftAnalysisRecords.length }} Active Configuration Overrides</span>
+            <span class="text-metric-mono text-amber-5" style="font-size: 10px;">{{ driftAnalysisRecords.length }} Active Configuration Overrides</span>
           </div>
 
           <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 200px;">
@@ -171,25 +171,25 @@
               <q-item 
                 v-for="d in driftAnalysisRecords" 
                 :key="d.id" 
-                class="q-px-sm q-py-xs bg-[#1b1916] rounded-borders column op-gap-2"
+                class="q-px-sm q-py-xs bg-panel border-main rounded-borders column op-gap-2"
               >
                 <div class="row items-center justify-between fit no-wrap">
                   <div class="row items-center op-gap-4 no-wrap">
-                    <span class="text-metric-mono text-amber-3 text-weight-bold" style="font-size: 11px;">{{ d.policyKey }}</span>
-                    <span class="text-grey-5" style="font-size: 9px;">| Target: {{ d.targetScope }}</span>
+                    <span class="text-metric-mono text-amber-5 text-weight-bold" style="font-size: 11px;">{{ d.policyKey }}</span>
+                    <span class="text-muted" style="font-size: 9px;">| Target: {{ d.targetScope }}</span>
                   </div>
-                  <span class="text-metric-mono text-grey-5" style="font-size: 9px;">Duration: {{ d.durationStr }}</span>
+                  <span class="text-metric-mono text-muted" style="font-size: 9px;">Duration: {{ d.durationStr }}</span>
                 </div>
 
-                <div class="row items-center justify-between text-caption text-grey-4" style="font-size: 10px;">
-                  <span>Baseline: <span class="text-metric-mono text-grey-5">{{ d.expectedVal }}</span></span>
+                <div class="row items-center justify-between text-caption text-secondary" style="font-size: 10px;">
+                  <span>Baseline: <span class="text-metric-mono text-muted">{{ d.expectedVal }}</span></span>
                   <q-icon name="arrow_forward" size="xs" color="grey-6" />
-                  <span>Detected Override: <span class="text-metric-mono text-red-3">{{ d.actualVal }}</span></span>
+                  <span>Detected Override: <span class="text-metric-mono text-red-5">{{ d.actualVal }}</span></span>
                 </div>
 
                 <div class="row items-center justify-between q-mt-xs">
-                  <span class="text-grey-6" style="font-size: 9px;">Severity Multiplier Impact: {{ d.impactFactor }}x</span>
-                  <q-btn dense flat size="xs" color="cyan-3" label="Force Baseline Sync" @click="remediateDrift(d.id)" class="bg-[#24221d] q-px-xs text-metric-sm" />
+                  <span class="text-muted" style="font-size: 9px;">Severity Multiplier Impact: {{ d.impactFactor }}x</span>
+                  <q-btn dense flat size="xs" color="blue-5" label="Force Baseline Sync" @click="remediateDrift(d.id)" class="bg-subpanel q-px-xs text-metric-sm" />
                 </div>
               </q-item>
             </q-list>
@@ -202,13 +202,13 @@
       <div class="col-12 col-md-5 column op-gap-16">
         
         <!-- Recurring Violations Tracking Log -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="repeat" size="xs" color="deep-orange-4" />
-              <span class="text-operator-title text-white text-weight-bold">Recurring Infraction Tracker</span>
+              <q-icon name="repeat" size="xs" color="deep-orange-5" />
+              <span class="text-operator-title text-main text-weight-bold">Recurring Infraction Tracker</span>
             </div>
-            <span class="text-metric-mono text-grey-5" style="font-size: 10px;">Consistent Vectors</span>
+            <span class="text-metric-mono text-muted" style="font-size: 10px;">Consistent Vectors</span>
           </div>
 
           <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 250px;">
@@ -216,20 +216,20 @@
               <q-item 
                 v-for="v in recurringViolations" 
                 :key="v.vectorId" 
-                class="q-px-sm q-py-xs bg-[#1c1412] rounded-borders column op-gap-2"
+                class="q-px-sm q-py-xs bg-red-focus rounded-borders column op-gap-2"
               >
                 <div class="row items-center justify-between fit no-wrap">
-                  <span class="text-white text-weight-bold text-caption">{{ v.ruleName }}</span>
+                  <span class="text-main text-weight-bold text-caption">{{ v.ruleName }}</span>
                   <q-badge color="deep-orange-10" text-color="deep-orange-2" class="text-metric-sm">
                     {{ v.occurrences }}x breaches
                   </q-badge>
                 </div>
                 
-                <div class="text-deep-orange-3" style="font-size: 10px;">Primary Source Root: {{ v.primaryEndpoint }}</div>
+                <div class="text-deep-orange-5" style="font-size: 10px;">Primary Source Root: {{ v.primaryEndpoint }}</div>
                 
-                <div class="row items-center justify-between text-grey-6" style="font-size: 9px;">
+                <div class="row items-center justify-between text-muted" style="font-size: 9px;">
                   <span>Last recorded: {{ v.lastObserved }}</span>
-                  <span class="text-metric-mono text-grey-4">Est. SLA Impact: -{{ v.slaPenalty }}%</span>
+                  <span class="text-metric-mono text-secondary">Est. SLA Impact: -{{ v.slaPenalty }}%</span>
                 </div>
               </q-item>
             </q-list>
@@ -237,11 +237,11 @@
         </div>
 
         <!-- Compliance Trend Visualization Summary -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit justify-between">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit justify-between">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="show_chart" size="xs" color="cyan-3" />
-              <span class="text-operator-title text-white text-weight-bold">Compliance Trend Trajectory</span>
+              <q-icon name="show_chart" size="xs" color="blue-5" />
+              <span class="text-operator-title text-main text-weight-bold">Compliance Trend Trajectory</span>
             </div>
             <span class="text-metric-mono text-green-3" style="font-size: 10px;">+0.12% Trajectory</span>
           </div>
@@ -250,15 +250,15 @@
             <!-- Simulated High-Density Narrative Trend Visual Map -->
             <div class="row items-end justify-between fit q-px-md q-pt-md" style="height: 110px;">
               <div class="column items-center op-gap-4" v-for="point in trendChartData" :key="point.label">
-                <span class="text-metric-mono text-grey-5" style="font-size: 8px;">{{ point.value }}%</span>
-                <div class="bg-cyan-4 rounded-borders" :style="`width: 12px; height: ${point.value * 0.8}px;`"></div>
-                <span class="text-metric-mono text-grey-6" style="font-size: 8px;">{{ point.label }}</span>
+                <span class="text-metric-mono text-muted" style="font-size: 8px;">{{ point.value }}%</span>
+                <div class="bg-blue-5 rounded-borders" :style="`width: 12px; height: ${point.value * 0.8}px;`"></div>
+                <span class="text-metric-mono text-muted" style="font-size: 8px;">{{ point.label }}</span>
               </div>
             </div>
 
-            <div class="q-mt-md text-caption text-grey-5 border-top full-width q-pt-xs row justify-between" style="font-size: 10px;">
-              <span>Aggregated sliding view: <span class="text-white">{{ activeHorizonLabel }}</span></span>
-              <span>Backend data engine sync: <span class="text-green-4">VERIFIED</span></span>
+            <div class="q-mt-md text-caption text-muted border-top full-width q-pt-xs row justify-between" style="font-size: 10px;">
+              <span>Aggregated sliding view: <span class="text-main">{{ activeHorizonLabel }}</span></span>
+              <span>Backend data engine sync: <span class="text-green-5">VERIFIED</span></span>
             </div>
           </div>
         </div>
@@ -397,14 +397,14 @@ const trendChartData = computed(() => {
   min-height: 84px;
 }
 
-.border-top-healthy { border-top: 2px solid #2b8a3e; }
-.border-top-warning { border-top: 2px solid #fcc419; }
-.border-top-degraded { border-top: 2px solid #e8590c; }
-.border-top-noncompliant { border-top: 2px solid #c92a2a; }
-.border-top-critical { border-top: 2px solid #862e9c; }
+.border-top-healthy { border-top: 2px solid var(--enterprise-green); }
+.border-top-warning { border-top: 2px solid var(--enterprise-amber); }
+.border-top-degraded { border-top: 2px solid var(--enterprise-orange); }
+.border-top-noncompliant { border-top: 2px solid var(--enterprise-red); }
+.border-top-critical { border-top: 2px solid var(--enterprise-purple); }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 
 @media (max-width: 900px) {

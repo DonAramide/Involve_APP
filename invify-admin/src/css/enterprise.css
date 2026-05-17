@@ -31,7 +31,7 @@
   --enterprise-panel-bg: #101826;
   --enterprise-subpanel-bg: #172033;
   --enterprise-border: #1F2D42;
-  --enterprise-border-focus: #1F6FEB;
+  --enterprise-border-focus: #1A73E8; /* Invify Blue */
   
   /* Text Contrast System */
   --enterprise-text-main: #E6EDF3;
@@ -42,14 +42,14 @@
   --sidebar-bg: #0B1220;
   --sidebar-panel-bg: #101826;
   --sidebar-hover: #172033;
-  --sidebar-active: #1E3A5F;
-  --sidebar-accent: #1F6FEB;
+  --sidebar-active: rgba(26, 115, 232, 0.15); /* Tinted Invify Blue */
+  --sidebar-accent: #1A73E8; /* Invify Blue */
 
   /* App Bar Tokens */
-  --appbar-bg: linear-gradient(90deg, #0F172A, #132238);
-  --appbar-text-inactive: #A9B8CC;
+  --appbar-bg: linear-gradient(90deg, #0F172A, #162E4E); /* Deeper Blue Gradient */
+  --appbar-text-inactive: rgba(255, 255, 255, 0.7);
   --appbar-text-active: #FFFFFF;
-  --appbar-text-hover: #58A6FF;
+  --appbar-text-hover: #F8C11A; /* Invify Gold */
 
   /* 3. Operational Spacing Scale */
   --space-2: 2px;
@@ -59,10 +59,47 @@
   --space-16: 16px;
 }
 
+/* Theme-Specific Overrides */
+.theme-dark {
+  --enterprise-page-bg: #0B1220;
+  --enterprise-panel-bg: #101826;
+  --enterprise-subpanel-bg: #172033;
+  --enterprise-border: #1F2D42;
+  --enterprise-text-main: #E6EDF3;
+  --enterprise-text-secondary: #9FB3C8;
+  --sidebar-bg: #0B1220;
+  --sidebar-panel-bg: #101826;
+  --appbar-bg: linear-gradient(90deg, #0F172A, #162E4E);
+}
+
+.theme-light {
+  --enterprise-page-bg: #F0F2F5;
+  --enterprise-panel-bg: #FFFFFF;
+  --enterprise-subpanel-bg: #F8FAFC;
+  --enterprise-border: #D1D5DB;
+  --enterprise-border-focus: #1A73E8;
+  --enterprise-text-main: #111827;
+  --enterprise-text-secondary: #4B5563;
+  --enterprise-text-muted: #6B7280;
+  --sidebar-bg: #FFFFFF;
+  --sidebar-panel-bg: #F8FAFC;
+  --sidebar-hover: #E2E8F0;
+  --sidebar-active: rgba(26, 115, 232, 0.1);
+  --appbar-bg: linear-gradient(90deg, #1A73E8, #0D47A1);
+  
+  /* Quasar Override Helpers for Light Mode */
+  --q-menu-bg: #FFFFFF;
+  --q-menu-text: #111827;
+}
+
+.text-appbar-inactive { color: var(--appbar-text-inactive) !important; }
+.text-appbar-active { color: var(--appbar-text-active) !important; }
+
 /* Global Shell Normalization */
 body {
   background-color: var(--enterprise-page-bg) !important;
-  color: var(--enterprise-text-main) !important;
+  color: var(--enterprise-text-main);
+
   font-family: 'Inter', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 13px;
   line-height: 1.4;
@@ -101,6 +138,18 @@ body {
 .op-pa-8 { padding: var(--space-8); }
 .op-pa-12 { padding: var(--space-12); }
 
+/* 2.5 Semantic Utility Mappings for Theme-Aware Layouts */
+.text-main { color: var(--enterprise-text-main) !important; }
+.text-secondary { color: var(--enterprise-text-secondary) !important; }
+.text-muted { color: var(--enterprise-text-muted) !important; }
+
+.bg-main { background-color: var(--enterprise-page-bg) !important; }
+.bg-panel { background-color: var(--enterprise-panel-bg) !important; }
+.bg-subpanel { background-color: var(--enterprise-subpanel-bg) !important; }
+
+.border-main { border: 1px solid var(--enterprise-border) !important; }
+.border-focus { border-color: var(--enterprise-border-focus) !important; }
+
 /* 3. Severity UI Mappings */
 .severity-critical {
   background-color: var(--severity-critical-bg) !important;
@@ -138,7 +187,6 @@ body {
   background-color: var(--enterprise-panel-bg) !important;
   border: 1px solid var(--enterprise-border) !important;
   border-radius: 2px !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
   transition: all 0.15s ease;
 }
 
@@ -208,10 +256,29 @@ body {
 
 .enterprise-data-grid .q-table td {
   border-bottom: 1px solid var(--enterprise-border) !important;
-  color: var(--enterprise-text-main);
+  color: var(--enterprise-text-main) !important;
   font-size: 12px !important;
   padding: 4px 8px !important;
   height: 28px !important;
+}
+
+/* Ensure Quasar dropdown menus and dialogs respect the theme text colors */
+.q-menu, .q-dialog {
+  background-color: var(--enterprise-panel-bg) !important;
+  color: var(--enterprise-text-main) !important;
+  border: 1px solid var(--enterprise-border);
+}
+
+.q-item {
+  color: var(--enterprise-text-main);
+}
+
+.q-item__label--caption {
+  color: var(--enterprise-text-secondary);
+}
+
+.q-item--active {
+  color: var(--sidebar-accent) !important;
 }
 
 .enterprise-data-grid--ultra-dense .q-table td {
@@ -240,3 +307,5 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--enterprise-border-focus);
 }
+
+.border-left-blue { border-left: 3px solid #1A73E8; }

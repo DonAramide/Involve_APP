@@ -5,14 +5,26 @@ const licenseService = require('../../services/license.service');
 
 class DeviceController {
     /**
-     * Fetch all activated devices with tenant info
+     * Fetch all activated devices with tenant info (Tenant-Isolated)
      */
     async getDevices(req, res) {
         try {
-            const { data, error } = await supabase
+            const isPlatformAdmin = req.user && ['SUPER_ADMIN', 'INTERNAL_STAFF'].includes(req.user.role);
+            
+            let query = supabase
                 .from('devices')
-                .select('*, tenants(name, plan)')
-                .order('created_at', { ascending: false });
+                .select('*, tenants(name, plan)');
+
+            // Strict Tenant Isolation Boundary
+            if (!isPlatformAdmin) {
+                const userTenantId = req.user ? req.user.tenantId : null;
+                if (!userTenantId) {
+                    return res.status(403).json({ message: 'Forbidden: Access token does not contain a valid tenant boundary.' });
+                }
+                query = query.eq('tenant_id', userTenantId);
+            }
+
+            const { data, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
             res.json(data);
@@ -22,10 +34,20 @@ class DeviceController {
     }
 
     /**
-     * Generate a new activation code (Mobile Compatible)
+     * Generate a new activation code (Tenant-Isolated, Role-Scoped)
      */
     async createActivationCode(req, res) {
-        const { tenantId, durationDays, planIndex } = req.body;
+        let { tenantId, durationDays, planIndex } = req.body;
+
+        const isPlatformAdmin = req.user && ['SUPER_ADMIN', 'INTERNAL_STAFF'].includes(req.user.role);
+        
+        // Enforce boundary safety
+        if (!isPlatformAdmin) {
+            tenantId = req.user ? req.user.tenantId : null;
+            if (!tenantId) {
+                return res.status(403).json({ message: 'Forbidden: Access token does not contain a valid tenant boundary.' });
+            }
+        }
 
         if (!tenantId || !durationDays) {
             return res.status(400).json({ message: 'tenantId and durationDays are required' });
@@ -68,14 +90,26 @@ class DeviceController {
     }
 
     /**
-     * Get activation history/pending codes
+     * Get activation history/pending codes (Tenant-Isolated)
      */
     async getActivationHistory(req, res) {
         try {
-            const { data, error } = await supabase
+            const isPlatformAdmin = req.user && ['SUPER_ADMIN', 'INTERNAL_STAFF'].includes(req.user.role);
+            
+            let query = supabase
                 .from('device_activations')
-                .select('*, tenants(name)')
-                .order('created_at', { ascending: false });
+                .select('*, tenants(name)');
+
+            // Strict Tenant Isolation Boundary
+            if (!isPlatformAdmin) {
+                const userTenantId = req.user ? req.user.tenantId : null;
+                if (!userTenantId) {
+                    return res.status(403).json({ message: 'Forbidden: Access token does not contain a valid tenant boundary.' });
+                }
+                query = query.eq('tenant_id', userTenantId);
+            }
+
+            const { data, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
             res.json(data);
@@ -100,13 +134,29 @@ class DeviceController {
     }
 
     /**
-     * Block/Deactivate device
+     * Block/Deactivate device (Tenant-Isolated status update)
      */
     async updateDeviceStatus(req, res) {
         const { id } = req.params;
         const { status } = req.body;
 
         try {
+            const isPlatformAdmin = req.user && ['SUPER_ADMIN', 'INTERNAL_STAFF'].includes(req.user.role);
+            
+            // If tenant operator, verify they own the device before status mutation
+            if (!isPlatformAdmin) {
+                const userTenantId = req.user ? req.user.tenantId : null;
+                const { data: matchedDevice } = await supabase
+                    .from('devices')
+                    .select('tenant_id')
+                    .eq('id', id)
+                    .single();
+
+                if (!matchedDevice || matchedDevice.tenant_id !== userTenantId) {
+                    return res.status(403).json({ message: 'Forbidden: Lateral device management access breach blocked.' });
+                }
+            }
+
             const { data, error } = await supabase
                 .from('devices')
                 .update({ status, updated_at: new Date().toISOString() })

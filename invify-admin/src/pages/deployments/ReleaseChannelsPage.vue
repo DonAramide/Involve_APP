@@ -1,19 +1,25 @@
 <!-- invify-admin/src/pages/deployments/ReleaseChannelsPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Title Line -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="alt_route" size="sm" color="cyan-3" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Multi-Tenant Release Channel Governance</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">PROMOTION_WORKFLOWS // DRIFT_DETECTION_MATRIX</div>
+          <div class="row items-center op-gap-4">
+            <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Multi-Tenant Release Channel Governance</div>
+            <EnterpriseManualTooltip 
+              title="Release Channel Governance" 
+              description="Governance hub for software distribution. Manages bundle graduation from engineering labs through canary groups to the global stable fleet."
+            />
+          </div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">PROMOTION_WORKFLOWS // DRIFT_DETECTION_MATRIX</div>
         </div>
       </div>
       
       <!-- Tenant Visibility Filter -->
-      <div class="row items-center op-gap-8 no-wrap text-caption text-grey-5">
+      <div class="row items-center op-gap-8 no-wrap text-caption text-muted">
         <span class="v-hide-xs">Inheritance Filter:</span>
         <q-chip dense size="xs" color="cyan-10" text-color="cyan-2" class="text-weight-bold">
           MULTI-TENANT ISOLATED
@@ -25,14 +31,14 @@
     <div class="grid-channels op-gap-8">
       
       <!-- 1. Stable -->
-      <div class="channel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-stable">
-        <div class="row items-center justify-between text-caption text-grey-5">
+      <div class="channel-card bg-panel-darker border-muted rounded-borders q-pa-sm column justify-between border-top-stable">
+        <div class="row items-center justify-between text-caption text-muted">
           <span class="text-weight-bold text-green-4">STABLE CHANNEL</span>
           <q-icon name="verified" size="xs" color="green-4" />
         </div>
         <div class="q-mt-xs">
-          <div class="text-metric-mono text-white text-weight-bold" style="font-size: 16px;">v2.4.1-Cert</div>
-          <div class="text-grey-5" style="font-size: 10px;">Assigned: <span class="text-white text-weight-bold">88.4%</span> Fleet</div>
+          <div class="text-metric-mono text-main text-weight-bold" style="font-size: 16px;">v2.4.1-Cert</div>
+          <div class="text-muted" style="font-size: 10px;">Assigned: <span class="text-main text-weight-bold">88.4%</span> Fleet</div>
         </div>
         <div class="row justify-between text-grey-6 border-top q-pt-xs q-mt-xs" style="font-size: 9px;">
           <span>SLA Hold: 0d</span>
@@ -41,14 +47,14 @@
       </div>
 
       <!-- 2. Beta -->
-      <div class="channel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-beta">
-        <div class="row items-center justify-between text-caption text-grey-5">
+      <div class="channel-card bg-panel-darker border-muted rounded-borders q-pa-sm column justify-between border-top-beta">
+        <div class="row items-center justify-between text-caption text-muted">
           <span class="text-weight-bold text-cyan-3">BETA CHANNEL</span>
           <q-icon name="science" size="xs" color="cyan-3" />
         </div>
         <div class="q-mt-xs">
-          <div class="text-metric-mono text-white text-weight-bold" style="font-size: 16px;">v2.5.0-rc1</div>
-          <div class="text-grey-5" style="font-size: 10px;">Assigned: <span class="text-white text-weight-bold">8.2%</span> Fleet</div>
+          <div class="text-metric-mono text-main text-weight-bold" style="font-size: 16px;">v2.5.0-rc1</div>
+          <div class="text-muted" style="font-size: 10px;">Assigned: <span class="text-main text-weight-bold">8.2%</span> Fleet</div>
         </div>
         <div class="row justify-between text-grey-6 border-top q-pt-xs q-mt-xs" style="font-size: 9px;">
           <span>SLA Hold: 3d</span>
@@ -57,14 +63,14 @@
       </div>
 
       <!-- 3. Canary -->
-      <div class="channel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-canary">
-        <div class="row items-center justify-between text-caption text-grey-5">
+      <div class="channel-card bg-panel-darker border-muted rounded-borders q-pa-sm column justify-between border-top-canary">
+        <div class="row items-center justify-between text-caption text-muted">
           <span class="text-weight-bold text-amber-4">CANARY CHANNEL</span>
           <q-icon name="pets" size="xs" color="amber-4" />
         </div>
         <div class="q-mt-xs">
-          <div class="text-metric-mono text-white text-weight-bold" style="font-size: 16px;">v2.6.0-w1</div>
-          <div class="text-grey-5" style="font-size: 10px;">Assigned: <span class="text-white text-weight-bold">2.1%</span> Fleet</div>
+          <div class="text-metric-mono text-main text-weight-bold" style="font-size: 16px;">v2.6.0-w1</div>
+          <div class="text-muted" style="font-size: 10px;">Assigned: <span class="text-main text-weight-bold">2.1%</span> Fleet</div>
         </div>
         <div class="row justify-between text-grey-6 border-top q-pt-xs q-mt-xs" style="font-size: 9px;">
           <span>SLA Hold: 7d</span>
@@ -73,14 +79,14 @@
       </div>
 
       <!-- 4. Internal -->
-      <div class="channel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-internal">
-        <div class="row items-center justify-between text-caption text-grey-5">
+      <div class="channel-card bg-panel-darker border-muted rounded-borders q-pa-sm column justify-between border-top-internal">
+        <div class="row items-center justify-between text-caption text-muted">
           <span class="text-weight-bold text-purple-4">INTERNAL CHANNEL</span>
           <q-icon name="badge" size="xs" color="purple-4" />
         </div>
         <div class="q-mt-xs">
-          <div class="text-metric-mono text-white text-weight-bold" style="font-size: 16px;">v3.0.0-dev</div>
-          <div class="text-grey-5" style="font-size: 10px;">Assigned: <span class="text-white text-weight-bold">1.0%</span> Fleet</div>
+          <div class="text-metric-mono text-main text-weight-bold" style="font-size: 16px;">v3.0.0-dev</div>
+          <div class="text-muted" style="font-size: 10px;">Assigned: <span class="text-main text-weight-bold">1.0%</span> Fleet</div>
         </div>
         <div class="row justify-between text-grey-6 border-top q-pt-xs q-mt-xs" style="font-size: 9px;">
           <span>SLA Hold: N/A</span>
@@ -89,14 +95,14 @@
       </div>
 
       <!-- 5. Emergency -->
-      <div class="channel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between border-top-emergency">
-        <div class="row items-center justify-between text-caption text-grey-5">
+      <div class="channel-card bg-panel-darker border-muted rounded-borders q-pa-sm column justify-between border-top-emergency">
+        <div class="row items-center justify-between text-caption text-muted">
           <span class="text-weight-bold text-red-5">EMERGENCY CHANNEL</span>
           <q-icon name="warning" size="xs" color="red-5" />
         </div>
         <div class="q-mt-xs">
-          <div class="text-metric-mono text-white text-weight-bold" style="font-size: 16px;">v2.4.2-hotfix</div>
-          <div class="text-grey-5" style="font-size: 10px;">Assigned: <span class="text-white text-weight-bold">0.3%</span> Fleet</div>
+          <div class="text-metric-mono text-main text-weight-bold" style="font-size: 16px;">v2.4.2-hotfix</div>
+          <div class="text-muted" style="font-size: 10px;">Assigned: <span class="text-main text-weight-bold">0.3%</span> Fleet</div>
         </div>
         <div class="row justify-between text-grey-6 border-top q-pt-xs q-mt-xs" style="font-size: 9px;">
           <span>SLA Hold: 0d</span>
@@ -107,11 +113,15 @@
     </div>
 
     <!-- MAIN MIDDLE GRID: FINAL REFINEMENT #3: Release Channel Drift Detection Matrix -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="enterprise-panel bg-panel rounded-borders column fit no-shadow">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
           <q-icon name="find_in_page" size="xs" color="amber-4" />
-          <span class="text-operator-title text-white text-weight-bold">Release Channel Drift Detection Intelligence Matrix</span>
+          <span class="text-operator-title text-main text-weight-bold">Release Channel Drift Detection Intelligence Matrix</span>
+          <EnterpriseManualTooltip 
+            title="Drift Detection Matrix" 
+            description="Identifies 'orphaned' endpoints or unauthorized manual firmware downgrades that violate the assigned release channel governance policy."
+          />
         </div>
         <span class="text-metric-mono text-amber-3" style="font-size: 10px;">{{ driftViolationsList.length }} GOVERNANCE EXCEPTIONS</span>
       </div>
@@ -121,12 +131,12 @@
           <q-item 
             v-for="d in driftViolationsList" 
             :key="d.id" 
-            class="q-px-sm q-py-xs bg-[#181412] rounded-borders row items-center justify-between no-wrap border-left-drift hover-row"
+            class="q-px-sm q-py-xs bg-panel-darker rounded-borders row items-center justify-between no-wrap border-left-drift hover-row"
           >
             <!-- Left: Violation Class & Description -->
             <div class="col-5 column op-gap-2">
               <div class="row items-center op-gap-8 no-wrap">
-                <span class="text-white text-weight-bold text-caption">{{ d.exceptionType }}</span>
+                <span class="text-main text-weight-bold text-caption">{{ d.exceptionType }}</span>
                 <q-badge color="deep-orange-10" text-color="deep-orange-2" class="text-metric-sm">
                   Severity: {{ d.severity }}
                 </q-badge>
@@ -138,8 +148,8 @@
 
             <!-- Middle: Tenant Target & Observed State Indicators -->
             <div class="col-4 q-px-sm column justify-center">
-              <div class="text-grey-4 text-caption" style="font-size: 11px;">
-                Target Boundary: <span class="text-metric-mono text-white">{{ d.tenantScope }}</span>
+              <div class="text-secondary text-caption" style="font-size: 11px;">
+                Target Boundary: <span class="text-metric-mono text-main">{{ d.tenantScope }}</span>
               </div>
               <div class="row items-center op-gap-8 text-grey-6 q-mt-xs" style="font-size: 10px;">
                 <span>Detected Target: <span class="text-metric-mono text-red-4">{{ d.observedState }}</span></span>
@@ -150,7 +160,7 @@
 
             <!-- Right Actions: Force Re-alignment Sync -->
             <div class="col-3 row items-center justify-end op-gap-4">
-              <span class="text-metric-mono text-grey-5 q-mr-xs" style="font-size: 9px;">{{ d.durationStr }}</span>
+              <span class="text-metric-mono text-muted q-mr-xs" style="font-size: 9px;">{{ d.durationStr }}</span>
               <q-btn 
                 dense 
                 size="xs" 
@@ -167,47 +177,51 @@
     </div>
 
     <!-- LOWER ROW: Phase 3 — Embedded Deployment Health Intelligence -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit justify-between">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="enterprise-panel bg-panel rounded-borders column fit justify-between no-shadow">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
           <q-icon name="monitor_heart" size="xs" color="cyan-3" />
-          <span class="text-operator-title text-white text-weight-bold">Deployment Health Intelligence & Convergence Metrics</span>
+          <span class="text-operator-title text-main text-weight-bold">Deployment Health Intelligence & Convergence Metrics</span>
+          <EnterpriseManualTooltip 
+            title="Deployment Health Intelligence" 
+            description="Aggregated real-time health signals from active rollouts. Tracks crash spikes, checksum failures, and total fleet convergence success ratios."
+          />
         </div>
-        <div class="row items-center op-gap-8 no-wrap text-caption text-grey-5">
-          <span>Continuous store stream engine sync: <span class="text-green-4 text-weight-bold">ACTIVE</span></span>
+        <div class="row items-center op-gap-8 no-wrap text-caption text-secondary">
+          <span>Continuous store stream engine sync: <span class="text-green-5 text-weight-bold">ACTIVE</span></span>
         </div>
       </div>
 
       <div class="panel-body q-pa-md column op-gap-16">
         
         <!-- TOP NUMERIC INDICATOR ROW -->
-        <div class="row items-center justify-between text-center bg-[#161b20] q-pa-sm rounded-borders border-muted">
+        <div class="row items-center justify-between text-center bg-panel-darker q-pa-sm rounded-borders border-muted">
           
           <div class="col column">
             <span class="text-metric-mono text-green-4 text-weight-bold" style="font-size: 18px;">99.4%</span>
-            <span class="text-caption text-grey-5" style="font-size: 10px;">Success Convergence</span>
+            <span class="text-caption text-muted" style="font-size: 10px;">Success Convergence</span>
           </div>
 
           <div class="col column border-left">
-            <span class="text-metric-mono text-weight-bold" :class="crashSpikeDetected ? 'text-red-4' : 'text-white'" style="font-size: 18px;">
+            <span class="text-metric-mono text-weight-bold" :class="crashSpikeDetected ? 'text-red-5' : 'text-main'" style="font-size: 18px;">
               {{ crashSpikeDetected ? '0.84% SPIKE' : '0.02% Nominal' }}
             </span>
-            <span class="text-caption text-grey-5" style="font-size: 10px;">Crash Spike Index</span>
+            <span class="text-caption text-muted" style="font-size: 10px;">Crash Spike Index</span>
           </div>
 
           <div class="col column border-left">
             <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 18px;">0.00%</span>
-            <span class="text-caption text-grey-5" style="font-size: 10px;">Integrity Regressions</span>
+            <span class="text-caption text-muted" style="font-size: 10px;">Integrity Regressions</span>
           </div>
 
           <div class="col column border-left">
             <span class="text-metric-mono text-amber-4 text-weight-bold" style="font-size: 18px;">{{ rolloutStore.activeRollbacksCount }}</span>
-            <span class="text-caption text-grey-5" style="font-size: 10px;">Degraded Subfleets</span>
+            <span class="text-caption text-muted" style="font-size: 10px;">Degraded Subfleets</span>
           </div>
 
           <div class="col column border-left">
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 18px;">12.4 eps</span>
-            <span class="text-caption text-grey-5" style="font-size: 10px;">OTA Feedback Loop</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">12.4 eps</span>
+            <span class="text-caption text-muted" style="font-size: 10px;">OTA Feedback Loop</span>
           </div>
 
         </div>
@@ -216,31 +230,31 @@
         <div class="row items-stretch op-gap-16">
           
           <!-- Sector 1: Package Promotion Workflows -->
-          <div class="col-12 col-md-6 bg-[#161b20] q-pa-sm rounded-borders border-muted column justify-between">
+          <div class="col-12 col-md-6 bg-subpanel q-pa-sm rounded-borders border-muted column justify-between">
             <div>
-              <div class="text-white text-weight-bold text-caption q-mb-xs">Package Graduation Lifecycles</div>
-              <div class="text-grey-5" style="font-size: 10px;">
+              <div class="text-main text-weight-bold text-caption q-mb-xs">Package Graduation Lifecycles</div>
+              <div class="text-muted" style="font-size: 10px;">
                 Staged progression pipelines mapping candidate bundles upwards across active stream tracks:
               </div>
             </div>
 
             <!-- Promotion Array Steps -->
             <div class="column op-gap-4 q-mt-sm">
-              <div class="row items-center justify-between text-metric-sm bg-[#12161a] q-pa-xs rounded-borders">
+              <div class="row items-center justify-between text-metric-sm bg-panel-darker q-pa-xs rounded-borders">
                 <span class="text-purple-3">Internal [v2.6.0-dev]</span>
                 <q-icon name="arrow_forward" size="xs" color="grey-6" />
                 <span class="text-amber-4">Canary [v2.6.0-w1]</span>
                 <q-btn dense flat size="xs" color="cyan-3" label="Promote" @click="triggerPromotion('Canary')" class="bg-[#1e2429] q-px-xs" />
               </div>
 
-              <div class="row items-center justify-between text-metric-sm bg-[#12161a] q-pa-xs rounded-borders">
+              <div class="row items-center justify-between text-metric-sm bg-panel-darker q-pa-xs rounded-borders">
                 <span class="text-amber-4">Canary [v2.5.0-w4]</span>
                 <q-icon name="arrow_forward" size="xs" color="grey-6" />
                 <span class="text-cyan-3">Beta [v2.5.0-rc1]</span>
                 <q-btn dense flat size="xs" color="cyan-3" label="Promote" @click="triggerPromotion('Beta')" class="bg-[#1e2429] q-px-xs" />
               </div>
 
-              <div class="row items-center justify-between text-metric-sm bg-[#12161a] q-pa-xs rounded-borders">
+              <div class="row items-center justify-between text-metric-sm bg-panel-darker q-pa-xs rounded-borders">
                 <span class="text-cyan-3">Beta [v2.4.1-rc3]</span>
                 <q-icon name="arrow_forward" size="xs" color="grey-6" />
                 <span class="text-green-4">Stable [v2.4.1-Cert]</span>
@@ -250,10 +264,10 @@
           </div>
 
           <!-- Sector 2: Real-time Convergence Trajectory Maps -->
-          <div class="col-12 col-md-6 bg-[#161b20] q-pa-sm rounded-borders border-muted column justify-between">
+          <div class="col-12 col-md-6 bg-subpanel q-pa-sm rounded-borders border-muted column justify-between">
             <div>
-              <div class="text-white text-weight-bold text-caption q-mb-xs">Continuous Convergence & Failure Analytics</div>
-              <div class="text-grey-5" style="font-size: 10px;">
+              <div class="text-main text-weight-bold text-caption q-mb-xs">Continuous Convergence & Failure Analytics</div>
+              <div class="text-muted" style="font-size: 10px;">
                 Fleet wide OTA installation consistency distributions tracked over active lifecycle buffers:
               </div>
             </div>
@@ -261,27 +275,27 @@
             <!-- Simulated high-fidelity comparative convergence progress map -->
             <div class="column op-gap-6 q-mt-sm">
               <div>
-                <div class="row justify-between text-metric-sm text-grey-4 q-mb-xs" style="font-size: 10px;">
+                <div class="row justify-between text-metric-sm text-secondary q-mb-xs" style="font-size: 10px;">
                   <span>Installation Handshake Success Ratios</span>
                   <span class="text-metric-mono text-green-4 text-weight-bold">99.4% Converged</span>
                 </div>
-                <q-linear-progress dark value="0.994" color="green-4" track-color="grey-9" size="xs" />
+                <q-linear-progress :dark="prefs.isDarkMode" value="0.994" color="green-4" track-color="grey-9" size="xs" />
               </div>
-
+ 
               <div>
-                <div class="row justify-between text-metric-sm text-grey-4 q-mb-xs" style="font-size: 10px;">
+                <div class="row justify-between text-metric-sm text-secondary q-mb-xs" style="font-size: 10px;">
                   <span>Transient Package Checksum Re-attempts</span>
                   <span class="text-metric-mono text-amber-4">0.4% Retrying</span>
                 </div>
-                <q-linear-progress dark value="0.004" color="amber-4" track-color="grey-9" size="xs" />
+                <q-linear-progress :dark="prefs.isDarkMode" value="0.004" color="amber-4" track-color="grey-9" size="xs" />
               </div>
-
+ 
               <div>
-                <div class="row justify-between text-metric-sm text-grey-4 q-mb-xs" style="font-size: 10px;">
+                <div class="row justify-between text-metric-sm text-secondary q-mb-xs" style="font-size: 10px;">
                   <span>Irrecoverable Rollback Executions</span>
                   <span class="text-metric-mono text-red-4">0.2% Terminated</span>
                 </div>
-                <q-linear-progress dark value="0.002" color="red-5" track-color="grey-9" size="xs" />
+                <q-linear-progress :dark="prefs.isDarkMode" value="0.002" color="red-5" track-color="grey-9" size="xs" />
               </div>
             </div>
           </div>
@@ -298,8 +312,11 @@
 import { ref, computed } from 'vue'
 import { useRolloutEventStore } from '../../stores/realtime/useRolloutEventStore'
 import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
+import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import EnterpriseManualTooltip from '../../components/common/EnterpriseManualTooltip.vue'
 import { Notify } from 'quasar'
 
+const { prefs } = useOperatorPreferences()
 const rolloutStore = useRolloutEventStore()
 
 // Simulated crash spike parameters
@@ -379,7 +396,7 @@ const triggerPromotion = (channelTarget) => {
 .border-left-drift { border-left: 3px solid #e8590c; }
 
 .hover-row:hover {
-  background-color: #241a16 !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 
 @media (max-width: 900px) {

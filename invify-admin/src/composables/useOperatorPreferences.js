@@ -19,6 +19,7 @@ export function useOperatorPreferences() {
       activeWorkspace: 'fleet',
       activeTenantScope: 'global', // Multi-tenant isolation boundary identifier ('global' | 'tenant-xyz')
       sidebarCollapsed: false,
+      isDarkMode: true, // Default to dark mode as requested
       pinnedViews: ['/fleet/overview', '/governance/compliance', '/observability/streams'],
       recentHistory: [],
       lastSyncedAt: null
@@ -175,6 +176,7 @@ export function useOperatorPreferences() {
     setActiveWorkspace,
     setTenantScope,
     toggleSidebarCollapse,
+    toggleTheme: () => { prefs.value.isDarkMode = !prefs.value.isDarkMode },
     togglePinView,
     isViewPinned,
     pushHistory,

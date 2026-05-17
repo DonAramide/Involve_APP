@@ -1,30 +1,30 @@
 <!-- invify-admin/src/pages/fleet/DeviceExplorerPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Header Preset Control Line -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="devices" size="sm" color="cyan-3" />
+        <q-icon name="devices" size="sm" color="blue-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Fleet Device Explorer Array</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">VIRTUALIZED_GRID // COMPOSITE NARRATIVE TIMELINES</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Fleet Device Explorer Array</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">VIRTUALIZED_GRID // COMPOSITE NARRATIVE TIMELINES</div>
         </div>
       </div>
       
       <!-- Presets Selector: FINAL REFINEMENT #1: Saved Operational Views -->
       <div class="row items-center op-gap-8 no-wrap overflow-x-auto">
-        <span class="text-caption text-grey-6 v-hide-xs">Saved Presets:</span>
-        <q-btn-group flat dense class="border-muted bg-[#12161a]">
+        <span class="text-caption text-muted v-hide-xs">Saved Presets:</span>
+        <q-btn-group flat dense class="border-main bg-subpanel">
           <q-btn 
             v-for="p in savedPresets" 
             :key="p.id"
             dense 
             size="xs" 
-            :color="activePreset === p.id ? 'cyan-4' : 'grey-5'" 
+            :color="activePreset === p.id ? 'blue-5' : 'grey-5'" 
             :label="p.label" 
             @click="selectPreset(p.id)" 
-            :class="['q-px-sm', activePreset === p.id ? 'bg-[#161b20] text-weight-bold' : '']"
+            :class="['q-px-sm', activePreset === p.id ? 'bg-panel text-weight-bold' : '']"
           />
         </q-btn-group>
       </div>
@@ -44,15 +44,15 @@
 
       <!-- Invisible interactive trigger to bind drawer click actions directly to data rows -->
       <!-- Since EnterpriseDataGrid abstracts body rows, we render a supplementary clickable index layer or explicit row selection triggers -->
-      <div class="q-pt-xs row items-center justify-between text-caption text-grey-6 bg-[#12161a] q-px-sm q-py-xs border-top">
+      <div class="q-pt-xs row items-center justify-between text-caption text-secondary bg-subpanel q-px-sm q-py-xs border-top">
         <div class="row items-center op-gap-8 no-wrap">
-          <q-icon name="info" size="xs" color="cyan-3" />
+          <q-icon name="info" size="xs" color="blue-5" />
           <span>Click any device identifier link to open unified chronological side drawer.</span>
         </div>
         <div class="row items-center op-gap-8 no-wrap">
           <span>Quick Lookup Simulation:</span>
-          <q-btn dense flat size="xs" color="cyan-4" label="Inspect [dev-node-alpha]" @click="openDeviceDrawer('dev-node-alpha')" class="bg-[#161b20] q-px-xs" />
-          <q-btn dense flat size="xs" color="amber-4" label="Inspect [dev-node-delta]" @click="openDeviceDrawer('dev-node-delta')" class="bg-[#161b20] q-px-xs" />
+          <q-btn dense flat size="xs" color="blue-5" label="Inspect [dev-node-alpha]" @click="openDeviceDrawer('dev-node-alpha')" class="bg-panel q-px-xs" />
+          <q-btn dense flat size="xs" color="amber-5" label="Inspect [dev-node-delta]" @click="openDeviceDrawer('dev-node-delta')" class="bg-panel q-px-xs" />
         </div>
       </div>
     </div>
@@ -65,17 +65,17 @@
       bordered
       overlay
       :width="540"
-      class="bg-[#12161a] text-[#e1e7ec]"
+      class="bg-subpanel text-main"
     >
       <div class="column fit justify-between" v-if="selectedDevice">
         
         <!-- Drawer Header -->
-        <div class="bg-[#161b20] q-px-md q-py-sm border-bottom row items-center justify-between">
+        <div class="bg-panel q-px-md q-py-sm border-bottom row items-center justify-between">
           <div class="row items-center op-gap-8 no-wrap">
             <span class="inline-status-block" :class="selectedDevice?.onlineState === 'ONLINE' ? 'bg-green-4' : 'bg-grey-6'"></span>
             <div>
-              <div class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">{{ selectedDevice.deviceId }}</div>
-              <div class="text-grey-5" style="font-size: 10px;">{{ selectedDevice.deviceName }} | {{ selectedDevice.tenant }}</div>
+              <div class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">{{ selectedDevice.deviceId }}</div>
+              <div class="text-muted" style="font-size: 10px;">{{ selectedDevice.deviceName }} | {{ selectedDevice.tenant }}</div>
             </div>
           </div>
           
@@ -91,18 +91,18 @@
         <q-scroll-area class="col q-pa-md">
           
           <!-- Metadata Summary Strip -->
-          <div class="row items-center justify-between bg-[#0b0f12] q-pa-sm rounded-borders border-muted q-mb-md text-caption text-grey-4" style="font-size: 11px;">
-            <div><span class="text-grey-6">Agent:</span> <span class="text-metric-mono text-cyan-3">{{ selectedDevice.agentCode }}</span></div>
-            <div><span class="text-grey-6">Location:</span> <span class="text-metric-mono text-cyan-3" v-if="selectedDevice.latitude">{{ selectedDevice.latitude }}, {{ selectedDevice.longitude }}</span><span class="text-grey-7" v-else>N/A</span></div>
-            <div><span class="text-grey-6">Battery:</span> <span class="text-metric-mono">{{ selectedDevice.battery }}%</span></div>
-            <div><span class="text-grey-6">OS:</span> <span class="text-metric-mono text-white">{{ selectedDevice.androidVersion }}</span></div>
-            <div><span class="text-grey-6">OTA:</span> <span class="text-metric-mono text-amber-3">{{ selectedDevice.otaStatus }}</span></div>
+          <div class="row items-center justify-between bg-main q-pa-sm rounded-borders border-main q-mb-md text-caption text-secondary" style="font-size: 11px;">
+            <div><span class="text-muted">Agent:</span> <span class="text-metric-mono text-blue-5">{{ selectedDevice.agentCode }}</span></div>
+            <div><span class="text-muted">Location:</span> <span class="text-metric-mono text-blue-5" v-if="selectedDevice.latitude">{{ selectedDevice.latitude }}, {{ selectedDevice.longitude }}</span><span class="text-grey-7" v-else>N/A</span></div>
+            <div><span class="text-muted">Battery:</span> <span class="text-metric-mono">{{ selectedDevice.battery }}%</span></div>
+            <div><span class="text-muted">OS:</span> <span class="text-metric-mono text-main">{{ selectedDevice.androidVersion }}</span></div>
+            <div><span class="text-muted">OTA:</span> <span class="text-metric-mono text-amber-5">{{ selectedDevice.otaStatus }}</span></div>
           </div>
 
           <!-- FINAL REFINEMENT #5: Unified Operational Timelines -->
-          <div class="text-operator-title text-cyan-3 q-mb-xs row items-center justify-between">
+          <div class="text-operator-title text-blue-5 q-mb-xs row items-center justify-between">
             <span>Unified Chronological Narrative</span>
-            <span class="text-metric-mono text-grey-6" style="font-size: 9px;">COMPOSITE MERGED LOGS</span>
+            <span class="text-metric-mono text-muted" style="font-size: 9px;">COMPOSITE MERGED LOGS</span>
           </div>
           
           <div class="timeline-container border-left q-pl-md q-ml-xs q-mb-md column op-gap-12">
@@ -111,11 +111,11 @@
               :key="evt.time" 
               class="timeline-item row items-start op-gap-8 no-wrap text-caption"
             >
-              <span class="text-metric-mono text-grey-5 q-mt-xs" style="font-size: 10px; min-width: 42px;">{{ evt.time }}</span>
+              <span class="text-metric-mono text-muted q-mt-xs" style="font-size: 10px; min-width: 42px;">{{ evt.time }}</span>
               <span class="timeline-dot q-mt-xs" :class="evt.dotClass"></span>
               <div class="col">
-                <div class="text-white text-weight-medium" style="font-size: 11px;">{{ evt.narrative }}</div>
-                <div class="text-grey-5" style="font-size: 10px;" v-if="evt.subtext">{{ evt.subtext }}</div>
+                <div class="text-main text-weight-medium" style="font-size: 11px;">{{ evt.narrative }}</div>
+                <div class="text-muted" style="font-size: 10px;" v-if="evt.subtext">{{ evt.subtext }}</div>
               </div>
             </div>
           </div>
@@ -123,9 +123,9 @@
           <q-separator dark class="q-my-md bg-[#22282d]" />
 
           <!-- App Inventory Vector -->
-          <div class="text-operator-title text-grey-5 q-mb-xs">Monitored Application Packages</div>
+          <div class="text-operator-title text-muted q-mb-xs">Monitored Application Packages</div>
           <div class="row op-gap-4 q-mb-md">
-            <q-chip dense dark size="xs" class="bg-[#161b20] text-grey-4" v-for="app in selectedDevice.apps" :key="app">
+            <q-chip dense dark size="xs" class="bg-panel text-secondary" v-for="app in selectedDevice.apps" :key="app">
               {{ app }}
             </q-chip>
           </div>
@@ -144,7 +144,7 @@
         </q-scroll-area>
 
         <!-- Drawer Footer Tracker Indicator -->
-        <div class="bg-[#0b0f12] q-pa-sm border-top text-center text-metric-sm text-grey-6">
+        <div class="bg-main q-pa-sm border-top text-center text-metric-sm text-muted">
           Stream Heartbeat Signature Hash Verified // Audit Bridge Activated
         </div>
 
@@ -153,35 +153,35 @@
 
     <!-- FINAL REFINEMENT #4: Remote Action Safety Gate Confirmation Modal -->
     <q-dialog v-model="actionGateOpen" persistent>
-      <q-card class="bg-[#12161a] text-[#e1e7ec] border-muted" style="min-width: 380px;">
-        <q-card-section class="bg-[#1b1515] border-bottom row items-center op-gap-8">
-          <q-icon name="security" color="red-4" size="sm" />
+      <q-card class="bg-subpanel text-main border-main" style="min-width: 380px;">
+        <q-card-section class="bg-red-focus border-bottom row items-center op-gap-8">
+          <q-icon name="security" color="red-5" size="sm" />
           <div>
-            <div class="text-white text-weight-bold text-caption">High-Risk Command Authorization Gate</div>
-            <div class="text-metric-sm text-red-3">Action Target: {{ pendingActionType?.toUpperCase() }}</div>
+            <div class="text-main text-weight-bold text-caption">High-Risk Command Authorization Gate</div>
+            <div class="text-metric-sm text-red-5">Action Target: {{ pendingActionType?.toUpperCase() }}</div>
           </div>
         </q-card-section>
 
         <q-card-section class="column op-gap-12 q-pt-md">
-          <div class="text-caption text-grey-4" style="font-size: 11px;">
+          <div class="text-caption text-secondary" style="font-size: 11px;">
             Executing operational instructions directly against live hardware endpoints demands explicit logging trail attribution.
           </div>
 
           <!-- Mandatory Audit Reason Annotations -->
           <q-input
             v-model="auditReasonText"
-            dark
+            :dark="useOperatorPreferences().prefs.value.isDarkMode"
             dense
             filled
             label="Mandatory Operator Reason Annotation *"
             placeholder="e.g. Cleared attestation hash flags post firmware analysis"
-            class="bg-[#161b20]"
+            class="bg-panel"
             autofocus
             :rules="[val => !!val || 'Audit annotation string cannot be null']"
           />
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-[#161b20] border-top q-pa-sm">
+        <q-card-actions align="right" class="bg-panel border-top q-pa-sm">
           <q-btn flat dense size="sm" color="grey-5" label="Abort Call" v-close-popup @click="resetActionGate" />
           <q-btn 
             dense 

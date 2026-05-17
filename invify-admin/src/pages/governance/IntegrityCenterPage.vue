@@ -1,21 +1,21 @@
 <!-- invify-admin/src/pages/governance/IntegrityCenterPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Top Telemetry & Control Line -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="security" size="sm" color="purple-4" />
+        <q-icon name="security" size="sm" color="purple-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Hardware Integrity & Attestation Center</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">CRYPTOGRAPHIC_ASSURANCE_LAYER // STREAM: NORMALIZED</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Hardware Integrity & Attestation Center</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">CRYPTOGRAPHIC_ASSURANCE_LAYER // STREAM: NORMALIZED</div>
         </div>
       </div>
       
       <div class="row items-center op-gap-8 no-wrap">
-        <span class="text-caption text-grey-6 v-hide-xs">Trust Engine Status:</span>
+        <span class="text-caption text-muted v-hide-xs">Trust Engine Status:</span>
         <q-chip dense size="xs" color="purple-10" text-color="purple-2" class="text-metric-sm">
-          <span class="live-indicator-dot bg-purple-4 q-mr-xs"></span>
+          <span class="live-indicator-dot bg-purple-5 q-mr-xs"></span>
           ENFORCING // ZERO DUPLICATION
         </q-chip>
       </div>
@@ -25,55 +25,55 @@
     <div class="grid-integrity-cards op-gap-8">
       
       <!-- 1. Average Fleet Trust Score -->
-      <div class="panel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between">
-        <div class="row items-center justify-between text-caption text-grey-5">
+      <div class="enterprise-panel bg-panel q-pa-sm column justify-between">
+        <div class="row items-center justify-between text-caption text-muted">
           <span class="text-weight-bold text-green-3">AGGREGATE FLEET TRUST</span>
           <q-icon name="verified" size="xs" color="green-3" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 20px;">{{ avgFleetTrustScore }}%</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ avgFleetTrustScore }}%</span>
           <span class="text-metric-sm text-green-4" v-if="avgFleetTrustScore > 95">OPTIMAL</span>
         </div>
-        <q-linear-progress dark :value="avgFleetTrustScore / 100" color="green-4" track-color="grey-9" size="xs" class="q-mt-xs" />
+        <q-linear-progress :dark="true" :value="avgFleetTrustScore / 100" color="green-4" track-color="grey-9" size="xs" class="q-mt-xs" />
       </div>
 
       <!-- 2. Play Integrity Attestation Failures -->
-      <div class="panel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between">
-        <div class="row items-center justify-between text-caption text-grey-5">
-          <span class="text-weight-bold text-red-4">ATTESTATION FAILURES</span>
-          <q-icon name="gpp_bad" size="xs" color="red-4" />
+      <div class="enterprise-panel bg-panel q-pa-sm column justify-between">
+        <div class="row items-center justify-between text-caption text-muted">
+          <span class="text-weight-bold text-red-5">ATTESTATION FAILURES</span>
+          <q-icon name="gpp_bad" size="xs" color="red-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 20px;">{{ integrityStore.failedAttestationsCount }}</span>
-          <span class="text-metric-sm text-red-3">triggers</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ integrityStore.failedAttestationsCount }}</span>
+          <span class="text-metric-sm text-red-5">triggers</span>
         </div>
-        <div class="text-metric-sm text-grey-5 q-mt-xs">Play Integrity hardware hashes broken</div>
+        <div class="text-metric-sm text-muted q-mt-xs">Play Integrity hardware hashes broken</div>
       </div>
 
       <!-- 3. Rooted OS / Kernel Tampering -->
-      <div class="panel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between">
-        <div class="row items-center justify-between text-caption text-grey-5">
-          <span class="text-weight-bold text-deep-orange-4">FIRMWARE TAMPERING</span>
-          <q-icon name="memory" size="xs" color="deep-orange-4" />
+      <div class="enterprise-panel bg-panel q-pa-sm column justify-between">
+        <div class="row items-center justify-between text-caption text-muted">
+          <span class="text-weight-bold text-deep-orange-5">FIRMWARE TAMPERING</span>
+          <q-icon name="memory" size="xs" color="deep-orange-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 20px;">{{ firmwareTamperedCount }}</span>
-          <span class="text-metric-sm text-deep-orange-3">endpoints</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ firmwareTamperedCount }}</span>
+          <span class="text-metric-sm text-deep-orange-5">endpoints</span>
         </div>
-        <div class="text-metric-sm text-grey-5 q-mt-xs">Root bridges detected via boot metrics</div>
+        <div class="text-metric-sm text-muted q-mt-xs">Root bridges detected via boot metrics</div>
       </div>
 
       <!-- 4. Suspicious Runtime Behavior -->
-      <div class="panel-card bg-[#12161a] border-muted rounded-borders q-pa-sm column justify-between">
-        <div class="row items-center justify-between text-caption text-grey-5">
-          <span class="text-weight-bold text-amber-4">RUNTIME ANOMALIES</span>
-          <q-icon name="trending_down" size="xs" color="amber-4" />
+      <div class="enterprise-panel bg-panel q-pa-sm column justify-between">
+        <div class="row items-center justify-between text-caption text-muted">
+          <span class="text-weight-bold text-amber-5">RUNTIME ANOMALIES</span>
+          <q-icon name="trending_down" size="xs" color="amber-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-white text-weight-bold" style="font-size: 20px;">{{ runtimeAnomaliesCount }}</span>
-          <span class="text-metric-sm text-grey-6">vectors</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ runtimeAnomaliesCount }}</span>
+          <span class="text-metric-sm text-muted">vectors</span>
         </div>
-        <div class="text-metric-sm text-grey-5 q-mt-xs">Execution stack timing exceptions</div>
+        <div class="text-metric-sm text-muted q-mt-xs">Execution stack timing exceptions</div>
       </div>
 
     </div>
@@ -84,13 +84,13 @@
       <!-- LEFT PORTION: Severity-Aware Cryptographic Traces -->
       <div class="col-12 col-md-7 column op-gap-16">
         
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="list_alt" size="xs" color="cyan-3" />
-              <span class="text-operator-title text-white text-weight-bold">Cryptographic Validation Array</span>
+              <q-icon name="list_alt" size="xs" color="blue-5" />
+              <span class="text-operator-title text-main text-weight-bold">Cryptographic Validation Array</span>
             </div>
-            <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">{{ validationTracesList.length }} Stream Events</span>
+            <span class="text-metric-mono text-blue-5" style="font-size: 10px;">{{ validationTracesList.length }} Stream Events</span>
           </div>
 
           <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 260px;">
@@ -98,7 +98,7 @@
               <q-item 
                 v-for="t in validationTracesList" 
                 :key="t.eventId" 
-                class="q-px-sm q-py-xs bg-[#161b20] rounded-borders row items-center justify-between no-wrap hover-row"
+                class="q-px-sm q-py-xs bg-subpanel rounded-borders row items-center justify-between no-wrap hover-row"
                 :class="getSeverityLeftBorderClass(t.severity)"
               >
                 <div class="row items-center op-gap-8 no-wrap col-8 overflow-hidden">
@@ -107,18 +107,18 @@
                   </q-badge>
                   
                   <div class="ellipsis">
-                    <span class="text-white text-weight-bold text-caption cursor-pointer hover-underline" @click="correlateToExplorer(t.sourceAttribution)">
+                    <span class="text-main text-weight-bold text-caption cursor-pointer hover-underline" @click="correlateToExplorer(t.sourceAttribution)">
                       {{ t.sourceAttribution }}
                     </span>
-                    <span class="text-grey-4 q-ml-xs" style="font-size: 11px;">- {{ t.payload?.message || t.eventType }}</span>
+                    <span class="text-secondary q-ml-xs" style="font-size: 11px;">- {{ t.payload?.message || t.eventType }}</span>
                   </div>
                 </div>
 
                 <div class="column items-end col-4">
-                  <span class="text-metric-mono text-white text-weight-bold" style="font-size: 11px;">
+                  <span class="text-metric-mono text-main text-weight-bold" style="font-size: 11px;">
                     Trust: {{ t.payload?.trustScore || 98 }}%
                   </span>
-                  <span class="text-metric-mono text-grey-6" style="font-size: 9px;">
+                  <span class="text-metric-mono text-muted" style="font-size: 9px;">
                     {{ formatRelativeTime(t.timestamp) }}
                   </span>
                 </div>
@@ -132,48 +132,48 @@
       <!-- RIGHT PORTION: Historical Trust Degradation Timeline -->
       <div class="col-12 col-md-5 column op-gap-16">
         
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="stacked_line_chart" size="xs" color="amber-4" />
-              <span class="text-operator-title text-white text-weight-bold">Historical Trust Degradation Trajectory</span>
+              <q-icon name="stacked_line_chart" size="xs" color="amber-5" />
+              <span class="text-operator-title text-main text-weight-bold">Historical Trust Degradation Trajectory</span>
             </div>
-            <span class="text-metric-mono text-grey-5" style="font-size: 10px;">7d Profile</span>
+            <span class="text-metric-mono text-muted" style="font-size: 10px;">7d Profile</span>
           </div>
 
           <div class="panel-body col q-pa-sm column justify-between">
-            <div class="text-caption text-grey-4 q-mb-xs" style="font-size: 11px;">
+            <div class="text-caption text-secondary q-mb-xs" style="font-size: 11px;">
               Continuous baseline hardware attestation variations over ingestion lifespan:
             </div>
 
             <!-- Simulated comparative trust metric vector mapping -->
             <div class="column op-gap-8 q-py-sm">
-              <div class="row items-center justify-between text-caption text-grey-5">
+              <div class="row items-center justify-between text-caption text-muted">
                 <span>Core Operating Base</span>
                 <span class="text-metric-mono text-green-3">99.8% Nominal</span>
               </div>
-              <q-linear-progress dark value="0.998" color="green-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.998" color="green-4" track-color="grey-9" size="xs" />
 
-              <div class="row items-center justify-between text-caption text-grey-5">
+              <div class="row items-center justify-between text-caption text-muted">
                 <span>Kiosk Subfleet Drift</span>
-                <span class="text-metric-mono text-amber-3">94.1% Impacted</span>
+                <span class="text-metric-mono text-amber-5">94.1% Impacted</span>
               </div>
-              <q-linear-progress dark value="0.941" color="amber-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.941" color="amber-5" track-color="grey-9" size="xs" />
 
-              <div class="row items-center justify-between text-caption text-grey-5">
+              <div class="row items-center justify-between text-caption text-muted">
                 <span>Compromised Scanner Waves</span>
-                <span class="text-metric-mono text-red-4">71.2% Degraded</span>
+                <span class="text-metric-mono text-red-5">71.2% Degraded</span>
               </div>
-              <q-linear-progress dark value="0.712" color="red-5" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.712" color="red-5" track-color="grey-9" size="xs" />
             </div>
 
             <!-- Dynamic Correlation notice banner -->
-            <div class="bg-[#1b1515] q-pa-sm rounded-borders border-left-critical q-mt-xs">
-              <div class="text-white text-weight-bold text-caption row items-center op-gap-4">
-                <q-icon name="warning" color="red-4" size="xs" />
+            <div class="bg-red-focus q-pa-sm rounded-borders border-left-critical q-mt-xs">
+              <div class="text-main text-weight-bold text-caption row items-center op-gap-4">
+                <q-icon name="warning" color="red-5" size="xs" />
                 <span>Incident Correlation Hook</span>
               </div>
-              <div class="text-red-3 q-mt-xs" style="font-size: 10px;">
+              <div class="text-red-5 q-mt-xs" style="font-size: 10px;">
                 Unresolved parity failures triggered cascade trust depreciation targeting hardware sector [tenant-omega].
               </div>
             </div>
@@ -185,13 +185,13 @@
     </div>
 
     <!-- LOWER ROW: FINAL REFINEMENT #3: Integrity Correlation Graphs -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="enterprise-panel bg-panel column fit">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="insights" size="xs" color="cyan-3" />
-          <span class="text-operator-title text-white text-weight-bold">Multi-Series Integrity Correlation Analysis Maps</span>
+          <q-icon name="insights" size="xs" color="blue-5" />
+          <span class="text-operator-title text-main text-weight-bold">Multi-Series Integrity Correlation Analysis Maps</span>
         </div>
-        <div class="row items-center op-gap-8 no-wrap text-caption text-grey-5">
+        <div class="row items-center op-gap-8 no-wrap text-caption text-muted">
           <span>Dual-Series Trajectory comparison</span>
         </div>
       </div>
@@ -199,89 +199,89 @@
       <div class="panel-body q-pa-md column op-gap-16">
         
         <!-- Correlation Graph A: Integrity Degradation <-> OTA Rollouts -->
-        <div class="correlation-box bg-[#161b20] q-pa-sm rounded-borders border-left-cyan column op-gap-4">
-          <div class="row items-center justify-between text-caption text-grey-4">
-            <span class="text-white text-weight-bold">Correlation Map A: Hardware Trust Degradation ↔ OTA Deployment Waves</span>
-            <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">R² = 0.84 HIGH CORRELATION</span>
+        <div class="correlation-box bg-subpanel q-pa-sm rounded-borders border-left-cyan column op-gap-4">
+          <div class="row items-center justify-between text-caption text-secondary">
+            <span class="text-main text-weight-bold">Correlation Map A: Hardware Trust Degradation ↔ OTA Deployment Waves</span>
+            <span class="text-metric-mono text-blue-5" style="font-size: 10px;">R² = 0.84 HIGH CORRELATION</span>
           </div>
 
           <!-- Multi-Series visual timeline bars plotting synthetic relationships -->
           <div class="row items-center op-gap-12 q-pt-xs">
             <div class="col column op-gap-2">
-              <div class="row justify-between text-grey-5" style="font-size: 9px;">
+              <div class="row justify-between text-muted" style="font-size: 9px;">
                 <span>Active Rollout Batch Velocity</span>
-                <span class="text-metric-mono text-cyan-3">240 nodes/min</span>
+                <span class="text-metric-mono text-blue-5">240 nodes/min</span>
               </div>
-              <q-linear-progress dark value="0.75" color="cyan-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.75" color="blue-5" track-color="grey-9" size="xs" />
             </div>
 
             <div class="col column op-gap-2">
-              <div class="row justify-between text-grey-5" style="font-size: 9px;">
+              <div class="row justify-between text-muted" style="font-size: 9px;">
                 <span>Observed Trust Drop Magnitude</span>
-                <span class="text-metric-mono text-amber-4">-4.2% Fleet Wide</span>
+                <span class="text-metric-mono text-amber-5">-4.2% Fleet Wide</span>
               </div>
-              <q-linear-progress dark value="0.32" color="amber-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.32" color="amber-5" track-color="grey-9" size="xs" />
             </div>
           </div>
-          <div class="text-grey-6" style="font-size: 9px; margin-top: 2px;">
+          <div class="text-muted" style="font-size: 9px; margin-top: 2px;">
             Inference: Upstream firmware batch injections frequently trigger transient memory signature timeouts before establishing stable handshake validations.
           </div>
         </div>
 
         <!-- Correlation Graph B: Trust Failures <-> Incident Spikes -->
-        <div class="correlation-box bg-[#161b20] q-pa-sm rounded-borders border-left-amber column op-gap-4">
-          <div class="row items-center justify-between text-caption text-grey-4">
-            <span class="text-white text-weight-bold">Correlation Map B: Cryptographic Trust Breaches ↔ Continuous Incident Spikes</span>
-            <span class="text-metric-mono text-amber-3" style="font-size: 10px;">R² = 0.91 SEVERE CASCADE</span>
+        <div class="correlation-box bg-subpanel q-pa-sm rounded-borders border-left-amber column op-gap-4">
+          <div class="row items-center justify-between text-caption text-secondary">
+            <span class="text-main text-weight-bold">Correlation Map B: Cryptographic Trust Breaches ↔ Continuous Incident Spikes</span>
+            <span class="text-metric-mono text-amber-5" style="font-size: 10px;">R² = 0.91 SEVERE CASCADE</span>
           </div>
 
           <div class="row items-center op-gap-12 q-pt-xs">
             <div class="col column op-gap-2">
-              <div class="row justify-between text-grey-5" style="font-size: 9px;">
+              <div class="row justify-between text-muted" style="font-size: 9px;">
                 <span>Unacknowledged Kernel Alerts</span>
-                <span class="text-metric-mono text-red-4">14 active triggers</span>
+                <span class="text-metric-mono text-red-5">14 active triggers</span>
               </div>
-              <q-linear-progress dark value="0.55" color="red-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.55" color="red-5" track-color="grey-9" size="xs" />
             </div>
 
             <div class="col column op-gap-2">
-              <div class="row justify-between text-grey-5" style="font-size: 9px;">
+              <div class="row justify-between text-muted" style="font-size: 9px;">
                 <span>Play Integrity Tamper Wave</span>
                 <span class="text-metric-mono text-purple-3">8 target nodes locked</span>
               </div>
-              <q-linear-progress dark value="0.45" color="purple-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.45" color="purple-4" track-color="grey-9" size="xs" />
             </div>
           </div>
-          <div class="text-grey-6" style="font-size: 9px; margin-top: 2px;">
+          <div class="text-muted" style="font-size: 9px; margin-top: 2px;">
             Inference: Hardware parity issues trigger automated secure runtime attestation resets immediately locking endpoint access.
           </div>
         </div>
 
         <!-- Correlation Graph C: Firmware Tampering <-> Quarantine Waves -->
-        <div class="correlation-box bg-[#161b20] q-pa-sm rounded-borders border-left-purple column op-gap-4">
-          <div class="row items-center justify-between text-caption text-grey-4">
-            <span class="text-white text-weight-bold">Correlation Map C: Unauthorized Kernel Patching ↔ Automated Quarantine Waves</span>
+        <div class="correlation-box bg-subpanel q-pa-sm rounded-borders border-left-purple column op-gap-4">
+          <div class="row items-center justify-between text-caption text-secondary">
+            <span class="text-main text-weight-bold">Correlation Map C: Unauthorized Kernel Patching ↔ Automated Quarantine Waves</span>
             <span class="text-metric-mono text-purple-3" style="font-size: 10px;">R² = 0.98 ABSOLUTE ENFORCEMENT</span>
           </div>
 
           <div class="row items-center op-gap-12 q-pt-xs">
             <div class="col column op-gap-2">
-              <div class="row justify-between text-grey-5" style="font-size: 9px;">
+              <div class="row justify-between text-muted" style="font-size: 9px;">
                 <span>Detected Root Bridges</span>
-                <span class="text-metric-mono text-deep-orange-4">3 physical kiosks</span>
+                <span class="text-metric-mono text-deep-orange-5">3 physical kiosks</span>
               </div>
-              <q-linear-progress dark value="0.12" color="deep-orange-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.12" color="deep-orange-5" track-color="grey-9" size="xs" />
             </div>
 
             <div class="col column op-gap-2">
-              <div class="row justify-between text-grey-5" style="font-size: 9px;">
+              <div class="row justify-between text-muted" style="font-size: 9px;">
                 <span>SOC Confined Enclosures</span>
                 <span class="text-metric-mono text-purple-3">3 absolute closures</span>
               </div>
-              <q-linear-progress dark value="0.12" color="purple-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="true" value="0.12" color="purple-4" track-color="grey-9" size="xs" />
             </div>
           </div>
-          <div class="text-grey-6" style="font-size: 9px; margin-top: 2px;">
+          <div class="text-muted" style="font-size: 9px; margin-top: 2px;">
             Inference: Immutable Normalizer envelope mappings ensure immediate network isolation whenever local secure registers display unauthorized state overrides.
           </div>
         </div>
@@ -378,16 +378,16 @@ const formatRelativeTime = (isoString) => {
   grid-template-columns: repeat(4, 1fr);
 }
 
-.border-left-critical { border-left: 3px solid #c92a2a !important; }
-.border-left-high { border-left: 3px solid #e8590c !important; }
-.border-left-warning { border-left: 3px solid #fcc419 !important; }
+.border-left-critical { border-left: 3px solid var(--enterprise-red) !important; }
+.border-left-high { border-left: 3px solid var(--enterprise-orange) !important; }
+.border-left-warning { border-left: 3px solid var(--enterprise-amber) !important; }
 
-.border-left-cyan { border-left: 3px solid #22b8cf; }
-.border-left-amber { border-left: 3px solid #fcc419; }
-.border-left-purple { border-left: 3px solid #7048e8; }
+.border-left-cyan { border-left: 3px solid var(--enterprise-blue); }
+.border-left-amber { border-left: 3px solid var(--enterprise-amber); }
+.border-left-purple { border-left: 3px solid var(--enterprise-purple); }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 
 .hover-underline:hover {

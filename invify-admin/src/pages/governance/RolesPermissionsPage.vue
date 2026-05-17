@@ -1,14 +1,14 @@
 <!-- invify-admin/src/pages/governance/RolesPermissionsPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Title Configuration Header -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="admin_panel_settings" size="sm" color="amber-3" />
+        <q-icon name="admin_panel_settings" size="sm" color="amber-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">RBAC Capabilities & Scopes Matrix</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">AUTHORITATIVE_BACKEND_ENGINE // ZERO_CLIENT_TRUST</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">RBAC Capabilities & Scopes Matrix</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">AUTHORITATIVE_BACKEND_ENGINE // ZERO_CLIENT_TRUST</div>
         </div>
       </div>
       
@@ -20,25 +20,25 @@
     </div>
 
     <!-- MANDATORY SECURITY ALERT BANNER -->
-    <q-banner dense class="bg-[#141009] text-amber-3 border-amber rounded-borders q-pa-sm text-caption column op-gap-4">
+    <q-banner dense class="bg-panel text-amber-5 border-amber rounded-borders q-pa-sm text-caption column op-gap-4">
       <template v-slot:avatar>
-        <q-icon name="gpp_maybe" color="amber-4" size="xs" />
+        <q-icon name="gpp_maybe" color="amber-5" size="xs" />
       </template>
       <div class="text-weight-bold tracking-wide">CRITICAL PRODUCTION SECURITY BOUNDARY</div>
-      <div class="text-grey-5" style="font-size: 11px;">
-        To prevent client-side bypass vectors, raw RBAC authorization matrices, trust score calculations, and governance execution logic are <span class="text-white text-weight-bold">NEVER exposed directly to frontend components</span>. This interface serves purely as a real-time visual attestation map. All decisions remain absolutely authoritative within the encrypted backend middleware pipelines.
+      <div class="text-muted" style="font-size: 11px;">
+        To prevent client-side bypass vectors, raw RBAC authorization matrices, trust score calculations, and governance execution logic are <span class="text-main text-weight-bold">NEVER exposed directly to frontend components</span>. This interface serves purely as a real-time visual attestation map. All decisions remain absolutely authoritative within the encrypted backend middleware pipelines.
       </div>
     </q-banner>
 
     <!-- MATRIX VIEW CONTAINER -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-grey-5">
+    <div class="enterprise-panel bg-panel column col">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-muted">
         <span class="col-4">Canonical Enterprise Capability Scope</span>
-        <span class="col text-center text-cyan-3">Super Admin</span>
-        <span class="col text-center text-amber-3">Internal Staff</span>
-        <span class="col text-center text-light-green-3">Tenant Admin</span>
-        <span class="col text-center text-grey-4">Tenant Op</span>
-        <span class="col text-center text-deep-purple-3">Pro Customer</span>
+        <span class="col text-center text-blue-5">Super Admin</span>
+        <span class="col text-center text-amber-5">Internal Staff</span>
+        <span class="col text-center text-light-green-5">Tenant Admin</span>
+        <span class="col text-center text-muted">Tenant Op</span>
+        <span class="col text-center text-deep-purple-5">Pro Customer</span>
       </div>
 
       <div class="panel-body col q-pa-xs overflow-y-auto">
@@ -47,12 +47,12 @@
           <q-item
             v-for="cap in capabilitiesMatrix"
             :key="cap.code"
-            class="q-px-sm q-py-xs bg-[#161b20] rounded-borders row items-center justify-between no-wrap hover-row"
+            class="q-px-sm q-py-xs bg-subpanel rounded-borders row items-center justify-between no-wrap hover-row"
           >
             <!-- Capability metadata -->
             <div class="column col-4 no-wrap ellipsis">
-              <span class="text-white text-weight-bold text-caption">{{ cap.label }}</span>
-              <span class="text-metric-mono text-grey-6" style="font-size: 9px;">{{ cap.code }}</span>
+              <span class="text-main text-weight-bold text-caption">{{ cap.label }}</span>
+              <span class="text-metric-mono text-muted" style="font-size: 9px;">{{ cap.code }}</span>
             </div>
 
             <!-- TIER 1: Super Admin -->
@@ -86,9 +86,9 @@
     </div>
 
     <!-- Live Update Narrative Toast block -->
-    <div class="row items-center justify-between border-top q-pt-xs text-metric-sm text-grey-6">
+    <div class="row items-center justify-between border-top q-pt-xs text-metric-sm text-muted">
       <span>Dynamic scope validation updates synchronizing upstream securely</span>
-      <span class="text-metric-mono text-cyan-4" v-if="lastActionMessage">{{ lastActionMessage }}</span>
+      <span class="text-metric-mono text-blue-5" v-if="lastActionMessage">{{ lastActionMessage }}</span>
       <span v-else>All matrices locked to active session token role envelope</span>
     </div>
 
@@ -160,6 +160,6 @@ const pushPolicyUpdate = (capCode, tierStr, newVal) => {
 }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 </style>

@@ -24,8 +24,8 @@ export class AIService {
     if (apiKey !== this.currentKey || !this.model) {
       console.log(`[AI] Initializing Gemini 2.5 with ${data?.config_value ? 'DB' : 'ENV'} key`);
       this.currentKey = apiKey;
-      this.genAI = new GoogleGenerativeAI(apiKey, { apiVersion: 'v1' });
-      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      this.genAI = new GoogleGenerativeAI(apiKey);
+      this.model = this.genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }, { apiVersion: 'v1' });
     }
   }
 

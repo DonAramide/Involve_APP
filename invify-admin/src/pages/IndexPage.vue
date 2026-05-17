@@ -4,10 +4,10 @@
     <!-- Dashboard Header -->
     <div class="row items-center q-mb-xl">
       <div class="col">
-        <h1 class="text-h4 text-weight-bold q-ma-none text-white letter-spacing-1">
+        <h1 class="text-h4 text-weight-bold q-ma-none text-main letter-spacing-1">
           System <span class="text-indigo-4">Overview</span>
         </h1>
-        <p class="text-grey-5 q-mt-sm">Real-time metrics across your multi-tenant SaaS platform.</p>
+        <p class="text-muted q-mt-sm">Real-time metrics across your multi-tenant SaaS platform.</p>
       </div>
       <div class="col-auto">
         <q-btn outline color="indigo-4" icon="download" label="Export Report" class="q-px-md" />
@@ -17,7 +17,7 @@
     <!-- Stats Grid -->
     <div class="row q-col-gutter-lg q-mb-xl">
       <div v-for="stat in stats" :key="stat.label" class="col-12 col-md-3">
-        <q-card class="bg-blue-grey-10 text-white shadow-2 q-pa-md hover-scale border-indigo">
+        <q-card class="bg-panel text-main shadow-2 q-pa-md hover-scale border-indigo no-shadow">
           <q-card-section horizontal class="items-center">
             <q-card-section>
               <div class="text-overline text-grey-5">{{ stat.label }}</div>
@@ -40,16 +40,16 @@
     <div class="row q-col-gutter-lg">
       <!-- Recent Ledger Activity -->
       <div class="col-12 col-lg-8">
-        <q-card class="bg-blue-grey-10 text-white shadow-2">
+        <q-card class="bg-panel text-main shadow-2 no-shadow">
           <q-card-section class="row items-center">
             <div class="text-h6 text-indigo-3">Recent Ledger Activity</div>
             <q-space />
             <q-btn flat dense color="indigo-4" label="View All" to="/ledger" />
           </q-card-section>
 
-          <q-separator dark />
+          <q-separator :dark="prefs.isDarkMode" />
 
-          <q-list dark padding>
+          <q-list :dark="prefs.isDarkMode" padding>
             <q-item v-for="tx in recentTransactions" :key="tx.ref" clickable>
               <q-item-section avatar>
                 <q-avatar :icon="tx.amount > 0 ? 'arrow_upward' : 'arrow_downward'" 
@@ -109,6 +109,9 @@
 </template>
 
 <script setup>
+import { useOperatorPreferences } from '../composables/useOperatorPreferences'
+const { prefs } = useOperatorPreferences()
+
 const stats = [
   { label: 'Platform Revenue', value: '₦4.2M', icon: 'payments', trend: 12.5 },
   { label: 'Active Tenants', value: '184', icon: 'business', trend: 4.2 },
@@ -129,7 +132,7 @@ const recentTransactions = [
   letter-spacing: 1px;
 }
 .bg-blue-grey-10 {
-  background: #1c262b;
+  background: var(--enterprise-panel-bg);
 }
 .border-indigo {
   border-left: 5px solid #3f51b5;

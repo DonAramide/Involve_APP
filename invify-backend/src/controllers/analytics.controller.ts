@@ -41,7 +41,7 @@ export class AnalyticsController {
       const usage = usageRaw.data || [];
       const invites = invitesRaw.data || [];
       const totalTeachers = (subsRaw as any).count || 0;
-      const activeSubs = subsRaw.data || [];
+      const activeSubs = revenueData.data || [];
 
       // --- AGGREGATION LOGIC ---
 

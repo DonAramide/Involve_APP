@@ -7,17 +7,17 @@
     transition-hide="jump-up"
     @show="focusInput"
   >
-    <div class="enterprise-panel full-width q-mt-xl bg-[#12161a] text-white" style="max-width: 650px; border-radius: 4px !important; border: 1px solid #333c44 !important; box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;">
+    <div class="enterprise-panel full-width q-mt-xl bg-panel text-main" style="max-width: 650px; border-radius: 4px !important; border: 1px solid var(--enterprise-border) !important; box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;">
       
       <!-- Command Input Prompt -->
-      <div class="q-pa-sm row items-center no-wrap border-bottom bg-[#0b0f12]">
+      <div class="q-pa-sm row items-center no-wrap border-bottom bg-panel-darker">
         <q-icon name="search" color="cyan-3" size="sm" class="q-mr-sm" />
         <input 
           ref="searchRef"
           v-model="query" 
           type="text" 
           placeholder="Type an actionable command or search route mappings (e.g. 'Open Device', 'Quarantine', 'Trigger Rollout')..." 
-          class="full-width bg-transparent text-white no-outline text-metric-mono"
+          class="full-width bg-transparent text-main no-outline text-metric-mono"
           style="border: none; outline: none; font-size: 13px; height: 32px;"
           @keydown.down.prevent="selectNext"
           @keydown.up.prevent="selectPrev"
@@ -28,9 +28,9 @@
       </div>
 
       <!-- Live Execution Filters & Active Scopes -->
-      <div class="q-px-sm q-py-xs bg-[#161b20] border-bottom row items-center justify-between text-caption text-grey-5" style="font-size: 11px;">
+      <div class="q-px-sm q-py-xs bg-panel-light border-bottom row items-center justify-between text-caption text-muted" style="font-size: 11px;">
         <div class="row items-center op-gap-8 no-wrap overflow-hidden">
-          <span class="text-weight-bold text-white">RBAC Session Filter:</span>
+          <span class="text-weight-bold text-main">RBAC Session Filter:</span>
           <span class="text-cyan-3">Verified Tokens Active</span>
           <span>•</span>
           <span class="cursor-pointer text-amber-3 hover-underline" @click="query = 'Trigger Rollout '">Trigger Rollout</span>
@@ -43,7 +43,7 @@
       <!-- Scrolled Action Items Container -->
       <div class="q-pa-xs" style="max-height: 380px; overflow-y: auto;">
         <div v-if="filteredItems.length === 0" class="text-center q-pa-xl text-grey-6 text-caption italic">
-          No RBAC-permitted operations match "<span class="text-white">{{ query }}</span>".
+          No RBAC-permitted operations match "<span class="text-main">{{ query }}</span>".
         </div>
 
         <q-list dense>
@@ -51,7 +51,7 @@
             v-for="(item, index) in filteredItems"
             :key="item.id"
             clickable
-            :class="['q-my-xs rounded-borders command-item', selectedIndex === index ? 'bg-[#1c262b] text-white border-left-focus' : 'text-grey-4']"
+            :class="['q-my-xs rounded-borders command-item', selectedIndex === index ? 'bg-panel-active text-main border-left-focus' : 'text-secondary']"
             @click="executeItem(item)"
             @mouseover="selectedIndex = index"
             style="min-height: 32px; padding: 4px 10px;"
@@ -65,7 +65,7 @@
 
             <!-- Center Data strings -->
             <q-item-section>
-              <q-item-label class="text-weight-medium text-white row items-center op-gap-4" style="font-size: 12px;">
+              <q-item-label class="text-weight-medium text-main row items-center op-gap-4" style="font-size: 12px;">
                 <span>{{ item.label }}</span>
                 <q-badge color="blue-grey-10" text-color="amber-4" class="text-metric-sm" v-if="item.isCommand">
                   EXECUTE CMD
@@ -92,7 +92,7 @@
       </div>
 
       <!-- Footer Info Bar -->
-      <div class="q-pa-xs bg-[#0b0f12] border-top text-right text-grey-6" style="font-size: 10px;">
+      <div class="q-pa-xs bg-panel-darker border-top text-right text-muted" style="font-size: 10px;">
         <span>FINAL REFINEMENT #3: Command visibility strictly filtered by verified operator session tokens</span>
       </div>
     </div>
@@ -151,6 +151,19 @@ const currentUserPermissions = ref([
 // Raw Actions repository
 const rawItems = [
   {
+    id: 'cmd-0',
+    label: 'Tenant Orchestration Ecosystem Center',
+    description: 'Mission Control for multi-tenant feature flags, module visibility, and reactive branding overrides.',
+    route: '/admin/orchestration',
+    domain: 'governance',
+    icon: 'hub',
+    avatarBg: 'blue-10',
+    avatarColor: 'blue-2',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['onboard', 'provision', 'setup', 'branding', 'modules']
+  },
+  {
     id: 'cmd-1',
     label: 'Open Device Explorer Interface',
     description: 'Filter endpoint nodes inside the live Fleet telemetry engine',
@@ -160,7 +173,8 @@ const rawItems = [
     avatarBg: 'cyan-10',
     avatarColor: 'cyan-2',
     isCommand: true,
-    permission: 'read_devices'
+    permission: 'read_devices',
+    keywords: ['explorer', 'nodes', 'fleet', 'endpoints']
   },
   {
     id: 'cmd-2',
@@ -172,7 +186,8 @@ const rawItems = [
     avatarBg: 'indigo-10',
     avatarColor: 'indigo-2',
     isCommand: true,
-    permission: 'read_tenant'
+    permission: 'read_tenant',
+    keywords: ['lookup', 'treasury', 'keys', 'identity', 'search']
   },
   {
     id: 'cmd-3',
@@ -184,7 +199,8 @@ const rawItems = [
     avatarBg: 'amber-10',
     avatarColor: 'amber-2',
     isCommand: true,
-    permission: 'admin_deploy'
+    permission: 'admin_deploy',
+    keywords: ['batch', 'ota', 'update', 'package', 'cohort']
   },
   {
     id: 'cmd-4',
@@ -196,7 +212,8 @@ const rawItems = [
     avatarBg: 'red-10',
     avatarColor: 'red-2',
     isCommand: true,
-    permission: 'soc_quarantine'
+    permission: 'soc_quarantine',
+    keywords: ['lock', 'isolate', 'security', 'ingress', 'block']
   },
   {
     id: 'cmd-5',
@@ -208,7 +225,8 @@ const rawItems = [
     avatarBg: 'deep-orange-10',
     avatarColor: 'amber-3',
     isCommand: true,
-    permission: 'soc_analyst'
+    permission: 'soc_analyst',
+    keywords: ['alerts', 'logs', 'exceptions', 'failed']
   },
   // UNAUTHORIZED COMMAND ACTION: Requires 'operator_root' scope which is omitted from active list
   {
@@ -233,7 +251,193 @@ const rawItems = [
   { id: 'route-5', label: 'Policy Drift Analysis Arrays', route: '/governance/drift', domain: 'governance', icon: 'timeline', permission: 'read_governance' },
 
   { id: 'route-6', label: 'Observability Live Event Streams', route: '/observability/streams', domain: 'observability', icon: 'stream', badgeBg: 'green-9', permission: 'read_streams' },
-  { id: 'route-7', label: 'WebSocket & Ingestion Queue Health', route: '/observability/websocket-health', domain: 'observability', icon: 'import_export', permission: 'read_streams' }
+  { id: 'route-7', label: 'WebSocket & Ingestion Queue Health', route: '/observability/websocket-health', domain: 'observability', icon: 'import_export', permission: 'read_streams' },
+
+  // ==========================================
+  // ADDITIONAL OPERATIONAL FUNCTIONS
+  // ==========================================
+  {
+    id: 'cmd-6',
+    label: 'Generate Device Activation Codes',
+    description: 'Provision new activation secrets for hardware endpoints.',
+    route: '/devices',
+    domain: 'fleet',
+    icon: 'vpn_key',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'write_fleet',
+    keywords: ['create', 'new', 'keys', 'provision', 'secrets', 'activation']
+  },
+  {
+    id: 'cmd-7',
+    label: 'Approve New Tenant Registrations',
+    description: 'Review pending onboarding requests and authorize organization identities.',
+    route: '/admin/tenants',
+    domain: 'governance',
+    icon: 'how_to_reg',
+    avatarBg: 'green-10',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['approve', 'verify', 'registration', 'pending', 'new', 'onboard']
+  },
+  {
+    id: 'cmd-8',
+    label: 'Lesson Note & Curriculum Designer',
+    description: 'Design educational lesson structures and curriculum benchmarks.',
+    route: '/notes',
+    domain: 'education',
+    icon: 'menu_book',
+    avatarBg: 'deep-purple-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_fleet',
+    keywords: ['lesson', 'note', 'curriculum', 'designer', 'education']
+  },
+  {
+    id: 'cmd-9',
+    label: 'Curriculum Management Matrix',
+    description: 'Standardize subject benchmarks across multiple school tenants.',
+    route: '/curriculum',
+    domain: 'education',
+    icon: 'account_tree',
+    avatarBg: 'indigo-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_fleet',
+    keywords: ['curriculum', 'matrix', 'benchmarks', 'standardization']
+  },
+  {
+    id: 'cmd-10',
+    label: 'Teacher Workspace Dashboard',
+    description: 'Unified interface for classroom management and student oversight.',
+    route: '/teacher-workspace',
+    domain: 'education',
+    icon: 'school',
+    avatarBg: 'purple-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_fleet',
+    keywords: ['teacher', 'workspace', 'classroom', 'student', 'oversight']
+  },
+  {
+    id: 'cmd-11',
+    label: 'Execute Onboarding Pipeline',
+    description: 'Start a new manual onboarding sequence for a business or school.',
+    route: '/onboarding',
+    domain: 'governance',
+    icon: 'rocket_launch',
+    avatarBg: 'orange-10',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['execute', 'onboard', 'pipeline', 'business', 'school']
+  },
+  {
+    id: 'cmd-12',
+    label: 'Billing & Financial Settlement',
+    description: 'Review invoices, subscription states, and credit balances.',
+    route: '/billing',
+    domain: 'finance',
+    icon: 'receipt_long',
+    avatarBg: 'teal-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['billing', 'finance', 'invoice', 'subscription', 'credit']
+  },
+  {
+    id: 'cmd-13',
+    label: 'Wallet & Payment Processing',
+    description: 'Manage virtual wallets and real-time transaction reconciliation.',
+    route: '/wallet',
+    domain: 'finance',
+    icon: 'account_balance_wallet',
+    avatarBg: 'green-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['wallet', 'payment', 'transaction', 'reconciliation', 'processing']
+  },
+  {
+    id: 'cmd-14',
+    label: 'Attendance Tracking Hub',
+    description: 'Monitor real-time student or operator presence logs.',
+    route: '/attendance',
+    domain: 'operations',
+    icon: 'fact_check',
+    avatarBg: 'blue-grey-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_fleet',
+    keywords: ['attendance', 'tracking', 'presence', 'student', 'operator']
+  },
+  {
+    id: 'cmd-15',
+    label: 'Referral & Loyalty Program',
+    description: 'Track organization growth through referral network indices.',
+    route: '/referrals',
+    domain: 'growth',
+    icon: 'share',
+    avatarBg: 'pink-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['referral', 'loyalty', 'growth', 'network', 'share']
+  },
+  {
+    id: 'cmd-16',
+    label: 'Analytics & Usage Intelligence',
+    description: 'Deep-dive into API consumption, AI tokens, and fleet health.',
+    route: '/analytics',
+    domain: 'observability',
+    icon: 'analytics',
+    avatarBg: 'deep-orange-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_metrics',
+    keywords: ['analytics', 'usage', 'intelligence', 'metrics']
+  },
+  {
+    id: 'cmd-17',
+    label: 'Financial Reconciliation & Balancing',
+    description: 'Verify ledger consistency and resolve transaction discrepancies.',
+    route: '/reconciliation',
+    domain: 'finance',
+    icon: 'account_balance',
+    avatarBg: 'blue-grey-8',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['financial', 'reconciliation', 'balancing', 'ledger', 'discrepancy']
+  },
+  {
+    id: 'cmd-18',
+    label: 'Enterprise Payment Gateways',
+    description: 'Configure and monitor external payment processor health.',
+    route: '/payments',
+    domain: 'finance',
+    icon: 'payments',
+    avatarBg: 'green-8',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['payment', 'gateway', 'processor', 'health', 'config']
+  },
+  {
+    id: 'cmd-19',
+    label: 'Accept & Verify Operator Invites',
+    description: 'Process incoming operator invitation tokens.',
+    route: '/invite/accept',
+    domain: 'governance',
+    icon: 'mail',
+    avatarBg: 'indigo-8',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_governance',
+    keywords: ['accept', 'verify', 'invite', 'operator', 'token']
+  }
 ]
 
 // FINAL REFINEMENT #3: Perform strict runtime RBAC checking alongside user string indexing
@@ -248,10 +452,8 @@ const filteredItems = computed(() => {
   if (!query.value) return rbacGatedItems.value
   const q = query.value.toLowerCase().trim()
   return rbacGatedItems.value.filter(i => {
-    return i.label.toLowerCase().includes(q) || 
-           i.domain.toLowerCase().includes(q) || 
-           i.route.toLowerCase().includes(q) ||
-           (i.description && i.description.toLowerCase().includes(q))
+    const searchString = `${i.label} ${i.domain} ${i.route} ${i.description || ''} ${(i.keywords || []).join(' ')}`.toLowerCase()
+    return searchString.includes(q)
   })
 })
 

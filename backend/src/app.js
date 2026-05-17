@@ -122,12 +122,12 @@ app.post('/api/ai/lesson-note/generate', AIController.generateLessonNote);
 app.get('/api/curriculum/topics', CurriculumController.getTopics);
 app.get('/api/curriculum/subjects', CurriculumController.getSubjects);
 
-// 10. Device Activation Module
-app.get('/api/devices', DeviceController.getDevices);
-app.get('/api/devices/activations', DeviceController.getActivationHistory);
-app.post('/api/devices/activations', DeviceController.createActivationCode);
-app.post('/api/devices/validate', DeviceController.validateCode);
-app.patch('/api/devices/:id', DeviceController.updateDeviceStatus);
+// 10. Device Activation Module (Hardened with authentication & isolation)
+app.get('/api/devices', authenticate, DeviceController.getDevices);
+app.get('/api/devices/activations', authenticate, DeviceController.getActivationHistory);
+app.post('/api/devices/activations', authenticate, DeviceController.createActivationCode);
+app.post('/api/devices/validate', authenticate, DeviceController.validateCode);
+app.patch('/api/devices/:id', authenticate, DeviceController.updateDeviceStatus);
 
 // 11. Multi-Tenant Orchestration & Experience Engine
 const OrchestrationRouter = require('./api/routes/orchestration.routes');

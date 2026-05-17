@@ -139,6 +139,7 @@
 
         <q-card-section class="q-pt-none">
           <q-select
+            v-if="isPlatformAdmin"
             v-model="newCode.tenantId"
             :options="filteredTenantOptions"
             use-input
@@ -164,6 +165,14 @@
             </template>
           </q-select>
 
+          <q-input
+            v-else
+            :model-value="myTenantName"
+            label="Target School/Business"
+            dark filled readonly
+            class="q-mb-md"
+          />
+
           <q-select
             v-model="newCode.serviceMode"
             :options="['School', 'Retail', 'Service']"
@@ -172,7 +181,7 @@
             class="q-mb-md"
           />
 
-          <div class="text-caption text-indigo-3 q-mb-sm" v-if="tenants.length > 0">
+          <div class="text-caption text-indigo-3 q-mb-sm" v-if="isPlatformAdmin && tenants.length > 0">
             {{ tenants.length }} businesses found in database.
           </div>
           <div class="row q-col-gutter-md">
@@ -332,8 +341,49 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { deviceApi, adminApi } from '../api'
-import { date } from 'quasar'
+import { date, useQuasar } from 'quasar'
 import logo from '../assets/logo.png'
+
+const $q = useQuasar()
+
+const getTenantIdFromToken = () => {
+  const token = localStorage.getItem('invify_token')
+  if (!token) return null
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    }).join(''))
+    const payload = JSON.parse(jsonPayload)
+    return payload.tenantId
+  } catch (e) {
+    return null
+  }
+}
+
+const getRoleFromToken = () => {
+  const token = localStorage.getItem('invify_token')
+  if (!token) return null
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    }).join(''))
+    const payload = JSON.parse(jsonPayload)
+    return payload.role
+  } catch (e) {
+    return null
+  }
+}
+
+const isPlatformAdmin = computed(() => {
+  const role = getRoleFromToken()
+  return ['SUPER_ADMIN', 'INTERNAL_STAFF'].includes(role)
+})
+
+const myTenantName = ref('My Business')
 
 const tab = ref('active')
 const loading = ref(false)
@@ -523,20 +573,39 @@ const loadData = async () => {
   deviceApi.getDevices().then(res => { devices.value = res.data || [] }).catch(e => console.error('Devices load fail:', e))
   deviceApi.getActivations().then(res => { activations.value = res.data || [] }).catch(e => console.error('Activations load fail:', e))
   
-  try {
-    const tenRes = await adminApi.getTenants()
-    tenants.value = tenRes.data || []
-    
-    // Explicitly update options after loading
-    filteredTenantOptions.value = tenants.value.map(t => ({ 
-      label: t.name, 
-      value: t.id 
-    }))
-    console.log('[Activation] Loaded Tenants:', tenants.value.length)
-  } catch (err) {
-    console.error('Failed to load tenants:', err)
-  } finally {
-    loading.value = false
+  const tenantId = getTenantIdFromToken()
+  const role = getRoleFromToken()
+  
+  if (tenantId && !['SUPER_ADMIN', 'INTERNAL_STAFF'].includes(role)) {
+    try {
+      const details = await adminApi.getTenantDetails(tenantId)
+      myTenantName.value = details.data.name
+      tenants.value = [{ id: tenantId, name: details.data.name, type: details.data.type || 'Retail' }]
+      filteredTenantOptions.value = [{ label: details.data.name, value: tenantId }]
+      newCode.value.tenantId = tenantId
+      newCode.value.serviceMode = details.data.type ? details.data.type.charAt(0).toUpperCase() + details.data.type.slice(1) : 'Retail'
+      console.log('[Activation] Loaded scoped tenant details successfully.')
+    } catch (err) {
+      console.error('Failed to load scoped tenant details:', err)
+    } finally {
+      loading.value = false
+    }
+  } else {
+    try {
+      const tenRes = await adminApi.getTenants()
+      tenants.value = tenRes.data || []
+      
+      // Explicitly update options after loading
+      filteredTenantOptions.value = tenants.value.map(t => ({ 
+        label: t.name, 
+        value: t.id 
+      }))
+      console.log('[Activation] Loaded Tenants:', tenants.value.length)
+    } catch (err) {
+      console.error('Failed to load tenants:', err)
+    } finally {
+      loading.value = false
+    }
   }
 }
 

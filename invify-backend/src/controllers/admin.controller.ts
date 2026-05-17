@@ -1,6 +1,9 @@
 // invify-backend/src/controllers/admin.controller.ts
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
+import { WalletService } from '../services/wallet.service';
+import { PDFService } from '../services/pdf.service';
+import { BillingService } from '../services/billing.service';
 
 export class AdminController {
   /**
@@ -192,7 +195,6 @@ export class AdminController {
       if (error) throw error;
 
       // 2. Fetch Quota Status for the KPI card
-      const { BillingService } = require('../services/billing.service');
       const billing = await BillingService.getBillingStatus(targetTenantId);
 
       return res.status(200).json({

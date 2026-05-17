@@ -1,4 +1,4 @@
-// src/app.ts
+// src/app.ts (network-stabilized)
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,6 +7,35 @@ import * as dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
+
+// 1. IMPORTS (Controllers & Middleware)
+import { PaymentController } from './controllers/payment.controller';
+import { OnboardingController } from './controllers/onboarding.controller';
+import { InviteController } from './controllers/invite.controller';
+import { AIController } from './controllers/ai.controller';
+import { AdminController } from './controllers/admin.controller';
+import { AnalyticsController } from './controllers/analytics.controller';
+import { WalletController } from './controllers/wallet.controller';
+import { UserController } from './controllers/user.controller';
+import { CurriculumController } from './controllers/curriculum.controller';
+import { BillingController } from './controllers/billing.controller';
+import { ReferralController } from './controllers/referral.controller';
+import { AttendanceController } from './controllers/attendance.controller';
+import { InsightsController } from './controllers/insights.controller';
+import { RetentionController } from './controllers/retention.controller';
+import { WebhookController } from './controllers/webhook.controller';
+import { ReconciliationController } from './controllers/reconciliation.controller';
+import { StudentController } from './controllers/student.controller';
+import { PayoutController } from './controllers/payout.controller';
+import { ExecutiveFinanceController } from './controllers/finance.controller';
+import { DefaultersController } from './controllers/defaulters.controller';
+import { IntegrityController } from './controllers/integrity.controller';
+import { NotificationController } from './controllers/notification.controller';
+import { OTPController } from './controllers/otp.controller';
+import { AuthController } from './controllers/auth.controller';
+
+import { authenticate } from './middleware/auth.middleware';
+import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -24,7 +53,6 @@ app.use(express.urlencoded({ extended: true }));
 
 
 // 2. ROUTES
-import { PaymentController } from './controllers/payment.controller';
 
 // Basic health check
 app.get('/health', (req: Request, res: Response) => {
@@ -37,25 +65,27 @@ app.get('/health', (req: Request, res: Response) => {
 
 // Payment Endpoints
 app.post('/payments/create', PaymentController.createPayment);
+app.post('/payments/initialize', PaymentController.initializeGatewayCheckout);
 
 // Public Onboarding
-import { OnboardingController } from './controllers/onboarding.controller';
+app.post('/public/otp/send', OTPController.sendOTP);
+app.post('/public/otp/verify', OTPController.verifyOTP);
 app.post('/public/onboarding/signup', OnboardingController.signup);
+app.post('/public/onboarding/provision', OnboardingController.provision);
+
+// Platform User Authentication & MFA / Recovery
+app.post('/api/auth/login', AuthController.login);
+app.post('/api/auth/reset-password', AuthController.resetPassword);
 
 // Teacher Invitations (Public)
-import { InviteController } from './controllers/invite.controller';
 app.get('/public/invites/validate/:token', InviteController.validateInvite);
 app.post('/public/invites/accept', InviteController.acceptInvite);
 
 // AI Generation Endpoints
-import { AIController } from './controllers/ai.controller';
 app.post('/ai/lesson-note/generate', authenticate, AIController.generateLessonNote);
 app.post('/ai/lesson-note/refresh', authenticate, AIController.refreshLessonNote);
 
 // Admin Endpoints
-import { AdminController } from './controllers/admin.controller';
-import { authenticate } from './middleware/auth.middleware';
-import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
 
 /** --- SYSTEM ADMIN (SUPER ADMIN ONLY) --- **/
 app.get('/admin/tenants', authenticate, checkRole(['super_admin']), AdminController.listTenants);
@@ -66,7 +96,6 @@ app.patch('/admin/profile', authenticate, AdminController.updateProfile);
 
 
 // Usage + Growth Intelligence
-import { AnalyticsController } from './controllers/analytics.controller';
 app.get('/admin/analytics', authenticate, checkRole(['super_admin']), AnalyticsController.getAdminAnalytics);
 
 /** --- FINANCIAL REVIEWS (SUPER ADMIN + TENANT ADMIN) --- **/
@@ -75,19 +104,16 @@ app.get('/admin/ledger', authenticate, checkTenantAccess, AdminController.listLe
 app.get('/admin/payments', authenticate, checkTenantAccess, AdminController.listPayments);
 
 // Wallet Endpoints (Internal Ledger)
-import { WalletController } from './controllers/wallet.controller';
 app.get('/wallet', authenticate, checkTenantAccess, WalletController.getBalance);
 app.get('/wallet/transactions', authenticate, checkTenantAccess, WalletController.getTransactions);
 
 // Users Management
-import { UserController } from './controllers/user.controller';
 app.get('/admin/users', authenticate, checkRole(['super_admin', 'tenant_admin']), UserController.listUsers);
 app.post('/admin/users', authenticate, checkRole(['super_admin', 'tenant_admin']), UserController.createUser);
 app.patch('/admin/users/:id', authenticate, checkRole(['super_admin', 'tenant_admin']), UserController.updateUser);
 app.post('/admin/invites', authenticate, checkRole(['tenant_admin', 'owner']), InviteController.sendInvite);
 
 // Curriculum System
-import { CurriculumController } from './controllers/curriculum.controller';
 app.get('/admin/curriculum', authenticate, CurriculumController.listCurriculum);
 app.post('/admin/curriculum', authenticate, checkRole(['super_admin']), CurriculumController.createTopic);
 app.patch('/admin/curriculum/:id', authenticate, checkRole(['super_admin']), CurriculumController.updateTopic);
@@ -99,17 +125,14 @@ app.post('/admin/notes', authenticate, AdminController.saveNote);
 app.get('/admin/notes/:id/export', authenticate, AdminController.exportNotePdf);
 
 // Billing & Subscriptions
-import { BillingController } from './controllers/billing.controller';
 app.get('/billing/status', authenticate, BillingController.getStatus);
 app.post('/billing/subscribe', authenticate, BillingController.subscribe);
 
 // Referral System
-import { ReferralController } from './controllers/referral.controller';
 app.get('/referrals/stats', authenticate, ReferralController.getStats);
 app.post('/referrals/send', authenticate, ReferralController.sendInvite);
 
 // Attendance System
-import { AttendanceController } from './controllers/attendance.controller';
 app.get('/attendance/students', authenticate, AttendanceController.listStudents);
 app.post('/attendance/enroll', authenticate, AttendanceController.enroll);
 app.post('/attendance/save', authenticate, AttendanceController.autoSave);
@@ -117,27 +140,23 @@ app.post('/attendance/bulk-present', authenticate, AttendanceController.bulkPres
 app.get('/attendance/history', authenticate, AttendanceController.getHistory);
 
 // Class Insights
-import { InsightsController } from './controllers/insights.controller';
 app.get('/insights/class', authenticate, InsightsController.getClassInsights);
 
 // Retention & Churn Prevention
-import { RetentionController } from './controllers/retention.controller';
 app.post('/admin/retention/process', authenticate, checkRole(['super_admin']), RetentionController.processRetention);
 app.get('/admin/retention/at-risk', authenticate, checkRole(['super_admin']), RetentionController.getAtRiskUsers);
 app.get('/admin/retention/suggestion', authenticate, RetentionController.getPersonalSuggestion);
 
 // Webhooks (Secret Verification handled internally)
-import { WebhookController } from './controllers/webhook.controller';
 app.post('/webhooks/quasar', WebhookController.handleQuasarWebhook);
+app.post('/webhooks/paystack', WebhookController.handlePaystackWebhook);
+app.post('/webhooks/flutterwave', WebhookController.handleFlutterwaveWebhook);
+app.post('/webhooks/stripe', WebhookController.handleStripeWebhook);
 
-import { ReconciliationController } from './controllers/reconciliation.controller';
-import { StudentController } from './controllers/student.controller';
-import { PayoutController } from './controllers/payout.controller';
 app.get('/api/reconciliation', authenticate, ReconciliationController.getReport);
 app.post('/api/reconciliation/assign', authenticate, ReconciliationController.assign);
 app.post('/api/reconciliation/retry', authenticate, ReconciliationController.retry);
 
-import { ExecutiveFinanceController } from './controllers/finance.controller';
 
 // Payout Configuration
 app.get('/api/payout/settings', authenticate, PayoutController.getSettings);
@@ -146,16 +165,13 @@ app.post('/api/payout/withdraw', authenticate, PayoutController.withdraw);
 app.get('/api/payout/history', authenticate, PayoutController.getHistory);
 
 // Executive Dashboard
-import { DefaultersController } from './controllers/defaulters.controller';
 app.get('/api/finance/executive-summary', authenticate, ExecutiveFinanceController.getSummary);
 
-import { IntegrityController } from './controllers/integrity.controller';
 
 // Defaulters System
 app.get('/api/finance/defaulters', authenticate, DefaultersController.getDefaulters);
 app.post('/api/finance/defaulters/remind', authenticate, DefaultersController.sendReminder);
 
-import { NotificationController } from './controllers/notification.controller';
 
 // Financial Integrity
 app.get('/api/finance/integrity/student-balances', authenticate, IntegrityController.validateStudentBalances);

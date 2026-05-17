@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://bertie-archegoniate-causelessly.ngrok-free.dev/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3004',
   timeout: 30000,
   headers: {
     'ngrok-skip-browser-warning': 'true'

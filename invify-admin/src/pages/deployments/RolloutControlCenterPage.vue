@@ -1,14 +1,20 @@
 <!-- invify-admin/src/pages/deployments/RolloutControlCenterPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Top Staging Title Bar -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="rocket_launch" size="sm" color="cyan-4" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Staged Rollout Orchestration Command Center</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">EXPLICIT_STATE_MACHINE // CONVERGENCE_AWARE</div>
+          <div class="row items-center op-gap-4">
+            <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Staged Rollout Orchestration Command Center</div>
+            <EnterpriseManualTooltip 
+              title="Staged Rollout Command Center" 
+              description="Centralized orchestration hub for multi-phase firmware deployments. Manages pacing, cohort selection, and dependency-aware rollback safeguards."
+            />
+          </div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">EXPLICIT_STATE_MACHINE // CONVERGENCE_AWARE</div>
         </div>
       </div>
       
@@ -19,22 +25,26 @@
           v-model="activeTenantScope"
           :options="['global', 'tenant-alpha', 'tenant-omega', 'tenant-beta']"
           dense
-          dark
+          :dark="prefs.isDarkMode"
           filled
           options-dense
           @update:model-value="onTenantScopeUpdated"
-          class="bg-[#12161a] text-caption"
+          class="bg-subpanel text-caption"
           style="width: 130px;"
         />
       </div>
     </div>
 
     <!-- UPPER ROW: FINAL REFINEMENT #1: Explicit Rollout State Machines -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="enterprise-panel bg-panel column fit no-shadow">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
           <q-icon name="linear_scale" size="xs" color="cyan-3" />
-          <span class="text-operator-title text-white text-weight-bold">Explicit Operational Rollout State Machine Profiles</span>
+          <span class="text-operator-title text-main text-weight-bold">Explicit Operational Rollout State Machine Profiles</span>
+          <EnterpriseManualTooltip 
+            title="Rollout State Machines" 
+            description="Tracks every deployment through 9 immutable lifecycle phases. This ensures deterministic state transitions and prevents illegal deployment states across the fleet."
+          />
         </div>
         <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">9 ABSOLUTE LIFECYCLE PHASES</span>
       </div>
@@ -44,65 +54,65 @@
         <div class="row items-stretch no-wrap op-gap-4 q-pa-xs text-center" style="min-width: 860px;">
           
           <!-- 1. DRAFT -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-draft">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-draft">
             <span class="text-weight-bold text-grey-5" style="font-size: 10px;">DRAFT</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">2</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">2</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">Unpublished</span>
           </div>
 
           <!-- 2. SIMULATING -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-simulating">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-simulating">
             <span class="text-weight-bold text-cyan-3" style="font-size: 10px;">SIMULATING</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">1</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">1</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">Blast Check</span>
           </div>
 
           <!-- 3. STAGED -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-staged">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-staged">
             <span class="text-weight-bold text-amber-4" style="font-size: 10px;">STAGED</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">4</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">4</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">Cohort Lock</span>
           </div>
 
           <!-- 4. ACTIVE -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-active">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-active">
             <span class="text-weight-bold text-green-4" style="font-size: 10px;">ACTIVE</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">{{ activeRolloutGroupsCount }}</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">{{ activeRolloutGroupsCount }}</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">Pacing Stream</span>
           </div>
 
           <!-- 5. PAUSED -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-paused">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-paused">
             <span class="text-weight-bold text-orange-4" style="font-size: 10px;">PAUSED</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">1</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">1</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">Operator Hold</span>
           </div>
 
           <!-- 6. DEGRADED -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-degraded">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-degraded">
             <span class="text-weight-bold text-deep-orange-4" style="font-size: 10px;">DEGRADED</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">{{ rolloutStore.activeRollbacksCount > 0 ? 1 : 0 }}</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">{{ rolloutStore.activeRollbacksCount > 0 ? 1 : 0 }}</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">SLA Drop</span>
           </div>
 
           <!-- 7. ROLLING_BACK -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-rollingback">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-rollingback">
             <span class="text-weight-bold text-red-4" style="font-size: 10px;">ROLLING_BACK</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">{{ rolloutStore.activeRollbacksCount }}</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">{{ rolloutStore.activeRollbacksCount }}</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">Auto Downgrade</span>
           </div>
 
           <!-- 8. COMPLETED -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-completed">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-completed">
             <span class="text-weight-bold text-teal-4" style="font-size: 10px;">COMPLETED</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">28</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">28</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">Stabilized</span>
           </div>
 
           <!-- 9. FAILED -->
-          <div class="col column justify-between bg-[#161b20] q-pa-xs rounded-borders border-top-failed">
+          <div class="col column justify-between bg-panel-darker q-pa-xs rounded-borders border-top-failed">
             <span class="text-weight-bold text-red-7" style="font-size: 10px;">FAILED</span>
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">2</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 14px;">2</span>
             <span class="text-grey-6 ellipsis" style="font-size: 8px;">Terminated</span>
           </div>
 
@@ -116,11 +126,11 @@
       <!-- LEFT PORTION: Staged Cohorts & Execution Controllers -->
       <div class="col-12 col-md-7 column op-gap-16">
         
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="groups" size="xs" color="cyan-3" />
-              <span class="text-operator-title text-white text-weight-bold">Target Cohort Batches & Pacing Flow</span>
+              <span class="text-operator-title text-main text-weight-bold">Target Cohort Batches & Pacing Flow</span>
             </div>
             <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">{{ stagedCohortsList.length }} Registered Waves</span>
           </div>
@@ -130,24 +140,24 @@
               <q-item 
                 v-for="c in stagedCohortsList" 
                 :key="c.cohortId" 
-                class="q-px-sm q-py-xs bg-[#161b20] rounded-borders column op-gap-2 hover-row"
+                class="q-px-sm q-py-xs bg-panel-darker rounded-borders column op-gap-2 hover-row"
               >
                 <div class="row items-center justify-between fit no-wrap">
                   <div class="row items-center op-gap-8 no-wrap">
-                    <span class="text-white text-weight-bold text-caption">{{ c.cohortName }}</span>
+                    <span class="text-main text-weight-bold text-caption">{{ c.cohortName }}</span>
                     <q-chip dense size="xs" :color="getStateChipColor(c.state)" :text-color="getStateTextColor(c.state)" class="text-metric-sm text-weight-bold">
                       {{ c.state }}
                     </q-chip>
                   </div>
-                  <span class="text-metric-mono text-grey-5" style="font-size: 10px;">Pacing: {{ c.pacingRate }}</span>
+                  <span class="text-metric-mono text-muted" style="font-size: 10px;">Pacing: {{ c.pacingRate }}</span>
                 </div>
 
                 <!-- Progress indicators -->
-                <div class="row items-center justify-between text-caption text-grey-4 q-mt-xs" style="font-size: 10px;">
-                  <span>Targeted Nodes: <span class="text-metric-mono text-white">{{ c.targetNodes.toLocaleString() }}</span></span>
+                <div class="row items-center justify-between text-caption text-secondary q-mt-xs" style="font-size: 10px;">
+                  <span>Targeted Nodes: <span class="text-metric-mono text-main">{{ c.targetNodes.toLocaleString() }}</span></span>
                   <span>Convergence Complete: <span class="text-metric-mono text-cyan-3">{{ c.convergencePercent }}%</span></span>
                 </div>
-                <q-linear-progress dark :value="c.convergencePercent / 100" color="cyan-4" track-color="grey-9" size="xs" />
+                <q-linear-progress :dark="prefs.isDarkMode" :value="c.convergencePercent / 100" color="cyan-4" track-color="grey-9" size="xs" />
 
                 <!-- Controller switches -->
                 <div class="row items-center justify-between q-mt-xs border-top q-pt-xs">
@@ -183,11 +193,15 @@
       <!-- RIGHT PORTION: FINAL REFINEMENT #2: Convergence Stability Windows -->
       <div class="col-12 col-md-5 column op-gap-16">
         
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit justify-between">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit justify-between no-shadow">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="timer" size="xs" color="amber-4" />
-              <span class="text-operator-title text-white text-weight-bold">Convergence Stabilization Holds</span>
+              <span class="text-operator-title text-main text-weight-bold">Convergence Stabilization Holds</span>
+              <EnterpriseManualTooltip 
+                title="Stabilization Holds" 
+                description="Mandatory observation period for completed rollouts. Ensures zero regression patterns (crashes/latency) before the deployment is officially closed."
+              />
             </div>
             <q-badge color="amber-10" text-color="amber-3">
               POST-DEPLOYMENT AUDIT
@@ -240,11 +254,15 @@
     </div>
 
     <!-- LOWER ROW: FINAL REFINEMENT #4: Pre-Execution Blast Radius simulation complete with Historical Learning -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="enterprise-panel bg-panel rounded-borders column fit no-shadow">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
           <q-icon name="dynamic_feed" size="xs" color="cyan-3" />
-          <span class="text-operator-title text-white text-weight-bold">Pre-Execution Blast Radius Impact Estimator</span>
+          <span class="text-operator-title text-main text-weight-bold">Pre-Execution Blast Radius Impact Estimator</span>
+          <EnterpriseManualTooltip 
+            title="Blast Radius Estimator" 
+            description="Uses AI-driven predictive modeling and historical cluster failure data to estimate the risk profile of a new deployment vector."
+          />
         </div>
         <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">HISTORICAL LEARNING FACTORS INCLUDED</span>
       </div>
@@ -259,15 +277,15 @@
             <q-select
               v-model="simTargetFirmware"
               :options="['v2.4.2-Stable-Patch', 'v2.5.0-Beta-Candidate', 'v3.0.0-Major-Rebuild']"
-              dense dark filled options-dense
-              class="bg-[#161b20] text-caption"
+              dense :dark="prefs.isDarkMode" filled options-dense
+              class="bg-subpanel text-caption"
               style="width: 180px;"
             />
           </div>
         </div>
 
         <!-- ESTIMATES STRIP -->
-        <div class="row items-stretch justify-between bg-[#161b20] q-pa-md rounded-borders border-muted text-center">
+        <div class="row items-stretch justify-between bg-panel-darker q-pa-md rounded-borders border-muted text-center">
           
           <div class="col column items-center justify-center">
             <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 22px;">{{ blastEstimates.affectedTenants }}</span>
@@ -303,7 +321,7 @@
         </div>
 
         <!-- FINAL REFINEMENT #4: Historical Learning Factor Component Diagnostics -->
-        <div class="bg-[#12161a] q-pa-sm rounded-borders border-muted column op-gap-4">
+        <div class="bg-panel-darker q-pa-sm rounded-borders border-muted column op-gap-4">
           <span class="text-metric-mono text-grey-5" style="font-size: 10px;">HISTORICAL INTELLIGENCE RISK WEIGHT CONTRIBUTORS:</span>
           
           <div class="row items-center justify-between text-caption text-grey-4" style="font-size: 11px;">
@@ -340,11 +358,11 @@
 
     <!-- FINAL REFINEMENT #5: REASON-GATED DEPENDENCY-AWARE ROLLBACK DIALOG -->
     <q-dialog v-model="rollbackGateOpen" persistent>
-      <q-card class="bg-[#12161a] text-[#e1e7ec] border-muted" style="min-width: 480px;">
-        <q-card-section class="bg-[#1b1515] border-bottom row items-center op-gap-8">
+      <q-card class="bg-panel text-main border-muted" style="min-width: 480px;">
+        <q-card-section class="bg-panel-darker border-bottom row items-center op-gap-8">
           <q-icon name="restore" color="red-4" size="sm" />
           <div>
-            <div class="text-white text-weight-bold text-caption">Dependency-Aware Rollback Execution Safeguard Gate</div>
+            <div class="text-main text-weight-bold text-caption">Dependency-Aware Rollback Execution Safeguard Gate</div>
             <div class="text-metric-sm text-red-3">Targeting Cohort: {{ pendingRollbackCohort?.cohortName }}</div>
           </div>
         </q-card-section>
@@ -369,18 +387,18 @@
           <!-- Traceability String Capture -->
           <q-input
             v-model="rollbackTraceabilityStr"
-            dark
+            :dark="prefs.isDarkMode"
             dense
             filled
             label="Mandatory Operator Downgrade Traceability Log *"
             placeholder="e.g. Critical crash spike breached 2% threshold limit during canary execution phase"
-            class="bg-[#161b20]"
+            class="bg-subpanel"
             autofocus
             :rules="[val => !!val || 'Traceability verification string cannot be null']"
           />
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-[#161b20] border-top q-pa-sm">
+        <q-card-actions align="right" class="bg-subpanel border-top q-pa-sm">
           <q-btn flat dense size="sm" color="grey-5" label="Abort Downgrade" v-close-popup @click="resetRollbackGate" />
           <q-btn 
             dense 
@@ -402,8 +420,11 @@
 import { ref, computed } from 'vue'
 import { useRolloutEventStore } from '../../stores/realtime/useRolloutEventStore'
 import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
+import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import EnterpriseManualTooltip from '../../components/common/EnterpriseManualTooltip.vue'
 import { Notify } from 'quasar'
 
+const { prefs } = useOperatorPreferences()
 const rolloutStore = useRolloutEventStore()
 
 // Tenant parameter mapping
@@ -617,7 +638,7 @@ const commitTraceableRollback = () => {
 .border-top-failed { border-top: 2px solid #c92a2a; }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 
 @media (max-width: 600px) {

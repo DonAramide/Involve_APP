@@ -1,88 +1,88 @@
 <!-- invify-admin/src/pages/fleet/FleetOverviewPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Header Command Line Bar -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="speed" size="sm" color="cyan-4" />
+        <q-icon name="speed" size="sm" color="blue-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Fleet Operations Center</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">PROACTIVE_ORCHESTRATION_LAYER // RESTOS: BATCHED</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Fleet Operations Center</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">PROACTIVE_ORCHESTRATION_LAYER // RESTOS: BATCHED</div>
         </div>
       </div>
       
       <div class="row items-center op-gap-8">
-        <q-btn-group flat dense class="border-muted bg-[#12161a]">
-          <q-btn dense size="xs" color="cyan-3" label="Simulate Presence Spike" @click="simulatePresenceSpike" class="text-weight-bold q-px-sm" />
-          <q-btn dense size="xs" color="amber-4" label="Inject Outage" @click="simulateIncidentSpike" class="q-px-sm" />
+        <q-btn-group flat dense class="border-main bg-subpanel">
+          <q-btn dense size="xs" color="blue-5" label="Simulate Presence Spike" @click="simulatePresenceSpike" class="text-weight-bold q-px-sm" />
+          <q-btn dense size="xs" color="amber-5" label="Inject Outage" @click="simulateIncidentSpike" class="q-px-sm" />
         </q-btn-group>
       </div>
     </div>
 
     <!-- 10-ITEM TOP TELEMETRY STRIP -->
-    <div class="grid-metrics-strip border-muted bg-[#12161a] q-pa-sm rounded-borders">
+    <div class="grid-metrics-strip border-main bg-subpanel q-pa-sm rounded-borders">
       
       <!-- 1. Online Devices -->
       <div class="metric-cell column justify-center items-center text-center">
         <span class="text-metric-mono text-weight-bold text-green-4" style="font-size: 15px; line-height: 1.1;">{{ onlineCount }}</span>
-        <span class="text-grey-5 text-uppercase" style="font-size: 9px; margin-top: 2px;">Online Edge</span>
+        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Online Edge</span>
       </div>
 
       <!-- 2. Offline Devices -->
       <div class="metric-cell column justify-center items-center text-center">
-        <span class="text-metric-mono text-weight-bold text-grey-6" style="font-size: 15px; line-height: 1.1;">{{ offlineCount }}</span>
-        <span class="text-grey-5 text-uppercase" style="font-size: 9px; margin-top: 2px;">Offline Node</span>
+        <span class="text-metric-mono text-weight-bold text-muted" style="font-size: 15px; line-height: 1.1;">{{ offlineCount }}</span>
+        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Offline Node</span>
       </div>
 
       <!-- 3. Degraded Devices -->
       <div class="metric-cell column justify-center items-center text-center">
-        <span class="text-metric-mono text-weight-bold text-amber-4" style="font-size: 15px; line-height: 1.1;">{{ degradedCount }}</span>
-        <span class="text-grey-5 text-uppercase" style="font-size: 9px; margin-top: 2px;">Degraded</span>
+        <span class="text-metric-mono text-weight-bold text-amber-5" style="font-size: 15px; line-height: 1.1;">{{ degradedCount }}</span>
+        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Degraded</span>
       </div>
 
       <!-- 4. Quarantined Devices -->
       <div class="metric-cell column justify-center items-center text-center cursor-pointer hover-cell" @click="drilldownToExplorer('quarantined')">
-        <span class="text-metric-mono text-weight-bold text-red-4" style="font-size: 15px; line-height: 1.1;">{{ quarantinedCount }}</span>
-        <span class="text-grey-4 text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">Quarantine</span>
+        <span class="text-metric-mono text-weight-bold text-red-5" style="font-size: 15px; line-height: 1.1;">{{ quarantinedCount }}</span>
+        <span class="text-secondary text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">Quarantine</span>
       </div>
 
       <!-- 5. Active Incidents -->
       <div class="metric-cell column justify-center items-center text-center cursor-pointer hover-cell" @click="drilldownToExplorer('incident')">
-        <span class="text-metric-mono text-weight-bold" :class="activeIncidentsCount > 0 ? 'text-red-4' : 'text-green-5'" style="font-size: 15px; line-height: 1.1;">
+        <span class="text-metric-mono text-weight-bold" :class="activeIncidentsCount > 0 ? 'text-red-5' : 'text-green-5'" style="font-size: 15px; line-height: 1.1;">
           {{ activeIncidentsCount }}
         </span>
-        <span class="text-grey-4 text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">Active Incidents</span>
+        <span class="text-secondary text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">Active Incidents</span>
       </div>
 
       <!-- 6. Rollout Failures -->
       <div class="metric-cell column justify-center items-center text-center cursor-pointer hover-cell" @click="drilldownToExplorer('rollout_fail')">
-        <span class="text-metric-mono text-weight-bold text-deep-orange-4" style="font-size: 15px; line-height: 1.1;">{{ rolloutFailuresCount }}</span>
-        <span class="text-grey-4 text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">OTA Failures</span>
+        <span class="text-metric-mono text-weight-bold text-deep-orange-5" style="font-size: 15px; line-height: 1.1;">{{ rolloutFailuresCount }}</span>
+        <span class="text-secondary text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">OTA Failures</span>
       </div>
 
       <!-- 7. Telemetry Throughput -->
       <div class="metric-cell column justify-center items-center text-center">
-        <span class="text-metric-mono text-weight-bold text-cyan-3" style="font-size: 15px; line-height: 1.1;">{{ obsStore.throughputEps }}</span>
-        <span class="text-grey-5 text-uppercase" style="font-size: 9px; margin-top: 2px;">Ingest eps</span>
+        <span class="text-metric-mono text-weight-bold text-blue-5" style="font-size: 15px; line-height: 1.1;">{{ obsStore.throughputEps }}</span>
+        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Ingest eps</span>
       </div>
 
       <!-- 8. WebSocket Health -->
       <div class="metric-cell column justify-center items-center text-center">
         <span class="live-indicator-dot q-mb-xs" :class="obsStore.connectionState === 'CONNECTED' ? 'bg-green-4' : 'pulse-critical'"></span>
-        <span class="text-metric-mono text-uppercase text-grey-4" style="font-size: 8px;">{{ obsStore.connectionState }}</span>
+        <span class="text-metric-mono text-uppercase text-secondary" style="font-size: 8px;">{{ obsStore.connectionState }}</span>
       </div>
 
       <!-- 9. Stream Latency -->
       <div class="metric-cell column justify-center items-center text-center">
-        <span class="text-metric-mono text-weight-bold text-cyan-4" style="font-size: 15px; line-height: 1.1;">{{ obsStore.avgLatencyMs }}ms</span>
-        <span class="text-grey-5 text-uppercase" style="font-size: 9px; margin-top: 2px;">Roundtrip SLA</span>
+        <span class="text-metric-mono text-weight-bold text-blue-5" style="font-size: 15px; line-height: 1.1;">{{ obsStore.avgLatencyMs }}ms</span>
+        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Roundtrip SLA</span>
       </div>
 
       <!-- 10. Compliance Rate -->
       <div class="metric-cell column justify-center items-center text-center">
         <span class="text-metric-mono text-weight-bold text-green-3" style="font-size: 15px; line-height: 1.1;">{{ complianceRateRatio }}%</span>
-        <span class="text-grey-5 text-uppercase" style="font-size: 9px; margin-top: 2px;">Fleet Trust</span>
+        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Fleet Trust</span>
       </div>
 
     </div>
@@ -94,34 +94,34 @@
       <div class="col-12 col-md-7 column op-gap-16">
         
         <!-- Panel 1: Fleet Presence Stream (Progressive State Aging) -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column full-width">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="radar" size="xs" color="cyan-3" />
-              <span class="text-operator-title text-white text-weight-bold">Fleet Presence Stream</span>
-              <span class="text-metric-mono text-grey-5" style="font-size: 10px;">(State Aging Applied)</span>
+              <q-icon name="radar" size="xs" color="blue-5" />
+              <span class="text-operator-title text-main text-weight-bold">Fleet Presence Stream</span>
+              <span class="text-metric-mono text-muted" style="font-size: 10px;">(State Aging Applied)</span>
             </div>
-            <q-badge color="blue-grey-9" text-color="cyan-3" class="text-metric-sm">
+            <q-badge color="blue-grey-9" text-color="blue-5" class="text-metric-sm">
               {{ presenceStream.length }} tracked
             </q-badge>
           </div>
 
           <div class="panel-body col q-pa-xs scroll overflow-hidden" style="max-height: 220px;">
-            <div class="text-center text-grey-6 text-caption q-py-md italic" v-if="presenceStream.length === 0">
+            <div class="text-center text-muted text-caption q-py-md italic" v-if="presenceStream.length === 0">
               Awaiting ingress presence updates...
             </div>
             <q-list dense class="q-gutter-y-xs" v-else>
               <q-item 
                 v-for="presence in presenceStream" 
                 :key="presence.id" 
-                class="q-px-sm q-py-xs bg-[#161b20] rounded-borders row items-center justify-between no-wrap hover-row cursor-pointer"
+                class="q-px-sm q-py-xs bg-subpanel rounded-borders row items-center justify-between no-wrap hover-row cursor-pointer"
                 @click="drilldownToExplorer('device', presence.id)"
               >
                 <div class="row items-center op-gap-8 no-wrap">
                   <span class="inline-status-block" :class="getAgingStatusColor(presence.agingState)"></span>
                   <div>
-                    <div class="text-metric-mono text-white" style="font-size: 11px;">{{ presence.id }}</div>
-                    <div class="text-grey-5" style="font-size: 9px;">Tenant: {{ presence.tenant }} | Agent: {{ presence.agent }}</div>
+                    <div class="text-metric-mono text-main" style="font-size: 11px;">{{ presence.id }}</div>
+                    <div class="text-muted" style="font-size: 9px;">Tenant: {{ presence.tenant }} | Agent: {{ presence.agent }}</div>
                   </div>
                 </div>
 
@@ -129,7 +129,7 @@
                   <span class="text-metric-mono text-weight-bold" :class="getAgingTextColor(presence.agingState)" style="font-size: 10px;">
                     {{ presence.agingState }}
                   </span>
-                  <span class="text-metric-mono text-grey-6" style="font-size: 9px;">{{ presence.lastHeartbeatStr }}</span>
+                  <span class="text-metric-mono text-muted" style="font-size: 9px;">{{ presence.lastHeartbeatStr }}</span>
                 </div>
               </q-item>
             </q-list>
@@ -137,19 +137,19 @@
         </div>
 
         <!-- Panel 2: Active Incident Feed -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column full-width">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="warning" size="xs" color="red-4" />
-              <span class="text-operator-title text-white text-weight-bold">Active Incident Feed</span>
+              <q-icon name="warning" size="xs" color="red-5" />
+              <span class="text-operator-title text-main text-weight-bold">Active Incident Feed</span>
             </div>
-            <span class="text-metric-mono text-red-3" style="font-size: 10px;" v-if="unackIncidents.length > 0">
+            <span class="text-metric-mono text-red-5" style="font-size: 10px;" v-if="unackIncidents.length > 0">
               {{ unackIncidents.length }} Unacknowledged
             </span>
           </div>
 
           <div class="panel-body col q-pa-xs scroll overflow-hidden" style="max-height: 220px;">
-            <div class="text-center text-grey-6 text-caption q-py-md italic" v-if="incidentStore.incidents.length === 0">
+            <div class="text-center text-muted text-caption q-py-md italic" v-if="incidentStore.incidents.length === 0">
               No active operational incidents recorded.
             </div>
             <q-list dense class="q-gutter-y-xs" v-else>
@@ -157,31 +157,31 @@
                 v-for="inc in incidentStore.incidents" 
                 :key="inc.eventId" 
                 class="q-px-sm q-py-xs rounded-borders row items-center justify-between no-wrap hover-row"
-                :class="inc.payload?._acknowledged ? 'bg-[#161b20] opacity-75' : 'bg-[#1d1716] border-left-critical'"
+                :class="inc.payload?._acknowledged ? 'bg-subpanel opacity-75' : 'bg-red-focus border-left-critical'"
               >
                 <div class="row items-center op-gap-8 no-wrap overflow-hidden">
                   <q-badge :color="inc.severity === 'CRITICAL' ? 'red-10' : 'amber-10'" :text-color="inc.severity === 'CRITICAL' ? 'red-2' : 'amber-2'" class="text-metric-sm">
                     {{ inc.severity }}
                   </q-badge>
                   <div class="ellipsis">
-                    <span class="text-white text-weight-bold text-caption cursor-pointer hover-underline" @click="drilldownToExplorer('device', inc.sourceAttribution)">
+                    <span class="text-main text-weight-bold text-caption cursor-pointer hover-underline" @click="drilldownToExplorer('device', inc.sourceAttribution)">
                       {{ inc.sourceAttribution }}
                     </span>
-                    <span class="text-grey-4 q-ml-xs" style="font-size: 11px;">- {{ inc.payload?.message || inc.eventType }}</span>
+                    <span class="text-secondary q-ml-xs" style="font-size: 11px;">- {{ inc.payload?.message || inc.eventType }}</span>
                   </div>
                 </div>
 
                 <div class="row items-center op-gap-4 no-wrap">
-                  <span class="text-metric-mono text-grey-6 q-mr-xs" style="font-size: 9px;">{{ formatRelativeTime(inc.timestamp) }}</span>
+                  <span class="text-metric-mono text-muted q-mr-xs" style="font-size: 9px;">{{ formatRelativeTime(inc.timestamp) }}</span>
                   <q-btn 
                     v-if="!inc.payload?._acknowledged" 
                     dense 
                     flat 
                     size="xs" 
-                    color="cyan-3" 
+                    color="blue-5" 
                     label="ACK" 
                     @click="acknowledgeIncidentHandler(inc.eventId)" 
-                    class="bg-[#2a2220] q-px-xs text-metric-sm" 
+                    class="bg-subpanel q-px-xs text-metric-sm" 
                   />
                   <span class="text-metric-mono text-green-5 text-weight-bold" style="font-size: 9px;" v-else>ACK'D</span>
                 </div>
@@ -191,35 +191,35 @@
         </div>
 
         <!-- Panel 3: Rollout Activity Timeline -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column full-width">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="system_update_alt" size="xs" color="amber-4" />
-              <span class="text-operator-title text-white text-weight-bold">Rollout Activity Timeline</span>
+              <q-icon name="system_update_alt" size="xs" color="amber-5" />
+              <span class="text-operator-title text-main text-weight-bold">Rollout Activity Timeline</span>
             </div>
-            <span class="text-metric-mono text-grey-5" style="font-size: 10px;">OTA Deployments</span>
+            <span class="text-metric-mono text-muted" style="font-size: 10px;">OTA Deployments</span>
           </div>
 
           <div class="panel-body col q-pa-xs scroll overflow-hidden" style="max-height: 180px;">
-            <div class="text-center text-grey-6 text-caption q-py-md italic" v-if="rolloutStore.rollouts.length === 0">
+            <div class="text-center text-muted text-caption q-py-md italic" v-if="rolloutStore.rollouts.length === 0">
               No continuous OTA batch loops active.
             </div>
             <q-list dense class="q-gutter-y-xs" v-else>
               <q-item 
                 v-for="roll in rolloutStore.rollouts" 
                 :key="roll.eventId" 
-                class="q-px-sm q-py-xs bg-[#161b20] rounded-borders row items-center justify-between no-wrap"
+                class="q-px-sm q-py-xs bg-subpanel rounded-borders row items-center justify-between no-wrap"
               >
                 <div class="row items-center op-gap-8 no-wrap">
-                  <q-icon :name="roll.eventType === 'ROLLBACK_TRIGGERED' ? 'history' : 'check_circle'" size="xs" :color="roll.eventType === 'ROLLBACK_TRIGGERED' ? 'red-4' : 'green-4'" />
+                  <q-icon :name="roll.eventType === 'ROLLBACK_TRIGGERED' ? 'history' : 'check_circle'" size="xs" :color="roll.eventType === 'ROLLBACK_TRIGGERED' ? 'red-5' : 'green-4'" />
                   <div>
-                    <div class="text-white text-weight-medium" style="font-size: 11px;">
-                      Batch {{ roll.payload?.batchId || 'Alpha' }} - <span class="text-cyan-3">{{ roll.payload?.version || 'v2.4.1' }}</span>
+                    <div class="text-main text-weight-medium" style="font-size: 11px;">
+                      Batch {{ roll.payload?.batchId || 'Alpha' }} - <span class="text-blue-5">{{ roll.payload?.version || 'v2.4.1' }}</span>
                     </div>
-                    <div class="text-grey-5" style="font-size: 9px;">Step: {{ roll.payload?.stepName || roll.eventType }}</div>
+                    <div class="text-muted" style="font-size: 9px;">Step: {{ roll.payload?.stepName || roll.eventType }}</div>
                   </div>
                 </div>
-                <span class="text-metric-mono text-grey-5" style="font-size: 9px;">{{ formatRelativeTime(roll.timestamp) }}</span>
+                <span class="text-metric-mono text-muted" style="font-size: 9px;">{{ formatRelativeTime(roll.timestamp) }}</span>
               </q-item>
             </q-list>
           </div>
@@ -231,82 +231,82 @@
       <div class="col-12 col-md-5 column op-gap-16">
         
         <!-- Panel 4: Quarantine Activity Panel -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column full-width">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="gpp_bad" size="xs" color="red-4" />
-              <span class="text-operator-title text-white text-weight-bold">Quarantined Hardware Center</span>
+              <q-icon name="gpp_bad" size="xs" color="red-5" />
+              <span class="text-operator-title text-main text-weight-bold">Quarantined Hardware Center</span>
             </div>
-            <span class="text-metric-mono text-red-4 text-weight-bold" style="font-size: 11px;">
+            <span class="text-metric-mono text-red-5 text-weight-bold" style="font-size: 11px;">
               {{ govStore.activeQuarantineCount }} Blocked
             </span>
           </div>
 
           <div class="panel-body col q-pa-xs scroll overflow-hidden" style="max-height: 280px;">
-            <div class="text-center text-grey-6 text-caption q-py-md italic" v-if="quarantinedNodesList.length === 0">
+            <div class="text-center text-muted text-caption q-py-md italic" v-if="quarantinedNodesList.length === 0">
               No hardware locked under attestation flags.
             </div>
             <q-list dense class="q-gutter-y-xs" v-else>
               <q-item 
                 v-for="qNode in quarantinedNodesList" 
                 :key="qNode.id" 
-                class="q-px-sm q-py-xs bg-[#1b1515] rounded-borders column op-gap-2 cursor-pointer hover-row"
+                class="q-px-sm q-py-xs bg-red-focus rounded-borders column op-gap-2 cursor-pointer hover-row"
                 @click="drilldownToExplorer('device', qNode.id)"
               >
                 <div class="row items-center justify-between fit no-wrap">
-                  <span class="text-metric-mono text-white text-weight-bold" style="font-size: 11px;">{{ qNode.id }}</span>
-                  <span class="text-metric-mono text-grey-5" style="font-size: 9px;">{{ qNode.timestampStr }}</span>
+                  <span class="text-metric-mono text-main text-weight-bold" style="font-size: 11px;">{{ qNode.id }}</span>
+                  <span class="text-metric-mono text-muted" style="font-size: 9px;">{{ qNode.timestampStr }}</span>
                 </div>
-                <div class="text-red-3" style="font-size: 10px;">Violation: {{ qNode.violationReason }}</div>
-                <div class="text-grey-6" style="font-size: 9px;">Attestation Matrix Check: FAILED</div>
+                <div class="text-red-5" style="font-size: 10px;">Violation: {{ qNode.violationReason }}</div>
+                <div class="text-muted" style="font-size: 9px;">Attestation Matrix Check: FAILED</div>
               </q-item>
             </q-list>
           </div>
         </div>
 
         <!-- Panel 5: Telemetry Throughput Monitor (Stream SLA visibility) -->
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column full-width">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column full-width">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="analytics" size="xs" color="cyan-3" />
-              <span class="text-operator-title text-white text-weight-bold">Ingestion Throughput Monitor</span>
+              <q-icon name="analytics" size="xs" color="blue-5" />
+              <span class="text-operator-title text-main text-weight-bold">Ingestion Throughput Monitor</span>
             </div>
-            <span class="text-metric-mono text-grey-5" style="font-size: 10px;">SLA Engine</span>
+            <span class="text-metric-mono text-muted" style="font-size: 10px;">SLA Engine</span>
           </div>
 
           <div class="panel-body col q-pa-sm column justify-between op-gap-8">
-            <div class="row items-center justify-between text-caption text-grey-4 border-bottom q-pb-xs">
+            <div class="row items-center justify-between text-caption text-secondary border-bottom q-pb-xs">
               <span>Streaming Uptime %</span>
               <span class="text-metric-mono text-green-3 text-weight-bold">{{ obsStore.streamUptimePercentage }}%</span>
             </div>
 
-            <div class="row items-center justify-between text-caption text-grey-4 border-bottom q-pb-xs">
+            <div class="row items-center justify-between text-caption text-secondary border-bottom q-pb-xs">
               <span>Est. Frame Drop Ratio</span>
-              <span class="text-metric-mono text-cyan-3">{{ obsStore.estimatedPacketLossRatio }}</span>
+              <span class="text-metric-mono text-blue-5">{{ obsStore.estimatedPacketLossRatio }}</span>
             </div>
 
-            <div class="row items-center justify-between text-caption text-grey-4 border-bottom q-pb-xs">
+            <div class="row items-center justify-between text-caption text-secondary border-bottom q-pb-xs">
               <span>Ingestion Queue Depth</span>
-              <span class="text-metric-mono text-amber-3">{{ obsStore.messageQueueDepth }} item</span>
+              <span class="text-metric-mono text-amber-5">{{ obsStore.messageQueueDepth }} item</span>
             </div>
 
-            <div class="row items-center justify-between text-caption text-grey-4 border-bottom q-pb-xs">
+            <div class="row items-center justify-between text-caption text-secondary border-bottom q-pb-xs">
               <span>Core Processing Lag</span>
               <span class="text-metric-mono text-purple-3">{{ obsStore.processingLagMs }}ms</span>
             </div>
 
-            <div class="row items-center justify-between text-caption text-grey-4 border-bottom q-pb-xs">
+            <div class="row items-center justify-between text-caption text-secondary border-bottom q-pb-xs">
               <span>Active Subscriptions</span>
-              <span class="text-metric-mono text-grey-4">{{ obsStore.activeSubscriptions }} topic</span>
+              <span class="text-metric-mono text-secondary">{{ obsStore.activeSubscriptions }} topic</span>
             </div>
 
             <!-- Visual Ingest Bar Simulation -->
             <div class="column op-gap-4 q-pt-xs">
-              <div class="row items-center justify-between text-grey-5" style="font-size: 9px;">
+              <div class="row items-center justify-between text-muted" style="font-size: 9px;">
                 <span>Ingest Capacity Map</span>
                 <span class="text-metric-mono">{{ Math.min(100, Math.round(obsStore.throughputEps * 4)) }}%</span>
               </div>
-              <q-linear-progress dark :value="Math.min(1, obsStore.throughputEps / 25)" color="cyan-4" track-color="grey-9" size="xs" />
+              <q-linear-progress :dark="obsStore.connectionState === 'CONNECTED'" :value="Math.min(1, obsStore.throughputEps / 25)" color="blue-5" track-color="grey-9" size="xs" />
             </div>
           </div>
         </div>
@@ -498,14 +498,14 @@ onMounted(() => {
 }
 
 .metric-cell {
-  background-color: #161b20;
+  background-color: var(--enterprise-panel-bg);
   border-radius: 2px;
   padding: 6px 2px;
   min-height: 48px;
 }
 
 .hover-cell:hover {
-  background-color: #1c262b;
+  background-color: var(--enterprise-subpanel-bg);
 }
 
 .inline-status-block {
@@ -516,7 +516,7 @@ onMounted(() => {
 }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 
 .hover-underline:hover {

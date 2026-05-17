@@ -96,6 +96,7 @@
           </div>
           <q-space />
           
+          <div class="row q-gutter-xs">
             <q-btn flat round dense icon="download" color="white" @click="exportPdf" :loading="exporting">
                <q-tooltip>Export as professional PDF</q-tooltip>
             </q-btn>

@@ -1,19 +1,19 @@
 <!-- invify-admin/src/pages/governance/QuarantineCenterPage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Top Telemetry & Control Strip -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="gpp_maybe" size="sm" color="purple-4" />
+        <q-icon name="gpp_maybe" size="sm" color="purple-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">SOC Quarantine Governance & Remediation Hub</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">SECURE_CONFINEMENT // AUDITED_TRUST_RESTORATION</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">SOC Quarantine Governance & Remediation Hub</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">SECURE_CONFINEMENT // AUDITED_TRUST_RESTORATION</div>
         </div>
       </div>
       
       <!-- Quick Status Counter -->
-      <div class="row items-center op-gap-8 no-wrap text-caption text-grey-5">
+      <div class="row items-center op-gap-8 no-wrap text-caption text-muted">
         <span>Confined Sector Target:</span>
         <q-chip dense size="xs" color="purple-10" text-color="purple-2" class="text-weight-bold">
           {{ quarantinedEndpointsList.length }} RESTRICTED VECTORS
@@ -22,58 +22,58 @@
     </div>
 
     <!-- UPPER ROW: FINAL REFINEMENT #4: Autonomous Remediation Readiness Engine Toggles -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="enterprise-panel bg-panel column fit">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="auto_mode" size="xs" color="cyan-3" />
-          <span class="text-operator-title text-white text-weight-bold">Autonomous Remediation Readiness Control Pipelines</span>
+          <q-icon name="auto_mode" size="xs" color="blue-5" />
+          <span class="text-operator-title text-main text-weight-bold">Autonomous Remediation Readiness Control Pipelines</span>
         </div>
-        <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">ZERO-TOUCH RECOVERY PRE-WARMING</span>
+        <span class="text-metric-mono text-blue-5" style="font-size: 10px;">ZERO-TOUCH RECOVERY PRE-WARMING</span>
       </div>
 
       <div class="panel-body q-pa-sm row items-center justify-between op-gap-16">
         <div class="col-12 col-md-3 column op-gap-2">
-          <div class="row items-center justify-between text-caption text-white text-weight-medium">
+          <div class="row items-center justify-between text-caption text-main text-weight-medium">
             <span>Automated Fallback Rollback</span>
-            <q-toggle v-model="autoRemediationConfig.rollback" dense dark color="cyan-4" size="xs" />
+            <q-toggle v-model="autoRemediationConfig.rollback" dense :dark="true" color="blue-5" size="xs" />
           </div>
-          <span class="text-grey-6" style="font-size: 9px;">Forces previous certified stable firmware image instantly upon critical verification drops.</span>
+          <span class="text-muted" style="font-size: 9px;">Forces previous certified stable firmware image instantly upon critical verification drops.</span>
         </div>
 
         <div class="col-12 col-md-3 column op-gap-2 border-left q-pl-sm">
-          <div class="row items-center justify-between text-caption text-white text-weight-medium">
+          <div class="row items-center justify-between text-caption text-main text-weight-medium">
             <span>Policy Auto-Repair</span>
-            <q-toggle v-model="autoRemediationConfig.policyRepair" dense dark color="cyan-4" size="xs" />
+            <q-toggle v-model="autoRemediationConfig.policyRepair" dense :dark="true" color="blue-5" size="xs" />
           </div>
-          <span class="text-grey-6" style="font-size: 9px;">Re-evaluates local configuration overrides automatically against pristine parent baseline hashes.</span>
+          <span class="text-muted" style="font-size: 9px;">Re-evaluates local configuration overrides automatically against pristine parent baseline hashes.</span>
         </div>
 
         <div class="col-12 col-md-3 column op-gap-2 border-left q-pl-sm">
-          <div class="row items-center justify-between text-caption text-white text-weight-medium">
+          <div class="row items-center justify-between text-caption text-main text-weight-medium">
             <span>Staged Self-Revalidation</span>
-            <q-toggle v-model="autoRemediationConfig.stagedReval" dense dark color="cyan-4" size="xs" />
+            <q-toggle v-model="autoRemediationConfig.stagedReval" dense :dark="true" color="blue-5" size="xs" />
           </div>
-          <span class="text-grey-6" style="font-size: 9px;">Performs phased canary attestation checks over sliding timing horizons before lifting restrictions.</span>
+          <span class="text-muted" style="font-size: 9px;">Performs phased canary attestation checks over sliding timing horizons before lifting restrictions.</span>
         </div>
 
         <div class="col-12 col-md-3 column op-gap-2 border-left q-pl-sm">
-          <div class="row items-center justify-between text-caption text-white text-weight-medium">
+          <div class="row items-center justify-between text-caption text-main text-weight-medium">
             <span>Autonomous Release Engine</span>
-            <q-toggle v-model="autoRemediationConfig.autoRelease" dense dark color="purple-4" size="xs" />
+            <q-toggle v-model="autoRemediationConfig.autoRelease" dense :dark="true" color="purple-5" size="xs" />
           </div>
-          <span class="text-grey-6" style="font-size: 9px;">Evaluates recovered telemetry streams securely without hardcoded manual intervention blocks.</span>
+          <span class="text-muted" style="font-size: 9px;">Evaluates recovered telemetry streams securely without hardcoded manual intervention blocks.</span>
         </div>
       </div>
     </div>
 
     <!-- MAIN GRID: Quarantined Endpoints Array complete with Duration Trackers -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column col fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="enterprise-panel bg-panel column col fit">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="lock" size="xs" color="red-4" />
-          <span class="text-operator-title text-white text-weight-bold">Active Isolated Hardware List</span>
+          <q-icon name="lock" size="xs" color="red-5" />
+          <span class="text-operator-title text-main text-weight-bold">Active Isolated Hardware List</span>
         </div>
-        <span class="text-metric-mono text-grey-5" style="font-size: 10px;">IMMUTABLE DURATION COUNTERS</span>
+        <span class="text-metric-mono text-muted" style="font-size: 10px;">IMMUTABLE DURATION COUNTERS</span>
       </div>
 
       <!-- High-Density Virtual Table Structure -->
@@ -82,36 +82,36 @@
           <q-item 
             v-for="q in quarantinedEndpointsList" 
             :key="q.targetId" 
-            class="q-px-sm q-py-xs bg-[#1a1414] rounded-borders row items-center justify-between no-wrap border-left-critical hover-row"
+            class="q-px-sm q-py-xs bg-subpanel rounded-borders row items-center justify-between no-wrap border-left-critical hover-row"
           >
             <!-- Left Details: ID, Tenant, App Package Vector -->
             <div class="col-4 column op-gap-2 overflow-hidden">
               <div class="row items-center op-gap-8 no-wrap">
-                <span class="text-white text-weight-bold text-caption ellipsis">{{ q.targetId }}</span>
+                <span class="text-main text-weight-bold text-caption ellipsis">{{ q.targetId }}</span>
                 <q-badge color="red-10" text-color="red-2" class="text-metric-sm">
                   Trust: {{ q.trustScore }}%
                 </q-badge>
               </div>
-              <div class="text-grey-5" style="font-size: 10px;">
-                Tenant Scope: <span class="text-metric-mono text-grey-3">{{ q.tenant }}</span>
+              <div class="text-muted" style="font-size: 10px;">
+                Tenant Scope: <span class="text-metric-mono text-muted">{{ q.tenant }}</span>
               </div>
-              <div class="text-grey-6 ellipsis" style="font-size: 9px;">
+              <div class="text-secondary ellipsis" style="font-size: 9px;">
                 Vector: {{ q.appPackage || 'com.iips.core' }}
               </div>
-              <div class="text-cyan-6 text-metric-mono" style="font-size: 9px;" v-if="q.latitude">
+              <div class="text-blue-5 text-metric-mono" style="font-size: 9px;" v-if="q.latitude">
                 Loc: {{ q.latitude }}, {{ q.longitude }}
               </div>
             </div>
 
             <!-- Middle Portion: Attestation Failure Reason & Ingestion Timestamp -->
             <div class="col-5 q-px-sm column justify-center">
-              <div class="text-red-3 text-weight-medium" style="font-size: 11px;">
+              <div class="text-red-5 text-weight-medium" style="font-size: 11px;">
                 Violation Reason: {{ q.reason }}
               </div>
-              <div class="row items-center op-gap-8 text-grey-6 q-mt-xs" style="font-size: 10px;">
-                <span>Locked At: <span class="text-metric-mono text-grey-4">{{ q.lockedTimestamp }}</span></span>
+              <div class="row items-center op-gap-8 text-muted q-mt-xs" style="font-size: 10px;">
+                <span>Locked At: <span class="text-metric-mono text-muted">{{ q.lockedTimestamp }}</span></span>
                 <span>•</span>
-                <span>Active Duration: <span class="text-metric-mono text-amber-3 text-weight-bold">{{ q.durationStr }}</span></span>
+                <span>Active Duration: <span class="text-metric-mono text-amber-5 text-weight-bold">{{ q.durationStr }}</span></span>
               </div>
             </div>
 
@@ -121,10 +121,10 @@
                 dense 
                 flat 
                 size="xs" 
-                color="cyan-3" 
+                color="blue-5" 
                 label="Trace Logs" 
                 @click="inspectQuarantineTraces(q)" 
-                class="bg-[#24221d] q-px-xs text-metric-sm" 
+                class="bg-subpanel q-px-xs text-metric-sm" 
               />
               <q-btn 
                 dense 
@@ -141,48 +141,48 @@
       </div>
 
       <!-- Footer Info Bar -->
-      <div class="panel-footer bg-[#161b20] q-pa-xs border-top text-center text-caption text-grey-6" style="font-size: 10px;">
+      <div class="panel-footer bg-subpanel q-pa-xs border-top text-center text-caption text-muted" style="font-size: 10px;">
         Quarantine containment guarantees complete external layer termination. Restored bridges enforce strict cryptographic handshakes.
       </div>
     </div>
 
     <!-- REASON-GATED TRUST RESTORATION RELEASE DIALOG -->
     <q-dialog v-model="releaseGateOpen" persistent>
-      <q-card class="bg-[#12161a] text-[#e1e7ec] border-muted" style="min-width: 420px;">
-        <q-card-section class="bg-[#1b1515] border-bottom row items-center op-gap-8">
-          <q-icon name="how_to_reg" color="purple-4" size="sm" />
+      <q-card class="bg-panel text-main border-main" style="min-width: 420px;">
+        <q-card-section class="bg-red-focus border-bottom row items-center op-gap-8">
+          <q-icon name="how_to_reg" color="purple-5" size="sm" />
           <div>
-            <div class="text-white text-weight-bold text-caption">Trust Restoration Authorization Gate</div>
-            <div class="text-metric-sm text-purple-3">Target Instance: {{ pendingReleaseTarget?.targetId }}</div>
+            <div class="text-main text-weight-bold text-caption">Trust Restoration Authorization Gate</div>
+            <div class="text-metric-sm text-purple-5">Target Instance: {{ pendingReleaseTarget?.targetId }}</div>
           </div>
         </q-card-section>
 
         <q-card-section class="column op-gap-12 q-pt-md">
-          <div class="text-caption text-grey-4" style="font-size: 11px;">
+          <div class="text-caption text-secondary" style="font-size: 11px;">
             Lifting containment profiles mandates validating absolute hardware configuration parity. Please review current cryptographic trust status and input an explicit operator attribution log before final commitment.
           </div>
 
-          <div class="bg-[#161b20] q-pa-sm rounded-borders border-left text-caption text-grey-4" style="font-size: 10px;">
-            <div>Original Violation: <span class="text-metric-mono text-red-4">{{ pendingReleaseTarget?.reason }}</span></div>
-            <div>Containment Lock Duration: <span class="text-metric-mono text-amber-3">{{ pendingReleaseTarget?.durationStr }}</span></div>
-            <div>Target Tenant: <span class="text-metric-mono text-white">{{ pendingReleaseTarget?.tenant }}</span></div>
+          <div class="bg-subpanel q-pa-sm rounded-borders border-left text-caption text-secondary" style="font-size: 10px;">
+            <div>Original Violation: <span class="text-metric-mono text-red-5">{{ pendingReleaseTarget?.reason }}</span></div>
+            <div>Containment Lock Duration: <span class="text-metric-mono text-amber-5">{{ pendingReleaseTarget?.durationStr }}</span></div>
+            <div>Target Tenant: <span class="text-metric-mono text-main">{{ pendingReleaseTarget?.tenant }}</span></div>
           </div>
 
           <!-- Mandatory Reason Input -->
           <q-input
             v-model="releaseReasonText"
-            dark
+            :dark="true"
             dense
             filled
             label="Mandatory Operator Remediation Log *"
             placeholder="e.g. Attestation check validated nominal post automated configuration repair"
-            class="bg-[#161b20]"
+            class="bg-subpanel"
             autofocus
             :rules="[val => !!val || 'Remediation log annotation cannot be null']"
           />
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-[#161b20] border-top q-pa-sm">
+        <q-card-actions align="right" class="bg-subpanel border-top q-pa-sm">
           <q-btn flat dense size="sm" color="grey-5" label="Cancel Workflow" v-close-popup @click="resetReleaseGate" />
           <q-btn 
             dense 
@@ -306,6 +306,6 @@ const dispatchTrustRestorationCommand = () => {
 .border-left-critical { border-left: 3px solid #c92a2a !important; }
 
 .hover-row:hover {
-  background-color: #241c1c !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 </style>

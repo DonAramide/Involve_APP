@@ -1,14 +1,14 @@
 <!-- invify-admin/src/pages/governance/PolicyGovernancePage.vue -->
 <template>
-  <q-page class="bg-[#0b0f12] text-[#e1e7ec] q-pa-md column op-gap-16">
+  <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Workspace Subheader Strip -->
     <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
       <div class="row items-center op-gap-8 no-wrap">
-        <q-icon name="policy" size="sm" color="cyan-3" />
+        <q-icon name="policy" size="sm" color="blue-5" />
         <div>
-          <div class="text-operator-title text-white text-weight-bold" style="font-size: 14px;">Versioned Policy Governance & Orchestration</div>
-          <div class="text-metric-mono text-grey-5" style="font-size: 10px;">INHERITANCE_SCOPES // AUDITABLE_DEPLOYMENTS</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Versioned Policy Governance & Orchestration</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">INHERITANCE_SCOPES // AUDITABLE_DEPLOYMENTS</div>
         </div>
       </div>
       
@@ -16,8 +16,7 @@
         <q-btn 
           dense 
           size="xs" 
-          color="cyan-4" 
-          text-color="black" 
+          color="blue-5" 
           label="Launch Simulation sandbox" 
           icon="science" 
           @click="simulationModeOpen = true" 
@@ -32,13 +31,13 @@
       <!-- LEFT PORTION: Published Policy Versions -->
       <div class="col-12 col-md-7 column op-gap-16">
         
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="collections_bookmark" size="xs" color="cyan-3" />
-              <span class="text-operator-title text-white text-weight-bold">Active Platform Blueprints</span>
+              <q-icon name="collections_bookmark" size="xs" color="blue-5" />
+              <span class="text-operator-title text-main text-weight-bold">Active Platform Blueprints</span>
             </div>
-            <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">{{ activePoliciesList.length }} Versioned Buffers</span>
+            <span class="text-metric-mono text-blue-5" style="font-size: 10px;">{{ activePoliciesList.length }} Versioned Buffers</span>
           </div>
 
           <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 250px;">
@@ -46,28 +45,28 @@
               <q-item 
                 v-for="p in activePoliciesList" 
                 :key="p.id" 
-                class="q-px-sm q-py-xs bg-[#161b20] rounded-borders column op-gap-4 hover-row"
+                class="q-px-sm q-py-xs bg-subpanel rounded-borders column op-gap-4 hover-row"
               >
                 <div class="row items-center justify-between fit no-wrap">
                   <div class="row items-center op-gap-8 no-wrap">
-                    <span class="text-white text-weight-bold text-caption">{{ p.policyName }}</span>
+                    <span class="text-main text-weight-bold text-caption">{{ p.policyName }}</span>
                     <q-badge color="cyan-10" text-color="cyan-2" class="text-metric-sm">
                       Ver {{ p.version }}
                     </q-badge>
                   </div>
-                  <span class="text-metric-mono text-grey-5" style="font-size: 10px;">Scope: {{ p.assignmentScope }}</span>
+                  <span class="text-metric-mono text-muted" style="font-size: 10px;">Scope: {{ p.assignmentScope }}</span>
                 </div>
 
-                <div class="text-grey-4" style="font-size: 11px;">
-                  Enforcement Vector: <span class="text-metric-mono text-grey-3">{{ p.description }}</span>
+                <div class="text-secondary" style="font-size: 11px;">
+                  Enforcement Vector: <span class="text-metric-mono text-muted">{{ p.description }}</span>
                 </div>
 
-                <div class="row items-center justify-between text-caption text-grey-6 border-top q-pt-xs q-mt-xs" style="font-size: 10px;">
-                  <span>Inheritance Level: <span class="text-white">{{ p.inheritanceBehavior }}</span></span>
+                <div class="row items-center justify-between text-caption text-muted border-top q-pt-xs q-mt-xs" style="font-size: 10px;">
+                  <span>Inheritance Level: <span class="text-main">{{ p.inheritanceBehavior }}</span></span>
                   
                   <div class="row items-center op-gap-4">
-                    <q-btn dense flat size="xs" color="amber-4" label="Force Drift Remediation" @click="triggerDriftRemediation(p.id)" class="bg-[#211f18] q-px-xs text-metric-sm" />
-                    <q-btn dense flat size="xs" color="red-4" label="Trigger Rollback" @click="triggerRollbackEnvelope(p.id)" class="bg-[#211515] q-px-xs text-metric-sm" />
+                    <q-btn dense flat size="xs" color="amber-5" label="Force Drift Remediation" @click="triggerDriftRemediation(p.id)" class="bg-subpanel q-px-xs text-metric-sm" />
+                    <q-btn dense flat size="xs" color="red-5" label="Trigger Rollback" @click="triggerRollbackEnvelope(p.id)" class="bg-red-focus q-px-xs text-metric-sm" />
                   </div>
                 </div>
               </q-item>
@@ -80,17 +79,17 @@
       <!-- RIGHT PORTION: Multi-Tenant Policy Inheritance Topology -->
       <div class="col-12 col-md-5 column op-gap-16">
         
-        <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-          <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+        <div class="enterprise-panel bg-panel column fit">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
-              <q-icon name="account_tree" size="xs" color="amber-4" />
-              <span class="text-operator-title text-white text-weight-bold">Multi-Tenant Scope Hierarchy</span>
+              <q-icon name="account_tree" size="xs" color="amber-5" />
+              <span class="text-operator-title text-main text-weight-bold">Multi-Tenant Scope Hierarchy</span>
             </div>
-            <span class="text-metric-mono text-grey-5" style="font-size: 10px;">Inheritance View</span>
+            <span class="text-metric-mono text-muted" style="font-size: 10px;">Inheritance View</span>
           </div>
 
           <div class="panel-body col q-pa-sm column justify-between">
-            <div class="text-caption text-grey-4 q-mb-xs" style="font-size: 11px;">
+            <div class="text-caption text-secondary q-mb-xs" style="font-size: 11px;">
               Nested policy configuration layers overriding global parent parameters:
             </div>
 
@@ -98,37 +97,37 @@
             <div class="column op-gap-4 q-pl-xs">
               
               <!-- Global Parent -->
-              <div class="row items-center op-gap-8 no-wrap text-caption text-grey-3">
-                <q-icon name="public" size="xs" color="cyan-3" />
+              <div class="row items-center op-gap-8 no-wrap text-caption text-main">
+                <q-icon name="public" size="xs" color="blue-5" />
                 <span class="text-weight-bold">Global Parent Blueprint</span>
-                <span class="text-metric-mono text-grey-6" style="font-size: 9px;">[v1.0 Baseline]</span>
+                <span class="text-metric-mono text-muted" style="font-size: 9px;">[v1.0 Baseline]</span>
               </div>
 
               <!-- Scope Alpha -->
-              <div class="row items-center op-gap-8 no-wrap text-caption text-grey-4 border-left-tree q-pl-md q-ml-xs">
+              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
-                <span>Tenant Overrides: <span class="text-white text-weight-bold">tenant-alpha</span></span>
+                <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-alpha</span></span>
                 <q-chip dense size="xs" color="cyan-10" text-color="cyan-3" class="text-metric-sm">STRICT_INHERIT</q-chip>
               </div>
 
               <!-- Scope Omega -->
-              <div class="row items-center op-gap-8 no-wrap text-caption text-grey-4 border-left-tree q-pl-md q-ml-xs">
+              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
-                <span>Tenant Overrides: <span class="text-white text-weight-bold">tenant-omega</span></span>
+                <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-omega</span></span>
                 <q-chip dense size="xs" color="amber-10" text-color="amber-3" class="text-metric-sm">CUSTOM_DRIFT</q-chip>
               </div>
 
               <!-- Scope Beta -->
-              <div class="row items-center op-gap-8 no-wrap text-caption text-grey-4 border-left-tree q-pl-md q-ml-xs">
+              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
-                <span>Tenant Overrides: <span class="text-white text-weight-bold">tenant-beta</span></span>
+                <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-beta</span></span>
                 <q-chip dense size="xs" color="grey-9" text-color="grey-4" class="text-metric-sm">MUTED_PARENT</q-chip>
               </div>
 
             </div>
 
             <!-- Quick Operator Info Notice -->
-            <div class="text-caption text-grey-6 text-center border-top q-pt-xs q-mt-sm" style="font-size: 10px;">
+            <div class="text-caption text-muted text-center border-top q-pt-xs q-mt-sm" style="font-size: 10px;">
               Inheritance overrides flow downwards dynamically. Conflict resolvers prioritize direct scoped parameters.
             </div>
           </div>
@@ -139,11 +138,11 @@
     </div>
 
     <!-- LOWER SECTION: FINAL REFINEMENT #2: Policy Simulation Mode Sandbox -->
-    <div class="panel-card bg-[#12161a] border-muted rounded-borders column fit">
-      <div class="panel-header bg-[#161b20] q-px-sm q-py-xs border-bottom row items-center justify-between">
+    <div class="enterprise-panel bg-panel column fit">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="science" size="xs" color="cyan-3" />
-          <span class="text-operator-title text-white text-weight-bold">Pre-Deployment Policy Simulation Engine</span>
+          <q-icon name="science" size="xs" color="blue-5" />
+          <span class="text-operator-title text-main text-weight-bold">Pre-Deployment Policy Simulation Engine</span>
         </div>
         <q-badge color="cyan-10" text-color="cyan-3" class="text-weight-bold">
           SANDBOX ACTIVE
@@ -151,47 +150,47 @@
       </div>
 
       <div class="panel-body q-pa-md column op-gap-16">
-        <div class="text-caption text-grey-4" style="font-size: 11px;">
+        <div class="text-caption text-secondary" style="font-size: 11px;">
           Adjust simulation constraints below to calculate projected multi-tenant assignment impact vectors in real time prior to commit sequences.
         </div>
 
         <!-- Simulation Interactive Parameter Controls -->
         <div class="row items-center op-gap-16">
           <div class="col-12 col-md-4 column op-gap-4">
-            <span class="text-caption text-grey-5" style="font-size: 11px;">Target Scope Depth</span>
+            <span class="text-caption text-muted" style="font-size: 11px;">Target Scope Depth</span>
             <q-select
               v-model="simTargetScope"
               :options="['GLOBAL_ALL', 'TENANT_ALPHA_ONLY', 'RETAIL_SECTOR_OMEGA', 'FINTECH_SUBFLEETS']"
               dense
-              dark
+              :dark="true"
               filled
               options-dense
-              class="bg-[#161b20] text-caption"
+              class="bg-subpanel text-caption"
             />
           </div>
 
           <div class="col-12 col-md-4 column op-gap-4">
-            <span class="text-caption text-grey-5" style="font-size: 11px;">Enforcement Restraint</span>
+            <span class="text-caption text-muted" style="font-size: 11px;">Enforcement Restraint</span>
             <q-select
               v-model="simRestraintLevel"
               :options="['STRICT_IMMEDIATE', 'STAGED_CANARY', 'PERMISSIVE_LOG_ONLY']"
               dense
-              dark
+              :dark="true"
               filled
               options-dense
-              class="bg-[#161b20] text-caption"
+              class="bg-subpanel text-caption"
             />
           </div>
 
           <div class="col-12 col-md-4 column op-gap-4">
-            <span class="text-caption text-grey-5" style="font-size: 11px;">Rollback Safeguard Threshold</span>
+            <span class="text-caption text-muted" style="font-size: 11px;">Rollback Safeguard Threshold</span>
             <q-slider
               v-model="simRollbackThreshold"
               :min="1"
               :max="10"
               :step="1"
-              dark
-              color="cyan-4"
+              :dark="true"
+              color="blue-5"
               label
               label-always
               class="q-mt-xs"
@@ -200,44 +199,44 @@
         </div>
 
         <!-- LIVE PREDICTIVE ESTIMATES OUTPUT STRIP -->
-        <div class="row items-center justify-between bg-[#161b20] q-pa-md rounded-borders border-muted text-center">
+        <div class="row items-center justify-between bg-subpanel q-pa-md rounded-borders border-main text-center">
           
           <div class="column items-center">
-            <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 20px;">{{ simulationEstimates.affectedTenants }}</span>
-            <span class="text-caption text-grey-5" style="font-size: 11px;">Affected Tenants</span>
+            <span class="text-metric-mono text-blue-5 text-weight-bold" style="font-size: 20px;">{{ simulationEstimates.affectedTenants }}</span>
+            <span class="text-caption text-muted" style="font-size: 11px;">Affected Tenants</span>
           </div>
 
           <div class="column items-center border-left q-pl-md">
-            <span class="text-metric-mono text-white text-weight-bold" style="font-size: 20px;">{{ simulationEstimates.impactedDevices.toLocaleString() }}</span>
-            <span class="text-caption text-grey-5" style="font-size: 11px;">Impacted Nodes</span>
+            <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ simulationEstimates.impactedDevices.toLocaleString() }}</span>
+            <span class="text-caption text-muted" style="font-size: 11px;">Impacted Nodes</span>
           </div>
 
           <div class="column items-center border-left q-pl-md">
-            <span class="text-metric-mono text-weight-bold" :class="simulationEstimates.rolloutRisk > 60 ? 'text-amber-4' : 'text-green-4'" style="font-size: 20px;">
+            <span class="text-metric-mono text-weight-bold" :class="simulationEstimates.rolloutRisk > 60 ? 'text-amber-5' : 'text-green-5'" style="font-size: 20px;">
               {{ simulationEstimates.rolloutRisk }}%
             </span>
-            <span class="text-caption text-grey-5" style="font-size: 11px;">Rollout Risk Index</span>
+            <span class="text-caption text-muted" style="font-size: 11px;">Rollout Risk Index</span>
           </div>
 
           <div class="column items-center border-left q-pl-md">
-            <span class="text-metric-mono text-weight-bold" :class="simulationEstimates.rollbackDifficulty === 'SEVERE' ? 'text-red-4' : 'text-cyan-3'" style="font-size: 20px;">
+            <span class="text-metric-mono text-weight-bold" :class="simulationEstimates.rollbackDifficulty === 'SEVERE' ? 'text-red-5' : 'text-blue-5'" style="font-size: 20px;">
               {{ simulationEstimates.rollbackDifficulty }}
             </span>
-            <span class="text-caption text-grey-5" style="font-size: 11px;">Rollback Difficulty</span>
+            <span class="text-caption text-muted" style="font-size: 11px;">Rollback Difficulty</span>
           </div>
 
           <div class="column items-center border-left q-pl-md">
             <q-chip dense size="xs" :color="simulationEstimates.conflictsDetected ? 'red-10' : 'green-10'" :text-color="simulationEstimates.conflictsDetected ? 'red-2' : 'green-3'" class="text-metric-sm">
               {{ simulationEstimates.conflictsDetected ? 'CONFLICTS DETECTED' : 'SCOPES CLEAR' }}
             </q-chip>
-            <span class="text-caption text-grey-5 q-mt-xs" style="font-size: 10px;">Inheritance Checks</span>
+            <span class="text-caption text-muted q-mt-xs" style="font-size: 10px;">Inheritance Checks</span>
           </div>
 
         </div>
 
         <!-- Auditable Action Confirmators -->
         <div class="row items-center justify-between border-top q-pt-md">
-          <span class="text-metric-sm text-grey-6">
+          <span class="text-metric-sm text-muted">
             Simulation profile execution parameters bound to verified backend authorization hashes.
           </span>
 
@@ -246,8 +245,7 @@
             <q-btn 
               dense 
               size="sm" 
-              color="cyan-4" 
-              text-color="black" 
+              color="blue-5" 
               label="Commit Simulated Blueprint Upstream" 
               @click="publishSimulatedBlueprint" 
               class="q-px-sm text-weight-bold"
@@ -419,6 +417,6 @@ const publishSimulatedBlueprint = () => {
 .border-left-tree { border-left: 2px solid #22b8cf; }
 
 .hover-row:hover {
-  background-color: #1c262b !important;
+  background-color: var(--enterprise-subpanel-bg) !important;
 }
 </style>
