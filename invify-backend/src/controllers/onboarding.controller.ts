@@ -1,6 +1,8 @@
 // src/controllers/onboarding.controller.ts
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class OnboardingController {
   /**
@@ -96,6 +98,51 @@ export class OnboardingController {
 
       if (!email || !businessName || !industry) {
         return res.status(400).json({ error: 'Missing mandatory enterprise parameters' });
+      }
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        console.log('[OnboardingController] Simulating atomic onboarding provisioning offline.');
+        const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
+        
+        // Ensure file exists
+        let tenants: any[] = [];
+        if (fs.existsSync(LOCAL_TENANTS_DB_PATH)) {
+          try {
+            tenants = JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'));
+          } catch (_) {}
+        } else {
+          tenants = [
+            { id: '00000000-0000-0000-0000-000000000001', name: 'Lagos Academy School', type: 'school', plan: 'standard', status: 'active', created_at: new Date().toISOString() },
+            { id: '00000000-0000-0000-0000-000000000002', name: 'Elite Retail Hub', type: 'retail', plan: 'premium', status: 'active', created_at: new Date().toISOString() },
+            { id: '00000000-0000-0000-0000-000000000003', name: 'City Hospital Clinic', type: 'healthcare', plan: 'enterprise', status: 'active', created_at: new Date().toISOString() }
+          ];
+        }
+
+        const tenantId = `tenant-${Date.now()}`;
+        const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        const startingBalance = plan === 'enterprise' ? 100000 : 50000;
+
+        const newTenant = {
+          id: tenantId,
+          name: businessName,
+          type: industry,
+          plan: plan || 'premium',
+          status: 'active',
+          created_at: new Date().toISOString()
+        };
+
+        tenants.unshift(newTenant);
+        fs.writeFileSync(LOCAL_TENANTS_DB_PATH, JSON.stringify(tenants, null, 2));
+
+        return res.status(201).json({
+          message: 'Stripe-grade Enterprise Provisioning sequence completed successfully.',
+          tenantId,
+          userId,
+          role: 'owner',
+          walletBalance: startingBalance,
+          subscriptionPlan: plan || 'premium',
+          activeModules: modules || [industry]
+        });
       }
 
       console.log(`[OnboardingController] Beginning atomic provisioning for: ${businessName} (${email})`);
