@@ -144,7 +144,6 @@
 
         <q-card-section class="q-pt-md">
           <q-select
-            v-if="isPlatformAdmin"
             v-model="newCode.tenantId"
             :options="filteredTenantOptions"
             use-input
@@ -169,14 +168,6 @@
               </q-item>
             </template>
           </q-select>
-
-          <q-input
-            v-else
-            :model-value="myTenantName"
-            label="Target School/Business"
-            filled readonly
-            class="q-mb-md"
-          />
 
           <q-select
             v-model="newCode.serviceMode"
