@@ -4,8 +4,45 @@ import { supabase } from '../db/supabase';
 import { WalletService } from '../services/wallet.service';
 import { PDFService } from '../services/pdf.service';
 import { BillingService } from '../services/billing.service';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
+
+interface MockTenant {
+  id: string;
+  name: string;
+  type: string;
+  plan: string;
+  status: string;
+  created_at: string;
+}
 
 export class AdminController {
+  private static initLocalDB() {
+    if (!fs.existsSync(LOCAL_TENANTS_DB_PATH)) {
+      const initialData = [
+        { id: '00000000-0000-0000-0000-000000000001', name: 'Lagos Academy School', type: 'school', plan: 'standard', status: 'active', created_at: new Date().toISOString() },
+        { id: '00000000-0000-0000-0000-000000000002', name: 'Elite Retail Hub', type: 'retail', plan: 'premium', status: 'active', created_at: new Date().toISOString() },
+        { id: '00000000-0000-0000-0000-000000000003', name: 'City Hospital Clinic', type: 'healthcare', plan: 'enterprise', status: 'active', created_at: new Date().toISOString() }
+      ];
+      fs.writeFileSync(LOCAL_TENANTS_DB_PATH, JSON.stringify(initialData, null, 2));
+    }
+  }
+
+  private static getLocalData(): MockTenant[] {
+    AdminController.initLocalDB();
+    try {
+      return JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'));
+    } catch (_) {
+      return [];
+    }
+  }
+
+  private static saveLocalData(data: MockTenant[]) {
+    fs.writeFileSync(LOCAL_TENANTS_DB_PATH, JSON.stringify(data, null, 2));
+  }
+
   /**
    * GET /admin/tenants
    * Lists all tenants with optional filtering.
@@ -13,11 +50,8 @@ export class AdminController {
   static async listTenants(req: Request, res: Response) {
     if (process.env.OFFLINE_MOCK_AUTH === 'true') {
       console.log('[AdminController] Serving local mock tenants immediately (OFFLINE_MOCK_AUTH active).');
-      return res.status(200).json([
-        { id: '00000000-0000-0000-0000-000000000001', name: 'Lagos Academy School', type: 'school', plan: 'standard', status: 'active', created_at: new Date().toISOString() },
-        { id: '00000000-0000-0000-0000-000000000002', name: 'Elite Retail Hub', type: 'retail', plan: 'premium', status: 'active', created_at: new Date().toISOString() },
-        { id: '00000000-0000-0000-0000-000000000003', name: 'City Hospital Clinic', type: 'healthcare', plan: 'enterprise', status: 'active', created_at: new Date().toISOString() }
-      ]);
+      const data = AdminController.getLocalData();
+      return res.status(200).json(data);
     }
 
     try {
@@ -64,6 +98,22 @@ export class AdminController {
 
       if (!name || !type) {
         return res.status(400).json({ error: "Name and Type are required" });
+      }
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        console.log('[AdminController] Creating tenant locally immediately (OFFLINE_MOCK_AUTH active).');
+        const data = AdminController.getLocalData();
+        const newTenant: MockTenant = {
+          id: `tenant-${Date.now()}`,
+          name,
+          type,
+          plan: plan || 'standard',
+          status: 'active',
+          created_at: new Date().toISOString()
+        };
+        data.unshift(newTenant);
+        AdminController.saveLocalData(data);
+        return res.status(201).json(newTenant);
       }
 
       const { data, error } = await supabase
