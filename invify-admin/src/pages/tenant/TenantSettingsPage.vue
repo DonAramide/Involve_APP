@@ -153,7 +153,7 @@ const webhookUrl = ref('https://mybusiness.com/api/v1/quasar-webhook')
 const modules = ref([
   { id: 'school', name: 'School & Academy Management', desc: 'Provision curriculum tools, lesson report cards, student attendance logs, and academy tuition fee matrices.', icon: 'school', color: 'indigo-4' },
   { id: 'retail', name: 'Retail & POS Stock Operations', desc: 'Provision physical point-of-sale checkout speeds, inventory matrices, depletion alerts, and customer invoices.', icon: 'point_of_sale', color: 'amber-4' },
-  { id: 'hospitality', name: 'Hospitality Room & Reserve System', desc: 'Provision booking schedules, occupancy matrices, guest details registry, and service catalog billings.', icon: 'king_bed', color: 'cyan-4' },
+  { id: 'hospitality', name: 'Service Provider Mode', desc: 'Manage tailor orders, dry cleaning drop-offs, salon appointments, and customized service catalog invoicing.', icon: 'dry_cleaning', color: 'cyan-4' },
   { id: 'logistics', name: 'Logistics Fleet & Dispatch Track', desc: 'Provision vehicle GPS pipelines, delivery analytics matrices, driver logs, and fuel ledgers.', icon: 'local_shipping', color: 'green-4' },
   { id: 'healthcare', name: 'Healthcare Clinic Patient Hub', desc: 'Provision pharmacy dispensers, appointment queues, patient charts, and clinician checklists.', icon: 'healing', color: 'red-4' }
 ])

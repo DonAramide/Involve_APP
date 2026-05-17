@@ -270,8 +270,8 @@ const industryNavigationTree = computed(() => {
     ]
   } else if (mode === 'hospitality') {
     return [
-      { label: 'Room Occupancy Matrix', path: '/tenant/hospitality/rooms', icon: 'king_bed', color: 'indigo-4', mode: 'HOTEL' },
-      { label: 'Reservations & Bookings', path: '/tenant/hospitality/bookings', icon: 'calendar_today', color: 'cyan-4', mode: 'HOTEL' },
+      { label: 'Service Order Matrix', path: '/tenant/hospitality/rooms', icon: 'dry_cleaning', color: 'indigo-4', mode: 'HOTEL' },
+      { label: 'Appointments & Bookings', path: '/tenant/hospitality/bookings', icon: 'calendar_today', color: 'cyan-4', mode: 'HOTEL' },
       { label: 'Service Catalog Invoicing', path: '/tenant/hospitality/billing', icon: 'receipt', color: 'green-4', mode: 'HOTEL' }
     ]
   } else if (mode === 'logistics') {

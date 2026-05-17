@@ -497,7 +497,7 @@ const form = ref({
 const industries = ref([
   { id: 'school', label: 'School & Academy', icon: 'school', desc: 'Tuition structures, curriculums, lesson notes database, class logs.' },
   { id: 'retail', label: 'Retail & POS Stock', icon: 'shopping_cart', desc: 'Point of sale checkout speeds, inventory, depletion alerts.' },
-  { id: 'hospitality', label: 'Hospitality Room', icon: 'hotel', desc: 'Booking calendars, room reserves, occupancy, billing logs.' }
+  { id: 'hospitality', label: 'Service Provider', icon: 'dry_cleaning', desc: 'Dry cleaners, tailors, salons, and all professionals rendering specialized services.' }
 ])
 
 const modulePresets = ref([
