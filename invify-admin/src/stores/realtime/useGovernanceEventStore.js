@@ -13,6 +13,7 @@ export const useGovernanceEventStore = defineStore('realtime_governance_events',
   const maxLimit = 150
   const pendingBuffer = ref([])
   const activeTenantScope = ref('global')
+  const quarantinedDevices = ref([])
 
   // Collect policy state events from shared Operational Event Bus
   operationalEventBusSingleton.on('POLICY_EVALUATION', (envelope) => {
@@ -21,6 +22,12 @@ export const useGovernanceEventStore = defineStore('realtime_governance_events',
 
   operationalEventBusSingleton.on('QUARANTINE_AUDIT', (envelope) => {
     pushToBuffer(envelope)
+    if (envelope.targetId) {
+      const exists = quarantinedDevices.value.some(d => d.targetId === envelope.targetId)
+      if (!exists) {
+        quarantinedDevices.value.push(envelope)
+      }
+    }
   })
 
   const pushToBuffer = (envelope) => {
@@ -54,12 +61,17 @@ export const useGovernanceEventStore = defineStore('realtime_governance_events',
   const clearStore = () => {
     policies.value = []
     pendingBuffer.value = []
+    quarantinedDevices.value = []
   }
 
   return {
     policies,
     activeTenantScope,
     activeQuarantineCount,
+    quarantineList: computed(() => quarantinedDevices.value),
+    releaseFromQuarantine: (targetId) => {
+      quarantinedDevices.value = quarantinedDevices.value.filter(d => d.targetId !== targetId)
+    },
     setTenantFilter,
     clearStore
   }
