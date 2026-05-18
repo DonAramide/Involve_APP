@@ -12,102 +12,108 @@ const STORAGE_KEY = 'invify_enterprise_operator_prefs'
  * 
  * FINAL REFINEMENT #2: Supports global active Tenant Context isolation state variables.
  */
-export function useOperatorPreferences() {
-  // Load preferences from local persistence layer as Phase 1 fallback cache
-  const loadStoredPrefs = () => {
-    const defaults = {
-      activeWorkspace: 'fleet',
-      activeTenantScope: 'global', // Multi-tenant isolation boundary identifier ('global' | 'tenant-xyz')
-      sidebarCollapsed: false,
-      isDarkMode: true, // Default to dark mode as requested
-      pinnedViews: ['/fleet/overview', '/governance/compliance', '/observability/streams'],
-      recentHistory: [],
-      lastSyncedAt: null
-    }
-
-    // FINAL REFINEMENT #6: Authoritative Session Restoration Rules
-    // Prevent unauthenticated or unverified multi-factor sessions from loading previous route traces
-    const hasToken = localStorage.getItem('invify_token')
-    const isMfaCleared = localStorage.getItem('mfa_status_verified') !== 'false'
-    
-    if (!hasToken || !isMfaCleared) {
-      return defaults
-    }
-
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        return {
-          ...defaults,
-          ...parsed,
-          activeTenantScope: parsed.activeTenantScope || 'global',
-          pinnedViews: Array.isArray(parsed.pinnedViews) ? parsed.pinnedViews : defaults.pinnedViews,
-          recentHistory: Array.isArray(parsed.recentHistory) ? parsed.recentHistory : defaults.recentHistory
-        }
-      }
-    } catch (e) {
-      console.warn('Unable to load stored operator preferences, loading absolute defaults.')
-    }
-    return defaults
+// Load preferences from local persistence layer as Phase 1 fallback cache
+const loadStoredPrefs = () => {
+  const defaults = {
+    activeWorkspace: 'fleet',
+    activeTenantScope: 'global', // Multi-tenant isolation boundary identifier ('global' | 'tenant-xyz')
+    sidebarCollapsed: false,
+    isDarkMode: true, // Default to dark mode as requested
+    pinnedViews: ['/fleet/overview', '/governance/compliance', '/observability/streams'],
+    recentHistory: [],
+    lastSyncedAt: null
   }
 
-  const prefs = ref(loadStoredPrefs())
-  const isSyncingBackend = ref(false)
-
-  // Serialize changes locally
-  const savePreferencesLocally = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs.value))
-    } catch (e) {
-      console.error('Failed to serialize operator preferences to storage cache:', e)
+  let parsed = {}
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      parsed = JSON.parse(raw)
     }
+  } catch (e) {
+    console.warn('Unable to load stored operator preferences, loading absolute defaults.')
   }
 
-  /**
-   * Placeholder interface enabling future continuous background state updates against remote operator profile schemas.
-   * Prevents local data drift when an operator accesses workflows across multiple independent clusters.
-   */
-  const syncPreferencesToBackend = async () => {
-    isSyncingBackend.value = true
-    try {
-      // In production: await axios.post('/api/v1/operators/profile/sync', prefs.value)
-      prefs.value.lastSyncedAt = new Date().toISOString()
-      savePreferencesLocally()
-    } catch (err) {
-      console.warn('Background operator preference profile sync deferred. Retaining local persistence layer.')
-    } finally {
-      isSyncingBackend.value = false
-    }
+  const merged = {
+    ...defaults,
+    ...parsed,
+    activeTenantScope: parsed.activeTenantScope || 'global',
+    pinnedViews: Array.isArray(parsed.pinnedViews) ? parsed.pinnedViews : defaults.pinnedViews,
+    recentHistory: Array.isArray(parsed.recentHistory) ? parsed.recentHistory : defaults.recentHistory
   }
 
-  /**
-   * Pull active profile matrices directly from cloud layers upon authenticated session boot cycles.
-   */
-  const fetchPreferencesFromBackend = async () => {
-    isSyncingBackend.value = true
-    try {
-      // In production: const { data } = await axios.get('/api/v1/operators/profile')
-      // Merge remote schemas safely over local cache
-    } catch (err) {
-      // Graceful degradation back to local copy
-    } finally {
-      isSyncingBackend.value = false
-    }
+  // FINAL REFINEMENT #6: Authoritative Session Restoration Rules
+  // Prevent unauthenticated or unverified multi-factor sessions from loading sensitive operational historical paths.
+  // Cosmetic details (isDarkMode, sidebarCollapsed) remain active globally to ensure guest comfort.
+  const hasToken = localStorage.getItem('invify_token')
+  const isMfaCleared = localStorage.getItem('mfa_status_verified') !== 'false'
+  
+  if (!hasToken || !isMfaCleared) {
+    merged.pinnedViews = defaults.pinnedViews
+    merged.recentHistory = defaults.recentHistory
   }
 
-  // Watcher orchestrating batched local serialization alongside throttled upstream profile diff syncing
-  let syncTimeout = null
-  watch(() => prefs.value, () => {
+  return merged
+}
+
+// Global Singletons sharing state seamlessly across all callers and multi-layout page transitions
+const prefs = ref(loadStoredPrefs())
+const isSyncingBackend = ref(false)
+
+// Serialize changes locally
+const savePreferencesLocally = () => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs.value))
+  } catch (e) {
+    console.error('Failed to serialize operator preferences to storage cache:', e)
+  }
+}
+
+/**
+ * Placeholder interface enabling future continuous background state updates against remote operator profile schemas.
+ * Prevents local data drift when an operator accesses workflows across multiple independent clusters.
+ */
+const syncPreferencesToBackend = async () => {
+  isSyncingBackend.value = true
+  try {
+    // In production: await axios.post('/api/v1/operators/profile/sync', prefs.value)
+    prefs.value.lastSyncedAt = new Date().toISOString()
     savePreferencesLocally()
-    
-    // Throttle remote syncing calls to prevent excessive backend hits
-    if (syncTimeout) clearTimeout(syncTimeout)
-    syncTimeout = setTimeout(() => {
-      syncPreferencesToBackend()
-    }, 5000)
-  }, { deep: true })
+  } catch (err) {
+    console.warn('Background operator preference profile sync deferred. Retaining local persistence layer.')
+  } finally {
+    isSyncingBackend.value = false
+  }
+}
 
+/**
+ * Pull active profile matrices directly from cloud layers upon authenticated session boot cycles.
+ */
+const fetchPreferencesFromBackend = async () => {
+  isSyncingBackend.value = true
+  try {
+    // In production: const { data } = await axios.get('/api/v1/operators/profile')
+    // Merge remote schemas safely over local cache
+  } catch (err) {
+    // Graceful degradation back to local copy
+  } finally {
+    isSyncingBackend.value = false
+  }
+}
+
+// Watcher orchestrating batched local serialization alongside throttled upstream profile diff syncing
+let syncTimeout = null
+watch(() => prefs.value, () => {
+  savePreferencesLocally()
+  
+  // Throttle remote syncing calls to prevent excessive backend hits
+  if (syncTimeout) clearTimeout(syncTimeout)
+  syncTimeout = setTimeout(() => {
+    syncPreferencesToBackend()
+  }, 5000)
+}, { deep: true })
+
+export function useOperatorPreferences() {
   const setActiveWorkspace = (workspaceId) => {
     prefs.value.activeWorkspace = workspaceId
   }

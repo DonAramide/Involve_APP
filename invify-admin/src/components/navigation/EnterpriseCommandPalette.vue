@@ -164,6 +164,19 @@ const rawItems = [
     keywords: ['onboard', 'provision', 'setup', 'branding', 'modules']
   },
   {
+    id: 'cmd-rev-gov',
+    label: 'Enterprise Revenue & Platform Billing Governance',
+    description: 'Global tariff splits, transactional margin controls, variable commissions, and live payout splits.',
+    route: '/admin/billing',
+    domain: 'governance',
+    icon: 'payments',
+    avatarBg: 'teal-10',
+    avatarColor: 'teal-2',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['billing', 'revenue', 'tariff', 'commission', 'fees', 'charges', 'splits', 'payout']
+  },
+  {
     id: 'cmd-1',
     label: 'Open Device Explorer Interface',
     description: 'Filter endpoint nodes inside the live Fleet telemetry engine',
@@ -227,6 +240,45 @@ const rawItems = [
     isCommand: true,
     permission: 'soc_analyst',
     keywords: ['alerts', 'logs', 'exceptions', 'failed']
+  },
+  {
+    id: 'cmd-staff-mgt',
+    label: 'Staff & Operator Management',
+    description: 'Manage and register platform operators, staff accounts, and assign tenant bounds.',
+    route: '/admin/users',
+    domain: 'governance',
+    icon: 'manage_accounts',
+    avatarBg: 'indigo-10',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'admin_deploy',
+    keywords: ['staff', 'operators', 'users', 'management', 'add', 'team', 'employees']
+  },
+  {
+    id: 'cmd-rbac-roles',
+    label: 'Roles & RBAC Privileges Governance',
+    description: 'Configure Role-Based Access Control matrices, permissions, and operational capabilities.',
+    route: '/governance/rbac-roles',
+    domain: 'governance',
+    icon: 'admin_panel_settings',
+    avatarBg: 'deep-orange-10',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_governance',
+    keywords: ['roles', 'rbac', 'permissions', 'privileges', 'capabilities', 'access', 'rights', 'controls', 'staff']
+  },
+  {
+    id: 'cmd-session-gov',
+    label: 'Operator Session Governance',
+    description: 'Track and govern active session tokens, elevation limits, and security lifecycles.',
+    route: '/governance/sessions',
+    domain: 'governance',
+    icon: 'security',
+    avatarBg: 'blue-grey-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_governance',
+    keywords: ['sessions', 'tokens', 'active', 'audit', 'login', 'logout', 'lifecycles', 'staff']
   },
   // UNAUTHORIZED COMMAND ACTION: Requires 'operator_root' scope which is omitted from active list
   {

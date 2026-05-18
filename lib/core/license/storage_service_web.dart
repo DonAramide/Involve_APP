@@ -11,6 +11,7 @@ class StorageService {
   static const _lastPrinterIpKey = 'last_printer_ip';
   static const _proExpiryKey = 'pro_plan_expiry';
   static const _deviceAccessKey = 'device_admin_access_granted';
+  static const _onboardingCompleteKey = 'onboarding_complete';
 
   static Future<void> saveLicense(String licenseData) async {
     await _secureStorage.write(key: _licenseKey, value: licenseData);
@@ -83,6 +84,15 @@ class StorageService {
 
   static Future<bool> isDeviceAccessGranted() async {
     final val = await _secureStorage.read(key: _deviceAccessKey);
+    return val == 'true';
+  }
+
+  static Future<void> setOnboardingCompleted(bool completed) async {
+    await _secureStorage.write(key: _onboardingCompleteKey, value: completed ? 'true' : 'false');
+  }
+
+  static Future<bool> isOnboardingCompleted() async {
+    final val = await _secureStorage.read(key: _onboardingCompleteKey);
     return val == 'true';
   }
 }

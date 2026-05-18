@@ -3,7 +3,7 @@
   <q-page class="bg-main text-main q-pa-md column op-gap-16">
     
     <!-- Workspace Subheader Strip -->
-    <div class="row items-center justify-between no-wrap border-bottom q-pb-sm">
+    <div class="row items-center justify-between no-wrap border-bottom q-pb-sm cursor-help">
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="policy" size="sm" color="blue-5" />
         <div>
@@ -11,6 +11,10 @@
           <div class="text-metric-mono text-muted" style="font-size: 10px;">INHERITANCE_SCOPES // AUDITABLE_DEPLOYMENTS</div>
         </div>
       </div>
+      <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 320px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+        <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Policy Orchestrator Cockpit</div>
+        Displays security compliance parameters, enforces hierarchical inheritance checks, and tests deployments using the live simulation sandbox.
+      </q-tooltip>
       
       <div class="row items-center op-gap-8 no-wrap">
         <q-btn 
@@ -21,7 +25,12 @@
           icon="science" 
           @click="simulationModeOpen = true" 
           class="q-px-sm text-weight-bold"
-        />
+        >
+          <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+            <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Simulation Sandbox Trigger</div>
+            Activates the safe isolated modeling environment to stress-test Canary configurations before real-time deployment.
+          </q-tooltip>
+        </q-btn>
       </div>
     </div>
 
@@ -32,12 +41,16 @@
       <div class="col-12 col-md-7 column op-gap-16">
         
         <div class="enterprise-panel bg-panel column fit">
-          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between cursor-help">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="collections_bookmark" size="xs" color="blue-5" />
               <span class="text-operator-title text-main text-weight-bold">Active Platform Blueprints</span>
             </div>
             <span class="text-metric-mono text-blue-5" style="font-size: 10px;">{{ activePoliciesList.length }} Versioned Buffers</span>
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 320px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Active Blueprints Matrix</div>
+              Manages versioned security policies active on physical POS terminals and mobile subfleets. Triggers audit remediation cycles or manual rollback actions.
+            </q-tooltip>
           </div>
 
           <div class="panel-body col q-pa-xs overflow-y-auto" style="max-height: 250px;">
@@ -45,8 +58,15 @@
               <q-item 
                 v-for="p in activePoliciesList" 
                 :key="p.id" 
-                class="q-px-sm q-py-xs bg-subpanel rounded-borders column op-gap-4 hover-row"
+                class="q-px-sm q-py-xs bg-subpanel rounded-borders column op-gap-4 hover-row cursor-help"
               >
+                <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                  <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Security Blueprint Details</div>
+                  <strong>Rule Name:</strong> {{ p.policyName }}<br/>
+                  <strong>Target Level:</strong> {{ p.inheritanceBehavior }}<br/>
+                  Hover on bottom actions to trigger targeted drift remediations or full rollbacks.
+                </q-tooltip>
+
                 <div class="row items-center justify-between fit no-wrap">
                   <div class="row items-center op-gap-8 no-wrap">
                     <span class="text-main text-weight-bold text-caption">{{ p.policyName }}</span>
@@ -65,8 +85,18 @@
                   <span>Inheritance Level: <span class="text-main">{{ p.inheritanceBehavior }}</span></span>
                   
                   <div class="row items-center op-gap-4">
-                    <q-btn dense flat size="xs" color="amber-5" label="Force Drift Remediation" @click="triggerDriftRemediation(p.id)" class="bg-subpanel q-px-xs text-metric-sm" />
-                    <q-btn dense flat size="xs" color="red-5" label="Trigger Rollback" @click="triggerRollbackEnvelope(p.id)" class="bg-red-focus q-px-xs text-metric-sm" />
+                    <q-btn dense flat size="xs" color="amber-5" label="Force Drift Remediation" @click.stop="triggerDriftRemediation(p.id)" class="bg-subpanel q-px-xs text-metric-sm">
+                      <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 260px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                        <div class="text-weight-bold text-amber-4 q-mb-xs font-mono" style="font-size: 10px;">DRIFT REMEDIATION ACTION</div>
+                        Sends an immediate high-priority configuration sync packet to realign nodes showing behavioral skew.
+                      </q-tooltip>
+                    </q-btn>
+                    <q-btn dense flat size="xs" color="red-5" label="Trigger Rollback" @click.stop="triggerRollbackEnvelope(p.id)" class="bg-red-focus q-px-xs text-metric-sm">
+                      <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 260px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                        <div class="text-weight-bold text-red-4 q-mb-xs font-mono" style="font-size: 10px;">BLUEPRINT ROLLBACK ACTION</div>
+                        Instantly dispatches an auditable downgrade command envelope, restoring nodes to the last verified safe state.
+                      </q-tooltip>
+                    </q-btn>
                   </div>
                 </div>
               </q-item>
@@ -80,12 +110,16 @@
       <div class="col-12 col-md-5 column op-gap-16">
         
         <div class="enterprise-panel bg-panel column fit">
-          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between cursor-help">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="account_tree" size="xs" color="amber-5" />
               <span class="text-operator-title text-main text-weight-bold">Multi-Tenant Scope Hierarchy</span>
             </div>
             <span class="text-metric-mono text-muted" style="font-size: 10px;">Inheritance View</span>
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 300px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Inheritance Topology</div>
+              Renders how parent rules propagate downward. Explains dynamic policy overrides, exceptions, and muted inheritance segments.
+            </q-tooltip>
           </div>
 
           <div class="panel-body col q-pa-sm column justify-between">
@@ -97,31 +131,47 @@
             <div class="column op-gap-4 q-pl-xs">
               
               <!-- Global Parent -->
-              <div class="row items-center op-gap-8 no-wrap text-caption text-main">
+              <div class="row items-center op-gap-8 no-wrap text-caption text-main cursor-help relative-position">
                 <q-icon name="public" size="xs" color="blue-5" />
                 <span class="text-weight-bold">Global Parent Blueprint</span>
                 <span class="text-metric-mono text-muted" style="font-size: 9px;">[v1.0 Baseline]</span>
+                <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                  <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Global Parent Blueprint</div>
+                  The foundational policy configuration rule enforced universally across all subfleets unless explicitly overridden.
+                </q-tooltip>
               </div>
 
               <!-- Scope Alpha -->
-              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs">
+              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs cursor-help">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
                 <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-alpha</span></span>
                 <q-chip dense size="xs" color="cyan-10" text-color="cyan-3" class="text-metric-sm">STRICT_INHERIT</q-chip>
+                <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                  <div class="text-weight-bold text-cyan-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Strict Inheritance Mode</div>
+                  Enforces global parent settings strictly on this tenant segment. Disallows local configuration deviations.
+                </q-tooltip>
               </div>
 
               <!-- Scope Omega -->
-              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs">
+              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs cursor-help">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
                 <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-omega</span></span>
                 <q-chip dense size="xs" color="amber-10" text-color="amber-3" class="text-metric-sm">CUSTOM_DRIFT</q-chip>
+                <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                  <div class="text-weight-bold text-amber-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Custom Drift Mode</div>
+                  Allows customized policy overrides for this tenant to permit specialized local merchant capabilities.
+                </q-tooltip>
               </div>
 
               <!-- Scope Beta -->
-              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs">
+              <div class="row items-center op-gap-8 no-wrap text-caption text-secondary border-left-tree q-pl-md q-ml-xs cursor-help">
                 <q-icon name="subdirectory_arrow_right" size="xs" color="grey-6" />
                 <span>Tenant Overrides: <span class="text-main text-weight-bold">tenant-beta</span></span>
                 <q-chip dense size="xs" color="grey-9" text-color="grey-4" class="text-metric-sm">MUTED_PARENT</q-chip>
+                <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                  <div class="text-weight-bold text-grey-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Muted Parent Mode</div>
+                  Temporarily suppresses all global blueprint sync packets. Prevents parent policies from reaching beta testbeds.
+                </q-tooltip>
               </div>
 
             </div>
@@ -137,9 +187,9 @@
 
     </div>
 
-    <!-- LOWER SECTION: FINAL REFINEMENT #2: Policy Simulation Mode Sandbox -->
+    <!-- LOWER SECTION: Policy Simulation Mode Sandbox -->
     <div class="enterprise-panel bg-panel column fit">
-      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
+      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between cursor-help">
         <div class="row items-center op-gap-4 no-wrap">
           <q-icon name="science" size="xs" color="blue-5" />
           <span class="text-operator-title text-main text-weight-bold">Pre-Deployment Policy Simulation Engine</span>
@@ -147,6 +197,10 @@
         <q-badge color="cyan-10" text-color="cyan-3" class="text-weight-bold">
           SANDBOX ACTIVE
         </q-badge>
+        <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 320px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+          <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Simulation Engine Panel</div>
+          Sandbox modeler used to simulate targeted subfleet depth, Canary restraints, and rollback safeguards to calculate conflict metrics before live push cycles.
+        </q-tooltip>
       </div>
 
       <div class="panel-body q-pa-md column op-gap-16">
@@ -156,7 +210,7 @@
 
         <!-- Simulation Interactive Parameter Controls -->
         <div class="row items-center op-gap-16">
-          <div class="col-12 col-md-4 column op-gap-4">
+          <div class="col-12 col-md-4 column op-gap-4 cursor-help">
             <span class="text-caption text-muted" style="font-size: 11px;">Target Scope Depth</span>
             <q-select
               v-model="simTargetScope"
@@ -167,9 +221,13 @@
               options-dense
               class="bg-subpanel text-caption"
             />
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Target Scope Selector</div>
+              Sets the specific organizational segment or subfleet range which will be evaluated in this sandbox session.
+            </q-tooltip>
           </div>
 
-          <div class="col-12 col-md-4 column op-gap-4">
+          <div class="col-12 col-md-4 column op-gap-4 cursor-help">
             <span class="text-caption text-muted" style="font-size: 11px;">Enforcement Restraint</span>
             <q-select
               v-model="simRestraintLevel"
@@ -180,9 +238,13 @@
               options-dense
               class="bg-subpanel text-caption"
             />
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Enforcement Restraint Mode</div>
+              Defines deployment pacing. STRICT_IMMEDIATE applies rules instantly. STAGED_CANARY tests a safe subset first. PERMISSIVE logs violations.
+            </q-tooltip>
           </div>
 
-          <div class="col-12 col-md-4 column op-gap-4">
+          <div class="col-12 col-md-4 column op-gap-4 cursor-help">
             <span class="text-caption text-muted" style="font-size: 11px;">Rollback Safeguard Threshold</span>
             <q-slider
               v-model="simRollbackThreshold"
@@ -195,41 +257,65 @@
               label-always
               class="q-mt-xs"
             />
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Rollback Trigger Threshold</div>
+              Specifies the fault tolerance level. Higher scores permit minor device errors. Lower scores trigger instant rollback safeguards on minor errors.
+            </q-tooltip>
           </div>
         </div>
 
         <!-- LIVE PREDICTIVE ESTIMATES OUTPUT STRIP -->
         <div class="row items-center justify-between bg-subpanel q-pa-md rounded-borders border-main text-center">
           
-          <div class="column items-center">
+          <div class="column items-center cursor-help">
             <span class="text-metric-mono text-blue-5 text-weight-bold" style="font-size: 20px;">{{ simulationEstimates.affectedTenants }}</span>
             <span class="text-caption text-muted" style="font-size: 11px;">Affected Tenants</span>
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-blue-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Projected Tenants Scope</div>
+              Calculated total distinct administrative merchant networks which fall within this scope boundary.
+            </q-tooltip>
           </div>
 
-          <div class="column items-center border-left q-pl-md">
+          <div class="column items-center border-left q-pl-md cursor-help">
             <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ simulationEstimates.impactedDevices.toLocaleString() }}</span>
             <span class="text-caption text-muted" style="font-size: 11px;">Impacted Nodes</span>
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Projected Nodes Count</div>
+              Calculated total hardware terminals, POS workstations, and operating registers immediately subject to this rule.
+            </q-tooltip>
           </div>
 
-          <div class="column items-center border-left q-pl-md">
+          <div class="column items-center border-left q-pl-md cursor-help">
             <span class="text-metric-mono text-weight-bold" :class="simulationEstimates.rolloutRisk > 60 ? 'text-amber-5' : 'text-green-5'" style="font-size: 20px;">
               {{ simulationEstimates.rolloutRisk }}%
             </span>
             <span class="text-caption text-muted" style="font-size: 11px;">Rollout Risk Index</span>
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-amber-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Predictive Risk Assessment</div>
+              Simulated failure probability calculation, factoring in Target Scope breadth and Canary restraints in real time.
+            </q-tooltip>
           </div>
 
-          <div class="column items-center border-left q-pl-md">
+          <div class="column items-center border-left q-pl-md cursor-help">
             <span class="text-metric-mono text-weight-bold" :class="simulationEstimates.rollbackDifficulty === 'SEVERE' ? 'text-red-5' : 'text-blue-5'" style="font-size: 20px;">
               {{ simulationEstimates.rollbackDifficulty }}
             </span>
             <span class="text-caption text-muted" style="font-size: 11px;">Rollback Difficulty</span>
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-blue-4 q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Recovery Effort analysis</div>
+              Estimates the network/physical coordination workload needed to roll back configurations if devices drop offline.
+            </q-tooltip>
           </div>
 
-          <div class="column items-center border-left q-pl-md">
+          <div class="column items-center border-left q-pl-md cursor-help">
             <q-chip dense size="xs" :color="simulationEstimates.conflictsDetected ? 'red-10' : 'green-10'" :text-color="simulationEstimates.conflictsDetected ? 'red-2' : 'green-3'" class="text-metric-sm">
               {{ simulationEstimates.conflictsDetected ? 'CONFLICTS DETECTED' : 'SCOPES CLEAR' }}
             </q-chip>
             <span class="text-caption text-muted q-mt-xs" style="font-size: 10px;">Inheritance Checks</span>
+            <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+              <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Inheritance Overlap Check</div>
+              Verifies if any conflicting property overrides already exist in lower tenant layers for these specific security variables.
+            </q-tooltip>
           </div>
 
         </div>
@@ -241,7 +327,11 @@
           </span>
 
           <div class="row items-center op-gap-8">
-            <q-btn dense flat size="sm" color="grey-5" label="Reset Profiler" @click="resetSimulation" />
+            <q-btn dense flat size="sm" color="grey-5" label="Reset Profiler" @click="resetSimulation">
+              <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 240px; font-size: 11px; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                Resets all sandbox inputs back to standard baseline parameters.
+              </q-tooltip>
+            </q-btn>
             <q-btn 
               dense 
               size="sm" 
@@ -249,7 +339,12 @@
               label="Commit Simulated Blueprint Upstream" 
               @click="publishSimulatedBlueprint" 
               class="q-px-sm text-weight-bold"
-            />
+            >
+              <q-tooltip class="enterprise-panel bg-panel text-main q-pa-md border-main shadow-24" style="max-width: 280px; font-size: 11px; line-height: 1.4; border: 1px solid var(--enterprise-border); border-radius: 6px;">
+                <div class="text-weight-bold text-accent q-mb-xs font-mono" style="font-size: 10px; letter-spacing: 0.5px; text-transform: uppercase;">Publish Upstream Action</div>
+                Signs, logs, and immediately commits sandbox results upstream to all matching live production nodes.
+              </q-tooltip>
+            </q-btn>
           </div>
         </div>
 

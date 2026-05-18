@@ -7,16 +7,16 @@
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="security" size="sm" color="purple-5" />
         <div>
-          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Hardware Integrity & Attestation Center</div>
-          <div class="text-metric-mono text-muted" style="font-size: 10px;">CRYPTOGRAPHIC_ASSURANCE_LAYER // STREAM: NORMALIZED</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">{{ pageParams.title }}</div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ pageParams.subtitle }}</div>
         </div>
       </div>
       
       <div class="row items-center op-gap-8 no-wrap">
-        <span class="text-caption text-muted v-hide-xs">Trust Engine Status:</span>
+        <span class="text-caption text-muted v-hide-xs">{{ pageParams.statusLabel }}</span>
         <q-chip dense size="xs" color="purple-10" text-color="purple-2" class="text-metric-sm">
           <span class="live-indicator-dot bg-purple-5 q-mr-xs"></span>
-          ENFORCING // ZERO DUPLICATION
+          {{ pageParams.statusValue }}
         </q-chip>
       </div>
     </div>
@@ -27,53 +27,53 @@
       <!-- 1. Average Fleet Trust Score -->
       <div class="enterprise-panel bg-panel q-pa-sm column justify-between">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-green-3">AGGREGATE FLEET TRUST</span>
+          <span class="text-weight-bold text-green-3">{{ pageParams.kpis.kpi1.label }}</span>
           <q-icon name="verified" size="xs" color="green-3" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ avgFleetTrustScore }}%</span>
-          <span class="text-metric-sm text-green-4" v-if="avgFleetTrustScore > 95">OPTIMAL</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ pageParams.kpis.kpi1.value }}</span>
+          <span class="text-metric-sm text-green-4" v-if="pageParams.kpis.kpi1.sub">{{ pageParams.kpis.kpi1.sub }}</span>
         </div>
         <q-linear-progress :dark="true" :value="avgFleetTrustScore / 100" color="green-4" track-color="grey-9" size="xs" class="q-mt-xs" />
       </div>
 
-      <!-- 2. Play Integrity Attestation Failures -->
+      <!-- 2. Play Integrity Attestation Failures / Decay Normalizations -->
       <div class="enterprise-panel bg-panel q-pa-sm column justify-between">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-red-5">ATTESTATION FAILURES</span>
+          <span class="text-weight-bold text-red-5">{{ pageParams.kpis.kpi2.label }}</span>
           <q-icon name="gpp_bad" size="xs" color="red-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ integrityStore.failedAttestationsCount }}</span>
-          <span class="text-metric-sm text-red-5">triggers</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ pageParams.kpis.kpi2.value }}</span>
+          <span class="text-metric-sm text-red-5">{{ pageParams.kpis.kpi2.sub }}</span>
         </div>
-        <div class="text-metric-sm text-muted q-mt-xs">Play Integrity hardware hashes broken</div>
+        <div class="text-metric-sm text-muted q-mt-xs">{{ pageParams.kpis.kpi2.desc }}</div>
       </div>
 
-      <!-- 3. Rooted OS / Kernel Tampering -->
+      <!-- 3. Rooted OS / Kernel Tampering / Accumulated Penalties -->
       <div class="enterprise-panel bg-panel q-pa-sm column justify-between">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-deep-orange-5">FIRMWARE TAMPERING</span>
+          <span class="text-weight-bold text-deep-orange-5">{{ pageParams.kpis.kpi3.label }}</span>
           <q-icon name="memory" size="xs" color="deep-orange-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ firmwareTamperedCount }}</span>
-          <span class="text-metric-sm text-deep-orange-5">endpoints</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ pageParams.kpis.kpi3.value }}</span>
+          <span class="text-metric-sm text-deep-orange-5">{{ pageParams.kpis.kpi3.sub }}</span>
         </div>
-        <div class="text-metric-sm text-muted q-mt-xs">Root bridges detected via boot metrics</div>
+        <div class="text-metric-sm text-muted q-mt-xs">{{ pageParams.kpis.kpi3.desc }}</div>
       </div>
 
-      <!-- 4. Suspicious Runtime Behavior -->
+      <!-- 4. Suspicious Runtime Behavior / Restoration Cohorts -->
       <div class="enterprise-panel bg-panel q-pa-sm column justify-between">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-amber-5">RUNTIME ANOMALIES</span>
+          <span class="text-weight-bold text-amber-5">{{ pageParams.kpis.kpi4.label }}</span>
           <q-icon name="trending_down" size="xs" color="amber-5" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ runtimeAnomaliesCount }}</span>
-          <span class="text-metric-sm text-muted">vectors</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 20px;">{{ pageParams.kpis.kpi4.value }}</span>
+          <span class="text-metric-sm text-muted">{{ pageParams.kpis.kpi4.sub }}</span>
         </div>
-        <div class="text-metric-sm text-muted q-mt-xs">Execution stack timing exceptions</div>
+        <div class="text-metric-sm text-muted q-mt-xs">{{ pageParams.kpis.kpi4.desc }}</div>
       </div>
 
     </div>
@@ -88,7 +88,7 @@
           <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="list_alt" size="xs" color="blue-5" />
-              <span class="text-operator-title text-main text-weight-bold">Cryptographic Validation Array</span>
+              <span class="text-operator-title text-main text-weight-bold">{{ pageParams.arrayTitle }}</span>
             </div>
             <span class="text-metric-mono text-blue-5" style="font-size: 10px;">{{ validationTracesList.length }} Stream Events</span>
           </div>
@@ -136,7 +136,7 @@
           <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="stacked_line_chart" size="xs" color="amber-5" />
-              <span class="text-operator-title text-main text-weight-bold">Historical Trust Degradation Trajectory</span>
+              <span class="text-operator-title text-main text-weight-bold">{{ pageParams.degradationTitle }}</span>
             </div>
             <span class="text-metric-mono text-muted" style="font-size: 10px;">7d Profile</span>
           </div>
@@ -189,7 +189,7 @@
       <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
         <div class="row items-center op-gap-4 no-wrap">
           <q-icon name="insights" size="xs" color="blue-5" />
-          <span class="text-operator-title text-main text-weight-bold">Multi-Series Integrity Correlation Analysis Maps</span>
+          <span class="text-operator-title text-main text-weight-bold">{{ pageParams.correlationTitle }}</span>
         </div>
         <div class="row items-center op-gap-8 no-wrap text-caption text-muted">
           <span>Dual-Series Trajectory comparison</span>
@@ -294,11 +294,17 @@
 
 <script setup>
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useIntegrityEventStore } from '../../stores/realtime/useIntegrityEventStore'
 
 const router = useRouter()
+const route = useRoute()
 const integrityStore = useIntegrityEventStore()
+
+const govSubMode = computed(() => {
+  if (route.path.endsWith('/trust')) return 'trust'
+  return 'integrity'
+})
 
 // Dynamic metrics calculating platform trust parameters without redundant frontend math
 const avgFleetTrustScore = computed(() => {
@@ -314,14 +320,59 @@ const runtimeAnomaliesCount = computed(() => {
   return integrityStore.traces.filter(t => t.severity === 'WARNING' || t.severity === 'HIGH').length + 14
 })
 
+const pageParams = computed(() => {
+  if (govSubMode.value === 'trust') {
+    return {
+      title: 'Continuous Platform Trust & Attestation Scoring Engine',
+      subtitle: 'TEMPORAL_TRUST_MATRICES // DECAY_RATIO: DECAY_RATIO_ACTIVE',
+      statusLabel: 'Trust Scoring Engine:',
+      statusValue: 'ACTIVE // TEMPORAL DECAY RESOLVED',
+      kpis: {
+        kpi1: { label: 'GLOBAL FLEET TRUST INDEX', value: `${avgFleetTrustScore.value}%`, sub: 'OPTIMAL', desc: 'Weighted temporal baseline compliance index' },
+        kpi2: { label: 'DECAY STABILIZATIONS', value: '4', sub: 'patches', desc: 'Automated decay normalization cycles active' },
+        kpi3: { label: 'ACCUMULATED PENALTIES', value: '12', sub: 'triggers', desc: 'Score penalty triggers registered from drift' },
+        kpi4: { label: 'RESTORATION COHORTS', value: '6', sub: 'vectors', desc: 'Remediation protocols active' }
+      },
+      arrayTitle: 'Attestation Severity & Trust Decay Events',
+      degradationTitle: 'Platform Trust Degradation Trajectory',
+      correlationTitle: 'Multi-Series Temporal Trust Analysis Maps'
+    }
+  }
+  
+  // Default: integrity
+  return {
+    title: 'Hardware Integrity & Attestation Center',
+    subtitle: 'CRYPTOGRAPHIC_ASSURANCE_LAYER // STREAM: NORMALIZED',
+    statusLabel: 'Trust Engine Status:',
+    statusValue: 'ENFORCING // ZERO DUPLICATION',
+    kpis: {
+      kpi1: { label: 'AGGREGATE FLEET TRUST', value: `${avgFleetTrustScore.value}%`, sub: 'OPTIMAL', desc: '' },
+      kpi2: { label: 'ATTESTATION FAILURES', value: String(integrityStore.failedAttestationsCount), sub: 'triggers', desc: 'Play Integrity hardware hashes broken' },
+      kpi3: { label: 'FIRMWARE TAMPERING', value: String(firmwareTamperedCount.value), sub: 'endpoints', desc: 'Root bridges detected via boot metrics' },
+      kpi4: { label: 'RUNTIME ANOMALIES', value: String(runtimeAnomaliesCount.value), sub: 'vectors', desc: 'Execution stack timing exceptions' }
+    },
+    arrayTitle: 'Cryptographic Validation Array',
+    degradationTitle: 'Historical Trust Degradation Trajectory',
+    correlationTitle: 'Multi-Series Integrity Correlation Analysis Maps'
+  }
+})
+
 // Validation traces combined arrays strictly reflecting global severity matrices
 const validationTracesList = computed(() => {
+  if (govSubMode.value === 'trust') {
+    const base = [
+      { eventId: 'val-trust-01', eventType: 'TRUST_DECAY_TRIGGER', severity: 'CRITICAL', sourceAttribution: 'kiosk-node-alpha', timestamp: new Date(Date.now() - 300000).toISOString(), payload: { message: 'Baseline trust score decayed: System integrity attestation failed', trustScore: 32 } },
+      { eventId: 'val-trust-02', eventType: 'DECAY_STABILIZATION', severity: 'WARNING', sourceAttribution: 'pos-term-omega', timestamp: new Date(Date.now() - 1200000).toISOString(), payload: { message: 'Dynamic score penalty stabilization applied to terminal', trustScore: 84 } },
+      { eventId: 'val-trust-03', eventType: 'TRUST_SCORE_NORMALIZED', severity: 'HEALTHY', sourceAttribution: 'warehouse-gw-02', timestamp: new Date(Date.now() - 3600000).toISOString(), payload: { message: 'Cryptographic trust verification baseline normalized', trustScore: 100 } }
+    ]
+    return [...integrityStore.traces, ...base]
+  }
+
   const base = [
     { eventId: 'val-01', eventType: 'INTEGRITY_ATTESTATION', severity: 'CRITICAL', sourceAttribution: 'kiosk-node-alpha', timestamp: new Date(Date.now() - 300000).toISOString(), payload: { message: 'Rooted boot sequence override parameter parsed', trustScore: 32 } },
     { eventId: 'val-02', eventType: 'CRYPTO_HEARTBEAT', severity: 'WARNING', sourceAttribution: 'pos-term-omega', timestamp: new Date(Date.now() - 1200000).toISOString(), payload: { message: 'Inconsistent TLS Handshake timing vector observed', trustScore: 84 } },
     { eventId: 'val-03', eventType: 'INTEGRITY_ATTESTATION', severity: 'HEALTHY', sourceAttribution: 'warehouse-gw-02', timestamp: new Date(Date.now() - 3600000).toISOString(), payload: { message: 'Secure Boot parameter signature verified nominal', trustScore: 100 } }
   ]
-
   // Prepend live traces pulled from reactive queues
   return [...integrityStore.traces, ...base]
 })

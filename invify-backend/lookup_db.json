@@ -1,0 +1,39 @@
+{
+  "gateways": [
+    {
+      "id": "stripe",
+      "label": "Stripe Global",
+      "icon": "credit_card"
+    },
+    {
+      "id": "paystack",
+      "label": "Paystack Africa",
+      "icon": "account_balance"
+    },
+    {
+      "id": "flutterwave",
+      "label": "Flutterwave Web",
+      "icon": "payments"
+    }
+  ],
+  "industries": [
+    {
+      "id": "school",
+      "label": "School & Academy",
+      "icon": "school",
+      "desc": "Tuition structures, curriculums, lesson notes database, class logs."
+    },
+    {
+      "id": "retail",
+      "label": "Retail & POS Stock",
+      "icon": "shopping_cart",
+      "desc": "Point of sale checkout speeds, inventory, depletion alerts."
+    },
+    {
+      "id": "hospitality",
+      "label": "Service Provider",
+      "icon": "dry_cleaning",
+      "desc": "Dry cleaners, tailors, salons, and all professionals rendering specialized services."
+    }
+  ]
+}

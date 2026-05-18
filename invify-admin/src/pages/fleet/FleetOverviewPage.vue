@@ -99,6 +99,7 @@
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="radar" size="xs" color="blue-5" />
               <span class="text-operator-title text-main text-weight-bold">Fleet Presence Stream</span>
+              <enterprise-context-hint registry-key="fleet-presence" />
               <span class="text-metric-mono text-muted" style="font-size: 10px;">(State Aging Applied)</span>
             </div>
             <q-badge color="blue-grey-9" text-color="blue-5" class="text-metric-sm">
@@ -196,6 +197,7 @@
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="system_update_alt" size="xs" color="amber-5" />
               <span class="text-operator-title text-main text-weight-bold">Rollout Activity Timeline</span>
+              <enterprise-context-hint registry-key="canary-rollout" />
             </div>
             <span class="text-metric-mono text-muted" style="font-size: 10px;">OTA Deployments</span>
           </div>
@@ -322,6 +324,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFleetEventStore } from '../../stores/realtime/useFleetEventStore'
+import EnterpriseContextHint from '../../components/contextual/EnterpriseContextHint.vue'
 import { useIncidentEventStore } from '../../stores/realtime/useIncidentEventStore'
 import { useRolloutEventStore } from '../../stores/realtime/useRolloutEventStore'
 import { useGovernanceEventStore } from '../../stores/realtime/useGovernanceEventStore'

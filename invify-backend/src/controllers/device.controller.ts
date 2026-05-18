@@ -91,6 +91,23 @@ export class DeviceController {
     );
   }
 
+  private static getTenantName(tenantId: string): { name: string; plan: string } {
+    try {
+      const tenantsDbPath = path.join(process.cwd(), 'tenants_db.json');
+      if (fs.existsSync(tenantsDbPath)) {
+        const tenants = JSON.parse(fs.readFileSync(tenantsDbPath, 'utf-8'));
+        const found = tenants.find((t: any) => t.id === tenantId);
+        if (found) {
+          return { name: found.name, plan: found.plan || 'standard' };
+        }
+      }
+    } catch (_) {}
+    return { 
+      name: tenantId === '00000000-0000-0000-0000-000000000001' ? 'Lagos Academy School' : 'Invify Retail Business',
+      plan: 'standard'
+    };
+  }
+
   /**
    * GET /devices
    * Retrieves all hardware devices
@@ -179,7 +196,8 @@ export class DeviceController {
         const local = DeviceController.getLocalData();
         
         // Try to lookup mock tenant name
-        const tenantName = tenantId === '00000000-0000-0000-0000-000000000001' ? 'Lagos Academy School' : 'Invify Retail Business';
+        const tenantInfo = DeviceController.getTenantName(tenantId);
+        const creatorEmail = (req as any).user?.email || 'superadmin@invify.app';
         
         const newAct: MockActivation = {
           id: `act-${Date.now()}`,
@@ -192,16 +210,21 @@ export class DeviceController {
           status: 'pending',
           is_used: false,
           created_at: new Date().toISOString(),
-          tenants: { name: tenantName, plan: 'standard' }
+          created_by: creatorEmail,
+          tenants: tenantInfo
         };
 
         local.activations.unshift(newAct);
         DeviceController.saveLocalData(local);
 
-        return res.status(201).json({ activation_code: code });
+        return res.status(201).json({ 
+          activation_code: code,
+          device_id: generatedDeviceId
+        });
       }
 
       try {
+        const creatorEmail = (req as any).user?.email || 'superadmin@invify.app';
         const { data, error } = await supabase
           .from('device_activations')
           .insert({
@@ -212,20 +235,25 @@ export class DeviceController {
             device_suffix: deviceSuffix || '0',
             device_id: generatedDeviceId,
             is_used: false,
-            status: 'pending'
+            status: 'pending',
+            created_by: creatorEmail
           })
           .select()
           .single();
 
         if (error) throw error;
-        return res.status(201).json({ activation_code: data.activation_code });
+        return res.status(201).json({ 
+          activation_code: data.activation_code,
+          device_id: data.device_id
+        });
       } catch (dbErr: any) {
         if (DeviceController.isNetworkTimeout(dbErr)) {
           console.warn('[DeviceController] Supabase timeout. Saving activation locally.');
           const local = DeviceController.getLocalData();
           
           // Try to lookup mock tenant name
-          const tenantName = tenantId === '00000000-0000-0000-0000-000000000001' ? 'Lagos Academy School' : 'Invify Retail Business';
+          const tenantInfo = DeviceController.getTenantName(tenantId);
+          const creatorEmail = (req as any).user?.email || 'superadmin@invify.app';
           
           const newAct: MockActivation = {
             id: `act-${Date.now()}`,
@@ -238,13 +266,17 @@ export class DeviceController {
             status: 'pending',
             is_used: false,
             created_at: new Date().toISOString(),
-            tenants: { name: tenantName, plan: 'standard' }
+            created_by: creatorEmail,
+            tenants: tenantInfo
           };
 
           local.activations.unshift(newAct);
           DeviceController.saveLocalData(local);
 
-          return res.status(201).json({ activation_code: code });
+          return res.status(201).json({ 
+            activation_code: code,
+            device_id: generatedDeviceId
+          });
         }
         throw dbErr;
       }
@@ -410,6 +442,55 @@ export class DeviceController {
       }
     } catch (error: any) {
       console.error('[DeviceController] updateDevice Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /devices/onboard
+   * Register first time onboarding from mobile client with full device diagnostics
+   */
+  static async onboardDevice(req: Request, res: Response) {
+    try {
+      const { businessName, phone, industry, themeColor, deviceInfo } = req.body;
+      console.log('[DeviceController] Received Device Onboarding Payload:', {
+        businessName,
+        phone,
+        industry,
+        themeColor,
+        deviceInfo
+      });
+
+      // Save in offline mock database
+      const local = DeviceController.getLocalData();
+      const existingIdx = local.devices.findIndex((d: any) => d.device_id === (deviceInfo?.deviceId || 'unknown'));
+      
+      const onboardedRecord = {
+        id: existingIdx >= 0 ? local.devices[existingIdx].id : `dev-${Date.now()}`,
+        device_id: deviceInfo?.deviceId || 'unknown',
+        device_suffix: deviceInfo?.deviceSuffix || 'XXXXXX',
+        tenant_id: '00000000-0000-0000-0000-000000000001',
+        status: 'active',
+        business_name: businessName,
+        phone: phone,
+        industry: industry,
+        theme_color: themeColor,
+        device_info: deviceInfo,
+        last_seen: new Date().toISOString(),
+        created_at: existingIdx >= 0 ? local.devices[existingIdx].created_at : new Date().toISOString(),
+        tenants: { name: businessName, plan: 'standard' }
+      };
+
+      if (existingIdx >= 0) {
+        local.devices[existingIdx] = onboardedRecord;
+      } else {
+        local.devices.unshift(onboardedRecord);
+      }
+
+      DeviceController.saveLocalData(local);
+      return res.status(200).json({ success: true, message: 'Device onboarded and registered successfully', record: onboardedRecord });
+    } catch (error: any) {
+      console.error('[DeviceController] onboardDevice Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }

@@ -7,8 +7,11 @@
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="fact_check" size="sm" color="green-4" />
         <div>
-          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Fleet Compliance Intelligence Center</div>
-          <div class="text-metric-mono text-muted" style="font-size: 10px;">PROGRESSIVE_STATE_ENGINE // ZERO_FRONTEND_DUPLICATION</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">
+            {{ pageParams.title }}
+            <enterprise-context-hint registry-key="policy-governance" />
+          </div>
+          <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ pageParams.subtitle }}</div>
         </div>
       </div>
       
@@ -34,69 +37,69 @@
     <!-- Incorporating FINAL REFINEMENT #1: Progressive Compliance States -->
     <div class="grid-states op-gap-8">
       
-      <!-- 1. HEALTHY -->
-      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-healthy">
+      <!-- 1. HEALTHY / SYNCED CONFIGS -->
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between" :class="pageParams.states.kpi1.borderClass">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-green-4">HEALTHY</span>
-          <q-icon name="check_circle" size="xs" color="green-4" />
+          <span class="text-weight-bold" :class="pageParams.states.kpi1.colorClass">{{ pageParams.states.kpi1.label }}</span>
+          <q-icon :name="pageParams.states.kpi1.icon" size="xs" :color="pageParams.states.kpi1.colorClass.replace('text-', '')" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.healthy }}</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ pageParams.states.kpi1.value }}</span>
           <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-muted q-mt-xs">Nominal secure boot signatures</div>
+        <div class="text-metric-sm text-muted q-mt-xs">{{ pageParams.states.kpi1.sub }}</div>
       </div>
 
-      <!-- 2. WARNING -->
-      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-warning">
+      <!-- 2. WARNING / MINOR DRIFT -->
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between" :class="pageParams.states.kpi2.borderClass">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-amber-5">WARNING</span>
-          <q-icon name="warning_amber" size="xs" color="amber-5" />
+          <span class="text-weight-bold" :class="pageParams.states.kpi2.colorClass">{{ pageParams.states.kpi2.label }}</span>
+          <q-icon :name="pageParams.states.kpi2.icon" size="xs" :color="pageParams.states.kpi2.colorClass.replace('text-', '')" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.warning }}</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ pageParams.states.kpi2.value }}</span>
           <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-amber-5 q-mt-xs">Minor config drift detected</div>
+        <div class="text-metric-sm q-mt-xs" :class="pageParams.states.kpi2.colorClass">{{ pageParams.states.kpi2.sub }}</div>
       </div>
 
-      <!-- 3. DEGRADED -->
-      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-degraded">
+      <!-- 3. DEGRADED / MODERATE DRIFT -->
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between" :class="pageParams.states.kpi3.borderClass">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-deep-orange-5">DEGRADED</span>
-          <q-icon name="trending_down" size="xs" color="deep-orange-5" />
+          <span class="text-weight-bold" :class="pageParams.states.kpi3.colorClass">{{ pageParams.states.kpi3.label }}</span>
+          <q-icon :name="pageParams.states.kpi3.icon" size="xs" :color="pageParams.states.kpi3.colorClass.replace('text-', '')" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.degraded }}</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ pageParams.states.kpi3.value }}</span>
           <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-deep-orange-5 q-mt-xs">Repeating operational violations</div>
+        <div class="text-metric-sm q-mt-xs" :class="pageParams.states.kpi3.colorClass">{{ pageParams.states.kpi3.sub }}</div>
       </div>
 
-      <!-- 4. NON_COMPLIANT -->
-      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-noncompliant">
+      <!-- 4. NON_COMPLIANT / CRITICAL DRIFT -->
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between" :class="pageParams.states.kpi4.borderClass">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-red-5">NON_COMPLIANT</span>
-          <q-icon name="gpp_bad" size="xs" color="red-5" />
+          <span class="text-weight-bold" :class="pageParams.states.kpi4.colorClass">{{ pageParams.states.kpi4.label }}</span>
+          <q-icon :name="pageParams.states.kpi4.icon" size="xs" :color="pageParams.states.kpi4.colorClass.replace('text-', '')" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.nonCompliant }}</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ pageParams.states.kpi4.value }}</span>
           <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-red-5 q-mt-xs">Attestation trust metrics failed</div>
+        <div class="text-metric-sm q-mt-xs" :class="pageParams.states.kpi4.colorClass">{{ pageParams.states.kpi4.sub }}</div>
       </div>
 
-      <!-- 5. CRITICAL -->
-      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between border-top-critical">
+      <!-- 5. CRITICAL / REMEDIATED -->
+      <div class="state-card bg-panel border-main rounded-borders q-pa-sm column justify-between" :class="pageParams.states.kpi5.borderClass">
         <div class="row items-center justify-between text-caption text-muted">
-          <span class="text-weight-bold text-purple-4">CRITICAL</span>
-          <q-icon name="security" size="xs" color="purple-4" />
+          <span class="text-weight-bold" :class="pageParams.states.kpi5.colorClass">{{ pageParams.states.kpi5.label }}</span>
+          <q-icon :name="pageParams.states.kpi5.icon" size="xs" :color="pageParams.states.kpi5.colorClass.replace('text-', '')" />
         </div>
         <div class="row items-baseline op-gap-4 q-mt-xs">
-          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ stateCounts.critical }}</span>
+          <span class="text-metric-mono text-main text-weight-bold" style="font-size: 18px;">{{ pageParams.states.kpi5.value }}</span>
           <span class="text-metric-sm text-muted">nodes</span>
         </div>
-        <div class="text-metric-sm text-purple-3 q-mt-xs">Active SOC quarantine lock applied</div>
+        <div class="text-metric-sm q-mt-xs" :class="pageParams.states.kpi5.colorClass">{{ pageParams.states.kpi5.sub }}</div>
       </div>
 
     </div>
@@ -112,7 +115,7 @@
           <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="corporate_fare" size="xs" color="blue-5" />
-              <span class="text-operator-title text-main text-weight-bold">Tenant Compliance Performance Matrix</span>
+              <span class="text-operator-title text-main text-weight-bold">{{ pageParams.matrixTitle }}</span>
             </div>
             <span class="text-metric-mono text-muted" style="font-size: 10px;">SORTED_STABILITY_INDEX</span>
           </div>
@@ -161,7 +164,8 @@
           <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="timeline" size="xs" color="amber-5" />
-              <span class="text-operator-title text-main text-weight-bold">Multi-Tenant Policy Drift Analysis</span>
+              <span class="text-operator-title text-main text-weight-bold">{{ pageParams.driftTitle }}</span>
+              <enterprise-context-hint registry-key="compliance-drift" />
             </div>
             <span class="text-metric-mono text-amber-5" style="font-size: 10px;">{{ driftAnalysisRecords.length }} Active Configuration Overrides</span>
           </div>
@@ -206,7 +210,7 @@
           <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="repeat" size="xs" color="deep-orange-5" />
-              <span class="text-operator-title text-main text-weight-bold">Recurring Infraction Tracker</span>
+              <span class="text-operator-title text-main text-weight-bold">{{ pageParams.infractionTitle }}</span>
             </div>
             <span class="text-metric-mono text-muted" style="font-size: 10px;">Consistent Vectors</span>
           </div>
@@ -241,7 +245,7 @@
           <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="show_chart" size="xs" color="blue-5" />
-              <span class="text-operator-title text-main text-weight-bold">Compliance Trend Trajectory</span>
+              <span class="text-operator-title text-main text-weight-bold">{{ pageParams.trendTitle }}</span>
             </div>
             <span class="text-metric-mono text-green-3" style="font-size: 10px;">+0.12% Trajectory</span>
           </div>
@@ -272,13 +276,20 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
+import EnterpriseContextHint from '../../components/contextual/EnterpriseContextHint.vue'
 import { useGovernanceEventStore } from '../../stores/realtime/useGovernanceEventStore'
 import { useIntegrityEventStore } from '../../stores/realtime/useIntegrityEventStore'
 
 const router = useRouter()
+const route = useRoute()
 const govStore = useGovernanceEventStore()
 const integrityStore = useIntegrityEventStore()
+
+const govSubMode = computed(() => {
+  if (route.path.endsWith('/drift')) return 'drift'
+  return 'compliance'
+})
 
 // 1. FINAL REFINEMENT #5: Historical Governance Retention parameters
 const retentionHorizons = [
@@ -310,6 +321,43 @@ const stateCounts = computed(() => {
     degraded: Math.round(18 * mult),
     nonCompliant: Math.round(7 * mult) + failedTraces,
     critical: Math.round(2 * mult) + govStore.activeQuarantineCount
+  }
+})
+
+const pageParams = computed(() => {
+  if (govSubMode.value === 'drift') {
+    return {
+      title: 'Deep Policy & Configuration Drift Analysis Hub',
+      subtitle: 'DRIFT_DETECTION_DAEMON // ANOMALY_TOLERANCE: MINIMAL',
+      states: {
+        kpi1: { label: 'SYNCED CONFIGS', value: String(stateCounts.value.healthy), sub: 'Nominally synced configurations', colorClass: 'text-green-4', borderClass: 'border-top-healthy', icon: 'check_circle' },
+        kpi2: { label: 'MINOR DRIFT', value: String(stateCounts.value.warning), sub: 'Minor key-value deviations', colorClass: 'text-amber-5', borderClass: 'border-top-warning', icon: 'warning_amber' },
+        kpi3: { label: 'MODERATE DRIFT', value: String(stateCounts.value.degraded), sub: 'Structural configuration variances', colorClass: 'text-deep-orange-5', borderClass: 'border-top-degraded', icon: 'trending_down' },
+        kpi4: { label: 'CRITICAL DRIFT', value: String(stateCounts.value.nonCompliant), sub: 'High-severity control mismatches', colorClass: 'text-red-5', borderClass: 'border-top-noncompliant', icon: 'gpp_bad' },
+        kpi5: { label: 'REMEDIATED', value: String(stateCounts.value.critical), sub: 'Auto-remediated overrides applied', colorClass: 'text-purple-4', borderClass: 'border-top-critical', icon: 'security' }
+      },
+      matrixTitle: 'Tenant Drift & Variance Matrix',
+      driftTitle: 'Comprehensive Config Drift Analysis',
+      infractionTitle: 'Frequent Configuration Deviations',
+      trendTitle: 'Drift Recovery Trajectory'
+    }
+  }
+
+  // Default: compliance
+  return {
+    title: 'Fleet Compliance & Security Audits Center',
+    subtitle: 'PROGRESSIVE_STATE_ENGINE // AUDIT_WINDOW_ACTIVE',
+    states: {
+      kpi1: { label: 'HEALTHY', value: String(stateCounts.value.healthy), sub: 'Nominal secure boot signatures', colorClass: 'text-green-4', borderClass: 'border-top-healthy', icon: 'check_circle' },
+      kpi2: { label: 'WARNING', value: String(stateCounts.value.warning), sub: 'Minor config drift detected', colorClass: 'text-amber-5', borderClass: 'border-top-warning', icon: 'warning_amber' },
+      kpi3: { label: 'DEGRADED', value: String(stateCounts.value.degraded), sub: 'Repeating operational violations', colorClass: 'text-deep-orange-5', borderClass: 'border-top-degraded', icon: 'trending_down' },
+      kpi4: { label: 'NON_COMPLIANT', value: String(stateCounts.value.nonCompliant), sub: 'Attestation trust metrics failed', colorClass: 'text-red-5', borderClass: 'border-top-noncompliant', icon: 'gpp_bad' },
+      kpi5: { label: 'CRITICAL', value: String(stateCounts.value.critical), sub: 'Active SOC quarantine lock applied', colorClass: 'text-purple-4', borderClass: 'border-top-critical', icon: 'security' }
+    },
+    matrixTitle: 'Tenant Compliance Performance Matrix',
+    driftTitle: 'Multi-Tenant Policy Drift Analysis',
+    infractionTitle: 'Recurring Infraction Tracker',
+    trendTitle: 'Compliance Trend Trajectory'
   }
 })
 
@@ -361,8 +409,16 @@ const recurringViolations = computed(() => {
   if (activeHorizon.value === '30d') baseBreaches = 48
   if (activeHorizon.value === '90d') baseBreaches = 142
 
+  if (govSubMode.value === 'drift') {
+    return [
+      { vectorId: 'vec-01', ruleName: 'Config drift: USB debug state mismatched', occurrences: baseBreaches, primaryEndpoint: 'pos-term-omega-14', lastObserved: '14m ago', slaPenalty: 0.4 },
+      { vectorId: 'vec-02', ruleName: 'Policy drift: Root module locking disabled', occurrences: Math.round(baseBreaches * 0.6), primaryEndpoint: 'kiosk-alpha-02', lastObserved: '2h ago', slaPenalty: 0.1 },
+      { vectorId: 'vec-03', ruleName: 'Signature drift: Cryptographic key missing', occurrences: Math.round(baseBreaches * 0.3), primaryEndpoint: 'scanner-gamma-09', lastObserved: '1d ago', slaPenalty: 0.2 }
+    ]
+  }
+
   return [
-    { vectorId: 'vec-01', ruleName: 'Unauthorized dotroid kernel modules loaded', occurrences: baseBreaches, primaryEndpoint: 'pos-term-omega-14', lastObserved: '14m ago', slaPenalty: 0.4 },
+    { vectorId: 'vec-01', ruleName: 'Unauthorized Android kernel modules loaded', occurrences: baseBreaches, primaryEndpoint: 'pos-term-omega-14', lastObserved: '14m ago', slaPenalty: 0.4 },
     { vectorId: 'vec-02', ruleName: 'Missing local storage encryption passphrase keys', occurrences: Math.round(baseBreaches * 0.6), primaryEndpoint: 'kiosk-alpha-02', lastObserved: '2h ago', slaPenalty: 0.1 },
     { vectorId: 'vec-03', ruleName: 'Stale OTA rollout step validation timing window', occurrences: Math.round(baseBreaches * 0.3), primaryEndpoint: 'scanner-gamma-09', lastObserved: '1d ago', slaPenalty: 0.2 }
   ]

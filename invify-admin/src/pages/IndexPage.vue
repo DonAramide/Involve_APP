@@ -106,6 +106,13 @@
       </div>
     </div>
 
+    <!-- Operator Contextual Intelligence Tuning Console -->
+    <div class="row q-col-gutter-lg q-mt-lg">
+      <div class="col-12">
+        <contextual-intelligence-settings-panel />
+      </div>
+    </div>
+
     <!-- Enterprise SaaS Configuration Lookup Matrix -->
     <div class="row q-col-gutter-lg q-mt-lg">
       <div class="col-12">
@@ -195,6 +202,7 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
+import ContextualIntelligenceSettingsPanel from '../components/contextual/ContextualIntelligenceSettingsPanel.vue'
 
 const $q = useQuasar()
 const { prefs } = useOperatorPreferences()

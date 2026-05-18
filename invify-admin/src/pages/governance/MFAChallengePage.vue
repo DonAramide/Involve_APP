@@ -1,6 +1,21 @@
 <!-- invify-admin/src/pages/governance/MFAChallengePage.vue -->
 <template>
-  <q-layout class="bg-main text-main row items-center justify-center fit" style="min-height: 100vh;">
+  <q-layout class="bg-main text-main row items-center justify-center fit relative-position" style="min-height: 100vh;">
+    <!-- Floating Premium Theme Toggle -->
+    <div class="absolute-top-right q-pa-md z-max">
+      <q-btn 
+        flat 
+        round 
+        dense 
+        :icon="prefs.isDarkMode ? 'light_mode' : 'dark_mode'" 
+        @click="toggleTheme" 
+        class="text-muted transition-all"
+        style="opacity: 0.8;"
+      >
+        <q-tooltip class="bg-panel text-main border-main">{{ prefs.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode' }}</q-tooltip>
+      </q-btn>
+    </div>
+
     <q-page-container class="fit row items-center justify-center q-pa-md">
       
       <div class="auth-card bg-panel enterprise-panel q-pa-xl column op-gap-24 shadow-2" style="width: 100%; max-width: 460px;">
@@ -52,7 +67,7 @@
               <div class="text-caption text-muted q-mb-xs text-center">Verify 6-Digit Generated Signature Code *</div>
               <q-input
                 v-model="totpInput"
-                :dark="true"
+                :dark="prefs.isDarkMode"
                 filled
                 dense
                 placeholder="000000"
@@ -91,7 +106,7 @@
             <div class="text-caption text-muted q-mb-xs text-center">Enter 6-Digit Verification Code *</div>
             <q-input
               v-model="totpInput"
-              :dark="true"
+              :dark="prefs.isDarkMode"
               filled
               dense
               placeholder="000000"
@@ -133,9 +148,12 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 
 const router = useRouter()
 const route = useRoute()
+
+const { prefs, toggleTheme } = useOperatorPreferences()
 
 const loading = ref(false)
 const errorMessage = ref('')

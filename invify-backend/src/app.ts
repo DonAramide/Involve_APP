@@ -103,6 +103,7 @@ app.get('/devices', authenticate, DeviceController.getDevices);
 app.get('/devices/activations', authenticate, DeviceController.getActivations);
 app.post('/devices/activations', authenticate, DeviceController.createActivation);
 app.post('/devices/validate', authenticate, DeviceController.validateCode);
+app.post('/devices/onboard', DeviceController.onboardDevice);
 app.patch('/devices/:id', authenticate, DeviceController.updateDevice);
 
 

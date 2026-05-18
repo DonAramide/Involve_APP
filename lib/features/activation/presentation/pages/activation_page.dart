@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/core/license/storage_service.dart';
+import 'package:involve_app/features/activation/presentation/pages/device_onboarding_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/license/license_model.dart';
@@ -29,10 +32,20 @@ class _ActivationPageState extends State<ActivationPage> {
   @override
   void initState() {
     super.initState();
+    _checkOnboarding();
     // Pre-populate business name if settings are already loaded
     final settingsState = context.read<SettingsBloc>().state;
     if (settingsState.settings != null) {
       _businessNameController.text = settingsState.settings!.organizationName;
+    }
+  }
+
+  Future<void> _checkOnboarding() async {
+    final completed = await StorageService.isOnboardingCompleted();
+    if (!completed && mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const DeviceOnboardingPage()),
+      );
     }
   }
 
@@ -176,174 +189,223 @@ class _ActivationPageState extends State<ActivationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.secondary,
+              Color(0xFF030509),
+              Color(0xFF05070D),
             ],
           ),
         ),
-        child: BlocListener<SettingsBloc, SettingsState>(
-          listenWhen: (previous, current) => 
-            previous.settings?.organizationName != current.settings?.organizationName,
-          listener: (context, state) {
-            if (state.settings != null && _businessNameController.text.isEmpty) {
-              _businessNameController.text = state.settings!.organizationName;
-            }
-          },
-          child: Center(
-            child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Card(
-                elevation: 12,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            'assets/images/logo_transparent.png',
-                            height: 70,
-                          ),
-                          const SizedBox(width: 16),
-                          Icon(Icons.lock_person, size: 70, color: Theme.of(context).colorScheme.primary),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        widget.isExpired ? 'Subscription Expired' : 'App Activation',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        widget.isExpired 
-                          ? 'Please enter a new activation code to continue using the app.'
-                          : 'Enter your business name and activation code to start.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 24),
-                      // Device ID Display
-                      FutureBuilder<String>(
-                        future: DeviceInfoService.getDeviceSuffix(),
-                        builder: (context, snapshot) {
-                          if (!snapshot.hasData) return const SizedBox.shrink();
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.orange.withOpacity(0.3)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.perm_device_information, size: 16, color: Colors.orange),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'DEVICE ID: ${snapshot.data}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange, letterSpacing: 1.2),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      TextField(
-                        controller: _businessNameController,
-                        decoration: InputDecoration(
-                          labelText: 'Business Name',
-                          prefixIcon: const Icon(Icons.business),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          filled: true,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _buildSegmentedInput(),
-                      if (_errorMessage != null) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _activate,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Theme.of(context).colorScheme.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: _isLoading 
-                            ? const Text('VERIFYING LICENSE CRYPTOGRAPHY...', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic, color: Colors.white))
-                            : const Text('ACTIVATE NOW', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      const Divider(),
-                      const SizedBox(height: 16),
-                      Text(
-                        'DON\'T HAVE A CODE?',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[600],
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildContactIcon(
-                            context,
-                            icon: Icons.phone,
-                            label: 'Support / WhatsApp',
-                            onTap: () => _launchUrl('tel:+2348023552282'),
-                          ),
-                          const SizedBox(width: 32),
-                          _buildContactIcon(
-                            context,
-                            icon: Icons.email,
-                            label: 'Email Support',
-                            onTap: () => _launchUrl('mailto:info.iips.ng@gmail.com'),
-                          ),
-                        ],
-                      ),
-                    ],
+        child: Stack(
+          children: [
+            // Watermarked Background Logo
+            Positioned.fill(
+              child: Center(
+                child: Opacity(
+                  opacity: 0.15,
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 500,
+                    height: 500,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
             ),
-          ),
+
+            // Content Layout
+            BlocListener<SettingsBloc, SettingsState>(
+              listenWhen: (previous, current) => 
+                previous.settings?.organizationName != current.settings?.organizationName,
+              listener: (context, state) {
+                if (state.settings != null && _businessNameController.text.isEmpty) {
+                  _businessNameController.text = state.settings!.organizationName;
+                }
+              },
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                        child: Card(
+                          color: const Color(0xFF0B0F19).withOpacity(0.55),
+                          elevation: 12,
+                          margin: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                            side: BorderSide(
+                              color: const Color(0xFF6366F1).withOpacity(0.25),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 48.0),
+                            child: Container(
+                              width: 500,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Image.asset(
+                                        'assets/images/logo_transparent.png',
+                                        height: 70,
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Icon(Icons.lock_person, size: 70, color: const Color(0xFF818CF8)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Text(
+                                    widget.isExpired ? 'Subscription Expired' : 'App Activation',
+                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    widget.isExpired 
+                                      ? 'Please enter a new activation code to continue using the app.'
+                                      : 'Enter your business name and activation code to start.',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  // Device ID Display
+                                  FutureBuilder<String>(
+                                    future: DeviceInfoService.getDeviceSuffix(),
+                                    builder: (context, snapshot) {
+                                      if (!snapshot.hasData) return const SizedBox.shrink();
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.perm_device_information, size: 16, color: Colors.orange),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'DEVICE ID: ${snapshot.data}',
+                                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange, letterSpacing: 1.2),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 24),
+                                  TextField(
+                                    controller: _businessNameController,
+                                    style: const TextStyle(color: Colors.white),
+                                    decoration: InputDecoration(
+                                      labelText: 'Business Name',
+                                      labelStyle: const TextStyle(color: Colors.grey),
+                                      prefixIcon: const Icon(Icons.business, color: Colors.grey),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors.black.withOpacity(0.2),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildSegmentedInput(),
+                                  if (_errorMessage != null) ...[
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _errorMessage!,
+                                      style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 32),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 56,
+                                    child: ElevatedButton(
+                                      onPressed: _isLoading ? null : _activate,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF6366F1),
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      ),
+                                      child: _isLoading 
+                                        ? const Text('VERIFYING LICENSE CRYPTOGRAPHY...', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic, color: Colors.white))
+                                        : const Text('ACTIVATE NOW', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 32),
+                                  const Divider(color: Colors.white10),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'DON\'T HAVE A CODE?',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey[500],
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      _buildContactIcon(
+                                        context,
+                                        icon: Icons.phone,
+                                        label: 'Support / WhatsApp',
+                                        onTap: () => _launchUrl('tel:+2348023552282'),
+                                      ),
+                                      const SizedBox(width: 32),
+                                      _buildContactIcon(
+                                        context,
+                                        icon: Icons.email,
+                                        label: 'Email Support',
+                                        onTap: () => _launchUrl('mailto:info.iips.ng@gmail.com'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    ),
-   );
+    );
   }
 
   Widget _buildSegmentedInput() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Activation Code',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Theme.of(context).colorScheme.primary),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF818CF8)),
         ),
         const SizedBox(height: 8),
         Row(
@@ -359,12 +421,21 @@ class _ActivationPageState extends State<ActivationPage> {
                   inputFormatters: [
                     LengthLimitingTextInputFormatter(30), // Allow paste
                   ],
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   decoration: InputDecoration(
                     counterText: '',
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFF6366F1)),
+                    ),
                     filled: true,
-                    fillColor: Colors.grey[50],
+                    fillColor: Colors.black.withOpacity(0.3),
                   ),
                   onChanged: (value) {
                     if (value.length > 4) {
@@ -422,17 +493,17 @@ class _ActivationPageState extends State<ActivationPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              color: const Color(0xFF6366F1).withOpacity(0.15),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: Theme.of(context).colorScheme.primary),
+            child: Icon(icon, color: const Color(0xFF818CF8)),
           ),
           const SizedBox(height: 8),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 11,
-              color: Theme.of(context).colorScheme.primary,
+              color: Color(0xFF818CF8),
               fontWeight: FontWeight.w500,
             ),
           ),

@@ -7,7 +7,10 @@
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="devices" size="sm" color="blue-5" />
         <div>
-          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Fleet Device Explorer Array</div>
+          <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">
+            Fleet Device Explorer Array
+            <enterprise-context-hint registry-key="fleet-presence" />
+          </div>
           <div class="text-metric-mono text-muted" style="font-size: 10px;">VIRTUALIZED_GRID // COMPOSITE NARRATIVE TIMELINES</div>
         </div>
       </div>
@@ -131,7 +134,10 @@
           </div>
 
           <!-- Remote Actions Panel complete with Safety Gates -->
-          <div class="text-operator-title text-red-4 q-mb-xs">Safety-Gated Hardware Commands</div>
+          <div class="text-operator-title text-red-4 q-mb-xs row items-center op-gap-4">
+            <span>Safety-Gated Hardware Commands</span>
+            <enterprise-context-hint registry-key="soc-quarantine" size="xs" />
+          </div>
           <div class="grid-actions q-gutter-xs">
             <q-btn dense size="xs" color="cyan-10" text-color="cyan-2" label="Reboot Device" @click="promptActionGate('reboot')" />
             <q-btn dense size="xs" color="indigo-10" text-color="indigo-2" label="Push Policy" @click="promptActionGate('push_policy')" />
@@ -203,6 +209,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EnterpriseDataGrid from '../../components/grid/EnterpriseDataGrid.vue'
+import EnterpriseContextHint from '../../components/contextual/EnterpriseContextHint.vue'
 import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { deviceApi } from '../../api'

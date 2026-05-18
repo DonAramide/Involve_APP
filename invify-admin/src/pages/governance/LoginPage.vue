@@ -1,6 +1,21 @@
 <!-- invify-admin/src/pages/governance/LoginPage.vue -->
 <template>
-  <q-layout class="bg-main text-main row items-center justify-center fit" style="min-height: 100vh;">
+  <q-layout class="bg-main text-main row items-center justify-center fit relative-position" style="min-height: 100vh;">
+    <!-- Floating Premium Theme Toggle -->
+    <div class="absolute-top-right q-pa-md z-max">
+      <q-btn 
+        flat 
+        round 
+        dense 
+        :icon="prefs.isDarkMode ? 'light_mode' : 'dark_mode'" 
+        @click="toggleTheme" 
+        class="text-muted transition-all"
+        style="opacity: 0.8;"
+      >
+        <q-tooltip class="bg-panel text-main border-main">{{ prefs.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode' }}</q-tooltip>
+      </q-btn>
+    </div>
+
     <q-page-container class="fit row items-center justify-center q-pa-md">
       
       <!-- AUTHENTICATION FORM BOX -->
@@ -65,7 +80,7 @@
             <div class="text-caption text-muted q-mb-xs">New Secure Passphrase *</div>
             <q-input
               v-model="resetForm.newPassword"
-              :dark="true"
+              :dark="prefs.isDarkMode"
               filled
               dense
               type="password"
@@ -83,7 +98,7 @@
             <div class="text-caption text-muted q-mb-xs">Confirm New Passphrase *</div>
             <q-input
               v-model="resetForm.confirmPassword"
-              :dark="true"
+              :dark="prefs.isDarkMode"
               filled
               dense
               type="password"
@@ -131,7 +146,7 @@
             <div class="text-caption text-muted q-mb-xs">Email Address *</div>
             <q-input
               v-model="otpForm.email"
-              :dark="true"
+              :dark="prefs.isDarkMode"
               filled
               dense
               placeholder="operator@IIPS.app"
@@ -151,7 +166,7 @@
               <div class="text-caption text-muted q-mb-xs">One-Time OTP Verification Code *</div>
               <q-input
                 v-model="otpForm.otpCode"
-                :dark="true"
+                :dark="prefs.isDarkMode"
                 filled
                 dense
                 placeholder="Enter 6-digit OTP code"
@@ -165,7 +180,7 @@
               <div class="text-caption text-muted q-mb-xs">New Secure Passphrase *</div>
               <q-input
                 v-model="otpForm.newPassword"
-                :dark="true"
+                :dark="prefs.isDarkMode"
                 filled
                 dense
                 type="password"
@@ -180,7 +195,7 @@
               <div class="text-caption text-muted q-mb-xs">Confirm New Passphrase *</div>
               <q-input
                 v-model="otpForm.confirmPassword"
-                :dark="true"
+                :dark="prefs.isDarkMode"
                 filled
                 dense
                 type="password"
@@ -220,7 +235,7 @@
             <div class="text-caption text-muted q-mb-xs">Operator Account Identity *</div>
             <q-input
               v-model="form.email"
-              :dark="true"
+              :dark="prefs.isDarkMode"
               filled
               dense
               :placeholder="activeTier === 'pro' ? 'customer@IIPS.app' : 'e.g. sysadmin@IIPS.app'"
@@ -243,7 +258,7 @@
             </div>
             <q-input
               v-model="form.password"
-              :dark="true"
+              :dark="prefs.isDarkMode"
               filled
               dense
               :type="showPassword ? 'text' : 'password'"
@@ -342,7 +357,7 @@
             <div class="text-caption text-muted q-mb-xs text-center">Enter 6-Digit Verification Envelope *</div>
             <q-input
               v-model="form.totpCode"
-              :dark="true"
+              :dark="prefs.isDarkMode"
               filled
               dense
               placeholder="000000"
@@ -408,9 +423,12 @@ import { ref } from 'vue'
 import logoImg from '../../assets/logo_transparent.png'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 
 const router = useRouter()
 const route = useRoute()
+
+const { prefs, toggleTheme } = useOperatorPreferences()
 
 const loading = ref(false)
 const showPassword = ref(false)

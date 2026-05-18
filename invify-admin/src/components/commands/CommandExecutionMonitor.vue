@@ -1,11 +1,11 @@
 <!-- invify-admin/src/components/commands/CommandExecutionMonitor.vue -->
 <template>
-  <div class="enterprise-panel full-width bg-[#12161a]">
+  <div class="enterprise-panel full-width bg-panel">
     <!-- Command Interface Header Bar -->
     <div class="enterprise-subpanel q-pa-sm row items-center justify-between no-wrap border-bottom">
       <div class="row items-center op-gap-8 no-wrap">
         <q-icon name="terminal" color="indigo-4" size="xs" />
-        <div class="text-operator-title text-white text-weight-bold">Stateful Command Execution Monitor</div>
+        <div class="text-operator-title text-main text-weight-bold">Stateful Command Execution Monitor</div>
         <q-badge color="blue-grey-9" text-color="grey-4" class="text-metric-sm">
           Active Pipeline: <span class="text-cyan-3 q-ml-xs">{{ activeCommands.length }}</span>
         </q-badge>
@@ -22,29 +22,29 @@
           label="DISPATCH ACTION" 
           class="text-caption text-weight-bold"
         >
-          <q-list dark class="bg-[#161b20] text-caption" style="min-width: 220px;">
-            <q-item-label header class="text-operator-title text-grey-5 q-py-xs">OTA & Fleet Targets</q-item-label>
+          <q-list class="bg-subpanel text-main text-caption border-main" style="min-width: 220px;">
+            <q-item-label header class="text-operator-title text-muted q-py-xs">OTA & Fleet Targets</q-item-label>
             <q-item clickable v-close-popup @click="dispatchCommand('OTA Deployment Trigger', 'fleet')">
               <q-item-section avatar><q-icon name="system_update_alt" size="xs" color="cyan-3" /></q-item-section>
-              <q-item-section><q-item-label class="text-metric-sm">OTA Package Rollout</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-metric-sm text-main">OTA Package Rollout</q-item-label></q-item-section>
             </q-item>
             <q-item clickable v-close-popup @click="dispatchCommand('Remote Device Action', 'device')">
               <q-item-section avatar><q-icon name="power_settings_new" size="xs" color="amber-4" /></q-item-section>
-              <q-item-section><q-item-label class="text-metric-sm">Remote Fleet Restart</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-metric-sm text-main">Remote Fleet Restart</q-item-label></q-item-section>
             </q-item>
             <q-item clickable v-close-popup @click="dispatchCommand('Quarantine Action', 'security')">
               <q-item-section avatar><q-icon name="gpp_bad" size="xs" color="red-4" /></q-item-section>
-              <q-item-section><q-item-label class="text-metric-sm">Quarantine Target Endpoint</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-metric-sm text-main">Quarantine Target Endpoint</q-item-label></q-item-section>
             </q-item>
-            <q-separator dark />
-            <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Governance & Policies</q-item-label>
+            <q-separator class="bg-main" />
+            <q-item-label header class="text-operator-title text-muted q-py-xs">Governance & Policies</q-item-label>
             <q-item clickable v-close-popup @click="dispatchCommand('Policy Push Operation', 'governance')">
               <q-item-section avatar><q-icon name="policy" size="xs" color="indigo-3" /></q-item-section>
-              <q-item-section><q-item-label class="text-metric-sm">Push Auth Security Drift Patch</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-metric-sm text-main">Push Auth Security Drift Patch</q-item-label></q-item-section>
             </q-item>
             <q-item clickable v-close-popup @click="dispatchCommand('Rollout Approval', 'governance')">
               <q-item-section avatar><q-icon name="fact_check" size="xs" color="green-4" /></q-item-section>
-              <q-item-section><q-item-label class="text-metric-sm">Approve Pending VA Batch</q-item-label></q-item-section>
+              <q-item-section><q-item-label class="text-metric-sm text-main">Approve Pending VA Batch</q-item-label></q-item-section>
             </q-item>
           </q-list>
         </q-btn-dropdown>
@@ -63,7 +63,7 @@
 
     <!-- Active Execution & Audit Timeline Logs -->
     <div class="q-pa-sm" style="max-height: 320px; overflow-y: auto;">
-      <div v-if="commands.length === 0" class="text-center q-pa-lg text-grey-7 text-caption italic">
+      <div v-if="commands.length === 0" class="text-center q-pa-lg text-muted text-caption italic">
         No stateful operations actively dispatched. Trigger actions via the command dispatch menu above.
       </div>
 
@@ -93,11 +93,11 @@
 
             <!-- Command Identifier & Operator Trace string -->
             <div class="col-auto no-wrap overflow-hidden ellipsis">
-              <div class="text-white text-weight-medium text-caption no-wrap ellipsis">{{ cmd.action }}</div>
-              <div class="row items-center op-gap-8 text-grey-6" style="font-size: 10px;">
+              <div class="text-main text-weight-medium text-caption no-wrap ellipsis">{{ cmd.action }}</div>
+              <div class="row items-center op-gap-8 text-muted" style="font-size: 10px;">
                 <span class="text-metric-mono">{{ cmd.targetId }}</span>
                 <span>•</span>
-                <span class="text-cyan-4">Attribution: {{ cmd.operator }}</span>
+                <span class="text-cyan-5">Attribution: {{ cmd.operator }}</span>
               </div>
             </div>
           </div>
@@ -105,8 +105,8 @@
           <!-- Right Columns: Execution Latency strings & Action Re-Triggers -->
           <div class="row items-center op-gap-8 no-wrap col-auto q-pl-sm">
             <div class="text-right v-hide-xs">
-              <div class="text-metric-mono text-grey-4" style="font-size: 11px;">{{ cmd.latency }}ms</div>
-              <div class="text-grey-6" style="font-size: 9px;">{{ new Date(cmd.timestamp).toLocaleTimeString() }}</div>
+              <div class="text-metric-mono text-secondary" style="font-size: 11px;">{{ cmd.latency }}ms</div>
+              <div class="text-muted" style="font-size: 9px;">{{ new Date(cmd.timestamp).toLocaleTimeString() }}</div>
             </div>
 
             <!-- Manual Operator Retry Trigger if execution enters 'failed' -->
@@ -115,11 +115,11 @@
               dense 
               flat 
               size="xs" 
-              color="amber-4" 
+              color="amber" 
               icon="refresh" 
               label="RETRY" 
               @click="retryCommand(cmd)" 
-              class="text-caption text-weight-bold bg-[#1d1912]"
+              class="text-caption text-weight-bold"
             />
             
             <q-icon 

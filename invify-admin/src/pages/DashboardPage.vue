@@ -12,7 +12,7 @@
           </div>
         </div>
         <q-chip dense color="blue-grey-10" text-color="blue-5" class="text-metric-sm q-ma-none v-hide-xs">
-          Stream Topic: <span class="text-main q-ml-xs">quasar.{{ activeWorkspace }}.telemetry.*</span>
+          Stream Topic: <span class="text-main q-ml-xs">quasar.{{ activeWorkspace }}.{{ fleetSubMode !== 'default' ? fleetSubMode : 'telemetry' }}.*</span>
         </q-chip>
       </div>
 
@@ -38,66 +38,66 @@
 
     <!-- Live Telemetry KPI Flat Panels Grid -->
     <div class="row q-col-gutter-sm q-mb-md">
-      <!-- KPI 1: Telemetry Ingestion Throughput -->
+      <!-- KPI 1 -->
       <div class="col-12 col-sm-6 col-md-3">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between border-cyan-left bg-panel">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel" :class="kpiCards.kpi1.border">
           <div class="row items-center justify-between no-wrap q-mb-xs">
-            <span class="text-operator-title text-muted">Ingestion Rate</span>
-            <span class="live-indicator-dot pulse-healthy"></span>
+            <span class="text-operator-title text-muted">{{ kpiCards.kpi1.label }}</span>
+            <span class="live-indicator-dot" :class="kpiCards.kpi1.dot"></span>
           </div>
           <div class="text-h4 text-metric-mono text-main">
-            {{ throughputEps }} <span class="text-caption text-muted">eps</span>
+            {{ kpiCards.kpi1.value }} <span class="text-caption text-muted">{{ kpiCards.kpi1.unit }}</span>
           </div>
           <div class="text-caption text-muted q-mt-xs" style="font-size: 10px;">
-            Peak buffer utilization: <span class="text-main">14.2 MB/s</span>
+            {{ kpiCards.kpi1.sub }}
           </div>
         </div>
       </div>
 
-      <!-- KPI 2: Total Connected Operators & Instances -->
+      <!-- KPI 2 -->
       <div class="col-12 col-sm-6 col-md-3">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between border-indigo-left bg-panel">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel" :class="kpiCards.kpi2.border">
           <div class="row items-center justify-between no-wrap q-mb-xs">
-            <span class="text-operator-title text-muted">Active Fleet Nodes</span>
-            <q-icon name="devices" color="indigo-4" size="xs" />
+            <span class="text-operator-title text-muted">{{ kpiCards.kpi2.label }}</span>
+            <q-icon v-if="kpiCards.kpi2.icon" :name="kpiCards.kpi2.icon" color="indigo-4" size="xs" />
           </div>
           <div class="text-h4 text-metric-mono text-blue-5">
-            {{ activeNodesCount }} <span class="text-caption text-muted">/ 18</span>
+            {{ kpiCards.kpi2.value }} <span class="text-caption text-muted">{{ kpiCards.kpi2.unit }}</span>
           </div>
           <div class="text-caption text-muted q-mt-xs" style="font-size: 10px;">
-            Edge deployment distribution: <span class="text-main">99.8% stable</span>
+            {{ kpiCards.kpi2.sub }}
           </div>
         </div>
       </div>
 
-      <!-- KPI 3: System Drift Exceptions (Severity Warning mapped) -->
+      <!-- KPI 3 -->
       <div class="col-12 col-sm-6 col-md-3">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between border-amber-left bg-panel">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel" :class="kpiCards.kpi3.border">
           <div class="row items-center justify-between no-wrap q-mb-xs">
-            <span class="text-operator-title text-muted">Active Warnings</span>
-            <span class="live-indicator-dot pulse-warning"></span>
+            <span class="text-operator-title text-muted">{{ kpiCards.kpi3.label }}</span>
+            <span class="live-indicator-dot" :class="kpiCards.kpi3.dot || 'pulse-warning'"></span>
           </div>
           <div class="text-h4 text-metric-mono text-amber-5">
-            {{ warningEventsCount }}
+            {{ kpiCards.kpi3.value }} <span class="text-caption text-muted">{{ kpiCards.kpi3.unit }}</span>
           </div>
           <div class="text-caption text-muted q-mt-xs" style="font-size: 10px;">
-            Drift severity index: <span class="text-amber-5">ELEVATED</span>
+            {{ kpiCards.kpi3.sub }}
           </div>
         </div>
       </div>
 
-      <!-- KPI 4: Critical Execution Rollbacks (Severity Critical mapped) -->
+      <!-- KPI 4 -->
       <div class="col-12 col-sm-6 col-md-3">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between border-red-left bg-panel">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel" :class="kpiCards.kpi4.border">
           <div class="row items-center justify-between no-wrap q-mb-xs">
-            <span class="text-operator-title text-muted">Critical Rollbacks</span>
-            <span class="live-indicator-dot pulse-critical"></span>
+            <span class="text-operator-title text-muted">{{ kpiCards.kpi4.label }}</span>
+            <span class="live-indicator-dot" :class="kpiCards.kpi4.dot || 'pulse-critical'"></span>
           </div>
-          <div class="text-h4 text-metric-mono" :class="criticalEventsCount > 0 ? 'text-red-5' : 'text-muted'">
-            {{ criticalEventsCount }}
+          <div class="text-h4 text-metric-mono text-main">
+            {{ kpiCards.kpi4.value }} <span class="text-caption text-muted">{{ kpiCards.kpi4.unit }}</span>
           </div>
           <div class="text-caption text-muted q-mt-xs" style="font-size: 10px;">
-            Failed Webhook bridges: <span :class="criticalEventsCount > 0 ? 'text-red-5' : 'text-muted'">{{ criticalEventsCount }} pipeline locks</span>
+            {{ kpiCards.kpi4.sub }}
           </div>
         </div>
       </div>
@@ -177,14 +177,36 @@
 
 <script setup>
 import { ref, computed, inject } from 'vue'
+import { useRoute } from 'vue-router'
 import EnterpriseDataGrid from '../components/grid/EnterpriseDataGrid.vue'
 import CommandExecutionMonitor from '../components/commands/CommandExecutionMonitor.vue'
 import { useTelemetryStream } from '../composables/useTelemetryStream'
 
 // Inject active Workspace context parameter cleanly
 const activeWorkspace = inject('activeWorkspace', ref('observability'))
+const route = useRoute()
+
+const fleetSubMode = computed(() => {
+  if (route.path.endsWith('/presence')) return 'presence'
+  if (route.path.endsWith('/groups')) return 'groups'
+  if (route.path.endsWith('/enrollment')) return 'enrollment'
+  if (route.path.endsWith('/telemetry')) return 'telemetry'
+  if (route.path.endsWith('/actions')) return 'actions'
+  return 'default'
+})
 
 const activeWorkspaceLabel = computed(() => {
+  if (activeWorkspace.value === 'fleet') {
+    const subModeMap = {
+      presence: 'Live Presence Map',
+      groups: 'Device Groups Array',
+      enrollment: 'Enrollment Pipelines',
+      telemetry: 'Fleet Telemetry Grid',
+      actions: 'Remote Action Controls'
+    }
+    return subModeMap[fleetSubMode.value] || 'Fleet Operations'
+  }
+
   const map = {
     observability: 'Observability',
     fleet: 'Fleet Operations',
@@ -210,6 +232,59 @@ const refreshTelemetry = () => {
   criticalEventsCount.value = Math.random() > 0.5 ? 1 : 0
 }
 
+const kpiCards = computed(() => {
+  if (activeWorkspace.value === 'fleet') {
+    if (fleetSubMode.value === 'presence') {
+      return {
+        kpi1: { label: 'Triangulation Influx', value: '8.4', unit: 'pps', sub: 'Signal latency: 12ms', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Edge Nodes', value: '14', unit: '/ 18', sub: 'Locations: Lagos, Abuja, London', border: 'border-indigo-left', icon: 'radar' },
+        kpi3: { label: 'Presence Warnings', value: '0', unit: '', sub: 'Triangulation anomalies: None', border: 'border-amber-left', dot: 'pulse-healthy' },
+        kpi4: { label: 'Signal Degradations', value: '0', unit: 'drops', sub: 'Cellular tower handshakes stable', border: 'border-red-left', dot: 'pulse-healthy' }
+      }
+    }
+    if (fleetSubMode.value === 'groups') {
+      return {
+        kpi1: { label: 'Active Cohorts', value: '4', unit: 'groups', sub: 'Canary, Beta, Staging, Stable', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Nodes Configured', value: '14', unit: '/ 14', sub: 'Group membership: 100% mapped', border: 'border-indigo-left', icon: 'group_work' },
+        kpi3: { label: 'Pending Migrations', value: '0', unit: '', sub: 'Dynamic balance updates: Stable', border: 'border-amber-left', dot: 'pulse-healthy' },
+        kpi4: { label: 'Policy Drift Mismatches', value: '0', unit: 'errors', sub: 'Security configurations compliant', border: 'border-red-left', dot: 'pulse-healthy' }
+      }
+    }
+    if (fleetSubMode.value === 'enrollment') {
+      return {
+        kpi1: { label: 'Enrolled Devices', value: '18', unit: 'nodes', sub: 'Zero-touch provisioning active', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Setup Pipelines', value: '2', unit: 'pipelines', sub: 'Android POS & IoT Gateway templates', border: 'border-indigo-left', icon: 'how_to_reg' },
+        kpi3: { label: 'Failed Bootstraps', value: '0', unit: '', sub: 'Key injection pipeline: Compliant', border: 'border-amber-left', dot: 'pulse-healthy' },
+        kpi4: { label: 'Staged Cancellations', value: '0', unit: 'cancels', sub: 'Awaiting operator authorization: None', border: 'border-red-left', dot: 'pulse-healthy' }
+      }
+    }
+    if (fleetSubMode.value === 'telemetry') {
+      return {
+        kpi1: { label: 'Packet Ingest Rate', value: '248k', unit: 'pps', sub: 'High-frequency telemetry stream', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Signals Checked', value: '12', unit: 'signals', sub: 'CPU Temp, RAM, Signal Strength, etc.', border: 'border-indigo-left', icon: 'show_chart' },
+        kpi3: { label: 'Thermal Drift Warnings', value: '3', unit: 'warnings', sub: 'Thermal throttling warning threshold', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Critical Packet Drops', value: '1', unit: 'drops', sub: 'Buffer packet overflows: Minimal', border: 'border-red-left', dot: 'pulse-critical' }
+      }
+    }
+    if (fleetSubMode.value === 'actions') {
+      return {
+        kpi1: { label: 'Executed Commands', value: '42', unit: 'actions', sub: 'Diagnostics, reboots, token resets', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Operator Approvals', value: '100%', unit: 'RBAC', sub: 'Elevation authorizations cleared', border: 'border-indigo-left', icon: 'terminal' },
+        kpi3: { label: 'Queued Actions', value: '0', unit: 'pending', sub: 'Awaiting execution window: None', border: 'border-amber-left', dot: 'pulse-healthy' },
+        kpi4: { label: 'Action Exceptions', value: '0', unit: 'errors', sub: 'Zero-touch script execution perfect', border: 'border-red-left', dot: 'pulse-healthy' }
+      }
+    }
+  }
+
+  // Default (Observability)
+  return {
+    kpi1: { label: 'Ingestion Rate', value: throughputEps.value || '4.2', unit: 'eps', sub: 'Peak buffer utilization: 14.2 MB/s', border: 'border-cyan-left', dot: 'pulse-healthy' },
+    kpi2: { label: 'Active Fleet Nodes', value: activeNodesCount.value, unit: '/ 18', sub: 'Edge deployment distribution: 99.8% stable', border: 'border-indigo-left', icon: 'devices' },
+    kpi3: { label: 'Active Warnings', value: warningEventsCount.value, unit: '', sub: 'Drift severity index: ELEVATED', border: 'border-amber-left', dot: 'pulse-warning' },
+    kpi4: { label: 'Critical Rollbacks', value: criticalEventsCount.value, unit: 'locks', sub: `${criticalEventsCount.value} pipeline locks`, border: 'border-red-left', dot: 'pulse-critical' }
+  }
+})
+
 // Master grid layout columns configuration
 const gridColumns = [
   { name: 'timestamp', label: 'INGESTED', field: 'created_at', align: 'left', format: val => new Date(val).toLocaleTimeString() },
@@ -222,6 +297,137 @@ const gridColumns = [
 
 // Pure enterprise mock logging entries covering all workspaces robustly
 const allGridRows = ref([
+  // --- PRESENCE SUB-MODE ROWS ---
+  {
+    id: 'row-presence-1',
+    created_at: new Date(Date.now() - 1000).toISOString(),
+    severity: 'healthy',
+    type: 'triangulation_success',
+    amount: 3,
+    provider: 'gps_triangulator',
+    description: 'Triangulated edge terminal coordinates across 3 cellular base station signal vectors.\n• Triangulated Margin of Error: ±4.2 meters\n• Triangulation Integrity check: Verified',
+    workspace: 'fleet',
+    subMode: 'presence',
+    operator: 'gps_daemon'
+  },
+  {
+    id: 'row-presence-2',
+    created_at: new Date(Date.now() - 5000).toISOString(),
+    severity: 'info',
+    type: 'presence_ping',
+    amount: 142,
+    provider: 'presence_broker',
+    description: 'Edge node presence ping received. Session active.\n• Terminal ID: DSPREAD-POS-80MM-0091\n• Latency: 12ms over HTTPS Websocket.',
+    workspace: 'fleet',
+    subMode: 'presence',
+    operator: 'presence_daemon'
+  },
+
+  // --- GROUPS SUB-MODE ROWS ---
+  {
+    id: 'row-groups-1',
+    created_at: new Date(Date.now() - 2000).toISOString(),
+    severity: 'healthy',
+    type: 'cohort_sync_complete',
+    amount: 14,
+    provider: 'cohort_manager',
+    description: 'Cohort deployment synchronization complete. Target rules confirmed.\n• Cohort Name: Lagos-POS-Terminals-Stable\n• Edges Verified: 14 / 14 nodes.',
+    workspace: 'fleet',
+    subMode: 'groups',
+    operator: 'group_sync_service'
+  },
+  {
+    id: 'row-groups-2',
+    created_at: new Date(Date.now() - 8000).toISOString(),
+    severity: 'info',
+    type: 'group_membership_bind',
+    amount: 1,
+    provider: 'cohort_manager',
+    description: 'Bound edge device to target group dynamically.\n• Device: DSPREAD-POS-XM1AJQUMM-1339\n• Target Group: Abuja-Beds-Retail-Beta.',
+    workspace: 'fleet',
+    subMode: 'groups',
+    operator: 'sysadmin@IIPS.app'
+  },
+
+  // --- ENROLLMENT SUB-MODE ROWS ---
+  {
+    id: 'row-enroll-1',
+    created_at: new Date(Date.now() - 1500).toISOString(),
+    severity: 'healthy',
+    type: 'bootstrap_complete',
+    amount: 200,
+    provider: 'enrollment_pipeline',
+    description: 'Zero-touch provisioning bootstrap complete.\n• Injected RSA Public Keys successfully.\n• Local state container deployed. Status: Active.',
+    workspace: 'fleet',
+    subMode: 'enrollment',
+    operator: 'auto_provisioner'
+  },
+  {
+    id: 'row-enroll-2',
+    created_at: new Date(Date.now() - 6000).toISOString(),
+    severity: 'info',
+    type: 'handshake_initiate',
+    amount: 1,
+    provider: 'enrollment_pipeline',
+    description: 'Initial device hardware handshake received. Verifying OEM signature.\n• Device ID: DSPREAD-POS-610011MM-8315\n• Handshake Status: Cleared.',
+    workspace: 'fleet',
+    subMode: 'enrollment',
+    operator: 'auto_provisioner'
+  },
+
+  // --- TELEMETRY SUB-MODE ROWS ---
+  {
+    id: 'row-telem-1',
+    created_at: new Date(Date.now() - 500).toISOString(),
+    severity: 'warning',
+    type: 'thermal_throttling_near',
+    amount: 72,
+    provider: 'fleet_telemetry',
+    description: 'Hardware thermal sensor reports elevated CPU temperature (72°C).\n• Device ID: DSPREAD-POS-XM1AJQUMM-1339\n• Throttling State: Approaching threshold.',
+    workspace: 'fleet',
+    subMode: 'telemetry',
+    operator: 'telemetry_daemon'
+  },
+  {
+    id: 'row-telem-2',
+    created_at: new Date(Date.now() - 4000).toISOString(),
+    severity: 'healthy',
+    type: 'telemetry_packet_flush',
+    amount: 128,
+    provider: 'fleet_telemetry',
+    description: 'Aggregated packet buffers flushed successfully to centralized influx ingestion pipeline.',
+    workspace: 'fleet',
+    subMode: 'telemetry',
+    operator: 'telemetry_daemon'
+  },
+
+  // --- ACTIONS SUB-MODE ROWS ---
+  {
+    id: 'row-actions-1',
+    created_at: new Date(Date.now() - 1000).toISOString(),
+    severity: 'healthy',
+    type: 'command_execution_success',
+    amount: 1,
+    provider: 'action_orchestrator',
+    description: 'Remote command reboot dispatched and completed successfully on target edge.\n• Reboot Context: Routine memory purge sweep.\n• Response Status: OK (0).',
+    workspace: 'fleet',
+    subMode: 'actions',
+    operator: 'sysadmin@IIPS.app'
+  },
+  {
+    id: 'row-actions-2',
+    created_at: new Date(Date.now() - 7000).toISOString(),
+    severity: 'info',
+    type: 'cache_purge_force',
+    amount: 1,
+    provider: 'action_orchestrator',
+    description: 'Dispatched direct WebSocket payload to force local cache purge on terminal.',
+    workspace: 'fleet',
+    subMode: 'actions',
+    operator: 'sysadmin@IIPS.app'
+  },
+
+  // --- STANDARD WORKSPACE ROWS ---
   {
     id: 'row-ai-1',
     created_at: new Date(Date.now() - 1200).toISOString(),
@@ -316,6 +522,13 @@ const allGridRows = ref([
 const filteredGridRows = computed(() => {
   // If active Workspace is 'observability', show all system logs for comprehensive oversight
   if (activeWorkspace.value === 'observability') return allGridRows.value
+
+  if (activeWorkspace.value === 'fleet') {
+    if (fleetSubMode.value !== 'default') {
+      return allGridRows.value.filter(r => r.workspace === 'fleet' && r.subMode === fleetSubMode.value)
+    }
+  }
+
   return allGridRows.value.filter(r => r.workspace === activeWorkspace.value)
 })
 

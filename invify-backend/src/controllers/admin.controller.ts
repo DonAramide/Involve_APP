@@ -50,7 +50,20 @@ export class AdminController {
   static async listTenants(req: Request, res: Response) {
     if (process.env.OFFLINE_MOCK_AUTH === 'true') {
       console.log('[AdminController] Serving local mock tenants immediately (OFFLINE_MOCK_AUTH active).');
-      const data = AdminController.getLocalData();
+      let data = AdminController.getLocalData();
+      
+      const { type, status, name } = req.query;
+      if (type) {
+        data = data.filter(t => t.type === type);
+      }
+      if (status) {
+        data = data.filter(t => t.status === status);
+      }
+      if (name) {
+        const queryStr = String(name).toLowerCase();
+        data = data.filter(t => t.name.toLowerCase().includes(queryStr));
+      }
+      
       return res.status(200).json(data);
     }
 
@@ -78,11 +91,25 @@ export class AdminController {
 
       if (isConnectionTimeout || process.env.OFFLINE_MOCK_AUTH === 'true') {
         console.warn('[AdminController] Supabase offline fallback triggered for listTenants.');
-        return res.status(200).json([
+        let fallbackData = [
           { id: '00000000-0000-0000-0000-000000000001', name: 'Lagos Academy School', type: 'school', plan: 'standard', status: 'active', created_at: new Date().toISOString() },
           { id: '00000000-0000-0000-0000-000000000002', name: 'Elite Retail Hub', type: 'retail', plan: 'premium', status: 'active', created_at: new Date().toISOString() },
           { id: '00000000-0000-0000-0000-000000000003', name: 'City Hospital Clinic', type: 'healthcare', plan: 'enterprise', status: 'active', created_at: new Date().toISOString() }
-        ]);
+        ];
+        
+        const { type, status, name } = req.query;
+        if (type) {
+          fallbackData = fallbackData.filter(t => t.type === type);
+        }
+        if (status) {
+          fallbackData = fallbackData.filter(t => t.status === status);
+        }
+        if (name) {
+          const queryStr = String(name).toLowerCase();
+          fallbackData = fallbackData.filter(t => t.name.toLowerCase().includes(queryStr));
+        }
+        
+        return res.status(200).json(fallbackData);
       }
       return res.status(500).json({ error: error.message });
     }
@@ -165,9 +192,24 @@ export class AdminController {
   static async getTenantDetails(req: Request, res: Response) {
     if (process.env.OFFLINE_MOCK_AUTH === 'true') {
       const { id } = req.params;
-      const tenantName = id === '00000000-0000-0000-0000-000000000001' ? 'Lagos Academy School' : 'Invify Retail Business';
+      const data = AdminController.getLocalData();
+      const match = data.find(t => t.id === id);
+      
+      const tenantName = match ? match.name : 'Invify Retail Business';
+      const tenantType = match ? match.type : 'retail';
+      const tenantPlan = match ? match.plan : 'standard';
+      const tenantStatus = match ? match.status : 'active';
+      const tenantCreatedAt = match ? match.created_at : new Date().toISOString();
+
       return res.status(200).json({
-        tenant: { id, name: tenantName, type: 'retail', plan: 'standard', status: 'active' },
+        tenant: { 
+          id, 
+          name: tenantName, 
+          type: tenantType, 
+          plan: tenantPlan, 
+          status: tenantStatus, 
+          created_at: tenantCreatedAt 
+        },
         users: [
           { id: 'usr-1', name: 'Admin User', role: 'admin' }
         ],

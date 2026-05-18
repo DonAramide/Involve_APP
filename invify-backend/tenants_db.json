@@ -1,5 +1,13 @@
 [
   {
+    "id": "tenant-1779041949485",
+    "name": "Wendy's gift Store",
+    "type": "retail",
+    "plan": "starter",
+    "status": "active",
+    "created_at": "2026-05-17T18:19:09.485Z"
+  },
+  {
     "id": "00000000-0000-0000-0000-000000000001",
     "name": "Lagos Academy School",
     "type": "school",

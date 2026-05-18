@@ -59,7 +59,6 @@
   --space-16: 16px;
 }
 
-/* Theme-Specific Overrides */
 .theme-dark {
   --enterprise-page-bg: #0B1220;
   --enterprise-panel-bg: #101826;
@@ -70,6 +69,12 @@
   --sidebar-bg: #0B1220;
   --sidebar-panel-bg: #101826;
   --appbar-bg: linear-gradient(90deg, #0F172A, #162E4E);
+
+  /* Custom Emerald Palette for Treasury Operations - Dark Mode */
+  --emerald-bg-tint: rgba(16, 185, 129, 0.12);
+  --emerald-border: #10B981;
+  --emerald-text: #34D399;
+  --emerald-label: #6EE7B7;
 }
 
 .theme-light {
@@ -90,7 +95,24 @@
   /* Quasar Override Helpers for Light Mode */
   --q-menu-bg: #FFFFFF;
   --q-menu-text: #111827;
+
+  /* Custom Emerald Palette for Treasury Operations - Light Mode (High Contrast) */
+  --emerald-bg-tint: #E6F4EA;
+  --emerald-border: #059669;
+  --emerald-text: #047857;
+  --emerald-label: #065F46;
 }
+
+/* Authoritative Emerald Palette Mappings */
+.text-emerald-4 { color: var(--emerald-text) !important; }
+.text-emerald-3 { color: var(--emerald-label) !important; }
+.bg-emerald-5 { background-color: var(--emerald-border) !important; }
+.bg-emerald-10 { background-color: var(--emerald-bg-tint) !important; }
+.text-emerald-10 { color: var(--emerald-bg-tint) !important; }
+
+/* Quasar Specific active state overrides for our tabs & indicators */
+.text-emerald-4.q-tab--active { color: var(--emerald-text) !important; }
+.q-tabs.text-emerald-4 .q-tab__indicator { background: var(--emerald-text) !important; }
 
 .text-appbar-inactive { color: var(--appbar-text-inactive) !important; }
 .text-appbar-active { color: var(--appbar-text-active) !important; }

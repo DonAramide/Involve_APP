@@ -125,7 +125,13 @@
         </q-card-section>
 
         <q-card-section class="q-gutter-md">
-          <q-input v-model="form.id" label="Auth ID (UUID)" dark filled dense :readonly="isEditing" />
+          <q-input v-model="form.id" label="Auth ID (UUID)" dark filled dense :readonly="isEditing">
+            <template v-slot:append v-if="!isEditing">
+              <q-btn flat round dense icon="autorenew" color="amber-5" @click="form.id = generateUUID()">
+                <q-tooltip class="bg-indigo-10 text-white">Auto-generate random development UUID</q-tooltip>
+              </q-btn>
+            </template>
+          </q-input>
           <q-input v-model="form.name" label="Full Name" dark filled dense />
           <q-input v-model="form.email" label="Email Address" dark filled dense :readonly="isEditing" />
           
@@ -156,6 +162,26 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <!-- Invite Teacher Modal -->
+    <q-dialog v-model="showInvite" persistent>
+      <q-card style="width: 450px" class="bg-blue-grey-10 text-white border-indigo">
+        <q-card-section>
+          <div class="text-h6 text-weight-bold">Invite Teacher</div>
+          <div class="text-caption text-grey-6">Generate a secure ACCEPT invitation link for new staff.</div>
+        </q-card-section>
+
+        <q-card-section class="q-gutter-md">
+          <q-input v-model="inviteEmail" label="Email Address" dark filled dense />
+          <q-input v-if="lastInviteLink" v-model="lastInviteLink" label="Generated Invitation Link" dark filled dense readonly class="font-mono text-cyan-4" />
+        </q-card-section>
+
+        <q-card-actions align="right" class="q-pb-md q-px-md">
+          <q-btn flat label="Close" v-close-popup color="grey-6" @click="inviteEmail = ''; lastInviteLink = ''" />
+          <q-btn label="Send Invite" color="indigo-7" class="q-px-md glossy" @click="inviteMember" :loading="sending" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
@@ -180,7 +206,23 @@ const searchText = ref('')
 const selectedTenant = ref(null)
 const selectedRole = ref('all')
 
+const showInvite = ref(false)
+const inviteEmail = ref('')
+const sending = ref(false)
+const lastInviteLink = ref('')
+
 const form = ref({ id: '', name: '', email: '', role: 'staff', tenantId: null })
+
+const generateUUID = () => {
+  try {
+    return crypto.randomUUID()
+  } catch (e) {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+}
 
 const columns = [
   { name: 'name', label: 'USER IDENTITY', field: 'name', align: 'left', sortable: true },

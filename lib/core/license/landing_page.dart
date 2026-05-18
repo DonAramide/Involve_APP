@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
+import 'package:involve_app/features/activation/presentation/pages/device_onboarding_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
@@ -23,6 +25,17 @@ class _LandingPageState extends State<LandingPage> {
   }
 
   Future<void> _checkLicense() async {
+    // Check onboarding completed first
+    final isOnboarded = await StorageService.isOnboardingCompleted();
+    if (!isOnboarded) {
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const DeviceOnboardingPage()),
+        );
+      }
+      return;
+    }
+
     // Check date tamper first
     final isTampered = await LicenseService.isDateTampered();
     if (isTampered) {

@@ -1,11 +1,14 @@
 <!-- invify-admin/src/pages/OnboardingFlow.vue -->
 <template>
-  <q-layout view="lHh Lpr lFf" style="background: #05070d; min-height: 100vh;">
+  <q-layout view="lHh Lpr lFf" style="background: #05070d; min-height: 100vh; position: relative; overflow: hidden;">
     <q-page-container>
-      <q-page class="flex flex-center q-pa-xl">
+      <q-page class="flex flex-center q-pa-xl" style="position: relative;">
+        
+        <!-- Watermarked Invify Logo Background -->
+        <img :src="logoImg" class="onboarding-bg-logo" />
     
     <!-- Stripe Atlas-Grade Setup Main Container -->
-    <q-card style="width: 850px; max-width: 95vw; background: #0b0f19; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; overflow: hidden;" class="shadow-24 text-white">
+    <q-card style="width: 850px; max-width: 95vw; background: #0b0f19; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; overflow: hidden; z-index: 1;" class="shadow-24 text-white">
       
       <!-- Linear Progress Telemetry Indicator -->
       <q-linear-progress :value="progress" color="indigo-5" class="q-mt-none" style="height: 4px;" />
@@ -362,7 +365,7 @@
               </div>
 
               <!-- Credentials Card -->
-              <q-card class="bg-[#101625] q-mt-lg q-pa-lg text-left border-grey-9 shadow-4">
+              <q-card class="card-dark q-mt-lg q-pa-lg text-left shadow-4" style="background: #101625 !important; border: 1px solid rgba(255,255,255,0.06) !important; color: #ffffff !important;">
                 <div class="row items-center justify-between q-mb-md border-bottom q-pb-sm" style="border-color: rgba(255,255,255,0.06);">
                   <span class="text-weight-bold text-indigo-4 text-uppercase tracking-wider font-mono" style="font-size: 11px;">Tenant Access Credentials</span>
                   <q-chip size="xs" color="indigo-10" text-color="white" dense class="text-metric-mono">
@@ -370,22 +373,22 @@
                   </q-chip>
                 </div>
 
-                <div class="column op-gap-8 text-caption font-mono">
+                <div class="column op-gap-8 text-caption font-mono" style="color: #ffffff !important;">
                   <div>
-                    <span class="text-grey-5">Organization Name:</span>
-                    <strong class="text-white q-ml-xs">{{ form.businessName }}</strong>
+                    <span style="color: #9ca3af !important;">Organization Name:</span>
+                    <strong class="text-white q-ml-xs" style="color: #ffffff !important;">{{ form.businessName }}</strong>
                   </div>
                   <div>
-                    <span class="text-grey-5">Identity Email:</span>
-                    <strong class="text-white q-ml-xs">{{ form.email }}</strong>
+                    <span style="color: #9ca3af !important;">Identity Email:</span>
+                    <strong class="text-white q-ml-xs" style="color: #ffffff !important;">{{ form.email }}</strong>
                   </div>
                   <div>
-                    <span class="text-grey-5">Initial Passphrase:</span>
-                    <span class="q-ml-xs text-amber-5 text-weight-bold">{{ form.password }}</span>
+                    <span style="color: #9ca3af !important;">Initial Passphrase:</span>
+                    <span class="q-ml-xs text-amber-5 text-weight-bold" style="color: #f59e0b !important;">{{ form.password }}</span>
                   </div>
-                  <div class="row items-center justify-between q-mt-sm bg-[#05070d] q-pa-sm rounded-borders border-grey-9">
-                    <span class="text-grey-5 text-caption">Initial Balance:</span>
-                    <strong class="text-green-4 text-metric-mono font-mono text-weight-bolder">₦{{ (form.plan === 'enterprise' ? 100000 : 50000).toLocaleString() }}</strong>
+                  <div class="row items-center justify-between q-mt-sm q-pa-sm rounded-borders" style="background: #05070d !important; border: 1px solid rgba(255,255,255,0.06) !important;">
+                    <span style="color: #9ca3af !important;" class="text-caption">Initial Balance:</span>
+                    <strong class="text-green-4 text-metric-mono font-mono text-weight-bolder" style="color: #34d399 !important;">₦{{ (form.plan === 'enterprise' ? 100000 : 50000).toLocaleString() }}</strong>
                   </div>
                 </div>
 
@@ -466,6 +469,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar, copyToClipboard } from 'quasar'
 import axios from 'axios'
+import logoImg from '../assets/logo_transparent.png'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -715,4 +719,16 @@ const testNewTenantLogin = () => {
 }
 
 .transition-3 { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+.onboarding-bg-logo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: auto;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
+}
 </style>

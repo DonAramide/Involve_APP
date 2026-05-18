@@ -18,4 +18,6 @@ class StorageService {
   static Future<void> clearProExpiryDate() async {}
   static Future<void> setDeviceAccessGranted(bool granted) async {}
   static Future<bool> isDeviceAccessGranted() async => false;
+  static Future<void> setOnboardingCompleted(bool completed) async {}
+  static Future<bool> isOnboardingCompleted() async => false;
 }

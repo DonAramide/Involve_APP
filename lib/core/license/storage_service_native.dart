@@ -15,6 +15,7 @@ class StorageService {
   static const _lastPrinterIpKey = 'last_printer_ip';
   static const _proExpiryKey = 'pro_plan_expiry';
   static const _deviceAccessKey = 'device_admin_access_granted';
+  static const _onboardingCompleteKey = 'onboarding_complete';
   static const _licenseFileName = 'license.dat';
 
   static const _encryptionKey = 0xAF;
@@ -205,6 +206,29 @@ class StorageService {
       value = await _secureStorage.read(key: _deviceAccessKey);
     } else {
       final file = await _getDesktopFile('admin_access.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    return value == 'true';
+  }
+
+  static Future<void> setOnboardingCompleted(bool completed) async {
+    final value = completed ? 'true' : 'false';
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _onboardingCompleteKey, value: value);
+    } else {
+      final file = await _getDesktopFile('onboarding.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<bool> isOnboardingCompleted() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _onboardingCompleteKey);
+    } else {
+      final file = await _getDesktopFile('onboarding.dat');
       if (await file.exists()) {
         value = await file.readAsString();
       }

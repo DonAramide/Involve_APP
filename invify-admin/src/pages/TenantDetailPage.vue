@@ -22,6 +22,16 @@
         <div class="text-grey-5">{{ tenant.type?.toUpperCase() }} • Plan: {{ tenant.plan?.toUpperCase() }} • ID: {{ tenant.id }}</div>
       </div>
       <div class="col-auto">
+        <q-btn 
+          color="amber-8" 
+          text-color="black"
+          icon="vpn_key" 
+          label="Generate Activation Code" 
+          @click="openActivationShortcut" 
+          class="q-mr-sm text-weight-bold animate-pulse-amber" 
+        >
+          <q-tooltip>Instantly generate and certify a secure terminal activation code for this tenant</q-tooltip>
+        </q-btn>
         <q-btn outline color="indigo-4" icon="edit" label="Edit" @click="openEditModal" class="q-mr-sm" />
         <q-btn flat color="grey-6" icon="refresh" @click="fetchDetails" />
       </div>
@@ -239,16 +249,143 @@
         </q-tab-panel>
       </q-tab-panels>
     </q-card>
+
+    <!-- SHORTCUT ACTIVATION CONFIG DIALOG -->
+    <q-dialog v-model="showShortcutDialog" persistent>
+      <q-card style="min-width: 420px" class="bg-grey-9 text-white border-gold rounded-borders shadow-24">
+        <q-card-section class="bg-indigo-10 text-white q-py-md">
+          <div class="text-h6 text-weight-bold row items-center op-gap-8 no-wrap">
+            <q-icon name="vpn_key" color="amber-8" />
+            <span>Generate Terminal Activation</span>
+          </div>
+          <div class="text-caption text-indigo-3 q-mt-xs">Instantly authorize a new POS/mobile terminal for {{ tenant.name }}</div>
+        </q-card-section>
+
+        <q-card-section class="q-pt-lg q-px-lg">
+          <q-select
+            v-model="shortcutConfig.duration"
+            :options="durationOptions"
+            label="License Duration"
+            dark filled 
+            emit-value map-options
+            class="q-mb-md font-mono"
+            label-color="indigo-3"
+          />
+
+          <q-select
+            v-model="shortcutConfig.planIndex"
+            :options="planOptions"
+            label="Service Plan Level"
+            dark filled 
+            emit-value map-options
+            class="q-mb-md font-mono"
+            label-color="indigo-3"
+          />
+
+          <q-input
+            v-model="shortcutConfig.deviceSuffix"
+            label="Device Suffix (6 chars)"
+            placeholder="e.g. DSPREAD"
+            dark filled
+            class="font-mono q-mb-md"
+            label-color="indigo-3"
+          />
+        </q-card-section>
+
+        <q-card-actions align="right" class="bg-grey-10 q-pa-md">
+          <q-btn flat label="Cancel" color="grey-5" class="text-weight-bold" v-close-popup />
+          <q-btn color="amber-8" text-color="black" label="Generate License Key" class="text-weight-bold" @click="generateShortcutCode" :loading="generating" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <!-- LUXURY LICENSE CERTIFICATE DIALOG -->
+    <q-dialog v-model="showSuccessDialog" persistent transition-show="scale" transition-hide="scale">
+      <q-card class="certificate-card relative-position overflow-hidden shadow-24" style="min-width: 650px; max-height: 90vh; display: flex; flex-direction: column;">
+        
+        <!-- Watermark Background -->
+        <div class="absolute-center full-width text-center no-pointer-events" style="opacity: 0.03; font-size: 10rem; transform: translate(-50%, -50%) rotate(-30deg); font-weight: 900; color: white;">INVIFY</div>
+
+        <!-- Scrollable Content -->
+        <q-card-section class="q-pa-xl text-center scroll" id="printable-certificate" style="flex: 1;">
+          <div class="column items-center q-mb-xl">
+             <div class="q-mb-sm">
+                <img :src="absoluteLogoUrl" style="height: 120px; width: auto; object-fit: contain;" />
+             </div>
+             <div class="text-overline text-amber-2 letter-spacing-10 q-mt-none opacity-8">LICENSED TERMINAL</div>
+          </div>
+          
+          <div class="q-my-xl">
+             <div class="text-caption text-amber-2 text-weight-medium uppercase letter-spacing-3 q-mb-sm">CERTIFIED FOR OPERATION</div>
+             <div class="text-h2 text-weight-bold text-white q-my-md text-shadow-glow" style="font-size: 2.2rem; margin-bottom: 4px;">{{ certificateData.businessName }}</div>
+             <div class="text-caption text-grey-4 q-mt-none font-mono q-mb-md" style="font-size: 0.95rem; opacity: 0.85;">
+                Device ID: <span class="text-amber-3 text-weight-bold">{{ certificateData.deviceId }}</span>
+             </div>
+             <div class="row justify-center items-center q-gutter-sm no-wrap">
+                <div class="text-subtitle1 text-grey-4">Licensed Mode:</div>
+                <div class="text-subtitle1 text-amber-5 text-weight-bolder uppercase">{{ certificateData.mode }}</div>
+             </div>
+          </div>
+
+          <!-- Info Grid -->
+          <div class="row q-col-gutter-xl q-my-xl justify-center">
+            <div class="col-4 border-right-grey">
+              <div class="text-caption text-amber-2 text-weight-bold">PLAN LEVEL</div>
+              <div class="text-h6 text-white text-weight-medium">{{ certificateData.plan }}</div>
+            </div>
+            <div class="col-4 border-right-grey">
+              <div class="text-caption text-amber-2 text-weight-bold">VALIDITY</div>
+              <div class="text-h6 text-white text-weight-medium">{{ certificateData.duration }}</div>
+            </div>
+            <div class="col-4">
+              <div class="text-caption text-amber-2 text-weight-bold">EXPIRATION</div>
+              <div class="text-h6 text-white text-weight-medium">{{ certificateData.expiry }}</div>
+            </div>
+          </div>
+
+          <!-- Secure Code Area -->
+          <div class="code-container q-pa-lg q-mt-md">
+             <div class="text-overline text-amber-3 letter-spacing-5 q-mb-md">SECURE ACTIVATION KEY</div>
+             <div class="text-h2 text-weight-bolder text-amber-5 font-mono code-glow" style="font-size: 2.5rem;">{{ lastGeneratedCode }}</div>
+          </div>
+
+          <div class="text-caption text-grey-5 q-mt-lg italic opacity-6">
+            Authorized by Invify Global Licensing Authority. This document is encrypted and non-transferable.
+          </div>
+          
+          <div class="q-mt-xl text-caption text-weight-bold text-amber-2 letter-spacing-3 opacity-8">
+            Powered by www.invify.iips.app
+          </div>
+        </q-card-section>
+
+        <!-- Fixed Actions Bottom -->
+        <q-card-actions align="between" class="q-pa-lg bg-black-transparent backdrop-blur" style="border-top: 1px solid rgba(255,255,255,0.05)">
+          <q-btn flat color="grey-5" label="Dismiss" v-close-popup class="text-weight-bold" />
+          <div class="row q-gutter-md">
+            <q-btn unelevated color="indigo-10" icon="content_copy" label="Copy Key" @click="copyShortcutCode" class="q-px-lg text-weight-bold" />
+            <q-btn unelevated color="amber-9" icon="print" label="Download PDF / Print" @click="printShortcutCertificate" class="q-px-lg text-weight-bold text-black" />
+          </div>
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 
   <q-inner-loading :showing="loading" dark color="indigo-4" />
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { useQuasar } from 'quasar'
-import { adminApi } from '../api'
+import { useQuasar, copyToClipboard } from 'quasar'
+import { adminApi, deviceApi } from '../api'
+import logo from '../assets/logo.png'
+
+const absoluteLogoUrl = computed(() => {
+  if (!logo) return ''
+  if (logo.startsWith('http') || logo.startsWith('data:')) return logo
+  const cleanPath = logo.startsWith('/') ? logo : '/' + logo
+  return window.location.origin + cleanPath
+})
 
 const $q = useQuasar()
 const $route = useRoute()
@@ -266,14 +403,205 @@ const wallet = ref({
 })
 const recentUsage = ref([])
 
+const showShortcutDialog = ref(false)
+const showSuccessDialog = ref(false)
+const generating = ref(false)
+const lastGeneratedCode = ref('')
+const certificateData = ref({
+  businessName: '',
+  mode: '',
+  plan: '',
+  duration: '',
+  expiry: '',
+  deviceId: ''
+})
+
+const shortcutConfig = ref({
+  duration: 30,
+  planIndex: 1,
+  deviceSuffix: '8841'
+})
+
+const durationOptions = [
+  { label: '1 Month', value: 30 },
+  { label: '2 Months', value: 60 },
+  { label: '3 Months', value: 90 },
+  { label: '6 Months', value: 180 },
+  { label: '1 Year', value: 365 },
+  { label: '2 Years', value: 730 },
+  { label: 'Lifetime', value: 36500 }
+]
+
+const planOptions = [
+  { label: 'BASIC', value: 0 },
+  { label: 'STANDARD', value: 1 },
+  { label: 'PREMIUM', value: 2 },
+  { label: 'ENTERPRISE', value: 3 }
+]
+
+const openActivationShortcut = () => {
+  if (!tenant.value) return
+  shortcutConfig.value.planIndex = getPlanIndex(tenant.value.plan)
+  shortcutConfig.value.deviceSuffix = Math.floor(1000 + Math.random() * 9000).toString()
+  showShortcutDialog.value = true
+}
+
+const getPlanIndex = (planName) => {
+  const name = (planName || 'standard').toLowerCase()
+  if (name.includes('starter') || name.includes('basic') || name.includes('free')) return 0
+  if (name.includes('premium')) return 2
+  if (name.includes('enterprise') || name.includes('custom')) return 3
+  return 1
+}
+
+const generateShortcutCode = async () => {
+  if (!tenant.value) return
+  generating.value = true
+  try {
+    const { data } = await deviceApi.createActivation({
+      tenantId: tenant.value.id,
+      durationDays: shortcutConfig.value.duration,
+      planIndex: shortcutConfig.value.planIndex,
+      deviceSuffix: shortcutConfig.value.deviceSuffix
+    })
+
+    const expiryDate = new Date()
+    expiryDate.setDate(expiryDate.getDate() + shortcutConfig.value.duration)
+
+    certificateData.value = {
+      businessName: tenant.value.name,
+      mode: tenant.value.type ? tenant.value.type.toUpperCase() : 'RETAIL',
+      plan: planOptions.find(p => p.value === shortcutConfig.value.planIndex)?.label || 'STANDARD',
+      duration: durationOptions.find(d => d.value === shortcutConfig.value.duration)?.label || '30 Days',
+      expiry: expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+      deviceId: data.device_id || `DSPREAD-POS-${shortcutConfig.value.deviceSuffix}8MM-${Math.floor(1000 + Math.random() * 9000)}`
+    }
+
+    lastGeneratedCode.value = data.activation_code
+    showShortcutDialog.value = false
+    showSuccessDialog.value = true
+    
+    fetchDetails()
+  } catch (err) {
+    console.error('Shortcut activation generation failed:', err)
+    $q.notify({ type: 'negative', message: 'Failed to generate code.' })
+  } finally {
+    generating.value = false
+  }
+}
+
+const copyShortcutCode = () => {
+  copyToClipboard(lastGeneratedCode.value)
+    .then(() => {
+      $q.notify({ type: 'positive', message: 'Activation code copied to clipboard!' })
+    })
+    .catch(() => {
+      $q.notify({ type: 'negative', message: 'Failed to copy activation code.' })
+    })
+}
+
+const printShortcutCertificate = () => {
+  const printWindow = window.open('', '_blank')
+  const content = document.getElementById('printable-certificate').innerHTML
+  
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Invify License Certificate - ${certificateData.value.businessName}</title>
+        <style>
+          @page { margin: 0; size: A4; }
+          body { 
+            margin: 0; 
+            padding: 0; 
+            background: #0f172a; 
+            color: white; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            width: 210mm;
+            height: 297mm;
+            overflow: hidden;
+          }
+          .certificate-print-container {
+            width: 210mm;
+            height: 297mm;
+            padding: 20mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            box-sizing: border-box;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            position: relative;
+            overflow: hidden;
+          }
+          .text-h2 { font-size: 2.5rem; font-weight: bold; margin: 15px 0; }
+          .text-h3 { font-size: 2.2rem; font-weight: 900; color: #fbbf24; margin: 0; letter-spacing: 2px; }
+          .text-subtitle1 { font-size: 1.2rem; }
+          .text-amber-5 { color: #fbbf24; }
+          .text-amber-2 { color: #fde68a; }
+          .text-grey-4 { color: #bdbdbd; }
+          .text-grey-5 { color: #9e9e9e; }
+          .code-container { 
+            background: #1e293b; 
+            border: 1px solid rgba(251, 191, 36, 0.4); 
+            padding: 30px; 
+            margin-top: 20px; 
+            border-radius: 16px; 
+            width: 100%;
+          }
+          .font-mono { font-family: 'Courier New', Courier, monospace; font-size: 2.5rem; letter-spacing: 6px; color: #fbbf24; }
+          .row { display: flex !important; flex-direction: row !important; width: 100%; justify-content: center; gap: 20px; margin: 20px 0; align-items: center; }
+          .no-wrap { flex-wrap: nowrap; }
+          .col-4 { flex: 1; border-right: 1px solid rgba(255,255,255,0.1); }
+          .col-4:last-child { border-right: none; }
+          img { height: 100px; margin-bottom: 15px; }
+          .uppercase { text-transform: uppercase; }
+          .letter-spacing-10 { letter-spacing: 10px; }
+          .letter-spacing-3 { letter-spacing: 3px; }
+          .opacity-6 { opacity: 0.6; }
+          .opacity-8 { opacity: 0.8; }
+          .italic { font-style: italic; }
+          .q-mt-xl { margin-top: 40px; }
+          .q-mt-md { margin-top: 20px; }
+          .q-mt-lg { margin-top: 30px; }
+          .q-mb-sm { margin-bottom: 8px; }
+          .q-mb-md { margin-bottom: 16px; }
+          .q-mb-none { margin-bottom: 0; }
+        </style>
+      </head>
+      <body>
+        <div class="certificate-print-container">
+          ${content}
+        </div>
+        <script>
+          setTimeout(() => {
+            window.print();
+            window.close();
+          }, 500);
+        <\/script>
+      </body>
+    </html>
+  `)
+  printWindow.document.close()
+}
+
 const fetchDetails = async () => {
   loading.value = true
   try {
     const { data } = await adminApi.getTenantDetails($route.params.id)
     tenant.value = data.tenant
-    users.value = data.users
-    wallet.value = data.wallet
-    recentUsage.value = data.recentUsage
+    users.value = data.users || []
+    wallet.value = {
+      balance: 0,
+      subAccount: null,
+      virtualAccounts: [],
+      transactions: [],
+      allWallets: [],
+      ...(data.wallet || {})
+    }
+    recentUsage.value = data.recentUsage || []
   } finally {
     loading.value = false
   }
@@ -285,5 +613,50 @@ onMounted(fetchDetails)
 <style scoped>
 .min-height-400 {
   min-height: 400px;
+}
+
+.certificate-card {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border: 2px solid #fbbf24 !important;
+  border-radius: 24px;
+}
+
+.text-shadow-glow {
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.code-container {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  border-radius: 16px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.code-glow {
+  text-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+  letter-spacing: 8px;
+}
+
+.border-right-grey {
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.letter-spacing-10 { letter-spacing: 10px; }
+.letter-spacing-3 { letter-spacing: 3px; }
+.backdrop-blur { backdrop-filter: blur(8px); }
+.bg-black-transparent { background: rgba(0, 0, 0, 0.4); }
+
+.border-gold { border: 2px solid #fbbf24 !important; }
+.font-mono { font-family: 'Courier New', Courier, monospace; }
+
+@keyframes pulse-amber {
+  0% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+
+.animate-pulse-amber {
+  animation: pulse-amber 2s infinite;
 }
 </style>

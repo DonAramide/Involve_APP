@@ -11,6 +11,7 @@
         <div>
           <div class="text-operator-title text-main text-weight-bold row items-center op-gap-4">
             <span>AI Operational Intelligence & Predictive Analytics</span>
+            <enterprise-context-hint registry-key="ai-copilot" />
             <q-badge color="blue-grey-9" text-color="amber-5" class="text-metric-sm">
               FINAL REFINEMENTS #1-6 APPLIED
             </q-badge>
@@ -82,6 +83,7 @@
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="account_tree" size="xs" color="purple-3" />
               <span class="text-operator-title text-main text-weight-bold">Correlated RCA Timeline Reconstruction</span>
+              <enterprise-context-hint registry-key="ai-rca" />
             </div>
             <q-badge color="purple-10" text-color="purple-2" class="text-metric-sm" v-if="activeRcaTrace">
               CONSENSUS: {{ Math.round(activeRcaTrace.causalConfidence * 100) }}%
@@ -283,6 +285,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useQuasar } from 'quasar'
+import EnterpriseContextHint from '../../components/contextual/EnterpriseContextHint.vue'
 
 import { aiGovernanceEngineSingleton } from '../../ai-governance/AIGovernanceEngine'
 import { predictiveIncidentEngineSingleton } from '../../services/ai/PredictiveIncidentEngine'
