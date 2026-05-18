@@ -29,6 +29,7 @@ interface MockActivation {
   status: string;
   is_used: boolean;
   created_at: string;
+  created_by?: string;
   tenants?: { name: string; plan: string };
 }
 
