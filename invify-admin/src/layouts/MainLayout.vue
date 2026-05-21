@@ -673,6 +673,7 @@ const activeNavigationTree = computed(() => {
     
     case 'apps':
       return [
+        { label: 'APK Fleet Deployment', path: '/apps/apk-deployment', icon: 'system_update', color: 'cyan-4', badge: '3 Vault Slots', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
         { label: 'Installed Applications Explorer', path: '/apps/installed', icon: 'apps', color: 'cyan-3', badge: '12 Cols', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
         { label: 'Forbidden Apps Governance', path: '/apps/forbidden', icon: 'block', color: 'red-4', badge: 'BLOCKED', badgeBg: 'red-10', badgeColor: 'red-2' },
         { label: 'Accessibility Abuse Interception', path: '/apps/accessibility', icon: 'visibility_off', color: 'amber-4', badge: 'Confidence %', badgeBg: 'amber-10', badgeColor: 'amber-3', motionPulse: 'pulse-warning' },
@@ -748,6 +749,7 @@ const getMenuDescription = (label) => {
     'Rollback Safeguards': 'Manage emergency rollback profiles, recovery scripts, and target configuration baselines to restore system balance.',
 
     // Apps
+    'APK Fleet Deployment': 'Upload, vault, and remotely install or uninstall APK packages across selected fleet devices. Supports a maximum of 3 concurrent APK vault entries.',
     'Installed Applications Explorer': 'Browse and audit the full portfolio of installed applications, microservices, and client versions across edge nodes.',
     'Forbidden Apps Governance': 'Define and enforce platform-level blacklists to prevent sideloading of unauthorized or high-risk packages.',
     'Accessibility Abuse Interception': 'Track applications requesting invasive accessibility permissions, protecting terminals from credential hijacking.',

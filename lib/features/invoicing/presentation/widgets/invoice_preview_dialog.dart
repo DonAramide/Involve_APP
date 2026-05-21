@@ -32,10 +32,16 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   void initState() {
     super.initState();
     _amountReceivedController = TextEditingController();
+    _amountReceivedController.addListener(_onAmountChanged);
+  }
+
+  void _onAmountChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _amountReceivedController.removeListener(_onAmountChanged);
     _amountReceivedController.dispose();
     super.dispose();
   }
@@ -143,20 +149,34 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           ),
                         ],
                         
-                        if (settings?.showAccountDetails == true && settings?.bankName != null) ...[
-                          const SizedBox(height: 12),
-                          const Divider(thickness: 1),
-                          const Center(
-                            child: Text(
-                              'PAYMENT DETAILS',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Center(child: Text('Bank: ${settings!.bankName}', style: const TextStyle(fontSize: 12))),
-                          Center(child: Text('Account: ${settings.accountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
-                          Center(child: Text('Name: ${settings.accountName ?? ""}', style: const TextStyle(fontSize: 12))),
-                        ],
+                        Builder(
+                          builder: (context) {
+                            final amountReceived = double.tryParse(_amountReceivedController.text) ?? 0.0;
+                            final balanceAmount = (invoiceState.total - amountReceived).clamp(0.0, double.infinity);
+                            final isFullPayment = balanceAmount <= 0;
+                            final showAccount = (settings?.showAccountDetails == true || invoiceState.paymentMethod == 'Transfer' || invoiceState.paymentMethod == 'VirtualAccount') && !isFullPayment;
+                            
+                            if (showAccount && settings?.bankName != null) {
+                              return Column(
+                                children: [
+                                  const SizedBox(height: 12),
+                                  const Divider(thickness: 1),
+                                  const Center(
+                                    child: Text(
+                                      'PAYMENT DETAILS',
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Center(child: Text('Bank: ${settings!.bankName}', style: const TextStyle(fontSize: 12))),
+                                  Center(child: Text('Account: ${settings.accountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
+                                  Center(child: Text('Name: ${settings.accountName ?? ""}', style: const TextStyle(fontSize: 12))),
+                                ],
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
 
                         if (settings?.paymentMethodsEnabled == true) ...[
                           const Divider(),

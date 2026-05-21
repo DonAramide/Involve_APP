@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-enum PlanType { basic, pro, lifetime }
+enum PlanType { basic, standard, premium, enterprise }
 
 class LicenseModel {
   final String businessName;

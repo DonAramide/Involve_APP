@@ -22,6 +22,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42); // Logic for 58, 80, 88
+    final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -77,7 +78,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
       TextCommand('-' * width),
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (showAccount && settings.bankName != null) ...[
         TextCommand('PAYMENT DETAILS', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}', align: 'center'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
@@ -115,6 +116,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+    final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -159,7 +161,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (showAccount && settings.bankName != null) ...[
         TextCommand('-' * width),
         TextCommand('ACCOUNT DETAILS', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}'),
@@ -198,12 +200,14 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+    final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
 
     return [
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       TextCommand('Date: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'center'),
       if (invoice.customerName != null)
         TextCommand('${settings.businessMode == 'school' ? 'Student' : 'Cust'}: ${invoice.customerName}', align: 'center'),
+      if (invoice.paymentMethod != null) TextCommand('Method: ${invoice.paymentMethod}', align: 'center'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'center'),
       TextCommand('-' * width),
       ...invoice.items.map((item) {
@@ -218,7 +222,7 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
         TextCommand('PAID: ${CurrencyFormatter.format(invoice.amountPaid)}', align: 'right'),
         TextCommand('BAL:  ${CurrencyFormatter.format(invoice.balanceAmount)}', align: 'right'),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (showAccount && settings.bankName != null) ...[
         TextCommand('-' * width),
         TextCommand('PAYMENT: ${settings.bankName}', align: 'center'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
@@ -250,6 +254,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+    final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -265,6 +270,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       SizedBoxCommand(height: 1),
       TextCommand('INVOICE #: ${invoice.invoiceNumber}', align: 'right'),
       TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'right'),
+      if (invoice.paymentMethod != null) TextCommand('PAYMENT METHOD: ${invoice.paymentMethod}', align: 'right'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'right'),
       TextCommand('-' * width),
       // Dynamic Table Header
@@ -296,7 +302,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
         TextCommand(_formatSummaryRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatSummaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (showAccount && settings.bankName != null) ...[
         TextCommand('-' * width),
         TextCommand('PAYMENT METHODS:', isBold: true),
         TextCommand('Bank: ${settings.bankName}'),
@@ -378,6 +384,7 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     const int width = 32;
+    final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
 
     return [
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
@@ -388,6 +395,7 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
       TextCommand('${settings.businessMode == 'school' ? 'STUDENT' : 'TO'}: ${invoice.customerName ?? (settings.businessMode == 'school' ? "Student" : "Client")}'),
       if (invoice.customerPhone != null) TextCommand('TEL: ${invoice.customerPhone}'),
       TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}'),
+      if (invoice.paymentMethod != null) TextCommand('METHOD: ${invoice.paymentMethod}'),
       TextCommand('-' * width),
       // 3-Column: QTY(5), ITEM(15), TOTAL(12) = 32
       TextCommand('QTY   ITEM           TOTAL', isBold: true),
@@ -423,7 +431,7 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width), isBold: true),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (showAccount && settings.bankName != null) ...[
         TextCommand('-' * width),
         TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}', align: 'center'),
@@ -459,6 +467,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+    final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
 
     return [
       if (settings.showCacNumber && settings.cacNumber != null && settings.cacNumber!.isNotEmpty)
@@ -473,6 +482,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
       TextCommand('-' * width),
       TextCommand('INV NO: ${invoice.invoiceNumber}'),
       TextCommand('DATE:   ${invoice.dateCreated.toString().split(' ')[0]}'),
+      if (invoice.paymentMethod != null) TextCommand('METHOD: ${invoice.paymentMethod}'),
       TextCommand('-' * width),
       // Dynamic Table Header
       TextCommand(_buildTableHeader(width), isBold: true),
@@ -492,7 +502,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
         TextCommand(_formatRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid), width)),
         TextCommand(_formatRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), width)),
       ],
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (showAccount && settings.bankName != null) ...[
         TextCommand('-' * width),
         TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}', align: 'center'),
@@ -555,6 +565,7 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
   List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
+    final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -565,6 +576,7 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
       TextCommand('SCHOOL RECEIPT', align: 'center', isBold: true),
       TextCommand('No: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated)}'),
+      if (invoice.paymentMethod != null) TextCommand('Payment Method: ${invoice.paymentMethod}'),
       TextCommand('-' * width),
       
       // Student Info Section
@@ -602,7 +614,7 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
       )),
       
       TextCommand('=' * width),
-      if (settings.showAccountDetails && settings.bankName != null) ...[
+      if (showAccount && settings.bankName != null) ...[
         TextCommand('PAYMENT INFORMATION', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}', align: 'center'),
         if (settings.accountNumber != null) TextCommand('A/C: ${settings.accountNumber}', align: 'center'),

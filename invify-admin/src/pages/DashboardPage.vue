@@ -12,7 +12,7 @@
           </div>
         </div>
         <q-chip dense color="blue-grey-10" text-color="blue-5" class="text-metric-sm q-ma-none v-hide-xs">
-          Stream Topic: <span class="text-main q-ml-xs">quasar.{{ activeWorkspace }}.{{ fleetSubMode !== 'default' ? fleetSubMode : 'telemetry' }}.*</span>
+          Stream Topic: <span class="text-main q-ml-xs">quasar.{{ activeWorkspace }}.{{ activeSubModeName }}.*</span>
         </q-chip>
       </div>
 
@@ -195,6 +195,25 @@ const fleetSubMode = computed(() => {
   return 'default'
 })
 
+const observabilitySubMode = computed(() => {
+  if (route.path.endsWith('/streams')) return 'streams'
+  if (route.path.endsWith('/metrics')) return 'metrics'
+  if (route.path.endsWith('/queues')) return 'queues'
+  if (route.path.endsWith('/websocket-health')) return 'websocket-health'
+  if (route.path.endsWith('/pipelines')) return 'pipelines'
+  return 'default'
+})
+
+const activeSubModeName = computed(() => {
+  if (activeWorkspace.value === 'fleet') {
+    return fleetSubMode.value !== 'default' ? fleetSubMode.value : 'telemetry'
+  }
+  if (activeWorkspace.value === 'observability') {
+    return observabilitySubMode.value !== 'default' ? observabilitySubMode.value : 'streams'
+  }
+  return 'default'
+})
+
 const activeWorkspaceLabel = computed(() => {
   if (activeWorkspace.value === 'fleet') {
     const subModeMap = {
@@ -207,12 +226,28 @@ const activeWorkspaceLabel = computed(() => {
     return subModeMap[fleetSubMode.value] || 'Fleet Operations'
   }
 
+  if (activeWorkspace.value === 'observability') {
+    const subModeMap = {
+      streams: 'Live Event Streams',
+      metrics: 'Telemetry Metrics',
+      queues: 'Queue Health Maps',
+      'websocket-health': 'WebSocket Diagnostics',
+      pipelines: 'Ingestion Pipelines'
+    }
+    return subModeMap[observabilitySubMode.value] || 'Observability'
+  }
+
+  if (activeWorkspace.value === 'incidents') {
+    return 'Incident Response'
+  }
+
   const map = {
     observability: 'Observability',
     fleet: 'Fleet Operations',
     finance: 'Finance Operations',
     governance: 'Governance',
-    ai: 'AI Operations'
+    ai: 'AI Operations',
+    incidents: 'Incident Response'
   }
   return map[activeWorkspace.value] || 'Operations'
 })
@@ -276,7 +311,59 @@ const kpiCards = computed(() => {
     }
   }
 
-  // Default (Observability)
+  if (activeWorkspace.value === 'observability') {
+    if (observabilitySubMode.value === 'streams') {
+      return {
+        kpi1: { label: 'Stream Influx', value: throughputEps.value || '4.8', unit: 'eps', sub: 'Peak buffer: 14.2 MB/s', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Topics', value: '3', unit: 'streams', sub: 'Topics: wallet, fleet, reconciliation', border: 'border-indigo-left', icon: 'rss_feed' },
+        kpi3: { label: 'Stream Warnings', value: String(warningEventsCount.value), unit: '', sub: 'Stale packets in window', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Corrupt Packets Rejected', value: String(criticalEventsCount.value), unit: 'drops', sub: 'Schema verification check failed', border: 'border-red-left', dot: 'pulse-critical' }
+      }
+    }
+    if (observabilitySubMode.value === 'metrics') {
+      return {
+        kpi1: { label: 'Ingested Telemetry Packets', value: '254k', unit: 'packets', sub: 'Aggregated historical rollup', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Polled Datapoints', value: '142', unit: 'metrics', sub: 'CPU, RAM, Signal Strength, etc.', border: 'border-indigo-left', icon: 'query_stats' },
+        kpi3: { label: 'Drift Alerts', value: '2', unit: 'anomalies', sub: 'Active baseline deviations', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Out of Bounds Violations', value: '0', unit: 'critical', sub: 'Absolute threshold violations', border: 'border-red-left', dot: 'pulse-healthy' }
+      }
+    }
+    if (observabilitySubMode.value === 'queues') {
+      return {
+        kpi1: { label: 'Queue Load', value: '12%', unit: 'capacity', sub: 'Processing capacity: 10k/sec', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Workers', value: '8', unit: 'threads', sub: 'Consumer partitions: 16 total', border: 'border-indigo-left', icon: 'dns' },
+        kpi3: { label: 'Pending Message Lag', value: '14', unit: 'messages', sub: 'Average lag duration: 18ms', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Dead Letter locks', value: '1', unit: 'DLQ', sub: 'Traceability exception envelope locked', border: 'border-red-left', dot: 'pulse-critical' }
+      }
+    }
+    if (observabilitySubMode.value === 'websocket-health') {
+      return {
+        kpi1: { label: 'Duplex Socket Latency', value: '12', unit: 'ms', sub: 'Round-trip ping verification', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Socket Clients', value: String(activeNodesCount.value), unit: 'clients', sub: 'Persistent channel tunnels active', border: 'border-indigo-left', icon: 'swap_calls' },
+        kpi3: { label: 'Transient Disconnects', value: '0', unit: 'warnings', sub: 'Keepalive heartbeat stable', border: 'border-amber-left', dot: 'pulse-healthy' },
+        kpi4: { label: 'Hard Socket Resets', value: '1', unit: 'resets', sub: 'Forceful recovery reconnect executed', border: 'border-red-left', dot: 'pulse-critical' }
+      }
+    }
+    if (observabilitySubMode.value === 'pipelines') {
+      return {
+        kpi1: { label: 'Pipeline Convergence', value: '100%', unit: 'uptime', sub: 'Ingestion channels nominal', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Active Transforms', value: '6', unit: 'filters', sub: 'Zero-touch payload verification', border: 'border-indigo-left', icon: 'filter_alt' },
+        kpi3: { label: 'Schema Drift Warnings', value: '3', unit: 'warnings', sub: 'Coerced type assertions in pipeline', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Dropped Ingestion Frames', value: '1', unit: 'drops', sub: 'Corrupted telemetry records', border: 'border-red-left', dot: 'pulse-critical' }
+      }
+    }
+  }
+
+  if (activeWorkspace.value === 'incidents') {
+    return {
+      kpi1: { label: 'SLA Status', value: '99.2%', unit: 'ratio', sub: 'Target operational SLA: 99.9%', border: 'border-cyan-left', dot: 'pulse-healthy' },
+      kpi2: { label: 'Active Alerts', value: '1', unit: 'active', sub: 'Reconciliation queue lockout', border: 'border-indigo-left', icon: 'warning' },
+      kpi3: { label: 'Acknowledged Incidents', value: '0', unit: 'resolved', sub: 'Awaiting operator review', border: 'border-amber-left', dot: 'pulse-healthy' },
+      kpi4: { label: 'Unresolved Critical Alerts', value: '1', unit: 'locks', sub: 'Temporal state drift failure', border: 'border-red-left', dot: 'pulse-critical' }
+    }
+  }
+
+  // Default (Fallback)
   return {
     kpi1: { label: 'Ingestion Rate', value: throughputEps.value || '4.2', unit: 'eps', sub: 'Peak buffer utilization: 14.2 MB/s', border: 'border-cyan-left', dot: 'pulse-healthy' },
     kpi2: { label: 'Active Fleet Nodes', value: activeNodesCount.value, unit: '/ 18', sub: 'Edge deployment distribution: 99.8% stable', border: 'border-indigo-left', icon: 'devices' },
@@ -427,31 +514,61 @@ const allGridRows = ref([
     operator: 'sysadmin@IIPS.app'
   },
 
-  // --- STANDARD WORKSPACE ROWS ---
+  // --- OBSERVABILITY STREAMS ROWS ---
   {
-    id: 'row-ai-1',
+    id: 'row-stream-1',
     created_at: new Date(Date.now() - 1200).toISOString(),
     severity: 'healthy',
     type: 'ai_lesson_cache_hit',
     amount: 1420,
     provider: 'ai_edge_cache',
-    description: 'AI Lesson Note Generation: Topic "Thermodynamics & Energy States" directly served from global edge cache.\n• Subject: Advanced Physics\n• Class: SS2 Science\n• Bypassed LLM inference layers saving 1,420 tokens.\n• Integrity Verification: AI Signature Validated.',
+    description: 'AI Lesson Note Generation: Topic "Thermodynamics & Energy States" served from global edge cache.',
     workspace: 'observability',
+    subMode: 'streams',
     operator: 'cache_router'
   },
   {
-    id: 'row-ai-2',
+    id: 'row-stream-2',
     created_at: new Date(Date.now() - 2800).toISOString(),
     severity: 'info',
     type: 'ai_lesson_generation',
     amount: 3850,
     provider: 'ai_engine',
-    description: 'AI Lesson Note Generation: Prompt synthetic pipeline completed successfully.\n• Subject: Literature in English\n• Topic: Elizabethan Sonnets\n• Term: 2 • Week: 4\n• Payload generated with structured curriculum sections, interactive quiz matrices, and strict compliance headers.',
+    description: 'AI Lesson Note Generation: Prompt synthetic pipeline completed successfully.',
     workspace: 'observability',
+    subMode: 'streams',
     operator: 'sysadmin@IIPS.app'
   },
+
+  // --- OBSERVABILITY METRICS ROWS ---
   {
-    id: 'row-1',
+    id: 'row-metric-1',
+    created_at: new Date(Date.now() - 25000).toISOString(),
+    severity: 'warning',
+    type: 'ledger_drift_detected',
+    amount: 250,
+    provider: 'quasar',
+    description: 'Minor ledger temporal mismatch logged between parent treasury and active subaccount.',
+    workspace: 'observability',
+    subMode: 'metrics',
+    operator: 'bursar_daemon'
+  },
+  {
+    id: 'row-metric-2',
+    created_at: new Date(Date.now() - 42000).toISOString(),
+    severity: 'healthy',
+    type: 'virtual_account_inflow',
+    amount: 150000,
+    provider: 'quasar',
+    description: 'Static dedicated virtual account NUBAN registered direct transfer deposit.',
+    workspace: 'observability',
+    subMode: 'metrics',
+    operator: 'providus_bridge'
+  },
+
+  // --- OBSERVABILITY QUEUES ROWS ---
+  {
+    id: 'row-queue-1',
     created_at: new Date(Date.now() - 4000).toISOString(),
     severity: 'critical',
     type: 'webhook_lock_timeout',
@@ -459,74 +576,117 @@ const allGridRows = ref([
     provider: 'quasar',
     description: 'Reconciliation webhook queue execution timed out waiting for state lock confirmation.',
     workspace: 'observability',
+    subMode: 'queues',
     operator: 'sysadmin@IIPS.app'
   },
   {
-    id: 'row-2',
-    created_at: new Date(Date.now() - 15000).toISOString(),
+    id: 'row-queue-2',
+    created_at: new Date(Date.now() - 18000).toISOString(),
+    severity: 'info',
+    type: 'queue_partition_rebalance',
+    amount: 16,
+    provider: 'queue_broker',
+    description: 'Triggered partition rebalance on quasar.stream.telemetry queue across 8 consumer threads.',
+    workspace: 'observability',
+    subMode: 'queues',
+    operator: 'sysadmin@IIPS.app'
+  },
+
+  // --- OBSERVABILITY WEBSOCKET-HEALTH ROWS ---
+  {
+    id: 'row-ws-1',
+    created_at: new Date(Date.now() - 3000).toISOString(),
     severity: 'healthy',
-    type: 'device_activation_sync',
+    type: 'ws_ping_pong',
+    amount: 12,
+    provider: 'ws_gateway',
+    description: 'WebSocket duplex ping-pong roundtrip latency verified under 12ms target limit.',
+    workspace: 'observability',
+    subMode: 'websocket-health',
+    operator: 'ws_daemon'
+  },
+  {
+    id: 'row-ws-2',
+    created_at: new Date(Date.now() - 11000).toISOString(),
+    severity: 'critical',
+    type: 'ws_hard_reset',
     amount: 1,
-    provider: 'fleet_engine',
-    description: 'Hardware endpoint handshake completed successfully. OTA profile verified.',
-    workspace: 'fleet',
-    operator: 'auto_provisioner'
+    provider: 'ws_gateway',
+    description: 'Forceful TCP socket socket reset initiated due to temporal framing mismatch anomalies.',
+    workspace: 'observability',
+    subMode: 'websocket-health',
+    operator: 'ws_daemon'
   },
+
+  // --- OBSERVABILITY PIPELINES ROWS ---
   {
-    id: 'row-3',
-    created_at: new Date(Date.now() - 25000).toISOString(),
-    severity: 'warning',
-    type: 'ledger_drift_detected',
-    amount: 250,
-    provider: 'quasar',
-    description: 'Minor ledger temporal mismatch logged between parent treasury and active subaccount.',
-    workspace: 'finance',
-    operator: 'bursar_daemon'
-  },
-  {
-    id: 'row-4',
-    created_at: new Date(Date.now() - 42000).toISOString(),
-    severity: 'healthy',
-    type: 'virtual_account_inflow',
-    amount: 150000,
-    provider: 'quasar',
-    description: 'Static dedicated virtual account NUBAN registered direct transfer deposit.',
-    workspace: 'finance',
-    operator: 'providus_bridge'
-  },
-  {
-    id: 'row-5',
+    id: 'row-pipe-1',
     created_at: new Date(Date.now() - 60000).toISOString(),
     severity: 'info',
     type: 'tenant_quota_compaction',
     amount: 12,
     provider: 'governance',
     description: 'AI generation metrics archived to block storage layer to preserve active memory arrays.',
-    workspace: 'governance',
+    workspace: 'observability',
+    subMode: 'pipelines',
     operator: 'storage_controller'
   },
   {
-    id: 'row-6',
+    id: 'row-pipe-2',
     created_at: new Date(Date.now() - 95000).toISOString(),
     severity: 'healthy',
     type: 'note_digitization_batch',
     amount: 42,
     provider: 'ai_engine',
     description: 'Curriculum layout parser finalized markdown syntax conversion strings.',
-    workspace: 'ai',
+    workspace: 'observability',
+    subMode: 'pipelines',
     operator: 'teacher_session'
+  },
+
+  // --- INCIDENTS ROWS ---
+  {
+    id: 'row-incident-1',
+    created_at: new Date(Date.now() - 4000).toISOString(),
+    severity: 'critical',
+    type: 'webhook_lock_timeout',
+    amount: 5400,
+    provider: 'quasar',
+    description: 'Reconciliation webhook queue execution timed out waiting for state lock confirmation.',
+    workspace: 'incidents',
+    operator: 'sysadmin@IIPS.app'
+  },
+  {
+    id: 'row-incident-2',
+    created_at: new Date(Date.now() - 14000).toISOString(),
+    severity: 'warning',
+    type: 'unauthorized_firmware_detected',
+    amount: 1,
+    provider: 'integrity_center',
+    description: 'Device pos-term-omega-14 reported unaligned cryptographic signature.',
+    workspace: 'incidents',
+    operator: 'auto_provisioner'
   }
 ])
 
 // Filter grid rows contextually based on Workspace isolation selection to prevent operator context clash
 const filteredGridRows = computed(() => {
-  // If active Workspace is 'observability', show all system logs for comprehensive oversight
-  if (activeWorkspace.value === 'observability') return allGridRows.value
+  if (activeWorkspace.value === 'observability') {
+    if (observabilitySubMode.value !== 'default') {
+      return allGridRows.value.filter(r => r.workspace === 'observability' && r.subMode === observabilitySubMode.value)
+    }
+    return allGridRows.value.filter(r => r.workspace === 'observability')
+  }
 
   if (activeWorkspace.value === 'fleet') {
     if (fleetSubMode.value !== 'default') {
       return allGridRows.value.filter(r => r.workspace === 'fleet' && r.subMode === fleetSubMode.value)
     }
+    return allGridRows.value.filter(r => r.workspace === 'fleet')
+  }
+
+  if (activeWorkspace.value === 'incidents') {
+    return allGridRows.value.filter(r => r.workspace === 'incidents')
   }
 
   return allGridRows.value.filter(r => r.workspace === activeWorkspace.value)
@@ -535,6 +695,7 @@ const filteredGridRows = computed(() => {
 const handlePresetChange = (preset) => {
   // Logic hook if parent needs side-effect tracking
 }
+
 </script>
 
 <style scoped>

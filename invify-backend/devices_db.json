@@ -1,6 +1,32 @@
 {
   "devices": [
     {
+      "id": "dev-1779151753027",
+      "device_id": "M1AJQ",
+      "device_suffix": "XM1AJQ",
+      "tenant_id": "tenant-1779155800041",
+      "status": "active",
+      "business_name": "imvi001",
+      "phone": "0810239333533",
+      "industry": "retail",
+      "theme_color": "#10B981",
+      "device_info": {
+        "deviceId": "M1AJQ",
+        "deviceSuffix": "XM1AJQ",
+        "os": "Android",
+        "model": "SM-T397U",
+        "brand": "samsung",
+        "osVersion": "8.1.0",
+        "isPhysicalDevice": true
+      },
+      "last_seen": "2026-05-19T02:20:00.559Z",
+      "created_at": "2026-05-19T00:49:13.028Z",
+      "tenants": {
+        "name": "imvi001",
+        "plan": "standard"
+      }
+    },
+    {
       "id": "dev-1779091048185",
       "device_id": "DSPREAD-POS-XM1AJQ8MM-1339",
       "tenant_id": "tenant-1779041949485",
@@ -26,6 +52,23 @@
     }
   ],
   "activations": [
+    {
+      "id": "act-1779158114509",
+      "activation_code": "NIZV-SYQB-3ZIC-IO2X-27RV-QYTR",
+      "tenant_id": "tenant-1779155800041",
+      "duration_days": 30,
+      "plan_index": 1,
+      "device_suffix": "XM1AJQ",
+      "device_id": "DSPREAD-POS-XM1AJQ8MM-8475",
+      "status": "pending",
+      "is_used": false,
+      "created_at": "2026-05-19T02:35:14.509Z",
+      "created_by": "superadmin@invify.app",
+      "tenants": {
+        "name": "imvi001",
+        "plan": "standard"
+      }
+    },
     {
       "id": "act-1779044675400",
       "activation_code": "SQGB-4F6F-HQVI-CX45-UGCU-ERIL",

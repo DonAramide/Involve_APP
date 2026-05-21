@@ -12,6 +12,7 @@ import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ActivationPage extends StatefulWidget {
   static const routeName = '/activation';
@@ -403,9 +404,42 @@ class _ActivationPageState extends State<ActivationPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Activation Code',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF818CF8)),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Activation Code',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF818CF8)),
+            ),
+            InkWell(
+              onTap: _openQRScanner,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.qr_code_scanner, size: 14, color: const Color(0xFF818CF8)),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'SCAN QR',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF818CF8),
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         Row(
@@ -542,6 +576,271 @@ class _ActivationPageState extends State<ActivationPage> {
     for (var f in _focusNodes) {
       f.dispose();
     }
+    super.dispose();
+  }
+
+  void _openQRScanner() {
+    bool _scanned = false;
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: const Color(0xFF0B0F19),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(color: const Color(0xFF6366F1).withOpacity(0.3), width: 1.5),
+          ),
+          child: Container(
+            width: 400,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.qr_code_scanner, color: const Color(0xFF818CF8), size: 24),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'QR Code Scanner',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                    ),
+                  ],
+                ),
+                const Divider(color: Colors.white10),
+                const SizedBox(height: 16),
+                
+                Container(
+                  height: 240,
+                  width: 240,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.2)),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: MobileScanner(
+                      onDetect: (capture) {
+                        if (_scanned) return;
+                        final List<Barcode> barcodes = capture.barcodes;
+                        for (final barcode in barcodes) {
+                          if (barcode.rawValue != null) {
+                            final code = barcode.rawValue!.trim().toUpperCase();
+                            if (code.contains('-') || code.length >= 10) {
+                              _scanned = true;
+                              Navigator.of(dialogContext).pop();
+                              _fillActivationCode(code);
+                              _showScannerSuccess(code);
+                              return;
+                            }
+                          }
+                        }
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                const Text(
+                  'Scan the license certificate QR generated on the Web Console to activate immediately.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey, fontSize: 12, height: 1.4),
+                ),
+                const SizedBox(height: 24),
+                
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final data = await Clipboard.getData('text/plain');
+                      if (data != null && data.text != null && data.text!.isNotEmpty) {
+                        final clean = data.text!.trim().toUpperCase();
+                        if (clean.contains('-') || clean.length >= 10) {
+                          Navigator.of(dialogContext).pop();
+                          _fillActivationCode(clean);
+                          _showScannerSuccess(clean);
+                          return;
+                        }
+                      }
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('No valid activation key found on clipboard.')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.content_paste, size: 16),
+                    label: const Text('PASTE / CLIP'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(color: Colors.white.withOpacity(0.15)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _fillActivationCode(String rawCode) {
+    final clean = rawCode.replaceAll('-', '').replaceAll(' ', '').toUpperCase();
+    int charPtr = 0;
+    for (int i = 0; i < 6; i++) {
+      if (charPtr >= clean.length) break;
+      final end = (charPtr + 4).clamp(0, clean.length);
+      _segmentControllers[i].text = clean.substring(charPtr, end);
+      charPtr += 4;
+    }
+  }
+
+  void _showScannerSuccess(String code) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.green[800],
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Scanned Code: $code successfully mapped!',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _simulateLiveScan() {
+    final textController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF0B0F19),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: const Color(0xFF6366F1).withOpacity(0.3)),
+        ),
+        title: const Text('Simulate Web QR Camera Scanner', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Input or paste the certificate activation key to simulate camera scanner detection.',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: textController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'e.g. SQGB-4F6F-HQVI-...',
+                hintStyle: const TextStyle(color: Colors.white30),
+                filled: true,
+                fillColor: Colors.black26,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('CANCEL', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final code = textController.text.trim().toUpperCase();
+              Navigator.of(context).pop();
+              if (code.isNotEmpty) {
+                _fillActivationCode(code);
+                _showScannerSuccess(code);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1)),
+            child: const Text('COMPLETE SCAN', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ScannerLaserAnimation extends StatefulWidget {
+  const ScannerLaserAnimation({super.key});
+
+  @override
+  State<ScannerLaserAnimation> createState() => _ScannerLaserAnimationState();
+}
+
+class _ScannerLaserAnimationState extends State<ScannerLaserAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _animation = Tween<double>(begin: 0.1, end: 0.9).animate(_controller);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            Align(
+              alignment: Alignment(0, _animation.value * 2 - 1),
+              child: Container(
+                height: 3,
+                width: 220,
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.redAccent.withOpacity(0.8),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
     super.dispose();
   }
 }

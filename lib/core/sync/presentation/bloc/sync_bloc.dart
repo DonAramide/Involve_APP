@@ -16,6 +16,7 @@ import 'package:involve_app/core/sync/data/repositories/sync_repository_impl.dar
 import 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_stub.dart'
     if (dart.library.io) 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_native.dart'
     if (dart.library.html) 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_web.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
@@ -169,6 +170,12 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
       lastSyncTime: meta?.lastSyncTime,
     ));
 
+    final isOnline = await PlanGatingInterceptor.checkIsOnlinePlan();
+    if (!isOnline) {
+      emit(state.copyWith(statusMessage: 'Offline mode active (Basic Plan)'));
+      return;
+    }
+
     if (isMaster) {
       if (!kIsWeb) await syncServer.start(8080);
       await bluetoothSyncServer.start();
@@ -234,6 +241,15 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
   }
 
   Future<void> _onStartDiscovery(StartDiscoveryRequested event, Emitter<SyncState> emit) async {
+    final isOnline = await PlanGatingInterceptor.checkIsOnlinePlan();
+    if (!isOnline) {
+      emit(state.copyWith(
+        isDiscoveryRunning: false,
+        statusMessage: 'Offline mode active (Basic Plan)',
+      ));
+      return;
+    }
+
     if (!kIsWeb) {
       await discoveryService.startDiscovery(
         deviceId: deviceId,
@@ -286,6 +302,14 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
   }
 
   Future<void> _onToggleRole(ToggleMasterRole event, Emitter<SyncState> emit) async {
+    final isOnline = await PlanGatingInterceptor.checkIsOnlinePlan();
+    if (!isOnline) {
+      emit(state.copyWith(statusMessage: 'Role configuration unavailable on Basic Plan'));
+      await Future.delayed(const Duration(seconds: 2));
+      emit(state.copyWith(statusMessage: null));
+      return;
+    }
+
     // 1. Stop current
     add(StopDiscoveryRequested());
     if (state.isMaster) {
@@ -324,6 +348,14 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
   }
 
   Future<void> _onManualSync(ManualSyncTriggered event, Emitter<SyncState> emit) async {
+    final isOnline = await PlanGatingInterceptor.checkIsOnlinePlan();
+    if (!isOnline) {
+      emit(state.copyWith(statusMessage: 'Online sync unavailable on Basic Plan'));
+      await Future.delayed(const Duration(seconds: 2));
+      emit(state.copyWith(statusMessage: null));
+      return;
+    }
+
     emit(state.copyWith(statusMessage: 'Syncing...'));
     await syncManager.syncNow();
     final meta = await syncRepository.getSyncMeta();
@@ -336,6 +368,14 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
   }
 
   Future<void> _onSyncWithPeer(SyncWithPeerTriggered event, Emitter<SyncState> emit) async {
+    final isOnline = await PlanGatingInterceptor.checkIsOnlinePlan();
+    if (!isOnline) {
+      emit(state.copyWith(statusMessage: 'Online sync unavailable on Basic Plan'));
+      await Future.delayed(const Duration(seconds: 2));
+      emit(state.copyWith(statusMessage: null));
+      return;
+    }
+
     emit(state.copyWith(statusMessage: 'Syncing with ${event.peerName}...'));
     try {
       await syncManager.syncWithPeer(

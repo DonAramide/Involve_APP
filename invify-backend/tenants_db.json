@@ -30,5 +30,21 @@
     "plan": "enterprise",
     "status": "active",
     "created_at": "2026-05-17T09:46:44.414Z"
+  },
+  {
+    "id": "tenant-invi001",
+    "name": "invi001",
+    "type": "retail",
+    "plan": "standard",
+    "status": "active",
+    "created_at": "2026-05-19T00:49:13.028Z"
+  },
+  {
+    "id": "tenant-1779155800041",
+    "name": "imvi001",
+    "type": "retail",
+    "plan": "standard",
+    "status": "active",
+    "created_at": "2026-05-19T01:56:40.041Z"
   }
 ]

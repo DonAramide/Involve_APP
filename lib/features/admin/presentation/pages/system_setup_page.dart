@@ -144,7 +144,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
 
                 // 4. Account Details
                 _buildSectionHeader(context, 'Account Details'),
-                _buildSwitchTile('Show Account Details on Invoice', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
+                _buildSwitchTile('Always Show Account Details on Receipt', settings.showAccountDetails, (val) => _update(context, settings.copyWith(showAccountDetails: val))),
                 _buildSwitchTile('Show Signature Space on Receipt', settings.showSignatureSpace, (val) => _update(context, settings.copyWith(showSignatureSpace: val))),
                 if (settings.showAccountDetails) ...[
                   _buildTextTile(context, 'Bank Name', settings.bankName ?? '', (val) => _update(context, settings.copyWith(bankName: val))),

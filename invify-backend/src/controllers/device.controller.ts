@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
 import * as fs from 'fs';
 import * as path from 'path';
+import { LicenseGenerator } from '../utils/license.util';
 
 // Local offline DB path
 const LOCAL_DB_PATH = path.join(process.cwd(), 'devices_db.json');
@@ -180,16 +181,27 @@ export class DeviceController {
         return res.status(400).json({ error: 'tenantId is required' });
       }
 
-      // Generate a cryptographically premium, secure 6-group key (XXXX-XXXX-XXXX-XXXX-XXXX-XXXX)
-      const randStr = () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let str = '';
-        for (let i = 0; i < 4; i++) {
-          str += chars.charAt(Math.floor(Math.random() * chars.length));
+      // Fetch tenant name for cryptographic signature
+      let businessName = 'Invify Retail Business';
+      try {
+        if (process.env.OFFLINE_MOCK_AUTH !== 'true') {
+          const { data } = await supabase.from('tenants').select('name').eq('id', tenantId).single();
+          if (data && data.name) businessName = data.name;
+        } else {
+          businessName = DeviceController.getTenantName(tenantId).name;
         }
-        return str;
-      };
-      const code = `${randStr()}-${randStr()}-${randStr()}-${randStr()}-${randStr()}-${randStr()}`;
+      } catch (err) {
+        businessName = DeviceController.getTenantName(tenantId).name;
+      }
+
+      // Generate a cryptographically valid Base32 HMAC-SHA256 signature code
+      const code = LicenseGenerator.generate(
+        businessName, 
+        Number(durationDays) || 30, 
+        Number(planIndex) || 0, 
+        deviceSuffix || '0'
+      );
+      
       const generatedDeviceId = `DSPREAD-POS-${deviceSuffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`;
 
       if (process.env.OFFLINE_MOCK_AUTH === 'true') {
@@ -462,6 +474,34 @@ export class DeviceController {
         deviceInfo
       });
 
+      // Ensure the business exists in tenants_db.json
+      let resolvedTenantId = 'tenant-invi001';
+      try {
+        const tenantsDbPath = path.join(process.cwd(), 'tenants_db.json');
+        if (fs.existsSync(tenantsDbPath)) {
+          const tenants = JSON.parse(fs.readFileSync(tenantsDbPath, 'utf-8'));
+          let found = tenants.find((t: any) => t.name.toLowerCase() === businessName.toLowerCase());
+          if (!found) {
+            resolvedTenantId = `tenant-${Date.now()}`;
+            const newTenant = {
+              id: resolvedTenantId,
+              name: businessName,
+              type: industry || 'retail',
+              plan: 'standard',
+              status: 'active',
+              created_at: new Date().toISOString()
+            };
+            tenants.push(newTenant);
+            fs.writeFileSync(tenantsDbPath, JSON.stringify(tenants, null, 2));
+            console.log('[DeviceController] Dynamically registered onboarded tenant:', businessName);
+          } else {
+            resolvedTenantId = found.id;
+          }
+        }
+      } catch (err) {
+        console.error('[DeviceController] Failed to sync tenant database during onboarding:', err);
+      }
+
       // Save in offline mock database
       const local = DeviceController.getLocalData();
       const existingIdx = local.devices.findIndex((d: any) => d.device_id === (deviceInfo?.deviceId || 'unknown'));
@@ -470,7 +510,7 @@ export class DeviceController {
         id: existingIdx >= 0 ? local.devices[existingIdx].id : `dev-${Date.now()}`,
         device_id: deviceInfo?.deviceId || 'unknown',
         device_suffix: deviceInfo?.deviceSuffix || 'XXXXXX',
-        tenant_id: '00000000-0000-0000-0000-000000000001',
+        tenant_id: resolvedTenantId,
         status: 'active',
         business_name: businessName,
         phone: phone,

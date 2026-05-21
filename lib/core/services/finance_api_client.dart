@@ -6,6 +6,11 @@
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../../features/settings/domain/services/security_service.dart';
+import '../license/storage_service.dart';
+import '../license/license_validator.dart';
+import '../license/license_model.dart';
+
 
 // ── Custom Exceptions ──────────────────────────────────────────────────────────
 
@@ -73,6 +78,68 @@ class TenantInterceptor extends Interceptor {
     super.onRequest(options, handler);
   }
 }
+
+// ── Plan Gating Interceptor ───────────────────────────────────────────────────
+
+class PlanGatingInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    // Always allow registration/onboarding device endpoint
+    if (options.path.contains('/api/admin/register-device')) {
+      return super.onRequest(options, handler);
+    }
+
+    final isOnline = await checkIsOnlinePlan();
+    if (!isOnline) {
+      handler.reject(
+        DioException(
+          requestOptions: options,
+          error: const FinanceApiException(
+            message: 'Local operations only. Cloud synchronisation and online features require a Pro Plan subscription.',
+            statusCode: 403,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+      return;
+    }
+
+    super.onRequest(options, handler);
+  }
+
+  static Future<bool> checkIsOnlinePlan() async {
+    try {
+      // 1. Check for Lifetime status
+      final isLifetime = await SecurityService().isDeviceAuthorized();
+      if (isLifetime) return true;
+
+      // 2. Check for Manual/Direct Pro status
+      final proExpiry = await StorageService.getProExpiryDate();
+      if (proExpiry != null && DateTime.now().isBefore(proExpiry)) {
+        return true;
+      }
+
+      // 3. Check for Active License key
+      final code = await StorageService.getLicense();
+      if (code != null) {
+        final peeked = LicenseValidator.peek(code);
+        if (peeked != null) {
+          final planType = peeked['planType'] as PlanType;
+          final expiryDate = peeked['expiryDate'] as DateTime;
+          if (DateTime.now().isBefore(expiryDate)) {
+            if (planType != PlanType.basic) {
+              return true;
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Fallback
+    }
+    return false;
+  }
+}
+
 
 // ── Error Interceptor ──────────────────────────────────────────────────────────
 
@@ -165,10 +232,11 @@ class FinanceApiClient {
       },
     ));
 
-    // Order matters: auth → tenant → error handling → logging
+    // Order matters: auth → tenant → plan gating → error handling → logging
     _dio.interceptors.addAll([
       JwtInterceptor(getToken: getToken),
       TenantInterceptor(getTenantId: getTenantId),
+      PlanGatingInterceptor(),
       ErrorInterceptor(),
       if (kDebugMode)
         LogInterceptor(

@@ -217,6 +217,7 @@ const routes = [
       { path: 'deployments/rollouts', component: () => import('pages/deployments/RolloutControlCenterPage.vue'), meta: { workspace: 'deployments', title: 'Rollout Control Center', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'deployments/channels', component: () => import('pages/deployments/ReleaseChannelsPage.vue'), meta: { workspace: 'deployments', title: 'Release Channels', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'apps/installed', component: () => import('pages/applications/InstalledApplicationsPage.vue'), meta: { workspace: 'apps', title: 'Installed Applications', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'apps/apk-deployment', component: () => import('pages/applications/APKDeploymentPage.vue'), meta: { workspace: 'apps', title: 'APK Fleet Deployment', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'apps/forbidden', component: () => import('pages/applications/ForbiddenApplicationsPage.vue'), meta: { workspace: 'apps', title: 'Forbidden Applications', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'apps/accessibility', component: () => import('pages/applications/AccessibilityAbusePage.vue'), meta: { workspace: 'apps', title: 'Accessibility Abuse', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'apps/sideload', component: () => import('pages/applications/SideloadIntegrityPage.vue'), meta: { workspace: 'apps', title: 'Sideload & Integrity', permission: 'admin_deploy', requiresAuth: true } },

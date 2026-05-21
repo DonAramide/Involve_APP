@@ -10,7 +10,7 @@ class UserPlan extends Equatable {
   });
   
   bool get isLifetime => planType == 'lifetime';
-  bool get isPro => planType == 'pro';
+  bool get isPro => planType == 'pro' || planType == 'standard' || planType == 'premium' || planType == 'enterprise' || planType == 'lifetime';
   bool get isBasic => planType == 'basic';
 
   bool get isValid {

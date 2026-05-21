@@ -12,7 +12,7 @@ void main() {
     final license = LicenseModel(
       businessName: businessName,
       expiryDate: expiry,
-      planType: PlanType.pro,
+      planType: PlanType.standard,
       licenseId: 12345,
     );
 

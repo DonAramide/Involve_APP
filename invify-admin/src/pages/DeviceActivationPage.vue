@@ -1,9 +1,9 @@
 <template>
-  <q-page class="q-pa-md bg-grey-1 text-grey-9">
+  <q-page class="q-pa-md text-main">
     <div class="row items-center q-mb-lg">
       <div class="col">
-        <div class="text-h4 text-weight-bold text-indigo-9">Device Activation Hub</div>
-        <div class="text-caption text-grey-7">Manage hardware terminals and generate secure activation codes.</div>
+        <div class="text-h4 text-weight-bold text-indigo-4">Device Activation Hub</div>
+        <div class="text-caption text-secondary">Manage hardware terminals and generate secure activation codes.</div>
       </div>
       <div class="col-auto">
         <q-btn 
@@ -13,6 +13,7 @@
           unelevated 
           class="q-px-md text-weight-bold"
           @click="showCodeDialog = true"
+          :dark="prefs.isDarkMode"
         />
       </div>
     </div>
@@ -20,30 +21,30 @@
     <!-- STATS CARDS -->
     <div class="row q-col-gutter-md q-mb-xl">
       <div class="col-12 col-sm-6 col-md-3">
-        <q-card class="bg-white shadow-1 border-grey-3 rounded-borders">
+        <q-card class="bg-panel text-main border-main shadow-1 rounded-borders">
           <q-card-section class="q-pa-md">
             <div class="row items-center no-wrap">
               <div class="col">
-                <div class="text-caption text-grey-7 text-weight-medium">Active Devices</div>
-                <div class="text-h5 text-weight-bold text-grey-9">{{ activeCount }}</div>
+                <div class="text-caption text-secondary text-weight-medium">Active Devices</div>
+                <div class="text-h5 text-weight-bold">{{ activeCount }}</div>
               </div>
               <div class="col-auto">
-                <q-icon name="devices" color="indigo-7" size="2em" />
+                <q-icon name="devices" color="indigo-4" size="2em" />
               </div>
             </div>
           </q-card-section>
         </q-card>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
-        <q-card class="bg-white shadow-1 border-grey-3 rounded-borders">
+        <q-card class="bg-panel text-main border-main shadow-1 rounded-borders">
           <q-card-section class="q-pa-md">
             <div class="row items-center no-wrap">
               <div class="col">
-                <div class="text-caption text-grey-7 text-weight-medium">Pending Codes</div>
-                <div class="text-h5 text-weight-bold text-grey-9">{{ pendingCount }}</div>
+                <div class="text-caption text-secondary text-weight-medium">Pending Codes</div>
+                <div class="text-h5 text-weight-bold">{{ pendingCount }}</div>
               </div>
               <div class="col-auto">
-                <q-icon name="vpn_key" color="amber-8" size="2em" />
+                <q-icon name="vpn_key" color="amber-5" size="2em" />
               </div>
             </div>
           </q-card-section>
@@ -55,9 +56,9 @@
     <q-tabs
       v-model="tab"
       dense
-      class="text-grey-7 q-mb-md"
-      active-color="indigo-8"
-      indicator-color="indigo-8"
+      class="text-secondary q-mb-md"
+      active-color="indigo-4"
+      indicator-color="indigo-4"
       align="left"
       narrow-indicator
     >
@@ -73,21 +74,32 @@
           row-key="id"
           flat
           bordered
-          class="bg-white text-grey-9 border-grey-3 shadow-1"
-          card-class="bg-white"
-          table-header-class="bg-indigo-1 text-indigo-10 text-weight-bold"
+          class="bg-panel text-main border-main shadow-1"
+          card-class="bg-panel"
+          table-header-class="bg-subpanel text-secondary text-weight-bold"
           :loading="loading"
+          :dark="prefs.isDarkMode"
         >
           <template v-slot:body-cell-status="props">
             <q-td :props="props">
-              <q-badge color="green-2" text-color="green-9" class="text-weight-bold">
+              <q-badge color="green-10" text-color="green-4" class="text-weight-bold">
                 {{ props.value.toUpperCase() }}
               </q-badge>
             </q-td>
           </template>
           <template v-slot:body-cell-plan="props">
             <q-td :props="props">
-              <div class="text-weight-bold text-indigo-8">{{ props.value.toUpperCase() }}</div>
+              <div class="text-weight-bold text-indigo-4">{{ props.value.toUpperCase() }}</div>
+            </q-td>
+          </template>
+          <template v-slot:body-cell-actions="props">
+            <q-td :props="props">
+              <q-btn flat round dense icon="card_membership" color="amber-4" @click="reviewDeviceCertificate(props.row)">
+                <q-tooltip>Review Certificate / Activation Key</q-tooltip>
+              </q-btn>
+              <q-btn flat round dense icon="vpn_key" color="indigo-4" @click="generateCodeForDevice(props.row)">
+                <q-tooltip>Generate New Activation Code</q-tooltip>
+              </q-btn>
             </q-td>
           </template>
         </q-table>
@@ -100,19 +112,20 @@
           row-key="id"
           flat
           bordered
-          class="bg-white text-grey-9 border-grey-3 shadow-1"
-          card-class="bg-white"
-          table-header-class="bg-indigo-1 text-indigo-10 text-weight-bold"
+          class="bg-panel text-main border-main shadow-1"
+          card-class="bg-panel"
+          table-header-class="bg-subpanel text-secondary text-weight-bold"
           :loading="loading"
+          :dark="prefs.isDarkMode"
         >
           <template v-slot:body-cell-code="props">
             <q-td :props="props">
-              <div class="text-subtitle1 text-weight-bolder text-amber-9 font-mono">{{ props.value }}</div>
+              <div class="text-subtitle1 text-weight-bolder text-amber-4 font-mono">{{ props.value }}</div>
             </q-td>
           </template>
           <template v-slot:body-cell-device_id="props">
             <q-td :props="props">
-              <div class="text-caption font-mono text-indigo-8 text-weight-bold">
+              <div class="text-caption font-mono text-indigo-4 text-weight-bold">
                 {{ props.value }}
               </div>
             </q-td>
@@ -120,21 +133,21 @@
           <template v-slot:body-cell-created_by="props">
             <q-td :props="props">
               <div class="row items-center no-wrap op-gap-4">
-                <q-icon name="person" color="indigo-5" size="xs" />
-                <span class="text-caption text-grey-8 font-mono">{{ props.value }}</span>
+                <q-icon name="person" color="indigo-4" size="xs" />
+                <span class="text-caption text-secondary font-mono">{{ props.value }}</span>
               </div>
             </q-td>
           </template>
           <template v-slot:body-cell-status="props">
             <q-td :props="props">
-              <q-badge :color="props.row.is_used ? 'green-2' : 'blue-2'" :text-color="props.row.is_used ? 'green-9' : 'blue-9'" class="text-weight-bold">
+              <q-badge :color="props.row.is_used ? 'green-10' : 'blue-10'" :text-color="props.row.is_used ? 'green-4' : 'blue-4'" class="text-weight-bold">
                 {{ props.row.is_used ? 'ACTIVATED' : 'PENDING' }}
               </q-badge>
             </q-td>
           </template>
           <template v-slot:body-cell-actions="props">
             <q-td :props="props">
-              <q-btn flat round dense icon="card_membership" color="amber-8" @click="reviewCertificate(props.row)">
+              <q-btn flat round dense icon="card_membership" color="amber-4" @click="reviewCertificate(props.row)">
                 <q-tooltip>Review Certificate</q-tooltip>
               </q-btn>
             </q-td>
@@ -145,8 +158,8 @@
 
     <!-- NEW CODE DIALOG -->
     <q-dialog v-model="showCodeDialog" persistent>
-      <q-card style="min-width: 400px" class="bg-white text-grey-9 border-grey-3">
-        <q-card-section class="bg-indigo-1 text-indigo-10">
+      <q-card style="min-width: 400px" class="bg-panel text-main border-main" :dark="prefs.isDarkMode">
+        <q-card-section class="bg-subpanel text-indigo-4 text-weight-bold border-bottom border-main">
           <div class="text-h6 text-weight-bold">Create Activation Code</div>
         </q-card-section>
 
@@ -162,15 +175,16 @@
             emit-value map-options
             class="q-mb-md"
             @update:model-value="onTenantChange"
+            :dark="prefs.isDarkMode"
           >
             <template v-slot:after>
-              <q-btn round flat icon="refresh" color="indigo-7" @click="loadData" :loading="loading">
+              <q-btn round flat icon="refresh" color="indigo-4" @click="loadData" :loading="loading" :dark="prefs.isDarkMode">
                 <q-tooltip>Reload Businesses</q-tooltip>
               </q-btn>
             </template>
             <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
+              <q-item :dark="prefs.isDarkMode">
+                <q-item-section class="text-secondary">
                   No businesses found. Try refreshing.
                 </q-item-section>
               </q-item>
@@ -183,9 +197,10 @@
             label="Service Mode"
             filled 
             class="q-mb-md"
+            :dark="prefs.isDarkMode"
           />
 
-          <div class="text-caption text-indigo-8 q-mb-sm" v-if="isPlatformAdmin && tenants.length > 0">
+          <div class="text-caption text-indigo-4 q-mb-sm" v-if="isPlatformAdmin && tenants.length > 0">
             {{ tenants.length }} businesses found in database.
           </div>
           <div class="row q-col-gutter-md">
@@ -197,6 +212,7 @@
                 filled 
                 emit-value map-options
                 class="q-mb-md"
+                :dark="prefs.isDarkMode"
               />
             </div>
             <div class="col-6">
@@ -206,6 +222,7 @@
                 placeholder="e.g. 7A2B9C"
                 filled
                 class="q-mb-md"
+                :dark="prefs.isDarkMode"
               />
             </div>
           </div>
@@ -216,20 +233,21 @@
             filled 
             emit-value map-options
             class="q-mb-md"
+            :dark="prefs.isDarkMode"
           />
         </q-card-section>
 
-        <q-card-actions align="right" class="bg-grey-2 q-pa-sm">
-          <q-btn flat label="Cancel" color="grey-7" class="text-weight-bold" v-close-popup />
-          <q-btn color="indigo-7" label="Generate Code" class="text-weight-bold" @click="generateCode" :loading="generating" />
+        <q-card-actions align="right" class="bg-subpanel q-pa-sm border-top border-main">
+          <q-btn flat label="Cancel" color="grey-5" class="text-weight-bold" v-close-popup :dark="prefs.isDarkMode" />
+          <q-btn color="indigo-7" label="Generate Code" class="text-weight-bold" @click="generateCode" :loading="generating" :dark="prefs.isDarkMode" />
         </q-card-actions>
       </q-card>
     </q-dialog>
 
     <!-- LICENSE VALIDATOR SECTION -->
     <div class="q-mt-xl">
-      <div class="text-h6 text-indigo-9 q-mb-md">License Validator</div>
-      <q-card class="bg-white border-grey-3 shadow-1 rounded-borders">
+      <div class="text-h6 text-indigo-4 q-mb-md">License Validator</div>
+      <q-card class="bg-panel text-main border-main shadow-1 rounded-borders">
         <q-card-section class="q-pa-lg">
           <div class="row q-col-gutter-md items-center">
             <div class="col">
@@ -238,6 +256,7 @@
                 label="Paste activation code here..."
                 filled
                 placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX"
+                :dark="prefs.isDarkMode"
               />
             </div>
             <div class="col-auto">
@@ -248,23 +267,24 @@
                 size="lg"
                 @click="validateCode"
                 :loading="validating"
+                :dark="prefs.isDarkMode"
               />
             </div>
           </div>
 
-          <div v-if="validationResult" class="q-mt-lg q-pa-md bg-grey-2 rounded-borders border-grey-3">
+          <div v-if="validationResult" class="q-mt-lg q-pa-md bg-subpanel rounded-borders border-main">
             <div class="row q-col-gutter-md">
               <div class="col-12 col-md-4">
-                <div class="text-caption text-grey-7">Business Name Hash</div>
-                <div class="text-subtitle1 text-weight-bold text-grey-9">{{ validationResult.bizHash }}</div>
+                <div class="text-caption text-secondary">Business Name Hash</div>
+                <div class="text-subtitle1 text-weight-bold text-main">{{ validationResult.bizHash }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <div class="text-caption text-grey-7">Plan Type</div>
-                <div class="text-subtitle1 text-weight-bold text-indigo-8">{{ validationResult.planType }}</div>
+                <div class="text-caption text-secondary">Plan Type</div>
+                <div class="text-subtitle1 text-weight-bold text-indigo-4">{{ validationResult.planType }}</div>
               </div>
               <div class="col-12 col-md-4">
-                <div class="text-caption text-grey-7">Expiry Date</div>
-                <div class="text-subtitle1 text-weight-bold text-grey-9">{{ validationResult.expiryDate }}</div>
+                <div class="text-caption text-secondary">Expiry Date</div>
+                <div class="text-subtitle1 text-weight-bold text-main">{{ validationResult.expiryDate }}</div>
               </div>
             </div>
           </div>
@@ -315,9 +335,19 @@
           </div>
 
           <!-- Secure Code Area (Glassmorphism) -->
-          <div class="code-container q-pa-lg q-mt-md">
-             <div class="text-overline text-amber-3 letter-spacing-5 q-mb-md">SECURE ACTIVATION KEY</div>
-             <div class="text-h2 text-weight-bolder text-amber-5 font-mono code-glow" style="font-size: 2.8rem;">{{ lastGeneratedCode }}</div>
+          <div class="code-container q-pa-lg q-mt-md" style="text-align: left;">
+             <div style="display: flex; flex-direction: row; justify-content: space-between; align-items: center; width: 100%; gap: 20px;">
+               <div style="flex: 1;">
+                 <div class="text-overline text-amber-3 letter-spacing-5 q-mb-md">SECURE ACTIVATION KEY</div>
+                 <div class="text-h2 text-weight-bolder text-amber-5 font-mono code-glow" style="font-size: 2.3rem; word-break: break-all; margin: 0; line-height: 1.2;">{{ lastGeneratedCode }}</div>
+               </div>
+               <div style="flex-shrink: 0; text-align: center;">
+                 <div style="padding: 6px; background: #0f172a; border: 2px solid #fbbf24; border-radius: 8px; display: inline-block; box-sizing: border-box; line-height: 0;">
+                   <img :src="`https://api.qrserver.com/v1/create-qr-code/?size=120x120&color=fbbf24&bgcolor=0f172a&data=${encodeURIComponent(lastGeneratedCode)}`" style="width: 110px; height: 110px; display: block; margin: 0;" />
+                 </div>
+                 <div class="text-caption text-amber-2 text-weight-bold" style="font-size: 0.75rem; letter-spacing: 1px; margin-top: 6px; text-transform: uppercase;">SCAN TO ACTIVATE</div>
+               </div>
+             </div>
           </div>
 
           <div class="text-caption text-grey-5 q-mt-lg italic opacity-6">
@@ -346,9 +376,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { deviceApi, adminApi } from '../api'
 import { date, useQuasar, copyToClipboard } from 'quasar'
-import logo from '../assets/logo.png'
+import logo from '../assets/logo_transparent.png'
+import { useOperatorPreferences } from '../composables/useOperatorPreferences'
+import { LicenseGenerator } from '../utils/licenseGenerator'
 
 const $q = useQuasar()
+const { prefs } = useOperatorPreferences()
 
 const getTenantIdFromToken = () => {
   const token = localStorage.getItem('invify_token')
@@ -552,10 +585,11 @@ const planOptions = [
 
 const deviceColumns = [
   { name: 'tenant', label: 'School/Business', field: row => row.tenants?.name, align: 'left', sortable: true },
-  { name: 'device_id', label: 'Device Serial', field: 'device_id', align: 'left' },
+  { name: 'device_id', label: 'Device Serial', field: row => row.device_suffix || row.device_id, align: 'left' },
   { name: 'plan', label: 'Plan', field: row => row.tenants?.plan, align: 'center' },
   { name: 'status', label: 'Status', field: 'status', align: 'center' },
-  { name: 'last_seen', label: 'Last Seen', field: row => row.last_seen ? date.formatDate(row.last_seen, 'YYYY-MM-DD HH:mm') : 'Never', align: 'right' }
+  { name: 'last_seen', label: 'Last Seen', field: row => row.last_seen ? date.formatDate(row.last_seen, 'YYYY-MM-DD HH:mm') : 'Never', align: 'right' },
+  { name: 'actions', label: 'ACTIONS', align: 'center' }
 ]
 
 const activationColumns = [
@@ -621,6 +655,59 @@ const onTenantChange = (val) => {
     // Capitalize type (e.g. school -> School)
     newCode.value.serviceMode = tenant.type.charAt(0).toUpperCase() + tenant.type.slice(1)
   }
+}
+
+const reviewDeviceCertificate = async (row) => {
+  const act = activations.value.find(a => a.device_id === row.device_id)
+  if (act) {
+    reviewCertificate(act)
+  } else {
+    const businessName = row.tenants?.name || 'Unknown Business';
+    const planName = row.tenants?.plan ? row.tenants.plan.toUpperCase() : 'STANDARD';
+    const mode = row.tenants?.type ? row.tenants.type.charAt(0).toUpperCase() + row.tenants.type.slice(1) : 'Retail';
+    const durationDays = 365;
+    
+    const expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + durationDays);
+    
+    certificateData.value = {
+      businessName,
+      mode,
+      plan: planName,
+      duration: `${durationDays} Days`,
+      expiry: expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    }
+    
+    // Generate a mathematically valid cryptographic Base32 activation code locally
+    const planIndex = planOptions.find(p => p.label === planName)?.value || 1;
+    const deviceSuffix = row.device_suffix || (row.device_id ? row.device_id.substring(Math.max(0, row.device_id.length - 6)).toUpperCase() : '0');
+    
+    lastGeneratedCode.value = await LicenseGenerator.generate(
+      businessName,
+      durationDays,
+      planIndex,
+      deviceSuffix
+    );
+    
+    showSuccessDialog.value = true
+    $q.notify({
+      type: 'info',
+      message: 'Generated dynamic operational certificate for active edge serial.'
+    })
+  }
+}
+
+const generateCodeForDevice = (row) => {
+  newCode.value = {
+    tenantId: row.tenant_id || row.tenants?.id || null,
+    serviceMode: row.tenants?.type ? row.tenants.type.charAt(0).toUpperCase() + row.tenants.type.slice(1) : 'School',
+    duration: 365,
+    planIndex: row.tenants?.plan ? (planOptions.find(p => p.label === row.tenants.plan.toUpperCase())?.value || 1) : 1,
+    deviceSuffix: row.device_suffix ? row.device_suffix.toUpperCase() : (row.device_id ? row.device_id.substring(Math.max(0, row.device_id.length - 6)).toUpperCase() : '0')
+  }
+  
+  filteredTenantOptions.value = tenants.value.map(t => ({ label: t.name, value: t.id }))
+  showCodeDialog.value = true
 }
 
 const reviewCertificate = (row) => {

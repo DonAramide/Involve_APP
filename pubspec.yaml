@@ -78,6 +78,7 @@ dependencies:
   flutter_otp_text_field: ^1.5.1+1
   jwt_decoder: ^2.0.1
   dio_cookie_manager: ^3.4.0
+  mobile_scanner: ^7.2.0
 
 dev_dependencies:
   flutter_test:

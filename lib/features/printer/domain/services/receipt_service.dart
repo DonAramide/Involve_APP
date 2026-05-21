@@ -119,6 +119,8 @@ class ReceiptService {
                   pw.Text(dateFormat.format(invoice.dateCreated)),
                 ],
               ),
+              if (invoice.paymentMethod != null)
+                pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Payment Method: ${invoice.paymentMethod}')),
               if (invoice.staffName != null && (template == 'classic' || template == 'professional'))
                 pw.Align(alignment: pw.Alignment.centerLeft, child: pw.Text('Sold By: ${invoice.staffName!.toUpperCase()}')),
               pw.Divider(),
@@ -222,7 +224,7 @@ class ReceiptService {
                 ],
               ),
 
-              if (settings.showAccountDetails && settings.bankName != null) ...[
+              if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
                 pw.SizedBox(height: 6),
                 pw.Text('Bank: ${settings.bankName}', style: const pw.TextStyle(fontSize: 9)),
                 if (settings.accountNumber != null) pw.Text('Acc No: ${settings.accountNumber}', style: const pw.TextStyle(fontSize: 9)),
@@ -318,6 +320,8 @@ class ReceiptService {
                       pw.SizedBox(height: 20),
                       pw.Text('INVOICE No: ${invoice.invoiceNumber}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                       pw.Text('DATE: ${dateFormat.format(invoice.dateCreated)}'),
+                      if (invoice.paymentMethod != null)
+                        pw.Text('Payment Method: ${invoice.paymentMethod}'),
                       if (logoImage != null)
                         pw.Padding(
                           padding: const pw.EdgeInsets.only(top: 10),
@@ -433,7 +437,7 @@ class ReceiptService {
               pw.Text('Notes:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
               pw.Text('1. Make all cheques payable to ${settings.organizationName}'),
               pw.Text('2. If you have any questions concerning this invoice, contact ${settings.phone}'),
-              if (settings.showAccountDetails && settings.bankName != null) ...[
+              if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
                 pw.SizedBox(height: 10),
                 pw.Text('Payment Details:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                 pw.Text('Bank: ${settings.bankName}'),
@@ -651,13 +655,13 @@ class ReceiptService {
                     children: [
                       pw.Text('Payments Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
                       pw.Text(invoice.paymentMethod ?? 'N/A'),
-                      pw.SizedBox(height: 10),
-                      if (settings.showAccountDetails && settings.bankName != null) ...[
-                        pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                        pw.Text('Bank: ${settings.bankName}'),
-                        pw.Text('Acc No: ${settings.accountNumber}'),
-                        pw.Text('Acc Name: ${settings.accountName}'),
-                      ],
+                       if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
+                         pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                         pw.Text('Bank: ${settings.bankName}'),
+                         pw.Text('Acc No: ${settings.accountNumber ?? ""}'),
+                         pw.Text('Acc Name: ${settings.accountName ?? ""}'),
+                         pw.SizedBox(height: 10),
+                       ],
                       pw.SizedBox(height: 10),
                       pw.Text('Terms & Conditions:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
                       pw.Container(
@@ -928,13 +932,13 @@ class ReceiptService {
                       pw.Text('Payments Method:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
                       pw.Text(invoice.paymentMethod ?? 'N/A'),
                       pw.SizedBox(height: 10),
-                      if (settings.showAccountDetails && settings.bankName != null) ...[
-                        pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
-                        pw.Text('Bank: ${settings.bankName}'),
-                        pw.Text('Acc No: ${settings.accountNumber}'),
-                        pw.Text('Acc Name: ${settings.accountName}'),
-                        pw.SizedBox(height: 10),
-                      ],
+                       if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
+                         pw.Text('Account Info:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
+                         pw.Text('Bank: ${settings.bankName}'),
+                         pw.Text('Acc No: ${settings.accountNumber ?? ""}'),
+                         pw.Text('Acc Name: ${settings.accountName ?? ""}'),
+                         pw.SizedBox(height: 10),
+                       ],
                       pw.Text('Terms & Conditions:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: primaryColor)),
                       pw.Container(
                         width: 250,
@@ -1166,10 +1170,10 @@ class ReceiptService {
                         )),
                         _academicSimpleRow('Being payment for:', '${invoice.termName ?? "Fees"} - ${invoice.academicYearName ?? ""}'),
                         _academicSimpleRow('Receipt printed on:', dateFormat.format(DateTime.now())),
-                        if (settings.showAccountDetails && settings.bankName != null) ...[
+                        if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
                           pw.SizedBox(height: 10),
                           pw.Text('PAYMENT DETAILS:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                          pw.Text('Bank: ${settings.bankName} | Acc No: ${settings.accountNumber} | Acc Name: ${settings.accountName}', 
+                          pw.Text('Bank: ${settings.bankName} | Acc No: ${settings.accountNumber ?? ""} | Acc Name: ${settings.accountName ?? ""}', 
                               style: const pw.TextStyle(fontSize: 10)),
                         ],
                       ],
@@ -1399,18 +1403,18 @@ class ReceiptService {
                                 ),
                              ],
                           ),
-                          if (settings.showAccountDetails && settings.bankName != null) ...[
-                            pw.SizedBox(width: 10),
-                            pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text('PAYMENT DETAILS:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: greenTheme, fontSize: 9)),
-                                pw.Text('Bank: ${settings.bankName}', style: const pw.TextStyle(fontSize: 8)),
-                                pw.Text('Acc No: ${settings.accountNumber}', style: const pw.TextStyle(fontSize: 8)),
-                                pw.Text('Acc Name: ${settings.accountName}', style: const pw.TextStyle(fontSize: 8)),
-                              ],
-                            ),
-                          ],
+                           if (((settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0) && settings.bankName != null) ...[
+                             pw.SizedBox(width: 10),
+                             pw.Column(
+                               crossAxisAlignment: pw.CrossAxisAlignment.start,
+                               children: [
+                                 pw.Text('PAYMENT DETAILS:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: greenTheme, fontSize: 9)),
+                                 pw.Text('Bank: ${settings.bankName}', style: const pw.TextStyle(fontSize: 8)),
+                                 pw.Text('Acc No: ${settings.accountNumber ?? ""}', style: const pw.TextStyle(fontSize: 8)),
+                                 pw.Text('Acc Name: ${settings.accountName ?? ""}', style: const pw.TextStyle(fontSize: 8)),
+                               ],
+                             ),
+                           ],
                           pw.Spacer(),
                           pw.Column(
                              children: [
