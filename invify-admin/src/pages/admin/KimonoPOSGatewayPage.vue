@@ -8,7 +8,28 @@
       <q-btn color="primary" icon="refresh" label="Refresh" @click="fetchData" />
     </div>
 
-    <!-- Configuration Section -->
+    <!-- Main Navigation Tabs -->
+    <q-card flat bordered class="q-mb-md bg-transparent">
+      <q-tabs
+        v-model="mainTab"
+        dense
+        class="text-grey"
+        active-color="primary"
+        indicator-color="primary"
+        align="left"
+        narrow-indicator
+      >
+        <q-tab name="routing" icon="router" label="Dynamic Host Routing Strategy" />
+        <q-tab name="analytics" icon="insights" label="Analytics & Charts" />
+        <q-tab name="transactions" icon="receipt_long" label="Recent Transactions (ISO8583)" />
+      </q-tabs>
+    </q-card>
+
+    <q-tab-panels v-model="mainTab" animated class="bg-transparent">
+      
+      <!-- Routing Panel -->
+      <q-tab-panel name="routing" class="q-pa-none">
+        <!-- Configuration Section -->
     <div class="row q-col-gutter-md q-mb-lg">
       <q-col cols="12" md="6">
         <q-card class="full-height" flat bordered>
@@ -86,111 +107,120 @@
         </q-card>
       </q-col>
     </div>
+    </q-tab-panel>
 
-    <!-- Filters Section -->
-    <q-card flat bordered class="q-mb-md">
-      <q-card-section>
-        <div class="row q-col-gutter-md">
-          <div class="col-12 col-md-2">
-            <q-input v-model="filters.tenantId" label="Business Owner" outlined dense clearable />
+    <!-- Analytics Panel -->
+    <q-tab-panel name="analytics" class="q-pa-none">
+      <!-- Analytics Tabs Section -->
+      <q-card flat bordered class="q-mb-md">
+        <q-tabs
+          v-model="activeTab"
+          dense
+          class="text-grey"
+          active-color="primary"
+          indicator-color="primary"
+          align="left"
+          narrow-indicator
+        >
+          <q-tab name="successRate" icon="trending_up" label="Success & Fail Rate" />
+          <q-tab name="amount" icon="payments" label="Volume & Profit Rate" />
+          <q-tab name="speed" icon="speed" label="Speed & Uptime" />
+        </q-tabs>
+
+        <q-separator />
+
+        <q-tab-panels v-model="activeTab" animated class="bg-transparent">
+          <q-tab-panel name="successRate">
+            <VueApexCharts v-if="chartSeries[0].data.length > 0" type="bar" height="300" :options="chartOptions" :series="chartSeries" />
+            <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
+          </q-tab-panel>
+
+          <q-tab-panel name="amount">
+            <VueApexCharts v-if="amountSeries[0].data.length > 0" type="area" height="300" :options="amountChartOptions" :series="amountSeries" />
+            <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
+          </q-tab-panel>
+
+          <q-tab-panel name="speed">
+            <VueApexCharts v-if="speedSeries[0].data.length > 0" type="line" height="300" :options="speedChartOptions" :series="speedSeries" />
+            <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
+          </q-tab-panel>
+        </q-tab-panels>
+      </q-card>
+    </q-tab-panel>
+
+    <!-- Transactions Panel -->
+    <q-tab-panel name="transactions" class="q-pa-none">
+      <!-- Filters Section -->
+      <q-card flat bordered class="q-mb-md">
+        <q-card-section>
+          <div class="row q-col-gutter-md">
+            <div class="col-12 col-md-2">
+              <q-input v-model="filters.tenantId" label="Business Owner" outlined dense clearable />
+            </div>
+            <div class="col-12 col-md-2">
+              <q-input v-model.number="filters.amountGt" label="Amount Greater (₦)" type="number" outlined dense clearable />
+            </div>
+            <div class="col-12 col-md-2">
+              <q-input v-model="filters.date" label="Date (YYYY-MM-DD)" outlined dense clearable>
+                <template v-slot:append>
+                  <q-icon name="event" class="cursor-pointer">
+                    <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                      <q-date v-model="filters.date" mask="YYYY-MM-DD" />
+                    </q-popup-proxy>
+                  </q-icon>
+                </template>
+              </q-input>
+            </div>
+            <div class="col-12 col-md-2">
+              <q-select v-model="filters.host" :options="['All', 'Medusa', 'NIBSS']" label="Host" outlined dense />
+            </div>
+            <div class="col-12 col-md-2">
+              <q-select v-model="filters.status" :options="['All', 'Approved', 'Declined']" label="Status" outlined dense />
+            </div>
+            <div class="col-12 col-md-2">
+              <q-input v-model="filters.search" label="Search RRN / STAN" outlined dense clearable>
+                <template v-slot:append><q-icon name="search" /></template>
+              </q-input>
+            </div>
           </div>
-          <div class="col-12 col-md-2">
-            <q-input v-model.number="filters.amountGt" label="Amount Greater (₦)" type="number" outlined dense clearable />
-          </div>
-          <div class="col-12 col-md-2">
-            <q-input v-model="filters.date" label="Date (YYYY-MM-DD)" outlined dense clearable>
-              <template v-slot:append>
-                <q-icon name="event" class="cursor-pointer">
-                  <q-popup-proxy cover transition-show="scale" transition-hide="scale">
-                    <q-date v-model="filters.date" mask="YYYY-MM-DD" />
-                  </q-popup-proxy>
-                </q-icon>
-              </template>
-            </q-input>
-          </div>
-          <div class="col-12 col-md-2">
-            <q-select v-model="filters.host" :options="['All', 'Medusa', 'NIBSS']" label="Host" outlined dense />
-          </div>
-          <div class="col-12 col-md-2">
-            <q-select v-model="filters.status" :options="['All', 'Approved', 'Declined']" label="Status" outlined dense />
-          </div>
-          <div class="col-12 col-md-2">
-            <q-input v-model="filters.search" label="Search RRN / STAN" outlined dense clearable>
-              <template v-slot:append><q-icon name="search" /></template>
-            </q-input>
-          </div>
-        </div>
-      </q-card-section>
-    </q-card>
+        </q-card-section>
+      </q-card>
 
-    <!-- Analytics Tabs Section -->
-    <q-card flat bordered class="q-mb-md">
-      <q-tabs
-        v-model="activeTab"
-        dense
-        class="text-grey"
-        active-color="primary"
-        indicator-color="primary"
-        align="left"
-        narrow-indicator
-      >
-        <q-tab name="successRate" icon="trending_up" label="Success & Fail Rate" />
-        <q-tab name="amount" icon="payments" label="Volume & Profit Rate" />
-        <q-tab name="speed" icon="speed" label="Speed & Uptime" />
-      </q-tabs>
+      <!-- Transactions Table -->
+      <q-card flat bordered>
+        <q-table
+          title="Recent Socket Transactions (ISO8583)"
+          :rows="filteredTransactions"
+          :columns="columns"
+          row-key="id"
+          :loading="loading"
+          flat
+          bordered
+        >
+          <template v-slot:body-cell-status="props">
+            <q-td :props="props">
+              <q-chip 
+                :color="props.row.status === 'Approved' ? 'positive' : 'negative'" 
+                text-color="white" 
+                dense 
+                class="text-weight-bold"
+              >
+                {{ props.row.status }}
+              </q-chip>
+            </q-td>
+          </template>
+          <template v-slot:body-cell-actions="props">
+            <q-td :props="props" class="text-right">
+              <q-btn flat dense round icon="visibility" color="primary" @click="viewDetails(props.row)">
+                <q-tooltip>View ISO Trace</q-tooltip>
+              </q-btn>
+            </q-td>
+          </template>
+        </q-table>
+      </q-card>
+    </q-tab-panel>
 
-      <q-separator />
-
-      <q-tab-panels v-model="activeTab" animated class="bg-transparent">
-        <q-tab-panel name="successRate">
-          <VueApexCharts v-if="chartSeries[0].data.length > 0" type="bar" height="300" :options="chartOptions" :series="chartSeries" />
-          <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
-        </q-tab-panel>
-
-        <q-tab-panel name="amount">
-          <VueApexCharts v-if="amountSeries[0].data.length > 0" type="area" height="300" :options="amountChartOptions" :series="amountSeries" />
-          <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
-        </q-tab-panel>
-
-        <q-tab-panel name="speed">
-          <VueApexCharts v-if="speedSeries[0].data.length > 0" type="line" height="300" :options="speedChartOptions" :series="speedSeries" />
-          <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
-        </q-tab-panel>
-      </q-tab-panels>
-    </q-card>
-
-    <!-- Transactions Table -->
-    <q-card flat bordered>
-      <q-table
-        title="Recent Socket Transactions (ISO8583)"
-        :rows="filteredTransactions"
-        :columns="columns"
-        row-key="id"
-        :loading="loading"
-        flat
-        bordered
-      >
-        <template v-slot:body-cell-status="props">
-          <q-td :props="props">
-            <q-chip 
-              :color="props.row.status === 'Approved' ? 'positive' : 'negative'" 
-              text-color="white" 
-              dense 
-              class="text-weight-bold"
-            >
-              {{ props.row.status }}
-            </q-chip>
-          </q-td>
-        </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props" class="text-right">
-            <q-btn flat dense round icon="visibility" color="primary" @click="viewDetails(props.row)">
-              <q-tooltip>View ISO Trace</q-tooltip>
-            </q-btn>
-          </q-td>
-        </template>
-      </q-table>
-    </q-card>
+  </q-tab-panels>
 
     <!-- Details Dialog -->
     <q-dialog v-model="detailsDialog">
@@ -237,6 +267,7 @@ const transactions = ref([])
 const detailsDialog = ref(false)
 const selectedTx = ref(null)
 const activeTab = ref('successRate')
+const mainTab = ref('routing')
 
 const mockHexRequest = ref("0200 4220000000000000 000000 000000001388...")
 const mockHexResponse = ref("0210 4220000000000000 000000 000000001388 00...")
