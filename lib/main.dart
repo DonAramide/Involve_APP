@@ -283,7 +283,7 @@ class AppDependencies {
     // 2. License Service
     LicenseService.init(database);
     
-    final String baseUrl = kDebugMode ? 'http://192.168.1.194:3004' : 'https://api.iips-finance.com';
+    final String baseUrl = kDebugMode ? 'https://bertie-archegoniate-causelessly.ngrok-free.dev' : 'https://api.iips-finance.com';
 
     final financeRepoNew = FinanceRepository(
       FinanceApiClient(

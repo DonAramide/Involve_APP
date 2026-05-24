@@ -123,6 +123,17 @@
       </q-card-section>
     </q-card>
 
+    <!-- Chart Section -->
+    <q-card flat bordered class="q-mb-md">
+      <q-card-section>
+        <div class="text-h6 text-primary q-mb-md">
+          <q-icon name="trending_up" class="q-mr-sm"/> Transaction Success & Fail Rate
+        </div>
+        <VueApexCharts v-if="chartSeries[0].data.length > 0" type="bar" height="300" :options="chartOptions" :series="chartSeries" />
+        <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
+      </q-card-section>
+    </q-card>
+
     <!-- Transactions Table -->
     <q-card flat bordered>
       <q-table
@@ -192,6 +203,7 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '../../api'
 import { useQuasar } from 'quasar'
+import VueApexCharts from 'vue3-apexcharts'
 
 const $q = useQuasar()
 const loading = ref(false)
@@ -232,6 +244,49 @@ const filteredTransactions = computed(() => {
     }
     return match;
   });
+})
+
+const chartSeries = computed(() => {
+  const grouped = {};
+  filteredTransactions.value.forEach(tx => {
+    const d = new Date(tx.date);
+    const timeKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:00`;
+    if (!grouped[timeKey]) grouped[timeKey] = { approved: 0, declined: 0 };
+    if (tx.status === 'Approved') {
+      grouped[timeKey].approved++;
+    } else {
+      grouped[timeKey].declined++;
+    }
+  });
+
+  const categories = Object.keys(grouped).sort();
+  const approvedData = categories.map(k => grouped[k].approved);
+  const declinedData = categories.map(k => grouped[k].declined);
+
+  return [
+    { name: 'Approved', data: approvedData },
+    { name: 'Declined', data: declinedData }
+  ];
+})
+
+const chartOptions = computed(() => {
+  const grouped = {};
+  filteredTransactions.value.forEach(tx => {
+    const d = new Date(tx.date);
+    const timeKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:00`;
+    grouped[timeKey] = true;
+  });
+  const categories = Object.keys(grouped).sort();
+
+  return {
+    chart: { type: 'bar', stacked: true, toolbar: { show: true }, background: 'transparent' },
+    plotOptions: { bar: { horizontal: false, borderRadius: 2 } },
+    xaxis: { categories: categories, title: { text: 'Time (Hours)' } },
+    yaxis: { title: { text: 'Transaction Count' } },
+    colors: ['#21BA45', '#C10015'],
+    dataLabels: { enabled: false },
+    theme: { mode: $q.dark.isActive ? 'dark' : 'light' }
+  };
 })
 
 const columns = [
