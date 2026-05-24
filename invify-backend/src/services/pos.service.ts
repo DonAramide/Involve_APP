@@ -7,12 +7,14 @@ export class PosService {
     medusa: {
       host: 'core.medusang.com', // or 52.209.119.78
       port: 8080,
-      thresholdAmount: 0 // Route to Medusa if amount > threshold
+      thresholdAmount: 0, // Route to Medusa if amount > threshold
+      isActive: true
     },
     nibss: {
       host: 'nibss.example.com',
       port: 5000,
-      thresholdAmount: 50000 
+      thresholdAmount: 50000,
+      isActive: true
     }
   };
 
@@ -52,11 +54,24 @@ export class PosService {
 
   private static determineRoute(amount: number) {
     // Basic routing logic
-    if (this.routingConfig.activeHost === 'nibss') {
-      return { name: 'NIBSS', config: this.routingConfig.nibss };
-    } else {
-      return { name: 'Medusa', config: this.routingConfig.medusa };
+    let route = this.routingConfig.activeHost === 'nibss' 
+      ? { name: 'NIBSS', config: this.routingConfig.nibss }
+      : { name: 'Medusa', config: this.routingConfig.medusa };
+
+    // If the preferred route is inactive, try the fallback
+    if (!route.config.isActive) {
+      if (route.name === 'NIBSS' && this.routingConfig.medusa.isActive) {
+        console.warn('[POS Service] NIBSS is inactive. Falling back to Medusa.');
+        route = { name: 'Medusa', config: this.routingConfig.medusa };
+      } else if (route.name === 'Medusa' && this.routingConfig.nibss.isActive) {
+        console.warn('[POS Service] Medusa is inactive. Falling back to NIBSS.');
+        route = { name: 'NIBSS', config: this.routingConfig.nibss };
+      } else {
+        throw new Error('All POS Gateway Hosts are currently inactive. Transaction cannot be routed.');
+      }
     }
+
+    return route;
   }
 
   private static buildIsoMessage(params: any) {

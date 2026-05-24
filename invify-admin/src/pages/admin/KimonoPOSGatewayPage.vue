@@ -33,16 +33,22 @@
 
             <div class="row q-col-gutter-md q-mt-sm">
               <div class="col-12 col-md-6">
-                <div class="text-subtitle2 text-weight-bold q-mb-xs">Medusa (core.medusang.com)</div>
-                <q-input v-model="routingConfig.medusa.host" label="Host/IP" outlined dense class="q-mb-sm" />
-                <q-input v-model.number="routingConfig.medusa.port" label="Port" type="number" outlined dense class="q-mb-sm" />
-                <q-input v-model.number="routingConfig.medusa.thresholdAmount" label="Threshold Routing Amt" type="number" outlined dense />
+                <div class="row items-center justify-between q-mb-xs">
+                  <div class="text-subtitle2 text-weight-bold">Medusa (core.medusang.com)</div>
+                  <q-toggle v-model="routingConfig.medusa.isActive" label="Active" color="positive" dense />
+                </div>
+                <q-input :disable="!routingConfig.medusa.isActive" v-model="routingConfig.medusa.host" label="Host/IP" outlined dense class="q-mb-sm" />
+                <q-input :disable="!routingConfig.medusa.isActive" v-model.number="routingConfig.medusa.port" label="Port" type="number" outlined dense class="q-mb-sm" />
+                <q-input :disable="!routingConfig.medusa.isActive" v-model.number="routingConfig.medusa.thresholdAmount" label="Threshold Routing Amt" type="number" outlined dense />
               </div>
               <div class="col-12 col-md-6">
-                <div class="text-subtitle2 text-weight-bold q-mb-xs">NIBSS Host</div>
-                <q-input v-model="routingConfig.nibss.host" label="Host/IP" outlined dense class="q-mb-sm" />
-                <q-input v-model.number="routingConfig.nibss.port" label="Port" type="number" outlined dense class="q-mb-sm" />
-                <q-input v-model.number="routingConfig.nibss.thresholdAmount" label="Threshold Routing Amt" type="number" outlined dense />
+                <div class="row items-center justify-between q-mb-xs">
+                  <div class="text-subtitle2 text-weight-bold">NIBSS Host</div>
+                  <q-toggle v-model="routingConfig.nibss.isActive" label="Active" color="positive" dense />
+                </div>
+                <q-input :disable="!routingConfig.nibss.isActive" v-model="routingConfig.nibss.host" label="Host/IP" outlined dense class="q-mb-sm" />
+                <q-input :disable="!routingConfig.nibss.isActive" v-model.number="routingConfig.nibss.port" label="Port" type="number" outlined dense class="q-mb-sm" />
+                <q-input :disable="!routingConfig.nibss.isActive" v-model.number="routingConfig.nibss.thresholdAmount" label="Threshold Routing Amt" type="number" outlined dense />
               </div>
             </div>
           </q-card-section>
@@ -159,8 +165,8 @@ const mockHexResponse = ref("0210 4220000000000000 000000 000000001388 00...")
 
 const routingConfig = ref({
   activeHost: 'medusa',
-  medusa: { host: 'core.medusang.com', port: 8080, thresholdAmount: 0 },
-  nibss: { host: 'nibss.example.com', port: 5000, thresholdAmount: 50000 }
+  medusa: { host: 'core.medusang.com', port: 8080, thresholdAmount: 0, isActive: true },
+  nibss: { host: 'nibss.example.com', port: 5000, thresholdAmount: 50000, isActive: true }
 })
 
 const columns = [
