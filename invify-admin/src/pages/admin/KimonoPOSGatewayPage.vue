@@ -11,7 +11,7 @@
     <!-- Configuration Section -->
     <div class="row q-col-gutter-md q-mb-lg">
       <q-col cols="12" md="6">
-        <q-card class="glass-card full-height">
+        <q-card class="full-height" flat bordered>
           <q-card-section>
             <div class="text-h6 text-primary q-mb-md">
               <q-icon name="router" class="q-mr-sm"/> Dynamic Host Routing Strategy
@@ -53,7 +53,7 @@
       </q-col>
 
       <q-col cols="12" md="6">
-        <q-card class="glass-card full-height">
+        <q-card class="full-height" flat bordered>
           <q-card-section>
              <div class="text-h6 text-primary q-mb-md">
               <q-icon name="insights" class="q-mr-sm"/> Gateway Health
@@ -82,7 +82,7 @@
     </div>
 
     <!-- Transactions Table -->
-    <q-card class="glass-card">
+    <q-card flat bordered>
       <q-table
         title="Recent Socket Transactions (ISO8583)"
         :rows="transactions"
@@ -216,10 +216,5 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.glass-card {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  box-shadow: 0 4px 24px 0 rgba(0, 0, 0, 0.05);
-}
+/* Removed hardcoded white glass-card to support Quasar native dark/light modes */
 </style>

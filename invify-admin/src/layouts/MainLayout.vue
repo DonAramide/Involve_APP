@@ -771,7 +771,8 @@ const activeNavigationTree = computed(() => {
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },
-        { label: 'Enterprise Billing & Fees', path: '/admin/billing', icon: 'payments', color: 'teal-4', badge: 'Finance', badgeBg: 'teal-10', badgeColor: 'teal-2' }
+        { label: 'Enterprise Billing & Fees', path: '/admin/billing', icon: 'payments', color: 'teal-4', badge: 'Finance', badgeBg: 'teal-10', badgeColor: 'teal-2' },
+        { label: 'Kimono POS Gateway', path: '/admin/kimono', icon: 'point_of_sale', color: 'purple-4', badge: 'Kimono', badgeBg: 'purple-10', badgeColor: 'purple-2' }
       ]
   }
 })
