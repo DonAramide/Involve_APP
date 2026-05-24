@@ -326,7 +326,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               if (backendResponse.statusCode != 200) {
                                 throw Exception("Transaction failed on backend");
                               }
-                              // Optionally parse backendResponse.data for receipt details
+                              final respData = backendResponse.data;
+                              if (respData['paymentSuccess'] != true) {
+                                throw Exception("Declined by POS Host (Code: ${respData['statusCode'] ?? 'Unknown'})");
+                              }
                             } catch (e) {
                               if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -503,6 +506,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               
                               if (backendResponse.statusCode != 200) {
                                 throw Exception("Transaction failed on backend");
+                              }
+                              final respData = backendResponse.data;
+                              if (respData['paymentSuccess'] != true) {
+                                throw Exception("Declined by POS Host (Code: ${respData['statusCode'] ?? 'Unknown'})");
                               }
                             } catch (e) {
                               if (!mounted) return;
