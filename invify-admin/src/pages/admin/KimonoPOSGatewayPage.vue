@@ -244,9 +244,9 @@
           </div>
           <q-separator class="q-my-md"/>
           <div class="text-subtitle2 text-grey-8 q-mb-sm">Raw Socket Request (Hex / TLV)</div>
-          <q-input type="textarea" readonly v-model="mockHexRequest" outlined dense />
+          <q-input type="textarea" readonly :model-value="selectedTx.rawRequest || mockHexRequest" outlined dense />
           <div class="text-subtitle2 text-grey-8 q-my-sm">Host Response</div>
-          <q-input type="textarea" readonly v-model="mockHexResponse" outlined dense />
+          <q-input type="textarea" readonly :model-value="selectedTx.rawResponse || mockHexResponse" outlined dense />
         </q-card-section>
       </q-card>
     </q-dialog>

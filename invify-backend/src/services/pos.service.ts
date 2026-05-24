@@ -152,7 +152,9 @@ export class PosService {
       host: hostName,
       maskedPan: response.maskedPan || '**** ****',
       rrn: response.rrn || 'N/A',
-      stan: response.stan || 'N/A'
+      stan: response.stan || 'N/A',
+      rawRequest: JSON.stringify(params, null, 2),
+      rawResponse: JSON.stringify(response, null, 2)
     });
   }
 
