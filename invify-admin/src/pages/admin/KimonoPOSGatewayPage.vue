@@ -144,7 +144,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { api } from 'boot/axios'
+import api from '../../api'
 import { useQuasar } from 'quasar'
 
 const $q = useQuasar()
