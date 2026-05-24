@@ -155,7 +155,8 @@ export class OnboardingController {
         footnote: branding?.footnote || 'Thank you for transacting with Invify Pro.',
         quotas: quota || { terminals: 6, dailyTx: 500, operators: 20 },
         paymentMethod: paymentMethod || 'Stripe',
-        transactionId: transactionId || `tx_atlas_${Date.now()}`
+        transactionId: transactionId || `tx_atlas_${Date.now()}`,
+        cacNumber: req.body.cacNumber || null
       };
 
       const { data: tenant, error: tenantError } = await supabase
@@ -164,7 +165,7 @@ export class OnboardingController {
           name: businessName,
           type: industry,
           plan: plan || 'premium',
-          status: 'active',
+          status: 'pending', // Set to pending until they contact admin and pay
           settings: mockSettings
         })
         .select()
@@ -173,6 +174,42 @@ export class OnboardingController {
       if (tenantError) {
         console.error('[OnboardingController] Tenant Provisioning Failed:', tenantError.message);
         throw tenantError;
+      }
+
+      let generatedVa: any = null;
+      // Generate Virtual Account for Tenant using Quasar SDK
+      try {
+        const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+        const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+        const quasar = new QuasarServiceModule(platformApiKey);
+        
+        const platformId = 'platform-admin-owner-id'; // Constant platform parent ID
+        
+        const va = await quasar.createVirtualAccount({
+          childId: tenant.id,
+          parentId: platformId,
+          currency: 'NGN',
+          email: email || `billing@tenant-${tenant.id.substring(0,8)}.invify.app`,
+          firstName: businessName.split(' ')[0],
+          lastName: businessName.split(' ').slice(1).join(' ') || 'Business',
+          parentShareBps: 0,
+          metadata: { type: 'tenant_operating_account' }
+        });
+        
+        generatedVa = va;
+
+        // Save VA details to the tenant record
+        await supabase
+          .from('tenants')
+          .update({
+            virtual_account_number: va.accountNumber,
+            virtual_account_bank: va.bankName,
+            virtual_account_status: 'ACTIVE'
+          })
+          .eq('id', tenant.id);
+          
+      } catch (vaError: any) {
+        console.error('[OnboardingController] Failed to generate Virtual Account for onboarding tenant:', vaError.message);
       }
 
       // 2. Provision Supabase User credentials or generate sandbox mock profile
@@ -261,7 +298,12 @@ export class OnboardingController {
         role: 'owner',
         walletBalance: startingBalance,
         subscriptionPlan: plan,
-        activeModules: modules || [industry]
+        activeModules: modules || [industry],
+        virtualAccount: generatedVa ? {
+          accountName: generatedVa.accountName || `${businessName.toUpperCase()}`,
+          accountNumber: generatedVa.accountNumber,
+          bankName: generatedVa.bankName
+        } : null
       });
 
     } catch (error: any) {

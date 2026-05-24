@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:involve_app/features/stock/data/models/item_table.dart';
+import 'package:involve_app/features/services/data/models/services_tables.dart';
 
 @DataClassName('InvoiceTable')
 class Invoices extends Table {
@@ -15,6 +16,7 @@ class Invoices extends Table {
   RealColumn get amountPaid => real().withDefault(const Constant(0.0))();
   RealColumn get balanceAmount => real().withDefault(const Constant(0.0))();
   TextColumn get customerName => text().nullable()();
+  TextColumn get customerId => text().nullable().references(Customers, #id)();
   TextColumn get customerAddress => text().nullable()();
   TextColumn get paymentMethod => text().nullable()(); // 'Cash', 'POS', 'Transfer'
   

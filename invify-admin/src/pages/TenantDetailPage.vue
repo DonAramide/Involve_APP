@@ -52,6 +52,7 @@
         <q-tab name="users" label="Users" icon="person" />
         <q-tab name="wallet" label="Wallet" icon="wallet" />
         <q-tab name="usage" label="AI Usage" icon="psychology" />
+        <q-tab name="certificates" label="Licenses" icon="workspace_premium" />
       </q-tabs>
 
       <q-separator dark />
@@ -95,9 +96,103 @@
             <div class="col-12 col-md-6 text-center flex flex-center">
               <div v-if="wallet">
                 <div class="text-overline text-grey-5">Current Wallet Balance</div>
-                <div class="text-h2 text-weight-bolder text-cyan-4">₦{{ wallet.balance.toLocaleString() }}</div>
-                <div class="text-caption text-grey-6 q-mt-xs">Last updated {{ new Date(wallet.updated_at).toLocaleTimeString() }}</div>
+                <div class="text-h2 text-weight-bolder text-cyan-4">₦{{ (wallet.balance || 0).toLocaleString() }}</div>
+                <div class="text-caption text-grey-6 q-mt-xs">
+                  {{ wallet.updated_at ? `Last updated ${new Date(wallet.updated_at).toLocaleTimeString()}` : 'No balance history yet' }}
+                </div>
               </div>
+            </div>
+            <!-- Virtual Account Details Card -->
+            <div class="col-12 q-mt-lg" v-if="tenant.virtual_account_number">
+              <q-card class="bg-white text-black shadow-4 rounded-borders q-pa-md" style="max-width: 600px; margin: 0 auto; border-radius: 12px;">
+                <q-card-section class="text-center">
+                  <q-avatar size="60px" color="deep-purple-5" text-color="white" class="q-mb-md relative-position">
+                    <span class="text-h5 text-weight-bold">{{ tenant.name.charAt(0).toUpperCase() }}</span>
+                    <q-badge floating color="white" text-color="black" rounded style="bottom: 0; right: 0; top: auto;">
+                      <q-icon name="security" size="xs" />
+                    </q-badge>
+                  </q-avatar>
+                  <div class="text-h6 text-weight-bolder letter-spacing-1">{{ tenant.name.toUpperCase() }}</div>
+                  <div class="text-subtitle2 text-grey-7">{{ tenant.virtual_account_bank }}</div>
+                  
+                  <div class="q-mt-md">
+                    <q-chip color="deep-purple-1" text-color="deep-purple-9" class="text-weight-bold" size="lg">
+                      {{ tenant.virtual_account_number }}
+                    </q-chip>
+                  </div>
+                </q-card-section>
+
+                <q-card-section>
+                  <div class="row q-col-gutter-md">
+                    <div class="col-12 col-sm-6">
+                      <div class="bg-blue-1 q-pa-md rounded-borders" style="height: 100%; border-radius: 8px;">
+                        <div class="text-subtitle2 text-blue-9 q-mb-md row items-center">
+                          <q-icon name="account_balance" class="q-mr-sm" size="sm" />
+                          Bank Information
+                        </div>
+                        
+                        <div class="q-mb-sm">
+                          <div class="text-caption text-blue-5">Bank Name</div>
+                          <div class="text-weight-bold">{{ tenant.virtual_account_bank }}</div>
+                        </div>
+                        <div class="q-mb-sm">
+                          <div class="text-caption text-blue-5">Bank Code</div>
+                          <div class="text-weight-bold">{{ tenant.virtual_account_bank_code || 'N/A' }}</div>
+                        </div>
+                        <div>
+                          <div class="text-caption text-blue-5">Account Type</div>
+                          <div class="text-weight-bold">Virtual Account</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-12 col-sm-6">
+                      <div class="bg-purple-1 q-pa-md rounded-borders" style="height: 100%; border-radius: 8px;">
+                        <div class="text-subtitle2 text-purple-9 q-mb-md row items-center">
+                          <q-icon name="payments" class="q-mr-sm" size="sm" />
+                          Account Status
+                        </div>
+                        
+                        <div class="q-mb-sm">
+                          <div class="text-caption text-purple-5">Operating Account</div>
+                          <div class="text-weight-bold">{{ tenant.virtual_account_number }}</div>
+                        </div>
+                        <div class="q-mb-sm">
+                          <div class="text-caption text-purple-5">Status</div>
+                          <div>
+                            <q-chip color="green-2" text-color="green-9" dense size="sm" class="text-weight-bold q-ma-none">
+                              {{ tenant.virtual_account_status || 'ACTIVE' }}
+                            </q-chip>
+                          </div>
+                        </div>
+                        <div>
+                          <div class="text-caption text-purple-5">Date Created</div>
+                          <div class="text-weight-bold">{{ new Date(tenant.created_at).toLocaleString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true }) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </q-card-section>
+                
+                <q-card-section class="text-center text-grey-5 text-caption q-pt-none">
+                  Virtual account details • {{ new Date().getFullYear() }}
+                </q-card-section>
+              </q-card>
+            </div>
+            
+            <!-- Missing Virtual Account Prompt -->
+            <div class="col-12 q-mt-lg text-center" v-else>
+              <q-btn 
+                color="deep-purple-5" 
+                icon="account_balance" 
+                label="Request Virtual Account" 
+                @click="requestVirtualAccount" 
+                :loading="isRequestingVA" 
+                rounded
+                unelevated
+                size="md"
+              />
+              <div class="text-caption text-grey-6 q-mt-sm">No virtual account has been provisioned via Quasar SDK yet.</div>
             </div>
           </div>
         </q-tab-panel>
@@ -247,6 +342,46 @@
           </div>
           <div v-else class="text-center q-pa-xl text-grey-6">No AI usage recorded for this tenant yet.</div>
         </q-tab-panel>
+
+        <!-- Certificates Panel -->
+        <q-tab-panel name="certificates" class="q-pa-none">
+          <q-table
+            :rows="certificates"
+            :columns="[
+              { name: 'code', label: 'ACTIVATION KEY', field: 'code', align: 'left', style: 'font-family: monospace; letter-spacing: 1px;' },
+              { name: 'deviceId', label: 'DEVICE ID', field: 'deviceId', align: 'left' },
+              { name: 'plan', label: 'PLAN', field: 'plan', align: 'center' },
+              { name: 'duration', label: 'DURATION', field: 'duration', align: 'center' },
+              { name: 'status', label: 'STATUS', field: 'status', align: 'center' },
+              { name: 'expiry', label: 'EXPIRY DATE', field: 'expiry', align: 'right' },
+              { name: 'actions', label: '', field: 'actions', align: 'right' }
+            ]"
+            row-key="code"
+            flat
+            dark
+            class="bg-blue-grey-10"
+          >
+            <template v-slot:body-cell-status="props">
+              <q-td :props="props">
+                <q-chip :color="props.row.status === 'ACTIVE' ? 'green-9' : 'red-9'" text-color="white" size="xs" dense>
+                  {{ props.row.status }}
+                </q-chip>
+              </q-td>
+            </template>
+            <template v-slot:body-cell-code="props">
+              <q-td :props="props" class="text-amber-3 text-weight-bold" style="font-family: monospace;">
+                {{ props.row.code }}
+              </q-td>
+            </template>
+            <template v-slot:body-cell-actions="props">
+              <q-td :props="props">
+                <q-btn flat dense round icon="visibility" color="cyan-4" @click="reviewCertificate(props.row)" size="sm">
+                  <q-tooltip>Review Certificate</q-tooltip>
+                </q-btn>
+              </q-td>
+            </template>
+          </q-table>
+        </q-tab-panel>
       </q-tab-panels>
     </q-card>
 
@@ -310,7 +445,7 @@
         <q-card-section class="q-pa-xl text-center scroll" id="printable-certificate" style="flex: 1;">
           <div class="column items-center q-mb-xl">
              <div class="q-mb-sm">
-                <img :src="absoluteLogoUrl" style="height: 120px; width: auto; object-fit: contain;" />
+                <img :src="logo" style="height: 120px; width: auto; object-fit: contain;" />
              </div>
              <div class="text-overline text-amber-2 letter-spacing-10 q-mt-none opacity-8">LICENSED TERMINAL</div>
           </div>
@@ -347,6 +482,11 @@
           <div class="code-container q-pa-lg q-mt-md">
              <div class="text-overline text-amber-3 letter-spacing-5 q-mb-md">SECURE ACTIVATION KEY</div>
              <div class="text-h2 text-weight-bolder text-amber-5 font-mono code-glow" style="font-size: 2.5rem;">{{ lastGeneratedCode }}</div>
+             <div class="q-mt-lg flex flex-center">
+               <div style="padding: 10px; background: white; border-radius: 8px; display: inline-block;">
+                 <img :src="'https://api.qrserver.com/v1/create-qr-code/?size=150x150&amp;data=' + lastGeneratedCode" style="width: 150px; height: 150px; margin: 0; display: block;" />
+               </div>
+             </div>
           </div>
 
           <div class="text-caption text-grey-5 q-mt-lg italic opacity-6">
@@ -378,14 +518,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar, copyToClipboard } from 'quasar'
 import { adminApi, deviceApi } from '../api'
-import logo from '../assets/logo.png'
-
-const absoluteLogoUrl = computed(() => {
-  if (!logo) return ''
-  if (logo.startsWith('http') || logo.startsWith('data:')) return logo
-  const cleanPath = logo.startsWith('/') ? logo : '/' + logo
-  return window.location.origin + cleanPath
-})
+import logo from '../assets/logo_transparent.png'
 
 const $q = useQuasar()
 const $route = useRoute()
@@ -402,6 +535,7 @@ const wallet = ref({
   allWallets: []
 })
 const recentUsage = ref([])
+const certificates = ref([])
 
 const showShortcutDialog = ref(false)
 const showSuccessDialog = ref(false)
@@ -438,6 +572,20 @@ const planOptions = [
   { label: 'PREMIUM', value: 2 },
   { label: 'ENTERPRISE', value: 3 }
 ]
+
+const reviewCertificate = (cert) => {
+  if (!tenant.value) return
+  certificateData.value = {
+    businessName: tenant.value.name,
+    mode: tenant.value.type ? tenant.value.type.toUpperCase() : 'RETAIL',
+    plan: cert.plan,
+    duration: cert.duration,
+    expiry: cert.expiry,
+    deviceId: cert.deviceId
+  }
+  lastGeneratedCode.value = cert.code
+  showSuccessDialog.value = true
+}
 
 const openActivationShortcut = () => {
   if (!tenant.value) return
@@ -478,6 +626,16 @@ const generateShortcutCode = async () => {
     }
 
     lastGeneratedCode.value = data.activation_code
+
+    certificates.value.unshift({
+      code: data.activation_code,
+      deviceId: certificateData.value.deviceId,
+      plan: certificateData.value.plan,
+      duration: certificateData.value.duration,
+      expiry: certificateData.value.expiry,
+      status: 'ACTIVE'
+    })
+
     showShortcutDialog.value = false
     showSuccessDialog.value = true
     
@@ -507,6 +665,7 @@ const printShortcutCertificate = () => {
   printWindow.document.write(`
     <html>
       <head>
+        <base href="${window.location.origin}">
         <title>Invify License Certificate - ${certificateData.value.businessName}</title>
         <style>
           @page { margin: 0; size: A4; }
@@ -587,6 +746,31 @@ const printShortcutCertificate = () => {
   printWindow.document.close()
 }
 
+const isRequestingVA = ref(false)
+
+const requestVirtualAccount = async () => {
+  try {
+    isRequestingVA.value = true
+    const { data } = await adminApi.provisionVirtualAccount($route.params.id)
+    if (data.success) {
+      $q.notify({
+        color: 'positive',
+        message: 'Virtual Account Provisioned successfully',
+        icon: 'check_circle'
+      })
+      await fetchDetails()
+    }
+  } catch (error) {
+    $q.notify({
+      color: 'negative',
+      message: error.response?.data?.error || 'Failed to provision Virtual Account',
+      icon: 'warning'
+    })
+  } finally {
+    isRequestingVA.value = false
+  }
+}
+
 const fetchDetails = async () => {
   loading.value = true
   try {
@@ -602,6 +786,7 @@ const fetchDetails = async () => {
       ...(data.wallet || {})
     }
     recentUsage.value = data.recentUsage || []
+    certificates.value = data.certificates || []
   } finally {
     loading.value = false
   }

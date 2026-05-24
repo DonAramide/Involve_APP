@@ -1355,6 +1355,624 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
   }
 }
 
+class $CustomersTable extends Customers
+    with TableInfo<$CustomersTable, CustomerTable> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CustomersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+      'name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  @override
+  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
+      'phone', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+      'email', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _addressMeta =
+      const VerificationMeta('address');
+  @override
+  late final GeneratedColumn<String> address = GeneratedColumn<String>(
+      'address', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _imageMeta = const VerificationMeta('image');
+  @override
+  late final GeneratedColumn<Uint8List> image = GeneratedColumn<Uint8List>(
+      'image', aliasedName, true,
+      type: DriftSqlType.blob, requiredDuringInsert: false);
+  static const VerificationMeta _balanceMeta =
+      const VerificationMeta('balance');
+  @override
+  late final GeneratedColumn<double> balance = GeneratedColumn<double>(
+      'balance', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _virtualAccountNumberMeta =
+      const VerificationMeta('virtualAccountNumber');
+  @override
+  late final GeneratedColumn<String> virtualAccountNumber =
+      GeneratedColumn<String>('virtual_account_number', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountNameMeta =
+      const VerificationMeta('virtualAccountName');
+  @override
+  late final GeneratedColumn<String> virtualAccountName =
+      GeneratedColumn<String>('virtual_account_name', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountBankMeta =
+      const VerificationMeta('virtualAccountBank');
+  @override
+  late final GeneratedColumn<String> virtualAccountBank =
+      GeneratedColumn<String>('virtual_account_bank', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _syncStatusMeta =
+      const VerificationMeta('syncStatus');
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+      'sync_status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pending'));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        name,
+        phone,
+        email,
+        address,
+        image,
+        balance,
+        virtualAccountNumber,
+        virtualAccountName,
+        virtualAccountBank,
+        createdAt,
+        syncStatus
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'customers';
+  @override
+  VerificationContext validateIntegrity(Insertable<CustomerTable> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('phone')) {
+      context.handle(
+          _phoneMeta, phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta));
+    }
+    if (data.containsKey('email')) {
+      context.handle(
+          _emailMeta, email.isAcceptableOrUnknown(data['email']!, _emailMeta));
+    }
+    if (data.containsKey('address')) {
+      context.handle(_addressMeta,
+          address.isAcceptableOrUnknown(data['address']!, _addressMeta));
+    }
+    if (data.containsKey('image')) {
+      context.handle(
+          _imageMeta, image.isAcceptableOrUnknown(data['image']!, _imageMeta));
+    }
+    if (data.containsKey('balance')) {
+      context.handle(_balanceMeta,
+          balance.isAcceptableOrUnknown(data['balance']!, _balanceMeta));
+    }
+    if (data.containsKey('virtual_account_number')) {
+      context.handle(
+          _virtualAccountNumberMeta,
+          virtualAccountNumber.isAcceptableOrUnknown(
+              data['virtual_account_number']!, _virtualAccountNumberMeta));
+    }
+    if (data.containsKey('virtual_account_name')) {
+      context.handle(
+          _virtualAccountNameMeta,
+          virtualAccountName.isAcceptableOrUnknown(
+              data['virtual_account_name']!, _virtualAccountNameMeta));
+    }
+    if (data.containsKey('virtual_account_bank')) {
+      context.handle(
+          _virtualAccountBankMeta,
+          virtualAccountBank.isAcceptableOrUnknown(
+              data['virtual_account_bank']!, _virtualAccountBankMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+          _syncStatusMeta,
+          syncStatus.isAcceptableOrUnknown(
+              data['sync_status']!, _syncStatusMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CustomerTable map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CustomerTable(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      phone: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}phone']),
+      email: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}email']),
+      address: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}address']),
+      image: attachedDatabase.typeMapping
+          .read(DriftSqlType.blob, data['${effectivePrefix}image']),
+      balance: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}balance'])!,
+      virtualAccountNumber: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}virtual_account_number']),
+      virtualAccountName: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}virtual_account_name']),
+      virtualAccountBank: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}virtual_account_bank']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      syncStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
+    );
+  }
+
+  @override
+  $CustomersTable createAlias(String alias) {
+    return $CustomersTable(attachedDatabase, alias);
+  }
+}
+
+class CustomerTable extends DataClass implements Insertable<CustomerTable> {
+  final String id;
+  final String name;
+  final String? phone;
+  final String? email;
+  final String? address;
+  final Uint8List? image;
+  final double balance;
+  final String? virtualAccountNumber;
+  final String? virtualAccountName;
+  final String? virtualAccountBank;
+  final DateTime createdAt;
+  final String syncStatus;
+  const CustomerTable(
+      {required this.id,
+      required this.name,
+      this.phone,
+      this.email,
+      this.address,
+      this.image,
+      required this.balance,
+      this.virtualAccountNumber,
+      this.virtualAccountName,
+      this.virtualAccountBank,
+      required this.createdAt,
+      required this.syncStatus});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || phone != null) {
+      map['phone'] = Variable<String>(phone);
+    }
+    if (!nullToAbsent || email != null) {
+      map['email'] = Variable<String>(email);
+    }
+    if (!nullToAbsent || address != null) {
+      map['address'] = Variable<String>(address);
+    }
+    if (!nullToAbsent || image != null) {
+      map['image'] = Variable<Uint8List>(image);
+    }
+    map['balance'] = Variable<double>(balance);
+    if (!nullToAbsent || virtualAccountNumber != null) {
+      map['virtual_account_number'] = Variable<String>(virtualAccountNumber);
+    }
+    if (!nullToAbsent || virtualAccountName != null) {
+      map['virtual_account_name'] = Variable<String>(virtualAccountName);
+    }
+    if (!nullToAbsent || virtualAccountBank != null) {
+      map['virtual_account_bank'] = Variable<String>(virtualAccountBank);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['sync_status'] = Variable<String>(syncStatus);
+    return map;
+  }
+
+  CustomersCompanion toCompanion(bool nullToAbsent) {
+    return CustomersCompanion(
+      id: Value(id),
+      name: Value(name),
+      phone:
+          phone == null && nullToAbsent ? const Value.absent() : Value(phone),
+      email:
+          email == null && nullToAbsent ? const Value.absent() : Value(email),
+      address: address == null && nullToAbsent
+          ? const Value.absent()
+          : Value(address),
+      image:
+          image == null && nullToAbsent ? const Value.absent() : Value(image),
+      balance: Value(balance),
+      virtualAccountNumber: virtualAccountNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountNumber),
+      virtualAccountName: virtualAccountName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountName),
+      virtualAccountBank: virtualAccountBank == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountBank),
+      createdAt: Value(createdAt),
+      syncStatus: Value(syncStatus),
+    );
+  }
+
+  factory CustomerTable.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CustomerTable(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      phone: serializer.fromJson<String?>(json['phone']),
+      email: serializer.fromJson<String?>(json['email']),
+      address: serializer.fromJson<String?>(json['address']),
+      image: serializer.fromJson<Uint8List?>(json['image']),
+      balance: serializer.fromJson<double>(json['balance']),
+      virtualAccountNumber:
+          serializer.fromJson<String?>(json['virtualAccountNumber']),
+      virtualAccountName:
+          serializer.fromJson<String?>(json['virtualAccountName']),
+      virtualAccountBank:
+          serializer.fromJson<String?>(json['virtualAccountBank']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'phone': serializer.toJson<String?>(phone),
+      'email': serializer.toJson<String?>(email),
+      'address': serializer.toJson<String?>(address),
+      'image': serializer.toJson<Uint8List?>(image),
+      'balance': serializer.toJson<double>(balance),
+      'virtualAccountNumber': serializer.toJson<String?>(virtualAccountNumber),
+      'virtualAccountName': serializer.toJson<String?>(virtualAccountName),
+      'virtualAccountBank': serializer.toJson<String?>(virtualAccountBank),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+    };
+  }
+
+  CustomerTable copyWith(
+          {String? id,
+          String? name,
+          Value<String?> phone = const Value.absent(),
+          Value<String?> email = const Value.absent(),
+          Value<String?> address = const Value.absent(),
+          Value<Uint8List?> image = const Value.absent(),
+          double? balance,
+          Value<String?> virtualAccountNumber = const Value.absent(),
+          Value<String?> virtualAccountName = const Value.absent(),
+          Value<String?> virtualAccountBank = const Value.absent(),
+          DateTime? createdAt,
+          String? syncStatus}) =>
+      CustomerTable(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        phone: phone.present ? phone.value : this.phone,
+        email: email.present ? email.value : this.email,
+        address: address.present ? address.value : this.address,
+        image: image.present ? image.value : this.image,
+        balance: balance ?? this.balance,
+        virtualAccountNumber: virtualAccountNumber.present
+            ? virtualAccountNumber.value
+            : this.virtualAccountNumber,
+        virtualAccountName: virtualAccountName.present
+            ? virtualAccountName.value
+            : this.virtualAccountName,
+        virtualAccountBank: virtualAccountBank.present
+            ? virtualAccountBank.value
+            : this.virtualAccountBank,
+        createdAt: createdAt ?? this.createdAt,
+        syncStatus: syncStatus ?? this.syncStatus,
+      );
+  CustomerTable copyWithCompanion(CustomersCompanion data) {
+    return CustomerTable(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      phone: data.phone.present ? data.phone.value : this.phone,
+      email: data.email.present ? data.email.value : this.email,
+      address: data.address.present ? data.address.value : this.address,
+      image: data.image.present ? data.image.value : this.image,
+      balance: data.balance.present ? data.balance.value : this.balance,
+      virtualAccountNumber: data.virtualAccountNumber.present
+          ? data.virtualAccountNumber.value
+          : this.virtualAccountNumber,
+      virtualAccountName: data.virtualAccountName.present
+          ? data.virtualAccountName.value
+          : this.virtualAccountName,
+      virtualAccountBank: data.virtualAccountBank.present
+          ? data.virtualAccountBank.value
+          : this.virtualAccountBank,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      syncStatus:
+          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerTable(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('phone: $phone, ')
+          ..write('email: $email, ')
+          ..write('address: $address, ')
+          ..write('image: $image, ')
+          ..write('balance: $balance, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('virtualAccountName: $virtualAccountName, ')
+          ..write('virtualAccountBank: $virtualAccountBank, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('syncStatus: $syncStatus')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      name,
+      phone,
+      email,
+      address,
+      $driftBlobEquality.hash(image),
+      balance,
+      virtualAccountNumber,
+      virtualAccountName,
+      virtualAccountBank,
+      createdAt,
+      syncStatus);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CustomerTable &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.phone == this.phone &&
+          other.email == this.email &&
+          other.address == this.address &&
+          $driftBlobEquality.equals(other.image, this.image) &&
+          other.balance == this.balance &&
+          other.virtualAccountNumber == this.virtualAccountNumber &&
+          other.virtualAccountName == this.virtualAccountName &&
+          other.virtualAccountBank == this.virtualAccountBank &&
+          other.createdAt == this.createdAt &&
+          other.syncStatus == this.syncStatus);
+}
+
+class CustomersCompanion extends UpdateCompanion<CustomerTable> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> phone;
+  final Value<String?> email;
+  final Value<String?> address;
+  final Value<Uint8List?> image;
+  final Value<double> balance;
+  final Value<String?> virtualAccountNumber;
+  final Value<String?> virtualAccountName;
+  final Value<String?> virtualAccountBank;
+  final Value<DateTime> createdAt;
+  final Value<String> syncStatus;
+  final Value<int> rowid;
+  const CustomersCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.phone = const Value.absent(),
+    this.email = const Value.absent(),
+    this.address = const Value.absent(),
+    this.image = const Value.absent(),
+    this.balance = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.virtualAccountName = const Value.absent(),
+    this.virtualAccountBank = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CustomersCompanion.insert({
+    required String id,
+    required String name,
+    this.phone = const Value.absent(),
+    this.email = const Value.absent(),
+    this.address = const Value.absent(),
+    this.image = const Value.absent(),
+    this.balance = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.virtualAccountName = const Value.absent(),
+    this.virtualAccountBank = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        name = Value(name);
+  static Insertable<CustomerTable> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? phone,
+    Expression<String>? email,
+    Expression<String>? address,
+    Expression<Uint8List>? image,
+    Expression<double>? balance,
+    Expression<String>? virtualAccountNumber,
+    Expression<String>? virtualAccountName,
+    Expression<String>? virtualAccountBank,
+    Expression<DateTime>? createdAt,
+    Expression<String>? syncStatus,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (phone != null) 'phone': phone,
+      if (email != null) 'email': email,
+      if (address != null) 'address': address,
+      if (image != null) 'image': image,
+      if (balance != null) 'balance': balance,
+      if (virtualAccountNumber != null)
+        'virtual_account_number': virtualAccountNumber,
+      if (virtualAccountName != null)
+        'virtual_account_name': virtualAccountName,
+      if (virtualAccountBank != null)
+        'virtual_account_bank': virtualAccountBank,
+      if (createdAt != null) 'created_at': createdAt,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CustomersCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? name,
+      Value<String?>? phone,
+      Value<String?>? email,
+      Value<String?>? address,
+      Value<Uint8List?>? image,
+      Value<double>? balance,
+      Value<String?>? virtualAccountNumber,
+      Value<String?>? virtualAccountName,
+      Value<String?>? virtualAccountBank,
+      Value<DateTime>? createdAt,
+      Value<String>? syncStatus,
+      Value<int>? rowid}) {
+    return CustomersCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      address: address ?? this.address,
+      image: image ?? this.image,
+      balance: balance ?? this.balance,
+      virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
+      virtualAccountName: virtualAccountName ?? this.virtualAccountName,
+      virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
+      createdAt: createdAt ?? this.createdAt,
+      syncStatus: syncStatus ?? this.syncStatus,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (phone.present) {
+      map['phone'] = Variable<String>(phone.value);
+    }
+    if (email.present) {
+      map['email'] = Variable<String>(email.value);
+    }
+    if (address.present) {
+      map['address'] = Variable<String>(address.value);
+    }
+    if (image.present) {
+      map['image'] = Variable<Uint8List>(image.value);
+    }
+    if (balance.present) {
+      map['balance'] = Variable<double>(balance.value);
+    }
+    if (virtualAccountNumber.present) {
+      map['virtual_account_number'] =
+          Variable<String>(virtualAccountNumber.value);
+    }
+    if (virtualAccountName.present) {
+      map['virtual_account_name'] = Variable<String>(virtualAccountName.value);
+    }
+    if (virtualAccountBank.present) {
+      map['virtual_account_bank'] = Variable<String>(virtualAccountBank.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomersCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('phone: $phone, ')
+          ..write('email: $email, ')
+          ..write('address: $address, ')
+          ..write('image: $image, ')
+          ..write('balance: $balance, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('virtualAccountName: $virtualAccountName, ')
+          ..write('virtualAccountBank: $virtualAccountBank, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $InvoicesTable extends Invoices
     with TableInfo<$InvoicesTable, InvoiceTable> {
   @override
@@ -1444,6 +2062,15 @@ class $InvoicesTable extends Invoices
   late final GeneratedColumn<String> customerName = GeneratedColumn<String>(
       'customer_name', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _customerIdMeta =
+      const VerificationMeta('customerId');
+  @override
+  late final GeneratedColumn<String> customerId = GeneratedColumn<String>(
+      'customer_id', aliasedName, true,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES customers (id)'));
   static const VerificationMeta _customerAddressMeta =
       const VerificationMeta('customerAddress');
   @override
@@ -1588,6 +2215,7 @@ class $InvoicesTable extends Invoices
         amountPaid,
         balanceAmount,
         customerName,
+        customerId,
         customerAddress,
         paymentMethod,
         staffId,
@@ -1696,6 +2324,12 @@ class $InvoicesTable extends Invoices
           _customerNameMeta,
           customerName.isAcceptableOrUnknown(
               data['customer_name']!, _customerNameMeta));
+    }
+    if (data.containsKey('customer_id')) {
+      context.handle(
+          _customerIdMeta,
+          customerId.isAcceptableOrUnknown(
+              data['customer_id']!, _customerIdMeta));
     }
     if (data.containsKey('customer_address')) {
       context.handle(
@@ -1832,6 +2466,8 @@ class $InvoicesTable extends Invoices
           .read(DriftSqlType.double, data['${effectivePrefix}balance_amount'])!,
       customerName: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}customer_name']),
+      customerId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}customer_id']),
       customerAddress: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}customer_address']),
       paymentMethod: attachedDatabase.typeMapping
@@ -1896,6 +2532,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
   final double amountPaid;
   final double balanceAmount;
   final String? customerName;
+  final String? customerId;
   final String? customerAddress;
   final String? paymentMethod;
   final int? staffId;
@@ -1930,6 +2567,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       required this.amountPaid,
       required this.balanceAmount,
       this.customerName,
+      this.customerId,
       this.customerAddress,
       this.paymentMethod,
       this.staffId,
@@ -1967,6 +2605,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
     map['balance_amount'] = Variable<double>(balanceAmount);
     if (!nullToAbsent || customerName != null) {
       map['customer_name'] = Variable<String>(customerName);
+    }
+    if (!nullToAbsent || customerId != null) {
+      map['customer_id'] = Variable<String>(customerId);
     }
     if (!nullToAbsent || customerAddress != null) {
       map['customer_address'] = Variable<String>(customerAddress);
@@ -2046,6 +2687,9 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       customerName: customerName == null && nullToAbsent
           ? const Value.absent()
           : Value(customerName),
+      customerId: customerId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerId),
       customerAddress: customerAddress == null && nullToAbsent
           ? const Value.absent()
           : Value(customerAddress),
@@ -2122,6 +2766,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       amountPaid: serializer.fromJson<double>(json['amountPaid']),
       balanceAmount: serializer.fromJson<double>(json['balanceAmount']),
       customerName: serializer.fromJson<String?>(json['customerName']),
+      customerId: serializer.fromJson<String?>(json['customerId']),
       customerAddress: serializer.fromJson<String?>(json['customerAddress']),
       paymentMethod: serializer.fromJson<String?>(json['paymentMethod']),
       staffId: serializer.fromJson<int?>(json['staffId']),
@@ -2161,6 +2806,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       'amountPaid': serializer.toJson<double>(amountPaid),
       'balanceAmount': serializer.toJson<double>(balanceAmount),
       'customerName': serializer.toJson<String?>(customerName),
+      'customerId': serializer.toJson<String?>(customerId),
       'customerAddress': serializer.toJson<String?>(customerAddress),
       'paymentMethod': serializer.toJson<String?>(paymentMethod),
       'staffId': serializer.toJson<int?>(staffId),
@@ -2198,6 +2844,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           double? amountPaid,
           double? balanceAmount,
           Value<String?> customerName = const Value.absent(),
+          Value<String?> customerId = const Value.absent(),
           Value<String?> customerAddress = const Value.absent(),
           Value<String?> paymentMethod = const Value.absent(),
           Value<int?> staffId = const Value.absent(),
@@ -2233,6 +2880,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         balanceAmount: balanceAmount ?? this.balanceAmount,
         customerName:
             customerName.present ? customerName.value : this.customerName,
+        customerId: customerId.present ? customerId.value : this.customerId,
         customerAddress: customerAddress.present
             ? customerAddress.value
             : this.customerAddress,
@@ -2297,6 +2945,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       customerName: data.customerName.present
           ? data.customerName.value
           : this.customerName,
+      customerId:
+          data.customerId.present ? data.customerId.value : this.customerId,
       customerAddress: data.customerAddress.present
           ? data.customerAddress.value
           : this.customerAddress,
@@ -2354,6 +3004,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ..write('amountPaid: $amountPaid, ')
           ..write('balanceAmount: $balanceAmount, ')
           ..write('customerName: $customerName, ')
+          ..write('customerId: $customerId, ')
           ..write('customerAddress: $customerAddress, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('staffId: $staffId, ')
@@ -2393,6 +3044,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         amountPaid,
         balanceAmount,
         customerName,
+        customerId,
         customerAddress,
         paymentMethod,
         staffId,
@@ -2431,6 +3083,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           other.amountPaid == this.amountPaid &&
           other.balanceAmount == this.balanceAmount &&
           other.customerName == this.customerName &&
+          other.customerId == this.customerId &&
           other.customerAddress == this.customerAddress &&
           other.paymentMethod == this.paymentMethod &&
           other.staffId == this.staffId &&
@@ -2467,6 +3120,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
   final Value<double> amountPaid;
   final Value<double> balanceAmount;
   final Value<String?> customerName;
+  final Value<String?> customerId;
   final Value<String?> customerAddress;
   final Value<String?> paymentMethod;
   final Value<int?> staffId;
@@ -2501,6 +3155,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.amountPaid = const Value.absent(),
     this.balanceAmount = const Value.absent(),
     this.customerName = const Value.absent(),
+    this.customerId = const Value.absent(),
     this.customerAddress = const Value.absent(),
     this.paymentMethod = const Value.absent(),
     this.staffId = const Value.absent(),
@@ -2536,6 +3191,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.amountPaid = const Value.absent(),
     this.balanceAmount = const Value.absent(),
     this.customerName = const Value.absent(),
+    this.customerId = const Value.absent(),
     this.customerAddress = const Value.absent(),
     this.paymentMethod = const Value.absent(),
     this.staffId = const Value.absent(),
@@ -2576,6 +3232,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     Expression<double>? amountPaid,
     Expression<double>? balanceAmount,
     Expression<String>? customerName,
+    Expression<String>? customerId,
     Expression<String>? customerAddress,
     Expression<String>? paymentMethod,
     Expression<int>? staffId,
@@ -2611,6 +3268,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       if (amountPaid != null) 'amount_paid': amountPaid,
       if (balanceAmount != null) 'balance_amount': balanceAmount,
       if (customerName != null) 'customer_name': customerName,
+      if (customerId != null) 'customer_id': customerId,
       if (customerAddress != null) 'customer_address': customerAddress,
       if (paymentMethod != null) 'payment_method': paymentMethod,
       if (staffId != null) 'staff_id': staffId,
@@ -2648,6 +3306,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       Value<double>? amountPaid,
       Value<double>? balanceAmount,
       Value<String?>? customerName,
+      Value<String?>? customerId,
       Value<String?>? customerAddress,
       Value<String?>? paymentMethod,
       Value<int?>? staffId,
@@ -2682,6 +3341,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       amountPaid: amountPaid ?? this.amountPaid,
       balanceAmount: balanceAmount ?? this.balanceAmount,
       customerName: customerName ?? this.customerName,
+      customerId: customerId ?? this.customerId,
       customerAddress: customerAddress ?? this.customerAddress,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       staffId: staffId ?? this.staffId,
@@ -2744,6 +3404,9 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     }
     if (customerName.present) {
       map['customer_name'] = Variable<String>(customerName.value);
+    }
+    if (customerId.present) {
+      map['customer_id'] = Variable<String>(customerId.value);
     }
     if (customerAddress.present) {
       map['customer_address'] = Variable<String>(customerAddress.value);
@@ -2826,6 +3489,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
           ..write('amountPaid: $amountPaid, ')
           ..write('balanceAmount: $balanceAmount, ')
           ..write('customerName: $customerName, ')
+          ..write('customerId: $customerId, ')
           ..write('customerAddress: $customerAddress, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('staffId: $staffId, ')
@@ -6647,6 +7311,24 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _virtualBankNameMeta =
+      const VerificationMeta('virtualBankName');
+  @override
+  late final GeneratedColumn<String> virtualBankName = GeneratedColumn<String>(
+      'virtual_bank_name', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountNumberMeta =
+      const VerificationMeta('virtualAccountNumber');
+  @override
+  late final GeneratedColumn<String> virtualAccountNumber =
+      GeneratedColumn<String>('virtual_account_number', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountNameMeta =
+      const VerificationMeta('virtualAccountName');
+  @override
+  late final GeneratedColumn<String> virtualAccountName =
+      GeneratedColumn<String>('virtual_account_name', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -6660,7 +7342,10 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
         updatedAt,
         createdAt,
         deviceId,
-        isDeleted
+        isDeleted,
+        virtualBankName,
+        virtualAccountNumber,
+        virtualAccountName
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -6723,6 +7408,24 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
       context.handle(_isDeletedMeta,
           isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
     }
+    if (data.containsKey('virtual_bank_name')) {
+      context.handle(
+          _virtualBankNameMeta,
+          virtualBankName.isAcceptableOrUnknown(
+              data['virtual_bank_name']!, _virtualBankNameMeta));
+    }
+    if (data.containsKey('virtual_account_number')) {
+      context.handle(
+          _virtualAccountNumberMeta,
+          virtualAccountNumber.isAcceptableOrUnknown(
+              data['virtual_account_number']!, _virtualAccountNumberMeta));
+    }
+    if (data.containsKey('virtual_account_name')) {
+      context.handle(
+          _virtualAccountNameMeta,
+          virtualAccountName.isAcceptableOrUnknown(
+              data['virtual_account_name']!, _virtualAccountNameMeta));
+    }
     return context;
   }
 
@@ -6756,6 +7459,13 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
           .read(DriftSqlType.string, data['${effectivePrefix}device_id']),
       isDeleted: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
+      virtualBankName: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}virtual_bank_name']),
+      virtualAccountNumber: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}virtual_account_number']),
+      virtualAccountName: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}virtual_account_name']),
     );
   }
 
@@ -6778,6 +7488,9 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
   final DateTime? createdAt;
   final String? deviceId;
   final bool isDeleted;
+  final String? virtualBankName;
+  final String? virtualAccountNumber;
+  final String? virtualAccountName;
   const StaffTable(
       {required this.id,
       required this.name,
@@ -6790,7 +7503,10 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       this.updatedAt,
       this.createdAt,
       this.deviceId,
-      required this.isDeleted});
+      required this.isDeleted,
+      this.virtualBankName,
+      this.virtualAccountNumber,
+      this.virtualAccountName});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -6818,6 +7534,15 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       map['device_id'] = Variable<String>(deviceId);
     }
     map['is_deleted'] = Variable<bool>(isDeleted);
+    if (!nullToAbsent || virtualBankName != null) {
+      map['virtual_bank_name'] = Variable<String>(virtualBankName);
+    }
+    if (!nullToAbsent || virtualAccountNumber != null) {
+      map['virtual_account_number'] = Variable<String>(virtualAccountNumber);
+    }
+    if (!nullToAbsent || virtualAccountName != null) {
+      map['virtual_account_name'] = Variable<String>(virtualAccountName);
+    }
     return map;
   }
 
@@ -6845,6 +7570,15 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           ? const Value.absent()
           : Value(deviceId),
       isDeleted: Value(isDeleted),
+      virtualBankName: virtualBankName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualBankName),
+      virtualAccountNumber: virtualAccountNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountNumber),
+      virtualAccountName: virtualAccountName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountName),
     );
   }
 
@@ -6864,6 +7598,11 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
       deviceId: serializer.fromJson<String?>(json['deviceId']),
       isDeleted: serializer.fromJson<bool>(json['isDeleted']),
+      virtualBankName: serializer.fromJson<String?>(json['virtualBankName']),
+      virtualAccountNumber:
+          serializer.fromJson<String?>(json['virtualAccountNumber']),
+      virtualAccountName:
+          serializer.fromJson<String?>(json['virtualAccountName']),
     );
   }
   @override
@@ -6882,6 +7621,9 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       'createdAt': serializer.toJson<DateTime?>(createdAt),
       'deviceId': serializer.toJson<String?>(deviceId),
       'isDeleted': serializer.toJson<bool>(isDeleted),
+      'virtualBankName': serializer.toJson<String?>(virtualBankName),
+      'virtualAccountNumber': serializer.toJson<String?>(virtualAccountNumber),
+      'virtualAccountName': serializer.toJson<String?>(virtualAccountName),
     };
   }
 
@@ -6897,7 +7639,10 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
           Value<String?> deviceId = const Value.absent(),
-          bool? isDeleted}) =>
+          bool? isDeleted,
+          Value<String?> virtualBankName = const Value.absent(),
+          Value<String?> virtualAccountNumber = const Value.absent(),
+          Value<String?> virtualAccountName = const Value.absent()}) =>
       StaffTable(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -6911,6 +7656,15 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
         deviceId: deviceId.present ? deviceId.value : this.deviceId,
         isDeleted: isDeleted ?? this.isDeleted,
+        virtualBankName: virtualBankName.present
+            ? virtualBankName.value
+            : this.virtualBankName,
+        virtualAccountNumber: virtualAccountNumber.present
+            ? virtualAccountNumber.value
+            : this.virtualAccountNumber,
+        virtualAccountName: virtualAccountName.present
+            ? virtualAccountName.value
+            : this.virtualAccountName,
       );
   StaffTable copyWithCompanion(StaffCompanion data) {
     return StaffTable(
@@ -6926,6 +7680,15 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
       isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
+      virtualBankName: data.virtualBankName.present
+          ? data.virtualBankName.value
+          : this.virtualBankName,
+      virtualAccountNumber: data.virtualAccountNumber.present
+          ? data.virtualAccountNumber.value
+          : this.virtualAccountNumber,
+      virtualAccountName: data.virtualAccountName.present
+          ? data.virtualAccountName.value
+          : this.virtualAccountName,
     );
   }
 
@@ -6943,14 +7706,31 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('virtualBankName: $virtualBankName, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('virtualAccountName: $virtualAccountName')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, staffCode, staffId, phone, role,
-      isActive, syncId, updatedAt, createdAt, deviceId, isDeleted);
+  int get hashCode => Object.hash(
+      id,
+      name,
+      staffCode,
+      staffId,
+      phone,
+      role,
+      isActive,
+      syncId,
+      updatedAt,
+      createdAt,
+      deviceId,
+      isDeleted,
+      virtualBankName,
+      virtualAccountNumber,
+      virtualAccountName);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -6966,7 +7746,10 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
           other.deviceId == this.deviceId &&
-          other.isDeleted == this.isDeleted);
+          other.isDeleted == this.isDeleted &&
+          other.virtualBankName == this.virtualBankName &&
+          other.virtualAccountNumber == this.virtualAccountNumber &&
+          other.virtualAccountName == this.virtualAccountName);
 }
 
 class StaffCompanion extends UpdateCompanion<StaffTable> {
@@ -6982,6 +7765,9 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
   final Value<DateTime?> createdAt;
   final Value<String?> deviceId;
   final Value<bool> isDeleted;
+  final Value<String?> virtualBankName;
+  final Value<String?> virtualAccountNumber;
+  final Value<String?> virtualAccountName;
   const StaffCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -6995,6 +7781,9 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     this.createdAt = const Value.absent(),
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.virtualBankName = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.virtualAccountName = const Value.absent(),
   });
   StaffCompanion.insert({
     this.id = const Value.absent(),
@@ -7009,6 +7798,9 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     this.createdAt = const Value.absent(),
     this.deviceId = const Value.absent(),
     this.isDeleted = const Value.absent(),
+    this.virtualBankName = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.virtualAccountName = const Value.absent(),
   })  : name = Value(name),
         staffCode = Value(staffCode);
   static Insertable<StaffTable> custom({
@@ -7024,6 +7816,9 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     Expression<DateTime>? createdAt,
     Expression<String>? deviceId,
     Expression<bool>? isDeleted,
+    Expression<String>? virtualBankName,
+    Expression<String>? virtualAccountNumber,
+    Expression<String>? virtualAccountName,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -7038,6 +7833,11 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
       if (createdAt != null) 'created_at': createdAt,
       if (deviceId != null) 'device_id': deviceId,
       if (isDeleted != null) 'is_deleted': isDeleted,
+      if (virtualBankName != null) 'virtual_bank_name': virtualBankName,
+      if (virtualAccountNumber != null)
+        'virtual_account_number': virtualAccountNumber,
+      if (virtualAccountName != null)
+        'virtual_account_name': virtualAccountName,
     });
   }
 
@@ -7053,7 +7853,10 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
       Value<String?>? deviceId,
-      Value<bool>? isDeleted}) {
+      Value<bool>? isDeleted,
+      Value<String?>? virtualBankName,
+      Value<String?>? virtualAccountNumber,
+      Value<String?>? virtualAccountName}) {
     return StaffCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -7067,6 +7870,9 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
       createdAt: createdAt ?? this.createdAt,
       deviceId: deviceId ?? this.deviceId,
       isDeleted: isDeleted ?? this.isDeleted,
+      virtualBankName: virtualBankName ?? this.virtualBankName,
+      virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
+      virtualAccountName: virtualAccountName ?? this.virtualAccountName,
     );
   }
 
@@ -7109,6 +7915,16 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     if (isDeleted.present) {
       map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
+    if (virtualBankName.present) {
+      map['virtual_bank_name'] = Variable<String>(virtualBankName.value);
+    }
+    if (virtualAccountNumber.present) {
+      map['virtual_account_number'] =
+          Variable<String>(virtualAccountNumber.value);
+    }
+    if (virtualAccountName.present) {
+      map['virtual_account_name'] = Variable<String>(virtualAccountName.value);
+    }
     return map;
   }
 
@@ -7126,7 +7942,10 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('deviceId: $deviceId, ')
-          ..write('isDeleted: $isDeleted')
+          ..write('isDeleted: $isDeleted, ')
+          ..write('virtualBankName: $virtualBankName, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('virtualAccountName: $virtualAccountName')
           ..write(')'))
         .toString();
   }
@@ -10731,6 +11550,14 @@ class $StudentsTable extends Students
       type: DriftSqlType.double,
       requiredDuringInsert: false,
       defaultValue: const Constant(0.0));
+  static const VerificationMeta _creditBalanceMeta =
+      const VerificationMeta('creditBalance');
+  @override
+  late final GeneratedColumn<double> creditBalance = GeneratedColumn<double>(
+      'credit_balance', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   static const VerificationMeta _dateOfBirthMeta =
       const VerificationMeta('dateOfBirth');
   @override
@@ -10755,6 +11582,24 @@ class $StudentsTable extends Students
   late final GeneratedColumn<Uint8List> image = GeneratedColumn<Uint8List>(
       'image', aliasedName, true,
       type: DriftSqlType.blob, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountNumberMeta =
+      const VerificationMeta('virtualAccountNumber');
+  @override
+  late final GeneratedColumn<String> virtualAccountNumber =
+      GeneratedColumn<String>('virtual_account_number', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountBankMeta =
+      const VerificationMeta('virtualAccountBank');
+  @override
+  late final GeneratedColumn<String> virtualAccountBank =
+      GeneratedColumn<String>('virtual_account_bank', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _virtualAccountStatusMeta =
+      const VerificationMeta('virtualAccountStatus');
+  @override
+  late final GeneratedColumn<String> virtualAccountStatus =
+      GeneratedColumn<String>('virtual_account_status', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -10799,10 +11644,14 @@ class $StudentsTable extends Students
         parentName,
         parentPhone,
         balance,
+        creditBalance,
         dateOfBirth,
         gender,
         registrationDate,
         image,
+        virtualAccountNumber,
+        virtualAccountBank,
+        virtualAccountStatus,
         syncId,
         updatedAt,
         createdAt,
@@ -10870,6 +11719,12 @@ class $StudentsTable extends Students
       context.handle(_balanceMeta,
           balance.isAcceptableOrUnknown(data['balance']!, _balanceMeta));
     }
+    if (data.containsKey('credit_balance')) {
+      context.handle(
+          _creditBalanceMeta,
+          creditBalance.isAcceptableOrUnknown(
+              data['credit_balance']!, _creditBalanceMeta));
+    }
     if (data.containsKey('date_of_birth')) {
       context.handle(
           _dateOfBirthMeta,
@@ -10889,6 +11744,24 @@ class $StudentsTable extends Students
     if (data.containsKey('image')) {
       context.handle(
           _imageMeta, image.isAcceptableOrUnknown(data['image']!, _imageMeta));
+    }
+    if (data.containsKey('virtual_account_number')) {
+      context.handle(
+          _virtualAccountNumberMeta,
+          virtualAccountNumber.isAcceptableOrUnknown(
+              data['virtual_account_number']!, _virtualAccountNumberMeta));
+    }
+    if (data.containsKey('virtual_account_bank')) {
+      context.handle(
+          _virtualAccountBankMeta,
+          virtualAccountBank.isAcceptableOrUnknown(
+              data['virtual_account_bank']!, _virtualAccountBankMeta));
+    }
+    if (data.containsKey('virtual_account_status')) {
+      context.handle(
+          _virtualAccountStatusMeta,
+          virtualAccountStatus.isAcceptableOrUnknown(
+              data['virtual_account_status']!, _virtualAccountStatusMeta));
     }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
@@ -10937,6 +11810,8 @@ class $StudentsTable extends Students
           .read(DriftSqlType.string, data['${effectivePrefix}parent_phone']),
       balance: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}balance'])!,
+      creditBalance: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}credit_balance'])!,
       dateOfBirth: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}date_of_birth']),
       gender: attachedDatabase.typeMapping
@@ -10945,6 +11820,14 @@ class $StudentsTable extends Students
           DriftSqlType.dateTime, data['${effectivePrefix}registration_date'])!,
       image: attachedDatabase.typeMapping
           .read(DriftSqlType.blob, data['${effectivePrefix}image']),
+      virtualAccountNumber: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}virtual_account_number']),
+      virtualAccountBank: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}virtual_account_bank']),
+      virtualAccountStatus: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}virtual_account_status']),
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -10974,10 +11857,14 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   final String? parentName;
   final String? parentPhone;
   final double balance;
+  final double creditBalance;
   final DateTime? dateOfBirth;
   final String? gender;
   final DateTime registrationDate;
   final Uint8List? image;
+  final String? virtualAccountNumber;
+  final String? virtualAccountBank;
+  final String? virtualAccountStatus;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -10993,10 +11880,14 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       this.parentName,
       this.parentPhone,
       required this.balance,
+      required this.creditBalance,
       this.dateOfBirth,
       this.gender,
       required this.registrationDate,
       this.image,
+      this.virtualAccountNumber,
+      this.virtualAccountBank,
+      this.virtualAccountStatus,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -11020,6 +11911,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       map['parent_phone'] = Variable<String>(parentPhone);
     }
     map['balance'] = Variable<double>(balance);
+    map['credit_balance'] = Variable<double>(creditBalance);
     if (!nullToAbsent || dateOfBirth != null) {
       map['date_of_birth'] = Variable<DateTime>(dateOfBirth);
     }
@@ -11029,6 +11921,15 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
     map['registration_date'] = Variable<DateTime>(registrationDate);
     if (!nullToAbsent || image != null) {
       map['image'] = Variable<Uint8List>(image);
+    }
+    if (!nullToAbsent || virtualAccountNumber != null) {
+      map['virtual_account_number'] = Variable<String>(virtualAccountNumber);
+    }
+    if (!nullToAbsent || virtualAccountBank != null) {
+      map['virtual_account_bank'] = Variable<String>(virtualAccountBank);
+    }
+    if (!nullToAbsent || virtualAccountStatus != null) {
+      map['virtual_account_status'] = Variable<String>(virtualAccountStatus);
     }
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
@@ -11063,6 +11964,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ? const Value.absent()
           : Value(parentPhone),
       balance: Value(balance),
+      creditBalance: Value(creditBalance),
       dateOfBirth: dateOfBirth == null && nullToAbsent
           ? const Value.absent()
           : Value(dateOfBirth),
@@ -11071,6 +11973,15 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       registrationDate: Value(registrationDate),
       image:
           image == null && nullToAbsent ? const Value.absent() : Value(image),
+      virtualAccountNumber: virtualAccountNumber == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountNumber),
+      virtualAccountBank: virtualAccountBank == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountBank),
+      virtualAccountStatus: virtualAccountStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(virtualAccountStatus),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -11099,10 +12010,17 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       parentName: serializer.fromJson<String?>(json['parentName']),
       parentPhone: serializer.fromJson<String?>(json['parentPhone']),
       balance: serializer.fromJson<double>(json['balance']),
+      creditBalance: serializer.fromJson<double>(json['creditBalance']),
       dateOfBirth: serializer.fromJson<DateTime?>(json['dateOfBirth']),
       gender: serializer.fromJson<String?>(json['gender']),
       registrationDate: serializer.fromJson<DateTime>(json['registrationDate']),
       image: serializer.fromJson<Uint8List?>(json['image']),
+      virtualAccountNumber:
+          serializer.fromJson<String?>(json['virtualAccountNumber']),
+      virtualAccountBank:
+          serializer.fromJson<String?>(json['virtualAccountBank']),
+      virtualAccountStatus:
+          serializer.fromJson<String?>(json['virtualAccountStatus']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -11123,10 +12041,14 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'parentName': serializer.toJson<String?>(parentName),
       'parentPhone': serializer.toJson<String?>(parentPhone),
       'balance': serializer.toJson<double>(balance),
+      'creditBalance': serializer.toJson<double>(creditBalance),
       'dateOfBirth': serializer.toJson<DateTime?>(dateOfBirth),
       'gender': serializer.toJson<String?>(gender),
       'registrationDate': serializer.toJson<DateTime>(registrationDate),
       'image': serializer.toJson<Uint8List?>(image),
+      'virtualAccountNumber': serializer.toJson<String?>(virtualAccountNumber),
+      'virtualAccountBank': serializer.toJson<String?>(virtualAccountBank),
+      'virtualAccountStatus': serializer.toJson<String?>(virtualAccountStatus),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -11145,10 +12067,14 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           Value<String?> parentName = const Value.absent(),
           Value<String?> parentPhone = const Value.absent(),
           double? balance,
+          double? creditBalance,
           Value<DateTime?> dateOfBirth = const Value.absent(),
           Value<String?> gender = const Value.absent(),
           DateTime? registrationDate,
           Value<Uint8List?> image = const Value.absent(),
+          Value<String?> virtualAccountNumber = const Value.absent(),
+          Value<String?> virtualAccountBank = const Value.absent(),
+          Value<String?> virtualAccountStatus = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -11165,10 +12091,20 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         parentName: parentName.present ? parentName.value : this.parentName,
         parentPhone: parentPhone.present ? parentPhone.value : this.parentPhone,
         balance: balance ?? this.balance,
+        creditBalance: creditBalance ?? this.creditBalance,
         dateOfBirth: dateOfBirth.present ? dateOfBirth.value : this.dateOfBirth,
         gender: gender.present ? gender.value : this.gender,
         registrationDate: registrationDate ?? this.registrationDate,
         image: image.present ? image.value : this.image,
+        virtualAccountNumber: virtualAccountNumber.present
+            ? virtualAccountNumber.value
+            : this.virtualAccountNumber,
+        virtualAccountBank: virtualAccountBank.present
+            ? virtualAccountBank.value
+            : this.virtualAccountBank,
+        virtualAccountStatus: virtualAccountStatus.present
+            ? virtualAccountStatus.value
+            : this.virtualAccountStatus,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -11192,6 +12128,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       parentPhone:
           data.parentPhone.present ? data.parentPhone.value : this.parentPhone,
       balance: data.balance.present ? data.balance.value : this.balance,
+      creditBalance: data.creditBalance.present
+          ? data.creditBalance.value
+          : this.creditBalance,
       dateOfBirth:
           data.dateOfBirth.present ? data.dateOfBirth.value : this.dateOfBirth,
       gender: data.gender.present ? data.gender.value : this.gender,
@@ -11199,6 +12138,15 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ? data.registrationDate.value
           : this.registrationDate,
       image: data.image.present ? data.image.value : this.image,
+      virtualAccountNumber: data.virtualAccountNumber.present
+          ? data.virtualAccountNumber.value
+          : this.virtualAccountNumber,
+      virtualAccountBank: data.virtualAccountBank.present
+          ? data.virtualAccountBank.value
+          : this.virtualAccountBank,
+      virtualAccountStatus: data.virtualAccountStatus.present
+          ? data.virtualAccountStatus.value
+          : this.virtualAccountStatus,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -11219,10 +12167,14 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('parentName: $parentName, ')
           ..write('parentPhone: $parentPhone, ')
           ..write('balance: $balance, ')
+          ..write('creditBalance: $creditBalance, ')
           ..write('dateOfBirth: $dateOfBirth, ')
           ..write('gender: $gender, ')
           ..write('registrationDate: $registrationDate, ')
           ..write('image: $image, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('virtualAccountBank: $virtualAccountBank, ')
+          ..write('virtualAccountStatus: $virtualAccountStatus, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -11233,25 +12185,30 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      admissionNumber,
-      firstName,
-      lastName,
-      classId,
-      academicYearId,
-      parentName,
-      parentPhone,
-      balance,
-      dateOfBirth,
-      gender,
-      registrationDate,
-      $driftBlobEquality.hash(image),
-      syncId,
-      updatedAt,
-      createdAt,
-      deviceId,
-      isDeleted);
+  int get hashCode => Object.hashAll([
+        id,
+        admissionNumber,
+        firstName,
+        lastName,
+        classId,
+        academicYearId,
+        parentName,
+        parentPhone,
+        balance,
+        creditBalance,
+        dateOfBirth,
+        gender,
+        registrationDate,
+        $driftBlobEquality.hash(image),
+        virtualAccountNumber,
+        virtualAccountBank,
+        virtualAccountStatus,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -11265,10 +12222,14 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.parentName == this.parentName &&
           other.parentPhone == this.parentPhone &&
           other.balance == this.balance &&
+          other.creditBalance == this.creditBalance &&
           other.dateOfBirth == this.dateOfBirth &&
           other.gender == this.gender &&
           other.registrationDate == this.registrationDate &&
           $driftBlobEquality.equals(other.image, this.image) &&
+          other.virtualAccountNumber == this.virtualAccountNumber &&
+          other.virtualAccountBank == this.virtualAccountBank &&
+          other.virtualAccountStatus == this.virtualAccountStatus &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -11286,10 +12247,14 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<String?> parentName;
   final Value<String?> parentPhone;
   final Value<double> balance;
+  final Value<double> creditBalance;
   final Value<DateTime?> dateOfBirth;
   final Value<String?> gender;
   final Value<DateTime> registrationDate;
   final Value<Uint8List?> image;
+  final Value<String?> virtualAccountNumber;
+  final Value<String?> virtualAccountBank;
+  final Value<String?> virtualAccountStatus;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -11305,10 +12270,14 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.parentName = const Value.absent(),
     this.parentPhone = const Value.absent(),
     this.balance = const Value.absent(),
+    this.creditBalance = const Value.absent(),
     this.dateOfBirth = const Value.absent(),
     this.gender = const Value.absent(),
     this.registrationDate = const Value.absent(),
     this.image = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.virtualAccountBank = const Value.absent(),
+    this.virtualAccountStatus = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -11325,10 +12294,14 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.parentName = const Value.absent(),
     this.parentPhone = const Value.absent(),
     this.balance = const Value.absent(),
+    this.creditBalance = const Value.absent(),
     this.dateOfBirth = const Value.absent(),
     this.gender = const Value.absent(),
     this.registrationDate = const Value.absent(),
     this.image = const Value.absent(),
+    this.virtualAccountNumber = const Value.absent(),
+    this.virtualAccountBank = const Value.absent(),
+    this.virtualAccountStatus = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -11348,10 +12321,14 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<String>? parentName,
     Expression<String>? parentPhone,
     Expression<double>? balance,
+    Expression<double>? creditBalance,
     Expression<DateTime>? dateOfBirth,
     Expression<String>? gender,
     Expression<DateTime>? registrationDate,
     Expression<Uint8List>? image,
+    Expression<String>? virtualAccountNumber,
+    Expression<String>? virtualAccountBank,
+    Expression<String>? virtualAccountStatus,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -11368,10 +12345,17 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       if (parentName != null) 'parent_name': parentName,
       if (parentPhone != null) 'parent_phone': parentPhone,
       if (balance != null) 'balance': balance,
+      if (creditBalance != null) 'credit_balance': creditBalance,
       if (dateOfBirth != null) 'date_of_birth': dateOfBirth,
       if (gender != null) 'gender': gender,
       if (registrationDate != null) 'registration_date': registrationDate,
       if (image != null) 'image': image,
+      if (virtualAccountNumber != null)
+        'virtual_account_number': virtualAccountNumber,
+      if (virtualAccountBank != null)
+        'virtual_account_bank': virtualAccountBank,
+      if (virtualAccountStatus != null)
+        'virtual_account_status': virtualAccountStatus,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -11390,10 +12374,14 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       Value<String?>? parentName,
       Value<String?>? parentPhone,
       Value<double>? balance,
+      Value<double>? creditBalance,
       Value<DateTime?>? dateOfBirth,
       Value<String?>? gender,
       Value<DateTime>? registrationDate,
       Value<Uint8List?>? image,
+      Value<String?>? virtualAccountNumber,
+      Value<String?>? virtualAccountBank,
+      Value<String?>? virtualAccountStatus,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -11409,10 +12397,14 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       parentName: parentName ?? this.parentName,
       parentPhone: parentPhone ?? this.parentPhone,
       balance: balance ?? this.balance,
+      creditBalance: creditBalance ?? this.creditBalance,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       gender: gender ?? this.gender,
       registrationDate: registrationDate ?? this.registrationDate,
       image: image ?? this.image,
+      virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
+      virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
+      virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -11451,6 +12443,9 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     if (balance.present) {
       map['balance'] = Variable<double>(balance.value);
     }
+    if (creditBalance.present) {
+      map['credit_balance'] = Variable<double>(creditBalance.value);
+    }
     if (dateOfBirth.present) {
       map['date_of_birth'] = Variable<DateTime>(dateOfBirth.value);
     }
@@ -11462,6 +12457,17 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     }
     if (image.present) {
       map['image'] = Variable<Uint8List>(image.value);
+    }
+    if (virtualAccountNumber.present) {
+      map['virtual_account_number'] =
+          Variable<String>(virtualAccountNumber.value);
+    }
+    if (virtualAccountBank.present) {
+      map['virtual_account_bank'] = Variable<String>(virtualAccountBank.value);
+    }
+    if (virtualAccountStatus.present) {
+      map['virtual_account_status'] =
+          Variable<String>(virtualAccountStatus.value);
     }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
@@ -11493,10 +12499,14 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('parentName: $parentName, ')
           ..write('parentPhone: $parentPhone, ')
           ..write('balance: $balance, ')
+          ..write('creditBalance: $creditBalance, ')
           ..write('dateOfBirth: $dateOfBirth, ')
           ..write('gender: $gender, ')
           ..write('registrationDate: $registrationDate, ')
           ..write('image: $image, ')
+          ..write('virtualAccountNumber: $virtualAccountNumber, ')
+          ..write('virtualAccountBank: $virtualAccountBank, ')
+          ..write('virtualAccountStatus: $virtualAccountStatus, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -14465,427 +15475,6 @@ class PrinterConfigsCompanion extends UpdateCompanion<PrinterConfig> {
   }
 }
 
-class $ServiceCustomersTable extends ServiceCustomers
-    with TableInfo<$ServiceCustomersTable, ServiceCustomerTable> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $ServiceCustomersTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-      'id', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _nameMeta = const VerificationMeta('name');
-  @override
-  late final GeneratedColumn<String> name = GeneratedColumn<String>(
-      'name', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
-  @override
-  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
-      'phone', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _emailMeta = const VerificationMeta('email');
-  @override
-  late final GeneratedColumn<String> email = GeneratedColumn<String>(
-      'email', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _addressMeta =
-      const VerificationMeta('address');
-  @override
-  late final GeneratedColumn<String> address = GeneratedColumn<String>(
-      'address', aliasedName, true,
-      type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _imageMeta = const VerificationMeta('image');
-  @override
-  late final GeneratedColumn<Uint8List> image = GeneratedColumn<Uint8List>(
-      'image', aliasedName, true,
-      type: DriftSqlType.blob, requiredDuringInsert: false);
-  static const VerificationMeta _createdAtMeta =
-      const VerificationMeta('createdAt');
-  @override
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-      'created_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: currentDateAndTime);
-  static const VerificationMeta _syncStatusMeta =
-      const VerificationMeta('syncStatus');
-  @override
-  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
-      'sync_status', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: false,
-      defaultValue: const Constant('pending'));
-  @override
-  List<GeneratedColumn> get $columns =>
-      [id, name, phone, email, address, image, createdAt, syncStatus];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'service_customers';
-  @override
-  VerificationContext validateIntegrity(
-      Insertable<ServiceCustomerTable> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    } else if (isInserting) {
-      context.missing(_idMeta);
-    }
-    if (data.containsKey('name')) {
-      context.handle(
-          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
-    } else if (isInserting) {
-      context.missing(_nameMeta);
-    }
-    if (data.containsKey('phone')) {
-      context.handle(
-          _phoneMeta, phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta));
-    }
-    if (data.containsKey('email')) {
-      context.handle(
-          _emailMeta, email.isAcceptableOrUnknown(data['email']!, _emailMeta));
-    }
-    if (data.containsKey('address')) {
-      context.handle(_addressMeta,
-          address.isAcceptableOrUnknown(data['address']!, _addressMeta));
-    }
-    if (data.containsKey('image')) {
-      context.handle(
-          _imageMeta, image.isAcceptableOrUnknown(data['image']!, _imageMeta));
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(_createdAtMeta,
-          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
-    }
-    if (data.containsKey('sync_status')) {
-      context.handle(
-          _syncStatusMeta,
-          syncStatus.isAcceptableOrUnknown(
-              data['sync_status']!, _syncStatusMeta));
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  ServiceCustomerTable map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ServiceCustomerTable(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
-      name: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
-      phone: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}phone']),
-      email: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}email']),
-      address: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}address']),
-      image: attachedDatabase.typeMapping
-          .read(DriftSqlType.blob, data['${effectivePrefix}image']),
-      createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
-      syncStatus: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}sync_status'])!,
-    );
-  }
-
-  @override
-  $ServiceCustomersTable createAlias(String alias) {
-    return $ServiceCustomersTable(attachedDatabase, alias);
-  }
-}
-
-class ServiceCustomerTable extends DataClass
-    implements Insertable<ServiceCustomerTable> {
-  final String id;
-  final String name;
-  final String? phone;
-  final String? email;
-  final String? address;
-  final Uint8List? image;
-  final DateTime createdAt;
-  final String syncStatus;
-  const ServiceCustomerTable(
-      {required this.id,
-      required this.name,
-      this.phone,
-      this.email,
-      this.address,
-      this.image,
-      required this.createdAt,
-      required this.syncStatus});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<String>(id);
-    map['name'] = Variable<String>(name);
-    if (!nullToAbsent || phone != null) {
-      map['phone'] = Variable<String>(phone);
-    }
-    if (!nullToAbsent || email != null) {
-      map['email'] = Variable<String>(email);
-    }
-    if (!nullToAbsent || address != null) {
-      map['address'] = Variable<String>(address);
-    }
-    if (!nullToAbsent || image != null) {
-      map['image'] = Variable<Uint8List>(image);
-    }
-    map['created_at'] = Variable<DateTime>(createdAt);
-    map['sync_status'] = Variable<String>(syncStatus);
-    return map;
-  }
-
-  ServiceCustomersCompanion toCompanion(bool nullToAbsent) {
-    return ServiceCustomersCompanion(
-      id: Value(id),
-      name: Value(name),
-      phone:
-          phone == null && nullToAbsent ? const Value.absent() : Value(phone),
-      email:
-          email == null && nullToAbsent ? const Value.absent() : Value(email),
-      address: address == null && nullToAbsent
-          ? const Value.absent()
-          : Value(address),
-      image:
-          image == null && nullToAbsent ? const Value.absent() : Value(image),
-      createdAt: Value(createdAt),
-      syncStatus: Value(syncStatus),
-    );
-  }
-
-  factory ServiceCustomerTable.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ServiceCustomerTable(
-      id: serializer.fromJson<String>(json['id']),
-      name: serializer.fromJson<String>(json['name']),
-      phone: serializer.fromJson<String?>(json['phone']),
-      email: serializer.fromJson<String?>(json['email']),
-      address: serializer.fromJson<String?>(json['address']),
-      image: serializer.fromJson<Uint8List?>(json['image']),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
-      syncStatus: serializer.fromJson<String>(json['syncStatus']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<String>(id),
-      'name': serializer.toJson<String>(name),
-      'phone': serializer.toJson<String?>(phone),
-      'email': serializer.toJson<String?>(email),
-      'address': serializer.toJson<String?>(address),
-      'image': serializer.toJson<Uint8List?>(image),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
-      'syncStatus': serializer.toJson<String>(syncStatus),
-    };
-  }
-
-  ServiceCustomerTable copyWith(
-          {String? id,
-          String? name,
-          Value<String?> phone = const Value.absent(),
-          Value<String?> email = const Value.absent(),
-          Value<String?> address = const Value.absent(),
-          Value<Uint8List?> image = const Value.absent(),
-          DateTime? createdAt,
-          String? syncStatus}) =>
-      ServiceCustomerTable(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        phone: phone.present ? phone.value : this.phone,
-        email: email.present ? email.value : this.email,
-        address: address.present ? address.value : this.address,
-        image: image.present ? image.value : this.image,
-        createdAt: createdAt ?? this.createdAt,
-        syncStatus: syncStatus ?? this.syncStatus,
-      );
-  ServiceCustomerTable copyWithCompanion(ServiceCustomersCompanion data) {
-    return ServiceCustomerTable(
-      id: data.id.present ? data.id.value : this.id,
-      name: data.name.present ? data.name.value : this.name,
-      phone: data.phone.present ? data.phone.value : this.phone,
-      email: data.email.present ? data.email.value : this.email,
-      address: data.address.present ? data.address.value : this.address,
-      image: data.image.present ? data.image.value : this.image,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      syncStatus:
-          data.syncStatus.present ? data.syncStatus.value : this.syncStatus,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('ServiceCustomerTable(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('phone: $phone, ')
-          ..write('email: $email, ')
-          ..write('address: $address, ')
-          ..write('image: $image, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('syncStatus: $syncStatus')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(id, name, phone, email, address,
-      $driftBlobEquality.hash(image), createdAt, syncStatus);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is ServiceCustomerTable &&
-          other.id == this.id &&
-          other.name == this.name &&
-          other.phone == this.phone &&
-          other.email == this.email &&
-          other.address == this.address &&
-          $driftBlobEquality.equals(other.image, this.image) &&
-          other.createdAt == this.createdAt &&
-          other.syncStatus == this.syncStatus);
-}
-
-class ServiceCustomersCompanion extends UpdateCompanion<ServiceCustomerTable> {
-  final Value<String> id;
-  final Value<String> name;
-  final Value<String?> phone;
-  final Value<String?> email;
-  final Value<String?> address;
-  final Value<Uint8List?> image;
-  final Value<DateTime> createdAt;
-  final Value<String> syncStatus;
-  final Value<int> rowid;
-  const ServiceCustomersCompanion({
-    this.id = const Value.absent(),
-    this.name = const Value.absent(),
-    this.phone = const Value.absent(),
-    this.email = const Value.absent(),
-    this.address = const Value.absent(),
-    this.image = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.syncStatus = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  ServiceCustomersCompanion.insert({
-    required String id,
-    required String name,
-    this.phone = const Value.absent(),
-    this.email = const Value.absent(),
-    this.address = const Value.absent(),
-    this.image = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.syncStatus = const Value.absent(),
-    this.rowid = const Value.absent(),
-  })  : id = Value(id),
-        name = Value(name);
-  static Insertable<ServiceCustomerTable> custom({
-    Expression<String>? id,
-    Expression<String>? name,
-    Expression<String>? phone,
-    Expression<String>? email,
-    Expression<String>? address,
-    Expression<Uint8List>? image,
-    Expression<DateTime>? createdAt,
-    Expression<String>? syncStatus,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (name != null) 'name': name,
-      if (phone != null) 'phone': phone,
-      if (email != null) 'email': email,
-      if (address != null) 'address': address,
-      if (image != null) 'image': image,
-      if (createdAt != null) 'created_at': createdAt,
-      if (syncStatus != null) 'sync_status': syncStatus,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  ServiceCustomersCompanion copyWith(
-      {Value<String>? id,
-      Value<String>? name,
-      Value<String?>? phone,
-      Value<String?>? email,
-      Value<String?>? address,
-      Value<Uint8List?>? image,
-      Value<DateTime>? createdAt,
-      Value<String>? syncStatus,
-      Value<int>? rowid}) {
-    return ServiceCustomersCompanion(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      phone: phone ?? this.phone,
-      email: email ?? this.email,
-      address: address ?? this.address,
-      image: image ?? this.image,
-      createdAt: createdAt ?? this.createdAt,
-      syncStatus: syncStatus ?? this.syncStatus,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<String>(id.value);
-    }
-    if (name.present) {
-      map['name'] = Variable<String>(name.value);
-    }
-    if (phone.present) {
-      map['phone'] = Variable<String>(phone.value);
-    }
-    if (email.present) {
-      map['email'] = Variable<String>(email.value);
-    }
-    if (address.present) {
-      map['address'] = Variable<String>(address.value);
-    }
-    if (image.present) {
-      map['image'] = Variable<Uint8List>(image.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
-    }
-    if (syncStatus.present) {
-      map['sync_status'] = Variable<String>(syncStatus.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('ServiceCustomersCompanion(')
-          ..write('id: $id, ')
-          ..write('name: $name, ')
-          ..write('phone: $phone, ')
-          ..write('email: $email, ')
-          ..write('address: $address, ')
-          ..write('image: $image, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('syncStatus: $syncStatus, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
 class $ServiceJobsTable extends ServiceJobs
     with TableInfo<$ServiceJobsTable, ServiceJobTable> {
   @override
@@ -14911,8 +15500,8 @@ class $ServiceJobsTable extends ServiceJobs
       'customer_id', aliasedName, false,
       type: DriftSqlType.string,
       requiredDuringInsert: true,
-      defaultConstraints: GeneratedColumn.constraintIsAlways(
-          'REFERENCES service_customers (id)'));
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES customers (id)'));
   static const VerificationMeta _titleMeta = const VerificationMeta('title');
   @override
   late final GeneratedColumn<String> title = GeneratedColumn<String>(
@@ -19038,6 +19627,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CategoriesTable categories = $CategoriesTable(this);
   late final $ItemsTable items = $ItemsTable(this);
+  late final $CustomersTable customers = $CustomersTable(this);
   late final $InvoicesTable invoices = $InvoicesTable(this);
   late final $InvoiceItemsTable invoiceItems = $InvoiceItemsTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
@@ -19059,8 +19649,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ResultsTable results = $ResultsTable(this);
   late final $GradingRulesTable gradingRules = $GradingRulesTable(this);
   late final $PrinterConfigsTable printerConfigs = $PrinterConfigsTable(this);
-  late final $ServiceCustomersTable serviceCustomers =
-      $ServiceCustomersTable(this);
   late final $ServiceJobsTable serviceJobs = $ServiceJobsTable(this);
   late final $ServicePaymentsTable servicePayments =
       $ServicePaymentsTable(this);
@@ -19086,6 +19674,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
         categories,
         items,
+        customers,
         invoices,
         invoiceItems,
         settings,
@@ -19105,7 +19694,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         results,
         gradingRules,
         printerConfigs,
-        serviceCustomers,
         serviceJobs,
         servicePayments,
         localCounters,
@@ -20166,6 +20754,444 @@ typedef $$ItemsTableProcessedTableManager = ProcessedTableManager<
         bool invoiceItemsRefs,
         bool stockIncrementsRefs,
         bool stockReturnsRefs})>;
+typedef $$CustomersTableCreateCompanionBuilder = CustomersCompanion Function({
+  required String id,
+  required String name,
+  Value<String?> phone,
+  Value<String?> email,
+  Value<String?> address,
+  Value<Uint8List?> image,
+  Value<double> balance,
+  Value<String?> virtualAccountNumber,
+  Value<String?> virtualAccountName,
+  Value<String?> virtualAccountBank,
+  Value<DateTime> createdAt,
+  Value<String> syncStatus,
+  Value<int> rowid,
+});
+typedef $$CustomersTableUpdateCompanionBuilder = CustomersCompanion Function({
+  Value<String> id,
+  Value<String> name,
+  Value<String?> phone,
+  Value<String?> email,
+  Value<String?> address,
+  Value<Uint8List?> image,
+  Value<double> balance,
+  Value<String?> virtualAccountNumber,
+  Value<String?> virtualAccountName,
+  Value<String?> virtualAccountBank,
+  Value<DateTime> createdAt,
+  Value<String> syncStatus,
+  Value<int> rowid,
+});
+
+final class $$CustomersTableReferences
+    extends BaseReferences<_$AppDatabase, $CustomersTable, CustomerTable> {
+  $$CustomersTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$InvoicesTable, List<InvoiceTable>>
+      _invoicesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+          db.invoices,
+          aliasName:
+              $_aliasNameGenerator(db.customers.id, db.invoices.customerId));
+
+  $$InvoicesTableProcessedTableManager get invoicesRefs {
+    final manager = $$InvoicesTableTableManager($_db, $_db.invoices)
+        .filter((f) => f.customerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_invoicesRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$ServiceJobsTable, List<ServiceJobTable>>
+      _serviceJobsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+          db.serviceJobs,
+          aliasName:
+              $_aliasNameGenerator(db.customers.id, db.serviceJobs.customerId));
+
+  $$ServiceJobsTableProcessedTableManager get serviceJobsRefs {
+    final manager = $$ServiceJobsTableTableManager($_db, $_db.serviceJobs)
+        .filter((f) => f.customerId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_serviceJobsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
+class $$CustomersTableFilterComposer
+    extends Composer<_$AppDatabase, $CustomersTable> {
+  $$CustomersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get phone => $composableBuilder(
+      column: $table.phone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get address => $composableBuilder(
+      column: $table.address, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<Uint8List> get image => $composableBuilder(
+      column: $table.image, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get balance => $composableBuilder(
+      column: $table.balance, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> invoicesRefs(
+      Expression<bool> Function($$InvoicesTableFilterComposer f) f) {
+    final $$InvoicesTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.invoices,
+        getReferencedColumn: (t) => t.customerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$InvoicesTableFilterComposer(
+              $db: $db,
+              $table: $db.invoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> serviceJobsRefs(
+      Expression<bool> Function($$ServiceJobsTableFilterComposer f) f) {
+    final $$ServiceJobsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.serviceJobs,
+        getReferencedColumn: (t) => t.customerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ServiceJobsTableFilterComposer(
+              $db: $db,
+              $table: $db.serviceJobs,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$CustomersTableOrderingComposer
+    extends Composer<_$AppDatabase, $CustomersTable> {
+  $$CustomersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get name => $composableBuilder(
+      column: $table.name, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get phone => $composableBuilder(
+      column: $table.phone, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get address => $composableBuilder(
+      column: $table.address, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<Uint8List> get image => $composableBuilder(
+      column: $table.image, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get balance => $composableBuilder(
+      column: $table.balance, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
+}
+
+class $$CustomersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CustomersTable> {
+  $$CustomersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get phone =>
+      $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get email =>
+      $composableBuilder(column: $table.email, builder: (column) => column);
+
+  GeneratedColumn<String> get address =>
+      $composableBuilder(column: $table.address, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get image =>
+      $composableBuilder(column: $table.image, builder: (column) => column);
+
+  GeneratedColumn<double> get balance =>
+      $composableBuilder(column: $table.balance, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+      column: $table.syncStatus, builder: (column) => column);
+
+  Expression<T> invoicesRefs<T extends Object>(
+      Expression<T> Function($$InvoicesTableAnnotationComposer a) f) {
+    final $$InvoicesTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.invoices,
+        getReferencedColumn: (t) => t.customerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$InvoicesTableAnnotationComposer(
+              $db: $db,
+              $table: $db.invoices,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<T> serviceJobsRefs<T extends Object>(
+      Expression<T> Function($$ServiceJobsTableAnnotationComposer a) f) {
+    final $$ServiceJobsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.serviceJobs,
+        getReferencedColumn: (t) => t.customerId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ServiceJobsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.serviceJobs,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+}
+
+class $$CustomersTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $CustomersTable,
+    CustomerTable,
+    $$CustomersTableFilterComposer,
+    $$CustomersTableOrderingComposer,
+    $$CustomersTableAnnotationComposer,
+    $$CustomersTableCreateCompanionBuilder,
+    $$CustomersTableUpdateCompanionBuilder,
+    (CustomerTable, $$CustomersTableReferences),
+    CustomerTable,
+    PrefetchHooks Function({bool invoicesRefs, bool serviceJobsRefs})> {
+  $$CustomersTableTableManager(_$AppDatabase db, $CustomersTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CustomersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CustomersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CustomersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String?> phone = const Value.absent(),
+            Value<String?> email = const Value.absent(),
+            Value<String?> address = const Value.absent(),
+            Value<Uint8List?> image = const Value.absent(),
+            Value<double> balance = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String?> virtualAccountName = const Value.absent(),
+            Value<String?> virtualAccountBank = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CustomersCompanion(
+            id: id,
+            name: name,
+            phone: phone,
+            email: email,
+            address: address,
+            image: image,
+            balance: balance,
+            virtualAccountNumber: virtualAccountNumber,
+            virtualAccountName: virtualAccountName,
+            virtualAccountBank: virtualAccountBank,
+            createdAt: createdAt,
+            syncStatus: syncStatus,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            Value<String?> phone = const Value.absent(),
+            Value<String?> email = const Value.absent(),
+            Value<String?> address = const Value.absent(),
+            Value<Uint8List?> image = const Value.absent(),
+            Value<double> balance = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String?> virtualAccountName = const Value.absent(),
+            Value<String?> virtualAccountBank = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<String> syncStatus = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              CustomersCompanion.insert(
+            id: id,
+            name: name,
+            phone: phone,
+            email: email,
+            address: address,
+            image: image,
+            balance: balance,
+            virtualAccountNumber: virtualAccountNumber,
+            virtualAccountName: virtualAccountName,
+            virtualAccountBank: virtualAccountBank,
+            createdAt: createdAt,
+            syncStatus: syncStatus,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (
+                    e.readTable(table),
+                    $$CustomersTableReferences(db, table, e)
+                  ))
+              .toList(),
+          prefetchHooksCallback: (
+              {invoicesRefs = false, serviceJobsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (invoicesRefs) db.invoices,
+                if (serviceJobsRefs) db.serviceJobs
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (invoicesRefs)
+                    await $_getPrefetchedData<CustomerTable, $CustomersTable,
+                            InvoiceTable>(
+                        currentTable: table,
+                        referencedTable:
+                            $$CustomersTableReferences._invoicesRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$CustomersTableReferences(db, table, p0)
+                                .invoicesRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.customerId == item.id),
+                        typedResults: items),
+                  if (serviceJobsRefs)
+                    await $_getPrefetchedData<CustomerTable, $CustomersTable,
+                            ServiceJobTable>(
+                        currentTable: table,
+                        referencedTable: $$CustomersTableReferences
+                            ._serviceJobsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$CustomersTableReferences(db, table, p0)
+                                .serviceJobsRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.customerId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
+        ));
+}
+
+typedef $$CustomersTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $CustomersTable,
+    CustomerTable,
+    $$CustomersTableFilterComposer,
+    $$CustomersTableOrderingComposer,
+    $$CustomersTableAnnotationComposer,
+    $$CustomersTableCreateCompanionBuilder,
+    $$CustomersTableUpdateCompanionBuilder,
+    (CustomerTable, $$CustomersTableReferences),
+    CustomerTable,
+    PrefetchHooks Function({bool invoicesRefs, bool serviceJobsRefs})>;
 typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<int> id,
   required String invoiceNumber,
@@ -20179,6 +21205,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<double> amountPaid,
   Value<double> balanceAmount,
   Value<String?> customerName,
+  Value<String?> customerId,
   Value<String?> customerAddress,
   Value<String?> paymentMethod,
   Value<int?> staffId,
@@ -20214,6 +21241,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<double> amountPaid,
   Value<double> balanceAmount,
   Value<String?> customerName,
+  Value<String?> customerId,
   Value<String?> customerAddress,
   Value<String?> paymentMethod,
   Value<int?> staffId,
@@ -20240,6 +21268,21 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
 final class $$InvoicesTableReferences
     extends BaseReferences<_$AppDatabase, $InvoicesTable, InvoiceTable> {
   $$InvoicesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CustomersTable _customerIdTable(_$AppDatabase db) =>
+      db.customers.createAlias(
+          $_aliasNameGenerator(db.invoices.customerId, db.customers.id));
+
+  $$CustomersTableProcessedTableManager? get customerId {
+    final $_column = $_itemColumn<String>('customer_id');
+    if ($_column == null) return null;
+    final manager = $$CustomersTableTableManager($_db, $_db.customers)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_customerIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
 
   static MultiTypedResultKey<$InvoiceItemsTable, List<InvoiceItemTable>>
       _invoiceItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -20386,6 +21429,26 @@ class $$InvoicesTableFilterComposer
   ColumnFilters<String> get warrantyDuration => $composableBuilder(
       column: $table.warrantyDuration,
       builder: (column) => ColumnFilters(column));
+
+  $$CustomersTableFilterComposer get customerId {
+    final $$CustomersTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.customerId,
+        referencedTable: $db.customers,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$CustomersTableFilterComposer(
+              $db: $db,
+              $table: $db.customers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 
   Expression<bool> invoiceItemsRefs(
       Expression<bool> Function($$InvoiceItemsTableFilterComposer f) f) {
@@ -20552,6 +21615,26 @@ class $$InvoicesTableOrderingComposer
   ColumnOrderings<String> get warrantyDuration => $composableBuilder(
       column: $table.warrantyDuration,
       builder: (column) => ColumnOrderings(column));
+
+  $$CustomersTableOrderingComposer get customerId {
+    final $$CustomersTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.customerId,
+        referencedTable: $db.customers,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$CustomersTableOrderingComposer(
+              $db: $db,
+              $table: $db.customers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$InvoicesTableAnnotationComposer
@@ -20662,6 +21745,26 @@ class $$InvoicesTableAnnotationComposer
   GeneratedColumn<String> get warrantyDuration => $composableBuilder(
       column: $table.warrantyDuration, builder: (column) => column);
 
+  $$CustomersTableAnnotationComposer get customerId {
+    final $$CustomersTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.customerId,
+        referencedTable: $db.customers,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$CustomersTableAnnotationComposer(
+              $db: $db,
+              $table: $db.customers,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
   Expression<T> invoiceItemsRefs<T extends Object>(
       Expression<T> Function($$InvoiceItemsTableAnnotationComposer a) f) {
     final $$InvoiceItemsTableAnnotationComposer composer = $composerBuilder(
@@ -20716,7 +21819,8 @@ class $$InvoicesTableTableManager extends RootTableManager<
     $$InvoicesTableUpdateCompanionBuilder,
     (InvoiceTable, $$InvoicesTableReferences),
     InvoiceTable,
-    PrefetchHooks Function({bool invoiceItemsRefs, bool stockReturnsRefs})> {
+    PrefetchHooks Function(
+        {bool customerId, bool invoiceItemsRefs, bool stockReturnsRefs})> {
   $$InvoicesTableTableManager(_$AppDatabase db, $InvoicesTable table)
       : super(TableManagerState(
           db: db,
@@ -20740,6 +21844,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<double> amountPaid = const Value.absent(),
             Value<double> balanceAmount = const Value.absent(),
             Value<String?> customerName = const Value.absent(),
+            Value<String?> customerId = const Value.absent(),
             Value<String?> customerAddress = const Value.absent(),
             Value<String?> paymentMethod = const Value.absent(),
             Value<int?> staffId = const Value.absent(),
@@ -20775,6 +21880,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             amountPaid: amountPaid,
             balanceAmount: balanceAmount,
             customerName: customerName,
+            customerId: customerId,
             customerAddress: customerAddress,
             paymentMethod: paymentMethod,
             staffId: staffId,
@@ -20810,6 +21916,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<double> amountPaid = const Value.absent(),
             Value<double> balanceAmount = const Value.absent(),
             Value<String?> customerName = const Value.absent(),
+            Value<String?> customerId = const Value.absent(),
             Value<String?> customerAddress = const Value.absent(),
             Value<String?> paymentMethod = const Value.absent(),
             Value<int?> staffId = const Value.absent(),
@@ -20845,6 +21952,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             amountPaid: amountPaid,
             balanceAmount: balanceAmount,
             customerName: customerName,
+            customerId: customerId,
             customerAddress: customerAddress,
             paymentMethod: paymentMethod,
             staffId: staffId,
@@ -20872,14 +21980,41 @@ class $$InvoicesTableTableManager extends RootTableManager<
                   (e.readTable(table), $$InvoicesTableReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: (
-              {invoiceItemsRefs = false, stockReturnsRefs = false}) {
+              {customerId = false,
+              invoiceItemsRefs = false,
+              stockReturnsRefs = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [
                 if (invoiceItemsRefs) db.invoiceItems,
                 if (stockReturnsRefs) db.stockReturns
               ],
-              addJoins: null,
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (customerId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.customerId,
+                    referencedTable:
+                        $$InvoicesTableReferences._customerIdTable(db),
+                    referencedColumn:
+                        $$InvoicesTableReferences._customerIdTable(db).id,
+                  ) as T;
+                }
+
+                return state;
+              },
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (invoiceItemsRefs)
@@ -20924,7 +22059,8 @@ typedef $$InvoicesTableProcessedTableManager = ProcessedTableManager<
     $$InvoicesTableUpdateCompanionBuilder,
     (InvoiceTable, $$InvoicesTableReferences),
     InvoiceTable,
-    PrefetchHooks Function({bool invoiceItemsRefs, bool stockReturnsRefs})>;
+    PrefetchHooks Function(
+        {bool customerId, bool invoiceItemsRefs, bool stockReturnsRefs})>;
 typedef $$InvoiceItemsTableCreateCompanionBuilder = InvoiceItemsCompanion
     Function({
   Value<int> id,
@@ -22641,6 +23777,9 @@ typedef $$StaffTableCreateCompanionBuilder = StaffCompanion Function({
   Value<DateTime?> createdAt,
   Value<String?> deviceId,
   Value<bool> isDeleted,
+  Value<String?> virtualBankName,
+  Value<String?> virtualAccountNumber,
+  Value<String?> virtualAccountName,
 });
 typedef $$StaffTableUpdateCompanionBuilder = StaffCompanion Function({
   Value<int> id,
@@ -22655,6 +23794,9 @@ typedef $$StaffTableUpdateCompanionBuilder = StaffCompanion Function({
   Value<DateTime?> createdAt,
   Value<String?> deviceId,
   Value<bool> isDeleted,
+  Value<String?> virtualBankName,
+  Value<String?> virtualAccountNumber,
+  Value<String?> virtualAccountName,
 });
 
 final class $$StaffTableReferences
@@ -22720,6 +23862,18 @@ class $$StaffTableFilterComposer extends Composer<_$AppDatabase, $StaffTable> {
 
   ColumnFilters<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualBankName => $composableBuilder(
+      column: $table.virtualBankName,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName,
+      builder: (column) => ColumnFilters(column));
 
   Expression<bool> stockReturnsRefs(
       Expression<bool> Function($$StockReturnsTableFilterComposer f) f) {
@@ -22787,6 +23941,18 @@ class $$StaffTableOrderingComposer
 
   ColumnOrderings<bool> get isDeleted => $composableBuilder(
       column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualBankName => $composableBuilder(
+      column: $table.virtualBankName,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$StaffTableAnnotationComposer
@@ -22833,6 +23999,15 @@ class $$StaffTableAnnotationComposer
 
   GeneratedColumn<bool> get isDeleted =>
       $composableBuilder(column: $table.isDeleted, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualBankName => $composableBuilder(
+      column: $table.virtualBankName, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountName => $composableBuilder(
+      column: $table.virtualAccountName, builder: (column) => column);
 
   Expression<T> stockReturnsRefs<T extends Object>(
       Expression<T> Function($$StockReturnsTableAnnotationComposer a) f) {
@@ -22891,6 +24066,9 @@ class $$StaffTableTableManager extends RootTableManager<
             Value<DateTime?> createdAt = const Value.absent(),
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<String?> virtualBankName = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String?> virtualAccountName = const Value.absent(),
           }) =>
               StaffCompanion(
             id: id,
@@ -22905,6 +24083,9 @@ class $$StaffTableTableManager extends RootTableManager<
             createdAt: createdAt,
             deviceId: deviceId,
             isDeleted: isDeleted,
+            virtualBankName: virtualBankName,
+            virtualAccountNumber: virtualAccountNumber,
+            virtualAccountName: virtualAccountName,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -22919,6 +24100,9 @@ class $$StaffTableTableManager extends RootTableManager<
             Value<DateTime?> createdAt = const Value.absent(),
             Value<String?> deviceId = const Value.absent(),
             Value<bool> isDeleted = const Value.absent(),
+            Value<String?> virtualBankName = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String?> virtualAccountName = const Value.absent(),
           }) =>
               StaffCompanion.insert(
             id: id,
@@ -22933,6 +24117,9 @@ class $$StaffTableTableManager extends RootTableManager<
             createdAt: createdAt,
             deviceId: deviceId,
             isDeleted: isDeleted,
+            virtualBankName: virtualBankName,
+            virtualAccountNumber: virtualAccountNumber,
+            virtualAccountName: virtualAccountName,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -25719,10 +26906,14 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   Value<String?> parentName,
   Value<String?> parentPhone,
   Value<double> balance,
+  Value<double> creditBalance,
   Value<DateTime?> dateOfBirth,
   Value<String?> gender,
   Value<DateTime> registrationDate,
   Value<Uint8List?> image,
+  Value<String?> virtualAccountNumber,
+  Value<String?> virtualAccountBank,
+  Value<String?> virtualAccountStatus,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -25739,10 +26930,14 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<String?> parentName,
   Value<String?> parentPhone,
   Value<double> balance,
+  Value<double> creditBalance,
   Value<DateTime?> dateOfBirth,
   Value<String?> gender,
   Value<DateTime> registrationDate,
   Value<Uint8List?> image,
+  Value<String?> virtualAccountNumber,
+  Value<String?> virtualAccountBank,
+  Value<String?> virtualAccountStatus,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -25830,6 +27025,9 @@ class $$StudentsTableFilterComposer
   ColumnFilters<double> get balance => $composableBuilder(
       column: $table.balance, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<double> get creditBalance => $composableBuilder(
+      column: $table.creditBalance, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<DateTime> get dateOfBirth => $composableBuilder(
       column: $table.dateOfBirth, builder: (column) => ColumnFilters(column));
 
@@ -25842,6 +27040,18 @@ class $$StudentsTableFilterComposer
 
   ColumnFilters<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get virtualAccountStatus => $composableBuilder(
+      column: $table.virtualAccountStatus,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -25951,6 +27161,10 @@ class $$StudentsTableOrderingComposer
   ColumnOrderings<double> get balance => $composableBuilder(
       column: $table.balance, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get creditBalance => $composableBuilder(
+      column: $table.creditBalance,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get dateOfBirth => $composableBuilder(
       column: $table.dateOfBirth, builder: (column) => ColumnOrderings(column));
 
@@ -25963,6 +27177,18 @@ class $$StudentsTableOrderingComposer
 
   ColumnOrderings<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get virtualAccountStatus => $composableBuilder(
+      column: $table.virtualAccountStatus,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
@@ -26050,6 +27276,9 @@ class $$StudentsTableAnnotationComposer
   GeneratedColumn<double> get balance =>
       $composableBuilder(column: $table.balance, builder: (column) => column);
 
+  GeneratedColumn<double> get creditBalance => $composableBuilder(
+      column: $table.creditBalance, builder: (column) => column);
+
   GeneratedColumn<DateTime> get dateOfBirth => $composableBuilder(
       column: $table.dateOfBirth, builder: (column) => column);
 
@@ -26061,6 +27290,15 @@ class $$StudentsTableAnnotationComposer
 
   GeneratedColumn<Uint8List> get image =>
       $composableBuilder(column: $table.image, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountNumber => $composableBuilder(
+      column: $table.virtualAccountNumber, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountBank => $composableBuilder(
+      column: $table.virtualAccountBank, builder: (column) => column);
+
+  GeneratedColumn<String> get virtualAccountStatus => $composableBuilder(
+      column: $table.virtualAccountStatus, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -26172,10 +27410,14 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> parentName = const Value.absent(),
             Value<String?> parentPhone = const Value.absent(),
             Value<double> balance = const Value.absent(),
+            Value<double> creditBalance = const Value.absent(),
             Value<DateTime?> dateOfBirth = const Value.absent(),
             Value<String?> gender = const Value.absent(),
             Value<DateTime> registrationDate = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String?> virtualAccountBank = const Value.absent(),
+            Value<String?> virtualAccountStatus = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -26192,10 +27434,14 @@ class $$StudentsTableTableManager extends RootTableManager<
             parentName: parentName,
             parentPhone: parentPhone,
             balance: balance,
+            creditBalance: creditBalance,
             dateOfBirth: dateOfBirth,
             gender: gender,
             registrationDate: registrationDate,
             image: image,
+            virtualAccountNumber: virtualAccountNumber,
+            virtualAccountBank: virtualAccountBank,
+            virtualAccountStatus: virtualAccountStatus,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -26212,10 +27458,14 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> parentName = const Value.absent(),
             Value<String?> parentPhone = const Value.absent(),
             Value<double> balance = const Value.absent(),
+            Value<double> creditBalance = const Value.absent(),
             Value<DateTime?> dateOfBirth = const Value.absent(),
             Value<String?> gender = const Value.absent(),
             Value<DateTime> registrationDate = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
+            Value<String?> virtualAccountNumber = const Value.absent(),
+            Value<String?> virtualAccountBank = const Value.absent(),
+            Value<String?> virtualAccountStatus = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -26232,10 +27482,14 @@ class $$StudentsTableTableManager extends RootTableManager<
             parentName: parentName,
             parentPhone: parentPhone,
             balance: balance,
+            creditBalance: creditBalance,
             dateOfBirth: dateOfBirth,
             gender: gender,
             registrationDate: registrationDate,
             image: image,
+            virtualAccountNumber: virtualAccountNumber,
+            virtualAccountBank: virtualAccountBank,
+            virtualAccountStatus: virtualAccountStatus,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -28490,308 +29744,6 @@ typedef $$PrinterConfigsTableProcessedTableManager = ProcessedTableManager<
     ),
     PrinterConfig,
     PrefetchHooks Function()>;
-typedef $$ServiceCustomersTableCreateCompanionBuilder
-    = ServiceCustomersCompanion Function({
-  required String id,
-  required String name,
-  Value<String?> phone,
-  Value<String?> email,
-  Value<String?> address,
-  Value<Uint8List?> image,
-  Value<DateTime> createdAt,
-  Value<String> syncStatus,
-  Value<int> rowid,
-});
-typedef $$ServiceCustomersTableUpdateCompanionBuilder
-    = ServiceCustomersCompanion Function({
-  Value<String> id,
-  Value<String> name,
-  Value<String?> phone,
-  Value<String?> email,
-  Value<String?> address,
-  Value<Uint8List?> image,
-  Value<DateTime> createdAt,
-  Value<String> syncStatus,
-  Value<int> rowid,
-});
-
-final class $$ServiceCustomersTableReferences extends BaseReferences<
-    _$AppDatabase, $ServiceCustomersTable, ServiceCustomerTable> {
-  $$ServiceCustomersTableReferences(
-      super.$_db, super.$_table, super.$_typedResult);
-
-  static MultiTypedResultKey<$ServiceJobsTable, List<ServiceJobTable>>
-      _serviceJobsRefsTable(_$AppDatabase db) =>
-          MultiTypedResultKey.fromTable(db.serviceJobs,
-              aliasName: $_aliasNameGenerator(
-                  db.serviceCustomers.id, db.serviceJobs.customerId));
-
-  $$ServiceJobsTableProcessedTableManager get serviceJobsRefs {
-    final manager = $$ServiceJobsTableTableManager($_db, $_db.serviceJobs)
-        .filter((f) => f.customerId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_serviceJobsRefsTable($_db));
-    return ProcessedTableManager(
-        manager.$state.copyWith(prefetchedData: cache));
-  }
-}
-
-class $$ServiceCustomersTableFilterComposer
-    extends Composer<_$AppDatabase, $ServiceCustomersTable> {
-  $$ServiceCustomersTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<String> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get phone => $composableBuilder(
-      column: $table.phone, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get email => $composableBuilder(
-      column: $table.email, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get address => $composableBuilder(
-      column: $table.address, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<Uint8List> get image => $composableBuilder(
-      column: $table.image, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get createdAt => $composableBuilder(
-      column: $table.createdAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get syncStatus => $composableBuilder(
-      column: $table.syncStatus, builder: (column) => ColumnFilters(column));
-
-  Expression<bool> serviceJobsRefs(
-      Expression<bool> Function($$ServiceJobsTableFilterComposer f) f) {
-    final $$ServiceJobsTableFilterComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.serviceJobs,
-        getReferencedColumn: (t) => t.customerId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$ServiceJobsTableFilterComposer(
-              $db: $db,
-              $table: $db.serviceJobs,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-}
-
-class $$ServiceCustomersTableOrderingComposer
-    extends Composer<_$AppDatabase, $ServiceCustomersTable> {
-  $$ServiceCustomersTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<String> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get name => $composableBuilder(
-      column: $table.name, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get phone => $composableBuilder(
-      column: $table.phone, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get email => $composableBuilder(
-      column: $table.email, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get address => $composableBuilder(
-      column: $table.address, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<Uint8List> get image => $composableBuilder(
-      column: $table.image, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get syncStatus => $composableBuilder(
-      column: $table.syncStatus, builder: (column) => ColumnOrderings(column));
-}
-
-class $$ServiceCustomersTableAnnotationComposer
-    extends Composer<_$AppDatabase, $ServiceCustomersTable> {
-  $$ServiceCustomersTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<String> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<String> get name =>
-      $composableBuilder(column: $table.name, builder: (column) => column);
-
-  GeneratedColumn<String> get phone =>
-      $composableBuilder(column: $table.phone, builder: (column) => column);
-
-  GeneratedColumn<String> get email =>
-      $composableBuilder(column: $table.email, builder: (column) => column);
-
-  GeneratedColumn<String> get address =>
-      $composableBuilder(column: $table.address, builder: (column) => column);
-
-  GeneratedColumn<Uint8List> get image =>
-      $composableBuilder(column: $table.image, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<String> get syncStatus => $composableBuilder(
-      column: $table.syncStatus, builder: (column) => column);
-
-  Expression<T> serviceJobsRefs<T extends Object>(
-      Expression<T> Function($$ServiceJobsTableAnnotationComposer a) f) {
-    final $$ServiceJobsTableAnnotationComposer composer = $composerBuilder(
-        composer: this,
-        getCurrentColumn: (t) => t.id,
-        referencedTable: $db.serviceJobs,
-        getReferencedColumn: (t) => t.customerId,
-        builder: (joinBuilder,
-                {$addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer}) =>
-            $$ServiceJobsTableAnnotationComposer(
-              $db: $db,
-              $table: $db.serviceJobs,
-              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-              joinBuilder: joinBuilder,
-              $removeJoinBuilderFromRootComposer:
-                  $removeJoinBuilderFromRootComposer,
-            ));
-    return f(composer);
-  }
-}
-
-class $$ServiceCustomersTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $ServiceCustomersTable,
-    ServiceCustomerTable,
-    $$ServiceCustomersTableFilterComposer,
-    $$ServiceCustomersTableOrderingComposer,
-    $$ServiceCustomersTableAnnotationComposer,
-    $$ServiceCustomersTableCreateCompanionBuilder,
-    $$ServiceCustomersTableUpdateCompanionBuilder,
-    (ServiceCustomerTable, $$ServiceCustomersTableReferences),
-    ServiceCustomerTable,
-    PrefetchHooks Function({bool serviceJobsRefs})> {
-  $$ServiceCustomersTableTableManager(
-      _$AppDatabase db, $ServiceCustomersTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$ServiceCustomersTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$ServiceCustomersTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$ServiceCustomersTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<String> id = const Value.absent(),
-            Value<String> name = const Value.absent(),
-            Value<String?> phone = const Value.absent(),
-            Value<String?> email = const Value.absent(),
-            Value<String?> address = const Value.absent(),
-            Value<Uint8List?> image = const Value.absent(),
-            Value<DateTime> createdAt = const Value.absent(),
-            Value<String> syncStatus = const Value.absent(),
-            Value<int> rowid = const Value.absent(),
-          }) =>
-              ServiceCustomersCompanion(
-            id: id,
-            name: name,
-            phone: phone,
-            email: email,
-            address: address,
-            image: image,
-            createdAt: createdAt,
-            syncStatus: syncStatus,
-            rowid: rowid,
-          ),
-          createCompanionCallback: ({
-            required String id,
-            required String name,
-            Value<String?> phone = const Value.absent(),
-            Value<String?> email = const Value.absent(),
-            Value<String?> address = const Value.absent(),
-            Value<Uint8List?> image = const Value.absent(),
-            Value<DateTime> createdAt = const Value.absent(),
-            Value<String> syncStatus = const Value.absent(),
-            Value<int> rowid = const Value.absent(),
-          }) =>
-              ServiceCustomersCompanion.insert(
-            id: id,
-            name: name,
-            phone: phone,
-            email: email,
-            address: address,
-            image: image,
-            createdAt: createdAt,
-            syncStatus: syncStatus,
-            rowid: rowid,
-          ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (
-                    e.readTable(table),
-                    $$ServiceCustomersTableReferences(db, table, e)
-                  ))
-              .toList(),
-          prefetchHooksCallback: ({serviceJobsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (serviceJobsRefs) db.serviceJobs],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (serviceJobsRefs)
-                    await $_getPrefetchedData<ServiceCustomerTable,
-                            $ServiceCustomersTable, ServiceJobTable>(
-                        currentTable: table,
-                        referencedTable: $$ServiceCustomersTableReferences
-                            ._serviceJobsRefsTable(db),
-                        managerFromTypedResult: (p0) =>
-                            $$ServiceCustomersTableReferences(db, table, p0)
-                                .serviceJobsRefs,
-                        referencedItemsForCurrentItem:
-                            (item, referencedItems) => referencedItems
-                                .where((e) => e.customerId == item.id),
-                        typedResults: items)
-                ];
-              },
-            );
-          },
-        ));
-}
-
-typedef $$ServiceCustomersTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $ServiceCustomersTable,
-    ServiceCustomerTable,
-    $$ServiceCustomersTableFilterComposer,
-    $$ServiceCustomersTableOrderingComposer,
-    $$ServiceCustomersTableAnnotationComposer,
-    $$ServiceCustomersTableCreateCompanionBuilder,
-    $$ServiceCustomersTableUpdateCompanionBuilder,
-    (ServiceCustomerTable, $$ServiceCustomersTableReferences),
-    ServiceCustomerTable,
-    PrefetchHooks Function({bool serviceJobsRefs})>;
 typedef $$ServiceJobsTableCreateCompanionBuilder = ServiceJobsCompanion
     Function({
   required String id,
@@ -28835,16 +29787,15 @@ final class $$ServiceJobsTableReferences
     extends BaseReferences<_$AppDatabase, $ServiceJobsTable, ServiceJobTable> {
   $$ServiceJobsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $ServiceCustomersTable _customerIdTable(_$AppDatabase db) =>
-      db.serviceCustomers.createAlias($_aliasNameGenerator(
-          db.serviceJobs.customerId, db.serviceCustomers.id));
+  static $CustomersTable _customerIdTable(_$AppDatabase db) =>
+      db.customers.createAlias(
+          $_aliasNameGenerator(db.serviceJobs.customerId, db.customers.id));
 
-  $$ServiceCustomersTableProcessedTableManager get customerId {
+  $$CustomersTableProcessedTableManager get customerId {
     final $_column = $_itemColumn<String>('customer_id')!;
 
-    final manager =
-        $$ServiceCustomersTableTableManager($_db, $_db.serviceCustomers)
-            .filter((f) => f.id.sqlEquals($_column));
+    final manager = $$CustomersTableTableManager($_db, $_db.customers)
+        .filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_customerIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
@@ -28938,18 +29889,18 @@ class $$ServiceJobsTableFilterComposer
       column: $table.warrantyDuration,
       builder: (column) => ColumnFilters(column));
 
-  $$ServiceCustomersTableFilterComposer get customerId {
-    final $$ServiceCustomersTableFilterComposer composer = $composerBuilder(
+  $$CustomersTableFilterComposer get customerId {
+    final $$CustomersTableFilterComposer composer = $composerBuilder(
         composer: this,
         getCurrentColumn: (t) => t.customerId,
-        referencedTable: $db.serviceCustomers,
+        referencedTable: $db.customers,
         getReferencedColumn: (t) => t.id,
         builder: (joinBuilder,
                 {$addJoinBuilderToRootComposer,
                 $removeJoinBuilderFromRootComposer}) =>
-            $$ServiceCustomersTableFilterComposer(
+            $$CustomersTableFilterComposer(
               $db: $db,
-              $table: $db.serviceCustomers,
+              $table: $db.customers,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -29053,18 +30004,18 @@ class $$ServiceJobsTableOrderingComposer
       column: $table.warrantyDuration,
       builder: (column) => ColumnOrderings(column));
 
-  $$ServiceCustomersTableOrderingComposer get customerId {
-    final $$ServiceCustomersTableOrderingComposer composer = $composerBuilder(
+  $$CustomersTableOrderingComposer get customerId {
+    final $$CustomersTableOrderingComposer composer = $composerBuilder(
         composer: this,
         getCurrentColumn: (t) => t.customerId,
-        referencedTable: $db.serviceCustomers,
+        referencedTable: $db.customers,
         getReferencedColumn: (t) => t.id,
         builder: (joinBuilder,
                 {$addJoinBuilderToRootComposer,
                 $removeJoinBuilderFromRootComposer}) =>
-            $$ServiceCustomersTableOrderingComposer(
+            $$CustomersTableOrderingComposer(
               $db: $db,
-              $table: $db.serviceCustomers,
+              $table: $db.customers,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -29125,18 +30076,18 @@ class $$ServiceJobsTableAnnotationComposer
   GeneratedColumn<String> get warrantyDuration => $composableBuilder(
       column: $table.warrantyDuration, builder: (column) => column);
 
-  $$ServiceCustomersTableAnnotationComposer get customerId {
-    final $$ServiceCustomersTableAnnotationComposer composer = $composerBuilder(
+  $$CustomersTableAnnotationComposer get customerId {
+    final $$CustomersTableAnnotationComposer composer = $composerBuilder(
         composer: this,
         getCurrentColumn: (t) => t.customerId,
-        referencedTable: $db.serviceCustomers,
+        referencedTable: $db.customers,
         getReferencedColumn: (t) => t.id,
         builder: (joinBuilder,
                 {$addJoinBuilderToRootComposer,
                 $removeJoinBuilderFromRootComposer}) =>
-            $$ServiceCustomersTableAnnotationComposer(
+            $$CustomersTableAnnotationComposer(
               $db: $db,
-              $table: $db.serviceCustomers,
+              $table: $db.customers,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -31869,6 +32820,8 @@ class $AppDatabaseManager {
       $$CategoriesTableTableManager(_db, _db.categories);
   $$ItemsTableTableManager get items =>
       $$ItemsTableTableManager(_db, _db.items);
+  $$CustomersTableTableManager get customers =>
+      $$CustomersTableTableManager(_db, _db.customers);
   $$InvoicesTableTableManager get invoices =>
       $$InvoicesTableTableManager(_db, _db.invoices);
   $$InvoiceItemsTableTableManager get invoiceItems =>
@@ -31907,8 +32860,6 @@ class $AppDatabaseManager {
       $$GradingRulesTableTableManager(_db, _db.gradingRules);
   $$PrinterConfigsTableTableManager get printerConfigs =>
       $$PrinterConfigsTableTableManager(_db, _db.printerConfigs);
-  $$ServiceCustomersTableTableManager get serviceCustomers =>
-      $$ServiceCustomersTableTableManager(_db, _db.serviceCustomers);
   $$ServiceJobsTableTableManager get serviceJobs =>
       $$ServiceJobsTableTableManager(_db, _db.serviceJobs);
   $$ServicePaymentsTableTableManager get servicePayments =>

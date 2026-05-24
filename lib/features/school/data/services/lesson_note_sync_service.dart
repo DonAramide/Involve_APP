@@ -47,8 +47,8 @@ class LessonNoteSyncService {
         }
       }
 
-      // 3. TODO: Pull Changes from Server
-      // await _pullChanges();
+      // 3. Pull Changes from Server
+      await _pullChanges();
 
     } catch (e) {
       debugPrint('LessonNoteSyncService: Sync loop failed: $e');
@@ -56,6 +56,50 @@ class LessonNoteSyncService {
       final c = _syncCompleter;
       _syncCompleter = null;
       c?.complete();
+    }
+  }
+
+  Future<void> _pullChanges() async {
+    try {
+      debugPrint('LessonNoteSyncService: Pulling remote changes...');
+      
+      // MOCK API FETCH: In a real implementation, you would call your apiClient here
+      // final remoteItems = await apiClient.fetchLessonNotes(since: _lastKnownServerTime);
+      final List<LessonNote> remoteItems = []; // Mock empty response
+
+      if (remoteItems.isEmpty) {
+        debugPrint('LessonNoteSyncService: No remote changes to pull.');
+        return;
+      }
+
+      for (final remoteNote in remoteItems) {
+        // Fetch local version to check for conflicts
+        final localNote = await repository.getLatestLessonByHash(remoteNote.contentHash);
+
+        if (localNote == null) {
+          // No local record exists, safely insert
+          await repository.saveLessonNote(remoteNote);
+          debugPrint('LessonNoteSyncService: Inserted new remote note: ${remoteNote.syncId}');
+        } else {
+          // Conflict Resolution
+          final resolvedNote = resolveConflict(localNote, remoteNote);
+          
+          if (resolvedNote == remoteNote) {
+            // Remote won, overwrite local
+            await repository.saveLessonNote(resolvedNote);
+            debugPrint('LessonNoteSyncService: Remote note overwrote local: ${remoteNote.syncId}');
+          } else {
+            // Local won, do nothing (it will be pushed up on the next sync loop)
+            debugPrint('LessonNoteSyncService: Local note kept during conflict: ${localNote.syncId}');
+          }
+        }
+      }
+      
+      // Update our clock drift tracker if server provided a timestamp
+      _lastKnownServerTime = DateTime.now(); 
+      debugPrint('LessonNoteSyncService: Successfully pulled remote changes.');
+    } catch (e) {
+      debugPrint('LessonNoteSyncService: Failed to pull remote changes: $e');
     }
   }
 

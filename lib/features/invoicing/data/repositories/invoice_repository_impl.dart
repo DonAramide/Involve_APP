@@ -55,6 +55,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               amountPaid: Value(invoice.amountPaid),
               balanceAmount: Value(invoice.balanceAmount),
               customerName: Value(invoice.customerName),
+              customerId: Value(invoice.customerId),
               customerAddress: Value(invoice.customerAddress),
               paymentMethod: Value(invoice.paymentMethod),
               staffId: Value(invoice.staffId),
@@ -167,6 +168,38 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
             Variable.withInt(invoice.studentId!)
           ],
           updates: {db.students},
+        );
+      }
+
+      // 4. Update Customer Balance if customer is associated with invoice
+      if (invoice.customerId != null) {
+        final double balanceChange;
+        
+        if (invoice.invoiceNumber.startsWith('PMT-')) {
+          // Explicit payment received from customer (reduces their debt)
+          balanceChange = -invoice.amountPaid;
+        } else if (invoice.paymentMethod == 'Wallet') {
+          // Paid using wallet/credit. Invoice is "Paid", but we must add the total to their debt (or reduce their credit)
+          balanceChange = invoice.totalAmount;
+        } else {
+          // Regular invoice, add whatever wasn't paid (the balance) to their debt
+          double carryForwardAmount = 0.0;
+          for (final item in invoice.items) {
+            if (item.item.name == 'Previous Term Balance' || item.item.name == 'Previous Balance') {
+              carryForwardAmount += (item.unitPrice * item.quantity);
+            }
+          }
+          balanceChange = invoice.balanceAmount - carryForwardAmount;
+        }
+        
+        await db.customUpdate(
+          'UPDATE customers SET balance = balance + ?, updated_at = ? WHERE id = ?',
+          variables: [
+            Variable.withReal(balanceChange),
+            Variable.withDateTime(now),
+            Variable.withString(invoice.customerId!)
+          ],
+          updates: {db.customers},
         );
       }
     });
@@ -307,6 +340,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         amountPaid: row.amountPaid,
         balanceAmount: row.balanceAmount,
         customerName: row.customerName,
+        customerId: row.customerId,
         customerAddress: row.customerAddress,
         paymentMethod: row.paymentMethod,
         staffId: row.staffId,
@@ -410,6 +444,19 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
             Variable.withInt(invoice.studentId!)
           ],
           updates: {db.students},
+        );
+      }
+
+      // Propagate balance update to customer master balance
+      if (invoice.customerId != null) {
+        await db.customUpdate(
+          'UPDATE customers SET balance = balance - ?, updated_at = ? WHERE id = ?',
+          variables: [
+            Variable.withReal(additionalAmount),
+            Variable.withDateTime(now),
+            Variable.withString(invoice.customerId!)
+          ],
+          updates: {db.customers},
         );
       }
     });
@@ -554,6 +601,21 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               Variable.withInt(invoiceRow.studentId!)
             ],
             updates: {db.students},
+          );
+        }
+      }
+
+      // Propagate balance update to customer master balance
+      if (invoiceRow.customerId != null) {
+        final double balanceChange = newBalance - invoiceRow.balanceAmount;
+        if (balanceChange != 0) {
+          await db.customUpdate(
+            'UPDATE customers SET balance = balance + ? WHERE id = ?',
+            variables: [
+              Variable.withReal(balanceChange),
+              Variable.withString(invoiceRow.customerId!)
+            ],
+            updates: {db.customers},
           );
         }
       }

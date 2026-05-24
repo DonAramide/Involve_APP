@@ -141,6 +141,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         amountPaid: amountPaid,
         balanceAmount: balance,
         customerName: state.customerName,
+        customerId: state.customerId,
         customerPhone: state.customerPhone,
         customerAddress: state.customerAddress,
         paymentMethod: state.paymentMethod,
@@ -178,6 +179,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   void _onUpdateCustomer(UpdateCustomerInfo event, Emitter<InvoiceState> emit) {
     emit(state.copyWith(
       customerName: event.name,
+      customerId: event.customerId,
       customerPhone: event.phone,
       customerAddress: event.address,
     ));

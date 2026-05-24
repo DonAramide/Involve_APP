@@ -84,10 +84,14 @@ class Students extends Table {
   TextColumn get parentName => text().nullable()();
   TextColumn get parentPhone => text().nullable()();
   RealColumn get balance => real().withDefault(const Constant(0.0))();
+  RealColumn get creditBalance => real().withDefault(const Constant(0.0))();
   DateTimeColumn get dateOfBirth => dateTime().nullable()();
   TextColumn get gender => text().nullable()();
   DateTimeColumn get registrationDate => dateTime().withDefault(currentDateAndTime)();
   BlobColumn get image => blob().nullable()();
+  TextColumn get virtualAccountNumber => text().nullable()();
+  TextColumn get virtualAccountBank => text().nullable()();
+  TextColumn get virtualAccountStatus => text().nullable()();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

@@ -43,11 +43,12 @@ class UpdateDiscount extends InvoiceEvent {
 
 class UpdateCustomerInfo extends InvoiceEvent {
   final String? name;
+  final String? customerId;
   final String? phone;
   final String? address;
-  UpdateCustomerInfo({this.name, this.phone, this.address});
+  UpdateCustomerInfo({this.name, this.customerId, this.phone, this.address});
   @override
-  List<Object?> get props => [name, phone, address];
+  List<Object?> get props => [name, customerId, phone, address];
 }
 
 class UpdatePaymentMethod extends InvoiceEvent {
@@ -167,6 +168,7 @@ class InvoiceState extends Equatable {
   final bool isGeneratingAccount;
   final Map<String, dynamic>? paymentIntent;
   final String? customerName;
+  final String? customerId;
   final String? customerPhone;
   final String? customerAddress;
   final String? paymentMethod;
@@ -201,6 +203,7 @@ class InvoiceState extends Equatable {
     this.taxEnabled = true,
     this.discountEnabled = true,
     this.customerName,
+    this.customerId,
     this.customerPhone,
     this.customerAddress,
     this.paymentMethod,
@@ -236,6 +239,7 @@ class InvoiceState extends Equatable {
     bool? isGeneratingAccount,
     Map<String, dynamic>? paymentIntent,
     String? customerName,
+    String? customerId,
     String? customerPhone,
     String? customerAddress,
     String? paymentMethod,
@@ -270,6 +274,7 @@ class InvoiceState extends Equatable {
       isGeneratingAccount: isGeneratingAccount ?? this.isGeneratingAccount,
       paymentIntent: paymentIntent ?? this.paymentIntent,
       customerName: customerName ?? this.customerName,
+      customerId: customerId ?? this.customerId,
       customerPhone: customerPhone ?? this.customerPhone,
       customerAddress: customerAddress ?? this.customerAddress,
       paymentMethod: paymentMethod ?? this.paymentMethod,
@@ -307,6 +312,7 @@ class InvoiceState extends Equatable {
         isGeneratingAccount,
         paymentIntent,
         customerName,
+        customerId,
         customerPhone,
         customerAddress,
         paymentMethod,

@@ -35,6 +35,7 @@ import { OTPController } from './controllers/otp.controller';
 import { AuthController } from './controllers/auth.controller';
 import { DeviceController } from './controllers/device.controller';
 import { LookupController } from './controllers/lookup.controller';
+import { CustomerController } from './controllers/customer.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
@@ -112,6 +113,9 @@ app.get('/admin/analytics', authenticate, checkRole(['super_admin']), AnalyticsC
 
 /** --- FINANCIAL REVIEWS (SUPER ADMIN + TENANT ADMIN) --- **/
 app.get('/admin/tenants/:id/details', authenticate, checkTenantAccess, AdminController.getTenantDetails);
+app.post('/admin/tenants/:id/provision-va', authenticate, checkTenantAccess, AdminController.provisionVirtualAccount);
+app.post('/admin/tenants/:id/students/:studentId/provision-va', authenticate, checkTenantAccess, AdminController.provisionStudentVirtualAccount);
+app.post('/admin/tenants/:id/customers/:customerId/provision-va', authenticate, checkTenantAccess, AdminController.provisionCustomerVirtualAccount);
 app.get('/admin/ledger', authenticate, checkTenantAccess, AdminController.listLedger);
 app.get('/admin/payments', authenticate, checkTenantAccess, AdminController.listPayments);
 
@@ -196,6 +200,7 @@ app.post('/api/notifications/read-all', authenticate, NotificationController.mar
 
 // Student & Finance Core
 app.get('/api/finance/virtual-account/:studentId', authenticate, StudentController.getVirtualAccount);
+app.post('/api/finance/customer-virtual-account/:customerId', authenticate, CustomerController.getVirtualAccount);
 
 // 3. 404 HANDLER
 app.use((req: Request, res: Response) => {

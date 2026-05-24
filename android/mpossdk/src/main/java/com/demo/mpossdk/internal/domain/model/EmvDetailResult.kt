@@ -1,0 +1,58 @@
+package com.demo.mpossdk.internal.domain.model
+
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+import java.util.Date
+
+@Parcelize
+internal data class EmvDetailResult(
+    val iccData: String? = null,
+    val cardNo: String? = null,
+    val cardSequenceNumber: String? = null,
+    val cardExpirationDate: String? = null,
+    val appCryptogram: String? = null,
+    val cryptogramInformationData: Byte = 0,
+    val issuerApplicationData: String? = null,
+    val unpredictableNumber: String? = null,
+    val appTransactionCounter: String? = null,
+    val terminalVerificationResults: String? = null,
+    val transactionDate: String? = Date().toString(),
+    val transactionType: String? = null,
+    val amountAuthorisedNumeric: String? = null,
+    val transactionCurrencyCode: String? = "566",
+    val applicationInterchangeProfile: String? = null,
+    val terminalCountryCode: String? = null,
+    val amountOtherNumeric: String? = null,
+    val additionalTerminalCapabilities: String? = null,
+    val ecIssuerAuthorizationCode: String? = null,
+    val cvmResult: String? = null,
+    val terminalType: String? = null,
+    val dedicatedFileName: String? = null,
+    val appVersionNumberTerminal: String? = null,
+    val transactionSequenceCounter: String? = null,
+    val issuerAuthenticationData: String? = null,
+    val issuerScriptTemplate1: String? = null,
+    val issuerScriptTemplate2: String? = null,
+    val scriptExecuteRslt: String? = null,
+    val authorisationResponseCode: String? = null,
+    val chipSerialNo: String? = null,
+    val pinBlock: String? = null,
+    val terminalCapabilities: String? = null,
+    val track2Data: String? = null,
+    val transactionTime: String? = null,
+    val pointOfServiceEntryMode: String? = "226",
+    val appPreferredName: String? = null,
+    val applicationLabel: String? = null,
+    val ksn: String? = null,
+    val aid: String? = null,
+    val cardHolderName: String? = null,
+    val cardHolderCertNo: String? = null,
+    val cardHolderCertType: String? = null,
+    val offlinePwdCount: Int = 0,
+    val pinType: String? = null,
+    val serviceCode: String? = null,
+    val pinVerificationValue: String? = null,
+    val cardVerificationValue: String? = null,
+    val acquirerInstitutionId: String? = null,
+    val terminalId: String? = null
+) : Parcelable

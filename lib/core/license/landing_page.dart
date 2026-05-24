@@ -52,14 +52,12 @@ class _LandingPageState extends State<LandingPage> {
     final hasAccess = await LicenseService.canAccess(businessName);
     if (hasAccess) {
       if (mounted) {
-        final destination = _getDestination(settings);
-        final routeName = (destination is DashboardPage) ? DashboardPage.routeName : (destination is ActivationPage ? ActivationPage.routeName : null);
-
+        // 1. Always establish Dashboard as the root of the navigation stack
         if (settings?.skipSplash == true) {
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
-              settings: RouteSettings(name: routeName),
-              pageBuilder: (context, animation1, animation2) => destination,
+              settings: const RouteSettings(name: DashboardPage.routeName),
+              pageBuilder: (context, animation1, animation2) => const DashboardPage(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
@@ -67,10 +65,20 @@ class _LandingPageState extends State<LandingPage> {
         } else {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              settings: RouteSettings(name: routeName),
-              builder: (_) => destination,
+              settings: const RouteSettings(name: DashboardPage.routeName),
+              builder: (_) => const DashboardPage(),
             ),
           );
+        }
+        
+        // 2. If restoreLastState is true, stack the last route on top of the dashboard
+        if (settings?.restoreLastState == true && 
+            settings?.lastRoute != null && 
+            settings!.lastRoute!.isNotEmpty && 
+            settings.lastRoute != DashboardPage.routeName && 
+            settings.lastRoute != '/') {
+          
+          Navigator.of(context).pushNamed(settings.lastRoute!);
         }
       }
     } else {
@@ -81,16 +89,6 @@ class _LandingPageState extends State<LandingPage> {
         );
       }
     }
-  }
-
-  Widget _getDestination(AppSettings? settings) {
-    if (settings?.restoreLastState == true && settings?.lastRoute != null) {
-      final route = settings!.lastRoute;
-      if (route == DashboardPage.routeName) return const DashboardPage();
-      if (route == ActivationPage.routeName) return const ActivationPage();
-      // Add more routes as needed
-    }
-    return const DashboardPage();
   }
 
   void _showTamperDialog() {

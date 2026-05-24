@@ -1,0 +1,7 @@
+<resources>
+    <string name="lib_name">MposPay</string>
+    <string name="error_packing_message">Error packing message</string>
+    <string name="network_error_please_check_your_connection_and_try_again">Network error. Please check your connection and try again.</string>
+    <string name="host_disconnect">Host disconnect</string>
+    <string name="an_error_occurred">An error occurred</string>
+</resources>

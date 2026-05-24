@@ -16,6 +16,12 @@ interface MockTenant {
   plan: string;
   status: string;
   created_at: string;
+  virtual_account_number?: string;
+  virtual_account_bank?: string;
+  virtual_account_status?: string;
+  wallet_balance?: number;
+  total_wallet_balance?: number;
+  available_wallet_balance?: number;
 }
 
 export class AdminController {
@@ -130,7 +136,7 @@ export class AdminController {
       if (process.env.OFFLINE_MOCK_AUTH === 'true') {
         console.log('[AdminController] Creating tenant locally immediately (OFFLINE_MOCK_AUTH active).');
         const data = AdminController.getLocalData();
-        const newTenant: MockTenant = {
+        const newTenant: any = {
           id: `tenant-${Date.now()}`,
           name,
           type,
@@ -138,6 +144,32 @@ export class AdminController {
           status: 'active',
           created_at: new Date().toISOString()
         };
+
+        // Call Quasar SDK for Virtual Account generation even in mock mode
+        try {
+          const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+          const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+          const quasar = new QuasarServiceModule(platformApiKey);
+          const platformId = 'platform-admin-owner-id';
+          
+          const va = await quasar.createVirtualAccount({
+            childId: newTenant.id,
+            parentId: platformId,
+            currency: 'NGN',
+            email: `billing@tenant-${newTenant.id.substring(0,8)}.invify.app`,
+            firstName: name.split(' ')[0],
+            lastName: name.split(' ').slice(1).join(' ') || 'Business',
+            parentShareBps: 0,
+            metadata: { type: 'tenant_operating_account' }
+          });
+          
+          newTenant.virtual_account_number = va.accountNumber;
+          newTenant.virtual_account_bank = va.bankName;
+          newTenant.virtual_account_status = 'ACTIVE';
+        } catch (vaError: any) {
+          console.error('[AdminController] Mock VA generation failed via Quasar:', vaError.message);
+        }
+
         data.unshift(newTenant);
         AdminController.saveLocalData(data);
         return res.status(201).json(newTenant);
@@ -153,6 +185,40 @@ export class AdminController {
       
       // Senior Practice: Auto-create wallet for the new tenant
       await supabase.from('wallets').insert({ tenant_id: data.id, balance: 0 });
+
+      // Generate Virtual Account for Tenant using Quasar SDK
+      try {
+        const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+        const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+        const quasar = new QuasarServiceModule(platformApiKey);
+        
+        const platformId = 'platform-admin-owner-id'; // Constant platform parent ID
+        
+        const va = await quasar.createVirtualAccount({
+          childId: data.id,
+          parentId: platformId,
+          currency: 'NGN',
+          email: `billing@tenant-${data.id.substring(0,8)}.invify.app`,
+          firstName: name.split(' ')[0],
+          lastName: name.split(' ').slice(1).join(' ') || 'Business',
+          parentShareBps: 0,
+          metadata: { type: 'tenant_operating_account' }
+        });
+        
+        // Save VA details to the tenant record
+        await supabase
+          .from('tenants')
+          .update({
+            virtual_account_number: va.accountNumber,
+            virtual_account_bank: va.bankName,
+            virtual_account_status: 'ACTIVE'
+          })
+          .eq('id', data.id);
+          
+      } catch (vaError: any) {
+        console.error('[AdminController] Failed to generate Virtual Account for tenant:', vaError.message);
+        // We don't block tenant creation if VA generation fails, just log it.
+      }
 
       return res.status(201).json(data);
     } catch (error: any) {
@@ -208,12 +274,19 @@ export class AdminController {
           type: tenantType, 
           plan: tenantPlan, 
           status: tenantStatus, 
-          created_at: tenantCreatedAt 
+          created_at: tenantCreatedAt,
+          virtual_account_number: match?.virtual_account_number || null,
+          virtual_account_bank: match?.virtual_account_bank || null,
+          virtual_account_status: match?.virtual_account_status || null
         },
         users: [
           { id: 'usr-1', name: 'Admin User', role: 'admin' }
         ],
-        wallet: { balance: 1500 },
+        wallet: { 
+          balance: match?.wallet_balance || 0,
+          total_wallet_balance: match?.total_wallet_balance || 0,
+          available_wallet_balance: match?.available_wallet_balance || 0
+        },
         recentUsage: []
       });
     }
@@ -239,6 +312,208 @@ export class AdminController {
       });
     } catch (error: any) {
       console.error('[AdminController] getTenantDetails Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/tenants/:id/provision-virtual-account
+   * Provisions a virtual account manually via Quasar SDK if not previously created.
+   */
+  static async provisionVirtualAccount(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        const data = AdminController.getLocalData();
+        const tenant = data.find(t => t.id === id);
+        
+        if (!tenant) return res.status(404).json({ error: 'Tenant not found locally' });
+
+        try {
+          const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+          const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+          const quasar = new QuasarServiceModule(platformApiKey);
+          const platformId = 'platform-admin-owner-id';
+          
+          const va = await quasar.createVirtualAccount({
+            childId: tenant.id,
+            parentId: platformId,
+            currency: 'NGN',
+            email: `billing@tenant-${tenant.id.substring(0,8)}.invify.app`,
+            firstName: tenant.name.split(' ')[0],
+            lastName: tenant.name.split(' ').slice(1).join(' ') || 'Business',
+            parentShareBps: 0,
+            metadata: { type: 'tenant_operating_account' }
+          });
+          
+          tenant.virtual_account_number = va.accountNumber;
+          tenant.virtual_account_bank = va.bankName;
+          tenant.virtual_account_status = 'ACTIVE';
+          AdminController.saveLocalData(data);
+          
+          return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
+        } catch (vaError: any) {
+          console.error('[AdminController] Mock VA generation failed via Quasar:', vaError.message);
+          return res.status(500).json({ error: 'Failed to provision VA: ' + vaError.message });
+        }
+      }
+
+      // Supabase flow
+      const { data: tenant, error: fetchErr } = await supabase.from('tenants').select('*').eq('id', id).single();
+      if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+      const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+      const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+      const quasar = new QuasarServiceModule(platformApiKey);
+      const platformId = 'platform-admin-owner-id';
+      
+      const va = await quasar.createVirtualAccount({
+        childId: tenant.id,
+        parentId: platformId,
+        currency: 'NGN',
+        email: `billing@tenant-${tenant.id.substring(0,8)}.invify.app`,
+        firstName: tenant.name.split(' ')[0],
+        lastName: tenant.name.split(' ').slice(1).join(' ') || 'Business',
+        parentShareBps: 0,
+        metadata: { type: 'tenant_operating_account' }
+      });
+      
+      await supabase
+        .from('tenants')
+        .update({
+          virtual_account_number: va.accountNumber,
+          virtual_account_bank: va.bankName,
+          virtual_account_status: 'ACTIVE'
+        })
+        .eq('id', tenant.id);
+
+      return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
+    } catch (error: any) {
+      console.error('[AdminController] provisionVirtualAccount Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/tenants/:id/students/:studentId/provision-va
+   * Provisions a virtual account manually via Quasar SDK for a specific student.
+   */
+  static async provisionStudentVirtualAccount(req: Request, res: Response) {
+    try {
+      const { id, studentId } = req.params;
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        try {
+          const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+          const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+          const quasar = new QuasarServiceModule(platformApiKey);
+          const platformId = 'platform-admin-owner-id';
+          
+          const va = await quasar.createVirtualAccount({
+            childId: studentId,
+            parentId: platformId,
+            currency: 'NGN',
+            email: `student-${studentId}@invify.app`,
+            firstName: 'Student',
+            lastName: studentId,
+            parentShareBps: 0,
+            metadata: { type: 'student_account', tenantId: id }
+          });
+          
+          return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
+        } catch (vaError: any) {
+          console.error('[AdminController] Mock Student VA generation failed via Quasar:', vaError.message);
+          return res.status(500).json({ error: 'Failed to provision Student VA: ' + vaError.message });
+        }
+      }
+
+      // Supabase flow - verify tenant first
+      const { data: tenant, error: fetchErr } = await supabase.from('tenants').select('*').eq('id', id).single();
+      if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+      // In real scenario, verify student exists in backend DB too.
+      // Here we just provision directly for the given studentId under this tenant.
+      
+      const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+      const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+      const quasar = new QuasarServiceModule(platformApiKey);
+      const platformId = 'platform-admin-owner-id'; // or tenant's subaccount id
+      
+      const va = await quasar.createVirtualAccount({
+        childId: studentId,
+        parentId: platformId,
+        currency: 'NGN',
+        email: `student-${studentId}@invify.app`,
+        firstName: 'Student',
+        lastName: studentId,
+        parentShareBps: 0,
+        metadata: { type: 'student_account', tenantId: id }
+      });
+      
+      return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
+    } catch (error: any) {
+      console.error('[AdminController] provisionStudentVirtualAccount Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/tenants/:id/customers/:customerId/provision-va
+   * Provisions a virtual account manually via Quasar SDK for a specific customer.
+   */
+  static async provisionCustomerVirtualAccount(req: Request, res: Response) {
+    try {
+      const { id, customerId } = req.params;
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        try {
+          const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+          const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+          const quasar = new QuasarServiceModule(platformApiKey);
+          const platformId = 'platform-admin-owner-id';
+          
+          const va = await quasar.createVirtualAccount({
+            childId: customerId,
+            parentId: platformId,
+            currency: 'NGN',
+            email: `customer-${customerId}@invify.app`,
+            firstName: 'Customer',
+            lastName: customerId,
+            parentShareBps: 0,
+            metadata: { type: 'customer_account', tenantId: id }
+          });
+          
+          return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
+        } catch (vaError: any) {
+          console.error('[AdminController] Mock Customer VA generation failed via Quasar:', vaError.message);
+          return res.status(500).json({ error: 'Failed to provision Customer VA: ' + vaError.message });
+        }
+      }
+
+      // Supabase flow - verify tenant first
+      const { data: tenant, error: fetchErr } = await supabase.from('tenants').select('*').eq('id', id).single();
+      if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+      const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+      const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
+      const quasar = new QuasarServiceModule(platformApiKey);
+      const platformId = 'platform-admin-owner-id';
+      
+      const va = await quasar.createVirtualAccount({
+        childId: customerId,
+        parentId: platformId,
+        currency: 'NGN',
+        email: `customer-${customerId}@invify.app`,
+        firstName: 'Customer',
+        lastName: customerId,
+        parentShareBps: 0,
+        metadata: { type: 'customer_account', tenantId: id }
+      });
+      
+      return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
+    } catch (error: any) {
+      console.error('[AdminController] provisionCustomerVirtualAccount Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }

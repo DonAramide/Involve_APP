@@ -30,14 +30,14 @@ class BackgroundSyncService {
       debugPrint('Starting Services Sync...');
 
       // 1. Sync Customers
-      final pendingCustomers = await (db.select(db.serviceCustomers)
+      final pendingCustomers = await (db.select(db.customers)
             ..where((t) => t.syncStatus.equals('pending')))
           .get();
       if (pendingCustomers.isNotEmpty) {
         await remoteDataSource.syncCustomers(pendingCustomers.map((c) => c.toJson()).toList());
         for (final c in pendingCustomers) {
-          await (db.update(db.serviceCustomers)..where((t) => t.id.equals(c.id)))
-              .write(ServiceCustomersCompanion(syncStatus: Value('synced')));
+          await (db.update(db.customers)..where((t) => t.id.equals(c.id)))
+              .write(CustomersCompanion(syncStatus: Value('synced')));
         }
       }
 

@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+    id 'kotlin-parcelize'
+}
+
+def localPropertiesFile = rootProject.file("local.properties")
+def localProperties = new Properties()
+localProperties.load(new FileInputStream(localPropertiesFile))
+
+android {
+    namespace 'com.demo.mpossdk'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        version = "1.0.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    signingConfigs {
+        release {
+            if (localProperties['SIGNING_JKS_FILE_PATH'] != null) {
+                storeFile file(localProperties['SIGNING_JKS_FILE_PATH'])
+                storePassword localProperties['SIGNING_KEYSTORE_PASSWORD']
+                keyAlias localProperties['SIGNING_KEY_ALIAS']
+                keyPassword localProperties['SIGNING_KEY_PASSWORD']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (localProperties['SIGNING_JKS_FILE_PATH'] != null) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+    buildFeatures {
+        viewBinding true
+        buildConfig true
+    }
+
+    libraryVariants.configureEach { variant ->
+        variant.outputs.each { output ->
+            def outputFile = output.outputFileName
+            def buildType = variant.buildType.name
+            if (outputFile != null && outputFile.endsWith('.aar')) {
+                def fileName = "${archivesBaseName}-${version}-${buildType}.aar"
+                output.outputFileName = fileName
+            }
+        }
+    }
+}
+
+dependencies {
+
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.activity:activity-ktx:1.7.2'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    implementation files('libs/AppSdkAidl.jar')
+    implementation files('libs/misAndroidSdk_230404121933.jar')
+    implementation files('libs/jpos-2.1.7.jar')
+    implementation files('libs/bcprov-jdk15on-1.70.jar')
+
+    //GSON
+    implementation 'com.google.code.gson:gson:2.10.1'
+}

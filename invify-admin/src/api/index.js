@@ -34,6 +34,7 @@ export const adminApi = {
   createTenant: (data) => api.post('/admin/tenants', data),
   updateTenant: (id, data) => api.patch(`/admin/tenants/${id}`, data),
   getTenantDetails: (id) => api.get(`/admin/tenants/${id}/details`),
+  provisionVirtualAccount: (id) => api.post(`/admin/tenants/${id}/provision-virtual-account`),
   getLedger: (params) => api.get('/admin/ledger', { params }),
   getPayments: (params) => api.get('/admin/payments', { params }),
   getDashboardStats: () => api.get('/admin/dashboard-stats'),

@@ -737,9 +737,9 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
             final id = _getString(row['id'])!;
             final name = _getString(row['name']) ?? '';
             
-            final existing = await (database.select(database.serviceCustomers)..where((t) => t.id.equals(id))).getSingleOrNull();
+            final existing = await (database.select(database.customers)..where((t) => t.id.equals(id))).getSingleOrNull();
             if (existing == null) {
-              await database.into(database.serviceCustomers).insert(ServiceCustomersCompanion.insert(
+              await database.into(database.customers).insert(CustomersCompanion.insert(
                 id: id,
                 name: name,
                 phone: Value(_getString(row['phone'])),

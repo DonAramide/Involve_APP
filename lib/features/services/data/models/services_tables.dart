@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-@DataClassName('ServiceCustomerTable')
-class ServiceCustomers extends Table {
+@DataClassName('CustomerTable')
+class Customers extends Table {
   TextColumn get id => text()(); // UUID generated locally
   TextColumn get name => text()();
   TextColumn get phone => text().nullable()();
@@ -9,6 +9,11 @@ class ServiceCustomers extends Table {
   TextColumn get address => text().nullable()();
   BlobColumn get image => blob().nullable()();
   
+  RealColumn get balance => real().withDefault(const Constant(0.0))();
+  TextColumn get virtualAccountNumber => text().nullable()();
+  TextColumn get virtualAccountName => text().nullable()();
+  TextColumn get virtualAccountBank => text().nullable()();
+
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   TextColumn get syncStatus => text().withDefault(const Constant('pending'))(); // pending, synced, syncing, failed
 
@@ -20,7 +25,7 @@ class ServiceCustomers extends Table {
 class ServiceJobs extends Table {
   TextColumn get id => text()(); // UUID generated locally
   TextColumn get jobId => text().unique()(); // INV-SRV-DEV-0001
-  TextColumn get customerId => text().references(ServiceCustomers, #id)();
+  TextColumn get customerId => text().references(Customers, #id)();
   TextColumn get title => text()();
   TextColumn get description => text().nullable()();
   RealColumn get totalAmount => real()();

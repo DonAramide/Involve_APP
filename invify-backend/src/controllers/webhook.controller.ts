@@ -176,6 +176,22 @@ export class WebhookController {
       .update({ status: 'SUCCESS', processed_at: new Date().toISOString() })
       .eq('reference', reference);
 
+    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      const fs = require('fs');
+      const path = require('path');
+      const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
+      if (fs.existsSync(LOCAL_TENANTS_DB_PATH)) {
+        let tenants = JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'));
+        const idx = tenants.findIndex((t: any) => t.id === tenantId);
+        if (idx !== -1) {
+          tenants[idx].total_wallet_balance = (tenants[idx].total_wallet_balance || 0) + amount;
+          tenants[idx].available_wallet_balance = (tenants[idx].available_wallet_balance || 0) + amount;
+          tenants[idx].wallet_balance = (tenants[idx].wallet_balance || 0) + amount;
+          fs.writeFileSync(LOCAL_TENANTS_DB_PATH, JSON.stringify(tenants, null, 2));
+        }
+      }
+    }
+
     // 3. Emit Financial Event for Realtime UI update
     await FinancialEventService.emit({
       type: type === 'payout' ? 'payout.success' : 'payment.success',
@@ -183,6 +199,7 @@ export class WebhookController {
       tenantId,
       walletId,
       amount,
+      metadata: event.data?.metadata || {},
       idempotencyKey: `event:${type === 'payout' ? 'payout' : 'payment'}_success:${reference}`
     });
 

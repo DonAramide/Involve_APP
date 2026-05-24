@@ -11,9 +11,14 @@ import '../pages/receipt_preview_page.dart';
 import '../../domain/templates/concrete_templates.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import '../../../settings/domain/entities/settings.dart';
-import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import '../../domain/entities/invoice.dart';
+import '../../../settings/domain/entities/staff.dart';
+import '../../../settings/presentation/bloc/staff_bloc.dart';
+import 'package:involve_app/core/utils/nibss_response_codes.dart';
+import 'package:involve_app/core/license/storage_service_native.dart';
+import 'package:involve_app/services/mpos_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class InvoicePreviewDialog extends StatefulWidget {
   final InvoiceBloc invoiceBloc;
@@ -156,23 +161,65 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             final isFullPayment = balanceAmount <= 0;
                             final showAccount = (settings?.showAccountDetails == true || invoiceState.paymentMethod == 'Transfer' || invoiceState.paymentMethod == 'VirtualAccount') && !isFullPayment;
                             
-                            if (showAccount && settings?.bankName != null) {
-                              return Column(
-                                children: [
-                                  const SizedBox(height: 12),
-                                  const Divider(thickness: 1),
-                                  const Center(
-                                    child: Text(
-                                      'PAYMENT DETAILS',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                            if (showAccount) {
+                              if (invoiceState.paymentMethod == 'VirtualAccount') {
+                                final staffList = context.watch<StaffBloc>().state.staffList;
+                                Staff? currentStaff;
+                                if (invoiceState.staffId != null) {
+                                  currentStaff = staffList.where((s) => s.id == invoiceState.staffId).firstOrNull;
+                                }
+                                
+                                if (currentStaff?.virtualBankName != null && currentStaff!.virtualBankName!.isNotEmpty) {
+                                  return Column(
+                                    children: [
+                                      const SizedBox(height: 12),
+                                      const Divider(thickness: 1),
+                                      const Center(
+                                        child: Text(
+                                          'PAYMENT DETAILS',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Center(child: Text('Bank: ${currentStaff.virtualBankName}', style: const TextStyle(fontSize: 12))),
+                                      Center(child: Text('Account: ${currentStaff.virtualAccountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
+                                      Center(child: Text('Name: ${currentStaff.virtualAccountName ?? ""}', style: const TextStyle(fontSize: 12))),
+                                    ],
+                                  );
+                                } else {
+                                  return Column(
+                                    children: [
+                                      const SizedBox(height: 12),
+                                      const Divider(thickness: 1),
+                                      const Center(
+                                        child: Text(
+                                          'PAYMENT DETAILS',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Center(child: Text('Contact admin for account profiling', style: TextStyle(fontSize: 12, color: Colors.red))),
+                                    ],
+                                  );
+                                }
+                              } else if (settings?.bankName != null) {
+                                return Column(
+                                  children: [
+                                    const SizedBox(height: 12),
+                                    const Divider(thickness: 1),
+                                    const Center(
+                                      child: Text(
+                                        'PAYMENT DETAILS',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Center(child: Text('Bank: ${settings!.bankName}', style: const TextStyle(fontSize: 12))),
-                                  Center(child: Text('Account: ${settings.accountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
-                                  Center(child: Text('Name: ${settings.accountName ?? ""}', style: const TextStyle(fontSize: 12))),
-                                ],
-                              );
+                                    const SizedBox(height: 4),
+                                    Center(child: Text('Bank: ${settings!.bankName}', style: const TextStyle(fontSize: 12))),
+                                    Center(child: Text('Account: ${settings.accountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
+                                    Center(child: Text('Name: ${settings.accountName ?? ""}', style: const TextStyle(fontSize: 12))),
+                                  ],
+                                );
+                              }
                             }
                             return const SizedBox.shrink();
                           },
@@ -197,10 +244,6 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               ),
                             ),
                           ],
-                          const Divider(),
-                          if (invoiceState.paymentIntent != null && invoiceState.paymentMethod == 'VirtualAccount') ...[
-                            _buildVirtualAccountDetails(invoiceState.paymentIntent!),
-                          ],
                         ],
                         
                         if (settings?.showSignatureSpace == true) ...[
@@ -224,13 +267,75 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                     onPressed: (invoiceState.isSaving || invoiceState.isGeneratingAccount || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
-                      if (invoiceState.paymentMethod == 'VirtualAccount' && invoiceState.paymentIntent == null) {
-                        widget.invoiceBloc.add(InitiateVirtualAccount(
-                          amount: invoiceState.total,
-                          customerName: invoiceState.customerName,
-                          customerPhone: invoiceState.customerPhone,
-                        ));
-                        return;
+                      // (Dynamic Virtual Account Generation removed)
+
+                      if (invoiceState.paymentMethod == 'POS') {
+                        final terminalId = await StorageService.getMposTerminalId();
+                        if (terminalId == null || terminalId.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please configure POS Terminal ID in Printer Settings first.'), backgroundColor: Colors.red),
+                          );
+                          return;
+                        }
+
+                        // Network Check
+                        final connectivityResult = await Connectivity().checkConnectivity();
+                        if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('No internet connection. POS requires an active network.'), backgroundColor: Colors.red),
+                          );
+                          return;
+                        }
+
+                        final amountToCharge = invoiceState.total;
+                        
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Confirm POS Payment'),
+                            content: Text('Charge ${CurrencyFormatter.formatWithSymbol(amountToCharge, symbol: settings?.currency ?? '₦')} to POS terminal?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('CHARGE')),
+                            ],
+                          ),
+                        );
+                        
+                        if (confirm != true) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending to POS...')));
+                        
+                        try {
+                          final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
+                          if (!mounted) return;
+                          
+                          if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
+                            String errorMessage = result.error?.message ?? result.transaction?.message ?? "Unknown Error";
+                            if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
+                              final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);
+                              errorMessage = "Code ${result.transaction!.statusCode}: $codeMsg";
+                            }
+                            
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('POS Payment Failed: $errorMessage'), 
+                                backgroundColor: Colors.red,
+                                duration: const Duration(seconds: 5),
+                              ),
+                            );
+                            return;
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('POS Payment Approved!'), backgroundColor: Colors.green),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('POS Error: $e'), backgroundColor: Colors.red),
+                          );
+                          return;
+                        }
                       }
 
                       final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
@@ -309,11 +414,80 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                     },
                     child: (invoiceState.isSaving || invoiceState.isGeneratingAccount)
                       ? const Text('PROCESSING...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))
-                      : Text(invoiceState.paymentMethod == 'VirtualAccount' && invoiceState.paymentIntent == null ? 'GENERATE ACCOUNT' : 'SAVE & PRINT'),
+                      : Text(invoiceState.paymentMethod == 'POS' ? 'CHARGE POS & SAVE' : 'SAVE & PRINT'),
                   ),
                   ElevatedButton(
                     onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                       final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
+
+                      if (invoiceState.paymentMethod == 'POS') {
+                        final terminalId = await StorageService.getMposTerminalId();
+                        if (terminalId == null || terminalId.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Please configure POS Terminal ID in Printer Settings first.'), backgroundColor: Colors.red),
+                          );
+                          return;
+                        }
+
+                        // Network Check
+                        final connectivityResult = await Connectivity().checkConnectivity();
+                        if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('No internet connection. POS requires an active network.'), backgroundColor: Colors.red),
+                          );
+                          return;
+                        }
+
+                        final amountToCharge = invoiceState.total;
+                        
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Confirm POS Payment'),
+                            content: Text('Charge ${CurrencyFormatter.formatWithSymbol(amountToCharge, symbol: settings?.currency ?? '₦')} to POS terminal?'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('CHARGE')),
+                            ],
+                          ),
+                        );
+                        
+                        if (confirm != true) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending to POS...')));
+                        
+                        try {
+                          final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
+                          if (!mounted) return;
+
+                          if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
+                            String errorMessage = result.error?.message ?? result.transaction?.message ?? "Unknown Error";
+                            if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
+                              final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);
+                              errorMessage = "Code ${result.transaction!.statusCode}: $codeMsg";
+                            }
+                            
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('POS Payment Failed: $errorMessage'), 
+                                backgroundColor: Colors.red,
+                                duration: const Duration(seconds: 5),
+                              ),
+                            );
+                            return;
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('POS Payment Approved!'), backgroundColor: Colors.green),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('POS Error: $e'), backgroundColor: Colors.red),
+                          );
+                          return;
+                        }
+                      }
 
                       // Safety check for significant overpayment
                       if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
@@ -387,7 +561,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
                       Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));
                     },
-                    child: invoiceState.isSaving ? const Text('SAVING...') : const Text('SAVE & PREVIEW'),
+                    child: invoiceState.isSaving ? const Text('SAVING...') : Text(invoiceState.paymentMethod == 'POS' ? 'CHARGE POS & PREVIEW' : 'SAVE & PREVIEW'),
                   ),
                 ],
               );
@@ -458,6 +632,18 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
             _amountReceivedController.text = CurrencyFormatter.format(state.total);
           },
+        ),
+        RadioListTile<String>(
+          title: const Text('Customer Wallet/Credit', style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
+          value: 'Wallet',
+          groupValue: state.paymentMethod,
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          onChanged: state.customerId != null ? (val) {
+            context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
+            _amountReceivedController.text = CurrencyFormatter.format(state.total);
+          } : null,
+          subtitle: state.customerId == null ? const Text('Please select a customer first.', style: TextStyle(fontSize: 10, color: Colors.grey)) : null,
         ),
         RadioListTile<String>(
           title: const Text('Pay Later (deferred)/ part payment', style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold)),

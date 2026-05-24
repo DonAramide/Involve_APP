@@ -476,6 +476,9 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     final codeController = TextEditingController(text: pin);
     final staffIdController = TextEditingController(text: staff?.staffId);
     final phoneController = TextEditingController(text: staff?.phone);
+    final virtualBankNameController = TextEditingController(text: staff?.virtualBankName);
+    final virtualAccountNumberController = TextEditingController(text: staff?.virtualAccountNumber);
+    final virtualAccountNameController = TextEditingController(text: staff?.virtualAccountName);
     final formKey = GlobalKey<FormState>();
     
     // Default or load role
@@ -550,6 +553,52 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   ),
                   const SizedBox(height: 20),
                   
+                  // Virtual Account Section
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'STAFF VIRTUAL ACCOUNT (OPTIONAL)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[700],
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: virtualBankNameController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: const InputDecoration(
+                      labelText: 'Bank Name',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: virtualAccountNumberController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: const InputDecoration(
+                      labelText: 'Account Number',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: virtualAccountNameController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: const InputDecoration(
+                      labelText: 'Account Name',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
                   // Elegant 3-Radio Identity Selector Block
                   Align(
                     alignment: Alignment.centerLeft,
@@ -600,6 +649,9 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     staffCode: pin.isEmpty && staff != null ? staff.staffCode : pin,
                     phone: phoneController.text.trim(),
                     role: selectedRole,
+                    virtualBankName: virtualBankNameController.text.trim().isEmpty ? null : virtualBankNameController.text.trim(),
+                    virtualAccountNumber: virtualAccountNumberController.text.trim().isEmpty ? null : virtualAccountNumberController.text.trim(),
+                    virtualAccountName: virtualAccountNameController.text.trim().isEmpty ? null : virtualAccountNameController.text.trim(),
                   );
                   if (staff == null) {
                     context.read<StaffBloc>().add(AddStaff(newStaff));

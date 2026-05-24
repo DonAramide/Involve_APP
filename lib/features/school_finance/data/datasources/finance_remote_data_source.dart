@@ -53,6 +53,9 @@ abstract class IFinanceRemoteDataSource {
 
   /// POST /api/payments/create
   Future<Map<String, dynamic>> initiatePayment(Map<String, dynamic> data);
+
+  /// POST /api/finance/customer-virtual-account/:customerId
+  Future<Map<String, dynamic>?> initiateCustomerVirtualAccount(String customerId, Map<String, dynamic> data);
 }
 
 
@@ -178,6 +181,20 @@ class FinanceRemoteDataSourceImpl implements IFinanceRemoteDataSource {
       queryParameters: {'limit': limit, 'offset': offset},
     );
     return _parseTransactionList(response.data);
+  }
+
+  @override
+  Future<Map<String, dynamic>?> initiateCustomerVirtualAccount(String customerId, Map<String, dynamic> data) async {
+    try {
+      final response = await client.post(
+        '/api/finance/customer-virtual-account/$customerId',
+        data: data,
+      );
+      return response.data as Map<String, dynamic>?;
+    } on FinanceApiException catch (e) {
+      if (e.statusCode == 404) return null;
+      rethrow;
+    }
   }
 
   @override

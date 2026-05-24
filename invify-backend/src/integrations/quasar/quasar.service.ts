@@ -56,21 +56,24 @@ export class QuasarService {
   }
 
   /**
-   * Provisions a unique virtual account for a student.
-   * Aligns with SDK method: school.createVirtualAccount
+   * Provisions a unique virtual account for an end user (child) under a counterparty (parent).
+   * Aligns with SDK method: endUsers.createVirtualAccount
    */
   async createVirtualAccount(params: {
-    studentId: string;
-    schoolId: string;
+    childId: string;
+    parentId: string;
     email: string;
     firstName?: string;
     lastName?: string;
+    parentShareBps?: number;
     metadata?: Record<string, any>;
   }) {
     try {
-      console.log(`[QuasarSDK] Provisioning virtual account for student: ${params.studentId}`);
-      return await this.client.school.createVirtualAccount({
+      console.log(`[QuasarSDK] Provisioning virtual account for child: ${params.childId}`);
+      return await this.client.endUsers.createVirtualAccount({
         ...params,
+        firstName: params.firstName || 'User',
+        lastName: params.lastName || 'Account',
         currency: 'NGN' // Defaulting to NGN for virtual accounts
       });
     } catch (error: any) {

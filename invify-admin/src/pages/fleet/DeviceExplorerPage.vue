@@ -206,13 +206,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import EnterpriseDataGrid from '../../components/grid/EnterpriseDataGrid.vue'
 import EnterpriseContextHint from '../../components/contextual/EnterpriseContextHint.vue'
 import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { deviceApi } from '../../api'
+import { supabase } from '../../supabase'
 
 const route = useRoute()
 const router = useRouter()
@@ -268,6 +269,7 @@ const baseDevicesArray = ref([
     rolloutVersion: 'v2.4.1',
     otaStatus: 'STABLE',
     lastSeen: '12s ago',
+    _lastSeenDate: new Date(Date.now() - 12000),
     battery: 94,
     networkState: 'WIFI_5G',
     androidVersion: '13.0',
@@ -289,6 +291,7 @@ const baseDevicesArray = ref([
     rolloutVersion: 'v2.4.1',
     otaStatus: 'STABLE',
     lastSeen: '45s ago',
+    _lastSeenDate: new Date(Date.now() - 45000),
     battery: 81,
     networkState: 'CELL_4G',
     androidVersion: '12.0',
@@ -310,6 +313,7 @@ const baseDevicesArray = ref([
     rolloutVersion: 'v2.1.0',
     otaStatus: 'STALE_PIPELINE',
     lastSeen: '140s ago',
+    _lastSeenDate: new Date(Date.now() - 140000),
     battery: 100,
     networkState: 'ETHERNET',
     androidVersion: '11.0',
@@ -329,6 +333,7 @@ const baseDevicesArray = ref([
     rolloutVersion: 'v2.3.0',
     otaStatus: 'ROLLBACK_FAILED',
     lastSeen: '12m ago',
+    _lastSeenDate: new Date(Date.now() - (12 * 60 * 1000)),
     battery: 14,
     networkState: 'DISCONNECTED',
     androidVersion: '13.0',
@@ -352,6 +357,7 @@ for (let i = 5; i <= 65; i++) {
     rolloutVersion: 'v2.4.1',
     otaStatus: 'STABLE',
     lastSeen: `${(i * 4) % 60}s ago`,
+    _lastSeenDate: new Date(Date.now() - (((i * 4) % 60) * 1000)),
     battery: 100 - (i % 30),
     networkState: 'WIFI_5G',
     androidVersion: '13.0',
@@ -485,6 +491,29 @@ watch(() => route.query.target, (newTarget) => {
   }
 }, { immediate: true })
 
+let tickerInterval = null
+let realtimeChannel = null
+
+const updateRelativeTimeStrings = () => {
+  const now = new Date()
+  baseDevicesArray.value.forEach(device => {
+    if (device._lastSeenDate) {
+      const diffSecs = Math.floor((now - device._lastSeenDate) / 1000)
+      if (diffSecs < 60) {
+        device.lastSeen = `${diffSecs}s ago`
+      } else {
+        const mins = Math.floor(diffSecs / 60)
+        device.lastSeen = `${mins}m ago`
+      }
+      
+      // Dynamically degrade state if too long since last ping
+      if (device.onlineState === 'ONLINE' && diffSecs > 120) {
+        device.onlineState = 'DEGRADED'
+      }
+    }
+  })
+}
+
 onMounted(async () => {
   // Restore custom continuity preset
   if (prefs.value.lastDevicePreset) {
@@ -507,12 +536,13 @@ onMounted(async () => {
         rolloutVersion: 'v2.5.0',
         otaStatus: 'STABLE',
         lastSeen: 'Live Handshake',
-        battery: 100,
-        networkState: 'SECURE_WIFI',
+        battery: d.battery || 100,
+        networkState: d.network_type || 'SECURE_WIFI',
         androidVersion: d.os_version || d.platform || '13.0',
         dotroidVersion: '4.2.0',
         description: `Persistent Attestation Hash Signature Mapped Natively.`,
-        apps: ['com.invify.invoice_app', 'io.flutter.app']
+        apps: ['com.invify.invoice_app', 'io.flutter.app'],
+        _lastSeenDate: d.last_seen ? new Date(d.last_seen) : new Date()
       }))
       // Merge live targets directly atop static simulated background matrices
       baseDevicesArray.value = [...realNodes, ...baseDevicesArray.value]
@@ -520,6 +550,59 @@ onMounted(async () => {
   } catch (err) {
     console.warn('Real-time backend client registry sweep pending cluster stability verification.')
   }
+
+  // Setup Supabase Realtime Subscription for the public devices table
+  realtimeChannel = supabase.channel('public:devices')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, payload => {
+      console.log('Realtime Device Telemetry Update:', payload)
+      const eventType = payload.eventType
+      const row = payload.new
+      
+      if (eventType === 'UPDATE' || eventType === 'INSERT') {
+        const existingIdx = baseDevicesArray.value.findIndex(d => d.deviceId === (row.device_id || row.id))
+        
+        const mappedNode = {
+          deviceId: row.device_id || row.id,
+          deviceName: row.device_name || row.model || 'Registered Client Hub',
+          tenant: 'Global Organization Scope', // would need full join resolution or local cache mapping
+          agentCode: 'ag-production',
+          onlineState: row.status === 'ACTIVE' ? 'ONLINE' : 'DEGRADED',
+          compliance: '100%',
+          integrity: 'HEALTHY',
+          trustScore: 99,
+          rolloutVersion: 'v2.5.0',
+          otaStatus: 'STABLE',
+          lastSeen: 'Just now',
+          battery: row.battery || 100,
+          networkState: row.network_type || 'SECURE_WIFI',
+          androidVersion: row.os_version || row.platform || '13.0',
+          dotroidVersion: '4.2.0',
+          description: `Live Telemetry Heartbeat Processed.`,
+          apps: ['com.invify.invoice_app', 'io.flutter.app'],
+          _lastSeenDate: row.last_seen ? new Date(row.last_seen) : new Date()
+        }
+
+        if (existingIdx !== -1) {
+          // Update existing keeping tenant mapping
+          mappedNode.tenant = baseDevicesArray.value[existingIdx].tenant
+          baseDevicesArray.value[existingIdx] = mappedNode
+        } else {
+          // Insert new at the top
+          baseDevicesArray.value.unshift(mappedNode)
+        }
+      } else if (eventType === 'DELETE') {
+        baseDevicesArray.value = baseDevicesArray.value.filter(d => d.deviceId !== (payload.old.device_id || payload.old.id))
+      }
+    })
+    .subscribe()
+
+  // Start live relative ticking
+  tickerInterval = setInterval(updateRelativeTimeStrings, 1000)
+})
+
+onUnmounted(() => {
+  if (tickerInterval) clearInterval(tickerInterval)
+  if (realtimeChannel) supabase.removeChannel(realtimeChannel)
 })
 </script>
 

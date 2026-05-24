@@ -155,12 +155,14 @@ const $router = useRouter()
 const loading = ref(false)
 const rows = ref([])
 const filter = ref({ name: '', type: 'all', status: 'all' })
-const pagination = ref({ rowsPerPage: 15 })
+const pagination = ref({ sortBy: 'created_at', descending: true, rowsPerPage: 15 })
 
 const columns = [
   { name: 'name', label: 'NAME', field: 'name', align: 'left', sortable: true },
   { name: 'type', label: 'TYPE', field: 'type', align: 'left', sortable: true },
-  { name: 'device_serial', label: 'DEVICE SERIAL', field: row => row.devices && row.devices.length > 0 ? row.devices[0].device_id : 'UNASSIGNED', align: 'left', sortable: true },
+  { name: 'device_serial', label: 'DEVICE ID', field: row => row.device_id || 'UNASSIGNED', align: 'left', sortable: true },
+  { name: 'agent_code', label: 'AGENT CODE', field: row => row.agent_code || 'N/A', align: 'center', sortable: true },
+  { name: 'location', label: 'LOCATION', field: row => row.location || 'N/A', align: 'left', sortable: true },
   { name: 'plan', label: 'PLAN', field: 'plan', align: 'left', sortable: true },
   { name: 'plan_expires_at', label: 'EXPIRY DATE', field: row => row.plan_expires_at || null, align: 'center', sortable: true },
   { name: 'status', label: 'STATUS', field: 'status', align: 'center', sortable: true },

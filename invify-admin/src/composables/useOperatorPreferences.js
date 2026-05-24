@@ -21,6 +21,7 @@ const loadStoredPrefs = () => {
     isDarkMode: true, // Default to dark mode as requested
     pinnedViews: ['/fleet/overview', '/governance/compliance', '/observability/streams'],
     recentHistory: [],
+    workspaceOrder: [],
     lastSyncedAt: null
   }
 
@@ -39,7 +40,8 @@ const loadStoredPrefs = () => {
     ...parsed,
     activeTenantScope: parsed.activeTenantScope || 'global',
     pinnedViews: Array.isArray(parsed.pinnedViews) ? parsed.pinnedViews : defaults.pinnedViews,
-    recentHistory: Array.isArray(parsed.recentHistory) ? parsed.recentHistory : defaults.recentHistory
+    recentHistory: Array.isArray(parsed.recentHistory) ? parsed.recentHistory : defaults.recentHistory,
+    workspaceOrder: Array.isArray(parsed.workspaceOrder) ? parsed.workspaceOrder : defaults.workspaceOrder
   }
 
   // FINAL REFINEMENT #6: Authoritative Session Restoration Rules
@@ -153,7 +155,7 @@ export function useOperatorPreferences() {
     prefs.value.recentHistory = prefs.value.recentHistory.filter(h => h.path !== routeObj.path)
     prefs.value.recentHistory.unshift(item)
 
-    if (prefs.value.recentHistory.length > 12) {
+    if (prefs.value.recentHistory.length > 20) {
       prefs.value.recentHistory.pop()
     }
   }
@@ -162,7 +164,11 @@ export function useOperatorPreferences() {
     prefs.value.recentHistory = []
   }
 
-  const executeLogout = () => {
+  const setWorkspaceOrder = (orderArray) => {
+    prefs.value.workspaceOrder = orderArray
+  }
+
+  const executeLogout = async () => {
     try {
       localStorage.removeItem('invify_token')
       localStorage.removeItem('invify_refresh_token')
@@ -187,6 +193,7 @@ export function useOperatorPreferences() {
     isViewPinned,
     pushHistory,
     clearHistory,
+    setWorkspaceOrder,
     executeLogout,
     fetchPreferencesFromBackend
   }

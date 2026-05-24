@@ -42,7 +42,7 @@ part 'app_database.g.dart';
   GradingRules,
   Teachers,
   PrinterConfigs,
-  ServiceCustomers,
+  Customers,
   ServiceJobs,
   ServicePayments,
   LocalCounters,
@@ -59,7 +59,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 78;
+  int get schemaVersion => 80;
 
   @override
   MigrationStrategy get migration {
@@ -296,7 +296,7 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 64) {
           // Schema V64: Add Services Module tables
-          await _safeCreateTable(m, serviceCustomers);
+          await _safeCreateTable(m, customers);
           await _safeCreateTable(m, serviceJobs);
           await _safeCreateTable(m, servicePayments);
           await _safeCreateTable(m, localCounters);
@@ -317,8 +317,8 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 68) {
           // Schema V68: Add address/image to customers and create LaborPresets table
-          await _safeAddColumn(m, serviceCustomers, serviceCustomers.address);
-          await _safeAddColumn(m, serviceCustomers, serviceCustomers.image);
+          await _safeAddColumn(m, customers, customers.address);
+          await _safeAddColumn(m, customers, customers.image);
           await _safeCreateTable(m, serviceLaborPresets);
         }
         if (from < 69) {
@@ -375,7 +375,7 @@ class AppDatabase extends _$AppDatabase {
         
         if (from < 74) {
           // Schema V74: Add syncStatus to ServiceCustomers
-          await _safeAddColumn(m, serviceCustomers, serviceCustomers.syncStatus);
+          await _safeAddColumn(m, customers, customers.syncStatus);
         }
         if (from < 75) {
           // Schema V75: Add syncStatus to ServiceJobs
@@ -394,6 +394,25 @@ class AppDatabase extends _$AppDatabase {
         if (from < 78) {
           // Schema V78: Add role to Staff table
           await _safeAddColumn(m, staff, staff.role);
+        }
+        if (from < 79) {
+          // Schema V79: Rename ServiceCustomers to Customers, add Virtual Accounts and Balances
+          // Drift's renameTable is tricky when we also renamed the accessor, so we just recreate/alter.
+          // By adding columns using _safeAddColumn, it'll apply to the table mapped to `customers`.
+          // If the table was previously `service_customers`, drift handles rename via TableMigration if configured,
+          // but we can just use _safeCreateTable to ensure `customers` exists and add columns.
+          await _safeCreateTable(m, customers);
+          await _safeAddColumn(m, customers, customers.balance);
+          await _safeAddColumn(m, customers, customers.virtualAccountNumber);
+          await _safeAddColumn(m, customers, customers.virtualAccountName);
+          await _safeAddColumn(m, customers, customers.virtualAccountBank);
+        }
+        if (from < 80) {
+          // Schema V80: Add virtual account fields and creditBalance to Students table
+          await _safeAddColumn(m, students, students.creditBalance);
+          await _safeAddColumn(m, students, students.virtualAccountNumber);
+          await _safeAddColumn(m, students, students.virtualAccountBank);
+          await _safeAddColumn(m, students, students.virtualAccountStatus);
         }
       },
       beforeOpen: (details) async {

@@ -130,8 +130,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       emit(state.copyWith(isSubmitting: false, error: 'Initialization failed: $e'));
     }
   }
-\n  Future<void> _onOnPaymentReceived(
-
+  Future<void> _onOnPaymentReceived(
     OnPaymentReceived event,
     Emitter<FinanceState> emit,
   ) async {

@@ -113,6 +113,11 @@ const routes = [
         meta: { title: 'Operator Management', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
       },
       { 
+        path: 'governance/agents', 
+        component: () => import('pages/admin/AgentGovernanceCenterPage.vue'),
+        meta: { title: 'Agent Governance Center', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
+      },
+      { 
         path: 'governance/rbac-roles', 
         component: () => import('pages/governance/RolesPermissionsPage.vue'),
         meta: { title: 'Roles & Capabilities', workspace: 'governance', permission: 'read_governance', requiresAuth: true }

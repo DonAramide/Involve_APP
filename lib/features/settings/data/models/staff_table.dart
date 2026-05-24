@@ -16,4 +16,9 @@ class Staff extends Table {
   DateTimeColumn get createdAt => dateTime().nullable()();
   TextColumn get deviceId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
+  // Virtual Account Columns
+  TextColumn get virtualBankName => text().nullable()();
+  TextColumn get virtualAccountNumber => text().nullable()();
+  TextColumn get virtualAccountName => text().nullable()();
 }

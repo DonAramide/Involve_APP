@@ -112,10 +112,14 @@ class Student extends Equatable {
   final String? parentName;
   final String? parentPhone;
   final double balance;
+  final double creditBalance;
   final Uint8List? image;
   final DateTime? dateOfBirth;
   final String? gender;
   final DateTime registrationDate;
+  final String? virtualAccountNumber;
+  final String? virtualAccountBank;
+  final String? virtualAccountStatus;
 
   const Student({
     this.id,
@@ -127,10 +131,14 @@ class Student extends Equatable {
     this.parentName,
     this.parentPhone,
     this.balance = 0.0,
+    this.creditBalance = 0.0,
     this.image,
     this.dateOfBirth,
     this.gender,
     required this.registrationDate,
+    this.virtualAccountNumber,
+    this.virtualAccountBank,
+    this.virtualAccountStatus,
   });
 
   Student copyWith({
@@ -143,10 +151,14 @@ class Student extends Equatable {
     String? parentName,
     String? parentPhone,
     double? balance,
+    double? creditBalance,
     Uint8List? image,
     DateTime? dateOfBirth,
     String? gender,
     DateTime? registrationDate,
+    String? virtualAccountNumber,
+    String? virtualAccountBank,
+    String? virtualAccountStatus,
   }) {
     return Student(
       id: id ?? this.id,
@@ -158,17 +170,21 @@ class Student extends Equatable {
       parentName: parentName ?? this.parentName,
       parentPhone: parentPhone ?? this.parentPhone,
       balance: balance ?? this.balance,
+      creditBalance: creditBalance ?? this.creditBalance,
       image: image ?? this.image,
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       gender: gender ?? this.gender,
       registrationDate: registrationDate ?? this.registrationDate,
+      virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
+      virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
+      virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
     );
   }
 
   String get fullName => '$firstName $lastName';
 
   @override
-  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, academicYearId, parentName, parentPhone, balance, image, dateOfBirth, gender, registrationDate];
+  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, academicYearId, parentName, parentPhone, balance, creditBalance, image, dateOfBirth, gender, registrationDate, virtualAccountNumber, virtualAccountBank, virtualAccountStatus];
 }
 
 class Subject extends Equatable {

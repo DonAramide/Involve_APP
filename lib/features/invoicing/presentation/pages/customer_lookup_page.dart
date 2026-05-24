@@ -4,6 +4,8 @@ import 'package:involve_app/features/invoicing/domain/repositories/invoice_repos
 import 'package:involve_app/features/invoicing/presentation/pages/customer_history_page.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
+import 'package:involve_app/features/services/domain/entities/service_customer.dart';
 
 class CustomerLookupPage extends StatefulWidget {
   const CustomerLookupPage({super.key});
@@ -13,8 +15,8 @@ class CustomerLookupPage extends StatefulWidget {
 }
 
 class _CustomerLookupPageState extends State<CustomerLookupPage> {
-  List<String> _allCustomers = [];
-  List<String> _filteredCustomers = [];
+  List<ServiceCustomer> _allCustomers = [];
+  List<ServiceCustomer> _filteredCustomers = [];
   bool _isLoading = true;
   String _searchQuery = '';
   DateTimeRange? _selectedRange;
@@ -28,8 +30,12 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
   Future<void> _loadCustomers() async {
     setState(() => _isLoading = true);
     try {
-      final repo = context.read<InvoiceRepository>();
-      final customers = await repo.getAllCustomerNames();
+      final repo = context.read<IServicesRepository>();
+      final customers = await repo.getCustomers();
+      
+      // Also fetch legacy names from invoices and merge? 
+      // For now, let's just use the Customers table as the source of truth.
+      
       setState(() {
         _allCustomers = customers;
         _filteredCustomers = customers;
@@ -49,7 +55,8 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
     setState(() {
       _searchQuery = query;
       _filteredCustomers = _allCustomers
-          .where((name) => name.toLowerCase().contains(query.toLowerCase()))
+          .where((c) => c.name.toLowerCase().contains(query.toLowerCase()) || 
+                       (c.phone != null && c.phone!.contains(query)))
           .toList();
     });
   }
@@ -133,20 +140,25 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
                         itemCount: _filteredCustomers.length,
                         separatorBuilder: (context, index) => const Divider(),
                         itemBuilder: (context, index) {
-                          final name = _filteredCustomers[index];
+                          final customer = _filteredCustomers[index];
+                          final name = customer.name;
                           return ListTile(
                             leading: CircleAvatar(
                               backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                              child: Text(name[0].toUpperCase()),
+                              backgroundImage: customer.image != null ? MemoryImage(customer.image!) : null,
+                              child: customer.image == null ? Text(name[0].toUpperCase()) : null,
                             ),
                             title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: customer.balance != 0 
+                                ? Text('Balance: ₦${customer.balance.toStringAsFixed(2)}', style: TextStyle(color: customer.balance > 0 ? Colors.red : Colors.green)) 
+                                : null,
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => CustomerHistoryPage(
-                                    customerName: name,
+                                    customer: customer,
                                     initialDateRange: _selectedRange,
                                   ),
                                 ),

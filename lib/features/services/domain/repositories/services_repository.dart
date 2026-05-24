@@ -37,6 +37,7 @@ abstract class IServicesRepository {
     String? address,
     Uint8List? image,
   });
+  Future<void> updateCustomerVirtualAccount(String customerId, String accountNumber, String bankName);
 
   Future<List<ServicePayment>> getJobPayments(String jobId);
   

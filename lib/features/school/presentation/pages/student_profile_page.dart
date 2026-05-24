@@ -143,9 +143,40 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
+                      if (student.creditBalance > 0) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: () {
+                            context.read<SchoolBloc>().add(ClearStudentDebitEvent(student.id!));
+                          },
+                          icon: const Icon(Icons.auto_fix_high, size: 16),
+                          label: const Text('CLEAR DEBIT'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.green,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      ],
                     ],
                   ],
                 ),
+                if (student.creditBalance > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Credit: ${CurrencyFormatter.formatWithSymbol(student.creditBalance, symbol: currency)}',
+                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -166,6 +197,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 children: [
                   _buildInfoTile('Parent/Guardian', student.parentName ?? 'Not Set', Icons.person_outline),
                   _buildInteractivePhoneTile('Phone', student.parentPhone ?? 'Not Set', Icons.phone_android),
+                  _buildVirtualAccountSection(context, student),
                 ],
               ),
             ),
@@ -602,6 +634,42 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
       context,
       MaterialPageRoute(
         builder: (_) => ReceiptPreviewPage(invoice: invoice, receiptTitle: title),
+      ),
+    );
+  }
+
+  Widget _buildVirtualAccountSection(BuildContext context, Student student) {
+    if (student.virtualAccountNumber != null && student.virtualAccountBank != null) {
+      return Card(
+        margin: const EdgeInsets.only(top: 16, bottom: 8),
+        color: Colors.green.shade50,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Dedicated Virtual Account', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('Bank: ${student.virtualAccountBank}'),
+              Text('Account: ${student.virtualAccountNumber}'),
+              Text('Status: ${student.virtualAccountStatus ?? "ACTIVE"}'),
+            ],
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: ElevatedButton.icon(
+        onPressed: () {
+          context.read<SchoolBloc>().add(ProvisionStudentVirtualAccountEvent(student.id!));
+        },
+        icon: const Icon(Icons.account_balance),
+        label: const Text('Generate Virtual Account'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue.shade800,
+          foregroundColor: Colors.white,
+        ),
       ),
     );
   }

@@ -71,3 +71,7 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation(project(":mpossdk"))
+}

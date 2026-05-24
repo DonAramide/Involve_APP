@@ -16,7 +16,7 @@ class AdminRepositoryImpl implements IAdminRepository {
 
   @override
   Future<String> enterMasterMode(String password, String? otp) async {
-    final response = await client.post('/api/admin/master-mode/enter', data: {
+    final response = await client.post('/admin/master-mode/enter', data: {
       'password': password,
       'otp': otp,
     });
@@ -25,31 +25,31 @@ class AdminRepositoryImpl implements IAdminRepository {
 
   @override
   Future<List<Map<String, dynamic>>> getApiKeys() async {
-    final response = await client.get('/api/admin/api-keys');
+    final response = await client.get('/admin/api-keys');
     return List<Map<String, dynamic>>.from(response.data['keys']);
   }
 
   @override
   Future<Map<String, dynamic>> createApiKey(String label) async {
-    final response = await client.post('/api/admin/api-keys', data: {'label': label});
+    final response = await client.post('/admin/api-keys', data: {'label': label});
     return Map<String, dynamic>.from(response.data);
   }
 
   @override
   Future<void> revokeApiKey(String keyId) async {
-    await client.post('/api/admin/api-keys/$keyId/revoke');
+    await client.post('/admin/api-keys/$keyId/revoke');
   }
 
   @override
   Future<List<Map<String, dynamic>>> getAuditLogs() async {
-    final response = await client.get('/api/admin/audit-logs');
+    final response = await client.get('/admin/audit-logs');
     return List<Map<String, dynamic>>.from(response.data);
   }
 
   @override
   Future<Map<String, dynamic>> getDashboardStats() async {
     try {
-      final response = await client.get('/api/admin/dashboard-stats');
+      final response = await client.get('/admin/dashboard-stats');
       return Map<String, dynamic>.from(response.data);
     } catch (_) {
       // Graceful offline fallback simulation when remote gateway tunnel is unreachable

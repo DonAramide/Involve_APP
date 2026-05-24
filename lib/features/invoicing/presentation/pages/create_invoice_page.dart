@@ -7,6 +7,8 @@ import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
 import 'package:involve_app/features/stock/domain/entities/item.dart';
 import 'package:involve_app/features/invoicing/presentation/widgets/invoice_preview_dialog.dart';
+import 'package:involve_app/features/services/domain/entities/service_customer.dart';
+import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
@@ -1244,18 +1246,54 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
   final phoneController = TextEditingController(text: currentPhone);
   final addrController = TextEditingController(text: currentAddress);
   final invoiceBloc = context.read<InvoiceBloc>();
+  String? selectedCustomerId = invoiceBloc.state.customerId;
 
   showDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(settings?.customerInfoLabel ?? 'Customer Information'),
-      content: Form(
-        key: formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextFormField(
-              controller: nameController,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setState) => AlertDialog(
+        title: Text(settings?.customerInfoLabel ?? 'Customer Information'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selectedCustomerId != null)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      const SizedBox(width: 8),
+                      const Expanded(child: Text('Linked to Customer Profile', style: TextStyle(color: Colors.green, fontSize: 12))),
+                      InkWell(
+                        onTap: () => setState(() => selectedCustomerId = null),
+                        child: const Icon(Icons.close, color: Colors.grey, size: 16),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                TextButton.icon(
+                  onPressed: () async {
+                    final ServiceCustomer? customer = await _showCustomerPicker(context);
+                    if (customer != null) {
+                      setState(() {
+                        selectedCustomerId = customer.id;
+                        nameController.text = customer.name;
+                        phoneController.text = customer.phone ?? '';
+                        addrController.text = customer.address ?? '';
+                      });
+                    }
+                  },
+                  icon: const Icon(Icons.search),
+                  label: const Text('Search Existing Customer'),
+                ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: nameController,
               decoration: InputDecoration(
                 labelText: settings?.customerNameLabel ?? 'Customer Name', 
                 border: const OutlineInputBorder(),
@@ -1308,6 +1346,7 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
                 name: nameController.text.trim(),
                 phone: phoneController.text.trim(),
                 address: addrController.text.isEmpty ? null : addrController.text.trim(),
+                customerId: selectedCustomerId,
               ));
               Navigator.pop(ctx);
             }
@@ -1315,6 +1354,99 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
           child: const Text('SAVE'),
         ),
       ],
+    ),
+    ),
+  );
+}
+
+Future<ServiceCustomer?> _showCustomerPicker(BuildContext context) async {
+  final repo = context.read<IServicesRepository>();
+  List<ServiceCustomer> customers = [];
+  bool isLoading = true;
+  String query = '';
+  
+  return showModalBottomSheet<ServiceCustomer>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => StatefulBuilder(
+      builder: (context, setState) {
+        if (isLoading && customers.isEmpty) {
+          repo.getCustomers().then((list) {
+            if (context.mounted) {
+              setState(() {
+                customers = list;
+                isLoading = false;
+              });
+            }
+          });
+        }
+        
+        final filtered = customers.where((c) => 
+          c.name.toLowerCase().contains(query) || 
+          (c.phone != null && c.phone!.contains(query))
+        ).toList();
+        
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.all(16),
+          height: MediaQuery.of(context).size.height * 0.75,
+          child: Column(
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+              const Text('Select Customer', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search by name or phone...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                ),
+                onChanged: (val) => setState(() => query = val.toLowerCase()),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: isLoading 
+                  ? const Center(child: CircularProgressIndicator())
+                  : filtered.isEmpty
+                    ? const Center(child: Text('No customers found.'))
+                    : ListView.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final c = filtered[index];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundImage: c.image != null ? MemoryImage(c.image!) : null,
+                              child: c.image == null ? Text(c.name[0].toUpperCase()) : null,
+                            ),
+                            title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text(c.phone ?? 'No phone'),
+                            trailing: c.balance != 0 
+                              ? Text(
+                                  'Balance: ₦${c.balance.toStringAsFixed(2)}',
+                                  style: TextStyle(color: c.balance > 0 ? Colors.red : Colors.green, fontWeight: FontWeight.bold, fontSize: 12),
+                                )
+                              : null,
+                            onTap: () => Navigator.pop(ctx, c),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     ),
   );
 }

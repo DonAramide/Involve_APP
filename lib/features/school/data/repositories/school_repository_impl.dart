@@ -149,11 +149,15 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: row.parentName,
       parentPhone: row.parentPhone,
       balance: row.balance,
+      creditBalance: row.creditBalance,
       academicYearId: row.academicYearId,
       image: row.image,
       dateOfBirth: row.dateOfBirth,
       gender: row.gender,
       registrationDate: row.registrationDate!,
+      virtualAccountNumber: row.virtualAccountNumber,
+      virtualAccountBank: row.virtualAccountBank,
+      virtualAccountStatus: row.virtualAccountStatus,
     )).toList();
   }
 
@@ -168,10 +172,14 @@ class SchoolRepositoryImpl implements SchoolRepository {
       database.students.parentName,
       database.students.parentPhone,
       database.students.balance,
+      database.students.creditBalance,
       database.students.academicYearId,
       database.students.dateOfBirth,
       database.students.gender,
       database.students.registrationDate,
+      database.students.virtualAccountNumber,
+      database.students.virtualAccountBank,
+      database.students.virtualAccountStatus,
     ]);
     
     final rows = await query.get();
@@ -184,11 +192,15 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: row.read(database.students.parentName),
       parentPhone: row.read(database.students.parentPhone),
       balance: row.read(database.students.balance)!,
+      creditBalance: row.read(database.students.creditBalance)!,
       academicYearId: row.read(database.students.academicYearId),
       dateOfBirth: row.read(database.students.dateOfBirth),
       gender: row.read(database.students.gender),
       registrationDate: row.read(database.students.registrationDate)!,
       image: null,
+      virtualAccountNumber: row.read(database.students.virtualAccountNumber),
+      virtualAccountBank: row.read(database.students.virtualAccountBank),
+      virtualAccountStatus: row.read(database.students.virtualAccountStatus),
     )).toList();
   }
 
@@ -202,11 +214,15 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: Value(student.parentName),
       parentPhone: Value(student.parentPhone),
       balance: Value(student.balance),
+      creditBalance: Value(student.creditBalance),
       academicYearId: Value(student.academicYearId),
       image: Value(student.image),
       dateOfBirth: Value(student.dateOfBirth),
       gender: Value(student.gender),
       registrationDate: Value(student.registrationDate),
+      virtualAccountNumber: Value(student.virtualAccountNumber),
+      virtualAccountBank: Value(student.virtualAccountBank),
+      virtualAccountStatus: Value(student.virtualAccountStatus),
     ));
   }
 
@@ -221,11 +237,15 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: Value(student.parentName),
       parentPhone: Value(student.parentPhone),
       balance: Value(student.balance),
+      creditBalance: Value(student.creditBalance),
       academicYearId: Value(student.academicYearId),
       image: Value(student.image),
       dateOfBirth: Value(student.dateOfBirth),
       gender: Value(student.gender),
       registrationDate: Value(student.registrationDate),
+      virtualAccountNumber: Value(student.virtualAccountNumber),
+      virtualAccountBank: Value(student.virtualAccountBank),
+      virtualAccountStatus: Value(student.virtualAccountStatus),
     ));
   }
 
@@ -280,11 +300,15 @@ class SchoolRepositoryImpl implements SchoolRepository {
       parentName: row.parentName,
       parentPhone: row.parentPhone,
       balance: row.balance,
+      creditBalance: row.creditBalance,
       academicYearId: row.academicYearId,
       image: row.image,
       dateOfBirth: row.dateOfBirth,
       gender: row.gender,
       registrationDate: row.registrationDate!,
+      virtualAccountNumber: row.virtualAccountNumber,
+      virtualAccountBank: row.virtualAccountBank,
+      virtualAccountStatus: row.virtualAccountStatus,
     );
   }
 

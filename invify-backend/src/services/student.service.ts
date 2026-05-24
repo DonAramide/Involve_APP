@@ -39,8 +39,8 @@ export class StudentService {
       const reference = `VA-${studentId.split('-')[0]}-${Date.now()}`;
       
       const quasarAccount = await quasar.createVirtualAccount({
-        studentId,
-        schoolId,
+        childId: studentId,
+        parentId: schoolId,
         email: `${student.admission_number}@invify.edu`, // Fallback email
         firstName: student.first_name,
         lastName: student.last_name,

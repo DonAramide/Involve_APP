@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
@@ -22,6 +23,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   final _formKey = GlobalKey<FormState>();
   final _businessNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _agentCodeController = TextEditingController();
   
   String _selectedIndustry = 'retail';
   String _primaryColorHex = '#6366F1';
@@ -56,6 +58,27 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     }
   }
 
+  Future<String> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return 'Location disabled';
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) return 'Permissions denied';
+      }
+      if (permission == LocationPermission.deniedForever) return 'Permissions denied forever';
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      );
+      return 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+    } catch (e) {
+      return 'Unknown Location';
+    }
+  }
+
   Future<void> _submitOnboarding({required bool isTrial}) async {
     if (!_formKey.currentState!.validate()) {
       setState(() => _currentStep = 1); // Switch to the form step
@@ -66,6 +89,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
 
     final businessName = _businessNameController.text.trim();
     final phone = _phoneController.text.trim();
+    final inputAgentCode = _agentCodeController.text.trim();
+    final finalAgentCode = inputAgentCode.isEmpty ? 'AAA000' : inputAgentCode;
     
     // Get full diagnostic device specs
     final deviceInfo = await DeviceInfoService.getDeviceDetails();
@@ -77,15 +102,22 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     final settingsBloc = context.read<SettingsBloc>();
     final currentSettings = settingsBloc.state.settings;
     if (currentSettings != null) {
+      final parsedColor = int.parse(_primaryColorHex.replaceFirst('#', '0xFF'));
+      
       settingsBloc.add(UpdateAppSettings(
         currentSettings.copyWith(
           organizationName: businessName,
           lastRoute: isTrial ? DashboardPage.routeName : ActivationPage.routeName,
+          businessMode: _selectedIndustry,
+          primaryColor: parsedColor,
         )
       ));
     }
 
+    final actualLocation = await _getCurrentLocation();
+
     // 2. Resiliently transmit the device details to the backend API
+    bool apiSuccess = false;
     try {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5)));
       final payload = {
@@ -93,25 +125,42 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         'phone': phone,
         'industry': _selectedIndustry,
         'themeColor': _primaryColorHex,
+        'agentCode': finalAgentCode,
+        'location': actualLocation,
         'deviceInfo': deviceInfo,
       };
 
       // Try local host ports (resilient fallbacks for Android/iOS emulators and localhost)
       final urls = [
-        'https://bertie-archegoniate-causelessly.ngrok-free.dev/devices/onboard',
         'http://localhost:3004/devices/onboard',
-        'http://10.0.2.2:3004/devices/onboard',
+        'http://192.168.1.194:3004/devices/onboard',
       ];
 
       for (var url in urls) {
         try {
           await dio.post(url, data: payload);
+          apiSuccess = true;
           debugPrint('[DeviceOnboarding] Successfully transmitted diagnostics to $url');
           break; // Stop once we successfully ping one of the active developer endpoints
         } catch (_) {}
       }
     } catch (e) {
-      debugPrint('[DeviceOnboarding] Telemetry delivery bypassed to offline local database: $e');
+      debugPrint('[DeviceOnboarding] Error during telemetry delivery: $e');
+    }
+
+    if (!isTrial && !apiSuccess) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Server is currently unavailable. Please proceed with the Free 3-Day Trial.'),
+            backgroundColor: Color(0xFFF59E0B), // Warning Orange
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
     }
 
     if (isTrial) {
@@ -385,6 +434,26 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             ),
             validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
           ),
+          const SizedBox(height: 20),
+          TextFormField(
+            controller: _agentCodeController,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              labelText: 'Agent Code (Optional)',
+              labelStyle: const TextStyle(color: Color(0xFF818CF8)),
+              prefixIcon: const Icon(Icons.badge, color: Color(0xFF818CF8)),
+              filled: true,
+              fillColor: const Color(0xFF101625),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF6366F1)),
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
           const Align(
             alignment: Alignment.centerLeft,
@@ -400,7 +469,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
               const SizedBox(width: 8),
               _buildIndustrySelector('retail', Icons.shopping_cart, 'Retail'),
               const SizedBox(width: 8),
-              _buildIndustrySelector('hospitality', Icons.dry_cleaning, 'Service'),
+              _buildIndustrySelector('services', Icons.dry_cleaning, 'Service'),
             ],
           ),
         ],
@@ -614,6 +683,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   void dispose() {
     _businessNameController.dispose();
     _phoneController.dispose();
+    _agentCodeController.dispose();
     super.dispose();
   }
 }

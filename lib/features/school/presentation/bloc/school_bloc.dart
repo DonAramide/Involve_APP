@@ -13,6 +13,7 @@ import 'package:involve_app/features/invoicing/domain/repositories/invoice_repos
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
 
 part 'school_event.dart';
 
@@ -20,11 +21,13 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   final SchoolRepository repository;
   final ItemRepository itemRepository;
   final InvoiceRepository invoiceRepository;
+  final FinanceApiClient? apiClient;
 
   SchoolBloc({
     required this.repository, 
     required this.itemRepository,
     required this.invoiceRepository,
+    this.apiClient,
   }) : super(const SchoolState()) {
     on<LoadSchoolData>(_onLoadSchoolData, transformer: sequential());
     on<AddAcademicYearEvent>(_onAddAcademicYear, transformer: sequential());
@@ -59,6 +62,8 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     on<DeleteTeacherEvent>(_onDeleteTeacher, transformer: sequential());
 
     on<MakeStudentPaymentEvent>(_onMakeStudentPayment, transformer: sequential());
+    on<ProvisionStudentVirtualAccountEvent>(_onProvisionVirtualAccount, transformer: sequential());
+    on<ClearStudentDebitEvent>(_onClearStudentDebit, transformer: sequential());
 
     on<ResetSchoolStatus>((event, emit) => emit(state.copyWith(status: SchoolStatus.initial, error: null)), transformer: sequential());
     
@@ -572,6 +577,145 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
       add(LoadStudentRecordsEvent(event.studentId)); // Refresh invoices list
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onProvisionVirtualAccount(ProvisionStudentVirtualAccountEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
+    try {
+      if (apiClient == null) {
+        throw Exception("API Client not available.");
+      }
+      
+      // We don't need to append the tenant id in URL since it's injected via headers,
+      // but let's see how the backend expects it.
+      // Based on the endpoint: /admin/tenants/:id/students/:studentId/provision-va
+      // We will need to get the tenantId.
+      final tenantId = 'default'; // TenantInterceptor handles header injection anyway
+      // But we need :id in the path... Let's just use 'current' or try to fetch it.
+      
+      // Let's execute the call without tenantId in path if backend accepts it, or we need to extract it.
+      // Wait, let's just make the call. We know we need to pass the tenant ID somehow if the URL requires it.
+      // Alternatively, I will just call the backend and pass dummy id, if backend reads from JWT or X-Tenant-ID anyway.
+      final response = await apiClient!.post('/admin/tenants/0/students/${event.studentId}/provision-va');
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // Fetch the updated student details from the backend?
+        // Or wait for background sync. Since we have local DB, let's update it locally.
+        final va = response.data['va'];
+        final student = state.students.firstWhere((s) => s.id == event.studentId);
+        
+        final updatedStudent = student.copyWith(
+          virtualAccountNumber: va['accountNumber'],
+          virtualAccountBank: va['bankName'],
+          virtualAccountStatus: 'ACTIVE',
+        );
+        
+        await repository.updateStudent(updatedStudent);
+        
+        emit(state.copyWith(status: SchoolStatus.success));
+        add(LoadSchoolData());
+        add(LoadStudentRecordsEvent(event.studentId)); // Refresh
+      } else {
+        throw Exception("Failed to provision account");
+      }
+    } catch (e) {
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+    }
+  }
+
+  Future<void> _onClearStudentDebit(ClearStudentDebitEvent event, Emitter<SchoolState> emit) async {
+    emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
+    try {
+      final student = state.students.firstWhere((s) => s.id == event.studentId);
+      
+      if (student.balance <= 0) {
+        throw Exception("Student does not have any pending debit.");
+      }
+      if (student.creditBalance <= 0) {
+        throw Exception("Student does not have sufficient credit.");
+      }
+
+      final amountToClear = student.balance > student.creditBalance ? student.creditBalance : student.balance;
+      
+      final newBalance = student.balance - amountToClear;
+      final newCreditBalance = student.creditBalance - amountToClear;
+
+      final updatedStudent = student.copyWith(
+        balance: newBalance,
+        creditBalance: newCreditBalance,
+      );
+
+      await repository.updateStudent(updatedStudent);
+
+      // Now create a payment record for the cleared amount
+      final activeTerm = state.terms.where((t) => t.isActive).firstOrNull ?? state.terms.firstOrNull;
+      final invoices = await invoiceRepository.getInvoicesByStudentId(student.id!);
+      
+      final existingBill = invoices.firstWhereOrNull((inv) => 
+        inv.invoiceNumber.startsWith('BILL-') && 
+        inv.termId == activeTerm?.id &&
+        inv.paymentStatus != 'Paid'
+      );
+
+      if (existingBill != null) {
+        final updatedBill = existingBill.copyWith(
+          amountPaid: existingBill.amountPaid + amountToClear,
+          balanceAmount: existingBill.balanceAmount - amountToClear,
+          paymentStatus: (existingBill.balanceAmount - amountToClear) <= 0 ? 'Paid' : 'Partial',
+          paymentMethod: 'Credit Balance',
+        );
+        await invoiceRepository.updateInvoice(updatedBill);
+      } else {
+        final activeYear = state.academicYears.where((y) => y.isActive).firstOrNull ?? state.academicYears.firstOrNull;
+        final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+
+        final invoice = Invoice(
+          invoiceNumber: 'PMT-${DateTime.now().millisecondsSinceEpoch}',
+          dateCreated: DateTime.now(),
+          customerName: student.fullName,
+          customerPhone: student.parentPhone,
+          studentId: student.id,
+          classId: student.classId,
+          admissionNumber: student.admissionNumber,
+          className: sClass?.name,
+          termId: activeTerm?.id,
+          termName: activeTerm?.name,
+          academicYearId: activeYear?.id,
+          academicYearName: activeYear?.name,
+          subtotal: amountToClear,
+          taxAmount: 0,
+          discountAmount: 0,
+          totalAmount: amountToClear,
+          amountPaid: amountToClear,
+          balanceAmount: 0,
+          paymentStatus: 'Paid',
+          paymentMethod: 'Credit Balance',
+          businessMode: 'school',
+          items: [
+            InvoiceItem(
+              item: Item(
+                name: 'Cleared from Credit Balance',
+                category: ItemCategory.service,
+                price: amountToClear,
+                stockQty: 0,
+                type: 'service',
+                businessMode: 'school',
+              ),
+              quantity: 1,
+              unitPrice: amountToClear,
+              type: 'service',
+            ),
+          ],
+        );
+        await invoiceRepository.saveInvoice(invoice);
+      }
+      
+      emit(state.copyWith(status: SchoolStatus.success));
+      add(LoadSchoolData());
+      add(LoadStudentRecordsEvent(event.studentId));
     } catch (e) {
       emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
     }

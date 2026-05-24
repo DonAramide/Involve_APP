@@ -62,6 +62,17 @@
       class="bg-blue-grey-10 shadow-2 rounded-borders"
       :pagination="{ rowsPerPage: 15 }"
     >
+      <template v-slot:no-data>
+        <div class="full-width row flex-center text-white q-pa-md bg-red-10 border-red rounded-borders" v-if="errorMessage">
+          <q-icon size="2em" name="cloud_off" class="q-mr-sm" />
+          <span class="text-weight-bold letter-spacing-1">{{ errorMessage }}</span>
+        </div>
+        <div class="full-width row flex-center text-grey-5 q-pa-md" v-else>
+          <q-icon size="2em" name="warning" class="q-mr-sm" />
+          <span>No staff access profiles available matching the current criteria.</span>
+        </div>
+      </template>
+
       <template v-slot:body-cell-name="props">
         <q-td :props="props">
           <div class="row items-center">
@@ -205,6 +216,7 @@ const isEditing = ref(false)
 const searchText = ref('')
 const selectedTenant = ref(null)
 const selectedRole = ref('all')
+const errorMessage = ref('')
 
 const showInvite = ref(false)
 const inviteEmail = ref('')
@@ -261,9 +273,16 @@ const tenantOptions = computed(() => [
 
 const fetchUsers = async () => {
   loading.value = true
+  errorMessage.value = ''
   try {
     const { data } = await adminApi.getUsers({ tenantId: selectedTenant.value })
     users.value = data
+  } catch (error) {
+    if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+      errorMessage.value = 'SYSTEM_HALT: Backend telemetry server is offline or unreachable. Please verify port configuration.'
+    } else {
+      errorMessage.value = error.response?.data?.error || error.message || 'Unknown error occurred while fetching users.'
+    }
   } finally {
     loading.value = false
   }
@@ -365,4 +384,6 @@ onMounted(async () => {
 .border-indigo { border-left: 5px solid #3f51b5; }
 .bg-blue-grey-10 { background: #1c262b; }
 .italic { font-style: italic; }
+.border-red { border: 1px solid #ff5252; }
+.letter-spacing-1 { letter-spacing: 1px; }
 </style>

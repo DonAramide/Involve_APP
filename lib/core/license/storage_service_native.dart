@@ -17,6 +17,7 @@ class StorageService {
   static const _deviceAccessKey = 'device_admin_access_granted';
   static const _onboardingCompleteKey = 'onboarding_complete';
   static const _licenseFileName = 'license.dat';
+  static const _mposTerminalIdKey = 'mpos_terminal_id';
 
   static const _encryptionKey = 0xAF;
 
@@ -149,6 +150,27 @@ class StorageService {
       return await _secureStorage.read(key: _lastPrinterIpKey);
     } else {
       final file = await _getDesktopFile('printer_ip.dat');
+      if (await file.exists()) {
+        return await file.readAsString();
+      }
+    }
+    return null;
+  }
+
+  static Future<void> saveMposTerminalId(String terminalId) async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _mposTerminalIdKey, value: terminalId);
+    } else {
+      final file = await _getDesktopFile('mpos_terminal_id.dat');
+      await file.writeAsString(terminalId);
+    }
+  }
+
+  static Future<String?> getMposTerminalId() async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      return await _secureStorage.read(key: _mposTerminalIdKey);
+    } else {
+      final file = await _getDesktopFile('mpos_terminal_id.dat');
       if (await file.exists()) {
         return await file.readAsString();
       }

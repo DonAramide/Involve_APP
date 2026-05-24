@@ -10,7 +10,7 @@ class ServicesBackupService {
   ServicesBackupService({required this.db});
 
   Future<void> exportToJson() async {
-    final customers = await db.select(db.serviceCustomers).get();
+    final customers = await db.select(db.customers).get();
     final jobs = await db.select(db.serviceJobs).get();
     final payments = await db.select(db.servicePayments).get();
 

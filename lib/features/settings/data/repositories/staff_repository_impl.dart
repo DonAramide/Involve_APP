@@ -49,6 +49,9 @@ class StaffRepositoryImpl implements StaffRepository {
             createdAt: Value(now),
             deviceId: Value(deviceId),
             isDeleted: const Value(false),
+            virtualBankName: Value(staff.virtualBankName),
+            virtualAccountNumber: Value(staff.virtualAccountNumber),
+            virtualAccountName: Value(staff.virtualAccountName),
           ),
         );
   }
@@ -73,6 +76,9 @@ class StaffRepositoryImpl implements StaffRepository {
             isActive: Value(staff.isActive),
             updatedAt: Value(DateTime.now()),
             isDeleted: const Value(false),
+            virtualBankName: Value(staff.virtualBankName),
+            virtualAccountNumber: Value(staff.virtualAccountNumber),
+            virtualAccountName: Value(staff.virtualAccountName),
           ),
         );
   }
@@ -114,6 +120,9 @@ class StaffRepositoryImpl implements StaffRepository {
       role: roleVal,
       isActive: row.isActive,
       syncId: row.syncId,
+      virtualBankName: row.virtualBankName,
+      virtualAccountNumber: row.virtualAccountNumber,
+      virtualAccountName: row.virtualAccountName,
     );
   }
 }

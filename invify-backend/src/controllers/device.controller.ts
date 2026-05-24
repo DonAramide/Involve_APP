@@ -465,12 +465,14 @@ export class DeviceController {
    */
   static async onboardDevice(req: Request, res: Response) {
     try {
-      const { businessName, phone, industry, themeColor, deviceInfo } = req.body;
+      const { businessName, phone, industry, themeColor, agentCode, location, deviceInfo } = req.body;
       console.log('[DeviceController] Received Device Onboarding Payload:', {
         businessName,
         phone,
         industry,
         themeColor,
+        agentCode,
+        location,
         deviceInfo
       });
 
@@ -489,6 +491,9 @@ export class DeviceController {
               type: industry || 'retail',
               plan: 'standard',
               status: 'active',
+              agent_code: agentCode || 'AAA000',
+              location: location || 'Unknown',
+              device_id: deviceInfo?.deviceId || 'UNASSIGNED',
               created_at: new Date().toISOString()
             };
             tenants.push(newTenant);
@@ -496,6 +501,10 @@ export class DeviceController {
             console.log('[DeviceController] Dynamically registered onboarded tenant:', businessName);
           } else {
             resolvedTenantId = found.id;
+            found.agent_code = agentCode || found.agent_code || 'AAA000';
+            found.location = location || found.location || 'Unknown';
+            found.device_id = deviceInfo?.deviceId || found.device_id || 'UNASSIGNED';
+            fs.writeFileSync(tenantsDbPath, JSON.stringify(tenants, null, 2));
           }
         }
       } catch (err) {

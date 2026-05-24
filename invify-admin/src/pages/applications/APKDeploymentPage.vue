@@ -211,19 +211,29 @@
           </div>
 
           <!-- Filter bar -->
-          <div class="q-px-sm q-py-xs row items-center op-gap-8 border-bottom bg-panel-darker">
-            <q-input v-model="deviceSearch" dense filled placeholder="Search devices..." class="col text-caption bg-subpanel" style="max-width:200px;">
+          <div class="q-px-sm q-py-xs row items-center op-gap-8 border-bottom bg-panel-darker wrap">
+            <q-input v-model="deviceSearch" dense filled placeholder="Search devices..." class="col text-caption bg-subpanel" style="min-width:150px;">
               <template v-slot:append><q-icon name="search" size="xs" color="grey-6" /></template>
             </q-input>
             <q-select
               v-model="statusFilter"
               :options="['ALL', 'ONLINE', 'OFFLINE', 'SYNCING']"
-              dense filled options-dense class="text-caption bg-subpanel" style="width: 110px;"
+              dense filled options-dense class="text-caption bg-subpanel" style="width: 100px;"
             />
             <q-select
               v-model="tenantFilter"
               :options="['ALL TENANTS', 'tenant-alpha', 'tenant-omega', 'tenant-beta']"
-              dense filled options-dense class="text-caption bg-subpanel v-hide-xs" style="width: 130px;"
+              dense filled options-dense class="text-caption bg-subpanel" style="width: 120px;"
+            />
+            <q-select
+              v-model="planFilter"
+              :options="['ALL PLANS', 'BASIC', 'PRO']"
+              dense filled options-dense class="text-caption bg-subpanel" style="width: 100px;"
+            />
+            <q-select
+              v-model="modeFilter"
+              :options="['ALL MODES', 'RETAIL', 'SERVICE', 'SCHOOL']"
+              dense filled options-dense class="text-caption bg-subpanel" style="width: 110px;"
             />
           </div>
 
@@ -236,6 +246,8 @@
                   <th class="q-pa-xs">Device ID</th>
                   <th class="q-pa-xs">Model</th>
                   <th class="q-pa-xs">Tenant</th>
+                  <th class="q-pa-xs">Plan</th>
+                  <th class="q-pa-xs">Mode</th>
                   <th class="q-pa-xs">Android</th>
                   <th class="q-pa-xs">Status</th>
                   <th class="q-pa-xs text-right">Last Sync</th>
@@ -254,6 +266,8 @@
                   <td class="q-pa-xs text-metric-mono text-cyan-3" style="font-size: 10px;">{{ device.id }}</td>
                   <td class="q-pa-xs text-main text-weight-medium">{{ device.model }}</td>
                   <td class="q-pa-xs text-secondary" style="font-size: 10px;">{{ device.tenant }}</td>
+                  <td class="q-pa-xs text-amber-3 text-weight-bold" style="font-size: 10px;">{{ device.plan }}</td>
+                  <td class="q-pa-xs text-indigo-3" style="font-size: 10px;">{{ device.mode }}</td>
                   <td class="q-pa-xs text-muted">{{ device.android }}</td>
                   <td class="q-pa-xs">
                     <q-chip dense size="xs"
@@ -514,22 +528,26 @@ const removeApk = (index) => {
 const deviceSearch = ref('')
 const statusFilter = ref('ALL')
 const tenantFilter = ref('ALL TENANTS')
+const planFilter = ref('ALL PLANS')
+const modeFilter = ref('ALL MODES')
 const selectedDevices = ref([])
 
 const devices = ref([
-  { id: 'DSPRD-POS-0091', model: 'DSpread QM800', tenant: 'tenant-alpha', android: 'Android 11', status: 'ONLINE', lastSync: '4s ago' },
-  { id: 'DSPRD-POS-1339', model: 'DSpread XM1A', tenant: 'tenant-alpha', android: 'Android 10', status: 'ONLINE', lastSync: '12s ago' },
-  { id: 'DSPRD-POS-8315', model: 'DSpread M610', tenant: 'tenant-omega', android: 'Android 11', status: 'SYNCING', lastSync: '1m ago' },
-  { id: 'DSPRD-POS-4421', model: 'DSpread QM800', tenant: 'tenant-omega', android: 'Android 9', status: 'ONLINE', lastSync: '2m ago' },
-  { id: 'DSPRD-POS-7702', model: 'DSpread XM1A', tenant: 'tenant-beta', android: 'Android 12', status: 'ONLINE', lastSync: '8s ago' },
-  { id: 'DSPRD-POS-3310', model: 'DSpread M610', tenant: 'tenant-beta', android: 'Android 11', status: 'OFFLINE', lastSync: '14m ago' },
-  { id: 'DSPRD-POS-6601', model: 'DSpread QM800', tenant: 'tenant-alpha', android: 'Android 10', status: 'ONLINE', lastSync: '30s ago' },
-  { id: 'DSPRD-POS-2204', model: 'DSpread XM1A', tenant: 'tenant-omega', android: 'Android 11', status: 'ONLINE', lastSync: '1s ago' },
+  { id: 'DSPRD-POS-0091', model: 'DSpread QM800', tenant: 'tenant-alpha', plan: 'PRO', mode: 'RETAIL', android: 'Android 11', status: 'ONLINE', lastSync: '4s ago' },
+  { id: 'DSPRD-POS-1339', model: 'DSpread XM1A', tenant: 'tenant-alpha', plan: 'BASIC', mode: 'SERVICE', android: 'Android 10', status: 'ONLINE', lastSync: '12s ago' },
+  { id: 'DSPRD-POS-8315', model: 'DSpread M610', tenant: 'tenant-omega', plan: 'PRO', mode: 'SCHOOL', android: 'Android 11', status: 'SYNCING', lastSync: '1m ago' },
+  { id: 'DSPRD-POS-4421', model: 'DSpread QM800', tenant: 'tenant-omega', plan: 'BASIC', mode: 'RETAIL', android: 'Android 9', status: 'ONLINE', lastSync: '2m ago' },
+  { id: 'DSPRD-POS-7702', model: 'DSpread XM1A', tenant: 'tenant-beta', plan: 'PRO', mode: 'RETAIL', android: 'Android 12', status: 'ONLINE', lastSync: '8s ago' },
+  { id: 'DSPRD-POS-3310', model: 'DSpread M610', tenant: 'tenant-beta', plan: 'BASIC', mode: 'SERVICE', android: 'Android 11', status: 'OFFLINE', lastSync: '14m ago' },
+  { id: 'DSPRD-POS-6601', model: 'DSpread QM800', tenant: 'tenant-alpha', plan: 'PRO', mode: 'SCHOOL', android: 'Android 10', status: 'ONLINE', lastSync: '30s ago' },
+  { id: 'DSPRD-POS-2204', model: 'DSpread XM1A', tenant: 'tenant-omega', plan: 'PRO', mode: 'RETAIL', android: 'Android 11', status: 'ONLINE', lastSync: '1s ago' },
 ])
 
 const filteredDevices = computed(() => devices.value.filter(d => {
   if (statusFilter.value !== 'ALL' && d.status !== statusFilter.value) return false
   if (tenantFilter.value !== 'ALL TENANTS' && d.tenant !== tenantFilter.value) return false
+  if (planFilter.value !== 'ALL PLANS' && d.plan !== planFilter.value) return false
+  if (modeFilter.value !== 'ALL MODES' && d.mode !== modeFilter.value) return false
   if (deviceSearch.value) {
     const q = deviceSearch.value.toLowerCase()
     if (!d.id.toLowerCase().includes(q) && !d.model.toLowerCase().includes(q)) return false

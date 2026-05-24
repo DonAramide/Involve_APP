@@ -14,6 +14,35 @@ export class AuthController {
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' });
       }
+      // Offline Developer Bypass
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        console.log(`[AuthController] OFFLINE_MOCK_AUTH is true. Bypassing Supabase for: ${email}`);
+        let role = 'TENANT_OPERATOR';
+        let tenantId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382';
+        let userId = '88a18bc0-d128-4e1b-b413-58019ab268f7';
+        
+        if (email.toLowerCase().includes('admin') || email.toLowerCase().includes('iips')) {
+          role = 'SUPER_ADMIN';
+          tenantId = 'global';
+          userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+        }
+        
+        const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString('base64');
+        const payload = Buffer.from(JSON.stringify({
+          id: userId,
+          email: email,
+          role: role,
+          tenantId: tenantId,
+          exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7)
+        })).toString('base64').replace(/=/g, '');
+        const mockToken = `${header}.${payload}.mock_signature`;
+        
+        return res.status(200).json({
+          token: mockToken,
+          refreshToken: 'mock_refresh_token',
+          user: { id: userId, email: email, role: role }
+        });
+      }
 
       // 1. Authenticate with Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({

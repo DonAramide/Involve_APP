@@ -30,6 +30,7 @@ import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart
 import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
 import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
+import 'package:involve_app/features/activation/presentation/pages/go_pro_page.dart';
 import 'dart:async';
 import 'package:involve_app/core/sync/presentation/bloc/sync_bloc.dart';
 import '../../../../core/sync/presentation/widgets/sync_indicator.dart';
@@ -173,10 +174,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       color: color,
                       isSyncing: isSyncing,
                       tooltip: tooltip,
-                      onPressed: () => Navigator.push(
-                        context, 
-                        MaterialPageRoute(builder: (_) => const DeviceSyncPage()),
-                      ),
+                      onPressed: () => Navigator.pushNamed(context, '/device_sync'),
                     );
                   },
                 ),
@@ -224,13 +222,13 @@ class _DashboardPageState extends State<DashboardPage> {
                 onSelected: (value) {
                   switch (value) {
                     case 'about':
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => AboutPage()));
+                      Navigator.pushNamed(context, '/about');
                       break;
                     case 'help':
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => HelpPage()));
+                      Navigator.pushNamed(context, '/help');
                       break;
                     case 'user_guide':
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AppUserGuidePage()));
+                      Navigator.pushNamed(context, '/user_guide');
                       break;
                   }
                 },
@@ -383,7 +381,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       ),
                       const SizedBox(width: 12),
                       TextButton(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ActivationPage())),
+                        onPressed: () => Navigator.pushNamed(context, ActivationPage.routeName),
                         style: TextButton.styleFrom(
                           backgroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
@@ -405,10 +403,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _verifyAndNavigateToSettings(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SettingsPage()),
-    );
+    Navigator.pushNamed(context, '/settings');
   }
 
   void _verifyAndNavigateToSuperAdmin(BuildContext context) {
@@ -424,10 +419,7 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (dialogContext) => SuperAdminPasswordDialog(bloc: settingsBloc),
     ).then((authorized) {
       if (authorized == true && context.mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SuperAdminSettingsPage()),
-        );
+        Navigator.pushNamed(context, '/super_admin_settings');
       }
     });
   }
@@ -445,10 +437,7 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (dialogContext) => PasswordDialog(bloc: settingsBloc),
     ).then((authorized) {
       if (authorized == true && context.mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SystemSetupPage()),
-        );
+        Navigator.pushNamed(context, '/system_setup');
       }
     });
   }
@@ -465,14 +454,14 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'INVENTORY REPORT',
           icon: Icons.assessment_outlined,
           color: Colors.indigo,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryReportPage())),
+          onTap: () => Navigator.pushNamed(context, '/inventory_report'),
         ),
         _DashboardMenuItem(
           id: 'customer_lookup',
           title: 'CUSTOMER LOOKUP',
           icon: Icons.person_search,
           color: Colors.blueAccent,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomerLookupPage())),
+          onTap: () => Navigator.pushNamed(context, '/customer_lookup'),
         ),
       ],
       _DashboardMenuItem(
@@ -482,7 +471,7 @@ class _DashboardPageState extends State<DashboardPage> {
         color: Theme.of(context).colorScheme.primary,
         onTap: () {
           context.read<InvoiceBloc>().add(ResetInvoice());
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateInvoicePage()));
+          Navigator.pushNamed(context, '/create_invoice');
         },
       ),
       _DashboardMenuItem(
@@ -490,7 +479,7 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'PRINTER',
         icon: Icons.print,
         color: Colors.purple,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PrinterSettingsPage())),
+        onTap: () => Navigator.pushNamed(context, '/printer_settings'),
         indicatorColor: printerState.connectedDevice != null ? Colors.green : Colors.red,
         indicatorTooltip: printerState.connectedDevice != null ? 'Connected' : 'Disconnected',
       ),
@@ -500,7 +489,7 @@ class _DashboardPageState extends State<DashboardPage> {
           title: settings?.stockLabel.toUpperCase() ?? 'STOCK / ITEMS',
           icon: Icons.inventory,
           color: Colors.orange,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
+          onTap: () => Navigator.pushNamed(context, '/stock_management'),
         ),
       ],
       _DashboardMenuItem(
@@ -508,14 +497,14 @@ class _DashboardPageState extends State<DashboardPage> {
         title: settings?.salesLabel.toUpperCase() ?? 'SALES RECORDS',
         icon: Icons.assessment,
         color: Colors.green,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InvoiceHistoryPage())),
+        onTap: () => Navigator.pushNamed(context, '/invoice_history'),
       ),
       _DashboardMenuItem(
         id: 'calculator',
         title: 'CALCULATOR',
         icon: Icons.calculate,
         color: Colors.teal,
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalculatorPage())),
+        onTap: () => Navigator.pushNamed(context, '/calculator'),
       ),
       _DashboardMenuItem(
         id: 'settings',
@@ -553,6 +542,14 @@ class _DashboardPageState extends State<DashboardPage> {
           color: Colors.teal,
           onTap: () => Navigator.pushNamed(context, '/executive_finance'),
         ),
+      ] else ...[
+        _DashboardMenuItem(
+          id: 'go_pro',
+          title: 'GO PRO / CLOUD',
+          icon: Icons.cloud_upload,
+          color: Colors.deepPurple,
+          onTap: () => Navigator.pushNamed(context, '/go_pro'),
+        ),
       ],
     ];
 
@@ -563,21 +560,21 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'SERVICES DASHBOARD',
           icon: Icons.dashboard,
           color: Colors.blue,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ServicesDashboardPage())),
+          onTap: () => Navigator.pushNamed(context, '/services_dashboard'),
         ),
         _DashboardMenuItem(
           id: 'new_job',
           title: 'NEW JOB',
           icon: Icons.add_task,
           color: Colors.green,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateJobPage())),
+          onTap: () => Navigator.pushNamed(context, '/create_job'),
         ),
         _DashboardMenuItem(
           id: 'all_jobs',
           title: 'ALL JOBS',
           icon: Icons.list_alt,
           color: Colors.orange,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const JobsListPage())),
+          onTap: () => Navigator.pushNamed(context, '/jobs_list'),
         ),
         _DashboardMenuItem(
           id: 'customers',
@@ -585,7 +582,7 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.people,
           color: Colors.purple,
           onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (_) => const CustomersListPage()));
+            Navigator.pushNamed(context, '/customers_list');
           },
         ),
         ...allItems.where((i) => [
@@ -607,21 +604,21 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'STUDENT ANALYTICS',
           icon: Icons.analytics_outlined,
           color: Colors.blueAccent,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentAnalyticsPage())),
+          onTap: () => Navigator.pushNamed(context, '/student_analytics'),
         ),
         _DashboardMenuItem(
           id: 'students',
           title: 'STUDENTS',
           icon: Icons.people_alt,
           color: Colors.indigo,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StudentListPage())),
+          onTap: () => Navigator.pushNamed(context, '/student_list'),
         ),
         _DashboardMenuItem(
           id: 'teachers',
           title: 'TEACHERS',
           icon: Icons.assignment_ind,
           color: Colors.deepPurple,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherListPage())),
+          onTap: () => Navigator.pushNamed(context, '/teacher_list'),
         ),
         _DashboardMenuItem(
           id: 'finance_dashboard',
@@ -635,42 +632,42 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'ACADEMIC SETUP',
           icon: Icons.school,
           color: Colors.brown,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SchoolSetupPage())),
+          onTap: () => Navigator.pushNamed(context, '/school_setup'),
         ),
         _DashboardMenuItem(
           id: 'fee_management',
           title: 'FEE MANAGEMENT',
           icon: Icons.payments,
           color: Colors.cyan,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FeeManagementPage())),
+          onTap: () => Navigator.pushNamed(context, '/fee_management'),
         ),
         _DashboardMenuItem(
           id: 'fees',
           title: settings?.productsLabel.toUpperCase() ?? 'FEES',
           icon: Icons.grid_view,
           color: Colors.orange,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StockManagementPage())),
+          onTap: () => Navigator.pushNamed(context, '/stock_management'),
         ),
         _DashboardMenuItem(
           id: 'subjects',
           title: 'SUBJECTS',
           icon: Icons.book,
           color: Colors.blue,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageSubjectsPage())),
+          onTap: () => Navigator.pushNamed(context, '/manage_subjects'),
         ),
         _DashboardMenuItem(
           id: 'result_entry',
           title: 'RESULT ENTRY',
           icon: Icons.edit_note,
           color: Colors.redAccent,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ResultEntryPage())),
+          onTap: () => Navigator.pushNamed(context, '/result_entry'),
         ),
         _DashboardMenuItem(
           id: 'lesson_notes',
           title: 'LESSON NOTES',
           icon: Icons.note_alt,
           color: Colors.teal,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LessonNotesListPage())),
+          onTap: () => Navigator.pushNamed(context, '/lesson_notes_list'),
         ),
       ]);
     }

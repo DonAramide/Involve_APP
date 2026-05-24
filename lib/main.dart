@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:involve_app/features/school_finance/presentation/widgets/global_payment_notification_listener.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:get_it/get_it.dart';
@@ -99,8 +102,32 @@ import 'package:involve_app/features/school_finance/presentation/pages/defaulter
 import 'package:involve_app/features/school_finance/presentation/bloc/reconciliation_event.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 import 'package:dio/dio.dart';
-
-
+import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
+import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
+import 'package:involve_app/features/invoicing/presentation/pages/create_invoice_page.dart';
+import 'package:involve_app/features/printer/presentation/pages/printer_settings_page.dart';
+import 'package:involve_app/features/stock/presentation/pages/stock_management_page.dart';
+import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
+import 'package:involve_app/features/dashboard/presentation/pages/calculator_page.dart';
+import 'package:involve_app/features/settings/presentation/pages/settings_page.dart';
+import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
+import 'package:involve_app/features/admin/presentation/pages/system_setup_page.dart';
+import 'package:involve_app/features/activation/presentation/pages/go_pro_page.dart';
+import 'package:involve_app/features/services/presentation/pages/create_job_page.dart';
+import 'package:involve_app/features/services/presentation/pages/jobs_list_page.dart';
+import 'package:involve_app/features/services/presentation/pages/customers_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/student_analytics_page.dart';
+import 'package:involve_app/features/school/presentation/pages/student_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/teacher_list_page.dart';
+import 'package:involve_app/features/school/presentation/pages/school_setup_page.dart';
+import 'package:involve_app/features/school/presentation/pages/fee_management_page.dart';
+import 'package:involve_app/features/school/presentation/pages/manage_subjects_page.dart';
+import 'package:involve_app/features/school/presentation/pages/result_entry_page.dart';
+import 'package:involve_app/features/school/presentation/pages/lesson_notes_list_page.dart';
+import 'package:involve_app/features/dashboard/presentation/pages/about_page.dart';
+import 'package:involve_app/features/help/presentation/pages/help_page.dart';
+import 'package:involve_app/features/school/presentation/pages/app_user_guide_page.dart';
+import 'package:involve_app/core/sync/presentation/pages/device_sync_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -115,7 +142,7 @@ void main() async {
   
   runApp(RestartWidget<AppDependencies>(
     initialize: () => AppDependencies.initialize(),
-    childBuilder: (context, deps) => MyApp(dependencies: deps),
+    childBuilder: (context, deps) => InvolveApp(dependencies: deps),
   ));
 }
 
@@ -256,7 +283,7 @@ class AppDependencies {
     // 2. License Service
     LicenseService.init(database);
     
-    final String baseUrl = kDebugMode ? 'https://bertie-archegoniate-causelessly.ngrok-free.dev' : 'https://api.iips-finance.com';
+    final String baseUrl = kDebugMode ? 'http://192.168.1.194:3004' : 'https://api.iips-finance.com';
 
     final financeRepoNew = FinanceRepository(
       FinanceApiClient(
@@ -414,16 +441,20 @@ class AppDependencies {
   }
 }
 
-class MyApp extends StatelessWidget {
+class InvolveApp extends StatefulWidget {
   final AppDependencies dependencies;
+  const InvolveApp({super.key, required this.dependencies});
 
-  const MyApp({
-    super.key,
-    required this.dependencies,
-  });
+  @override
+  State<InvolveApp> createState() => _InvolveAppState();
+}
+
+class _InvolveAppState extends State<InvolveApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) {
+    final dependencies = widget.dependencies;
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<ItemRepository>(create: (_) => dependencies.itemRepository),
@@ -569,6 +600,13 @@ class MyApp extends StatelessWidget {
                 : themeMode == 'dark' 
                     ? ThemeMode.dark 
                     : ThemeMode.system,
+            navigatorKey: _navigatorKey,
+            builder: (context, child) {
+              return GlobalPaymentNotificationListener(
+                navigatorKey: _navigatorKey,
+                child: child ?? const SizedBox(),
+              );
+            },
             theme: ThemeData(
               fontFamily: kIsWeb ? 'sans-serif' : null,
               colorScheme: ColorScheme.fromSeed(seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3)),
@@ -601,7 +639,34 @@ class MyApp extends StatelessWidget {
               '/defaulters': (_) => const DefaultersPage(),
               '/admin_hub': (_) => const AdminDashboardPage(),
               '/admin_finance': (_) => const AdminFinanceDashboardPage(),
-              '/admin_api_keys': (_) => const ApiKeyManagementPage(),
+              '/api_keys': (_) => const ApiKeyManagementPage(),
+              '/inventory_report': (_) => const InventoryReportPage(),
+              '/customer_lookup': (_) => const CustomerLookupPage(),
+              '/create_invoice': (_) => const CreateInvoicePage(),
+              '/printer_settings': (_) => const PrinterSettingsPage(),
+              '/stock_management': (_) => const StockManagementPage(),
+              '/invoice_history': (_) => const InvoiceHistoryPage(),
+              '/calculator': (_) => const CalculatorPage(),
+              '/settings': (_) => const SettingsPage(),
+              '/super_admin_settings': (_) => const SuperAdminSettingsPage(),
+              '/system_setup': (_) => const SystemSetupPage(),
+              '/go_pro': (_) => const GoProPage(),
+              '/services_dashboard': (_) => const ServicesDashboardPage(),
+              '/create_job': (_) => const CreateJobPage(),
+              '/jobs_list': (_) => const JobsListPage(),
+              '/customers_list': (_) => const CustomersListPage(),
+              '/student_analytics': (_) => const StudentAnalyticsPage(),
+              '/student_list': (_) => const StudentListPage(),
+              '/teacher_list': (_) => const TeacherListPage(),
+              '/school_setup': (_) => const SchoolSetupPage(),
+              '/fee_management': (_) => const FeeManagementPage(),
+              '/manage_subjects': (_) => const ManageSubjectsPage(),
+              '/result_entry': (_) => const ResultEntryPage(),
+              '/lesson_notes_list': (_) => const LessonNotesListPage(),
+              '/about': (_) => const AboutPage(),
+              '/help': (_) => const HelpPage(),
+              '/user_guide': (_) => const AppUserGuidePage(),
+              '/device_sync': (_) => const DeviceSyncPage(),
             },
 
             );

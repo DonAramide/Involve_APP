@@ -79,10 +79,11 @@
               :name="ws.id"
               :label="ws.label"
               class="workspace-tab-item text-caption q-px-md"
+              v-touch-hold.mouse="openReorderDialog"
             >
               <div v-if="ws.priority" class="priority-dot bg-blue-5"></div>
               <q-tooltip class="enterprise-panel bg-panel text-main border-main shadow-24" anchor="bottom middle" self="top middle" style="font-size: 11px; border: 1px solid var(--enterprise-border); border-radius: 4px;">
-                Switch active workspace console to: {{ ws.label }}
+                Switch active workspace console to: {{ ws.label }}. (Long press to reorder)
               </q-tooltip>
             </q-tab>
           </q-tabs>
@@ -438,6 +439,34 @@
 
     <!-- Persistent Right-Side Operational Knowledge Base Drawer -->
     <operational-knowledge-drawer />
+
+    <!-- Reorder Workspaces Dialog -->
+    <q-dialog v-model="reorderDialogVisible">
+      <q-card class="bg-panel text-main" style="width: 400px; max-width: 90vw; border: 1px solid var(--enterprise-border)">
+        <q-card-section class="row items-center justify-between border-bottom q-py-sm">
+          <div class="text-subtitle2 text-weight-bold">Rearrange Workspaces</div>
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        <q-card-section class="q-pa-none">
+          <q-list separator>
+            <q-item v-for="(ws, index) in localWorkspaceOrder" :key="ws.id" class="q-py-sm">
+              <q-item-section>
+                <q-item-label>{{ ws.label }}</q-item-label>
+              </q-item-section>
+              <q-item-section side class="row items-center op-gap-4">
+                <q-btn icon="keyboard_arrow_up" size="sm" flat dense round color="blue-5" @click="moveWorkspace(index, -1)" :disable="index === 0" />
+                <q-btn icon="keyboard_arrow_down" size="sm" flat dense round color="blue-5" @click="moveWorkspace(index, 1)" :disable="index === localWorkspaceOrder.length - 1" />
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+        <q-card-actions align="right" class="border-top q-pa-sm">
+          <q-btn flat label="Cancel" color="grey" v-close-popup />
+          <q-btn flat label="Save Order" color="blue-5" @click="saveReorder" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-layout>
 </template>
 
@@ -458,7 +487,7 @@ const route = useRoute()
 const $q = useQuasar()
 
 // Pull enhanced asynchronous persistent storage handlers
-const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, toggleTheme, togglePinView, isViewPinned, pushHistory, clearHistory, executeLogout, fetchPreferencesFromBackend } = useOperatorPreferences()
+const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, toggleTheme, togglePinView, isViewPinned, pushHistory, clearHistory, executeLogout, fetchPreferencesFromBackend, setWorkspaceOrder } = useOperatorPreferences()
 
 // useContextualIntelligence setup
 const {
@@ -557,8 +586,40 @@ const workspaces = computed(() => {
     list.push({ id: 'admin', label: 'Administration', priority: false })
   }
   
+  if (prefs.value.workspaceOrder && prefs.value.workspaceOrder.length > 0) {
+    list.sort((a, b) => {
+      let idxA = prefs.value.workspaceOrder.indexOf(a.id)
+      let idxB = prefs.value.workspaceOrder.indexOf(b.id)
+      if (idxA === -1) idxA = 999
+      if (idxB === -1) idxB = 999
+      return idxA - idxB
+    })
+  }
+  
   return list
 })
+
+// Reorder Logic
+const reorderDialogVisible = ref(false)
+const localWorkspaceOrder = ref([])
+
+const openReorderDialog = () => {
+  localWorkspaceOrder.value = [...workspaces.value]
+  reorderDialogVisible.value = true
+}
+
+const moveWorkspace = (index, direction) => {
+  const targetIndex = index + direction
+  if (targetIndex < 0 || targetIndex >= localWorkspaceOrder.value.length) return
+  const temp = localWorkspaceOrder.value[index]
+  localWorkspaceOrder.value[index] = localWorkspaceOrder.value[targetIndex]
+  localWorkspaceOrder.value[targetIndex] = temp
+}
+
+const saveReorder = () => {
+  const newOrder = localWorkspaceOrder.value.map(w => w.id)
+  setWorkspaceOrder(newOrder)
+}
 
 // Centralized Workspace Switching Logic
 const activeWorkspaceObj = computed(() => {

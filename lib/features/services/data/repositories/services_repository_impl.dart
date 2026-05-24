@@ -18,7 +18,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
   @override
   Future<List<ServiceJob>> getJobs({String? status, String? query}) async {
     final joinedQuery = db.select(db.serviceJobs).join([
-      leftOuterJoin(db.serviceCustomers, db.serviceCustomers.id.equalsExp(db.serviceJobs.customerId)),
+      leftOuterJoin(db.customers, db.customers.id.equalsExp(db.serviceJobs.customerId)),
     ]);
 
     if (status != null) {
@@ -26,13 +26,13 @@ class ServicesRepositoryImpl implements IServicesRepository {
     }
     
     if (query != null && query.isNotEmpty) {
-      joinedQuery.where(db.serviceCustomers.name.like('%$query%') | db.serviceJobs.jobId.like('%$query%'));
+      joinedQuery.where(db.customers.name.like('%$query%') | db.serviceJobs.jobId.like('%$query%'));
     }
 
     final results = await joinedQuery.get();
     return results.map((row) {
       final job = row.readTable(db.serviceJobs);
-      final customer = row.readTableOrNull(db.serviceCustomers);
+      final customer = row.readTableOrNull(db.customers);
       return _mapJob(job, customerName: customer?.name);
     }).toList();
   }
@@ -40,11 +40,11 @@ class ServicesRepositoryImpl implements IServicesRepository {
   @override
   Future<ServiceJob> getJobById(String id) async {
     final row = await (db.select(db.serviceJobs).join([
-      leftOuterJoin(db.serviceCustomers, db.serviceCustomers.id.equalsExp(db.serviceJobs.customerId)),
+      leftOuterJoin(db.customers, db.customers.id.equalsExp(db.serviceJobs.customerId)),
     ])..where(db.serviceJobs.id.equals(id))).getSingle();
 
     final jobTable = row.readTable(db.serviceJobs);
-    final customerTable = row.readTableOrNull(db.serviceCustomers);
+    final customerTable = row.readTableOrNull(db.customers);
 
     // Fetch items
     final itemRows = await (db.select(db.serviceJobItems)..where((t) => t.jobId.equals(id))).get();
@@ -150,7 +150,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
 
   @override
   Future<List<ServiceCustomer>> getCustomers({String? query}) async {
-    final queryBuilder = db.select(db.serviceCustomers);
+    final queryBuilder = db.select(db.customers);
     if (query != null && query.isNotEmpty) {
       queryBuilder.where((t) => t.name.like('%$query%'));
     }
@@ -167,7 +167,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
     Uint8List? image,
   }) async {
     final id = const Uuid().v4();
-    final row = await db.into(db.serviceCustomers).insertReturning(ServiceCustomersCompanion.insert(
+    final row = await db.into(db.customers).insertReturning(CustomersCompanion.insert(
       id: id,
       name: name,
       phone: Value(phone),
@@ -177,6 +177,16 @@ class ServicesRepositoryImpl implements IServicesRepository {
       createdAt: Value(DateTime.now()),
     ));
     return _mapCustomer(row);
+  }
+
+  @override
+  Future<void> updateCustomerVirtualAccount(String customerId, String accountNumber, String bankName) async {
+    await (db.update(db.customers)..where((t) => t.id.equals(customerId))).write(
+      CustomersCompanion(
+        virtualAccountNumber: Value(accountNumber),
+        virtualAccountBank: Value(bankName),
+      ),
+    );
   }
 
   @override
@@ -439,7 +449,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
     );
   }
 
-  ServiceCustomer _mapCustomer(ServiceCustomerTable row) {
+  ServiceCustomer _mapCustomer(CustomerTable row) {
     return ServiceCustomer(
       id: row.id,
       name: row.name,
@@ -447,6 +457,10 @@ class ServicesRepositoryImpl implements IServicesRepository {
       email: row.email,
       address: row.address,
       image: row.image,
+      balance: row.balance,
+      virtualAccountNumber: row.virtualAccountNumber,
+      virtualAccountName: row.virtualAccountName,
+      virtualAccountBank: row.virtualAccountBank,
       createdAt: row.createdAt,
     );
   }

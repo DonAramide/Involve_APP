@@ -225,3 +225,17 @@ class MakeStudentPaymentEvent extends SchoolEvent {
   @override
   List<Object?> get props => [studentId, amount, method, remarks];
 }
+
+class ProvisionStudentVirtualAccountEvent extends SchoolEvent {
+  final int studentId;
+  const ProvisionStudentVirtualAccountEvent(this.studentId);
+  @override
+  List<Object?> get props => [studentId];
+}
+
+class ClearStudentDebitEvent extends SchoolEvent {
+  final int studentId;
+  const ClearStudentDebitEvent(this.studentId);
+  @override
+  List<Object?> get props => [studentId];
+}

@@ -46,5 +46,27 @@
     "plan": "standard",
     "status": "active",
     "created_at": "2026-05-19T01:56:40.041Z"
+  },
+  {
+    "id": "tenant-1779516835715",
+    "name": "invify001",
+    "type": "school",
+    "plan": "standard",
+    "status": "active",
+    "created_at": "2026-05-23T06:13:55.715Z",
+    "agent_code": "AAA001",
+    "location": "Lagos, Nigeria",
+    "device_id": "PPR1.180610.011"
+  },
+  {
+    "id": "tenant-1779640483822",
+    "name": "My Business",
+    "type": "services",
+    "plan": "standard",
+    "status": "active",
+    "agent_code": "Aaa555",
+    "location": "Lat: 6.6241, Lng: 3.4800",
+    "device_id": "M1AJQ",
+    "created_at": "2026-05-24T16:34:43.822Z"
   }
 ]
