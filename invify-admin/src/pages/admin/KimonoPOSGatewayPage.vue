@@ -87,11 +87,47 @@
       </q-col>
     </div>
 
+    <!-- Filters Section -->
+    <q-card flat bordered class="q-mb-md">
+      <q-card-section>
+        <div class="row q-col-gutter-md">
+          <div class="col-12 col-md-2">
+            <q-input v-model="filters.tenantId" label="Business Owner" outlined dense clearable />
+          </div>
+          <div class="col-12 col-md-2">
+            <q-input v-model.number="filters.amountGt" label="Amount Greater (₦)" type="number" outlined dense clearable />
+          </div>
+          <div class="col-12 col-md-2">
+            <q-input v-model="filters.date" label="Date (YYYY-MM-DD)" outlined dense clearable>
+              <template v-slot:append>
+                <q-icon name="event" class="cursor-pointer">
+                  <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+                    <q-date v-model="filters.date" mask="YYYY-MM-DD" />
+                  </q-popup-proxy>
+                </q-icon>
+              </template>
+            </q-input>
+          </div>
+          <div class="col-12 col-md-2">
+            <q-select v-model="filters.host" :options="['All', 'Medusa', 'NIBSS']" label="Host" outlined dense />
+          </div>
+          <div class="col-12 col-md-2">
+            <q-select v-model="filters.status" :options="['All', 'Approved', 'Declined']" label="Status" outlined dense />
+          </div>
+          <div class="col-12 col-md-2">
+            <q-input v-model="filters.search" label="Search RRN / STAN" outlined dense clearable>
+              <template v-slot:append><q-icon name="search" /></template>
+            </q-input>
+          </div>
+        </div>
+      </q-card-section>
+    </q-card>
+
     <!-- Transactions Table -->
     <q-card flat bordered>
       <q-table
         title="Recent Socket Transactions (ISO8583)"
-        :rows="transactions"
+        :rows="filteredTransactions"
         :columns="columns"
         row-key="id"
         :loading="loading"
@@ -132,9 +168,13 @@
         <q-card-section v-if="selectedTx">
           <div class="row q-col-gutter-sm">
             <div class="col-6"><strong>Host:</strong> {{ selectedTx.host }}</div>
+            <div class="col-6"><strong>Business Owner:</strong> {{ selectedTx.tenantId }}</div>
+            <div class="col-6"><strong>Terminal ID:</strong> {{ selectedTx.terminalId }}</div>
             <div class="col-6"><strong>Amount:</strong> ₦{{ selectedTx.amount }}</div>
             <div class="col-6"><strong>Card:</strong> {{ selectedTx.maskedPan }}</div>
             <div class="col-6"><strong>Date:</strong> {{ new Date(selectedTx.date).toLocaleString() }}</div>
+            <div class="col-6"><strong>RRN:</strong> {{ selectedTx.rrn || 'N/A' }}</div>
+            <div class="col-6"><strong>STAN:</strong> {{ selectedTx.stan || 'N/A' }}</div>
           </div>
           <q-separator class="q-my-md"/>
           <div class="text-subtitle2 text-grey-8 q-mb-sm">Raw Socket Request (Hex / TLV)</div>
@@ -149,7 +189,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import api from '../../api'
 import { useQuasar } from 'quasar'
 
@@ -169,8 +209,35 @@ const routingConfig = ref({
   nibss: { host: 'nibss.example.com', port: 5000, thresholdAmount: 50000, isActive: true }
 })
 
+const filters = ref({
+  tenantId: '',
+  amountGt: null,
+  date: '',
+  host: 'All',
+  status: 'All',
+  search: ''
+})
+
+const filteredTransactions = computed(() => {
+  return transactions.value.filter(tx => {
+    let match = true;
+    if (filters.value.tenantId && !tx.tenantId?.toLowerCase().includes(filters.value.tenantId.toLowerCase())) match = false;
+    if (filters.value.amountGt !== null && tx.amount <= filters.value.amountGt) match = false;
+    if (filters.value.date && !new Date(tx.date).toISOString().startsWith(filters.value.date)) match = false;
+    if (filters.value.host && filters.value.host !== 'All' && tx.host !== filters.value.host) match = false;
+    if (filters.value.status && filters.value.status !== 'All' && tx.status !== filters.value.status) match = false;
+    if (filters.value.search) {
+      const q = filters.value.search.toLowerCase();
+      if (!tx.rrn?.toLowerCase().includes(q) && !tx.stan?.toLowerCase().includes(q)) match = false;
+    }
+    return match;
+  });
+})
+
 const columns = [
   { name: 'date', label: 'Date', field: row => new Date(row.date).toLocaleString(), sortable: true, align: 'left' },
+  { name: 'tenantId', label: 'Business Owner', field: 'tenantId', sortable: true, align: 'left' },
+  { name: 'terminalId', label: 'Terminal ID', field: 'terminalId', sortable: true, align: 'left' },
   { name: 'host', label: 'Routed Host', field: 'host', sortable: true, align: 'left' },
   { name: 'amount', label: 'Amount', field: 'amount', sortable: true, align: 'left' },
   { name: 'maskedPan', label: 'Card PAN', field: 'maskedPan', align: 'left' },

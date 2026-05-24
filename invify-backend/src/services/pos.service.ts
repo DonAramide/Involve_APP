@@ -121,11 +121,27 @@ export class PosService {
     return [
       {
         id: '1',
+        tenantId: 'John Doe Enterprise', // Mock Business Owner
+        terminalId: '20394012',
         amount: 5000,
         status: 'Approved',
         date: new Date().toISOString(),
         host: 'Medusa',
-        maskedPan: '**** 1234'
+        maskedPan: '**** 1234',
+        rrn: '123456789012',
+        stan: '000001'
+      },
+      {
+        id: '2',
+        tenantId: 'Acme Corp',
+        terminalId: '20394013',
+        amount: 150000,
+        status: 'Declined',
+        date: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        host: 'NIBSS',
+        maskedPan: '**** 5678',
+        rrn: '987654321098',
+        stan: '000002'
       }
     ];
   }
