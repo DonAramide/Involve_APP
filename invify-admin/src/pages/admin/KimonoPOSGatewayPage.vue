@@ -2,7 +2,7 @@
   <q-page padding>
     <div class="row items-center justify-between q-mb-md">
       <div>
-        <div class="text-h4 text-weight-bold">Kimono POS Gateway</div>
+        <div class="text-h4 text-weight-bold">EMV POS Gateway</div>
         <div class="text-subtitle1 text-grey-7">Hardware Level Socket Routing & Transaction Insights</div>
       </div>
       <q-btn color="primary" icon="refresh" label="Refresh" @click="fetchData" />

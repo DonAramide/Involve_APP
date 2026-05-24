@@ -1,5 +1,13 @@
 [
   {
+    "id": "tenant-1779662125243",
+    "name": "myde",
+    "type": "retail",
+    "plan": "premium",
+    "status": "active",
+    "created_at": "2026-05-24T22:35:25.244Z"
+  },
+  {
     "id": "tenant-1779041949485",
     "name": "Wendy's gift Store",
     "type": "retail",
