@@ -236,16 +236,15 @@ class FinanceApiClient {
     _dio.interceptors.addAll([
       JwtInterceptor(getToken: getToken),
       TenantInterceptor(getTenantId: getTenantId),
-      PlanGatingInterceptor(),
+      // PlanGatingInterceptor(),
       ErrorInterceptor(),
-      if (kDebugMode)
-        LogInterceptor(
-          requestHeader: true,
-          requestBody: true,
-          responseHeader: false,
-          responseBody: true,
-          error: true,
-        ),
+      LogInterceptor(
+        requestHeader: true,
+        requestBody: true,
+        responseHeader: true,
+        responseBody: true,
+        error: true,
+      ),
     ]);
   }
 
