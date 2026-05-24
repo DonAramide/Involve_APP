@@ -10,6 +10,7 @@ import kotlinx.parcelize.Parcelize
 data class TransactionResult(
     val status: String? = null,
     val mposTransactionResponse: MposTransactionResponse? = null,
+    val emvData: com.demo.mpossdk.internal.domain.model.EmvDetailResult? = null,
     val errorData: ErrorData? = null
 ): Parcelable
 

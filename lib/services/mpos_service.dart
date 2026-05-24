@@ -70,11 +70,13 @@ class MposTransactionResponse {
   final String? status;
   final MposErrorData? error;
   final MposTransactionData? transaction;
+  final EmvData? emvData;
 
   MposTransactionResponse({
     this.status,
     this.error,
     this.transaction,
+    this.emvData,
   });
 
   factory MposTransactionResponse.fromMap(Map<Object?, Object?>? map) {
@@ -87,6 +89,9 @@ class MposTransactionResponse {
           : null,
       transaction: map['transaction'] != null 
           ? MposTransactionData.fromMap(map['transaction'] as Map<Object?, Object?>) 
+          : null,
+      emvData: map['emvData'] != null
+          ? EmvData.fromMap(map['emvData'] as Map<Object?, Object?>)
           : null,
     );
   }
@@ -103,6 +108,18 @@ class MposErrorData {
       message: map['message']?.toString(),
     );
   }
+}
+
+class EmvData {
+  final Map<String, dynamic> data;
+
+  EmvData(this.data);
+
+  factory EmvData.fromMap(Map<Object?, Object?> map) {
+    return EmvData(Map<String, dynamic>.from(map));
+  }
+
+  Map<String, dynamic> toJson() => data;
 }
 
 class MposTransactionData {

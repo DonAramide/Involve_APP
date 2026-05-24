@@ -19,6 +19,7 @@ import 'package:involve_app/core/utils/nibss_response_codes.dart';
 import 'package:involve_app/core/license/storage_service_native.dart';
 import 'package:involve_app/services/mpos_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 
 class InvoicePreviewDialog extends StatefulWidget {
   final InvoiceBloc invoiceBloc;
@@ -310,7 +311,34 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
                           if (!mounted) return;
                           
-                          if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
+                          if (result.status == 'emv_data_ready' && result.emvData != null) {
+                            try {
+                              final financeRepo = context.read<FinanceRepository>();
+                              final backendResponse = await financeRepo.apiClient.post(
+                                '/api/pos/transaction',
+                                data: {
+                                  'terminalId': terminalId,
+                                  'amount': amountToCharge,
+                                  'emvData': result.emvData!.toJson(),
+                                },
+                              );
+                              
+                              if (backendResponse.statusCode != 200) {
+                                throw Exception("Transaction failed on backend");
+                              }
+                              // Optionally parse backendResponse.data for receipt details
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('POS Backend Error: $e'), 
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 5),
+                                ),
+                              );
+                              return;
+                            }
+                          } else if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
                             String errorMessage = result.error?.message ?? result.transaction?.message ?? "Unknown Error";
                             if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
                               final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);
@@ -461,7 +489,33 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
                           if (!mounted) return;
 
-                          if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
+                          if (result.status == 'emv_data_ready' && result.emvData != null) {
+                            try {
+                              final financeRepo = context.read<FinanceRepository>();
+                              final backendResponse = await financeRepo.apiClient.post(
+                                '/api/pos/transaction',
+                                data: {
+                                  'terminalId': terminalId,
+                                  'amount': amountToCharge,
+                                  'emvData': result.emvData!.toJson(),
+                                },
+                              );
+                              
+                              if (backendResponse.statusCode != 200) {
+                                throw Exception("Transaction failed on backend");
+                              }
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('POS Backend Error: $e'), 
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 5),
+                                ),
+                              );
+                              return;
+                            }
+                          } else if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
                             String errorMessage = result.error?.message ?? result.transaction?.message ?? "Unknown Error";
                             if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
                               final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);

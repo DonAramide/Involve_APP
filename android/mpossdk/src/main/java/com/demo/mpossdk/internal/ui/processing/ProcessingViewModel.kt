@@ -59,7 +59,7 @@ internal class ProcessingViewModel(
     private val _errorFlow = Channel<ErrorData?>()
     val errorFlow = _errorFlow.receiveAsFlow()
 
-    private val _transactionStatusFlow = Channel<MposTransactionResponse?>()
+    private val _transactionStatusFlow = Channel<com.demo.mpossdk.open.TransactionResult?>()
     val transactionStatusFlow = _transactionStatusFlow.receiveAsFlow()
 
     private val _loadingLiveData = MutableLiveData(false)
@@ -348,39 +348,21 @@ internal class ProcessingViewModel(
 
     private suspend fun postToHostServer() {
         try {
-            val channel = socketChannel.setup()
-            channel.connect()
-
-            val purchaseRequest = isoMessageBuilder.buildPurchaseMessage(emvDetailResult)
-
-            channel.send(purchaseRequest)
-            val response = channel.receive()
-            channel.disconnect()
-
-            val transactionResponse = setupTransactionResponse(response, emvDetailResult)
-
-            //Save transaction to DB
-            //transactionDao.saveTransaction(transactionResponse.toTransactionEntity())
-
             LcdApi.LedLightOn_Api(0x04)
             LcdApi.ScrCls_Api()
-            LcdApi.ScrDisp_Api(1, 0, "Transaction Approved!", 0x08)
+            LcdApi.ScrDisp_Api(1, 0, "Processing on Server...", 0x08)
 
             SystemApi.Beep_Api(1)
 
-            _transactionStatusFlow.send(transactionResponse)
-        } catch (e: ISOException) {
-            e.printStackTrace()
-            _errorFlow.send(ErrorData(ErrorType.NETWORK_ERROR, "ISO Exception"))
-        } catch (e: EOFException) {
-            e.printStackTrace()
-            _errorFlow.send(ErrorData(ErrorType.NETWORK_ERROR, "Host disconnect"))
-        } catch (e: IOException) {
-            e.printStackTrace()
-            _errorFlow.send(ErrorData(ErrorType.NETWORK_ERROR, "Network error. Please check your connection and try again."))
+            _transactionStatusFlow.send(
+                com.demo.mpossdk.open.TransactionResult(
+                    status = "emv_data_ready",
+                    emvData = emvDetailResult
+                )
+            )
         } catch (e: Exception) {
             e.printStackTrace()
-            _errorFlow.send(ErrorData(ErrorType.UNKNOWN_ERROR, "An error occurred"))
+            _errorFlow.send(ErrorData(ErrorType.UNKNOWN_ERROR, "An error occurred extracting EMV data"))
         }
     }
 

@@ -36,6 +36,7 @@ import { AuthController } from './controllers/auth.controller';
 import { DeviceController } from './controllers/device.controller';
 import { LookupController } from './controllers/lookup.controller';
 import { CustomerController } from './controllers/customer.controller';
+import { PosController } from './controllers/pos.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
@@ -183,6 +184,11 @@ app.get('/api/payout/history', authenticate, PayoutController.getHistory);
 // Executive Dashboard
 app.get('/api/finance/executive-summary', authenticate, ExecutiveFinanceController.getSummary);
 
+// POS Operations (Kimono)
+app.post('/api/pos/transaction', authenticate, PosController.processTransaction);
+app.get('/api/pos/history', authenticate, PosController.getTransactionHistory);
+app.get('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.getRoutingConfig);
+app.post('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.updateRoutingConfig);
 
 // Defaulters System
 app.get('/api/finance/defaulters', authenticate, DefaultersController.getDefaulters);

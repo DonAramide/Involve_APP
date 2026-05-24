@@ -77,6 +77,61 @@ class MainActivity: FlutterActivity() {
                                     )
                                 }
                                 
+                                if (txResult.status == "emv_data_ready" && txResult.emvData != null) {
+                                    val emvData = txResult.emvData!!
+                                    responseMap["emvData"] = mapOf(
+                                        "iccData" to emvData.iccData,
+                                        "cardNo" to emvData.cardNo,
+                                        "cardSequenceNumber" to emvData.cardSequenceNumber,
+                                        "cardExpirationDate" to emvData.cardExpirationDate,
+                                        "appCryptogram" to emvData.appCryptogram,
+                                        "cryptogramInformationData" to emvData.cryptogramInformationData,
+                                        "issuerApplicationData" to emvData.issuerApplicationData,
+                                        "unpredictableNumber" to emvData.unpredictableNumber,
+                                        "appTransactionCounter" to emvData.appTransactionCounter,
+                                        "terminalVerificationResults" to emvData.terminalVerificationResults,
+                                        "transactionDate" to emvData.transactionDate,
+                                        "transactionType" to emvData.transactionType,
+                                        "amountAuthorisedNumeric" to emvData.amountAuthorisedNumeric,
+                                        "transactionCurrencyCode" to emvData.transactionCurrencyCode,
+                                        "applicationInterchangeProfile" to emvData.applicationInterchangeProfile,
+                                        "terminalCountryCode" to emvData.terminalCountryCode,
+                                        "amountOtherNumeric" to emvData.amountOtherNumeric,
+                                        "additionalTerminalCapabilities" to emvData.additionalTerminalCapabilities,
+                                        "ecIssuerAuthorizationCode" to emvData.ecIssuerAuthorizationCode,
+                                        "cvmResult" to emvData.cvmResult,
+                                        "terminalType" to emvData.terminalType,
+                                        "dedicatedFileName" to emvData.dedicatedFileName,
+                                        "appVersionNumberTerminal" to emvData.appVersionNumberTerminal,
+                                        "transactionSequenceCounter" to emvData.transactionSequenceCounter,
+                                        "issuerAuthenticationData" to emvData.issuerAuthenticationData,
+                                        "issuerScriptTemplate1" to emvData.issuerScriptTemplate1,
+                                        "issuerScriptTemplate2" to emvData.issuerScriptTemplate2,
+                                        "scriptExecuteRslt" to emvData.scriptExecuteRslt,
+                                        "authorisationResponseCode" to emvData.authorisationResponseCode,
+                                        "chipSerialNo" to emvData.chipSerialNo,
+                                        "pinBlock" to emvData.pinBlock,
+                                        "terminalCapabilities" to emvData.terminalCapabilities,
+                                        "track2Data" to emvData.track2Data,
+                                        "transactionTime" to emvData.transactionTime,
+                                        "pointOfServiceEntryMode" to emvData.pointOfServiceEntryMode,
+                                        "appPreferredName" to emvData.appPreferredName,
+                                        "applicationLabel" to emvData.applicationLabel,
+                                        "ksn" to emvData.ksn,
+                                        "aid" to emvData.aid,
+                                        "cardHolderName" to emvData.cardHolderName,
+                                        "cardHolderCertNo" to emvData.cardHolderCertNo,
+                                        "cardHolderCertType" to emvData.cardHolderCertType,
+                                        "offlinePwdCount" to emvData.offlinePwdCount,
+                                        "pinType" to emvData.pinType,
+                                        "serviceCode" to emvData.serviceCode,
+                                        "pinVerificationValue" to emvData.pinVerificationValue,
+                                        "cardVerificationValue" to emvData.cardVerificationValue,
+                                        "acquirerInstitutionId" to emvData.acquirerInstitutionId,
+                                        "terminalId" to emvData.terminalId
+                                    )
+                                }
+                                
                                 if (txResult.mposTransactionResponse != null) {
                                     val txRes = txResult.mposTransactionResponse!!
                                     responseMap["transaction"] = mapOf(

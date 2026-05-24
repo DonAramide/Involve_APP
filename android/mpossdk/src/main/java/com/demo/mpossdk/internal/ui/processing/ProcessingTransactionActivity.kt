@@ -77,13 +77,10 @@ internal class ProcessingTransactionActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            viewModel.transactionStatusFlow.collect { transactionData ->
+            viewModel.transactionStatusFlow.collect { transactionResult ->
                 MposSdk.transactionListener(
                     TransactionResultListener.OnCompleted(
-                        TransactionResult(
-                            mposTransactionResponse = transactionData,
-                            status = transactionData?.statusCode
-                        )
+                        transactionResult ?: TransactionResult(status = "unknown_error")
                     )
                 )
 

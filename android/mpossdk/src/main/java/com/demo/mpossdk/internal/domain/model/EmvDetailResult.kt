@@ -5,7 +5,7 @@ import kotlinx.parcelize.Parcelize
 import java.util.Date
 
 @Parcelize
-internal data class EmvDetailResult(
+data class EmvDetailResult(
     val iccData: String? = null,
     val cardNo: String? = null,
     val cardSequenceNumber: String? = null,
