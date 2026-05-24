@@ -354,6 +354,12 @@ internal class ProcessingViewModel(
 
             SystemApi.Beep_Api(1)
 
+            val isoMessageBuilder = com.demo.mpossdk.internal.iso8583.IsoMessageBuilder(sessionManager)
+            val isoMsg = isoMessageBuilder.buildPurchaseMessage(emvDetailResult)
+            val prePack = isoMsg.pack()
+            val hexString = org.jpos.iso.ISOUtil.hexString(prePack)
+            emvDetailResult = emvDetailResult.copy(packedIsoMessage = hexString)
+
             _transactionStatusFlow.send(
                 com.demo.mpossdk.open.TransactionResult(
                     status = "emv_data_ready",

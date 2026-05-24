@@ -128,7 +128,8 @@ class MainActivity: FlutterActivity() {
                                         "pinVerificationValue" to emvData.pinVerificationValue,
                                         "cardVerificationValue" to emvData.cardVerificationValue,
                                         "acquirerInstitutionId" to emvData.acquirerInstitutionId,
-                                        "terminalId" to emvData.terminalId
+                                        "terminalId" to emvData.terminalId,
+                                        "packedIsoMessage" to emvData.packedIsoMessage
                                     )
                                 }
                                 
