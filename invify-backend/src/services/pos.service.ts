@@ -18,6 +18,33 @@ export class PosService {
     }
   };
 
+  private static transactionHistory: any[] = [
+    {
+      id: '1',
+      tenantId: 'John Doe Enterprise',
+      terminalId: '20394012',
+      amount: 5000,
+      status: 'Approved',
+      date: new Date().toISOString(),
+      host: 'Medusa',
+      maskedPan: '**** 1234',
+      rrn: '123456789012',
+      stan: '000001'
+    },
+    {
+      id: '2',
+      tenantId: 'Acme Corp',
+      terminalId: '20394013',
+      amount: 150000,
+      status: 'Declined',
+      date: new Date(Date.now() - 3600000).toISOString(),
+      host: 'NIBSS',
+      maskedPan: '**** 5678',
+      rrn: '987654321098',
+      stan: '000002'
+    }
+  ];
+
   static async getRoutingConfig() {
     return this.routingConfig;
   }
@@ -46,8 +73,8 @@ export class PosService {
     // 3. Send via Socket (Simulated for safety/lack of VPN)
     const response = await this.sendToHostSimulated(targetHost, isoMessage);
 
-    // 4. Log the transaction to Supabase/DB
-    await this.logTransaction(params, response);
+    // 4. Log the transaction
+    await this.logTransaction(params, response, targetHost.name);
 
     return response;
   }
@@ -111,38 +138,25 @@ export class PosService {
     };
   }
 
-  private static async logTransaction(params: any, response: any) {
-    // Here we would use supabase to log this into a 'pos_transactions' table
+  private static async logTransaction(params: any, response: any, hostName: string) {
     console.log('[POS Service] Logged transaction for tenant:', params.tenantId);
+    
+    // Save to in-memory history so it shows up on the web
+    this.transactionHistory.unshift({
+      id: Math.random().toString(36).substring(7),
+      tenantId: params.tenantId || 'Unknown Merchant',
+      terminalId: params.terminalId,
+      amount: params.amount,
+      status: response.paymentSuccess ? 'Approved' : 'Declined',
+      date: new Date().toISOString(),
+      host: hostName,
+      maskedPan: response.maskedPan || '**** ****',
+      rrn: response.rrn || 'N/A',
+      stan: response.stan || 'N/A'
+    });
   }
 
   static async getTransactionHistory(tenantId: string) {
-    // Mock history
-    return [
-      {
-        id: '1',
-        tenantId: 'John Doe Enterprise', // Mock Business Owner
-        terminalId: '20394012',
-        amount: 5000,
-        status: 'Approved',
-        date: new Date().toISOString(),
-        host: 'Medusa',
-        maskedPan: '**** 1234',
-        rrn: '123456789012',
-        stan: '000001'
-      },
-      {
-        id: '2',
-        tenantId: 'Acme Corp',
-        terminalId: '20394013',
-        amount: 150000,
-        status: 'Declined',
-        date: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        host: 'NIBSS',
-        maskedPan: '**** 5678',
-        rrn: '987654321098',
-        stan: '000002'
-      }
-    ];
+    return this.transactionHistory;
   }
 }
