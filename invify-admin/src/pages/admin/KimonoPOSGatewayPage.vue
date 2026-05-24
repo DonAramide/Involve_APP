@@ -308,9 +308,14 @@ const chartSeries = computed(() => {
   filteredTransactions.value.forEach(tx => {
     const d = new Date(tx.date);
     const timeKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:00`;
-    if (!grouped[timeKey]) grouped[timeKey] = { approved: 0, declined: 0 };
+    if (!grouped[timeKey]) grouped[timeKey] = { approved: 0, declined: 0, invalidPin: 0, sysError: 0 };
+    
     if (tx.status === 'Approved') {
       grouped[timeKey].approved++;
+    } else if (tx.statusCode === '55') {
+      grouped[timeKey].invalidPin++;
+    } else if (tx.statusCode === '96') {
+      grouped[timeKey].sysError++;
     } else {
       grouped[timeKey].declined++;
     }
@@ -319,10 +324,14 @@ const chartSeries = computed(() => {
   const categories = Object.keys(grouped).sort();
   const approvedData = categories.map(k => grouped[k].approved);
   const declinedData = categories.map(k => grouped[k].declined);
+  const invalidPinData = categories.map(k => grouped[k].invalidPin);
+  const sysErrorData = categories.map(k => grouped[k].sysError);
 
   return [
     { name: 'Approved', data: approvedData },
-    { name: 'Declined', data: declinedData }
+    { name: 'Declined (Other)', data: declinedData },
+    { name: 'Invalid PIN (55)', data: invalidPinData },
+    { name: 'System Error (96)', data: sysErrorData }
   ];
 })
 
@@ -340,7 +349,7 @@ const chartOptions = computed(() => {
     plotOptions: { bar: { horizontal: false, borderRadius: 2 } },
     xaxis: { categories: categories, title: { text: 'Time (Hours)' } },
     yaxis: { title: { text: 'Transaction Count' } },
-    colors: ['#21BA45', '#C10015'],
+    colors: ['#21BA45', '#C10015', '#FF9800', '#9C27B0'],
     dataLabels: { enabled: false },
     theme: { mode: $q.dark.isActive ? 'dark' : 'light' }
   };

@@ -29,7 +29,8 @@ export class PosService {
       host: 'Medusa',
       maskedPan: '**** 1234',
       rrn: '123456789012',
-      stan: '000001'
+      stan: '000001',
+      statusCode: '00'
     },
     {
       id: '2',
@@ -41,7 +42,21 @@ export class PosService {
       host: 'NIBSS',
       maskedPan: '**** 5678',
       rrn: '987654321098',
-      stan: '000002'
+      stan: '000002',
+      statusCode: '55'
+    },
+    {
+      id: '3',
+      tenantId: 'Acme Corp',
+      terminalId: '20394013',
+      amount: 25000,
+      status: 'Declined',
+      date: new Date(Date.now() - 7200000).toISOString(),
+      host: 'NIBSS',
+      maskedPan: '**** 5678',
+      rrn: '987654321099',
+      stan: '000003',
+      statusCode: '96'
     }
   ];
 
@@ -153,6 +168,7 @@ export class PosService {
       maskedPan: response.maskedPan || '**** ****',
       rrn: response.rrn || 'N/A',
       stan: response.stan || 'N/A',
+      statusCode: response.statusCode || (response.paymentSuccess ? '00' : '55'),
       rawRequest: JSON.stringify(params, null, 2),
       rawResponse: JSON.stringify(response, null, 2)
     });
