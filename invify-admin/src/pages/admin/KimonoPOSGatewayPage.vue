@@ -123,15 +123,40 @@
       </q-card-section>
     </q-card>
 
-    <!-- Chart Section -->
+    <!-- Analytics Tabs Section -->
     <q-card flat bordered class="q-mb-md">
-      <q-card-section>
-        <div class="text-h6 text-primary q-mb-md">
-          <q-icon name="trending_up" class="q-mr-sm"/> Transaction Success & Fail Rate
-        </div>
-        <VueApexCharts v-if="chartSeries[0].data.length > 0" type="bar" height="300" :options="chartOptions" :series="chartSeries" />
-        <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
-      </q-card-section>
+      <q-tabs
+        v-model="activeTab"
+        dense
+        class="text-grey"
+        active-color="primary"
+        indicator-color="primary"
+        align="left"
+        narrow-indicator
+      >
+        <q-tab name="successRate" icon="trending_up" label="Success & Fail Rate" />
+        <q-tab name="amount" icon="payments" label="Volume & Profit Rate" />
+        <q-tab name="speed" icon="speed" label="Speed & Uptime" />
+      </q-tabs>
+
+      <q-separator />
+
+      <q-tab-panels v-model="activeTab" animated class="bg-transparent">
+        <q-tab-panel name="successRate">
+          <VueApexCharts v-if="chartSeries[0].data.length > 0" type="bar" height="300" :options="chartOptions" :series="chartSeries" />
+          <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
+        </q-tab-panel>
+
+        <q-tab-panel name="amount">
+          <VueApexCharts v-if="amountSeries[0].data.length > 0" type="area" height="300" :options="amountChartOptions" :series="amountSeries" />
+          <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
+        </q-tab-panel>
+
+        <q-tab-panel name="speed">
+          <VueApexCharts v-if="speedSeries[0].data.length > 0" type="line" height="300" :options="speedChartOptions" :series="speedSeries" />
+          <div v-else class="text-center text-grey-6 q-py-lg">No data available for chart</div>
+        </q-tab-panel>
+      </q-tab-panels>
     </q-card>
 
     <!-- Transactions Table -->
@@ -211,6 +236,7 @@ const saving = ref(false)
 const transactions = ref([])
 const detailsDialog = ref(false)
 const selectedTx = ref(null)
+const activeTab = ref('successRate')
 
 const mockHexRequest = ref("0200 4220000000000000 000000 000000001388...")
 const mockHexResponse = ref("0210 4220000000000000 000000 000000001388 00...")
@@ -284,6 +310,94 @@ const chartOptions = computed(() => {
     xaxis: { categories: categories, title: { text: 'Time (Hours)' } },
     yaxis: { title: { text: 'Transaction Count' } },
     colors: ['#21BA45', '#C10015'],
+    dataLabels: { enabled: false },
+    theme: { mode: $q.dark.isActive ? 'dark' : 'light' }
+  };
+})
+
+const amountSeries = computed(() => {
+  const grouped = {};
+  filteredTransactions.value.forEach(tx => {
+    const d = new Date(tx.date);
+    const timeKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:00`;
+    if (!grouped[timeKey]) grouped[timeKey] = { amount: 0, profit: 0 };
+    if (tx.status === 'Approved') {
+      grouped[timeKey].amount += tx.amount;
+      grouped[timeKey].profit += (tx.amount * 0.015); // 1.5% profit margin
+    }
+  });
+
+  const categories = Object.keys(grouped).sort();
+  const volumeData = categories.map(k => grouped[k].amount);
+  const profitData = categories.map(k => grouped[k].profit);
+
+  return [
+    { name: 'Total Volume (₦)', data: volumeData },
+    { name: 'Profit (₦)', data: profitData }
+  ];
+})
+
+const amountChartOptions = computed(() => {
+  const grouped = {};
+  filteredTransactions.value.forEach(tx => {
+    const d = new Date(tx.date);
+    const timeKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:00`;
+    grouped[timeKey] = true;
+  });
+  const categories = Object.keys(grouped).sort();
+
+  return {
+    chart: { type: 'area', toolbar: { show: true }, background: 'transparent' },
+    stroke: { curve: 'smooth', width: 2 },
+    xaxis: { categories: categories, title: { text: 'Time (Hours)' } },
+    yaxis: { title: { text: 'Amount (₦)' } },
+    colors: ['#1976D2', '#FF9800'],
+    dataLabels: { enabled: false },
+    theme: { mode: $q.dark.isActive ? 'dark' : 'light' }
+  };
+})
+
+const speedSeries = computed(() => {
+  const grouped = {};
+  filteredTransactions.value.forEach(tx => {
+    const d = new Date(tx.date);
+    const timeKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:00`;
+    if (!grouped[timeKey]) grouped[timeKey] = { speedSum: 0, count: 0, uptimeSum: 0 };
+    
+    // Mocking speed between 150ms and 350ms, uptime around 99.5 to 100
+    grouped[timeKey].speedSum += (150 + Math.random() * 200);
+    grouped[timeKey].uptimeSum += (99.0 + Math.random() * 1.0);
+    grouped[timeKey].count++;
+  });
+
+  const categories = Object.keys(grouped).sort();
+  const speedData = categories.map(k => Math.round(grouped[k].speedSum / grouped[k].count));
+  const uptimeData = categories.map(k => +(grouped[k].uptimeSum / grouped[k].count).toFixed(2));
+
+  return [
+    { name: 'Avg Speed (ms)', type: 'line', data: speedData },
+    { name: 'Uptime (%)', type: 'line', data: uptimeData }
+  ];
+})
+
+const speedChartOptions = computed(() => {
+  const grouped = {};
+  filteredTransactions.value.forEach(tx => {
+    const d = new Date(tx.date);
+    const timeKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:00`;
+    grouped[timeKey] = true;
+  });
+  const categories = Object.keys(grouped).sort();
+
+  return {
+    chart: { type: 'line', toolbar: { show: true }, background: 'transparent' },
+    stroke: { width: [3, 3] },
+    xaxis: { categories: categories, title: { text: 'Time (Hours)' } },
+    yaxis: [
+      { title: { text: 'Speed (ms)' } },
+      { opposite: true, title: { text: 'Uptime (%)' }, min: 90, max: 100 }
+    ],
+    colors: ['#9C27B0', '#00BCD4'],
     dataLabels: { enabled: false },
     theme: { mode: $q.dark.isActive ? 'dark' : 'light' }
   };
