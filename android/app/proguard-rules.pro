@@ -7,3 +7,7 @@
 -keep interface okhttp3.** { *; }
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# Avoid R8 Missing Class Warnings
+-dontwarn javax.xml.stream.**
+-dontwarn java.lang.invoke.StringConcatFactory

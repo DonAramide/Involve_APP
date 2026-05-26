@@ -772,7 +772,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Enterprise Billing & Fees', path: '/admin/billing', icon: 'payments', color: 'teal-4', badge: 'Finance', badgeBg: 'teal-10', badgeColor: 'teal-2' },
-        { label: 'EMV POS Gateway', path: '/admin/kimono', icon: 'point_of_sale', color: 'purple-4', badge: 'EMV', badgeBg: 'purple-10', badgeColor: 'purple-2' }
+        { label: 'EMV POS Gateway', path: '/admin/pos-gateway', icon: 'point_of_sale', color: 'purple-4', badge: 'LIVE', badgeBg: 'purple-10', badgeColor: 'purple-2' }
       ]
   }
 })
@@ -837,7 +837,8 @@ const getMenuDescription = (label) => {
     'Tenants Identity Matrix': 'Manage tenant registrations, approve incoming business profiles, provision database schemas, and view indices.',
     'Operators Access Profiles': 'Configure internal administrative operator profiles, map RBAC scopes, and verify MFA parameters.',
     'Tenant Orchestration': 'Authoritatively manage backend feature flags, reactive JSON branding tokens, and tier consumption limits.',
-    'Enterprise Billing & Fees': 'Govern subscription plans, transaction processing fees, settlement splits, and live treasury logs.'
+    'Enterprise Billing & Fees': 'Govern subscription plans, transaction processing fees, settlement splits, and live treasury logs.',
+    'EMV POS Gateway': 'Live switchboard for routing EMV card transactions between Cpoint-Kimono (HTTPS REST), Medusa (ISO8583 TCP), and NIBSS — with real-time failover, terminal key cache management, and a full transaction log.'
   }
   return descriptions[label] || 'Access and govern this administrative module.'
 }

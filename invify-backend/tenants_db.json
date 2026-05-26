@@ -72,9 +72,20 @@
     "type": "services",
     "plan": "standard",
     "status": "active",
-    "agent_code": "Aaa555",
-    "location": "Lat: 6.6241, Lng: 3.4800",
-    "device_id": "M1AJQ",
+    "agent_code": "AAA000",
+    "location": "Lat: 6.6257, Lng: 3.4782",
+    "device_id": "PPR1.180610.011",
     "created_at": "2026-05-24T16:34:43.822Z"
+  },
+  {
+    "id": "tenant-1779711092175",
+    "name": "My01",
+    "type": "retail",
+    "plan": "standard",
+    "status": "active",
+    "agent_code": "AAA000",
+    "location": "Lat: 6.6257, Lng: 3.4782",
+    "device_id": "PPR1.180610.011",
+    "created_at": "2026-05-25T12:11:32.176Z"
   }
 ]

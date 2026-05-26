@@ -268,180 +268,197 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                     onPressed: (invoiceState.isSaving || invoiceState.isGeneratingAccount || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
-                      // (Dynamic Virtual Account Generation removed)
-
-                      if (invoiceState.paymentMethod == 'POS') {
-                        final terminalId = await StorageService.getMposTerminalId();
-                        if (terminalId == null || terminalId.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please configure POS Terminal ID in Printer Settings first.'), backgroundColor: Colors.red),
-                          );
-                          return;
-                        }
-
-                        // Network Check
-                        final connectivityResult = await Connectivity().checkConnectivity();
-                        if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
+                      try {
+                        if (invoiceState.paymentMethod == 'POS') {
+                          final terminalId = await StorageService.getMposTerminalId();
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('No internet connection. POS requires an active network.'), backgroundColor: Colors.red),
+                          if (terminalId == null || terminalId.isEmpty) {
+                            await showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('POS Not Configured'),
+                                content: const Text('Please configure your POS Terminal ID in Printer Settings first.'),
+                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+                              ),
+                            );
+                            return;
+                          }
+
+                          // Network Check
+                          final connectivityResult = await Connectivity().checkConnectivity();
+                          if (!mounted) return;
+                          if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
+                            await showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('No Internet'),
+                                content: const Text('POS requires an active network connection.'),
+                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+                              ),
+                            );
+                            return;
+                          }
+
+                          final amountToCharge = invoiceState.total;
+                          
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Confirm POS Payment'),
+                              content: Text('Charge ${CurrencyFormatter.formatWithSymbol(amountToCharge, symbol: settings?.currency ?? '₦')} to POS terminal?'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
+                                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('CHARGE')),
+                              ],
+                            ),
                           );
-                          return;
-                        }
+                          
+                          if (confirm != true) return;
 
-                        final amountToCharge = invoiceState.total;
-                        
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Confirm POS Payment'),
-                            content: Text('Charge ${CurrencyFormatter.formatWithSymbol(amountToCharge, symbol: settings?.currency ?? '₦')} to POS terminal?'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
-                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('CHARGE')),
-                            ],
-                          ),
-                        );
-                        
-                        if (confirm != true) return;
-
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending to POS...')));
-                        
-                        try {
+                          if (!mounted) return;
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => const Center(child: CircularProgressIndicator()),
+                          );
+                          
                           final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
                           if (!mounted) return;
-                          
+                          Navigator.pop(context); // Close loading
+
                           if (result.status == 'emv_data_ready' && result.emvData != null) {
-                            try {
-                              final financeRepo = context.read<FinanceRepository>();
-                              final backendResponse = await financeRepo.apiClient.post(
-                                '/api/pos/transaction',
-                                data: {
-                                  'terminalId': terminalId,
-                                  'amount': amountToCharge,
-                                  'emvData': result.emvData!.toJson(),
-                                },
-                              );
-                              
-                              if (backendResponse.statusCode != 200) {
-                                throw Exception("Transaction failed on backend");
-                              }
-                              final respData = backendResponse.data;
-                              if (respData['paymentSuccess'] != true) {
-                                throw Exception("Declined by POS Host (Code: ${respData['statusCode'] ?? 'Unknown'})");
-                              }
-                            } catch (e) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('POS Backend Error: $e'), 
-                                  backgroundColor: Colors.red,
-                                  duration: const Duration(seconds: 5),
+                            final financeRepo = context.read<FinanceRepository>();
+                            final backendResponse = await financeRepo.apiClient.post(
+                              '/api/pos/transaction',
+                              data: {
+                                'terminalId': terminalId,
+                                'amount': amountToCharge,
+                                'emvData': result.emvData!.toJson(),
+                              },
+                            );
+                            if (!mounted) return;
+                            if (backendResponse.statusCode != 200 || backendResponse.data['paymentSuccess'] != true) {
+                              final code = backendResponse.data['statusCode'] ?? 'Unknown';
+                              await showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('POS Declined'),
+                                  content: Text('Transaction declined by host (Code: $code).'),
+                                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
                                 ),
                               );
                               return;
                             }
                           } else if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
-                            String errorMessage = result.error?.message ?? result.transaction?.message ?? "Unknown Error";
+                            String errorMessage = result.error?.message ?? result.transaction?.message ?? 'Unknown Error';
                             if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
                               final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);
-                              errorMessage = "Code ${result.transaction!.statusCode}: $codeMsg";
+                              errorMessage = 'Code ${result.transaction!.statusCode}: $codeMsg';
                             }
-                            
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('POS Payment Failed: $errorMessage'), 
-                                backgroundColor: Colors.red,
-                                duration: const Duration(seconds: 5),
+                            if (!mounted) return;
+                            await showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('POS Payment Failed'),
+                                content: Text(errorMessage),
+                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
                               ),
                             );
                             return;
                           }
+                          if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('POS Payment Approved!'), backgroundColor: Colors.green),
                           );
-                        } catch (e) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('POS Error: $e'), backgroundColor: Colors.red),
-                          );
-                          return;
                         }
-                      }
 
-                      final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
-                      
-                      // Safety check for significant overpayment
-                      if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
-                        final proceed = await showDialog<bool>(
+                        final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
+
+                        // Safety check for significant overpayment
+                        if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
+                          final proceed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Confirm Overpayment'),
+                              content: const Text('The amount received is significantly higher than the total. Proceed?'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('NO, CORRECT IT')),
+                                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('YES, PROCEED')),
+                              ],
+                            ),
+                          );
+                          if (proceed != true) return;
+                        }
+
+                        final invoiceNumber = widget.invoiceBloc.calculationService.generateInvoiceNumber();
+                        widget.invoiceBloc.add(SaveInvoice(
+                          invoiceNumber: invoiceNumber,
+                          amountPaid: amountReceived,
+                        ));
+
+                        await Future.delayed(const Duration(milliseconds: 300));
+
+                        // Create invoice object for printing
+                        final status = amountReceived >= invoiceState.total
+                            ? 'Paid'
+                            : (amountReceived <= 0 ? 'Unpaid' : 'Partial');
+                        final invoice = Invoice(
+                          id: 0,
+                          invoiceNumber: invoiceNumber,
+                          dateCreated: DateTime.now(),
+                          items: List.from(invoiceState.items),
+                          subtotal: invoiceState.subtotal,
+                          taxAmount: invoiceState.tax,
+                          discountAmount: widget.invoiceBloc.calculationService.calculateDiscountAmount(
+                            invoiceState.subtotal,
+                            invoiceState.tax,
+                            invoiceState.discount,
+                            invoiceState.discountType,
+                          ),
+                          discountType: invoiceState.discountType,
+                          totalAmount: invoiceState.total,
+                          paymentStatus: status,
+                          amountPaid: amountReceived,
+                          balanceAmount: (invoiceState.total - amountReceived).clamp(0, double.infinity),
+                          customerName: invoiceState.customerName,
+                          customerPhone: invoiceState.customerPhone,
+                          customerAddress: invoiceState.customerAddress,
+                          paymentMethod: invoiceState.paymentMethod,
+                          staffId: invoiceState.staffId,
+                          staffName: invoiceState.staffName,
+                          totalPrintAmount: widget.invoiceBloc.calculationService.calculateTotalPrintAmount(
+                            invoiceState.items,
+                            invoiceState.taxRate,
+                            invoiceState.taxEnabled,
+                            invoiceState.discount,
+                            invoiceState.discountType,
+                          ),
+                          businessMode: invoiceState.businessMode,
+                          studentId: invoiceState.studentId,
+                          classId: invoiceState.classId,
+                          termId: invoiceState.termId,
+                          academicYearId: invoiceState.academicYearId,
+                          admissionNumber: invoiceState.admissionNumber,
+                          className: invoiceState.className,
+                          termName: invoiceState.termName,
+                          academicYearName: invoiceState.academicYearName,
+                          studentImage: invoiceState.studentImage,
+                          warrantyDuration: invoiceState.warrantyDuration,
+                        );
+
+                        _printInvoice(context, invoice, settings!);
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invoice saved!')));
+                      } catch (e) {
+                        if (!mounted) return;
+                        await showDialog(
                           context: context,
                           builder: (ctx) => AlertDialog(
-                            title: const Text('Confirm Overpayment'),
-                            content: Text('The amount received ($amountReceived) is significantly higher than the total (${invoiceState.total}). Are you sure you want to proceed?'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('NO, CORRECT IT')),
-                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('YES, PROCEED')),
-                            ],
+                            title: const Text('Error'),
+                            content: Text(e.toString()),
+                            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
                           ),
                         );
-                        if (proceed != true) return;
                       }
-
-                      final invoiceNumber = widget.invoiceBloc.calculationService.generateInvoiceNumber();
-                      
-                      widget.invoiceBloc.add(SaveInvoice(
-                        invoiceNumber: invoiceNumber,
-                        amountPaid: amountReceived,
-                      ));
-
-                      // Create invoice object for printing
-                      final status = amountReceived >= invoiceState.total ? 'Paid' : (amountReceived <= 0 ? 'Unpaid' : 'Partial');
-                      final invoice = Invoice(
-                        id: 0,
-                        invoiceNumber: invoiceNumber,
-                        dateCreated: DateTime.now(),
-                        items: List.from(invoiceState.items),
-                        subtotal: invoiceState.subtotal,
-                        taxAmount: invoiceState.tax,
-                        discountAmount: widget.invoiceBloc.calculationService.calculateDiscountAmount(
-                          invoiceState.subtotal, 
-                          invoiceState.tax, 
-                          invoiceState.discount, 
-                          invoiceState.discountType,
-                        ),
-                        discountType: invoiceState.discountType,
-                        totalAmount: invoiceState.total,
-                        paymentStatus: status,
-                        amountPaid: amountReceived,
-                        balanceAmount: (invoiceState.total - amountReceived).clamp(0, double.infinity),
-                        customerName: invoiceState.customerName,
-                        customerPhone: invoiceState.customerPhone,
-                        customerAddress: invoiceState.customerAddress,
-                        paymentMethod: invoiceState.paymentMethod,
-                        staffId: invoiceState.staffId,
-                        staffName: invoiceState.staffName,
-                        totalPrintAmount: widget.invoiceBloc.calculationService.calculateTotalPrintAmount(
-                          invoiceState.items, 
-                          invoiceState.taxRate, 
-                          invoiceState.taxEnabled, 
-                          invoiceState.discount,
-                          invoiceState.discountType,
-                        ),
-                        businessMode: invoiceState.businessMode,
-                        studentId: invoiceState.studentId,
-                        classId: invoiceState.classId,
-                        termId: invoiceState.termId,
-                        academicYearId: invoiceState.academicYearId,
-                        admissionNumber: invoiceState.admissionNumber,
-                        className: invoiceState.className,
-                        termName: invoiceState.termName,
-                        academicYearName: invoiceState.academicYearName,
-                        studentImage: invoiceState.studentImage,
-                        warrantyDuration: invoiceState.warrantyDuration,
-                      );
-
-                      _printInvoice(context, invoice, settings!);
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Processing... please wait.')));
                     },
                     child: (invoiceState.isSaving || invoiceState.isGeneratingAccount)
                       ? const Text('PROCESSING...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))
@@ -449,29 +466,39 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   ),
                   ElevatedButton(
                     onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
+                      try {
                       final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
 
                       if (invoiceState.paymentMethod == 'POS') {
                         final terminalId = await StorageService.getMposTerminalId();
+                        if (!mounted) return;
                         if (terminalId == null || terminalId.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Please configure POS Terminal ID in Printer Settings first.'), backgroundColor: Colors.red),
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('POS Not Configured'),
+                              content: const Text('Please configure your POS Terminal ID in Printer Settings first.'),
+                              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+                            ),
                           );
                           return;
                         }
 
-                        // Network Check
                         final connectivityResult = await Connectivity().checkConnectivity();
+                        if (!mounted) return;
                         if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('No internet connection. POS requires an active network.'), backgroundColor: Colors.red),
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('No Internet'),
+                              content: const Text('POS requires an active network connection.'),
+                              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+                            ),
                           );
                           return;
                         }
 
                         final amountToCharge = invoiceState.total;
-                        
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
@@ -483,71 +510,54 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             ],
                           ),
                         );
-                        
                         if (confirm != true) return;
 
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending to POS...')));
-                        
-                        try {
-                          final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
-                          if (!mounted) return;
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending to POS terminal…')));
 
-                          if (result.status == 'emv_data_ready' && result.emvData != null) {
-                            try {
-                              final financeRepo = context.read<FinanceRepository>();
-                              final backendResponse = await financeRepo.apiClient.post(
-                                '/api/pos/transaction',
-                                data: {
-                                  'terminalId': terminalId,
-                                  'amount': amountToCharge,
-                                  'emvData': result.emvData!.toJson(),
-                                },
-                              );
-                              
-                              if (backendResponse.statusCode != 200) {
-                                throw Exception("Transaction failed on backend");
-                              }
-                              final respData = backendResponse.data;
-                              if (respData['paymentSuccess'] != true) {
-                                throw Exception("Declined by POS Host (Code: ${respData['statusCode'] ?? 'Unknown'})");
-                              }
-                            } catch (e) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('POS Backend Error: $e'), 
-                                  backgroundColor: Colors.red,
-                                  duration: const Duration(seconds: 5),
-                                ),
-                              );
-                              return;
-                            }
-                          } else if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
-                            String errorMessage = result.error?.message ?? result.transaction?.message ?? "Unknown Error";
-                            if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
-                              final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);
-                              errorMessage = "Code ${result.transaction!.statusCode}: $codeMsg";
-                            }
-                            
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('POS Payment Failed: $errorMessage'), 
-                                backgroundColor: Colors.red,
-                                duration: const Duration(seconds: 5),
+                        final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
+                        if (!mounted) return;
+
+                        if (result.status == 'emv_data_ready' && result.emvData != null) {
+                          final financeRepo = context.read<FinanceRepository>();
+                          final backendResponse = await financeRepo.apiClient.post(
+                            '/api/pos/transaction',
+                            data: {'terminalId': terminalId, 'amount': amountToCharge, 'emvData': result.emvData!.toJson()},
+                          );
+                          if (!mounted) return;
+                          if (backendResponse.statusCode != 200 || backendResponse.data['paymentSuccess'] != true) {
+                            final code = backendResponse.data['statusCode'] ?? 'Unknown';
+                            await showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('POS Declined'),
+                                content: Text('Transaction declined (Code: $code).'),
+                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
                               ),
                             );
                             return;
                           }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('POS Payment Approved!'), backgroundColor: Colors.green),
-                          );
-                        } catch (e) {
+                        } else if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
+                          String errorMessage = result.error?.message ?? result.transaction?.message ?? 'Unknown Error';
+                          if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
+                            final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);
+                            errorMessage = 'Code ${result.transaction!.statusCode}: $codeMsg';
+                          }
                           if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('POS Error: $e'), backgroundColor: Colors.red),
+                          await showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('POS Payment Failed'),
+                              content: Text(errorMessage),
+                              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+                            ),
                           );
                           return;
                         }
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('POS Payment Approved!'), backgroundColor: Colors.green),
+                        );
                       }
 
                       // Safety check for significant overpayment
@@ -621,6 +631,17 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                       );
 
                       Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));
+                      } catch (e) {
+                        if (!mounted) return;
+                        await showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Error'),
+                            content: Text(e.toString()),
+                            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+                          ),
+                        );
+                      }
                     },
                     child: invoiceState.isSaving ? const Text('SAVING...') : Text(invoiceState.paymentMethod == 'POS' ? 'CHARGE POS & PREVIEW' : 'SAVE & PREVIEW'),
                   ),

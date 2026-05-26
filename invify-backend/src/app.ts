@@ -184,11 +184,14 @@ app.get('/api/payout/history', authenticate, PayoutController.getHistory);
 // Executive Dashboard
 app.get('/api/finance/executive-summary', authenticate, ExecutiveFinanceController.getSummary);
 
-// POS Operations (Kimono)
+// POS Operations (Medusa | Cpoint-Kimono | NIBSS)
 app.post('/api/pos/transaction', authenticate, PosController.processTransaction);
 app.get('/api/pos/history', authenticate, PosController.getTransactionHistory);
+app.post('/api/pos/test-iso', authenticate, PosController.testIso);  // ISO8583 debug parser
 app.get('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.getRoutingConfig);
 app.post('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.updateRoutingConfig);
+app.post('/admin/pos/kimono-params/refresh', authenticate, checkRole(['super_admin']), PosController.refreshKimonoParams);
+
 
 // Defaulters System
 app.get('/api/finance/defaulters', authenticate, DefaultersController.getDefaulters);

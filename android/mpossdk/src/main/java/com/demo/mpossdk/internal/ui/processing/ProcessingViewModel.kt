@@ -356,6 +356,15 @@ internal class ProcessingViewModel(
 
             val isoMessageBuilder = com.demo.mpossdk.internal.iso8583.IsoMessageBuilder(sessionManager)
             val isoMsg = isoMessageBuilder.buildPurchaseMessage(emvDetailResult)
+            
+            // Log the ISOMsg in XML format
+            try {
+                val baos = java.io.ByteArrayOutputStream()
+                val ps = java.io.PrintStream(baos)
+                isoMsg.dump(ps, "")
+                com.demo.mpossdk.internal.utils.LogUtil.i("ISO8583 Dump:\n${baos.toString("UTF-8")}")
+            } catch (e: Throwable) {}
+
             val prePack = isoMsg.pack()
             val hexString = org.jpos.iso.ISOUtil.hexString(prePack)
             emvDetailResult = emvDetailResult.copy(packedIsoMessage = hexString)
@@ -431,7 +440,9 @@ internal class ProcessingViewModel(
         //Track2Data
         result = CommonApi.Common_GetTLV_Api(0x57, buf, len)
         if (result == 0) {
-            val track2 = CommonConvert.bcdToASCString(buf, 0, len[0])
+            var track2 = CommonConvert.bcdToASCString(buf, 0, len[0])
+            // Fix Medusa ISO parser bug: strip trailing BCD padding 'F'
+            track2 = track2.trimEnd('F', 'f')
             emvDetailResult = emvDetailResult.copy(track2Data = track2)
 
             //AcquirerInstitutionId

@@ -98,4 +98,18 @@ export const reconciliationApi = {
   fixIssue: (data) => api.post('/reconciliation/fix', data)
 };
 
+export const posApi = {
+  // Routing configuration (super_admin only)
+  getRoutingConfig:    ()     => api.get('/admin/pos/routing'),
+  updateRoutingConfig: (data) => api.post('/admin/pos/routing', data),
+
+  // Transaction history
+  getHistory: () => api.get('/api/pos/history'),
+
+  // Kimono terminal key refresh (super_admin only)
+  refreshKimonoParams: (terminalId) =>
+    api.post('/admin/pos/kimono-params/refresh', { terminalId }),
+};
+
 export default api;
+

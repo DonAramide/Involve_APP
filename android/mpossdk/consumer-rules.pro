@@ -44,9 +44,7 @@
 }
 
 -dontwarn org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider
--dontwarn org.jdom2.Element
--dontwarn org.jdom2.output.Format
--dontwarn org.jdom2.output.XMLOutputter
+-keep class org.jdom2.** { *; }
 
 -dontwarn javax.naming.**
 
