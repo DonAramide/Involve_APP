@@ -696,6 +696,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Fleet Overview', path: '/fleet/overview', icon: 'speed', color: 'cyan-4', count: `${throttledCounters.value.fleetDevices}/18`, hasStream: true },
         // Tenant scope-aware routing construction mapping natively to the router profiles
         { label: 'Device Explorer', path: `${tScope}/fleet/devices`, icon: 'devices', color: 'cyan-3', badge: `${throttledCounters.value.fleetDevices} Edge`, badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
+        { label: 'Terminal Management', path: '/fleet/terminals', icon: 'point_of_sale', color: 'teal-3', badge: 'POS', badgeBg: 'teal-10', badgeColor: 'teal-2' },
         { label: 'Device Activation Hub', path: '/devices', icon: 'vpn_key', color: 'amber-4', badge: 'ACTIVATOR', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Live Presence Map', path: '/fleet/presence', icon: 'radar', color: 'cyan-4', hasStream: true },
         { label: 'Device Groups Array', path: '/fleet/groups', icon: 'group_work', color: 'grey-4' },
@@ -767,7 +768,7 @@ const activeNavigationTree = computed(() => {
     case 'admin':
     default:
       return [
-        { label: 'Global Setup & RBAC', path: '/admin/settings', icon: 'settings', color: 'grey-4' },
+        { label: 'Contact Maintenance', path: '/admin/settings', icon: 'contact_phone', color: 'cyan-4' },
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },

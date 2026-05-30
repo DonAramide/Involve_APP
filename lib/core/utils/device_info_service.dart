@@ -64,6 +64,7 @@ class DeviceInfoService {
     String osVersion = 'UNKNOWN';
     bool isPhysicalDevice = false;
     String os = 'UNKNOWN';
+    String? serialNumber;
 
     try {
       if (kIsWeb) {
@@ -81,6 +82,8 @@ class DeviceInfoService {
         brand = androidInfo.brand;
         osVersion = androidInfo.version.release;
         isPhysicalDevice = androidInfo.isPhysicalDevice;
+        // The serialNumber getter was completely removed from device_info_plus in version 4.0.0+
+        // because it requires READ_PHONE_STATE permissions and is deprecated in Android 10+.
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final iosInfo = await _deviceInfo.iosInfo;
         deviceId = iosInfo.identifierForVendor ?? 'IOS-DEVICE';
@@ -115,6 +118,8 @@ class DeviceInfoService {
       'brand': brand,
       'osVersion': osVersion,
       'isPhysicalDevice': isPhysicalDevice,
+      'androidId': defaultTargetPlatform == TargetPlatform.android ? deviceId : null,
+      'serialNumber': serialNumber,
     };
   }
 }

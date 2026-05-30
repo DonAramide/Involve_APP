@@ -94,6 +94,11 @@ const routes = [
         component: () => import('pages/DashboardPage.vue'),
         meta: { title: 'Remote Action Triggers', workspace: 'fleet', permission: 'execute_actions', requiresAuth: true }
       },
+      { 
+        path: 'fleet/terminals', 
+        component: () => import('pages/terminal-management/TerminalManagementPage.vue'),
+        meta: { title: 'Terminal Management Center', workspace: 'fleet', permission: 'read_devices', requiresAuth: true }
+      },
 
       // ==========================================
       // PRIORITY WORKSPACE 2: GOVERNANCE
@@ -229,7 +234,7 @@ const routes = [
       { path: 'incidents/active', component: () => import('pages/DashboardPage.vue'), meta: { workspace: 'incidents', title: 'Active Incidents', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/tenants', component: () => import('pages/TenantsPage.vue'), meta: { workspace: 'admin', title: 'Tenants', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/users', component: () => import('pages/UsersPage.vue'), meta: { workspace: 'admin', title: 'Operators', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'admin/settings', component: () => import('pages/IndexPage.vue'), meta: { workspace: 'admin', title: 'Global Settings', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/settings', component: () => import('pages/governance/ContactMaintenancePage.vue'), meta: { workspace: 'admin', title: 'Global Settings', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/orchestration', component: () => import('pages/admin/TenantOrchestrationCenterPage.vue'), meta: { workspace: 'admin', title: 'Tenant Orchestration', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/billing', component: () => import('pages/admin/BillingGovernanceCenterPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Billing & Revenue', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/pos-gateway', component: () => import('pages/PosGatewayPage.vue'), meta: { workspace: 'admin', title: 'EMV POS Gateway', permission: 'admin_deploy', requiresAuth: true } },

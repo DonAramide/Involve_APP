@@ -10,6 +10,9 @@ import '../../../settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import 'package:involve_app/core/license/storage_service_native.dart';
 import 'package:involve_app/services/mpos_service.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:involve_app/features/admin/presentation/widgets/device_access_dialog.dart';
 
 class PrinterSettingsPage extends StatefulWidget {
   const PrinterSettingsPage({super.key});
@@ -22,27 +25,212 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
   final TextEditingController _mposTerminalIdController = TextEditingController();
   final MposService _mposService = MposService();
 
+  // Server-provisioned terminal config (read-only)
+  TerminalConfig? _terminalConfig;
+  bool _isSyncing = false;
+  String? _syncError;
+  String? _mposSerialNumber;
+  DateTime? _lastSyncTime;
+  String _deviceId = '';
+
   @override
   void initState() {
     super.initState();
-    // Check connection status when entering the page
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PrinterBloc>().add(CheckConnectionStatus());
     });
-    _loadMposTerminalId();
+    _initTerminalSync();
   }
 
-  Future<void> _loadMposTerminalId() async {
-    final terminalId = await StorageService.getMposTerminalId();
-    if (terminalId != null && mounted) {
-      _mposTerminalIdController.text = terminalId;
+  Future<void> _initTerminalSync() async {
+    final details = await DeviceInfoService.getDeviceDetails();
+    _deviceId = details['deviceId'];
+    
+    // Fetch MPOS Serial from paired Bluetooth name
+    final mposSn = await _mposService.getMposSerialNumber();
+
+    final cached = await TerminalSyncService.loadCachedConfig();
+    _lastSyncTime = await TerminalSyncService.getLastSyncTime();
+
+    if (mounted) {
+      setState(() {
+        _terminalConfig = cached;
+        _mposSerialNumber = mposSn;
+      });
+    }
+
+    await _syncTerminalConfig(showLoading: false);
+  }
+
+  Future<void> _syncTerminalConfig({bool showLoading = true}) async {
+    final details = await DeviceInfoService.getDeviceDetails();
+    if (_deviceId.isEmpty || _deviceId == 'UNKNOWN_DEVICE') {
+      _deviceId = details['deviceId'];
+    }
+    final settingsBloc = context.read<SettingsBloc>();
+    final businessName = settingsBloc.state.settings?.organizationName;
+    final enrollmentKey = await StorageService.getLicense();
+    
+    final mposSn = await _mposService.getMposSerialNumber();
+
+    final androidId = details['androidId'] as String?;
+    final serialNum = details['serialNumber'] as String?;
+
+    if (showLoading && mounted) setState(() { 
+      _isSyncing = true; 
+      _syncError = null; 
+      _terminalConfig = null;
+    });
+
+    try {
+      final config = await TerminalSyncService.syncTerminalConfig(
+        deviceId: _deviceId,
+        androidId: androidId,
+        serialNumber: serialNum,
+        businessName: businessName,
+        enrollmentKey: enrollmentKey,
+      );
+      _lastSyncTime = await TerminalSyncService.getLastSyncTime();
+      if (mounted) {
+        setState(() {
+          _terminalConfig = config;
+          _mposSerialNumber = mposSn;
+          _isSyncing = false;
+          _syncError = null;
+        });
+
+        // Enforce validations and disconnect invalid hardware
+        final connectedPrinterMac = context.read<PrinterBloc>().state.connectedDevice?.address;
+        final isPrinterMismatch = config.printerMac != null && connectedPrinterMac != null && config.printerMac != connectedPrinterMac;
+        final isMposMismatch = config.posSerialNumber != null && mposSn != null && mposSn.isNotEmpty && config.posSerialNumber != mposSn;
+
+        if (isPrinterMismatch) {
+          context.read<PrinterBloc>().add(DisconnectPrinter());
+        }
+
+        if (isMposMismatch) {
+          await _mposService.unpairDevice();
+          if (mounted) {
+             setState(() {
+               _mposSerialNumber = null;
+             });
+          }
+        }
+
+        if (!config.assigned && showLoading) {
+           final supportPhone = config.supportPhone ?? context.read<SettingsBloc>().state.settings?.phone;
+           final phoneDisplay = (supportPhone != null && supportPhone.isNotEmpty) 
+               ? supportPhone 
+               : "the number maintained on your web configuration page";
+               
+           if (mounted) {
+             showDialog(
+               context: context,
+               builder: (ctx) => AlertDialog(
+                 title: const Row(
+                   children: [
+                     Icon(Icons.info_outline, color: Colors.blue),
+                     SizedBox(width: 8),
+                     Text('Terminal Unassigned'),
+                   ],
+                 ),
+                 content: Text('${config.message ?? "No terminal assigned to this device"}\n\nPlease contact Invify admin on $phoneDisplay.'),
+                 actions: [
+                   TextButton(
+                     onPressed: () => Navigator.of(ctx).pop(),
+                     child: const Text('OK'),
+                   ),
+                 ],
+               ),
+             );
+           }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        String errorMsg = e.toString().replaceFirst('Exception: ', '');
+        
+        // Provide user-friendly messages for common network errors
+        if (errorMsg.contains('SocketException') || errorMsg.contains('ClientException')) {
+          errorMsg = 'Unable to connect to the Invify Server. Please check your internet connection.';
+        } else if (errorMsg.contains('404')) {
+          errorMsg = 'System not connecting or backend not responding (404 Not Found).';
+        } else if (errorMsg.contains('502')) {
+          errorMsg = 'Bad Gateway: The server is currently unreachable or down for maintenance.';
+        }
+
+        setState(() {
+          _isSyncing = false;
+          _syncError = errorMsg;
+          _mposSerialNumber = mposSn;
+        });
+        
+        if (showLoading) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.wifi_off, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Connection Error'),
+                ],
+              ),
+              content: Text(errorMsg),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
     }
   }
 
   @override
   void dispose() {
-    _mposTerminalIdController.dispose();
     super.dispose();
+  }
+
+  void _showDeviceDetails(BuildContext context) async {
+    final granted = await showDialog<bool>(
+      context: context,
+      builder: (context) => const DeviceAccessDialog(),
+    );
+
+    if (granted == true && context.mounted) {
+      final deviceInfo = await DeviceInfoService.getDeviceDetails();
+      
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Device Telemetry Identity'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Hardware ID: ${deviceInfo['deviceId'] ?? 'Unknown'}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Manufacturer: ${deviceInfo['brand'] ?? 'Unknown'}'),
+              Text('Model: ${deviceInfo['model'] ?? 'Unknown'}'),
+              Text('OS Version: ${deviceInfo['osVersion'] ?? 'Unknown'}'),
+              const SizedBox(height: 8),
+              Text('License Suffix: ${deviceInfo['deviceSuffix'] ?? 'Unknown'}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -52,6 +240,13 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Device Configuration'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings),
+              tooltip: 'Device Details',
+              onPressed: () => _showDeviceDetails(context),
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.print), text: 'Receipt Printer'),
@@ -220,8 +415,139 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
             ),
             
             // POS TERMINAL TAB
-            SingleChildScrollView(
-              child: _buildMposSettings(context),
+            RefreshIndicator(
+              onRefresh: () => _syncTerminalConfig(showLoading: true),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'POS Terminal Configuration',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        if (_isSyncing)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          IconButton(
+                            icon: const Icon(Icons.sync, color: Colors.teal, size: 20),
+                            onPressed: () => _syncTerminalConfig(showLoading: true),
+                            tooltip: 'Force Sync Config',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Provisioned by Invify Operations — read-only',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (_syncError != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Sync Failed: $_syncError\nCheck your network connection and try again.',
+                                style: const TextStyle(color: Colors.red, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    _buildTerminalStatusCard(),
+
+                    const SizedBox(height: 24),
+                    
+                    // Hardware Interaction Buttons
+                    Builder(
+                      builder: (ctx) {
+                        bool hasMismatch = false;
+                        bool isMissingMapping = false;
+                        bool isInvalidDevice = _mposSerialNumber == null || _mposSerialNumber!.isEmpty;
+
+                        if (_terminalConfig != null) {
+                          if (!_terminalConfig!.assigned) {
+                            isMissingMapping = true;
+                          } else {
+                            final connectedPrinterMac = ctx.watch<PrinterBloc>().state.connectedDevice?.address;
+                            final isPrinterMismatch = _terminalConfig!.printerMac != null && connectedPrinterMac != null && _terminalConfig!.printerMac != connectedPrinterMac;
+                            final isMposMismatch = _terminalConfig!.posSerialNumber != null && !isInvalidDevice && _terminalConfig!.posSerialNumber != _mposSerialNumber;
+                            hasMismatch = isPrinterMismatch || isMposMismatch;
+                            
+                            isMissingMapping = _terminalConfig!.terminalId == null || _terminalConfig!.terminalId!.isEmpty;
+                          }
+                        } else {
+                          isMissingMapping = true;
+                        }
+
+                        final disableHardwareInteraction = hasMismatch || isMissingMapping || isInvalidDevice;
+
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: disableHardwareInteraction ? null : _pairDevice,
+                                icon: const Icon(Icons.bluetooth_connected, size: 18),
+                                label: const Text('Pair Device'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.indigo.shade600,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: (_isLoadingParams || disableHardwareInteraction) ? null : _downloadParams,
+                                icon: _isLoadingParams 
+                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : const Icon(Icons.download, size: 18),
+                                label: Text(_isLoadingParams ? 'Loading...' : 'Download Terminal Params', style: const TextStyle(fontSize: 12)),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal.shade600,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    ),
+                    const SizedBox(height: 12),
+                    if (_lastSyncTime != null)
+                      Center(
+                        child: Text(
+                          'Last synced: ${_formatSyncTime(_lastSyncTime!)}',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
@@ -322,119 +648,292 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     );
   }
 
-  Widget _buildMposSettings(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'POS Terminal Configuration:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _mposTerminalIdController,
-                  decoration: const InputDecoration(
-                    labelText: 'Terminal ID',
-                    border: OutlineInputBorder(),
-                    hintText: 'Enter POS Terminal ID',
+  bool _isLoadingParams = false;
+
+  Future<void> _pairDevice() async {
+    try {
+      final result = await _mposService.pairDevice();
+      if (!mounted) return;
+      final isSuccess = result.status == 'success';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isSuccess ? 'Device paired successfully' : 'Pairing failed: ${result.message ?? "Unknown Error"}'),
+          backgroundColor: isSuccess ? Colors.green : Colors.orange,
+        ),
+      );
+      if (isSuccess) {
+        // Fetch new SN and re-sync
+        _initTerminalSync();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Pairing error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _downloadParams() async {
+    if (_terminalConfig == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Terminal not provisioned. Sync first.'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    setState(() => _isLoadingParams = true);
+    try {
+      final result = await _mposService.loadParams();
+      if (!mounted) return;
+      final isSuccess = result.status == 'success';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isSuccess ? 'Params loaded successfully' : 'Failed to load params: ${result.message ?? "Unknown Error"}'),
+          backgroundColor: isSuccess ? Colors.green : Colors.orange,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Load Params error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingParams = false);
+    }
+  }
+
+  Widget _buildTerminalStatusCard() {
+    final config = _terminalConfig;
+
+    if (config == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200, width: 2, strokeAlign: BorderSide.strokeAlignOutside),
+        ),
+        child: Column(
+          children: [
+            Icon(Icons.warning_amber_rounded, size: 48, color: Colors.orange.shade700),
+            const SizedBox(height: 12),
+            Text(
+              'Terminal Not Provisioned',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange.shade900),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This device has not been assigned a hardware bundle by Invify Operations. Please contact support to provision device ID:\n\n$_deviceId',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.orange.shade800),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Validate Printer Match
+    final connectedPrinterMac = context.read<PrinterBloc>().state.connectedDevice?.address;
+    final isPrinterMismatch = config.printerMac != null && connectedPrinterMac != null && config.printerMac != connectedPrinterMac;
+
+    // Validate MPOS Match
+    final isMposMismatch = config.posSerialNumber != null && _mposSerialNumber != null && _mposSerialNumber!.isNotEmpty && config.posSerialNumber != _mposSerialNumber;
+
+    return Column(
+      children: [
+        if (isMposMismatch)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.shade300),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Invalid device mapped: The connected MPOS ($_mposSerialNumber) does not match the assigned MPOS (${config.posSerialNumber}). Unauthorized device.',
+                    style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold),
                   ),
                 ),
+              ],
+            ),
+          ),
+        if (isPrinterMismatch)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.red.shade300),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Invalid device mapped: The connected Printer ($connectedPrinterMac) does not match the assigned Printer (${config.printerMac}). Unauthorized device.',
+                    style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.teal.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.teal.shade200),
+          ),
+          child: Column(
+            children: [
+              // Status Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.teal.shade700,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(11),
+                    topRight: Radius.circular(11),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Terminal Provisioned',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'v${config.configVersion}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: () async {
-                  final terminalId = _mposTerminalIdController.text.trim();
-                  if (terminalId.isNotEmpty) {
-                    await StorageService.saveMposTerminalId(terminalId);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Terminal ID Saved!'), backgroundColor: Colors.green),
-                      );
-                    }
-                  }
-                },
-                child: const Text('SAVE'),
+
+              // Fields Grid
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _buildReadOnlyField(
+                      label: 'Terminal ID',
+                      value: config.terminalId,
+                      icon: Icons.credit_card,
+                      isMonospace: true,
+                      color: Colors.teal.shade700,
+                    ),
+                    const SizedBox(height: 10),
+                    // The user wanted POS Serial Number as "MPOS Terminal" field
+                    _buildReadOnlyField(
+                      label: 'MPOS Terminal',
+                      value: config.posSerialNumber, // Map to serial number
+                      icon: Icons.point_of_sale,
+                      isMonospace: true,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildReadOnlyField(
+                      label: 'Business Name',
+                      value: config.businessName,
+                      icon: Icons.business,
+                    ),
+                    if (config.printerMac != null) ...
+                      [
+                        const SizedBox(height: 10),
+                        _buildReadOnlyField(
+                          label: 'Bound Printer',
+                          value: '${config.printerModel ?? "Printer"} (${config.printerMac})',
+                          icon: Icons.print,
+                          isMonospace: true,
+                        ),
+                      ],
+                    if (config.terminalType != null) ...
+                      [
+                        const SizedBox(height: 10),
+                        _buildReadOnlyField(
+                          label: 'Terminal Type',
+                          value: config.terminalType,
+                          icon: Icons.devices,
+                        ),
+                      ],
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    try {
-                      final result = await _mposService.pairDevice();
-                      if (!mounted) return;
-                      final isSuccess = result.status == 'success';
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(isSuccess ? 'Device paired successfully' : 'Pairing failed: ${result.message ?? "Unknown Error"}'),
-                          backgroundColor: isSuccess ? Colors.green : Colors.orange,
-                        ),
-                      );
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Pairing error: $e'), backgroundColor: Colors.red),
-                        );
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.bluetooth_connected),
-                  label: const Text('Pair Device'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    final terminalId = _mposTerminalIdController.text.trim();
-                    if (terminalId.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please save Terminal ID first'), backgroundColor: Colors.orange),
-                      );
-                      return;
-                    }
-                    try {
-                      final result = await _mposService.loadParams();
-                      if (!mounted) return;
-                      final isSuccess = result.status == 'success';
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(isSuccess ? 'Params loaded successfully' : 'Failed to load params: ${result.message ?? "Unknown Error"}'),
-                          backgroundColor: isSuccess ? Colors.green : Colors.orange,
-                        ),
-                      );
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Load Params error: $e'), backgroundColor: Colors.red),
-                        );
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.cloud_download),
-                  label: const Text('Load Params'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
+  }
+
+  Widget _buildReadOnlyField({
+    required String label,
+    String? value,
+    required IconData icon,
+    bool isMonospace = false,
+    Color? color,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600, letterSpacing: 0.3),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value ?? '—',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: isMonospace ? 'monospace' : null,
+                  color: value != null ? (color ?? Colors.black87) : Colors.grey.shade400,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Read-only lock indicator
+        Tooltip(
+          message: 'Managed by Invify Admin — cannot be edited on device',
+          child: Icon(Icons.lock_outline, size: 12, color: Colors.grey.shade400),
+        ),
+      ],
+    );
+  }
+
+  String _formatSyncTime(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${dt.day}/${dt.month}/${dt.year}';
   }
 }

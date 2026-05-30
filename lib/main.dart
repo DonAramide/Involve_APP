@@ -451,6 +451,7 @@ class InvolveApp extends StatefulWidget {
 
 class _InvolveAppState extends State<InvolveApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   Widget build(BuildContext context) {
@@ -592,21 +593,19 @@ class _InvolveAppState extends State<InvolveApp> {
         child: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, state) {
           final themeMode = state.settings?.themeMode ?? 'system';
-          return MaterialApp(
-            title: 'Invify',
-            debugShowCheckedModeBanner: false,
-            themeMode: themeMode == 'light' 
-                ? ThemeMode.light 
-                : themeMode == 'dark' 
-                    ? ThemeMode.dark 
-                    : ThemeMode.system,
+          return GlobalPaymentNotificationListener(
             navigatorKey: _navigatorKey,
-            builder: (context, child) {
-              return GlobalPaymentNotificationListener(
-                navigatorKey: _navigatorKey,
-                child: child ?? const SizedBox(),
-              );
-            },
+            scaffoldMessengerKey: _scaffoldMessengerKey,
+            child: MaterialApp(
+              title: 'Invify',
+              debugShowCheckedModeBanner: false,
+              themeMode: themeMode == 'light' 
+                  ? ThemeMode.light 
+                  : themeMode == 'dark' 
+                      ? ThemeMode.dark 
+                      : ThemeMode.system,
+              navigatorKey: _navigatorKey,
+              scaffoldMessengerKey: _scaffoldMessengerKey,
             theme: ThemeData(
               fontFamily: kIsWeb ? 'sans-serif' : null,
               colorScheme: ColorScheme.fromSeed(seedColor: Color(state.settings?.primaryColor ?? 0xFF2196F3)),
@@ -668,9 +667,8 @@ class _InvolveAppState extends State<InvolveApp> {
               '/user_guide': (_) => const AppUserGuidePage(),
               '/device_sync': (_) => const DeviceSyncPage(),
             },
-
-            );
-          },
+          ));
+        },
         ),
       ),
     );

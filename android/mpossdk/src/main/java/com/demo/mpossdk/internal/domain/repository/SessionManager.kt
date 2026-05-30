@@ -16,4 +16,5 @@ internal interface SessionManager {
     fun getDeviceMac(): String?
     fun setDeviceName(macName: String)
     fun getDeviceName(): String?
+    fun clearDevice()
 }

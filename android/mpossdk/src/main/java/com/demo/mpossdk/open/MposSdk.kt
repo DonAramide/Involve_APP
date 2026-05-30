@@ -50,6 +50,24 @@ object MposSdk {
     }
 
     /**
+     * Returns the physical MPOS Serial Number (which is broadcasted as its Bluetooth Name)
+     * saved during the pairing process.
+     */
+    fun getMposSerialNumber(context: Context): String? {
+        val serviceLocator = ServiceLocator.getInstance(context)
+        return serviceLocator.provideSessionManager().getDeviceName()
+    }
+
+    /**
+     * Unpairs the MPOS device by clearing its MAC address and Name from the session manager.
+     */
+    fun unpairDevice(context: Context) {
+        val serviceLocator = ServiceLocator.getInstance(context)
+        serviceLocator.provideSessionManager().clearDevice()
+        deviceMac = null
+    }
+
+    /**
      * Loads necessary parameters for the mPOS device.
      *
      * This function checks if the device has been initialized using [initMposDevice].

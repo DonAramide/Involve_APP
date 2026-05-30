@@ -1,0 +1,250 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'dart:io' show Platform;
+import 'package:http/http.dart' as http;
+
+/// Terminal configuration synced from the Invify backend.
+class TerminalConfig {
+  final bool assigned;
+  final String? terminalId;
+  final String? mposTerminalId;
+  final String? posSerialNumber;
+  final String? businessName;
+  final String? merchantName;
+  final String? terminalType;
+  final int configVersion;
+  final String? syncedAt;
+  final String? message;
+  final String? printerMac;
+  final String? printerModel;
+  final String? supportPhone;
+
+  const TerminalConfig({
+    required this.assigned,
+    this.terminalId,
+    this.mposTerminalId,
+    this.posSerialNumber,
+    this.businessName,
+    this.merchantName,
+    this.terminalType,
+    this.configVersion = 1,
+    this.syncedAt,
+    this.message,
+    this.printerMac,
+    this.printerModel,
+    this.supportPhone,
+  });
+
+  factory TerminalConfig.notAssigned() {
+    return const TerminalConfig(
+      assigned: false,
+      message: 'No terminal assigned to this device',
+    );
+  }
+
+  factory TerminalConfig.fromJson(Map<String, dynamic> json) {
+    return TerminalConfig(
+      assigned: json['assigned'] == true,
+      terminalId: json['terminalId']?.toString(),
+      mposTerminalId: json['mposTerminalId']?.toString(),
+      posSerialNumber: json['posSerialNumber']?.toString(),
+      businessName: json['businessName']?.toString(),
+      merchantName: json['merchantName']?.toString() ?? json['businessName']?.toString(),
+      terminalType: json['terminalType']?.toString(),
+      configVersion: (json['configVersion'] as num?)?.toInt() ?? 1,
+      syncedAt: json['syncedAt']?.toString(),
+      message: json['message']?.toString(),
+      printerMac: json['printerMac']?.toString(),
+      printerModel: json['printerModel']?.toString(),
+      supportPhone: json['supportPhone']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'assigned': assigned,
+    'terminalId': terminalId,
+    'mposTerminalId': mposTerminalId,
+    'posSerialNumber': posSerialNumber,
+    'businessName': businessName,
+    'merchantName': merchantName,
+    'terminalType': terminalType,
+    'configVersion': configVersion,
+    'syncedAt': syncedAt,
+    'message': message,
+    'printerMac': printerMac,
+    'printerModel': printerModel,
+  };
+
+  @override
+  String toString() => 'TerminalConfig(terminalId: $terminalId, assigned: $assigned)';
+}
+
+/// Handles syncing terminal configuration from the Invify backend.
+///
+/// Replaces manual Terminal ID entry — all terminal config is server-controlled.
+class TerminalSyncService {
+  static const _secureStorage = FlutterSecureStorage();
+  static const _cachedConfigKey = 'terminal_sync_cache';
+  static const _cachedVersionKey = 'terminal_config_version';
+  static const _lastSyncTimeKey = 'terminal_last_sync_time';
+
+  // Base URL — reads from app config or defaults to localhost
+  static String get _baseUrl {
+    // Hardcoded ngrok URL for emulator testing based on user's active session
+    return 'https://bertie-archegoniate-causelessly.ngrok-free.dev';
+  }
+
+  /// Sync the terminal configuration for this device from the backend.
+  ///
+  /// [deviceId] — the device's unique identifier (activation/enrollment ID)
+  /// [enrollmentKey] — optional enrollment key for verification
+  /// [serialNumber] — optional device serial number
+  /// [androidId] — optional Android device ID for correlation
+  ///
+  /// Returns the synced [TerminalConfig]. Falls back to cached config on failure.
+  static Future<TerminalConfig> syncTerminalConfig({
+    required String deviceId,
+    String? enrollmentKey,
+    String? serialNumber,
+    String? androidId,
+    String? businessName,
+  }) async {
+    try {
+      final payload = {
+        'deviceId': deviceId,
+        'enrollmentKey': enrollmentKey,
+        'serialNumber': serialNumber,
+        'androidId': androidId,
+        'businessName': businessName,
+      };
+      
+      debugPrint('[TerminalSync] Requesting sync with payload: ${jsonEncode(payload)}');
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/mobile/terminal/sync'),
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        debugPrint('[TerminalSync] Received response: ${response.body}');
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final config = TerminalConfig.fromJson(data);
+
+        // Persist config to secure storage for offline fallback
+        await _cacheConfig(config);
+
+        debugPrint('[TerminalSync] Synced: terminalId=${config.terminalId}, version=${config.configVersion}');
+        return config;
+      } else {
+        debugPrint('[TerminalSync] Sync failed (${response.statusCode}): ${response.body}');
+        
+        String errorMessage = 'Server returned ${response.statusCode}.';
+        if (response.body.contains('ERR_NGROK_') || response.body.contains('502 Bad Gateway') || response.body.contains('Bad Gateway')) {
+          errorMessage = 'The backend server is offline or unreachable (Ngrok Gateway Error).';
+        } else if (response.statusCode == 404) {
+          errorMessage = 'Terminal sync endpoint not found on the server.';
+        } else if (response.statusCode == 500) {
+          errorMessage = 'Internal server error on the backend.';
+        } else {
+           try {
+             final errData = jsonDecode(response.body);
+             if (errData['message'] != null) {
+               errorMessage = errData['message'];
+             } else if (errData['error'] != null) {
+               errorMessage = errData['error'];
+             }
+           } catch (_) {}
+        }
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      debugPrint('[TerminalSync] Network error: $e. Falling back to cache.');
+      if (e.toString().startsWith('Exception:')) {
+        rethrow;
+      }
+      throw Exception('Network error: Could not connect to the server. Please check your internet connection.');
+    }
+  }
+
+  /// Get the current terminal assignment status without a full sync.
+  static Future<TerminalConfig> getTerminalStatus({
+    required String deviceId,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/mobile/terminal/status?deviceId=${Uri.encodeComponent(deviceId)}'),
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return TerminalConfig.fromJson(data);
+      }
+    } catch (_) {}
+    return await _getCachedConfig() ?? TerminalConfig.notAssigned();
+  }
+
+  /// Retrieve the locally cached terminal config (for offline use).
+  static Future<TerminalConfig?> _getCachedConfig() async {
+    try {
+      final cached = await _secureStorage.read(key: _cachedConfigKey);
+      if (cached != null) {
+        final json = jsonDecode(cached) as Map<String, dynamic>;
+        return TerminalConfig.fromJson(json);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Load cached config synchronously-ish for initial UI population.
+  static Future<TerminalConfig?> loadCachedConfig() => _getCachedConfig();
+
+  /// Save config to secure local storage.
+  static Future<void> _cacheConfig(TerminalConfig config) async {
+    await _secureStorage.write(
+      key: _cachedConfigKey,
+      value: jsonEncode(config.toJson()),
+    );
+    await _secureStorage.write(
+      key: _cachedVersionKey,
+      value: config.configVersion.toString(),
+    );
+    await _secureStorage.write(
+      key: _lastSyncTimeKey,
+      value: DateTime.now().toIso8601String(),
+    );
+  }
+
+  /// Get the timestamp of the last successful sync.
+  static Future<DateTime?> getLastSyncTime() async {
+    try {
+      final raw = await _secureStorage.read(key: _lastSyncTimeKey);
+      if (raw != null) return DateTime.tryParse(raw);
+    } catch (_) {}
+    return null;
+  }
+
+  /// Get the cached config version number.
+  static Future<int> getCachedConfigVersion() async {
+    try {
+      final raw = await _secureStorage.read(key: _cachedVersionKey);
+      if (raw != null) return int.tryParse(raw) ?? 1;
+    } catch (_) {}
+    return 1;
+  }
+
+  /// Clear the cached terminal config (e.g., on logout/reset).
+  static Future<void> clearCache() async {
+    await _secureStorage.delete(key: _cachedConfigKey);
+    await _secureStorage.delete(key: _cachedVersionKey);
+    await _secureStorage.delete(key: _lastSyncTimeKey);
+  }
+}

@@ -9,8 +9,14 @@ import '../../data/datasources/finance_realtime_data_source.dart';
 class GlobalPaymentNotificationListener extends StatefulWidget {
   final Widget child;
   final GlobalKey<NavigatorState> navigatorKey;
+  final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey;
 
-  const GlobalPaymentNotificationListener({Key? key, required this.child, required this.navigatorKey}) : super(key: key);
+  const GlobalPaymentNotificationListener({
+    Key? key, 
+    required this.child, 
+    required this.navigatorKey,
+    required this.scaffoldMessengerKey,
+  }) : super(key: key);
 
   @override
   State<GlobalPaymentNotificationListener> createState() => _GlobalPaymentNotificationListenerState();
@@ -42,7 +48,7 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
   }
 
   void _showNotification(dynamic amount, String studentName, String reference) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    widget.scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text('₦$amount received from $studentName!'),
         action: SnackBarAction(

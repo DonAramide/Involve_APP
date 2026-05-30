@@ -48,6 +48,14 @@ class MainActivity: FlutterActivity() {
                         }
                     }
                 }
+                "unpairDevice" -> {
+                    MposSdk.unpairDevice(this)
+                    result.success(mapOf("status" to "success"))
+                }
+                "getMposSerialNumber" -> {
+                    val serialNumber = MposSdk.getMposSerialNumber(this)
+                    result.success(serialNumber)
+                }
                 "loadParams" -> {
                     MposSdk.loadParams { listener ->
                         when (listener) {

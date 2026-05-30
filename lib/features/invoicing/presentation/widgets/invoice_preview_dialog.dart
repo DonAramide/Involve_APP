@@ -20,6 +20,7 @@ import 'package:involve_app/core/license/storage_service_native.dart';
 import 'package:involve_app/services/mpos_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
 
 class InvoicePreviewDialog extends StatefulWidget {
   final InvoiceBloc invoiceBloc;
@@ -33,12 +34,19 @@ class InvoicePreviewDialog extends StatefulWidget {
 class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   late TextEditingController _amountReceivedController;
   bool _isInitialized = false;
+  TerminalConfig? _terminalConfig;
 
   @override
   void initState() {
     super.initState();
     _amountReceivedController = TextEditingController();
     _amountReceivedController.addListener(_onAmountChanged);
+    _loadTerminalConfig();
+  }
+
+  Future<void> _loadTerminalConfig() async {
+    final config = await TerminalSyncService.loadCachedConfig();
+    if (mounted) setState(() { _terminalConfig = config; });
   }
 
   void _onAmountChanged() {
@@ -270,19 +278,19 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                     onPressed: (invoiceState.isSaving || invoiceState.isGeneratingAccount || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                       try {
                         if (invoiceState.paymentMethod == 'POS') {
-                          final terminalId = await StorageService.getMposTerminalId();
                           if (!mounted) return;
-                          if (terminalId == null || terminalId.isEmpty) {
+                          if (_terminalConfig == null || _terminalConfig!.posSerialNumber == null || _terminalConfig!.posSerialNumber!.isEmpty) {
                             await showDialog(
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: const Text('POS Not Configured'),
-                                content: const Text('Please configure your POS Terminal ID in Printer Settings first.'),
+                                content: const Text('This POS device is not authorized or provisioned in Invify Operations.'),
                                 actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
                               ),
                             );
                             return;
                           }
+                          final terminalId = _terminalConfig!.posSerialNumber!; // Use the centralized config
 
                           // Network Check
                           final connectivityResult = await Connectivity().checkConnectivity();
@@ -470,19 +478,19 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                       final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
 
                       if (invoiceState.paymentMethod == 'POS') {
-                        final terminalId = await StorageService.getMposTerminalId();
                         if (!mounted) return;
-                        if (terminalId == null || terminalId.isEmpty) {
+                        if (_terminalConfig == null || _terminalConfig!.posSerialNumber == null || _terminalConfig!.posSerialNumber!.isEmpty) {
                           await showDialog(
                             context: context,
                             builder: (ctx) => AlertDialog(
                               title: const Text('POS Not Configured'),
-                              content: const Text('Please configure your POS Terminal ID in Printer Settings first.'),
+                              content: const Text('This POS device is not authorized or provisioned in Invify Operations.'),
                               actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
                             ),
                           );
                           return;
                         }
+                        final terminalId = _terminalConfig!.posSerialNumber!; // Use the centralized config
 
                         final connectivityResult = await Connectivity().checkConnectivity();
                         if (!mounted) return;
@@ -669,6 +677,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   }
 
   Widget _buildPaymentMethodSelector(BuildContext context, InvoiceState state) {
+    final isPosEnabled = _terminalConfig != null && _terminalConfig!.posSerialNumber != null && _terminalConfig!.posSerialNumber!.isNotEmpty;
+
     return Column(
       children: [
         RadioListTile<String>(
@@ -683,15 +693,23 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           },
         ),
         RadioListTile<String>(
-          title: const Text('POS'),
+          title: Row(
+            children: [
+              Text('POS', style: TextStyle(color: isPosEnabled ? null : Colors.grey)),
+              if (!isPosEnabled) ...[
+                const SizedBox(width: 8),
+                const Text('(Not Configured)', style: TextStyle(fontSize: 10, color: Colors.red)),
+              ]
+            ]
+          ),
           value: 'POS',
           groupValue: state.paymentMethod,
           dense: true,
           contentPadding: EdgeInsets.zero,
-          onChanged: (val) {
+          onChanged: isPosEnabled ? (val) {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
             _amountReceivedController.text = CurrencyFormatter.format(state.total);
-          },
+          } : null,
         ),
         RadioListTile<String>(
           title: const Text('Transfer'),

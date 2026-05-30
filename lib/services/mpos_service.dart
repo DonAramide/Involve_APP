@@ -49,6 +49,26 @@ class MposService {
       );
     }
   }
+  /// Gets the physical serial number of the paired MPOS device.
+  Future<String?> getMposSerialNumber() async {
+    try {
+      final result = await _channel.invokeMethod<String>('getMposSerialNumber');
+      return result;
+    } on PlatformException catch (e) {
+      debugPrint('Failed to get MPOS serial number: ${e.message}');
+      return null;
+    }
+  }
+
+  /// Unpairs the MPOS device locally by clearing its address from the Android session manager.
+  Future<MposResult> unpairDevice() async {
+    try {
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>('unpairDevice');
+      return MposResult.fromMap(result);
+    } on PlatformException catch (e) {
+      return MposResult(status: 'failure', message: e.message);
+    }
+  }
 }
 
 class MposResult {

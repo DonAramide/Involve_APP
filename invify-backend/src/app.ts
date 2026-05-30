@@ -37,6 +37,7 @@ import { DeviceController } from './controllers/device.controller';
 import { LookupController } from './controllers/lookup.controller';
 import { CustomerController } from './controllers/customer.controller';
 import { PosController } from './controllers/pos.controller';
+import { TerminalController, terminalUploadMiddleware } from './controllers/terminal.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
@@ -100,6 +101,11 @@ app.patch('/admin/tenants/:id', authenticate, checkRole(['super_admin']), AdminC
 app.get('/admin/dashboard-stats', authenticate, checkRole(['super_admin']), AdminController.getDashboardStats);
 app.patch('/admin/profile', authenticate, AdminController.updateProfile);
 
+// Global Settings (Super Admin Only)
+app.get('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.getGlobalSettings);
+app.patch('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.updateGlobalSettings);
+
+
 // Device Activation Hub Endpoints
 app.get('/devices', authenticate, DeviceController.getDevices);
 app.get('/devices/activations', authenticate, DeviceController.getActivations);
@@ -108,8 +114,16 @@ app.post('/devices/validate', authenticate, DeviceController.validateCode);
 app.post('/devices/onboard', DeviceController.onboardDevice);
 app.patch('/devices/:id', authenticate, DeviceController.updateDevice);
 
+// Terminal Sync (Public for mobile app)
+app.post('/api/mobile/terminal/sync', TerminalController.mobileSync);
 
-// Usage + Growth Intelligence
+// Terminal Admin APIs
+app.get('/api/admin/terminals', authenticate, checkRole(['super_admin', 'tenant_admin']), TerminalController.getTablets);
+app.post('/api/admin/terminals/import', authenticate, checkRole(['super_admin']), terminalUploadMiddleware, TerminalController.importTerminals);
+app.get('/api/admin/terminals/assignments', authenticate, checkRole(['super_admin', 'tenant_admin']), TerminalController.getAssignments);
+app.post('/api/admin/terminals/assignments', authenticate, checkRole(['super_admin']), TerminalController.assignHardware);
+app.get('/api/admin/terminals/audit', authenticate, checkRole(['super_admin']), TerminalController.getAuditLog);
+app.patch('/api/admin/terminals/:id/status', authenticate, checkRole(['super_admin']), TerminalController.updateTablet);
 app.get('/admin/analytics', authenticate, checkRole(['super_admin']), AnalyticsController.getAdminAnalytics);
 
 /** --- FINANCIAL REVIEWS (SUPER ADMIN + TENANT ADMIN) --- **/

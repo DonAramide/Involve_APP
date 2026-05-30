@@ -74,4 +74,11 @@ internal class SessionManagerImpl(
     override fun getDeviceName(): String? {
         return getString(Constants.PREF_DEVICE_NAME)
     }
+
+    override fun clearDevice() {
+        sharedPreferences.edit()
+            .remove(Constants.PREF_DEVICE_MAC)
+            .remove(Constants.PREF_DEVICE_NAME)
+            .apply()
+    }
 }

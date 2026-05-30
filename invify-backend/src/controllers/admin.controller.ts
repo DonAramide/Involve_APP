@@ -49,6 +49,59 @@ export class AdminController {
     fs.writeFileSync(LOCAL_TENANTS_DB_PATH, JSON.stringify(data, null, 2));
   }
 
+  private static getGlobalSettingsData() {
+    const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
+    if (!fs.existsSync(GLOBAL_SETTINGS_PATH)) {
+      fs.writeFileSync(GLOBAL_SETTINGS_PATH, JSON.stringify({ support_phone: '+234 800 INVIFY' }, null, 2));
+    }
+    return JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
+  }
+
+  private static saveGlobalSettingsData(data: any) {
+    const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
+    fs.writeFileSync(GLOBAL_SETTINGS_PATH, JSON.stringify(data, null, 2));
+  }
+
+  static async getGlobalSettings(req: Request, res: Response) {
+    try {
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        return res.status(200).json(AdminController.getGlobalSettingsData());
+      }
+      // Assuming a global_settings table with a single row id=1
+      const { data, error } = await supabase.from('global_settings').select('*').eq('id', 1).single();
+      if (error || !data) {
+         return res.status(200).json(AdminController.getGlobalSettingsData());
+      }
+      return res.status(200).json(data);
+    } catch (error: any) {
+      return res.status(200).json(AdminController.getGlobalSettingsData());
+    }
+  }
+
+  static async updateGlobalSettings(req: Request, res: Response) {
+    try {
+      const updates = req.body;
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        const current = AdminController.getGlobalSettingsData();
+        const updated = { ...current, ...updates };
+        AdminController.saveGlobalSettingsData(updated);
+        return res.status(200).json(updated);
+      }
+      
+      const { data, error } = await supabase.from('global_settings').upsert({ id: 1, ...updates }).select().single();
+      if (error) {
+         // Fallback local
+         const current = AdminController.getGlobalSettingsData();
+         const updated = { ...current, ...updates };
+         AdminController.saveGlobalSettingsData(updated);
+         return res.status(200).json(updated);
+      }
+      return res.status(200).json(data);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
   /**
    * GET /admin/tenants
    * Lists all tenants with optional filtering.

@@ -151,6 +151,19 @@ const currentUserPermissions = ref([
 // Raw Actions repository
 const rawItems = [
   {
+    id: 'cmd-terminals',
+    label: 'Hardware Terminal Management',
+    description: 'Manage POS terminals, inspect assignments, hardware diagnostics and audit logs.',
+    route: '/fleet/terminals',
+    domain: 'fleet',
+    icon: 'point_of_sale',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_devices',
+    keywords: ['terminal', 'mpos', 'pos', 'hardware', 'payment', 'terminals']
+  },
+  {
     id: 'cmd-0',
     label: 'Tenant Orchestration Ecosystem Center',
     description: 'Mission Control for multi-tenant feature flags, module visibility, and reactive branding overrides.',
