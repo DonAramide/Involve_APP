@@ -23,6 +23,8 @@ import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import '../../domain/entities/settings.dart';
 import '../widgets/upgrade_dialog.dart';
 import 'package:involve_app/core/widgets/restart_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../bloc/staff_bloc.dart';
 import '../bloc/staff_state.dart';
@@ -188,8 +190,30 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
 
       // Maintenance
-      if (_matches('Maintenance', ['backup', 'export', 'sync', 'restore', 'date', 'time', 'total sales'])) ...[
+      if (_matches('Maintenance', ['backup', 'export', 'sync', 'restore', 'date', 'time', 'total sales', 'update', 'download', 'ota'])) ...[
         _buildSectionHeader(context, 'Maintenance'),
+        if (_matches('Re-download System Update', ['update', 'download', 'ota']))
+          FutureBuilder<SharedPreferences>(
+            future: SharedPreferences.getInstance(),
+            builder: (context, snapshot) {
+              final urlString = snapshot.hasData ? snapshot.data!.getString('last_ota_url') : null;
+              final version = snapshot.hasData ? (snapshot.data!.getString('last_ota_version') ?? 'Unknown') : 'Unknown';
+              return ListTile(
+                title: const Text('Re-download System Update'),
+                subtitle: Text(urlString != null ? 'Download the latest pushed version (v$version)' : 'No recent updates available to download'),
+                trailing: Icon(Icons.system_update, color: urlString != null ? Colors.cyan : Colors.grey),
+                enabled: urlString != null,
+                onTap: urlString == null ? null : () async {
+                  final Uri url = Uri.parse(urlString);
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not launch update URL.')));
+                  }
+                },
+              );
+            },
+          ),
         if (_matches('Export/Local Backup'))
           ListTile(
             title: const Text('Export/Local Backup'),

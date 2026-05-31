@@ -6,6 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:involve_app/services/socket_service.dart' as import_socket_service;
+import 'package:involve_app/services/terminal_sync_service.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:get_it/get_it.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/notification_repository.dart';
 
@@ -452,6 +455,55 @@ class InvolveApp extends StatefulWidget {
 class _InvolveAppState extends State<InvolveApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _initSocket();
+  }
+
+  Future<void> _initSocket() async {
+    final socketService = import_socket_service.SocketService();
+    socketService.scaffoldMessengerKey = _scaffoldMessengerKey;
+    socketService.navigatorKey = _navigatorKey;
+    
+    // Fetch cached config to pass tenant details for room joining
+    var config = await TerminalSyncService.loadCachedConfig();
+    
+    final deviceId = await DeviceInfoService.getDeviceSuffix();
+    
+    // If the cached config lacks the new tenant fields, sync seamlessly in the background
+    if (config != null && config.tenantId == null) {
+      try {
+        debugPrint('[Socket Initialization] Config has null tenantId. Triggering background sync with businessName: ${config.businessName}');
+        config = await TerminalSyncService.syncTerminalConfig(
+          deviceId: deviceId,
+          businessName: config.businessName, // Pass businessName so the backend can fallback to mapping via tenants_db.json
+        );
+        debugPrint('[Socket Initialization] Background sync complete. New tenantId: ${config?.tenantId}, plan: ${config?.plan}, type: ${config?.type}');
+      } catch (e) {
+        debugPrint('[Socket Initialization] Background sync failed: $e');
+      }
+    } else {
+      debugPrint('[Socket Initialization] Using cached config. tenantId: ${config?.tenantId}, plan: ${config?.plan}, type: ${config?.type}');
+    }
+
+    // Attempt to connect immediately with cached or updated details
+    socketService.initializeSocket(
+      'https://bertie-archegoniate-causelessly.ngrok-free.dev',
+      tenantId: config?.tenantId,
+      plan: config?.plan,
+      type: config?.type,
+      deviceId: deviceId,
+      businessName: config?.businessName,
+    );
+  }
+
+  @override
+  void dispose() {
+    import_socket_service.SocketService().dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

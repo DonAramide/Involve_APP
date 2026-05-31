@@ -72,11 +72,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
               // Initialize amount received once total and method are available
               if (!_isInitialized && settings != null) {
-                if (invoiceState.paymentMethod == 'Deferred') {
-                  _amountReceivedController.text = '0.00';
-                } else if (invoiceState.paymentMethod != null) {
-                  _amountReceivedController.text = CurrencyFormatter.format(invoiceState.total);
-                }
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (invoiceState.paymentMethod == 'Deferred') {
+                    _amountReceivedController.text = '0.00';
+                  } else if (invoiceState.paymentMethod != null) {
+                    _amountReceivedController.text = CurrencyFormatter.format(invoiceState.total);
+                  }
+                });
                 _isInitialized = true;
               }
 
@@ -332,7 +334,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           
                           final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
                           if (!mounted) return;
-                          Navigator.pop(context); // Close loading
+                          if (Navigator.canPop(context)) {
+                            Navigator.pop(context); // Close loading
+                          }
 
                           if (result.status == 'emv_data_ready' && result.emvData != null) {
                             final financeRepo = context.read<FinanceRepository>();
@@ -458,6 +462,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invoice saved!')));
                       } catch (e) {
                         if (!mounted) return;
+                        if (Navigator.canPop(context)) {
+                          Navigator.pop(context); // Close loading
+                        }
                         await showDialog(
                           context: context,
                           builder: (ctx) => AlertDialog(
@@ -638,7 +645,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         warrantyDuration: invoiceState.warrantyDuration,
                       );
 
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));
+                      if (mounted) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));
+                      }
                       } catch (e) {
                         if (!mounted) return;
                         await showDialog(

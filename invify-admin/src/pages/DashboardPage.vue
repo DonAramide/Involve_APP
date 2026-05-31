@@ -176,7 +176,7 @@
 </template>
 
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import EnterpriseDataGrid from '../components/grid/EnterpriseDataGrid.vue'
 import CommandExecutionMonitor from '../components/commands/CommandExecutionMonitor.vue'
@@ -204,12 +204,22 @@ const observabilitySubMode = computed(() => {
   return 'default'
 })
 
+const financeSubMode = computed(() => {
+  if (route.path.endsWith('/payouts')) return 'payouts'
+  if (route.path.endsWith('/card-telemetry')) return 'card-telemetry'
+  if (route.path.endsWith('/cross-tenant')) return 'cross-tenant'
+  return 'default'
+})
+
 const activeSubModeName = computed(() => {
   if (activeWorkspace.value === 'fleet') {
     return fleetSubMode.value !== 'default' ? fleetSubMode.value : 'telemetry'
   }
   if (activeWorkspace.value === 'observability') {
     return observabilitySubMode.value !== 'default' ? observabilitySubMode.value : 'streams'
+  }
+  if (activeWorkspace.value === 'finance') {
+    return financeSubMode.value !== 'default' ? financeSubMode.value : 'payouts'
   }
   return 'default'
 })
@@ -235,6 +245,15 @@ const activeWorkspaceLabel = computed(() => {
       pipelines: 'Ingestion Pipelines'
     }
     return subModeMap[observabilitySubMode.value] || 'Observability'
+  }
+
+  if (activeWorkspace.value === 'finance') {
+    const subModeMap = {
+      payouts: 'Global Payout Escrow',
+      'card-telemetry': 'Card Telemetry Matrix',
+      'cross-tenant': 'Cross-Tenant Audits'
+    }
+    return subModeMap[financeSubMode.value] || 'Finance Operations'
   }
 
   if (activeWorkspace.value === 'incidents') {
@@ -363,6 +382,33 @@ const kpiCards = computed(() => {
     }
   }
 
+  if (activeWorkspace.value === 'finance') {
+    if (financeSubMode.value === 'payouts') {
+      return {
+        kpi1: { label: 'Pending Settlement', value: '₦ 89.2M', unit: 'Escrow', sub: 'T+0 & T+1 Processing', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Cleared Today', value: '₦ 412M', unit: 'Paid', sub: 'Successful disbursements', border: 'border-indigo-left', icon: 'payments' },
+        kpi3: { label: 'Held Funds', value: '₦ 1.2M', unit: 'Locked', sub: 'Awaiting manual clearing', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Failed Transfers', value: '2', unit: 'Drops', sub: 'Bank network API timeouts', border: 'border-red-left', dot: 'pulse-critical' }
+      }
+    }
+    if (financeSubMode.value === 'card-telemetry') {
+      return {
+        kpi1: { label: 'Auth Success Rate', value: '98.4%', unit: 'Rate', sub: 'Network average: 97.2%', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Live Transactions', value: '142', unit: 'TPS', sub: 'Peak volume threshold', border: 'border-indigo-left', icon: 'credit_card' },
+        kpi3: { label: 'High-Risk Flags', value: '14', unit: 'Holds', sub: 'Fraud engine interceptions', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Gateway Declines', value: '3', unit: 'Fails', sub: 'Hard network rejections', border: 'border-red-left', dot: 'pulse-critical' }
+      }
+    }
+    if (financeSubMode.value === 'cross-tenant') {
+      return {
+        kpi1: { label: 'Analyzed Transfers', value: '14.2k', unit: 'Scans', sub: 'Cross-boundary validation', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Ledger Parity', value: '100%', unit: 'Match', sub: 'Double-entry books balanced', border: 'border-indigo-left', icon: 'fact_check' },
+        kpi3: { label: 'Orphaned Records', value: '4', unit: 'Anomalies', sub: 'Pending trace investigation', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi4: { label: 'Double Spend Risks', value: '0', unit: 'Blocks', sub: 'Cryptographic lock intact', border: 'border-red-left', dot: 'pulse-healthy' }
+      }
+    }
+  }
+
   // Default (Fallback)
   return {
     kpi1: { label: 'Ingestion Rate', value: throughputEps.value || '4.2', unit: 'eps', sub: 'Peak buffer utilization: 14.2 MB/s', border: 'border-cyan-left', dot: 'pulse-healthy' },
@@ -382,292 +428,30 @@ const gridColumns = [
   { name: 'narrative', label: 'LOG TRACE NARRATIVE', field: 'description', align: 'left' }
 ]
 
-// Pure enterprise mock logging entries covering all workspaces robustly
-const allGridRows = ref([
-  // --- PRESENCE SUB-MODE ROWS ---
-  {
-    id: 'row-presence-1',
-    created_at: new Date(Date.now() - 1000).toISOString(),
-    severity: 'healthy',
-    type: 'triangulation_success',
-    amount: 3,
-    provider: 'gps_triangulator',
-    description: 'Triangulated edge terminal coordinates across 3 cellular base station signal vectors.\n• Triangulated Margin of Error: ±4.2 meters\n• Triangulation Integrity check: Verified',
-    workspace: 'fleet',
-    subMode: 'presence',
-    operator: 'gps_daemon'
-  },
-  {
-    id: 'row-presence-2',
-    created_at: new Date(Date.now() - 5000).toISOString(),
-    severity: 'info',
-    type: 'presence_ping',
-    amount: 142,
-    provider: 'presence_broker',
-    description: 'Edge node presence ping received. Session active.\n• Terminal ID: DSPREAD-POS-80MM-0091\n• Latency: 12ms over HTTPS Websocket.',
-    workspace: 'fleet',
-    subMode: 'presence',
-    operator: 'presence_daemon'
-  },
+// Dynamic enterprise logging entries pushed from the live WebSocket layer
+const allGridRows = ref([])
 
-  // --- GROUPS SUB-MODE ROWS ---
-  {
-    id: 'row-groups-1',
-    created_at: new Date(Date.now() - 2000).toISOString(),
-    severity: 'healthy',
-    type: 'cohort_sync_complete',
-    amount: 14,
-    provider: 'cohort_manager',
-    description: 'Cohort deployment synchronization complete. Target rules confirmed.\n• Cohort Name: Lagos-POS-Terminals-Stable\n• Edges Verified: 14 / 14 nodes.',
-    workspace: 'fleet',
-    subMode: 'groups',
-    operator: 'group_sync_service'
-  },
-  {
-    id: 'row-groups-2',
-    created_at: new Date(Date.now() - 8000).toISOString(),
-    severity: 'info',
-    type: 'group_membership_bind',
-    amount: 1,
-    provider: 'cohort_manager',
-    description: 'Bound edge device to target group dynamically.\n• Device: DSPREAD-POS-XM1AJQUMM-1339\n• Target Group: Abuja-Beds-Retail-Beta.',
-    workspace: 'fleet',
-    subMode: 'groups',
-    operator: 'sysadmin@IIPS.app'
-  },
-
-  // --- ENROLLMENT SUB-MODE ROWS ---
-  {
-    id: 'row-enroll-1',
-    created_at: new Date(Date.now() - 1500).toISOString(),
-    severity: 'healthy',
-    type: 'bootstrap_complete',
-    amount: 200,
-    provider: 'enrollment_pipeline',
-    description: 'Zero-touch provisioning bootstrap complete.\n• Injected RSA Public Keys successfully.\n• Local state container deployed. Status: Active.',
-    workspace: 'fleet',
-    subMode: 'enrollment',
-    operator: 'auto_provisioner'
-  },
-  {
-    id: 'row-enroll-2',
-    created_at: new Date(Date.now() - 6000).toISOString(),
-    severity: 'info',
-    type: 'handshake_initiate',
-    amount: 1,
-    provider: 'enrollment_pipeline',
-    description: 'Initial device hardware handshake received. Verifying OEM signature.\n• Device ID: DSPREAD-POS-610011MM-8315\n• Handshake Status: Cleared.',
-    workspace: 'fleet',
-    subMode: 'enrollment',
-    operator: 'auto_provisioner'
-  },
-
-  // --- TELEMETRY SUB-MODE ROWS ---
-  {
-    id: 'row-telem-1',
-    created_at: new Date(Date.now() - 500).toISOString(),
-    severity: 'warning',
-    type: 'thermal_throttling_near',
-    amount: 72,
-    provider: 'fleet_telemetry',
-    description: 'Hardware thermal sensor reports elevated CPU temperature (72°C).\n• Device ID: DSPREAD-POS-XM1AJQUMM-1339\n• Throttling State: Approaching threshold.',
-    workspace: 'fleet',
-    subMode: 'telemetry',
-    operator: 'telemetry_daemon'
-  },
-  {
-    id: 'row-telem-2',
-    created_at: new Date(Date.now() - 4000).toISOString(),
-    severity: 'healthy',
-    type: 'telemetry_packet_flush',
-    amount: 128,
-    provider: 'fleet_telemetry',
-    description: 'Aggregated packet buffers flushed successfully to centralized influx ingestion pipeline.',
-    workspace: 'fleet',
-    subMode: 'telemetry',
-    operator: 'telemetry_daemon'
-  },
-
-  // --- ACTIONS SUB-MODE ROWS ---
-  {
-    id: 'row-actions-1',
-    created_at: new Date(Date.now() - 1000).toISOString(),
-    severity: 'healthy',
-    type: 'command_execution_success',
-    amount: 1,
-    provider: 'action_orchestrator',
-    description: 'Remote command reboot dispatched and completed successfully on target edge.\n• Reboot Context: Routine memory purge sweep.\n• Response Status: OK (0).',
-    workspace: 'fleet',
-    subMode: 'actions',
-    operator: 'sysadmin@IIPS.app'
-  },
-  {
-    id: 'row-actions-2',
-    created_at: new Date(Date.now() - 7000).toISOString(),
-    severity: 'info',
-    type: 'cache_purge_force',
-    amount: 1,
-    provider: 'action_orchestrator',
-    description: 'Dispatched direct WebSocket payload to force local cache purge on terminal.',
-    workspace: 'fleet',
-    subMode: 'actions',
-    operator: 'sysadmin@IIPS.app'
-  },
-
-  // --- OBSERVABILITY STREAMS ROWS ---
-  {
-    id: 'row-stream-1',
-    created_at: new Date(Date.now() - 1200).toISOString(),
-    severity: 'healthy',
-    type: 'ai_lesson_cache_hit',
-    amount: 1420,
-    provider: 'ai_edge_cache',
-    description: 'AI Lesson Note Generation: Topic "Thermodynamics & Energy States" served from global edge cache.',
-    workspace: 'observability',
-    subMode: 'streams',
-    operator: 'cache_router'
-  },
-  {
-    id: 'row-stream-2',
-    created_at: new Date(Date.now() - 2800).toISOString(),
-    severity: 'info',
-    type: 'ai_lesson_generation',
-    amount: 3850,
-    provider: 'ai_engine',
-    description: 'AI Lesson Note Generation: Prompt synthetic pipeline completed successfully.',
-    workspace: 'observability',
-    subMode: 'streams',
-    operator: 'sysadmin@IIPS.app'
-  },
-
-  // --- OBSERVABILITY METRICS ROWS ---
-  {
-    id: 'row-metric-1',
-    created_at: new Date(Date.now() - 25000).toISOString(),
-    severity: 'warning',
-    type: 'ledger_drift_detected',
-    amount: 250,
-    provider: 'quasar',
-    description: 'Minor ledger temporal mismatch logged between parent treasury and active subaccount.',
-    workspace: 'observability',
-    subMode: 'metrics',
-    operator: 'bursar_daemon'
-  },
-  {
-    id: 'row-metric-2',
-    created_at: new Date(Date.now() - 42000).toISOString(),
-    severity: 'healthy',
-    type: 'virtual_account_inflow',
-    amount: 150000,
-    provider: 'quasar',
-    description: 'Static dedicated virtual account NUBAN registered direct transfer deposit.',
-    workspace: 'observability',
-    subMode: 'metrics',
-    operator: 'providus_bridge'
-  },
-
-  // --- OBSERVABILITY QUEUES ROWS ---
-  {
-    id: 'row-queue-1',
-    created_at: new Date(Date.now() - 4000).toISOString(),
-    severity: 'critical',
-    type: 'webhook_lock_timeout',
-    amount: 5400,
-    provider: 'quasar',
-    description: 'Reconciliation webhook queue execution timed out waiting for state lock confirmation.',
-    workspace: 'observability',
-    subMode: 'queues',
-    operator: 'sysadmin@IIPS.app'
-  },
-  {
-    id: 'row-queue-2',
-    created_at: new Date(Date.now() - 18000).toISOString(),
-    severity: 'info',
-    type: 'queue_partition_rebalance',
-    amount: 16,
-    provider: 'queue_broker',
-    description: 'Triggered partition rebalance on quasar.stream.telemetry queue across 8 consumer threads.',
-    workspace: 'observability',
-    subMode: 'queues',
-    operator: 'sysadmin@IIPS.app'
-  },
-
-  // --- OBSERVABILITY WEBSOCKET-HEALTH ROWS ---
-  {
-    id: 'row-ws-1',
-    created_at: new Date(Date.now() - 3000).toISOString(),
-    severity: 'healthy',
-    type: 'ws_ping_pong',
-    amount: 12,
-    provider: 'ws_gateway',
-    description: 'WebSocket duplex ping-pong roundtrip latency verified under 12ms target limit.',
-    workspace: 'observability',
-    subMode: 'websocket-health',
-    operator: 'ws_daemon'
-  },
-  {
-    id: 'row-ws-2',
-    created_at: new Date(Date.now() - 11000).toISOString(),
-    severity: 'critical',
-    type: 'ws_hard_reset',
-    amount: 1,
-    provider: 'ws_gateway',
-    description: 'Forceful TCP socket socket reset initiated due to temporal framing mismatch anomalies.',
-    workspace: 'observability',
-    subMode: 'websocket-health',
-    operator: 'ws_daemon'
-  },
-
-  // --- OBSERVABILITY PIPELINES ROWS ---
-  {
-    id: 'row-pipe-1',
-    created_at: new Date(Date.now() - 60000).toISOString(),
-    severity: 'info',
-    type: 'tenant_quota_compaction',
-    amount: 12,
-    provider: 'governance',
-    description: 'AI generation metrics archived to block storage layer to preserve active memory arrays.',
-    workspace: 'observability',
-    subMode: 'pipelines',
-    operator: 'storage_controller'
-  },
-  {
-    id: 'row-pipe-2',
-    created_at: new Date(Date.now() - 95000).toISOString(),
-    severity: 'healthy',
-    type: 'note_digitization_batch',
-    amount: 42,
-    provider: 'ai_engine',
-    description: 'Curriculum layout parser finalized markdown syntax conversion strings.',
-    workspace: 'observability',
-    subMode: 'pipelines',
-    operator: 'teacher_session'
-  },
-
-  // --- INCIDENTS ROWS ---
-  {
-    id: 'row-incident-1',
-    created_at: new Date(Date.now() - 4000).toISOString(),
-    severity: 'critical',
-    type: 'webhook_lock_timeout',
-    amount: 5400,
-    provider: 'quasar',
-    description: 'Reconciliation webhook queue execution timed out waiting for state lock confirmation.',
-    workspace: 'incidents',
-    operator: 'sysadmin@IIPS.app'
-  },
-  {
-    id: 'row-incident-2',
-    created_at: new Date(Date.now() - 14000).toISOString(),
-    severity: 'warning',
-    type: 'unauthorized_firmware_detected',
-    amount: 1,
-    provider: 'integrity_center',
-    description: 'Device pos-term-omega-14 reported unaligned cryptographic signature.',
-    workspace: 'incidents',
-    operator: 'auto_provisioner'
+// Map raw incoming WebSocket payloads to the unified grid schema dynamically
+watch(lastEventPayload, (newPayload) => {
+  if (newPayload) {
+    allGridRows.value.unshift({
+      id: newPayload.id || `evt_${Date.now()}_${Math.random()}`,
+      created_at: newPayload.timestamp || new Date().toISOString(),
+      severity: newPayload.severity || 'info',
+      type: newPayload.topic || 'unknown_event',
+      amount: newPayload.payload?.throughput_metric || newPayload.payload?.amount || 0,
+      provider: 'quasar_live_stream',
+      description: JSON.stringify(newPayload.payload) || 'Raw event stream ingested',
+      workspace: activeWorkspace.value,
+      subMode: activeSubModeName.value
+    })
+    
+    // Prune old logs to prevent memory leaks in the browser tab
+    if (allGridRows.value.length > 500) {
+      allGridRows.value.pop()
+    }
   }
-])
+})
 
 // Filter grid rows contextually based on Workspace isolation selection to prevent operator context clash
 const filteredGridRows = computed(() => {

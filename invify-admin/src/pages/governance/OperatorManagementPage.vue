@@ -187,14 +187,16 @@
 
           <div>
             <div class="text-caption text-muted q-mb-xs">Target Workspace Scope Namespace *</div>
-            <q-input
+            <q-select
               v-model="newOp.targetTenantId"
+              :options="targetScopeOptions"
               :dark="prefs.isDarkMode"
               filled
               dense
-              placeholder="e.g. tenant-default-01 or global-platform"
+              options-dense
+              emit-value
+              map-options
               class="bg-subpanel text-main rounded-borders"
-              required
             />
           </div>
 
@@ -225,8 +227,9 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
+import { adminApi } from '../../api'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import EnterpriseManualTooltip from '../../components/common/EnterpriseManualTooltip.vue'
 
@@ -235,6 +238,32 @@ const { prefs } = useOperatorPreferences()
 const loading = ref(false)
 const openCreateDialog = ref(false)
 const activeTierTab = ref('ALL')
+
+const tenants = ref([])
+
+onMounted(async () => {
+  try {
+    const res = await adminApi.getTenants()
+    tenants.value = res.data || []
+  } catch (e) {
+    // Sandbox offline presets fallback
+    tenants.value = [
+      { id: 'tenant-alpha', name: 'Fintech Alpha' },
+      { id: 'tenant-beta', name: 'Beta Labs' },
+      { id: 'tenant-omega', name: 'Omega Retail Group' }
+    ]
+  }
+})
+
+const targetScopeOptions = computed(() => {
+  const list = [
+    { label: 'Global Platform Boundary (Platform Level)', value: 'global-platform' }
+  ]
+  tenants.value.forEach(t => {
+    list.push({ label: `${t.name} (${t.id})`, value: t.id })
+  })
+  return list
+})
 
 const hierarchyRoles = [
   { label: 'Tier 1: Super Admin Master Mode', value: 'SUPER_ADMIN' },
@@ -261,7 +290,7 @@ const filteredOperators = computed(() => {
 const newOp = ref({
   email: '',
   role: 'TENANT_OPERATOR',
-  targetTenantId: 'tenant-default-01',
+  targetTenantId: 'global-platform',
   password: ''
 })
 

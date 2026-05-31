@@ -18,17 +18,17 @@
         </div>
       </div>
       
-      <!-- Tenant Scope selector -->
+      <!-- Mode Scope selector -->
       <div class="row items-center op-gap-8 no-wrap text-caption text-grey-5">
-        <span class="v-hide-xs">Tenant Scope:</span>
+        <span class="v-hide-xs">Mode Scope:</span>
         <q-select
-          v-model="activeTenantScope"
-          :options="['global', 'tenant-alpha', 'tenant-omega', 'tenant-beta']"
+          v-model="activeModeScope"
+          :options="modeScopeOptions"
           dense
           :dark="prefs.isDarkMode"
           filled
           options-dense
-          @update:model-value="onTenantScopeUpdated"
+          @update:model-value="onModeScopeUpdated"
           class="bg-subpanel text-caption"
           style="width: 130px;"
         />
@@ -121,12 +121,12 @@
     </div>
 
     <!-- MIDDLE SPLIT: Staged Cohorts & Convergence Stability Windows -->
-    <div class="row items-stretch op-gap-16 fit">
+    <div class="row items-stretch q-col-gutter-md full-width">
       
       <!-- LEFT PORTION: Staged Cohorts & Execution Controllers -->
-      <div class="col-12 col-md-7 column op-gap-16">
+      <div class="col-12 col-md-7 column">
         
-        <div class="enterprise-panel bg-panel column fit">
+        <div class="enterprise-panel bg-panel column full-width">
           <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="groups" size="xs" color="cyan-3" />
@@ -142,7 +142,7 @@
                 :key="c.cohortId" 
                 class="q-px-sm q-py-xs bg-panel-darker rounded-borders column op-gap-2 hover-row"
               >
-                <div class="row items-center justify-between fit no-wrap">
+                <div class="row items-center justify-between no-wrap full-width">
                   <div class="row items-center op-gap-8 no-wrap">
                     <span class="text-main text-weight-bold text-caption">{{ c.cohortName }}</span>
                     <q-chip dense size="xs" :color="getStateChipColor(c.state)" :text-color="getStateTextColor(c.state)" class="text-metric-sm text-weight-bold">
@@ -153,14 +153,14 @@
                 </div>
 
                 <!-- Progress indicators -->
-                <div class="row items-center justify-between text-caption text-secondary q-mt-xs" style="font-size: 10px;">
+                <div class="row items-center justify-between text-caption text-secondary q-mt-xs full-width" style="font-size: 10px;">
                   <span>Targeted Nodes: <span class="text-metric-mono text-main">{{ c.targetNodes.toLocaleString() }}</span></span>
                   <span>Convergence Complete: <span class="text-metric-mono text-cyan-3">{{ c.convergencePercent }}%</span></span>
                 </div>
-                <q-linear-progress :dark="prefs.isDarkMode" :value="c.convergencePercent / 100" color="cyan-4" track-color="grey-9" size="xs" />
+                <q-linear-progress :dark="prefs.isDarkMode" :value="c.convergencePercent / 100" color="cyan-4" track-color="grey-9" size="xs" class="full-width" />
 
                 <!-- Controller switches -->
-                <div class="row items-center justify-between q-mt-xs border-top q-pt-xs">
+                <div class="row items-center justify-between q-mt-xs border-top q-pt-xs full-width">
                   <span class="text-grey-6 ellipsis" style="font-size: 9px;">Targeting: {{ c.assignmentFilter }}</span>
                   
                   <div class="row items-center op-gap-4">
@@ -191,9 +191,9 @@
       </div>
 
       <!-- RIGHT PORTION: FINAL REFINEMENT #2: Convergence Stability Windows -->
-      <div class="col-12 col-md-5 column op-gap-16">
+      <div class="col-12 col-md-5 column">
         
-        <div class="enterprise-panel bg-panel column fit justify-between no-shadow">
+        <div class="enterprise-panel bg-panel column justify-between no-shadow full-width">
           <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
             <div class="row items-center op-gap-4 no-wrap">
               <q-icon name="timer" size="xs" color="amber-4" />
@@ -274,9 +274,9 @@
           </span>
           <div class="row items-center op-gap-4 no-wrap">
             <span class="text-grey-6" style="font-size: 11px;">Simulation Core:</span>
-            <q-select
-              v-model="simTargetFirmware"
-              :options="['v2.4.2-Stable-Patch', 'v2.5.0-Beta-Candidate', 'v3.0.0-Major-Rebuild']"
+            <q-select 
+              v-model="simTargetFirmware" 
+              :options="simulationCoreOptions" 
               dense :dark="prefs.isDarkMode" filled options-dense
               class="bg-subpanel text-caption"
               style="width: 180px;"
@@ -417,21 +417,37 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRolloutEventStore } from '../../stores/realtime/useRolloutEventStore'
 import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import EnterpriseManualTooltip from '../../components/common/EnterpriseManualTooltip.vue'
 import { Notify } from 'quasar'
+import api from '../../api'
 
 const { prefs } = useOperatorPreferences()
 const rolloutStore = useRolloutEventStore()
 
-// Tenant parameter mapping
-const activeTenantScope = ref('global')
-const onTenantScopeUpdated = (val) => {
+// Mode Scope parameter mapping
+const activeModeScope = ref('global')
+const modeScopeOptions = ref(['global', 'retail', 'service', 'school'])
+const onModeScopeUpdated = (val) => {
   rolloutStore.setTenantFilter(val)
 }
+
+// Fetch live data
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/api/admin/apk')
+    if (data && data.vault && data.vault.length > 0) {
+      const versions = data.vault.map(apk => `${apk.name} v${apk.version}`)
+      simulationCoreOptions.value = versions
+      simTargetFirmware.value = versions[0]
+    }
+  } catch (err) {
+    console.warn('Failed to load live firmware versions', err)
+  }
+})
 
 // 1. Staged Cohorts Array
 const stagedCohortsList = ref([
@@ -473,6 +489,7 @@ const getStateTextColor = (state) => {
 }
 
 // 2. Pre-Execution Simulation inputs
+const simulationCoreOptions = ref(['v2.4.2-Stable-Patch', 'v2.5.0-Beta-Candidate', 'v3.0.0-Major-Rebuild'])
 const simTargetFirmware = ref('v2.5.0-Beta-Candidate')
 
 // FINAL REFINEMENT #4: Dynamic Predictive Simulation math incorporating Historical Intelligence Learning contributors

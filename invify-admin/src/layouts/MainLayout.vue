@@ -4,6 +4,8 @@
     
     <!-- Universal Extensible Command Palette Shell -->
     <EnterpriseCommandPalette ref="paletteRef" />
+    <GlobalSearchModal v-model="isSearchOpen" />
+    <NotificationCenter v-model="isAlertDrawerOpen" />
 
     <!-- Top Operational Command Header Bar -->
     <q-header elevated class="border-bottom" style="background: var(--appbar-bg); height: 42px;">
@@ -40,10 +42,10 @@
           <q-btn-dropdown dense flat size="sm" color="amber-4" :content-style="prefs.isDarkMode ? 'background-color: #101826; border: 1px solid #1F2D42;' : 'background-color: #FFFFFF; border: 1px solid #D1D5DB;'" class="text-metric-sm border-amber-left q-ml-xs v-hide-xs">
             <template v-slot:label>
               <span class="text-weight-bold">{{ (prefs?.activeTenantScope || 'global').toUpperCase() }}</span>
+              <q-tooltip class="enterprise-panel bg-panel text-main border-main shadow-24" anchor="bottom middle" self="top middle" style="font-size: 11px; border: 1px solid var(--enterprise-border); border-radius: 4px;">
+                Active Multi-Tenant Domain Boundary. Click to toggle between isolation profiles.
+              </q-tooltip>
             </template>
-            <q-tooltip class="enterprise-panel bg-panel text-main border-main shadow-24" anchor="bottom middle" self="top middle" style="font-size: 11px; border: 1px solid var(--enterprise-border); border-radius: 4px;">
-              Active Multi-Tenant Domain Boundary. Click to toggle between isolation profiles.
-            </q-tooltip>
             <q-list :dark="prefs.isDarkMode" class="bg-panel text-caption">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Tenant Scope Context</q-item-label>
               <q-item clickable v-close-popup @click="setTenantScope('global')" class="hover-bg">
@@ -104,6 +106,16 @@
             <q-tooltip class="enterprise-panel bg-panel text-main border-main shadow-24" anchor="bottom middle" self="top middle" style="font-size: 11px; border: 1px solid var(--enterprise-border); border-radius: 4px;">
               Open Enterprise Command Index Palette (Ctrl+K) to find routes, actions, or tools immediately.
             </q-tooltip>
+          </div>
+
+          <!-- Executive Alert Bell -->
+          <div class="row items-center op-gap-8 no-wrap enterprise-subpanel q-px-sm q-py-xs rounded-borders" style="height: 28px; position: relative;">
+            <q-btn flat dense round size="xs" icon="notifications" :color="headerBellColor" @click="toggleAlertDrawer">
+              <q-badge v-if="systemAlertCount > 0" color="red-5" text-color="white" floating rounded style="top: -4px; right: -4px; font-size: 8px;">{{ systemAlertCount }}</q-badge>
+              <q-tooltip class="enterprise-panel bg-panel text-main border-main shadow-24" anchor="bottom middle" self="top middle" style="font-size: 11px;">
+                Global Notifications ({{ systemAlertCount }} Unread)
+              </q-tooltip>
+            </q-btn>
           </div>
 
           <!-- Theme Toggle & Diagnostic View -->
@@ -201,15 +213,15 @@
                 <q-icon :name="isSyncingBackend ? 'cloud_sync' : 'shield'" :color="isSyncingBackend ? 'amber-5' : 'blue-5'" size="xs" />
                 <div class="v-hide-xs">
                   <div class="text-operator-title text-white" style="font-size: 9px; line-height: 1;">
-                    {{ isSyncingBackend ? 'SYNCING...' : (operatorRole === 'SUPER_ADMIN' ? 'Operator Node' : (operatorRole === 'OWNER' ? 'Tenant Owner' : 'Workspace Node')) }}
+                    {{ isSyncingBackend ? 'SYNCING...' : getRoleLabel(operatorRole) }}
                   </div>
                   <div class="text-metric-sm text-blue-3" style="font-size: 10px;">{{ operatorEmail }}</div>
                 </div>
               </div>
+              <q-tooltip class="enterprise-panel bg-panel text-main border-main shadow-24" anchor="bottom middle" self="top middle" style="font-size: 11px; border: 1px solid var(--enterprise-border); border-radius: 4px;">
+                Active User Node: {{ operatorRole }}. Click to view access details or perform cloud continuity syncs.
+              </q-tooltip>
             </template>
-            <q-tooltip class="enterprise-panel bg-panel text-main border-main shadow-24" anchor="bottom middle" self="top middle" style="font-size: 11px; border: 1px solid var(--enterprise-border); border-radius: 4px;">
-              Active User Node: {{ operatorRole }}. Click to view access details or perform cloud continuity syncs.
-            </q-tooltip>
             <q-list :dark="prefs.isDarkMode" class="bg-panel text-caption">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Backend Continuity Sync</q-item-label>
               <q-item clickable v-close-popup @click="fetchPreferencesFromBackend" class="hover-bg">
@@ -471,12 +483,16 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, provide, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, provide, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useTelemetryStream } from '../composables/useTelemetryStream'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
+
 import EnterpriseCommandPalette from '../components/navigation/EnterpriseCommandPalette.vue'
+import GlobalSearchModal from '../components/GlobalSearchModal.vue'
+import NotificationCenter from '../components/NotificationCenter.vue'
+import { NotificationEngine } from '../services/NotificationEngine'
 import { connectionManagerSingleton } from '../services/realtime/RealtimeConnectionManager'
 import { operationalEventBusSingleton } from '../services/realtime/OperationalEventBus'
 import { useContextualIntelligence } from '../composables/useContextualIntelligence'
@@ -485,6 +501,36 @@ import OperationalKnowledgeDrawer from '../components/contextual/OperationalKnow
 const router = useRouter()
 const route = useRoute()
 const $q = useQuasar()
+
+// New State for Modals
+const isSearchOpen = ref(false)
+const isAlertDrawerOpen = ref(false)
+const systemAlertCount = ref(0)
+const hasCriticalAlerts = ref(false)
+
+// Alert System Hookup
+const updateAlertCount = () => {
+  systemAlertCount.value = NotificationEngine.getUnreadCount()
+  hasCriticalAlerts.value = NotificationEngine.hasCriticalUnread()
+}
+
+const headerBellColor = computed(() => {
+  if (hasCriticalAlerts.value) return 'red-5'
+  if (systemAlertCount.value > 0) return 'amber-4'
+  return 'green-4'
+})
+
+onMounted(() => {
+  NotificationEngine.subscribe(updateAlertCount)
+})
+
+onUnmounted(() => {
+  NotificationEngine.unsubscribe(updateAlertCount)
+})
+
+const toggleAlertDrawer = () => {
+  isAlertDrawerOpen.value = !isAlertDrawerOpen.value
+}
 
 // Pull enhanced asynchronous persistent storage handlers
 const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, toggleTheme, togglePinView, isViewPinned, pushHistory, clearHistory, executeLogout, fetchPreferencesFromBackend, setWorkspaceOrder } = useOperatorPreferences()
@@ -503,9 +549,24 @@ const {
 const operatorEmail = ref(localStorage.getItem('operator_email') || 'sysadmin@IIPS.app')
 const operatorRole = ref(localStorage.getItem('operator_role') || 'SUPER_ADMIN')
 
+const getRoleLabel = (role) => {
+  const map = {
+    SUPER_ADMIN: 'Operator Node',
+    ADMIN_DEPLOY: 'Deploy Ops Node',
+    ADMIN_OPS: 'Fleet Ops Node',
+    ADMIN_RISK: 'Risk Ops Node',
+    ADMIN_EXECUTIVE: 'Executive Node',
+    ADMIN_FINANCE: 'Finance Ops Node',
+    ADMIN_TREASURY: 'Treasury Ops Node',
+    STAFF: 'Staff Node',
+    OWNER: 'Tenant Owner'
+  }
+  return map[role] || 'Workspace Node'
+}
+
 const paletteRef = ref(null)
 const openCommandPalette = () => {
-  if (paletteRef.value) paletteRef.value.togglePalette()
+  isSearchOpen.value = true
 }
 
 provide('activeWorkspace', computed(() => prefs.value.activeWorkspace))
@@ -539,50 +600,63 @@ watch(() => prefs.value.isDarkMode, (isDark) => {
 
 const workspaces = computed(() => {
   const list = []
+  const isPlatformStaff = [
+    'SUPER_ADMIN',
+    'STAFF',
+    'ADMIN_DEPLOY',
+    'ADMIN_OPS',
+    'ADMIN_RISK',
+    'ADMIN_EXECUTIVE',
+    'ADMIN_FINANCE',
+    'ADMIN_TREASURY'
+  ].includes(operatorRole.value)
   
   // 1. Fleet Operations (accessible to all)
   list.push({ id: 'fleet', label: 'Fleet Operations', priority: true })
   
-  // 2. Governance (accessible to SUPER_ADMIN and STAFF)
-  if (['SUPER_ADMIN', 'STAFF'].includes(operatorRole.value)) {
+  // 2. Finance & Audit (accessible to all)
+  list.push({ id: 'finance', label: 'Finance & Audit', priority: true })
+
+  // 3. Governance (accessible to platform staff)
+  if (isPlatformStaff) {
     list.push({ id: 'governance', label: 'Governance', priority: true })
   }
   
-  // 3. Observability (accessible to all)
+  // 4. Observability (accessible to all)
   list.push({ id: 'observability', label: 'Observability', priority: true })
   
-  // 4. AI Operational Intelligence (accessible exclusively to SUPER_ADMIN)
-  if (operatorRole.value === 'SUPER_ADMIN') {
+  // 5. AI Operational Intelligence (accessible exclusively to SUPER_ADMIN and EXECUTIVE)
+  if (['SUPER_ADMIN', 'ADMIN_EXECUTIVE'].includes(operatorRole.value)) {
     list.push({ id: 'ai', label: 'AI Operational Intelligence', priority: true })
   }
   
-  // 5. Deployments (accessible exclusively to SUPER_ADMIN)
-  if (operatorRole.value === 'SUPER_ADMIN') {
+  // 6. Deployments (accessible exclusively to SUPER_ADMIN and DEPLOY)
+  if (['SUPER_ADMIN', 'ADMIN_DEPLOY'].includes(operatorRole.value)) {
     list.push({ id: 'deployments', label: 'Deployments', priority: false })
   }
   
-  // 6. Applications (accessible exclusively to SUPER_ADMIN)
-  if (operatorRole.value === 'SUPER_ADMIN') {
+  // 7. Applications (accessible exclusively to SUPER_ADMIN and OPS)
+  if (['SUPER_ADMIN', 'ADMIN_OPS'].includes(operatorRole.value)) {
     list.push({ id: 'apps', label: 'Applications', priority: false })
   }
   
-  // 7. Incident Response (accessible exclusively to SUPER_ADMIN)
-  if (operatorRole.value === 'SUPER_ADMIN') {
+  // 8. Incident Response (accessible exclusively to SUPER_ADMIN and RISK)
+  if (['SUPER_ADMIN', 'ADMIN_RISK'].includes(operatorRole.value)) {
     list.push({ id: 'incidents', label: 'Incident Response', priority: false })
   }
   
-  // 8. Automation & Policy (accessible exclusively to SUPER_ADMIN)
-  if (operatorRole.value === 'SUPER_ADMIN') {
+  // 9. Automation & Policy (accessible exclusively to SUPER_ADMIN and DEPLOY)
+  if (['SUPER_ADMIN', 'ADMIN_DEPLOY'].includes(operatorRole.value)) {
     list.push({ id: 'automation', label: 'Automation & Policy', priority: false })
   }
   
-  // 9. Operational Communications (accessible to SUPER_ADMIN and STAFF)
-  if (['SUPER_ADMIN', 'STAFF'].includes(operatorRole.value)) {
+  // 10. Operational Communications (accessible to platform staff)
+  if (isPlatformStaff) {
     list.push({ id: 'communications', label: 'Operational Communications', priority: false })
   }
   
-  // 10. Administration (accessible exclusively to SUPER_ADMIN)
-  if (operatorRole.value === 'SUPER_ADMIN') {
+  // 11. Administration (accessible exclusively to SUPER_ADMIN and DEPLOY)
+  if (['SUPER_ADMIN', 'ADMIN_DEPLOY'].includes(operatorRole.value)) {
     list.push({ id: 'admin', label: 'Administration', priority: false })
   }
   
@@ -635,6 +709,7 @@ const switchWorkspace = (id) => {
 watch(() => prefs.value.activeWorkspace, (newId) => {
   const targetMap = {
     fleet: '/fleet/overview',
+    finance: '/finance/reconciliation',
     governance: '/governance/compliance',
     observability: '/observability/streams',
     ai: '/ai/copilot',
@@ -704,10 +779,23 @@ const activeNavigationTree = computed(() => {
         { label: 'Fleet Telemetry Grid', path: '/fleet/telemetry', icon: 'show_chart', color: 'indigo-3', hasStream: true },
         { label: 'Remote Action Controls', path: '/fleet/actions', icon: 'terminal', color: 'purple-3' }
       ]
+      
+    case 'finance':
+      return [
+        { label: 'Transactions', path: '/finance/transactions', icon: 'sync_alt', color: 'cyan-4', badge: 'INVESTIGATE', badgeBg: 'cyan-10', badgeColor: 'cyan-3' },
+        { label: 'Financial Ledger', path: '/finance/ledger', icon: 'account_balance_wallet', color: 'amber-4', badge: 'SOURCE', badgeBg: 'amber-10', badgeColor: 'amber-3' },
+        { label: 'Reconciliation', path: '/finance/reconciliation', icon: 'fact_check', color: 'green-4' },
+        { label: 'Settlements', path: '/finance/settlements', icon: 'payments', color: 'indigo-4' },
+        { label: 'Audit Engine', path: '/finance/audit', icon: 'policy', color: 'red-4' }
+      ]
     
     case 'governance':
       return [
+        { label: 'Operator Governance', path: '/governance/operators', icon: 'manage_accounts', color: 'blue-4' },
+        { label: 'Approval Engine', path: '/governance/approvals', icon: 'fact_check', color: 'purple-4', badge: 'Queue', badgeBg: 'purple-10', badgeColor: 'purple-3' },
         { label: 'Compliance Audits', path: `${tScope}/governance/compliance`, icon: 'fact_check', color: 'green-4', badge: '99.8%', badgeBg: 'green-10', badgeColor: 'green-3' },
+        { label: 'Audit Trail Ledger', path: '/governance/audit-trail', icon: 'history_edu', color: 'blue-5' },
+        { label: 'User Device Approvals', path: '/governance/user-devices', icon: 'phonelink_lock', color: 'red-4' },
         { label: 'Policy Governance', path: '/governance/policy', icon: 'policy', color: 'indigo-3' },
         { label: 'Integrity Center', path: '/governance/integrity', icon: 'security', color: 'grey-4' },
         { label: 'Trust Scoring', path: '/governance/trust', icon: 'thumb_up', color: 'cyan-3' },
@@ -729,8 +817,7 @@ const activeNavigationTree = computed(() => {
     case 'deployments':
       return [
         { label: 'Rollout Control Center', path: '/deployments/rollouts', icon: 'rocket_launch', color: 'cyan-4', count: 'Active' },
-        { label: 'Release Channels', path: '/deployments/channels', icon: 'alt_route', color: 'amber-4', badge: '5 Tracks', badgeBg: 'amber-10', badgeColor: 'amber-3' },
-        { label: 'Rollback Safeguards', path: '/deployments/rollouts', icon: 'restore', color: 'red-4', badge: 'Dependency-Aware', badgeBg: 'red-10', badgeColor: 'red-2', motionPulse: 'pulse-critical' }
+        { label: 'Release Channels', path: '/deployments/channels', icon: 'alt_route', color: 'amber-4', badge: '5 Tracks', badgeBg: 'amber-10', badgeColor: 'amber-3' }
       ]
     
     case 'apps':
@@ -755,7 +842,8 @@ const activeNavigationTree = computed(() => {
     
     case 'ai':
       return [
-        { label: 'AI Operational Copilot', path: '/ai/copilot', icon: 'psychology', color: 'cyan-3', badge: 'Ground Truth', badgeBg: 'cyan-10', badgeColor: 'cyan-2' }
+        { label: 'AI Operational Copilot', path: '/ai/copilot', icon: 'psychology', color: 'cyan-3', badge: 'Ground Truth', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
+        { label: 'AI Lesson Planner', path: '/notes', icon: 'auto_awesome', color: 'indigo-3', badge: 'AI', badgeBg: 'indigo-10', badgeColor: 'indigo-2' }
       ]
     
     case 'communications':
@@ -768,12 +856,14 @@ const activeNavigationTree = computed(() => {
     case 'admin':
     default:
       return [
-        { label: 'Contact Maintenance', path: '/admin/settings', icon: 'contact_phone', color: 'cyan-4' },
+        { label: 'Platform Overview', path: '/admin/settings', icon: 'dashboard', color: 'cyan-4' },
+        { label: 'Platform Configuration', path: '/admin/config', icon: 'tune', color: 'cyan-4' },
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Enterprise Billing & Fees', path: '/admin/billing', icon: 'payments', color: 'teal-4', badge: 'Finance', badgeBg: 'teal-10', badgeColor: 'teal-2' },
-        { label: 'EMV POS Gateway', path: '/admin/pos-gateway', icon: 'point_of_sale', color: 'purple-4', badge: 'LIVE', badgeBg: 'purple-10', badgeColor: 'purple-2' }
+        { label: 'EMV POS Gateway', path: '/admin/pos-gateway', icon: 'point_of_sale', color: 'purple-4', badge: 'LIVE', badgeBg: 'purple-10', badgeColor: 'purple-2' },
+        { label: 'Contact Maintenance', path: '/admin/contact', icon: 'contact_phone', color: 'grey-4' }
       ]
   }
 })
@@ -792,6 +882,8 @@ const getMenuDescription = (label) => {
 
     // Governance
     'Compliance Audits': 'Continuous real-time verification of operational processes against SLA definitions, central bank guidelines, and security requirements.',
+    'Audit Trail Ledger': 'Trace security, authentication, and operator change histories via immutable, cryptographically sealed lineage logs.',
+    'User Device Approvals': 'Manage browser device approvals for admins, staff, and tenant operators to prevent unauthorized logins.',
     'Policy Governance': 'Draft, model, and distribute system-wide structural policies, transaction restrictions, and automated remediation boundaries.',
     'Integrity Center': 'Verify system integrity, binary hashes, and boot verification keys across operational channels and edge hardware.',
     'Trust Scoring': 'Review cryptographic trust indices, anomaly detection risk ranks, and session access metrics for multi-workstation operators.',
@@ -805,6 +897,13 @@ const getMenuDescription = (label) => {
     'WebSocket Diagnostics': 'Track real-time duplex channel metrics, active subscriber nodes, frame transmission integrity, and latency indices.',
     'Audit Logs Base': 'Immutable double-entry operational logging trace system preserving permanent administrative change histories.',
     'Ingestion Pipelines': 'Configure event collectors, stream mapping logic, log indexing parameters, and downstream storage routing profiles.',
+
+    // Finance
+    'Transactions': 'Cross-channel transaction investigation, ledger mapping, and fraud anomaly traces.',
+    'Financial Ledger': 'Double-entry ledger chart of accounts, immutable journal explorer, and posting parity checks.',
+    'Reconciliation': 'Settlement matching, exception queue management, and cross-ledger reconciliation rules.',
+    'Settlements': 'Batch settlement orchestration, processing queues, and bank gateway clearing status.',
+    'Audit Engine': 'Immutable financial action tracing, compliance checks, and operational audit logs.',
 
     // Deployments
     'Rollout Control Center': 'Manage progressive rollout campaigns, automated canary triggers, and rollback rules for platform software.',
@@ -827,6 +926,7 @@ const getMenuDescription = (label) => {
 
     // AI
     'AI Operational Copilot': 'Engage with the autonomous system copilot to draft, verify, or execute commands against the active infrastructure.',
+    'AI Lesson Planner': 'Curriculum-aligned lesson note generation with NERDC standards powered by AI.',
 
     // Communications
     'Broadcast Center Hub': 'Draft, verify, and broadcast real-time announcements, emergency messages, and notifications to edge operators.',
@@ -834,6 +934,9 @@ const getMenuDescription = (label) => {
     'Lineage Hash Audits': 'Audit cryptographic signatures and sender identities of all platform broadcast messages.',
 
     // Admin
+    'Platform Overview': 'Single-pane-of-glass administrative command center aggregating ecosystem health, security, operations, and telemetry.',
+    'Platform Configuration': 'Configure core platform parameters, localization & currency systems, session security policies, and whitelabel branding.',
+    'Contact Maintenance': 'Update support contact numbers and dispatch real-time emergency notifications to active devices.',
     'Global Setup & RBAC': 'Configure core platform parameters, primary currency defaults, global variables, and roles & permissions.',
     'Tenants Identity Matrix': 'Manage tenant registrations, approve incoming business profiles, provision database schemas, and view indices.',
     'Operators Access Profiles': 'Configure internal administrative operator profiles, map RBAC scopes, and verify MFA parameters.',
@@ -873,7 +976,7 @@ onMounted(() => {
   }
 })
 
-onBeforeUnmount(() => {
+onUnmounted(() => {
   if (throttleTimer) clearInterval(throttleTimer)
 })
 </script>

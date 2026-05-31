@@ -76,21 +76,10 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         }
       }
 
-      // Preserve fallback visual figures if local SQLite is empty during brand new demo onboarding
-      final finalCollected = localCollected > 0 ? localCollected : 4850000.0;
-      final finalCustomers = localCustomersCount > 0 ? localCustomersCount : 240;
-      final finalActivities = localActivities.isNotEmpty ? localActivities : [
-        {
-          'created_at': DateTime.now().subtract(const Duration(minutes: 12)).toIso8601String(),
-          'type': 'fee',
-          'amount': 150000,
-        },
-        {
-          'created_at': DateTime.now().subtract(const Duration(hours: 1)).toIso8601String(),
-          'type': 'fee',
-          'amount': 45000,
-        },
-      ];
+      // Clean up fallback figures to zero instead of mock demo values for production
+      final finalCollected = localCollected > 0 ? localCollected : 0.0;
+      final finalCustomers = localCustomersCount > 0 ? localCustomersCount : 0;
+      final finalActivities = localActivities.isNotEmpty ? localActivities : [];
 
       setState(() {
         _summary = {
@@ -98,7 +87,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
           'totalCollected': finalCollected,
           'revenueInRange': finalCollected * 0.18,
           'alerts': {
-            'unmatchedCount': 1,
+            'unmatchedCount': 0,
             'failedPayoutsCount': 0,
           },
           'studentMetrics': {

@@ -415,18 +415,83 @@
 
       </div>
 
+        <!-- DEVICE APPROVAL PENDING DIALOG -->
+        <q-dialog v-model="showDeviceApprovalDialog" persistent>
+          <q-card style="width: 500px; max-width: 95vw;" class="enterprise-panel bg-panel text-main border-critical">
+            <q-card-section class="row items-center q-pb-none border-bottom q-py-sm bg-subpanel">
+              <div class="row items-center op-gap-8 text-weight-bold text-red-4">
+                <q-icon name="gpp_bad" size="sm" />
+                <span>DEVICE ACCESS RESTRICTED</span>
+              </div>
+              <q-space />
+              <q-btn icon="close" flat round dense v-close-popup />
+            </q-card-section>
+
+            <q-card-section class="column op-gap-16 q-pt-md">
+              <div class="text-caption text-secondary">
+                This account enforcement profile utilizes strict device fingerprint auditing. Logins from new or modified browser environments must be manually authorized.
+              </div>
+
+              <q-banner rounded class="bg-subpanel text-main border-main q-pa-sm font-mono text-metric-sm">
+                <div class="row items-center justify-between text-weight-bold text-cyan-3">
+                  <span>Operator Email:</span>
+                  <span>{{ approvalUserEmail }}</span>
+                </div>
+                <div class="row items-center justify-between text-weight-bold text-amber-4 q-mt-xs">
+                  <span>Device Footprint Status:</span>
+                  <span>PENDING APPROVAL</span>
+                </div>
+              </q-banner>
+
+              <div class="column op-gap-4">
+                <span class="text-caption text-muted">Device Footprint Hash Identifier:</span>
+                <q-input 
+                  outlined 
+                  dense 
+                  readonly 
+                  dark 
+                  v-model="approvalDeviceId" 
+                  class="bg-subpanel text-metric-mono font-mono"
+                >
+                  <template v-slot:append>
+                    <q-btn 
+                      flat 
+                      round 
+                      dense 
+                      color="cyan-3" 
+                      icon="content_copy" 
+                      size="sm" 
+                      @click="copyApprovalId" 
+                    />
+                  </template>
+                </q-input>
+              </div>
+
+              <q-banner rounded class="bg-red-10 text-red-2 border-critical q-py-xs text-metric-sm">
+                Share this Device Footprint Hash Identifier with your system administrator or the Invify Ops team to authorize access.
+              </q-banner>
+            </q-card-section>
+
+            <q-card-actions align="right" class="q-pa-md border-top bg-subpanel">
+              <q-btn flat label="Close" color="grey-5" v-close-popup />
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+
     </q-page-container>
   </q-layout>
 </template>
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import logoImg from '../../assets/logo_transparent.png'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import { useQuasar, copyToClipboard } from 'quasar'
 
 const router = useRouter()
 const route = useRoute()
+const $q = useQuasar()
 
 const { prefs, toggleTheme } = useOperatorPreferences()
 
@@ -434,6 +499,28 @@ const loading = ref(false)
 const showPassword = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+
+const deviceId = ref('')
+const showDeviceApprovalDialog = ref(false)
+const approvalDeviceId = ref('')
+const approvalUserEmail = ref('')
+
+onMounted(() => {
+  let storedId = localStorage.getItem('invify_browser_device_id')
+  if (!storedId) {
+    storedId = `browser-id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    localStorage.setItem('invify_browser_device_id', storedId)
+  }
+  deviceId.value = storedId
+})
+
+function copyApprovalId() {
+  copyToClipboard(approvalDeviceId.value)
+  $q.notify({
+    type: 'positive',
+    message: 'Device ID copied to clipboard'
+  })
+}
 
 const activeTier = ref('staff')
 const authTiers = [
@@ -579,7 +666,8 @@ const executeLoginPass = async () => {
     const res = await axios.post(`${API_BASE}/api/auth/login`, {
       email: form.value.email,
       password: form.value.password,
-      isolationTier: activeTier.value
+      isolationTier: activeTier.value,
+      deviceId: deviceId.value
     })
 
     if (res.data?.requiresPasswordReset) {
@@ -610,20 +698,28 @@ const executeLoginPass = async () => {
       finalizeAuthenticatedSession(res.data)
     }
   } catch (err) {
-    failedAttemptsCount.value++
-    if (failedAttemptsCount.value >= 3) {
-      // Trigger Brute Force Lockout Cooldown period
-      lockoutRemainingMs.value = 15000
-      const timer = setInterval(() => {
-        lockoutRemainingMs.value -= 1000
-        if (lockoutRemainingMs.value <= 0) {
-          clearInterval(timer)
-          failedAttemptsCount.value = 0
-        }
-      }, 1000)
-      errorMessage.value = 'Continuous authentication failures exceeded threshold. Enforcing brute force security protocol.'
+    const errorResponse = err.response?.data
+    if (errorResponse?.error === 'DEVICE_APPROVAL_REQUIRED') {
+      errorMessage.value = errorResponse.message || 'Browser device pending operations team approval.'
+      showDeviceApprovalDialog.value = true
+      approvalDeviceId.value = errorResponse.deviceId || deviceId.value
+      approvalUserEmail.value = form.value.email
     } else {
-      errorMessage.value = err.response?.data?.message || err.message || 'Authentication handshakes rejected due to origin validation blocks.'
+      failedAttemptsCount.value++
+      if (failedAttemptsCount.value >= 3) {
+        // Trigger Brute Force Lockout Cooldown period
+        lockoutRemainingMs.value = 15000
+        const timer = setInterval(() => {
+          lockoutRemainingMs.value -= 1000
+          if (lockoutRemainingMs.value <= 0) {
+            clearInterval(timer)
+            failedAttemptsCount.value = 0
+          }
+        }, 1000)
+        errorMessage.value = 'Continuous authentication failures exceeded threshold. Enforcing brute force security protocol.'
+      } else {
+        errorMessage.value = err.response?.data?.message || err.message || 'Authentication handshakes rejected due to origin validation blocks.'
+      }
     }
   } finally {
     loading.value = false
@@ -689,7 +785,8 @@ const finalizeAuthenticatedSession = (tokenData) => {
   }
   
   // Set explicit attribution storage values
-  localStorage.setItem('operator_role', tokenData.user?.role || activeUserRole.value || 'SUPER_ADMIN')
+  const cleanRole = (tokenData.user?.role || activeUserRole.value || 'SUPER_ADMIN').toUpperCase()
+  localStorage.setItem('operator_role', cleanRole)
   localStorage.setItem('operator_email', form.value.email || 'federated@IIPS.app')
   localStorage.setItem('mfa_status_verified', 'true')
   

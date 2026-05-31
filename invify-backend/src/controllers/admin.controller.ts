@@ -22,6 +22,9 @@ interface MockTenant {
   wallet_balance?: number;
   total_wallet_balance?: number;
   available_wallet_balance?: number;
+  support_phone?: string;
+  support_email?: string;
+  support_whatsapp?: string;
 }
 
 export class AdminController {
@@ -52,9 +55,21 @@ export class AdminController {
   private static getGlobalSettingsData() {
     const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
     if (!fs.existsSync(GLOBAL_SETTINGS_PATH)) {
-      fs.writeFileSync(GLOBAL_SETTINGS_PATH, JSON.stringify({ support_phone: '+234 800 INVIFY' }, null, 2));
+      fs.writeFileSync(GLOBAL_SETTINGS_PATH, JSON.stringify({ 
+        support_phone: '+234 800 INVIFY',
+        support_email: 'info.iips.ng@gmail.com',
+        support_whatsapp: '+2348023552282',
+        broadcast_message: ''
+      }, null, 2));
     }
-    return JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
+    const data = JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
+    // Ensure new fields exist even for existing files
+    if (!data.support_email) data.support_email = 'info.iips.ng@gmail.com';
+    if (!data.support_whatsapp) data.support_whatsapp = '+2348023552282';
+    if (!data.broadcast_message) data.broadcast_message = '';
+    if (data.audit_retention_hours === undefined) data.audit_retention_hours = 72;
+    if (data.enforce_device_control === undefined) data.enforce_device_control = false;
+    return data;
   }
 
   private static saveGlobalSettingsData(data: any) {
@@ -289,6 +304,17 @@ export class AdminController {
       const { id } = req.params;
       const updates = req.body;
 
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        const data = AdminController.getLocalData();
+        const index = data.findIndex(t => t.id === id);
+        if (index !== -1) {
+          data[index] = { ...data[index], ...updates };
+          AdminController.saveLocalData(data);
+          return res.status(200).json(data[index]);
+        }
+        return res.status(404).json({ error: 'Tenant not found' });
+      }
+
       const { data, error } = await supabase
         .from('tenants')
         .update(updates)
@@ -300,6 +326,63 @@ export class AdminController {
       return res.status(200).json(data);
     } catch (error: any) {
       console.error('[AdminController] updateTenant Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/broadcast
+   * Sends a real-time socket.io broadcast message to terminals/apps.
+   */
+  static async sendBroadcast(req: Request, res: Response) {
+    try {
+      const { message, targetType, targetValue } = req.body;
+      if (!message) return res.status(400).json({ error: "Message is required" });
+
+      const { io } = require('../app');
+      
+      if (targetType === 'agent' && targetValue) {
+        // Read tenants to find all tenants under this agent
+        let tenants: any[] = [];
+        if (fs.existsSync(LOCAL_TENANTS_DB_PATH)) {
+          tenants = JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'));
+        }
+        
+        const agentTenants = tenants.filter(t => t.agent_code === targetValue);
+        
+        console.log(`[AdminController] Emitting broadcast to ${agentTenants.length} tenants under agent: ${targetValue}`);
+        
+        agentTenants.forEach(tenant => {
+          io.to(`tenant:${tenant.id}`).emit('app_broadcast', {
+            message,
+            timestamp: new Date().toISOString()
+          });
+        });
+
+        return res.status(200).json({ success: true, message: `Broadcast sent to ${agentTenants.length} tenants under agent ${targetValue}` });
+      }
+
+      let room = 'all';
+
+      if (targetType === 'tenant' && targetValue) {
+        room = `tenant:${targetValue}`;
+      } else if (targetType === 'plan' && targetValue) {
+        room = `plan:${String(targetValue).toLowerCase()}`;
+      } else if (targetType === 'type' && targetValue) {
+        room = `type:${String(targetValue).toLowerCase()}`;
+      }
+
+      console.log(`[AdminController] Sending Broadcast!`);
+      console.log(`[AdminController] Input parameters -> Type: ${targetType}, Value: ${targetValue}`);
+      console.log(`[AdminController] Emitting broadcast to formatted socket room: ${room}`);
+      io.to(room).emit('app_broadcast', {
+        message,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.status(200).json({ success: true, room, message: 'Broadcast sent successfully' });
+    } catch (error: any) {
+      console.error('[AdminController] sendBroadcast Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }
@@ -319,6 +402,26 @@ export class AdminController {
       const tenantPlan = match ? match.plan : 'standard';
       const tenantStatus = match ? match.status : 'active';
       const tenantCreatedAt = match ? match.created_at : new Date().toISOString();
+
+      let tenantCertificates: any[] = [];
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const devicesDbPath = path.join(process.cwd(), 'devices_db.json');
+        if (fs.existsSync(devicesDbPath)) {
+          const deviceDb = JSON.parse(fs.readFileSync(devicesDbPath, 'utf-8'));
+          tenantCertificates = (deviceDb.activations || [])
+            .filter((a: any) => a.tenant_id === id)
+            .map((a: any) => ({
+              code: a.activation_code,
+              deviceId: a.device_id,
+              plan: a.plan_index === 3 ? 'ENTERPRISE' : (a.plan_index === 2 ? 'PREMIUM' : (a.plan_index === 1 ? 'STANDARD' : 'BASIC')),
+              duration: `${a.duration_days} Days`,
+              expiry: new Date(new Date(a.created_at).getTime() + a.duration_days * 24 * 60 * 60 * 1000).toLocaleDateString(),
+              status: a.status === 'used' ? 'USED' : 'ACTIVE'
+            }));
+        }
+      } catch (e) {}
 
       return res.status(200).json({
         tenant: { 
@@ -340,7 +443,8 @@ export class AdminController {
           total_wallet_balance: match?.total_wallet_balance || 0,
           available_wallet_balance: match?.available_wallet_balance || 0
         },
-        recentUsage: []
+        recentUsage: [],
+        certificates: tenantCertificates
       });
     }
 
@@ -348,20 +452,31 @@ export class AdminController {
       const { id } = req.params;
 
       // Parallel fetch for deep insights
-      const [tenantRes, usersRes, walletInfo, usageRes] = await Promise.all([
+      const [tenantRes, usersRes, walletInfo, usageRes, certRes] = await Promise.all([
         supabase.from('tenants').select('*').eq('id', id).single(),
         supabase.from('users').select('*').eq('tenant_id', id),
         WalletService.getBalance(id), // DERIVED: Sum of ledger entries
-        supabase.from('ai_usage').select('*').eq('tenant_id', id).limit(5)
+        supabase.from('ai_usage').select('*').eq('tenant_id', id).limit(5),
+        supabase.from('device_activations').select('*').eq('tenant_id', id)
       ]);
 
       if (tenantRes.error) throw tenantRes.error;
+
+      const certificates = (certRes.data || []).map((a: any) => ({
+        code: a.activation_code,
+        deviceId: a.device_id,
+        plan: a.plan_index === 3 ? 'ENTERPRISE' : (a.plan_index === 2 ? 'PREMIUM' : (a.plan_index === 1 ? 'STANDARD' : 'BASIC')),
+        duration: `${a.duration_days} Days`,
+        expiry: new Date(new Date(a.created_at).getTime() + a.duration_days * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        status: a.is_used ? 'USED' : 'ACTIVE'
+      }));
 
       return res.status(200).json({
         tenant: tenantRes.data,
         users: usersRes.data,
         wallet: { balance: walletInfo.balance }, // Normalized structure for frontend
-        recentUsage: usageRes.data
+        recentUsage: usageRes.data,
+        certificates
       });
     } catch (error: any) {
       console.error('[AdminController] getTenantDetails Error:', error.message);
@@ -670,10 +785,10 @@ export class AdminController {
       if (isConnectionTimeout || process.env.OFFLINE_MOCK_AUTH === 'true') {
         console.warn('[AdminController] Supabase offline fallback triggered for getDashboardStats.');
         return res.status(200).json({
-          total_revenue: 1250000,
-          active_students: 450,
-          pending_invoices: 18,
-          billing: { plan: 'PREMIUM', status: 'active', quotaUsed: 65, maxQuota: 100 }
+          total_revenue: 0,
+          active_students: 0,
+          pending_invoices: 0,
+          billing: { plan: 'Standard', status: 'active', quotaUsed: 0, maxQuota: 100 }
         });
       }
       return res.status(500).json({ error: error.message });

@@ -56,11 +56,14 @@
                       <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ apkVault[slot - 1].packageName }}</div>
                     </div>
                   </div>
-                  <div class="row items-center op-gap-4">
-                    <q-btn flat dense size="xs" icon="upgrade" color="amber-4" @click="openUpdateDialog(slot - 1)">
+                  <div class="row items-center">
+                    <q-btn flat dense size="sm" icon="upgrade" color="amber-4" @click="openUpdateDialog(slot - 1)">
                       <q-tooltip class="bg-amber-10 text-amber-2 text-caption">Upload New Version</q-tooltip>
                     </q-btn>
-                    <q-btn flat dense size="xs" icon="delete_outline" color="red-4" @click="removeApk(slot - 1)">
+                    <q-btn flat dense size="sm" class="q-mx-md" icon="edit_link" color="cyan-4" @click="promptEditUrl(slot - 1)">
+                      <q-tooltip class="bg-cyan-10 text-cyan-2 text-caption">Edit Download URL</q-tooltip>
+                    </q-btn>
+                    <q-btn flat dense size="sm" icon="delete_outline" color="red-4" @click="removeApk(slot - 1)">
                       <q-tooltip class="bg-red-10 text-red-2 text-caption">Remove from Vault</q-tooltip>
                     </q-btn>
                   </div>
@@ -360,46 +363,41 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { Notify } from 'quasar'
+import { ref, computed, onMounted } from 'vue'
+import { Notify, useQuasar } from 'quasar'
+import api from 'src/api'
 
+const $q = useQuasar()
 // ── APK Vault (max 3) ──────────────────────────────────────────────────────────
-const apkVault = ref([
-  {
-    id: 'apk-1',
-    name: 'Invify Kiosk Gateway',
-    packageName: 'com.invify.kiosk.base',
-    version: '2.5.0',
-    size: '48.2 MB',
-    status: 'READY',
-    uploadProgress: 100,
-    installCount: 14,
-    uninstallCount: 2,
-    versionDistribution: [
-      { version: '2.5.0', deviceCount: 14 },
-      { version: '2.4.1', deviceCount: 8 },
-      { version: '2.4.0', deviceCount: 3 }
-    ],
-    selectedDeployVersion: '2.5.0'
-  },
-  {
-    id: 'apk-2',
-    name: 'CpointBaseApp',
-    packageName: 'com.invify.cpointbaseapp',
-    version: '3.1.0',
-    size: '62.8 MB',
-    status: 'READY',
-    uploadProgress: 100,
-    installCount: 8,
-    uninstallCount: 0,
-    versionDistribution: [
-      { version: '3.1.0', deviceCount: 8 },
-      { version: '3.0.4', deviceCount: 21 },
-      { version: '2.9.8', deviceCount: 5 }
-    ],
-    selectedDeployVersion: '3.1.0'
+const apkVault = ref([])
+
+onMounted(async () => {
+  try {
+    const { data } = await api.get('/api/admin/apk')
+    apkVault.value = data.vault || []
+    deploymentLog.value = data.logs || []
+  } catch (error) {
+    Notify.create({ type: 'negative', message: 'Failed to load APK vault', position: 'bottom-right' })
   }
-])
+
+  try {
+    const { data: termData } = await api.get('/api/admin/inventory/tablets')
+    if (termData && termData.data) {
+      devices.value = termData.data.map(d => ({
+        id: d.device_id || d.serial_number || d.id,
+        model: d.model || 'Unknown Tablet',
+        tenant: d.tenant || 'N/A',
+        plan: 'PRO',
+        mode: 'RETAIL',
+        android: 'Android 11',
+        status: 'ONLINE',
+        lastSync: 'just now'
+      }))
+    }
+  } catch (error) {
+    Notify.create({ type: 'negative', message: 'Failed to load target devices', position: 'bottom-right' })
+  }
+})
 
 const uploadDialogOpen = ref(false)
 const fileInputRef = ref(null)
@@ -416,6 +414,31 @@ const openUpdateDialog = (index) => {
   targetSlotIndex.value = index
   resetNewApk()
   uploadDialogOpen.value = true
+}
+
+const promptEditUrl = (index) => {
+  const apk = apkVault.value[index]
+  if (!apk) return
+  
+  $q.dialog({
+    title: 'Edit APK URL',
+    message: 'Update the public download URL for this package.',
+    prompt: {
+      model: apk.s3Url,
+      type: 'url'
+    },
+    cancel: true,
+    persistent: true,
+    color: 'cyan-4'
+  }).onOk(async data => {
+    try {
+      const response = await api.patch(`/api/admin/apk/${apk.id}/url`, { s3Url: data })
+      apkVault.value[index] = response.data
+      Notify.create({ type: 'positive', message: 'URL updated successfully', position: 'bottom-right' })
+    } catch (e) {
+      Notify.create({ type: 'negative', message: 'Failed to update URL', position: 'bottom-right' })
+    }
+  })
 }
 
 const newApk = ref({ name: '', packageName: '', version: '', fileName: '', fileRef: null })
@@ -459,14 +482,25 @@ const onFileSelected = (e) => {
   }, 1200)
 }
 
-const commitApkToVault = () => {
+const commitApkToVault = async () => {
   if (targetSlotIndex.value === null && apkVault.value.length >= 3) {
     Notify.create({ type: 'negative', message: 'Vault is full. Remove an existing APK to upload a new one.', position: 'bottom-right' })
     return
   }
 
-  const entry = {
-    id: `apk-${Date.now()}`,
+  const formData = new FormData()
+  formData.append('file', newApk.value.fileRef)
+  formData.append('name', newApk.value.name)
+  formData.append('packageName', newApk.value.packageName)
+  formData.append('version', newApk.value.version)
+  
+  if (targetSlotIndex.value !== null) {
+    formData.append('targetSlotId', apkVault.value[targetSlotIndex.value].id)
+  }
+
+  // Create a placeholder entry for optimistic UI
+  const optimisticEntry = {
+    id: `apk-temp`,
     name: newApk.value.name,
     packageName: newApk.value.packageName,
     version: newApk.value.version,
@@ -475,53 +509,53 @@ const commitApkToVault = () => {
     uploadProgress: 0,
     installCount: 0,
     uninstallCount: 0,
-    versionDistribution: [
-      { version: newApk.value.version, deviceCount: 0 }
-    ],
+    versionDistribution: [{ version: newApk.value.version, deviceCount: 0 }],
     selectedDeployVersion: newApk.value.version
   }
 
-  let finalIndex = -1
-
+  let finalIndex = targetSlotIndex.value !== null ? targetSlotIndex.value : apkVault.value.length
+  
   if (targetSlotIndex.value !== null) {
-    // Updating existing slot: keep historical version distribution
-    const existing = apkVault.value[targetSlotIndex.value]
-    entry.versionDistribution = [ ...existing.versionDistribution ]
-    
-    // Add the new version if it doesn't exist
-    if (!entry.versionDistribution.find(v => v.version === entry.version)) {
-      entry.versionDistribution.unshift({ version: entry.version, deviceCount: 0 })
-      if (entry.versionDistribution.length > 3) {
-        entry.versionDistribution = entry.versionDistribution.slice(0, 3)
-      }
-    }
-    
-    // Overwrite the slot
-    apkVault.value[targetSlotIndex.value] = entry
-    finalIndex = targetSlotIndex.value
+    apkVault.value[finalIndex] = { ...apkVault.value[finalIndex], status: 'UPLOADING', uploadProgress: 0 }
   } else {
-    // New slot
-    apkVault.value.push(entry)
-    finalIndex = apkVault.value.length - 1
+    apkVault.value.push(optimisticEntry)
   }
 
   uploadDialogOpen.value = false
-  resetNewApk()
 
-  // Simulate upload progress
-  const interval = setInterval(() => {
-    entry.uploadProgress = Math.min(entry.uploadProgress + 20, 100)
-    if (entry.uploadProgress >= 100) {
-      entry.status = 'READY'
-      clearInterval(interval)
-      Notify.create({ type: 'positive', message: `APK [${entry.name}] committed to vault slot ${finalIndex + 1}`, position: 'bottom-right' })
+  try {
+    const { data } = await api.post('/api/admin/apk/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        apkVault.value[finalIndex].uploadProgress = percentCompleted
+      }
+    })
+    
+    // Replace optimistic entry with real data
+    apkVault.value[finalIndex] = data
+    Notify.create({ type: 'positive', message: `APK [${data.name}] committed to vault successfully`, position: 'bottom-right' })
+  } catch (error) {
+    Notify.create({ type: 'negative', message: `Upload failed: ${error.response?.data?.error || error.message}`, position: 'bottom-right' })
+    if (targetSlotIndex.value === null) {
+      apkVault.value.pop() // Remove optimistic new slot on error
+    } else {
+      apkVault.value[finalIndex].status = 'ERROR'
     }
-  }, 400)
+  }
+
+  resetNewApk()
 }
 
-const removeApk = (index) => {
-  const removed = apkVault.value.splice(index, 1)[0]
-  Notify.create({ type: 'warning', message: `APK [${removed.name}] removed from vault`, position: 'bottom-right' })
+const removeApk = async (index) => {
+  try {
+    const apkId = apkVault.value[index].id
+    await api.delete(`/api/admin/apk/${apkId}`)
+    const removed = apkVault.value.splice(index, 1)[0]
+    Notify.create({ type: 'warning', message: `APK [${removed.name}] removed from vault`, position: 'bottom-right' })
+  } catch (error) {
+    Notify.create({ type: 'negative', message: 'Failed to delete APK', position: 'bottom-right' })
+  }
 }
 
 // ── Device Registry ────────────────────────────────────────────────────────────
@@ -532,16 +566,7 @@ const planFilter = ref('ALL PLANS')
 const modeFilter = ref('ALL MODES')
 const selectedDevices = ref([])
 
-const devices = ref([
-  { id: 'DSPRD-POS-0091', model: 'DSpread QM800', tenant: 'tenant-alpha', plan: 'PRO', mode: 'RETAIL', android: 'Android 11', status: 'ONLINE', lastSync: '4s ago' },
-  { id: 'DSPRD-POS-1339', model: 'DSpread XM1A', tenant: 'tenant-alpha', plan: 'BASIC', mode: 'SERVICE', android: 'Android 10', status: 'ONLINE', lastSync: '12s ago' },
-  { id: 'DSPRD-POS-8315', model: 'DSpread M610', tenant: 'tenant-omega', plan: 'PRO', mode: 'SCHOOL', android: 'Android 11', status: 'SYNCING', lastSync: '1m ago' },
-  { id: 'DSPRD-POS-4421', model: 'DSpread QM800', tenant: 'tenant-omega', plan: 'BASIC', mode: 'RETAIL', android: 'Android 9', status: 'ONLINE', lastSync: '2m ago' },
-  { id: 'DSPRD-POS-7702', model: 'DSpread XM1A', tenant: 'tenant-beta', plan: 'PRO', mode: 'RETAIL', android: 'Android 12', status: 'ONLINE', lastSync: '8s ago' },
-  { id: 'DSPRD-POS-3310', model: 'DSpread M610', tenant: 'tenant-beta', plan: 'BASIC', mode: 'SERVICE', android: 'Android 11', status: 'OFFLINE', lastSync: '14m ago' },
-  { id: 'DSPRD-POS-6601', model: 'DSpread QM800', tenant: 'tenant-alpha', plan: 'PRO', mode: 'SCHOOL', android: 'Android 10', status: 'ONLINE', lastSync: '30s ago' },
-  { id: 'DSPRD-POS-2204', model: 'DSpread XM1A', tenant: 'tenant-omega', plan: 'PRO', mode: 'RETAIL', android: 'Android 11', status: 'ONLINE', lastSync: '1s ago' },
-])
+const devices = ref([])
 
 const filteredDevices = computed(() => devices.value.filter(d => {
   if (statusFilter.value !== 'ALL' && d.status !== statusFilter.value) return false
@@ -573,78 +598,47 @@ const toggleSelectAll = () => {
 const activeDeployments = ref([])
 const deploymentLog = ref([])
 
-const deployApk = (apk) => {
+const deployApk = async (apk) => {
   if (!selectedDevices.value.length) return
   
   const targetVersion = apk.selectedDeployVersion || apk.version
 
-  const dep = {
-    id: `dep-${Date.now()}`,
-    apkName: apk.name,
-    targetVersion: targetVersion,
-    action: 'INSTALL',
-    targetCount: selectedDevices.value.length,
-    completed: 0,
-    progress: 0
+  try {
+    await api.post('/api/admin/apk/deploy', {
+      apkId: apk.id,
+      targetDevices: selectedDevices.value,
+      targetVersion
+    })
+    
+    Notify.create({ type: 'positive', message: `Install deployment dispatched for [${apk.name} v${targetVersion}] → ${selectedDevices.value.length} devices`, position: 'bottom-right' })
+    
+    // Refresh vault to get updated counts
+    const { data } = await api.get('/api/admin/apk')
+    apkVault.value = data.vault || []
+    deploymentLog.value = data.logs || []
+  } catch (error) {
+    Notify.create({ type: 'negative', message: 'Deploy dispatch failed', position: 'bottom-right' })
   }
-  activeDeployments.value.push(dep)
-
-  Notify.create({ type: 'positive', message: `Install deployment dispatched for [${apk.name} v${targetVersion}] → ${dep.targetCount} devices`, position: 'bottom-right' })
-
-  const interval = setInterval(() => {
-    dep.completed = Math.min(dep.completed + 1, dep.targetCount)
-    dep.progress = Math.round((dep.completed / dep.targetCount) * 100)
-    if (dep.completed >= dep.targetCount) {
-      clearInterval(interval)
-      activeDeployments.value = activeDeployments.value.filter(d => d.id !== dep.id)
-      // Increment install counter and update version distribution
-      const vaultEntry = apkVault.value.find(a => a.id === apk.id)
-      if (vaultEntry) {
-        vaultEntry.installCount += dep.targetCount
-        const vdEntry = vaultEntry.versionDistribution.find(v => v.version === dep.targetVersion)
-        if (vdEntry) {
-          vdEntry.deviceCount += dep.targetCount
-        } else {
-          vaultEntry.versionDistribution.unshift({ version: dep.targetVersion, deviceCount: dep.targetCount })
-          if (vaultEntry.versionDistribution.length > 3) vaultEntry.versionDistribution = vaultEntry.versionDistribution.slice(0, 3)
-        }
-      }
-      deploymentLog.value.unshift({ id: dep.id, action: 'INSTALL', apkName: `${apk.name} v${dep.targetVersion}`, devices: dep.targetCount, time: 'just now', status: 'SUCCESS' })
-    }
-  }, 600)
 }
 
-const uninstallApk = (apk) => {
+const uninstallApk = async (apk) => {
   if (!selectedDevices.value.length) return
 
-  const dep = {
-    id: `dep-${Date.now()}`,
-    apkName: apk.name,
-    action: 'UNINSTALL',
-    targetCount: selectedDevices.value.length,
-    completed: 0,
-    progress: 0
+  try {
+    await api.post('/api/admin/apk/uninstall', {
+      apkId: apk.id,
+      targetDevices: selectedDevices.value
+    })
+    
+    Notify.create({ type: 'warning', message: `Uninstall command dispatched for [${apk.name}] → ${selectedDevices.value.length} devices`, position: 'bottom-right' })
+    
+    // Refresh vault
+    const { data } = await api.get('/api/admin/apk')
+    apkVault.value = data.vault || []
+    deploymentLog.value = data.logs || []
+  } catch (error) {
+    Notify.create({ type: 'negative', message: 'Uninstall dispatch failed', position: 'bottom-right' })
   }
-  activeDeployments.value.push(dep)
-
-  Notify.create({ type: 'warning', message: `Uninstall command dispatched for [${apk.name}] → ${dep.targetCount} devices`, position: 'bottom-right' })
-
-  const interval = setInterval(() => {
-    dep.completed = Math.min(dep.completed + 1, dep.targetCount)
-    dep.progress = Math.round((dep.completed / dep.targetCount) * 100)
-    if (dep.completed >= dep.targetCount) {
-      clearInterval(interval)
-      activeDeployments.value = activeDeployments.value.filter(d => d.id !== dep.id)
-      // Increment uninstall counter and reduce version distribution
-      const vaultEntry = apkVault.value.find(a => a.id === apk.id)
-      if (vaultEntry) {
-        vaultEntry.uninstallCount += dep.targetCount
-        const vdEntry = vaultEntry.versionDistribution.find(v => v.version === vaultEntry.version)
-        if (vdEntry) vdEntry.deviceCount = Math.max(0, vdEntry.deviceCount - dep.targetCount)
-      }
-      deploymentLog.value.unshift({ id: dep.id, action: 'UNINSTALL', apkName: apk.name, devices: dep.targetCount, time: 'just now', status: 'SUCCESS' })
-    }
-  }, 600)
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────

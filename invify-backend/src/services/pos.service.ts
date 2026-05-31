@@ -131,6 +131,28 @@ export class PosService {
     console.log(`\n[POS Gateway] ▶ Routing ₦${params.amount} transaction → ${route.name}`);
     console.log(`[POS Gateway]   Terminal: ${params.terminalId} | Tenant: ${params.tenantId}`);
 
+    // Pre-log the transaction as Pending
+    const pendingId = Math.random().toString(36).substring(7);
+    const pendingEntry = {
+      id:          pendingId,
+      tenantId:    params.tenantId || 'Unknown',
+      terminalId:  params.terminalId,
+      amount:      params.amount,
+      status:      'Pending',
+      statusCode:  '',
+      date:        new Date().toISOString(),
+      host:        route.name,
+      maskedPan:   params.emvData?.pan ? this.maskPan(params.emvData.pan) : (params.emvData?.cardNo ? this.maskPan(params.emvData.cardNo) : '**** ****'),
+      rrn:         params.emvData?.rrn   || 'N/A',
+      stan:        params.emvData?.stan  || 'N/A',
+      authCode:    'N/A',
+      rawRequest:  JSON.stringify({ terminalId: params.terminalId, amount: params.amount, host: route.name, emvData: params.emvData }),
+      rawResponse: '',
+    };
+    
+    this.transactionHistory.unshift(pendingEntry);
+    if (this.transactionHistory.length > 500) this.transactionHistory.pop();
+
     let response: PosTransactionResult;
 
     try {
@@ -161,7 +183,7 @@ export class PosService {
       }
     }
 
-    await this.logTransaction(params, response);
+    await this.updateTransaction(pendingId, params, response);
     return response;
   }
 
@@ -728,30 +750,23 @@ export class PosService {
   //  TRANSACTION LOGGER
   // ═══════════════════════════════════════════════════════════════════════════
 
-  private static async logTransaction(params: any, response: PosTransactionResult) {
-    const entry = {
-      id:          Math.random().toString(36).substring(7),
-      tenantId:    params.tenantId || 'Unknown',
-      terminalId:  params.terminalId,
-      amount:      params.amount,
-      status:      response.paymentSuccess ? 'Approved' : 'Declined',
-      statusCode:  response.statusCode,
-      date:        new Date().toISOString(),
-      host:        response.host,
-      maskedPan:   response.maskedPan || (params.emvData?.pan ? this.maskPan(params.emvData.pan) : '**** ****'),
-      rrn:         response.rrn   || params.emvData?.rrn   || 'N/A',
-      stan:        response.stan  || params.emvData?.stan  || 'N/A',
-      authCode:    response.authCode || 'N/A',
-      rawRequest:  JSON.stringify({ terminalId: params.terminalId, amount: params.amount, host: response.host }),
-      rawResponse: JSON.stringify(
-        response.kimonoResponse ||
-        response.isoFields ||
-        { statusCode: response.statusCode, message: response.message }
-      ),
-    };
+  private static async updateTransaction(id: string, params: any, response: PosTransactionResult) {
+    const entry = this.transactionHistory.find(t => t.id === id);
+    if (!entry) return;
 
-    this.transactionHistory.unshift(entry);
-    if (this.transactionHistory.length > 500) this.transactionHistory.pop(); // cap log size
-    console.log(`[POS Gateway] ✓ Transaction logged: ${entry.id} | ${entry.status} | ${entry.host} | ₦${entry.amount}`);
+    entry.status      = response.paymentSuccess ? 'Approved' : 'Declined';
+    entry.statusCode  = response.statusCode;
+    entry.host        = response.host;
+    entry.maskedPan   = response.maskedPan || entry.maskedPan;
+    entry.rrn         = response.rrn   || entry.rrn;
+    entry.stan        = response.stan  || entry.stan;
+    entry.authCode    = response.authCode || 'N/A';
+    entry.rawResponse = JSON.stringify(
+      response.kimonoResponse ||
+      response.isoFields ||
+      { statusCode: response.statusCode, message: response.message }
+    );
+
+    console.log(`[POS Gateway] ✓ Transaction updated: ${entry.id} | ${entry.status} | ${entry.host} | ₦${entry.amount}`);
   }
 }

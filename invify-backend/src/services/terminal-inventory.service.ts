@@ -8,7 +8,23 @@ const LOCAL_DB_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
 function getLocalDB() {
   try {
     if (!fs.existsSync(LOCAL_DB_PATH)) {
-      const initial = { tablets: [], mpos_devices: [], printers: [], terminal_ids: [], assignments: [], audit_log: [] };
+      const initial = { 
+        tablets: [
+          { id: 'tab-101', device_id: 'DEV-TEST-002', model: 'Tab-A7', serial_number: 'SN-TAB-002', created_at: new Date().toISOString() },
+          { id: 'tab-102', device_id: 'DEV-TEST-003', model: 'Tab-A7', serial_number: 'SN-TAB-003', created_at: new Date().toISOString() }
+        ], 
+        mpos_devices: [
+          { id: 'mpos-201', serial_number: 'DSPREAD-001', device_model: 'DSPREAD-X1', hardware_type: 'MPOS', created_at: new Date().toISOString() }
+        ], 
+        printers: [
+          { id: 'prn-301', mac_address: '00:11:22:33:44:55', model: 'XP-58', printer_type: 'Bluetooth', created_at: new Date().toISOString() }
+        ], 
+        terminal_ids: [
+          { id: 'tid-401', tid: '20330001', mid: 'M-9001', bank_name: 'Access', created_at: new Date().toISOString() }
+        ], 
+        assignments: [], 
+        audit_log: [] 
+      };
       fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(initial, null, 2));
       return initial;
     }

@@ -1,6 +1,8 @@
 // src/controllers/user.controller.ts
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
+import { UserDeviceService } from '../services/user-device.service';
+import { AuditArchiveService } from '../services/audit-archive.service';
 
 export class UserController {
   /**
@@ -44,9 +46,24 @@ export class UserController {
       const { id, name, email, role, tenantId } = req.body;
       const currentUser = (req as any).user;
 
+      const isPlatform = [
+        'super_admin',
+        'admin_finance',
+        'admin_treasury',
+        'admin_risk',
+        'admin_ops',
+        'admin_executive',
+        'admin_deploy'
+      ].includes(role);
+
       // 1. Validation
-      if (currentUser.role !== 'super_admin' && tenantId !== currentUser.tenantId) {
-        return res.status(403).json({ error: 'Cannot create users for other tenants' });
+      if (currentUser.role !== 'super_admin') {
+        if (tenantId !== currentUser.tenantId) {
+          return res.status(403).json({ error: 'Cannot create users for other tenants' });
+        }
+        if (isPlatform) {
+          return res.status(403).json({ error: 'Tenant admins cannot assign platform-level roles' });
+        }
       }
 
       const { data, error } = await supabase
@@ -56,7 +73,7 @@ export class UserController {
           name,
           email,
           role,
-          tenant_id: role === 'super_admin' ? null : tenantId,
+          tenant_id: isPlatform ? null : tenantId,
           is_active: true
         })
         .select()
@@ -83,6 +100,35 @@ export class UserController {
       // Ensure no tenant-override if not super_admin
       if (currentUser.role !== 'super_admin') {
         delete updates.tenant_id;
+        
+        // Prevent tenant admin from elevating someone to a platform role
+        if (updates.role && [
+          'super_admin',
+          'admin_finance',
+          'admin_treasury',
+          'admin_risk',
+          'admin_ops',
+          'admin_executive',
+          'admin_deploy'
+        ].includes(updates.role)) {
+          return res.status(403).json({ error: 'Tenant admins cannot assign platform-level roles' });
+        }
+      } else {
+        // If super_admin, force tenant_id to null for platform roles
+        if (updates.role) {
+          const isPlatform = [
+            'super_admin',
+            'admin_finance',
+            'admin_treasury',
+            'admin_risk',
+            'admin_ops',
+            'admin_executive',
+            'admin_deploy'
+          ].includes(updates.role);
+          if (isPlatform) {
+            updates.tenant_id = null;
+          }
+        }
       }
 
       const { data, error } = await supabase
@@ -97,6 +143,54 @@ export class UserController {
     } catch (error: any) {
       console.error('[UserController] updateUser Error:', error.message);
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async listDevices(req: Request, res: Response) {
+    try {
+      const filters = {
+        status: req.query.status ? String(req.query.status) : undefined,
+        search: req.query.search ? String(req.query.search) : undefined,
+        page: req.query.page ? String(req.query.page) : undefined,
+        limit: req.query.limit ? String(req.query.limit) : undefined
+      };
+      const result = await UserDeviceService.getDevices(filters);
+      return res.status(200).json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async approveDevice(req: Request, res: Response) {
+    try {
+      const { id } = req.body;
+      const approvedBy = (req as any).user?.email || 'admin';
+      if (!id) return res.status(400).json({ error: 'Device ID/Record ID is required' });
+      await UserDeviceService.approveDevice(id, approvedBy);
+      return res.status(200).json({ message: 'Device access approved successfully.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async blockDevice(req: Request, res: Response) {
+    try {
+      const { id } = req.body;
+      const blockedBy = (req as any).user?.email || 'admin';
+      if (!id) return res.status(400).json({ error: 'Device ID/Record ID is required' });
+      await UserDeviceService.blockDevice(id, blockedBy);
+      return res.status(200).json({ message: 'Device access blocked.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  static async triggerArchiving(req: Request, res: Response) {
+    try {
+      const result = await AuditArchiveService.runArchiving();
+      return res.status(200).json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
     }
   }
 }

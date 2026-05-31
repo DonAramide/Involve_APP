@@ -1,5 +1,7 @@
 // src/app.ts (network-stabilized)
 import express, { Request, Response, NextFunction } from 'express';
+import * as http from 'http';
+import { Server as SocketIOServer, Socket } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -17,6 +19,8 @@ import { AdminController } from './controllers/admin.controller';
 import { AnalyticsController } from './controllers/analytics.controller';
 import { WalletController } from './controllers/wallet.controller';
 import { UserController } from './controllers/user.controller';
+import { AuditArchiveService } from './services/audit-archive.service';
+import { GovAuditService } from './services/gov-audit.service';
 import { CurriculumController } from './controllers/curriculum.controller';
 import { BillingController } from './controllers/billing.controller';
 import { ReferralController } from './controllers/referral.controller';
@@ -38,6 +42,7 @@ import { LookupController } from './controllers/lookup.controller';
 import { CustomerController } from './controllers/customer.controller';
 import { PosController } from './controllers/pos.controller';
 import { TerminalController, terminalUploadMiddleware } from './controllers/terminal.controller';
+import { SearchController } from './controllers/search.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
@@ -99,11 +104,19 @@ app.get('/admin/tenants', authenticate, checkRole(['super_admin']), AdminControl
 app.post('/admin/tenants', authenticate, checkRole(['super_admin']), AdminController.createTenant);
 app.patch('/admin/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
 app.get('/admin/dashboard-stats', authenticate, checkRole(['super_admin']), AdminController.getDashboardStats);
+app.get('/admin/audit-logs', authenticate, checkRole(['super_admin']), TerminalController.getAuditLog);
 app.patch('/admin/profile', authenticate, AdminController.updateProfile);
 
 // Global Settings (Super Admin Only)
 app.get('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.getGlobalSettings);
 app.patch('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.updateGlobalSettings);
+app.post('/admin/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
+
+// User Device Controls & Audit Archiving (Super Admin only)
+app.get('/api/admin/user-devices', authenticate, checkRole(['super_admin']), UserController.listDevices);
+app.post('/api/admin/user-devices/approve', authenticate, checkRole(['super_admin']), UserController.approveDevice);
+app.post('/api/admin/user-devices/block', authenticate, checkRole(['super_admin']), UserController.blockDevice);
+app.post('/api/admin/audit/archive', authenticate, checkRole(['super_admin']), UserController.triggerArchiving);
 
 
 // Device Activation Hub Endpoints
@@ -125,6 +138,9 @@ app.post('/api/admin/terminals/assignments', authenticate, checkRole(['super_adm
 app.get('/api/admin/terminals/audit', authenticate, checkRole(['super_admin']), TerminalController.getAuditLog);
 app.patch('/api/admin/terminals/:id/status', authenticate, checkRole(['super_admin']), TerminalController.updateTablet);
 app.get('/admin/analytics', authenticate, checkRole(['super_admin']), AnalyticsController.getAdminAnalytics);
+
+// Global AI Search
+app.get('/api/search', authenticate, SearchController.performGlobalSearch);
 
 /** --- FINANCIAL REVIEWS (SUPER ADMIN + TENANT ADMIN) --- **/
 app.get('/admin/tenants/:id/details', authenticate, checkTenantAccess, AdminController.getTenantDetails);
@@ -184,9 +200,9 @@ app.post('/webhooks/paystack', WebhookController.handlePaystackWebhook);
 app.post('/webhooks/flutterwave', WebhookController.handleFlutterwaveWebhook);
 app.post('/webhooks/stripe', WebhookController.handleStripeWebhook);
 
-app.get('/api/reconciliation', authenticate, ReconciliationController.getReport);
-app.post('/api/reconciliation/assign', authenticate, ReconciliationController.assign);
-app.post('/api/reconciliation/retry', authenticate, ReconciliationController.retry);
+app.get('/api/reconciliation', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ReconciliationController.getReport);
+app.post('/api/reconciliation/assign', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ReconciliationController.assign);
+app.post('/api/reconciliation/retry', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ReconciliationController.retry);
 
 
 // Payout Configuration
@@ -196,7 +212,7 @@ app.post('/api/payout/withdraw', authenticate, PayoutController.withdraw);
 app.get('/api/payout/history', authenticate, PayoutController.getHistory);
 
 // Executive Dashboard
-app.get('/api/finance/executive-summary', authenticate, ExecutiveFinanceController.getSummary);
+app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ExecutiveFinanceController.getSummary);
 
 // POS Operations (Medusa | Cpoint-Kimono | NIBSS)
 app.post('/api/pos/transaction', authenticate, PosController.processTransaction);
@@ -206,6 +222,29 @@ app.get('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosContr
 app.post('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.updateRoutingConfig);
 app.post('/admin/pos/kimono-params/refresh', authenticate, checkRole(['super_admin']), PosController.refreshKimonoParams);
 
+// Terminal & Inventory Management Operations
+app.get('/api/admin/inventory/stats', authenticate, TerminalController.getStats);
+app.get('/api/admin/inventory/tablets', authenticate, TerminalController.getTablets);
+app.patch('/api/admin/inventory/tablets/:id', authenticate, TerminalController.updateTablet);
+app.get('/api/admin/inventory/mpos', authenticate, TerminalController.getMpos);
+app.patch('/api/admin/inventory/mpos/:id', authenticate, TerminalController.updateMpos);
+app.get('/api/admin/inventory/printers', authenticate, TerminalController.getPrinters);
+app.patch('/api/admin/inventory/printers/:id', authenticate, TerminalController.updatePrinter);
+app.get('/api/admin/inventory/tids', authenticate, TerminalController.getTids);
+app.patch('/api/admin/inventory/tids/:id', authenticate, TerminalController.updateTid);
+app.post('/api/admin/inventory/upload', authenticate, terminalUploadMiddleware, TerminalController.importTerminals);
+app.post('/api/admin/inventory/assign', authenticate, TerminalController.assignHardware);
+app.get('/api/admin/inventory/assignments', authenticate, TerminalController.getAssignments);
+app.get('/api/admin/inventory/audit', authenticate, TerminalController.getAuditLog);
+
+// ─── APK Fleet Deployment ────────────────────────────────────────────────
+import { ApkController, apkUploadMiddleware } from './controllers/apk.controller';
+app.get('/api/admin/apk', authenticate, ApkController.getVault);
+app.post('/api/admin/apk/upload', authenticate, apkUploadMiddleware, ApkController.uploadApk);
+app.post('/api/admin/apk/deploy', authenticate, ApkController.deployApk);
+app.post('/api/admin/apk/uninstall', authenticate, ApkController.uninstallApk);
+app.delete('/api/admin/apk/:id', authenticate, ApkController.removeApk);
+app.patch('/api/admin/apk/:id/url', authenticate, ApkController.updateApkUrl);
 
 // Defaulters System
 app.get('/api/finance/defaulters', authenticate, DefaultersController.getDefaulters);
@@ -239,7 +278,92 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 });
 
 // 5. START SERVER
-app.listen(PORT, () => {
+const server = http.createServer(app);
+
+export const io = new SocketIOServer(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+io.on('connection', (socket: Socket) => {
+  console.log(`[Socket.io] Client connected: ${socket.id}`);
+  
+  // Clients will emit 'join_room' passing their characteristics
+  socket.on('join_room', (data: any) => {
+    const joined = ['all'];
+    if (data.tenantId) { socket.join(`tenant:${data.tenantId}`); joined.push(`tenant:${data.tenantId}`); }
+    if (data.plan) { socket.join(`plan:${String(data.plan).toLowerCase()}`); joined.push(`plan:${data.plan}`); }
+    if (data.type) { socket.join(`type:${String(data.type).toLowerCase()}`); joined.push(`type:${data.type}`); }
+    if (data.deviceId) { socket.join(`device:${data.deviceId}`); joined.push(`device:${data.deviceId}`); }
+    if (data.businessName) { socket.join(`business:${data.businessName}`); joined.push(`business:${data.businessName}`); }
+    socket.join('all');
+    console.log(`[Socket.io] Client ${socket.id} joined rooms: ${joined.join(', ')}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket.io] Client disconnected: ${socket.id}`);
+  });
+});
+
+// Run audit logs archival sweep periodically (once every 1 hour)
+setInterval(() => {
+  AuditArchiveService.runArchiving().catch((err: any) => {
+    console.error('[AuditArchive] Scheduled sweep failed:', err.message);
+  });
+}, 60 * 60 * 1000);
+
+// Run an initial sweep 10 seconds after boot to process any existing stale records
+setTimeout(() => {
+  AuditArchiveService.runArchiving().catch((err: any) => {
+    console.error('[AuditArchive] Initial boot sweep failed:', err.message);
+  });
+}, 10000);
+
+// Seed sample governance audit logs on first boot
+setTimeout(() => {
+  try { GovAuditService.seedSampleLogs(); } catch {}
+}, 3000);
+
+// ─── GOVERNANCE AUDIT LEDGER ROUTES ─────────────────────────────────────────
+
+// GET /api/admin/audit/ledger  ─  Unified multi-source audit ledger
+app.get('/api/admin/audit/ledger', authenticate, checkRole(['super_admin', 'internal_staff']), async (req: Request, res: Response) => {
+  try {
+    const result = await GovAuditService.getLedger(req.query as any);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/admin/audit/log  ─  Write a governance/maker-checker audit entry
+app.post('/api/admin/audit/log', authenticate, async (req: Request, res: Response) => {
+  try {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+    const user = (req as any).user || {};
+    await GovAuditService.logAction({
+      id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      module: req.body.module || 'GOVERNANCE',
+      action: req.body.action || 'UNKNOWN_ACTION',
+      user_email: user.email || req.body.user_email || 'unknown',
+      user_name: user.name || req.body.user_name || (user.email?.split('@')[0]?.toUpperCase() || 'Unknown'),
+      ip_address: ip,
+      location: req.body.location,
+      target: req.body.target || '-',
+      status: req.body.status || 'success',
+      metadata: req.body.metadata || {}
+    });
+    res.json({ success: true, message: 'Audit entry logged.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+
+server.listen(PORT, () => {
   console.log(`🚀 Invify SaaS (TS) running on port ${PORT} in ${process.env.NODE_ENV} mode`);
 });
 

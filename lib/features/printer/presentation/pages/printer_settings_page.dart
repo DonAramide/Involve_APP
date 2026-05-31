@@ -502,13 +502,14 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                           isMissingMapping = true;
                         }
 
-                        final disableHardwareInteraction = hasMismatch || isMissingMapping || isInvalidDevice;
+                        final disablePairing = isMissingMapping;
+                        final disableDownload = hasMismatch || isMissingMapping || isInvalidDevice;
 
                         return Row(
                           children: [
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: disableHardwareInteraction ? null : _pairDevice,
+                                onPressed: disablePairing ? null : _pairDevice,
                                 icon: const Icon(Icons.bluetooth_connected, size: 18),
                                 label: const Text('Pair Device'),
                                 style: ElevatedButton.styleFrom(
@@ -521,7 +522,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton.icon(
-                                onPressed: (_isLoadingParams || disableHardwareInteraction) ? null : _downloadParams,
+                                onPressed: (_isLoadingParams || disableDownload) ? null : _downloadParams,
                                 icon: _isLoadingParams 
                                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                                   : const Icon(Icons.download, size: 18),

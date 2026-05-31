@@ -168,10 +168,7 @@ import { Notify } from 'quasar'
 const lineageRetentionHorizon = ref('30d')
 
 // 1. Static base arrays complete with FINAL REFINEMENT #3: Forensic-Grade Package Lineage Modeling
-const lineageChainsList = ref([
-  { id: 'lin-01', packageName: 'com.invify.terminal.pos', exceptionType: 'CERTIFICATE_TRANSITION_DRIFT', riskSeverity: 'CRITICAL', trustScore: 24, ancestrySteps: { origin: 'Certified Root v2', transition: 'SHA-1 Weak Chain', current: 'Tampered Bytecode' }, sideloadOrigin: 'adb remote shell script loop', driftSummary: 'Signing keys rotated out-of-order bypassing staged update keys', tenantScope: 'tenant-omega' },
-  { id: 'lin-02', packageName: 'com.thirdparty.scanner.compat', exceptionType: 'VERSION_DOWNGRADE_CHAIN', riskSeverity: 'WARNING', trustScore: 68, ancestrySteps: { origin: 'v4.1 Certified', transition: 'Staged Patch v4.2', current: 'Forced Fallback v3.0' }, sideloadOrigin: 'Local download manifest trigger', driftSummary: 'Attempted to force application parameters backward to exploit legacy permissions', tenantScope: 'warehouse_beta' }
-])
+const lineageChainsList = ref([])
 
 const forceAttestationSync = (linId) => {
   Notify.create({

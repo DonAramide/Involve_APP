@@ -8,7 +8,7 @@
         <q-icon name="alt_route" size="sm" color="cyan-3" />
         <div>
           <div class="row items-center op-gap-4">
-            <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Multi-Tenant Release Channel Governance</div>
+            <div class="text-operator-title text-main text-weight-bold" style="font-size: 14px;">Mode-Based Release Channel Governance</div>
             <EnterpriseManualTooltip 
               title="Release Channel Governance" 
               description="Governance hub for software distribution. Manages bundle graduation from engineering labs through canary groups to the global stable fleet."
@@ -18,11 +18,11 @@
         </div>
       </div>
       
-      <!-- Tenant Visibility Filter -->
+      <!-- Mode Visibility Filter -->
       <div class="row items-center op-gap-8 no-wrap text-caption text-muted">
         <span class="v-hide-xs">Inheritance Filter:</span>
         <q-chip dense size="xs" color="cyan-10" text-color="cyan-2" class="text-weight-bold">
-          MULTI-TENANT ISOLATED
+          MODE ISOLATED
         </q-chip>
       </div>
     </div>
@@ -112,67 +112,114 @@
 
     </div>
 
-    <!-- MAIN MIDDLE GRID: FINAL REFINEMENT #3: Release Channel Drift Detection Matrix -->
-    <div class="enterprise-panel bg-panel rounded-borders column fit no-shadow">
-      <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
-        <div class="row items-center op-gap-4 no-wrap">
-          <q-icon name="find_in_page" size="xs" color="amber-4" />
-          <span class="text-operator-title text-main text-weight-bold">Release Channel Drift Detection Intelligence Matrix</span>
-          <EnterpriseManualTooltip 
-            title="Drift Detection Matrix" 
-            description="Identifies 'orphaned' endpoints or unauthorized manual firmware downgrades that violate the assigned release channel governance policy."
-          />
+    <!-- MIDDLE ROW: Device Group Mapping Matrix AND Drift Detection Matrix -->
+    <div class="row items-stretch q-col-gutter-md">
+      
+      <!-- Left Split: Device Group Channel Assignment Mapping -->
+      <div class="col-12 col-lg-6 column">
+        <div class="enterprise-panel bg-panel rounded-borders column fit no-shadow border-muted">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
+            <div class="row items-center op-gap-4 no-wrap">
+              <q-icon name="device_hub" size="xs" color="cyan-3" />
+              <span class="text-operator-title text-main text-weight-bold">Mode Scope Channel Assignments</span>
+            </div>
+            <span class="text-metric-mono text-cyan-3" style="font-size: 10px;">{{ modeMappings.length }} GROUPS MAPPED</span>
+          </div>
+
+          <div class="panel-body q-pa-xs overflow-y-auto" style="max-height: 250px;">
+            <q-list dense class="q-gutter-y-xs">
+              <q-item 
+                v-for="m in modeMappings" 
+                :key="m.id" 
+                class="q-px-sm q-py-xs bg-panel-darker rounded-borders row items-center justify-between no-wrap hover-row"
+                style="border-left: 2px solid var(--enterprise-border);"
+              >
+                <!-- Left: Mode Group & Scope -->
+                <div class="col-5 column op-gap-2">
+                  <div class="row items-center op-gap-8 no-wrap">
+                    <span class="text-main text-weight-bold text-caption">{{ m.modeName }}</span>
+                    <q-badge color="blue-grey-9" text-color="cyan-3" class="text-metric-sm">
+                      Nodes: {{ m.nodeCount }}
+                    </q-badge>
+                  </div>
+                  <div class="text-muted ellipsis" style="font-size: 11px;">
+                    Mode Scope: <span class="text-white">{{ m.modeScope }}</span>
+                  </div>
+                </div>
+
+                <!-- Right: Channel Assignment Dropdown -->
+                <div class="col-7 row items-center justify-end op-gap-8">
+                  <div class="text-secondary text-caption v-hide-xs" style="font-size: 10px;">Enforced Track:</div>
+                  <q-select
+                    v-model="m.assignedChannel"
+                    :options="['Stable', 'Beta', 'Canary', 'Internal']"
+                    dense
+                    :dark="prefs.isDarkMode"
+                    filled
+                    options-dense
+                    class="bg-subpanel text-caption"
+                    style="width: 120px;"
+                    @update:model-value="notifyMappingChange(m)"
+                  />
+                </div>
+              </q-item>
+            </q-list>
+          </div>
         </div>
-        <span class="text-metric-mono text-amber-3" style="font-size: 10px;">{{ driftViolationsList.length }} GOVERNANCE EXCEPTIONS</span>
       </div>
 
-      <div class="panel-body q-pa-xs overflow-y-auto" style="max-height: 250px;">
-        <q-list dense class="q-gutter-y-xs">
-          <q-item 
-            v-for="d in driftViolationsList" 
-            :key="d.id" 
-            class="q-px-sm q-py-xs bg-panel-darker rounded-borders row items-center justify-between no-wrap border-left-drift hover-row"
-          >
-            <!-- Left: Violation Class & Description -->
-            <div class="col-5 column op-gap-2">
-              <div class="row items-center op-gap-8 no-wrap">
-                <span class="text-main text-weight-bold text-caption">{{ d.exceptionType }}</span>
-                <q-badge color="deep-orange-10" text-color="deep-orange-2" class="text-metric-sm">
-                  Severity: {{ d.severity }}
-                </q-badge>
-              </div>
-              <div class="text-amber-3 ellipsis" style="font-size: 11px;">
-                {{ d.description }}
-              </div>
+      <!-- Right Split: Release Channel Drift Detection Matrix -->
+      <div class="col-12 col-lg-6 column">
+        <div class="enterprise-panel bg-panel rounded-borders column fit no-shadow border-muted">
+          <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between">
+            <div class="row items-center op-gap-4 no-wrap">
+              <q-icon name="find_in_page" size="xs" color="amber-4" />
+              <span class="text-operator-title text-main text-weight-bold">Drift Detection Intelligence Matrix</span>
             </div>
+            <span class="text-metric-mono text-amber-3" style="font-size: 10px;">{{ driftViolationsList.length }} EXCEPTIONS</span>
+          </div>
 
-            <!-- Middle: Tenant Target & Observed State Indicators -->
-            <div class="col-4 q-px-sm column justify-center">
-              <div class="text-secondary text-caption" style="font-size: 11px;">
-                Target Boundary: <span class="text-metric-mono text-main">{{ d.tenantScope }}</span>
-              </div>
-              <div class="row items-center op-gap-8 text-grey-6 q-mt-xs" style="font-size: 10px;">
-                <span>Detected Target: <span class="text-metric-mono text-red-4">{{ d.observedState }}</span></span>
-                <span>•</span>
-                <span>Expected: <span class="text-metric-mono text-green-4">{{ d.expectedState }}</span></span>
-              </div>
-            </div>
+          <div class="panel-body q-pa-xs overflow-y-auto" style="max-height: 250px;">
+            <q-list dense class="q-gutter-y-xs">
+              <q-item 
+                v-for="d in driftViolationsList" 
+                :key="d.id" 
+                class="q-px-sm q-py-xs bg-panel-darker rounded-borders row items-center justify-between no-wrap border-left-drift hover-row"
+              >
+                <!-- Left: Violation Class & Description -->
+                <div class="col-6 column op-gap-2">
+                  <div class="row items-center op-gap-8 no-wrap">
+                    <span class="text-main text-weight-bold text-caption ellipsis">{{ d.exceptionType }}</span>
+                  </div>
+                  <div class="text-amber-3 ellipsis" style="font-size: 11px;">
+                    {{ d.description }}
+                  </div>
+                  <div class="text-secondary text-caption q-mt-xs" style="font-size: 10px;">
+                    Target: <span class="text-metric-mono text-main">{{ d.tenantScope }}</span>
+                  </div>
+                </div>
 
-            <!-- Right Actions: Force Re-alignment Sync -->
-            <div class="col-3 row items-center justify-end op-gap-4">
-              <span class="text-metric-mono text-muted q-mr-xs" style="font-size: 9px;">{{ d.durationStr }}</span>
-              <q-btn 
-                dense 
-                size="xs" 
-                color="amber-5" 
-                text-color="black" 
-                label="Force Realignment Sync" 
-                @click="realignChannelDrift(d.id)" 
-                class="q-px-sm text-weight-bold" 
-              />
-            </div>
-          </q-item>
-        </q-list>
+                <!-- Right Actions: Expected vs Observed -->
+                <div class="col-6 column justify-center items-end">
+                  <div class="row items-center justify-end op-gap-4 text-grey-6" style="font-size: 10px;">
+                    <span>Found: <span class="text-metric-mono text-red-4">{{ d.observedState }}</span></span>
+                    <span>|</span>
+                    <span>Need: <span class="text-metric-mono text-green-4">{{ d.expectedState }}</span></span>
+                  </div>
+                  <q-btn 
+                    dense 
+                    size="xs" 
+                    color="amber-5" 
+                    text-color="black" 
+                    label="Force Sync" 
+                    @click="realignChannelDrift(d.id)" 
+                    class="q-px-xs text-weight-bold q-mt-xs" 
+                  />
+                </div>
+              </q-item>
+            </q-list>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -321,6 +368,24 @@ const rolloutStore = useRolloutEventStore()
 
 // Simulated crash spike parameters
 const crashSpikeDetected = computed(() => rolloutStore.activeRollbacksCount > 0)
+
+// Mode Scope Channel Assignment Data
+const modeMappings = ref([
+  { id: 'm-1', modeName: 'Alpha Retail Nodes', modeScope: 'retail', nodeCount: 150, assignedChannel: 'Canary' },
+  { id: 'm-2', modeName: 'Standard POS Sector', modeScope: 'retail', nodeCount: 82000, assignedChannel: 'Stable' },
+  { id: 'm-3', modeName: 'Logistics Scanners', modeScope: 'service', nodeCount: 4100, assignedChannel: 'Beta' },
+  { id: 'm-4', modeName: 'Core Edu Tablets', modeScope: 'school', nodeCount: 12500, assignedChannel: 'Stable' },
+  { id: 'm-5', modeName: 'Global IT Testing', modeScope: 'global', nodeCount: 50, assignedChannel: 'Internal' }
+])
+
+const notifyMappingChange = (mapping) => {
+  console.log(`[ChannelManager] Updated enforced track for ${mapping.modeName} to ${mapping.assignedChannel}`)
+  Notify.create({
+    type: 'positive',
+    message: `Updated Enforced Track for ${mapping.modeName} to [${mapping.assignedChannel}]`,
+    position: 'bottom-right'
+  })
+}
 
 // 1. FINAL REFINEMENT #3: Release Channel Drift Detection Violations array
 const driftViolationsList = ref([

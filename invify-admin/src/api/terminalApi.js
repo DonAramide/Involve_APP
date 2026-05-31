@@ -29,13 +29,13 @@ export const terminalApi = {
     return api.get('/api/admin/inventory/assignments', { params })
   },
   assignHardware(data) {
-    return api.post('/api/admin/inventory/assignments', data)
+    return api.post('/api/admin/inventory/assign', data)
   },
   unassignHardware(id) {
     return api.post(`/api/admin/inventory/assignments/${id}/unassign`)
   },
   getStats() {
-    return api.get('/api/terminals/stats')
+    return api.get('/api/admin/inventory/stats')
   },
   getTerminal(id) {
     return api.get(`/api/terminals/${id}`)
@@ -47,17 +47,17 @@ export const terminalApi = {
     const formData = new FormData()
     files.forEach(file => formData.append('files', file))
     formData.append('importType', importType)
-    return api.post('/api/terminals/import', formData, {
+    return api.post('/api/admin/inventory/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     })
   },
   exportTerminals(filters, format = 'xlsx') {
-    return api.post('/api/terminals/export', { filters, format }, {
+    return api.post('/api/admin/inventory/export', { filters, format }, {
       responseType: 'blob'
     })
   },
   getAuditLog(params) {
-    return api.get('/api/terminals/audit', { params })
+    return api.get('/api/admin/inventory/audit', { params })
   },
   unassignTerminal(id) {
     return api.post('/api/terminals/unassign', { terminalId: id })

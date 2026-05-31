@@ -1,0 +1,17 @@
+Found 24 modifications
+{
+  "name": "replace_file_content",
+  "args": {
+    "AllowMultiple": "false",
+    "Description": "\"Add MPOS serial mismatch banner\"",
+    "EndLine": "690",
+    "Instruction": "\"Add a mismatch check for the MPOS serial number using `_mposSerialNumber` and display a warning banner if it does not match the backend `posSerialNumber`.\"",
+    "ReplacementContent": "\"    // Validate Printer Match\\n    final connectedPrinterMac = context.read<PrinterBloc>().state.connectedDevice?.address;\\n    final isPrinterMismatch = config!.printerMac != null && connectedPrinterMac != null && config.printerMac != connectedPrinterMac;\\n\\n    // Validate MPOS Match\\n    final isMposMismatch = config.posSerialNumber != null && _mposSerialNumber != null && _mposSerialNumber!.isNotEmpty && config.posSerialNumber != _mposSerialNumber;\\n\\n    return Column(\\n      children: [\\n        if (isMposMismatch)\\n          Container(\\n            width: double.infinity,\\n            margin: const EdgeInsets.only(bottom: 12),\\n            padding: const EdgeInsets.all(12),\\n            decoration: BoxDecoration(\\n              color: Colors.red.shade50,\\n              borderRadius: BorderRadius.circular(8),\\n              border: Border.all(color: Colors.red.shade300),\\n            ),\\n            child: Row(\\n              children: [\\n                const Icon(Icons.error_outline, color: Colors.red),\\n                const SizedBox(width: 12),\\n                Expanded(\\n                  child: Text(\\n                    'Invalid device mapped: The connected MPOS ($_mposSerialNumber) does not match the assigned MPOS (${config.posSerialNumber}). Unauthorized device.',\\n                    style: const TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.bold),\\n                  ),\\n                ),\\n              ],\\n            ),\\n          ),\"",
+    "StartLine": "685",
+    "TargetContent": "\"    // Validate Printer Match\\n    final connectedPrinterMac = context.read<PrinterBloc>().state.connectedDevice?.address;\\n    final isPrinterMismatch = config!.printerMac != null && connectedPrinterMac != null && config.printerMac != connectedPrinterMac;\\n\\n    return Column(\\n      children: [\"",
+    "TargetFile": "\"c:\\\\dev\\\\Involve_APP\\\\lib\\\\features\\\\printer\\\\presentation\\\\pages\\\\printer_settings_page.dart\"",
+    "TargetLintErrorIds": "[]",
+    "toolAction": "\"Add MPOS mismatch banner\"",
+    "toolSummary": "\"Modify printer_settings_page.dart\""
+  }
+}

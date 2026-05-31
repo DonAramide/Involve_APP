@@ -1,192 +1,196 @@
 <!-- invify-admin/src/pages/TeacherDashboardPage.vue -->
 <template>
-  <q-page class="q-pa-lg bg-dark text-white">
-    <!-- Header -->
-    <div class="row items-center q-mb-lg">
-      <div class="col">
-        <h1 class="text-h4 text-weight-bolder q-ma-none text-white letter-spacing-1">Teacher Workspace</h1>
-        <div class="text-grey-6">Streamlined pedagogical planning and repository management.</div>
-      </div>
-      <div class="col-auto">
-        <q-btn 
-          color="indigo-7" 
-          icon="auto_awesome" 
-          label="Quick Generate" 
-          class="q-px-md glossy" 
-          @click="showGenerator = true" 
-        />
-      </div>
-    </div>
-
-    <!-- Metrics Row -->
-    <div class="row q-col-gutter-lg q-mb-xl">
-      <div v-for="stat in dashboardStats" :key="stat.label" class="col-12 col-sm-4">
-        <q-card class="bg-blue-grey-10 shadow-2 border-left-highlight" :style="{ borderLeftColor: stat.color }">
-           <q-card-section class="row items-center">
-              <div class="col">
-                 <div class="text-overline text-grey-6">{{ stat.label }}</div>
-                 <div class="text-h5 text-weight-bold">{{ stat.value }}</div>
-              </div>
-              <q-icon :name="stat.icon" size="md" color="grey-7" class="opacity-30" />
-           </q-card-section>
-        </q-card>
-      </div>
-    </div>
-
-    <!-- Repository Tabs -->
-    <div class="q-mb-lg">
-      <q-tabs
-        v-model="activeTab"
-        dense active-color="indigo-4"
-        indicator-color="indigo-4"
-        align="left"
-        narrow-indicator
-        class="text-grey-6"
-      >
-        <q-tab name="personal" label="My Notes" icon="person" />
-        <q-tab name="school" label="School Library" icon="business" />
-        <q-tab name="global" label="Platform Shared" icon="public" />
-      </q-tabs>
-      <q-separator dark />
-    </div>
-
-    <!-- Repository Content -->
-    <div class="row q-col-gutter-lg">
-       <div v-if="loading" class="col-12 flex flex-center q-pa-xl">
-          <q-spinner-dots color="indigo-4" size="3em" />
-       </div>
-       
-       <template v-else-if="notes.length">
-          <div v-for="note in notes" :key="note.id" class="col-12 col-md-4">
-             <q-card class="bg-blue-grey-10 shadow-2 hover-lift cursor-pointer" @click="viewNote(note)">
-                <q-card-section>
-                   <div class="row items-center q-mb-sm">
-                      <q-chip size="xs" :color="sourceColors[note.source]" text-color="white" dense class="text-weight-bold">
-                        {{ note.source.toUpperCase() }}
-                      </q-chip>
-                      <q-space />
-                      <div class="text-caption text-grey-6">{{ new Date(note.created_at).toLocaleDateString() }}</div>
-                   </div>
-                   <div class="text-subtitle1 text-weight-bold text-white q-mb-xs">{{ note.subject }}</div>
-                   <div class="text-caption text-indigo-3">{{ note.class_level }} • Term {{ note.term }}</div>
-                   <div class="text-caption text-grey-5 q-mt-sm ellipsis">{{ note.topic }}</div>
-                </q-card-section>
-                <q-card-actions align="right">
-                   <q-btn flat round dense icon="visibility" color="indigo-3" />
-                   <q-btn flat round dense icon="edit" color="indigo-3" @click.stop="editNote(note)" />
-                </q-card-actions>
-             </q-card>
+  <q-layout view="lHh Lpr lFf" style="background: #05070d; min-height: 100vh;">
+    <q-page-container>
+      <q-page class="q-pa-lg bg-dark text-white">
+        <!-- Header -->
+        <div class="row items-center q-mb-lg">
+          <div class="col">
+            <h1 class="text-h4 text-weight-bolder q-ma-none text-white letter-spacing-1">Teacher Workspace</h1>
+            <div class="text-grey-6">Streamlined pedagogical planning and repository management.</div>
           </div>
-       </template>
-
-       <div v-else class="col-12 flex flex-center q-pa-xl column text-grey-7">
-          <q-icon name="folder_open" size="4em" />
-          <div class="text-h6 q-mt-md">Your repository is empty</div>
-          <q-btn outline label="Create your first note" color="indigo-4" class="q-mt-md q-px-md" @click="showGenerator = true" />
-       </div>
-    </div>
-
-    <!-- Note Viewer / Editor Dialog -->
-    <q-dialog v-model="viewerActive" backdrop-filter="blur(10px)">
-      <q-card style="width: 800px; max-width: 95vw;" class="bg-blue-grey-10 text-white border-indigo">
-        <q-card-section class="bg-indigo-10 row items-center q-pa-md">
-          <div class="column">
-             <div class="text-h6 text-weight-bold">{{ currentNote?.subject }}</div>
-             <div class="text-caption text-indigo-2">{{ currentNote?.class_level }} | Term {{ currentNote?.term }} | Week {{ currentNote?.week }}</div>
-          </div>
-          <q-space />
-          
-          <div class="row q-gutter-xs">
-            <q-btn flat round dense icon="download" color="white" @click="exportPdf" :loading="exporting">
-               <q-tooltip>Export as professional PDF</q-tooltip>
-            </q-btn>
+          <div class="col-auto">
             <q-btn 
-              flat round dense 
-              :icon="isEditing ? 'save' : 'edit'" 
-              :color="isEditing ? 'green-4' : 'white'" 
-              @click="isEditing ? saveChanges() : startEditing()" 
-            >
-               <q-tooltip>{{ isEditing ? 'Save as Personal Copy' : 'Personalize this note' }}</q-tooltip>
-            </q-btn>
-            <q-btn icon="close" flat round dense v-close-popup />
+              color="indigo-7" 
+              icon="auto_awesome" 
+              label="Quick Generate" 
+              class="q-px-md glossy" 
+              @click="showGenerator = true" 
+            />
           </div>
-        </q-card-section>
+        </div>
 
-        <q-card-section class="q-pa-lg scroll" style="max-height: 75vh">
-           <div v-if="!isEditing" class="q-gutter-y-lg">
-              <div v-for="(content, key) in currentNote?.content.structured" :key="key">
-                 <div class="text-subtitle1 text-weight-bolder text-indigo-3 text-uppercase letter-spacing-1 border-bottom-indigo q-mb-sm">
-                   {{ key }}
-                 </div>
-                 <template v-if="Array.isArray(content)">
-                    <ul class="q-pl-md text-grey-4">
-                       <li v-for="(item, i) in content" :key="i" class="q-mb-xs">{{ item.description || item }}</li>
-                    </ul>
-                 </template>
-                 <p v-else class="text-body1 text-grey-4">{{ content }}</p>
-              </div>
+        <!-- Metrics Row -->
+        <div class="row q-col-gutter-lg q-mb-xl">
+          <div v-for="stat in dashboardStats" :key="stat.label" class="col-12 col-sm-4">
+            <q-card class="bg-blue-grey-10 shadow-2 border-left-highlight" :style="{ borderLeftColor: stat.color }">
+               <q-card-section class="row items-center">
+                  <div class="col">
+                     <div class="text-overline text-grey-6">{{ stat.label }}</div>
+                     <div class="text-h5 text-weight-bold">{{ stat.value }}</div>
+                  </div>
+                  <q-icon :name="stat.icon" size="md" color="grey-7" class="opacity-30" />
+               </q-card-section>
+            </q-card>
+          </div>
+        </div>
+
+        <!-- Repository Tabs -->
+        <div class="q-mb-lg">
+          <q-tabs
+            v-model="activeTab"
+            dense active-color="indigo-4"
+            indicator-color="indigo-4"
+            align="left"
+            narrow-indicator
+            class="text-grey-6"
+          >
+            <q-tab name="personal" label="My Notes" icon="person" />
+            <q-tab name="school" label="School Library" icon="business" />
+            <q-tab name="global" label="Platform Shared" icon="public" />
+          </q-tabs>
+          <q-separator dark />
+        </div>
+
+        <!-- Repository Content -->
+        <div class="row q-col-gutter-lg">
+           <div v-if="loading" class="col-12 flex flex-center q-pa-xl">
+              <q-spinner-dots color="indigo-4" size="3em" />
            </div>
            
-           <!-- Editor Mode (simplified for JSON structure) -->
-           <div v-else class="q-gutter-md">
-              <q-banner dense class="bg-indigo-9 text-caption text-white rounded-borders">
-                <template v-slot:avatar><q-icon name="info" /></template>
-                You are customizing this note. Saving will create a new personal copy in your repository.
-              </q-banner>
-              
-              <div v-for="(content, key) in editorNote.content.structured" :key="key">
-                <div class="text-overline text-indigo-3">{{ key.toUpperCase() }}</div>
-                <q-input 
-                  v-if="!Array.isArray(content)"
-                  v-model="editorNote.content.structured[key]"
-                  type="textarea" dark filled autogrow dense
-                />
-                <div v-else class="q-gutter-xs">
-                   <q-input 
-                     v-for="(item, i) in content" :key="i"
-                     v-model="editorNote.content.structured[key][i]"
-                     dark filled dense class="q-mb-xs"
-                   >
-                     <template v-slot:append>
-                        <q-btn flat round dense icon="delete" size="xs" color="red-4" @click="removeItem(key, i)" />
-                     </template>
-                   </q-input>
-                   <q-btn flat label="Add Point" icon="add" size="sm" color="indigo-3" @click="addItem(key)" />
-                </div>
+           <template v-else-if="notes.length">
+              <div v-for="note in notes" :key="note.id" class="col-12 col-md-4">
+                 <q-card class="bg-blue-grey-10 shadow-2 hover-lift cursor-pointer" @click="viewNote(note)">
+                    <q-card-section>
+                       <div class="row items-center q-mb-sm">
+                          <q-chip size="xs" :color="sourceColors[note.source]" text-color="white" dense class="text-weight-bold">
+                            {{ note.source.toUpperCase() }}
+                          </q-chip>
+                          <q-space />
+                          <div class="text-caption text-grey-6">{{ new Date(note.created_at).toLocaleDateString() }}</div>
+                       </div>
+                       <div class="text-subtitle1 text-weight-bold text-white q-mb-xs">{{ note.subject }}</div>
+                       <div class="text-caption text-indigo-3">{{ note.class_level }} • Term {{ note.term }}</div>
+                       <div class="text-caption text-grey-5 q-mt-sm ellipsis">{{ note.topic }}</div>
+                    </q-card-section>
+                    <q-card-actions align="right">
+                       <q-btn flat round dense icon="visibility" color="indigo-3" />
+                       <q-btn flat round dense icon="edit" color="indigo-3" @click.stop="editNote(note)" />
+                    </q-card-actions>
+                 </q-card>
               </div>
-           </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
+           </template>
 
-    <!-- Quick Generation Sidebar -->
-    <q-dialog v-model="showGenerator" position="right" backdrop-filter="blur(4px)">
-       <q-card style="width: 350px; height: 100vh;" class="bg-blue-grey-10 text-white shadow-10">
-          <q-card-section class="q-pa-lg">
-             <div class="text-h6 text-weight-bold q-mb-md">Quick Generate</div>
-             <div class="text-caption text-grey-6 q-mb-xl">Powered by AI and standardized Master Curriculum.</div>
-             
-             <div class="q-gutter-lg">
-                <q-select v-model="genForm.class_level" :options="classOptions" label="Class Level" dark filled dense />
-                <q-input v-model="genForm.subjectName" label="Subject Name" dark filled dense />
-                <div class="row q-col-gutter-sm">
-                   <div class="col-6"><q-select v-model="genForm.term" :options="termOptions" label="Term" dark filled dense /></div>
-                   <div class="col-6"><q-input v-model="genForm.week" label="Week" type="number" dark filled dense /></div>
-                </div>
-                
+           <div v-else class="col-12 flex flex-center q-pa-xl column text-grey-7">
+              <q-icon name="folder_open" size="4em" />
+              <div class="text-h6 q-mt-md">Your repository is empty</div>
+              <q-btn outline label="Create your first note" color="indigo-4" class="q-mt-md q-px-md" @click="showGenerator = true" />
+           </div>
+        </div>
+
+        <!-- Note Viewer / Editor Dialog -->
+        <q-dialog v-model="viewerActive" backdrop-filter="blur(10px)">
+          <q-card style="width: 800px; max-width: 95vw;" class="bg-blue-grey-10 text-white border-indigo">
+            <q-card-section class="bg-indigo-10 row items-center q-pa-md">
+              <div class="column">
+                 <div class="text-h6 text-weight-bold">{{ currentNote?.subject }}</div>
+                 <div class="text-caption text-indigo-2">{{ currentNote?.class_level }} | Term {{ currentNote?.term }} | Week {{ currentNote?.week }}</div>
+              </div>
+              <q-space />
+              
+              <div class="row q-gutter-xs">
+                <q-btn flat round dense icon="download" color="white" @click="exportPdf" :loading="exporting">
+                   <q-tooltip>Export as professional PDF</q-tooltip>
+                </q-btn>
                 <q-btn 
-                  color="indigo-7" 
-                  icon="auto_awesome" 
-                  label="Generate Lesson Note" 
-                  class="full-width glossy q-py-md q-mt-xl" 
-                  :loading="generating"
-                  @click="triggerGeneration"
-                />
-             </div>
-          </q-card-section>
-       </q-card>
-    </q-dialog>
-  </q-page>
+                  flat round dense 
+                  :icon="isEditing ? 'save' : 'edit'" 
+                  :color="isEditing ? 'green-4' : 'white'" 
+                  @click="isEditing ? saveChanges() : startEditing()" 
+                >
+                   <q-tooltip>{{ isEditing ? 'Save as Personal Copy' : 'Personalize this note' }}</q-tooltip>
+                </q-btn>
+                <q-btn icon="close" flat round dense v-close-popup />
+              </div>
+            </q-card-section>
+
+            <q-card-section class="q-pa-lg scroll" style="max-height: 75vh">
+               <div v-if="!isEditing" class="q-gutter-y-lg">
+                  <div v-for="(content, key) in currentNote?.content.structured" :key="key">
+                     <div class="text-subtitle1 text-weight-bolder text-indigo-3 text-uppercase letter-spacing-1 border-bottom-indigo q-mb-sm">
+                       {{ key }}
+                     </div>
+                     <template v-if="Array.isArray(content)">
+                        <ul class="q-pl-md text-grey-4">
+                           <li v-for="(item, i) in content" :key="i" class="q-mb-xs">{{ item.description || item }}</li>
+                        </ul>
+                     </template>
+                     <p v-else class="text-body1 text-grey-4">{{ content }}</p>
+                  </div>
+               </div>
+               
+               <!-- Editor Mode (simplified for JSON structure) -->
+               <div v-else class="q-gutter-md">
+                  <q-banner dense class="bg-indigo-9 text-caption text-white rounded-borders">
+                    <template v-slot:avatar><q-icon name="info" /></template>
+                    You are customizing this note. Saving will create a new personal copy in your repository.
+                  </q-banner>
+                  
+                  <div v-for="(content, key) in editorNote.content.structured" :key="key">
+                    <div class="text-overline text-indigo-3">{{ key.toUpperCase() }}</div>
+                    <q-input 
+                      v-if="!Array.isArray(content)"
+                      v-model="editorNote.content.structured[key]"
+                      type="textarea" dark filled autogrow dense
+                    />
+                    <div v-else class="q-gutter-xs">
+                       <q-input 
+                         v-for="(item, i) in content" :key="i"
+                         v-model="editorNote.content.structured[key][i]"
+                         dark filled dense class="q-mb-xs"
+                       >
+                         <template v-slot:append>
+                            <q-btn flat round dense icon="delete" size="xs" color="red-4" @click="removeItem(key, i)" />
+                         </template>
+                       </q-input>
+                       <q-btn flat label="Add Point" icon="add" size="sm" color="indigo-3" @click="addItem(key)" />
+                    </div>
+                  </div>
+               </div>
+            </q-card-section>
+          </q-card>
+        </q-dialog>
+
+        <!-- Quick Generation Sidebar -->
+        <q-dialog v-model="showGenerator" position="right" backdrop-filter="blur(4px)">
+           <q-card style="width: 350px; height: 100vh;" class="bg-blue-grey-10 text-white shadow-10">
+              <q-card-section class="q-pa-lg">
+                 <div class="text-h6 text-weight-bold q-mb-md">Quick Generate</div>
+                 <div class="text-caption text-grey-6 q-mb-xl">Powered by AI and standardized Master Curriculum.</div>
+                 
+                 <div class="q-gutter-lg">
+                    <q-select v-model="genForm.class_level" :options="classOptions" label="Class Level" dark filled dense />
+                    <q-input v-model="genForm.subjectName" label="Subject Name" dark filled dense />
+                    <div class="row q-col-gutter-sm">
+                       <div class="col-6"><q-select v-model="genForm.term" :options="termOptions" label="Term" dark filled dense /></div>
+                       <div class="col-6"><q-input v-model="genForm.week" label="Week" type="number" dark filled dense /></div>
+                    </div>
+                    
+                    <q-btn 
+                      color="indigo-7" 
+                      icon="auto_awesome" 
+                      label="Generate Lesson Note" 
+                      class="full-width glossy q-py-md q-mt-xl" 
+                      :loading="generating"
+                      @click="triggerGeneration"
+                    />
+                 </div>
+              </q-card-section>
+           </q-card>
+        </q-dialog>
+      </q-page>
+    </q-page-container>
+  </q-layout>
 </template>
 
 <script setup>

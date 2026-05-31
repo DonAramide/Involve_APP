@@ -11,3 +11,5 @@
 # Avoid R8 Missing Class Warnings
 -dontwarn javax.xml.stream.**
 -dontwarn java.lang.invoke.StringConcatFactory
+-dontwarn org.jdom2.**
+-dontwarn org.jpos.**

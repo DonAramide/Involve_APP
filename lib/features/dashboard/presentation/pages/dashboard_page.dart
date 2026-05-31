@@ -54,6 +54,8 @@ import 'package:involve_app/features/stock/presentation/pages/inventory_report_p
 import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
 import 'package:involve_app/features/admin/presentation/pages/system_setup_page.dart';
 
+import 'package:involve_app/services/terminal_sync_service.dart';
+
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
   final bool autoOpenSettings;
@@ -64,15 +66,27 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  TerminalConfig? _terminalConfig;
+
   @override
   void initState() {
     super.initState();
+    _loadTerminalConfig();
     if (widget.autoOpenSettings) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _verifyAndNavigateToSettings(context);
       });
     }
     context.read<HistoryBloc>().add(LoadHistory());
+  }
+
+  Future<void> _loadTerminalConfig() async {
+    final config = await TerminalSyncService.loadCachedConfig();
+    if (mounted) {
+      setState(() {
+        _terminalConfig = config;
+      });
+    }
   }
 
   @override
@@ -316,6 +330,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   key: ValueKey(item.id),
                   indicatorColor: item.indicatorColor,
                   indicatorTooltip: item.indicatorTooltip,
+                  secondaryIndicatorColor: item.secondaryIndicatorColor,
+                  secondaryIndicatorTooltip: item.secondaryIndicatorTooltip,
                 )).toList(),
               );
 
@@ -340,6 +356,17 @@ class _DashboardPageState extends State<DashboardPage> {
 
               return menuGrid;
             },
+          ),
+          Positioned(
+            bottom: 16,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                'v1.0.0',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ),
           ),
         ],
       ),
@@ -442,6 +469,24 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  void _verifyAndNavigateToFinance(BuildContext context, String routeName) {
+    final settingsBloc = context.read<SettingsBloc>();
+    
+    // Reset auth state to ensure listener catches new success
+    settingsBloc.add(ResetSystemAuth());
+    
+    // Show password dialog
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PasswordDialog(bloc: settingsBloc),
+    ).then((authorized) {
+      if (authorized == true && context.mounted) {
+        Navigator.pushNamed(context, routeName);
+      }
+    });
+  }
+
   List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState, UserPlan? userPlan) {
     final isSchool = settings?.businessMode == 'school';
     final isServices = settings?.businessMode == 'services';
@@ -476,12 +521,14 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       _DashboardMenuItem(
         id: 'printer',
-        title: 'PRINTER',
+        title: 'PRINTER & MPOS',
         icon: Icons.print,
         color: Colors.purple,
         onTap: () => Navigator.pushNamed(context, '/printer_settings'),
         indicatorColor: printerState.connectedDevice != null ? Colors.green : Colors.red,
-        indicatorTooltip: printerState.connectedDevice != null ? 'Connected' : 'Disconnected',
+        indicatorTooltip: printerState.connectedDevice != null ? 'Printer: Connected' : 'Printer: Disconnected',
+        secondaryIndicatorColor: (_terminalConfig?.posSerialNumber?.isNotEmpty == true) ? Colors.blue : Colors.grey,
+        secondaryIndicatorTooltip: (_terminalConfig?.posSerialNumber?.isNotEmpty == true) ? 'POS Device: Configured' : 'POS Device: Not Configured',
       ),
       if (!isSchool) ...[
         _DashboardMenuItem(
@@ -526,21 +573,21 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'CLOUD METRICS',
           icon: Icons.cloud_done_outlined,
           color: Colors.indigo,
-          onTap: () => Navigator.pushNamed(context, '/admin_hub'),
+          onTap: () => _verifyAndNavigateToAdminHub(context),
         ),
         _DashboardMenuItem(
           id: 'finance_analytics',
           title: 'FINANCE ANALYTICS',
           icon: Icons.insights,
           color: Colors.blueAccent,
-          onTap: () => Navigator.pushNamed(context, '/admin_finance'),
+          onTap: () => _verifyAndNavigateToFinance(context, '/admin_finance'),
         ),
         _DashboardMenuItem(
           id: 'reconciliation',
           title: 'RECONCILIATION',
           icon: Icons.account_balance,
           color: Colors.teal,
-          onTap: () => Navigator.pushNamed(context, '/executive_finance'),
+          onTap: () => _verifyAndNavigateToFinance(context, '/executive_finance'),
         ),
       ] else ...[
         _DashboardMenuItem(
@@ -625,7 +672,7 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'FINANCE DASHBOARD',
           icon: Icons.dashboard_customize,
           color: Colors.blueGrey,
-          onTap: () => Navigator.pushNamed(context, '/school_finance'),
+          onTap: () => _verifyAndNavigateToFinance(context, '/school_finance'),
         ),
         _DashboardMenuItem(
           id: 'academic_setup',
@@ -701,6 +748,8 @@ class _DashboardPageState extends State<DashboardPage> {
     required Key key,
     Color? indicatorColor,
     String? indicatorTooltip,
+    Color? secondaryIndicatorColor,
+    String? secondaryIndicatorTooltip,
   }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -747,27 +796,53 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            if (indicatorColor != null)
+            if (indicatorColor != null || secondaryIndicatorColor != null)
               Positioned(
                 top: 16,
                 right: 16,
-                child: Tooltip(
-                  message: indicatorTooltip ?? '',
-                  child: Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: indicatorColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: indicatorColor.withOpacity(0.4),
-                          blurRadius: 6,
-                          spreadRadius: 2,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (secondaryIndicatorColor != null)
+                      Tooltip(
+                        message: secondaryIndicatorTooltip ?? '',
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: secondaryIndicatorColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: secondaryIndicatorColor.withOpacity(0.4),
+                                blurRadius: 6,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    if (indicatorColor != null)
+                      Tooltip(
+                        message: indicatorTooltip ?? '',
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: indicatorColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: indicatorColor.withOpacity(0.4),
+                                blurRadius: 6,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
           ],
@@ -830,6 +905,8 @@ class _DashboardMenuItem {
   final VoidCallback onTap;
   final Color? indicatorColor;
   final String? indicatorTooltip;
+  final Color? secondaryIndicatorColor;
+  final String? secondaryIndicatorTooltip;
 
   _DashboardMenuItem({
     required this.id,
@@ -839,5 +916,7 @@ class _DashboardMenuItem {
     required this.onTap,
     this.indicatorColor,
     this.indicatorTooltip,
+    this.secondaryIndicatorColor,
+    this.secondaryIndicatorTooltip,
   });
 }

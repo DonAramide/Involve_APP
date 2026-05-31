@@ -246,9 +246,9 @@ export class TerminalController {
   // POST /api/mobile/terminal/sync
   static async mobileSync(req: Request, res: Response) {
     try {
-      const { deviceId, enrollmentKey, serialNumber, androidId } = req.body;
+      const { deviceId, enrollmentKey, serialNumber, androidId, businessName } = req.body;
       if (!deviceId) return res.status(400).json({ error: 'deviceId is required' });
-      const result = await TerminalSyncService.syncTerminalForDevice(deviceId, enrollmentKey, serialNumber, androidId);
+      const result = await TerminalSyncService.syncTerminalForDevice(deviceId, enrollmentKey, serialNumber, androidId, businessName);
       return res.status(200).json(result);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });

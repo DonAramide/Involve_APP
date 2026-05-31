@@ -288,14 +288,7 @@ const selectedTrustFilter = ref('ALL_TRUST_STATES')
 const selectedApp = ref(null)
 
 // 1. Static base arrays complete with FINAL REFINEMENT #1: Explicit Trust States
-const masterPackagesList = ref([
-  { appName: 'Invify Kiosk Gateway', packageName: 'com.invify.kiosk.base', version: '2.4.1', signatureStatus: 'VERIFIED', tenant: 'tenant-alpha', deviceCount: 2450, trustState: 'TRUSTED', lastSeen: '14s ago', integrityState: 'NOMINAL', runtimeState: 'Foreground Active', rolloutChannel: 'Stable', crashSpike: false, certHash: 'a8f4b2c9e7d104250014200fe41a', sideloadSafe: true, permissionSummary: 'Standard Base APIs' },
-  { appName: 'Invify Secure Display Engine', packageName: 'com.invify.display.engine', version: '1.2.0', signatureStatus: 'VERIFIED', tenant: 'tenant-alpha', deviceCount: 2400, trustState: 'MONITORED', lastSeen: '2m ago', integrityState: 'NOMINAL', runtimeState: 'Background Serviced', rolloutChannel: 'Beta', crashSpike: false, certHash: 'b9e4a1f8c2d304250014200cb84e', sideloadSafe: true, permissionSummary: 'Display Interception Hooks' },
-  { appName: 'Invify Payment Bridge Subsystem', packageName: 'com.invify.pos.terminal', version: '3.0.4', signatureStatus: 'VERIFIED', tenant: 'tenant-omega', deviceCount: 14200, trustState: 'SUSPICIOUS', lastSeen: '1s ago', integrityState: 'NOMINAL', runtimeState: 'Foreground Active', rolloutChannel: 'Stable', crashSpike: false, certHash: 'c4d1e2f8b9a704250014200ea12b', sideloadSafe: true, permissionSummary: 'Overlay + Accessibility APIs' },
-  { appName: 'Invify Hardware IO Service', packageName: 'com.invify.hw.serial', version: '2.1.0', signatureStatus: 'BROKEN', tenant: 'tenant-omega', deviceCount: 42, trustState: 'BLOCKED', lastSeen: '12m ago', integrityState: 'TAMPERED', runtimeState: 'Confined Lock', rolloutChannel: 'Emergency', crashSpike: true, certHash: 'INVALID_SIGNATURE_KEY_EXP', sideloadSafe: false, permissionSummary: 'Unauthorized Kernel Sockets' },
-  { appName: 'Invify Scanner Driver Interface', packageName: 'com.invify.warehouse.scanner', version: '4.0.0', signatureStatus: 'VERIFIED', tenant: 'tenant-beta', deviceCount: 3100, trustState: 'TRUSTED', lastSeen: '4m ago', integrityState: 'NOMINAL', runtimeState: 'Background Cached', rolloutChannel: 'Canary', crashSpike: false, certHash: 'd3f2e1a8b9c404250014200f8901', sideloadSafe: true, permissionSummary: 'USB Peripheral Bridge' },
-  { appName: 'Dotroid Kernel Assist Package', packageName: 'com.dotroid.kernel.assist', version: '1.0.1', signatureStatus: 'VERIFIED', tenant: 'global', deviceCount: 104250, trustState: 'RESTRICTED', lastSeen: 'just now', integrityState: 'NOMINAL', runtimeState: 'Kernel Daemon', rolloutChannel: 'Internal', crashSpike: false, certHash: 'e7d1a8f4b2c904250014200da41c', sideloadSafe: true, permissionSummary: 'Root Daemon Privileges' }
-])
+const masterPackagesList = ref([])
 
 // Computed filter pipeline
 const filteredPackages = computed(() => {

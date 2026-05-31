@@ -415,8 +415,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
               if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING STAFF CONFIGURATION...');
               
               final userPlan = context.read<SettingsBloc>().state.userPlan;
-              // Force Basic Plan tier evaluation for testing/demonstration purposes
-              final isBasicPlan = true;
+              final isBasicPlan = userPlan == null || userPlan.isBasic;
               final canAddStaff = !isBasicPlan || state.staffList.length < 2;
 
               return Column(

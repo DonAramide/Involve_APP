@@ -1,0 +1,107 @@
+{
+  "vault": [
+    {
+      "id": "apk-1780148662401",
+      "name": "App",
+      "packageName": "com.invify.app",
+      "version": "1.0.0",
+      "size": "99.4 MB",
+      "status": "READY",
+      "uploadProgress": 100,
+      "installCount": 0,
+      "uninstallCount": 0,
+      "versionDistribution": [
+        {
+          "version": "1.0.0",
+          "deviceCount": 0
+        }
+      ],
+      "selectedDeployVersion": "1.0.0",
+      "s3Url": "https://usc1.contabostorage.com/0d205683f3b543beb7298e9b68e26b0f:iips.stargazer.bucket/apks/com.invify.app_v1.0.0_1780148562760.apk",
+      "createdAt": "2026-05-30T13:44:22.401Z",
+      "updatedAt": "2026-05-30T16:15:55.192Z"
+    }
+  ],
+  "deploymentLog": [
+    {
+      "id": "dep-1780157404026",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T16:10:04.026Z"
+    },
+    {
+      "id": "dep-1780156707433",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T15:58:27.433Z"
+    },
+    {
+      "id": "dep-1780156348704",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T15:52:28.704Z"
+    },
+    {
+      "id": "dep-1780156257166",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T15:50:57.166Z"
+    },
+    {
+      "id": "dep-1780154874172",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T15:27:54.172Z"
+    },
+    {
+      "id": "dep-1780153413641",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T15:03:33.641Z"
+    },
+    {
+      "id": "dep-1780149755215",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T14:02:35.215Z"
+    },
+    {
+      "id": "dep-1780149652599",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T14:00:52.599Z"
+    },
+    {
+      "id": "dep-1780149121914",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T13:52:01.914Z"
+    },
+    {
+      "id": "dep-1780149092666",
+      "action": "INSTALL",
+      "apkName": "App v1.0.0",
+      "devices": 1,
+      "status": "SUCCESS",
+      "time": "2026-05-30T13:51:32.666Z"
+    }
+  ]
+}

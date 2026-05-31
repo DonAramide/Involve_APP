@@ -13,6 +13,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
 
 class ActivationPage extends StatefulWidget {
   static const routeName = '/activation';
@@ -29,6 +30,7 @@ class _ActivationPageState extends State<ActivationPage> {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
   String? _errorMessage;
+  TerminalConfig? _globalConfig;
   
   @override
   void initState() {
@@ -38,6 +40,21 @@ class _ActivationPageState extends State<ActivationPage> {
     final settingsState = context.read<SettingsBloc>().state;
     if (settingsState.settings != null) {
       _businessNameController.text = settingsState.settings!.organizationName;
+    }
+    _loadGlobalConfig();
+  }
+
+  Future<void> _loadGlobalConfig() async {
+    try {
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      final config = await TerminalSyncService.syncTerminalConfig(deviceId: deviceId);
+      if (mounted) {
+        setState(() {
+          _globalConfig = config;
+        });
+      }
+    } catch (e) {
+      debugPrint('[ActivationPage] Failed to load global config: $e');
     }
   }
 
@@ -218,7 +235,34 @@ class _ActivationPageState extends State<ActivationPage> {
             ),
 
             // Content Layout
-            BlocListener<SettingsBloc, SettingsState>(
+            SafeArea(
+              child: Column(
+                children: [
+                  if (_globalConfig?.broadcastMessage != null && _globalConfig!.broadcastMessage!.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.15),
+                        border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.campaign, color: Colors.orange, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _globalConfig!.broadcastMessage!,
+                              style: const TextStyle(color: Colors.orange, fontSize: 14, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Expanded(
+                    child: BlocListener<SettingsBloc, SettingsState>(
               listenWhen: (previous, current) => 
                 previous.settings?.organizationName != current.settings?.organizationName,
               listener: (context, state) {
@@ -372,14 +416,14 @@ class _ActivationPageState extends State<ActivationPage> {
                                         context,
                                         icon: Icons.phone,
                                         label: 'Support / WhatsApp',
-                                        onTap: () => _launchUrl('tel:+2348023552282'),
+                                        onTap: () => _launchUrl('tel:${_globalConfig?.supportWhatsapp ?? '+2348023552282'}'),
                                       ),
                                       const SizedBox(width: 32),
                                       _buildContactIcon(
                                         context,
                                         icon: Icons.email,
                                         label: 'Email Support',
-                                        onTap: () => _launchUrl('mailto:info.iips.ng@gmail.com'),
+                                        onTap: () => _launchUrl('mailto:${_globalConfig?.supportEmail ?? 'info.iips.ng@gmail.com'}'),
                                       ),
                                     ],
                                   ),
@@ -392,6 +436,10 @@ class _ActivationPageState extends State<ActivationPage> {
                     ),
                   ),
                 ),
+              ),
+            ),
+          ),
+        ],
               ),
             ),
           ],

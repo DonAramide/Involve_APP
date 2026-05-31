@@ -46,6 +46,38 @@
             color="green"
             dark
           />
+
+          <q-expansion-item
+            icon="support_agent"
+            label="Dedicated Support Agent Contacts"
+            caption="Optional. Overrides global settings for this tenant's devices."
+            dark
+            header-class="bg-blue-grey-9 text-white rounded-borders"
+            class="q-mt-md"
+          >
+            <q-card class="bg-blue-grey-10">
+              <q-card-section class="q-gutter-sm">
+                <q-input 
+                  v-model="form.support_phone" 
+                  label="Agent Phone" 
+                  dark filled dense
+                  placeholder="+234..."
+                />
+                <q-input 
+                  v-model="form.support_email" 
+                  label="Agent Email" 
+                  dark filled dense
+                  placeholder="agent@domain.com"
+                />
+                <q-input 
+                  v-model="form.support_whatsapp" 
+                  label="Agent WhatsApp" 
+                  dark filled dense
+                  placeholder="+234..."
+                />
+              </q-card-section>
+            </q-card>
+          </q-expansion-item>
         </q-card-section>
 
         <q-card-actions align="right" class="q-pa-md">
@@ -81,7 +113,10 @@ const form = ref({
   name: '',
   type: 'school',
   plan: 'free',
-  status: 'active'
+  status: 'active',
+  support_phone: '',
+  support_email: '',
+  support_whatsapp: ''
 })
 
 onMounted(() => {

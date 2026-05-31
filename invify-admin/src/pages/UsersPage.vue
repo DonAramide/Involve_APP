@@ -156,13 +156,13 @@
                 />
              </div>
              <div class="col-6">
-                <q-select
-                  v-model="form.tenantId"
-                  :options="tenantOptions"
-                  label="Assign Tenant"
-                  dark filled dense emit-value map-options
-                  :disable="form.role === 'super_admin'"
-                />
+                 <q-select
+                   v-model="form.tenantId"
+                   :options="tenantOptions"
+                   label="Assign Tenant"
+                   dark filled dense emit-value map-options
+                   :disable="isPlatformRole(form.role)"
+                 />
              </div>
           </div>
         </q-card-section>
@@ -197,7 +197,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../api'
 import axios from 'axios'
@@ -225,6 +225,25 @@ const lastInviteLink = ref('')
 
 const form = ref({ id: '', name: '', email: '', role: 'staff', tenantId: null })
 
+const isPlatformRole = (role) => {
+  return [
+    'super_admin',
+    'admin_finance',
+    'admin_treasury',
+    'admin_risk',
+    'admin_ops',
+    'admin_executive',
+    'admin_deploy'
+  ].includes(role)
+}
+
+// Watch role change to clean tenant selection for platform-level roles
+watch(() => form.value.role, (newRole) => {
+  if (isPlatformRole(newRole)) {
+    form.value.tenantId = null
+  }
+})
+
 const generateUUID = () => {
   try {
     return crypto.randomUUID()
@@ -247,12 +266,24 @@ const columns = [
 const roleOptions = [
   { label: 'All Roles', value: 'all' },
   { label: 'Super Admin', value: 'super_admin' },
+  { label: 'Admin Finance', value: 'admin_finance' },
+  { label: 'Admin Treasury', value: 'admin_treasury' },
+  { label: 'Admin Risk', value: 'admin_risk' },
+  { label: 'Admin Ops', value: 'admin_ops' },
+  { label: 'Admin Executive', value: 'admin_executive' },
+  { label: 'Admin Deploy', value: 'admin_deploy' },
   { label: 'Tenant Admin', value: 'tenant_admin' },
   { label: 'Staff', value: 'staff' }
 ]
 
 const roleColors = {
   'super_admin': 'deep-orange-10',
+  'admin_finance': 'indigo-9',
+  'admin_treasury': 'teal-9',
+  'admin_risk': 'red-9',
+  'admin_ops': 'blue-9',
+  'admin_executive': 'purple-9',
+  'admin_deploy': 'cyan-9',
   'tenant_admin': 'indigo-10',
   'staff': 'blue-grey-8'
 }
@@ -320,14 +351,19 @@ const openModal = (user = null) => {
 const saveUser = async () => {
   saving.value = true
   try {
+    const isPlatform = isPlatformRole(form.value.role)
+    const payload = {
+      ...form.value,
+      tenantId: isPlatform ? null : form.value.tenantId
+    }
     if (isEditing.value) {
       await adminApi.updateUser(form.value.id, { 
         name: form.value.name, 
         role: form.value.role, 
-        tenant_id: form.value.role === 'super_admin' ? null : form.value.tenantId 
+        tenant_id: isPlatform ? null : form.value.tenantId 
       })
     } else {
-      await adminApi.createUser(form.value)
+      await adminApi.createUser(payload)
     }
     modalVisible.value = false
     fetchUsers()

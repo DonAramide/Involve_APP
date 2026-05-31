@@ -135,12 +135,7 @@ import { ref } from 'vue'
 import { Notify } from 'quasar'
 
 // 1. Static base arrays simulating continuous accessibility stream packages complete with FINAL REFINEMENT #4: Confidence Scoring
-const activeStreamsList = ref([
-  { id: 'ab-01', abuseType: 'OVERLAY_INJECTION_ABUSE', severity: 'CRITICAL', packageName: 'com.rogue.accessibility.overlay', confidenceScore: 94, behavioralSignature: 'Simulated Touch Event Forging', reputationIndex: 'MALICIOUS_CLUSTER', hookTrace: 'AccessibilityNodeInfo.performAction(ACTION_CLICK)', tenantScope: 'tenant-alpha', deviceId: 'dev-node-9941' },
-  { id: 'ab-02', abuseType: 'AUTOMATION_SCREEN_INTERCEPTION', severity: 'HIGH', packageName: 'org.unapproved.screen.capture', confidenceScore: 88, behavioralSignature: 'Continuous Framebuffer Polling', reputationIndex: 'UNKNOWN_NEW', hookTrace: 'MediaProjection.createVirtualDisplay()', tenantScope: 'retail_sector_omega', deviceId: 'pos-kiosk-04' },
-  { id: 'ab-03', abuseType: 'PRIVILEGE_ESCALATION_PATTERN', severity: 'CRITICAL', packageName: 'com.malware.auto.grant', confidenceScore: 92, behavioralSignature: 'System Permission Dialogue Traversal', reputationIndex: 'MALICIOUS_CLUSTER', hookTrace: 'findAccessibilityNodeInfosByText("Allow")', tenantScope: 'tenant-beta', deviceId: 'scanner-node-12' },
-  { id: 'ab-04', abuseType: 'SUSPICIOUS_RUNTIME_HOOK', severity: 'MEDIUM', packageName: 'com.custom.debug.utility', confidenceScore: 65, behavioralSignature: 'Non-Standard Binder Transactions', reputationIndex: 'INTERNAL_DEBUGGING', hookTrace: 'IBinder.transact(CUSTOM_CODE)', tenantScope: 'tenant-omega', deviceId: 'dev-board-alpha' }
-])
+const activeStreamsList = ref([])
 
 const acknowledgeStream = (streamId) => {
   activeStreamsList.value = activeStreamsList.value.filter(s => s.id !== streamId)

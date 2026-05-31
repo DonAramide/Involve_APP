@@ -453,8 +453,9 @@
           <div class="q-my-xl">
              <div class="text-caption text-amber-2 text-weight-medium uppercase letter-spacing-3 q-mb-sm">CERTIFIED FOR OPERATION</div>
              <div class="text-h2 text-weight-bold text-white q-my-md text-shadow-glow" style="font-size: 2.2rem; margin-bottom: 4px;">{{ certificateData.businessName }}</div>
-             <div class="text-caption text-grey-4 q-mt-none font-mono q-mb-md" style="font-size: 0.95rem; opacity: 0.85;">
-                Device ID: <span class="text-amber-3 text-weight-bold">{{ certificateData.deviceId }}</span>
+             <div class="q-my-md q-py-sm" style="background: rgba(251, 191, 36, 0.1); border-radius: 8px; border: 1px solid rgba(251, 191, 36, 0.3);">
+                <span class="text-overline text-grey-4 q-mr-sm">DEVICE ID:</span> 
+                <span class="text-amber-5 text-weight-bolder font-mono text-h6" style="letter-spacing: 2px;">{{ certificateData.deviceId || 'AWAITING-PROVISION' }}</span>
              </div>
              <div class="row justify-center items-center q-gutter-sm no-wrap">
                 <div class="text-subtitle1 text-grey-4">Licensed Mode:</div>

@@ -19,6 +19,12 @@ class TerminalConfig {
   final String? printerMac;
   final String? printerModel;
   final String? supportPhone;
+  final String? supportEmail;
+  final String? supportWhatsapp;
+  final String? broadcastMessage;
+  final String? tenantId;
+  final String? plan;
+  final String? type;
 
   const TerminalConfig({
     required this.assigned,
@@ -34,6 +40,12 @@ class TerminalConfig {
     this.printerMac,
     this.printerModel,
     this.supportPhone,
+    this.supportEmail,
+    this.supportWhatsapp,
+    this.broadcastMessage,
+    this.tenantId,
+    this.plan,
+    this.type,
   });
 
   factory TerminalConfig.notAssigned() {
@@ -58,6 +70,12 @@ class TerminalConfig {
       printerMac: json['printerMac']?.toString(),
       printerModel: json['printerModel']?.toString(),
       supportPhone: json['supportPhone']?.toString(),
+      supportEmail: json['supportEmail']?.toString(),
+      supportWhatsapp: json['supportWhatsapp']?.toString(),
+      broadcastMessage: json['broadcastMessage']?.toString(),
+      tenantId: json['tenantId']?.toString(),
+      plan: json['plan']?.toString(),
+      type: json['type']?.toString(),
     );
   }
 
@@ -74,6 +92,13 @@ class TerminalConfig {
     'message': message,
     'printerMac': printerMac,
     'printerModel': printerModel,
+    'supportPhone': supportPhone,
+    'supportEmail': supportEmail,
+    'supportWhatsapp': supportWhatsapp,
+    'broadcastMessage': broadcastMessage,
+    'tenantId': tenantId,
+    'plan': plan,
+    'type': type,
   };
 
   @override

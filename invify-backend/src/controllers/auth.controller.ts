@@ -1,6 +1,57 @@
 // src/controllers/auth.controller.ts
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
+import { UserDeviceService } from '../services/user-device.service';
+import * as fs from 'fs';
+import * as path from 'path';
+
+async function validateDeviceOrBlock(userId: string, email: string, req: Request): Promise<{ allowed: boolean; errorResponse?: any }> {
+  try {
+    const p = path.join(process.cwd(), 'global_settings.json');
+    let enforce = false;
+    if (fs.existsSync(p)) {
+      const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+      enforce = !!data.enforce_device_control;
+    }
+    if (!enforce) return { allowed: true };
+
+    const deviceId = req.body.deviceId;
+    if (!deviceId) {
+      return { 
+        allowed: false, 
+        errorResponse: { 
+          error: 'DEVICE_APPROVAL_REQUIRED', 
+          message: 'Secure device identity footprint is missing. Device control is strictly enforced.' 
+        } 
+      };
+    }
+
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'] || '';
+
+    const verification = await UserDeviceService.verifyDevice(
+      userId,
+      deviceId,
+      email,
+      { ipAddress: String(ipAddress), userAgent }
+    );
+
+    if (!verification.isApproved) {
+      return {
+        allowed: false,
+        errorResponse: {
+          error: 'DEVICE_APPROVAL_REQUIRED',
+          deviceId,
+          status: verification.record.status,
+          message: `This device footprint (${deviceId}) status is ${verification.record.status} and requires manual Invify operations team approval.`
+        }
+      };
+    }
+    return { allowed: true };
+  } catch (err) {
+    return { allowed: true };
+  }
+}
 
 export class AuthController {
   /**
@@ -37,6 +88,11 @@ export class AuthController {
         })).toString('base64').replace(/=/g, '');
         const mockToken = `${header}.${payload}.mock_signature`;
         
+        const check = await validateDeviceOrBlock(userId, email, req);
+        if (!check.allowed) {
+          return res.status(403).json(check.errorResponse);
+        }
+
         return res.status(200).json({
           token: mockToken,
           refreshToken: 'mock_refresh_token',
@@ -76,6 +132,11 @@ export class AuthController {
           })).toString('base64').replace(/=/g, '');
           const mockToken = `${header}.${payload}.mock_signature`;
           
+          const check = await validateDeviceOrBlock(userId, email, req);
+          if (!check.allowed) {
+            return res.status(403).json(check.errorResponse);
+          }
+
           return res.status(200).json({
             token: mockToken,
             refreshToken: 'mock_refresh_token',
@@ -113,6 +174,11 @@ export class AuthController {
       }
 
       // 4. Return complete JWT Session
+      const check = await validateDeviceOrBlock(profile.id, profile.email, req);
+      if (!check.allowed) {
+        return res.status(403).json(check.errorResponse);
+      }
+
       return res.status(200).json({
         token: authData.session.access_token,
         refreshToken: authData.session.refresh_token,
@@ -162,6 +228,11 @@ export class AuthController {
         const signature = 'mock_signature';
         const mockToken = `${header}.${payload}.${signature}`;
         
+        const check = await validateDeviceOrBlock(userId, email, req);
+        if (!check.allowed) {
+          return res.status(403).json(check.errorResponse);
+        }
+
         return res.status(200).json({
           token: mockToken,
           refreshToken: 'mock_refresh_token',

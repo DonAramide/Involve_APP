@@ -13,8 +13,19 @@
  */
 export function registerAuthBootstrapGuard(router) {
   // Helper to determine role-based home landing path
+  const isPlatformStaffRole = (role) => [
+    'SUPER_ADMIN',
+    'STAFF',
+    'ADMIN_FINANCE',
+    'ADMIN_TREASURY',
+    'ADMIN_RISK',
+    'ADMIN_OPS',
+    'ADMIN_EXECUTIVE',
+    'ADMIN_DEPLOY'
+  ].includes(role)
+
   const getHomePath = (role) => {
-    if (['SUPER_ADMIN', 'STAFF'].includes(role)) {
+    if (isPlatformStaffRole(role)) {
       return '/fleet/overview'
     }
     return '/tenant/dashboard'
@@ -41,7 +52,7 @@ export function registerAuthBootstrapGuard(router) {
       }
       
       // Strict Tenant Isolation redirection
-      if (!['SUPER_ADMIN', 'STAFF'].includes(operatorRole)) {
+      if (!isPlatformStaffRole(operatorRole)) {
         return next('/tenant/dashboard')
       }
 
@@ -105,7 +116,7 @@ export function registerAuthBootstrapGuard(router) {
       }
 
       // Gate 2.5: Platform Administration Layout Isolation (Strict Tenant Redirection)
-      if (!['SUPER_ADMIN', 'STAFF'].includes(operatorRole)) {
+      if (!isPlatformStaffRole(operatorRole)) {
         const adminPathPrefixes = [
           '/fleet', '/governance', '/observability', '/ai', 
           '/deployments', '/apps', '/incidents', '/admin', 
@@ -123,6 +134,12 @@ export function registerAuthBootstrapGuard(router) {
         // Simulated validation array matching the primary user tier matrix definitions
         const userScopeMatrix = {
           SUPER_ADMIN: ['read_fleet', 'read_devices', 'read_tenant', 'soc_analyst', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'admin_deploy', 'write_fleet', 'read_telemetry', 'execute_actions', 'read_audit', 'write_policies', 'read_ai_intelligence', 'soc_communications'],
+          ADMIN_FINANCE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications'],
+          ADMIN_TREASURY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications'],
+          ADMIN_RISK: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'read_telemetry', 'read_audit', 'soc_communications'],
+          ADMIN_OPS: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications'],
+          ADMIN_EXECUTIVE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'read_ai_intelligence', 'soc_communications'],
+          ADMIN_DEPLOY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'admin_deploy', 'read_telemetry', 'read_audit', 'soc_communications'],
           STAFF: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications'],
           TENANT_OPERATOR: ['read_fleet', 'read_devices', 'read_streams']
         }

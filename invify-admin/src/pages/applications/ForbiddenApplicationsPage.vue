@@ -221,12 +221,7 @@ import { Notify } from 'quasar'
 const activePolicyScope = ref('global')
 
 // Master rules mapping complete with FINAL REFINEMENT #1: Explicit Trust State BLOCKED
-const masterRulesList = ref([
-  { ruleId: 'rule-01', ruleName: 'Generic Remote Keyloggers', targetPattern: 'com.malware.keylogger.*', enforcedTrustState: 'BLOCKED', riskScore: 98, observedViolations: 12, inheritanceType: 'STRICT_GLOBAL', driftAlerts: 2, policyScope: 'global' },
-  { ruleId: 'rule-02', ruleName: 'Unauthorized Serial IO Proxies', targetPattern: 'com.unapproved.serial.proxy', enforcedTrustState: 'BLOCKED', riskScore: 85, observedViolations: 2, inheritanceType: 'CUSTOM_OVERRIDE', driftAlerts: 0, policyScope: 'tenant-omega' },
-  { ruleId: 'rule-03', ruleName: 'Rooted Overlay Hijackers', targetPattern: 'org.overlay.hijack.malware', enforcedTrustState: 'BLOCKED', riskScore: 95, observedViolations: 0, inheritanceType: 'STRICT_GLOBAL', driftAlerts: 0, policyScope: 'global' },
-  { ruleId: 'rule-04', ruleName: 'Legacy Insecure Barcode Scanners', targetPattern: 'com.old.scanner.unsupported', enforcedTrustState: 'RESTRICTED', riskScore: 65, observedViolations: 410, inheritanceType: 'STRICT_GLOBAL', driftAlerts: 1, policyScope: 'global' }
-])
+const masterRulesList = ref([])
 
 const filteredRules = computed(() => {
   return masterRulesList.value.filter(r => {

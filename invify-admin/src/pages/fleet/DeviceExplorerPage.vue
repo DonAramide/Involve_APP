@@ -255,119 +255,8 @@ const gridColumns = [
   { name: 'dotroidVersion', label: 'Dotroid Ver', align: 'left', field: 'dotroidVersion' }
 ]
 
-// Base device entries simulating thousands of edge nodes via virtual chunks
-const baseDevicesArray = ref([
-  {
-    deviceId: 'dev-node-alpha',
-    deviceName: 'Edge Kiosk Alpha',
-    tenant: 'tenant-alpha',
-    agentCode: 'ag-241',
-    onlineState: 'ONLINE',
-    compliance: '100%',
-    integrity: 'HEALTHY',
-    trustScore: 99,
-    rolloutVersion: 'v2.4.1',
-    otaStatus: 'STABLE',
-    lastSeen: '12s ago',
-    _lastSeenDate: new Date(Date.now() - 12000),
-    battery: 94,
-    networkState: 'WIFI_5G',
-    androidVersion: '13.0',
-    dotroidVersion: '4.2.0',
-    latitude: '6.5244',
-    longitude: '3.3792',
-    description: 'Hardware stream active. Secure boot attestation verified.',
-    apps: ['com.invify.kiosk', 'com.android.settings', 'org.chromium.webview']
-  },
-  {
-    deviceId: 'dev-node-beta',
-    deviceName: 'Warehouse Scanner 02',
-    tenant: 'global',
-    agentCode: 'ag-241',
-    onlineState: 'ONLINE',
-    compliance: '100%',
-    integrity: 'HEALTHY',
-    trustScore: 95,
-    rolloutVersion: 'v2.4.1',
-    otaStatus: 'STABLE',
-    lastSeen: '45s ago',
-    _lastSeenDate: new Date(Date.now() - 45000),
-    battery: 81,
-    networkState: 'CELL_4G',
-    androidVersion: '12.0',
-    dotroidVersion: '4.1.8',
-    latitude: '6.4531',
-    longitude: '3.3958',
-    description: 'Continuous network packet transmissions nominal.',
-    apps: ['com.invify.warehouse', 'com.zebra.scanner']
-  },
-  {
-    deviceId: 'dev-node-gamma',
-    deviceName: 'Retail Point Terminal',
-    tenant: 'tenant-omega',
-    agentCode: 'ag-210',
-    onlineState: 'STALE',
-    compliance: '98%',
-    integrity: 'WARNING',
-    trustScore: 88,
-    rolloutVersion: 'v2.1.0',
-    otaStatus: 'STALE_PIPELINE',
-    lastSeen: '140s ago',
-    _lastSeenDate: new Date(Date.now() - 140000),
-    battery: 100,
-    networkState: 'ETHERNET',
-    androidVersion: '11.0',
-    dotroidVersion: '4.0.1',
-    description: 'Kernel configuration module tracking anomalous timing flags.',
-    apps: ['com.invify.pos', 'com.topwise.bridge']
-  },
-  {
-    deviceId: 'dev-node-delta',
-    deviceName: 'Quarantined Smart Display',
-    tenant: 'tenant-alpha',
-    agentCode: 'ag-230',
-    onlineState: 'OFFLINE',
-    compliance: '40%',
-    integrity: 'CRITICAL',
-    trustScore: 32,
-    rolloutVersion: 'v2.3.0',
-    otaStatus: 'ROLLBACK_FAILED',
-    lastSeen: '12m ago',
-    _lastSeenDate: new Date(Date.now() - (12 * 60 * 1000)),
-    battery: 14,
-    networkState: 'DISCONNECTED',
-    androidVersion: '13.0',
-    dotroidVersion: '4.1.2',
-    description: 'Attestation trust vectors breached. Secure signature failed.',
-    apps: ['com.invify.display']
-  }
-])
-
-// Auto-expand mock entries to simulate large virtual arrays
-for (let i = 5; i <= 65; i++) {
-  baseDevicesArray.value.push({
-    deviceId: `dev-node-${i.toString().padStart(3, '0')}`,
-    deviceName: `Virtual Aux Terminal ${i}`,
-    tenant: i % 2 === 0 ? 'tenant-alpha' : 'global',
-    agentCode: 'ag-241',
-    onlineState: i % 7 === 0 ? 'OFFLINE' : i % 5 === 0 ? 'DEGRADED' : 'ONLINE',
-    compliance: i % 7 === 0 ? '80%' : '100%',
-    integrity: i % 7 === 0 ? 'WARNING' : 'HEALTHY',
-    trustScore: i % 7 === 0 ? 75 : 98,
-    rolloutVersion: 'v2.4.1',
-    otaStatus: 'STABLE',
-    lastSeen: `${(i * 4) % 60}s ago`,
-    _lastSeenDate: new Date(Date.now() - (((i * 4) % 60) * 1000)),
-    battery: 100 - (i % 30),
-    networkState: 'WIFI_5G',
-    androidVersion: '13.0',
-    dotroidVersion: '4.2.0',
-    latitude: (6.5 + (Math.random() * 0.1)).toFixed(4),
-    longitude: (3.3 + (Math.random() * 0.1)).toFixed(4),
-    description: `Generated stream background row mapping sequence test ${i}.`,
-    apps: ['com.invify.kiosk']
-  })
-}
+// Base device entries
+const baseDevicesArray = ref([])
 
 // 3. Map URL routing filters to absolute view subsets dynamically
 const filteredDevices = computed(() => {
@@ -544,8 +433,8 @@ onMounted(async () => {
         apps: ['com.invify.invoice_app', 'io.flutter.app'],
         _lastSeenDate: d.last_seen ? new Date(d.last_seen) : new Date()
       }))
-      // Merge live targets directly atop static simulated background matrices
-      baseDevicesArray.value = [...realNodes, ...baseDevicesArray.value]
+      // Set live targets as the only devices
+      baseDevicesArray.value = realNodes
     }
   } catch (err) {
     console.warn('Real-time backend client registry sweep pending cluster stability verification.')

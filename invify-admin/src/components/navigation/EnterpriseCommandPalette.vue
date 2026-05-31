@@ -507,7 +507,32 @@ const rawItems = [
 
 // FINAL REFINEMENT #3: Perform strict runtime RBAC checking alongside user string indexing
 const rbacGatedItems = computed(() => {
-  return rawItems.filter(i => {
+  const dynamicRoutes = router.getRoutes()
+    .filter(r => r.meta && r.meta.title && r.path && !r.path.includes(':') && r.path !== '/')
+    .map((r, index) => {
+      return {
+        id: `dyn-${index}`,
+        label: r.meta.title,
+        description: `Navigate to ${r.meta.title} (${r.meta.workspace || 'System'})`,
+        route: r.path,
+        domain: r.meta.workspace || 'system',
+        icon: 'explore',
+        avatarBg: 'blue-grey-8',
+        avatarColor: 'white',
+        isCommand: false,
+        permission: r.meta.permission || null,
+        keywords: r.meta.title.toLowerCase().split(' ')
+      }
+    });
+
+  const combinedItems = [...rawItems];
+  dynamicRoutes.forEach(dynRoute => {
+    if (!combinedItems.find(i => i.route === dynRoute.route)) {
+      combinedItems.push(dynRoute);
+    }
+  });
+
+  return combinedItems.filter(i => {
     if (!i.permission) return true
     return currentUserPermissions.value.includes(i.permission)
   })

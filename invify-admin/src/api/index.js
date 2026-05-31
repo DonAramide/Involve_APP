@@ -46,6 +46,12 @@ export const adminApi = {
   updateUser: (id, data) => api.patch(`/admin/users/${id}`, data),
   sendInvite: (data) => api.post('/admin/invites', data),
   updateProfile: (data) => api.patch('/admin/profile', data),
+  getGlobalSettings: () => api.get('/admin/settings'),
+  updateGlobalSettings: (data) => api.patch('/admin/settings', data),
+  getUserDevices: (params) => api.get('/api/admin/user-devices', { params }),
+  approveUserDevice: (id) => api.post('/api/admin/user-devices/approve', { id }),
+  blockUserDevice: (id) => api.post('/api/admin/user-devices/block', { id }),
+  triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
 
   // Retention & Insights
   getRetentionSuggestion: () => api.get('/admin/retention/suggestion'),
@@ -111,5 +117,8 @@ export const posApi = {
     api.post('/admin/pos/kimono-params/refresh', { terminalId }),
 };
 
-export default api;
+export const searchApi = {
+  globalSearch: (q) => api.get(`/api/search?q=${encodeURIComponent(q)}`)
+};
 
+export default api;

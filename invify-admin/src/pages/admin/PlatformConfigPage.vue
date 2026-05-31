@@ -6,7 +6,7 @@
         <div class="text-subtitle1 text-grey-7">Manage Global Platform Settings & Policies</div>
       </div>
       <div>
-        <q-btn unelevated color="blue-6" icon="save" label="Save All Changes" />
+        <q-btn unelevated color="blue-6" icon="save" label="Save All Changes" @click="saveAllSettings" />
       </div>
     </div>
 
@@ -126,7 +126,9 @@
               <div class="col-12 col-md-6 column op-gap-16">
                 <q-toggle v-model="mockSettings.requireMFA" color="red-5" label="Enforce MFA for all Tenant Admins" dark />
                 <q-toggle v-model="mockSettings.strictIPBinding" color="blue-5" label="Strict Session IP Binding" dark />
+                <q-toggle v-model="mockSettings.enforceDeviceControl" color="red-5" label="Enforce Strict Device Fingerprint on Login" dark />
                 <q-input outlined dense dark type="number" v-model="mockSettings.sessionTimeout" label="Idle Session Timeout (Minutes)" />
+                <q-input outlined dense dark type="number" v-model="mockSettings.auditArchiveHours" label="Audit Trail Retention Limit (Hours)" />
               </div>
               <div class="col-12 col-md-6">
                 <q-banner rounded class="bg-red-10 text-red-2 border-critical">
@@ -194,6 +196,7 @@
 import { ref, onMounted, watch } from 'vue';
 import { useQuasar } from 'quasar';
 import { useCurrency } from '../../composables/useCurrency';
+import { adminApi } from '../../api';
 
 const $q = useQuasar();
 const { currentCurrency, setCurrency } = useCurrency();
@@ -208,7 +211,9 @@ const mockSettings = ref({
   sessionTimeout: 15,
   primaryColor: '#26A69A',
   logoUrl: 'https://cdn.invify.com/enterprise-logo.png',
-  hideInvifyWatermark: false
+  hideInvifyWatermark: false,
+  auditArchiveHours: 72,
+  enforceDeviceControl: false
 });
 
 const currencyColumns = [
@@ -228,7 +233,8 @@ const defaultCurrencies = [
 
 const currencyList = ref([]);
 
-onMounted(() => {
+onMounted(async () => {
+  await fetchSettings();
   const savedList = localStorage.getItem('platform_currencies_list');
   if (savedList) {
     currencyList.value = JSON.parse(savedList);
@@ -237,6 +243,56 @@ onMounted(() => {
     localStorage.setItem('platform_currencies_list', JSON.stringify(currencyList.value));
   }
 });
+
+async function fetchSettings() {
+  try {
+    const res = await adminApi.getGlobalSettings();
+    if (res.data) {
+      const data = res.data;
+      mockSettings.value.platformName = data.platform_name || data.platformName || mockSettings.value.platformName;
+      mockSettings.value.supportEmail = data.support_email || data.supportEmail || mockSettings.value.supportEmail;
+      mockSettings.value.timezone = data.timezone || mockSettings.value.timezone;
+      mockSettings.value.requireMFA = data.require_mfa !== undefined ? data.require_mfa : (data.requireMFA !== undefined ? data.requireMFA : mockSettings.value.requireMFA);
+      mockSettings.value.strictIPBinding = data.strict_ip_binding !== undefined ? data.strict_ip_binding : (data.strictIPBinding !== undefined ? data.strictIPBinding : mockSettings.value.strictIPBinding);
+      mockSettings.value.sessionTimeout = data.session_timeout !== undefined ? data.session_timeout : (data.sessionTimeout !== undefined ? data.sessionTimeout : mockSettings.value.sessionTimeout);
+      mockSettings.value.primaryColor = data.primary_color || data.primaryColor || mockSettings.value.primaryColor;
+      mockSettings.value.logoUrl = data.logo_url || data.logoUrl || mockSettings.value.logoUrl;
+      mockSettings.value.hideInvifyWatermark = data.hide_invify_watermark !== undefined ? data.hide_invify_watermark : (data.hideInvifyWatermark !== undefined ? data.hideInvifyWatermark : mockSettings.value.hideInvifyWatermark);
+      mockSettings.value.auditArchiveHours = data.audit_retention_hours !== undefined ? data.audit_retention_hours : (data.auditArchiveHours !== undefined ? data.auditArchiveHours : 72);
+      mockSettings.value.enforceDeviceControl = data.enforce_device_control !== undefined ? data.enforce_device_control : (data.enforceDeviceControl !== undefined ? data.enforceDeviceControl : false);
+    }
+  } catch (err) {
+    console.error('Failed to load global platform settings:', err);
+  }
+}
+
+async function saveAllSettings() {
+  try {
+    const payload = {
+      platform_name: mockSettings.value.platformName,
+      support_email: mockSettings.value.supportEmail,
+      timezone: mockSettings.value.timezone,
+      require_mfa: mockSettings.value.requireMFA,
+      strict_ip_binding: mockSettings.value.strictIPBinding,
+      session_timeout: Number(mockSettings.value.sessionTimeout),
+      primary_color: mockSettings.value.primaryColor,
+      logo_url: mockSettings.value.logoUrl,
+      hide_invify_watermark: mockSettings.value.hideInvifyWatermark,
+      audit_retention_hours: Number(mockSettings.value.auditArchiveHours),
+      enforce_device_control: mockSettings.value.enforceDeviceControl
+    };
+    await adminApi.updateGlobalSettings(payload);
+    $q.notify({
+      type: 'positive',
+      message: 'Global platform configuration saved successfully.'
+    });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to save global platform configuration: ' + (err.response?.data?.error || err.message)
+    });
+  }
+}
 
 const showAddCurrencyDialog = ref(false);
 const isEditing = ref(false);

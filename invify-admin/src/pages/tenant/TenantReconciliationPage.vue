@@ -1,8 +1,8 @@
 <!-- invify-admin/src/pages/tenant/TenantReconciliationPage.vue -->
 <template>
-  <q-page class="q-pa-lg text-white" style="background: #05070d; min-height: 100vh;">
-    
-    <!-- Top Header -->
+  <q-page class="q-pa-lg text-white relative-position" style="background: #05070d; min-height: 100vh;">
+    <SecureFinanceGate>
+      <!-- Top Header -->
     <div class="row items-center justify-between q-mb-xl">
       <div>
         <div class="row items-center op-gap-8 no-wrap">
@@ -98,12 +98,14 @@
       </q-table>
     </q-card>
 
+    </SecureFinanceGate>
   </q-page>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
+import SecureFinanceGate from '../../components/finance/SecureFinanceGate.vue'
 
 const $q = useQuasar()
 const auditing = ref(false)

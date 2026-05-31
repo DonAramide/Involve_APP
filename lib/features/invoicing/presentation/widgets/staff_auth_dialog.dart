@@ -7,6 +7,7 @@ import '../../../../features/settings/presentation/bloc/staff_bloc.dart';
 import '../../../../features/settings/presentation/bloc/staff_state.dart';
 import '../../../../features/settings/presentation/bloc/settings_bloc.dart';
 import '../../../../features/settings/presentation/bloc/settings_state.dart';
+import '../../../../core/services/biometric_service.dart';
 
 class StaffAuthDialog extends StatefulWidget {
   const StaffAuthDialog({super.key});
@@ -19,6 +20,46 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
   Staff? _selectedStaff;
   final _codeController = TextEditingController();
   String? _error;
+  bool _isBiometricAvailable = false;
+  final BiometricService _biometricService = BiometricService();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBiometrics();
+  }
+
+  Future<void> _checkBiometrics() async {
+    final available = await _biometricService.isBiometricAvailable();
+    if (mounted) {
+      setState(() {
+        _isBiometricAvailable = available;
+      });
+    }
+  }
+
+  Future<void> _handleBiometricAuth(List<Staff> staffList) async {
+    final session = await _biometricService.getSecureSession();
+    if (session == null || session['staffId'] == null) {
+      if (mounted) {
+        setState(() => _error = 'No biometric profile linked to a staff account yet. Please log in with PIN first.');
+      }
+      return;
+    }
+
+    final authenticated = await _biometricService.authenticate(reason: 'Verify identity to continue');
+    if (authenticated && mounted) {
+      final staffId = session['staffId'];
+      try {
+        final staff = staffList.firstWhere((s) => s.id == staffId);
+        final settingsBloc = context.read<SettingsBloc>();
+        settingsBloc.add(ResetFailedAttempts());
+        Navigator.pop(context, staff);
+      } catch (e) {
+        setState(() => _error = 'Linked staff profile no longer exists.');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +153,11 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
                     decoration: InputDecoration(
                       labelText: isLocked ? 'Unlock Code' : 'Enter 4-digit Key',
                       errorText: _error ?? (settingsState.error != null && isLocked ? settingsState.error : null),
+                      suffixIcon: (!_isBiometricAvailable || isLocked) ? null : IconButton(
+                        icon: const Icon(Icons.fingerprint, color: Colors.blue, size: 28),
+                        onPressed: () => _handleBiometricAuth(state.staffList),
+                        tooltip: 'Login with Biometrics',
+                      ),
                     ),
                     obscureText: !isLocked,
                     keyboardType: isLocked ? TextInputType.text : TextInputType.number,
@@ -160,6 +206,37 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
     if (_hash(pin) == _selectedStaff!.staffCode) {
       // Clear failed attempts on success
       settingsBloc.add(ResetFailedAttempts());
+
+      // Prompt to save biometric if available
+      if (_isBiometricAvailable) {
+        final session = await _biometricService.getSecureSession();
+        if (session == null || session['staffId'] != _selectedStaff!.id) {
+          final shouldEnroll = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Enable Biometrics?'),
+              content: const Text('Would you like to use FaceID/Fingerprint to login faster next time?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('LATER')),
+                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ENABLE')),
+              ],
+            ),
+          ) ?? false;
+
+          if (shouldEnroll) {
+            final authed = await _biometricService.authenticate(reason: 'Verify to link profile');
+            if (authed) {
+              await _biometricService.saveSecureSession(
+                token: 'offline_staff_auth',
+                role: 'staff',
+                tenantId: 'local',
+                staffId: _selectedStaff!.id,
+              );
+            }
+          }
+        }
+      }
+
       Navigator.pop(context, _selectedStaff);
     } else {
       // Record failed attempt in SettingsBloc

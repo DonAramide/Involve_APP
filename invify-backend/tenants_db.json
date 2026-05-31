@@ -69,13 +69,16 @@
   {
     "id": "tenant-1779640483822",
     "name": "My Business",
-    "type": "services",
+    "type": "retail",
     "plan": "standard",
     "status": "active",
     "agent_code": "AAA000",
     "location": "Lat: 6.6257, Lng: 3.4782",
-    "device_id": "PPR1.180610.011",
-    "created_at": "2026-05-24T16:34:43.822Z"
+    "device_id": "M1AJQ",
+    "created_at": "2026-05-24T16:34:43.822Z",
+    "support_phone": "",
+    "support_email": "",
+    "support_whatsapp": ""
   },
   {
     "id": "tenant-1779711092175",
@@ -86,6 +89,9 @@
     "agent_code": "AAA000",
     "location": "Lat: 6.6257, Lng: 3.4782",
     "device_id": "PPR1.180610.011",
-    "created_at": "2026-05-25T12:11:32.176Z"
+    "created_at": "2026-05-25T12:11:32.176Z",
+    "support_phone": "+234234811111111",
+    "support_email": "muyibitaliat12@gmail.com",
+    "support_whatsapp": "234234811111111"
   }
 ]
