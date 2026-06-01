@@ -56,6 +56,8 @@ import 'package:involve_app/features/admin/presentation/pages/system_setup_page.
 
 import 'package:involve_app/services/terminal_sync_service.dart';
 import '../widgets/notification_bell.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:involve_app/services/socket_service.dart' as import_socket_service;
 
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -73,12 +75,25 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _loadTerminalConfig();
-    if (widget.autoOpenSettings) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkEmergencyLock();
+      if (widget.autoOpenSettings) {
         _verifyAndNavigateToSettings(context);
-      });
-    }
+      }
+    });
     context.read<HistoryBloc>().add(LoadHistory());
+  }
+
+  Future<void> _checkEmergencyLock() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLocked = prefs.getBool('is_emergency_locked') ?? false;
+    final passcode = prefs.getString('emergency_lock_passcode');
+    
+    if (isLocked && passcode != null) {
+      if (mounted) {
+        import_socket_service.SocketService().showEmergencyLockScreen(context, passcode);
+      }
+    }
   }
 
   Future<void> _loadTerminalConfig() async {
