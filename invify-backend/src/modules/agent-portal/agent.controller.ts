@@ -14,6 +14,7 @@ export interface Agent {
   passportImage?: string; // base64 or url
   idCard?: string; // base64 or url
   kycStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  status: 'ACTIVE' | 'SUSPENDED';
   commissions: number;
   points: number;
   createdAt: Date;
@@ -32,6 +33,7 @@ const mockAgents: Agent[] = [
     whatsappNumber: '+2348000000000',
     address: '1 Master Admin Way',
     kycStatus: 'VERIFIED',
+    status: 'ACTIVE',
     commissions: 0,
     points: 0,
     createdAt: new Date()
@@ -72,6 +74,7 @@ export class AgentController {
         passportImage,
         idCard,
         kycStatus: 'PENDING',
+        status: 'ACTIVE',
         commissions: 0,
         points: 0,
         createdAt: new Date()
@@ -208,11 +211,92 @@ export class AgentController {
         phone: a.phone,
         whatsappNumber: a.whatsappNumber,
         kycStatus: a.kycStatus,
+        status: a.status,
         isFirstLogin: a.isFirstLogin,
         points: a.points,
         commissions: a.commissions
       }))
     });
+  }
+
+  static async getAgentProfile(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const agent = mockAgents.find(a => a.id === id);
+      if (!agent) {
+        return res.status(404).json({ success: false, message: 'Agent not found' });
+      }
+
+      // Mock tenants onboarded by this agent
+      const tenants = [
+        { id: `t-${id}-1`, businessName: 'Retail Fast', industry: 'Retail', status: 'ACTIVE', onboardedAt: new Date().toISOString() },
+        { id: `t-${id}-2`, businessName: 'Logistics Beta', industry: 'Logistics', status: 'ONBOARDING', onboardedAt: new Date().toISOString() }
+      ];
+
+      return res.status(200).json({
+        success: true,
+        agent,
+        tenants
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async updateAgentStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const agent = mockAgents.find(a => a.id === id);
+      if (!agent) {
+        return res.status(404).json({ success: false, message: 'Agent not found' });
+      }
+
+      if (status !== 'ACTIVE' && status !== 'SUSPENDED') {
+        return res.status(400).json({ success: false, message: 'Invalid status' });
+      }
+
+      agent.status = status;
+      return res.status(200).json({ success: true, message: `Agent status updated to ${status}`, agent });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async messageAgent(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+      const agent = mockAgents.find(a => a.id === id);
+      if (!agent) {
+        return res.status(404).json({ success: false, message: 'Agent not found' });
+      }
+      
+      // Simulate dispatching via WebSockets
+      console.log(`[Notification Engine] Direct Message to Agent ${agent.agentCode}: ${message}`);
+      
+      return res.status(200).json({ success: true, message: 'Message dispatched successfully' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async messageAgentTenants(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+      const agent = mockAgents.find(a => a.id === id);
+      if (!agent) {
+        return res.status(404).json({ success: false, message: 'Agent not found' });
+      }
+      
+      // Simulate broadcasting to tenants
+      console.log(`[Notification Engine] Broadcast to tenants of Agent ${agent.agentCode}: ${message}`);
+      
+      return res.status(200).json({ success: true, message: 'Broadcast dispatched to tenants successfully' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
   }
 
 }

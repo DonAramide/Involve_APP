@@ -111,8 +111,13 @@ app.patch('/admin/tenants/:id/status', authenticate, checkRole(['super_admin']),
 app.post('/admin/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);
 
 // Admin Agent Onboarding routes
-app.get('/admin/agents', authenticate, checkRole(['super_admin']), AgentController.listAgents);
-app.post('/admin/agents/onboard', authenticate, checkRole(['super_admin']), AgentController.onboardAgent);
+app.post('/admin/agents/onboard', authenticate, checkRole(['super_admin', 'admin']), AgentController.onboardAgent);
+app.get('/admin/agents', authenticate, checkRole(['super_admin', 'admin']), AgentController.listAgents);
+app.get('/admin/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AgentController.getAgentProfile);
+app.patch('/admin/agents/:id/status', authenticate, checkRole(['super_admin', 'admin']), AgentController.updateAgentStatus);
+app.post('/admin/agents/:id/message', authenticate, checkRole(['super_admin', 'admin']), AgentController.messageAgent);
+app.post('/admin/agents/:id/message-tenants', authenticate, checkRole(['super_admin', 'admin']), AgentController.messageAgentTenants);
+
 app.post('/admin/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
 
 // Agent Portal Routes
