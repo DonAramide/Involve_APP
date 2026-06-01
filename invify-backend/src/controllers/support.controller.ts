@@ -34,7 +34,7 @@ export class SupportController {
    */
   static async createComplaint(req: Request, res: Response) {
     try {
-      const { title, description, category, urgency, tenant_id, tenant_name, device_id } = req.body;
+      const { title, description, category, urgency, tenant_id, tenant_name, device_id, incident_date, attachment_url } = req.body;
       const newComplaint = {
         id: `comp-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         title,
@@ -45,6 +45,8 @@ export class SupportController {
         tenant_id: tenant_id || 'unknown',
         tenant_name: tenant_name || 'Unknown Tenant',
         device_id: device_id || null,
+        incident_date: incident_date || null,
+        attachment_url: attachment_url || null,
         created_at: new Date().toISOString()
       };
 
@@ -86,6 +88,34 @@ export class SupportController {
       return res.json({ success: true, data });
     } catch (err: any) {
       return res.json({ success: true, data: getLocalDB().complaints });
+    }
+  }
+
+  /**
+   * GET /api/mobile/complaints
+   * Get complaints for the specific tenant/device
+   */
+  static async getMobileComplaints(req: Request, res: Response) {
+    const tenantId = req.query.tenant_id as string;
+    const deviceId = req.query.device_id as string;
+    if (isOfflineMode()) {
+       const db = getLocalDB();
+       return res.json({ success: true, data: db.complaints.filter((c: any) => c.tenant_id === tenantId || c.device_id === deviceId) });
+    }
+    try {
+      let query = supabase.from('complaints').select('*').order('created_at', { ascending: false });
+      if (tenantId && deviceId) {
+        query = query.or(`tenant_id.eq.${tenantId},device_id.eq.${deviceId}`);
+      } else if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      } else if (deviceId) {
+        query = query.eq('device_id', deviceId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return res.json({ success: true, data });
+    } catch(err: any) {
+       return res.json({ success: true, data: getLocalDB().complaints.filter((c: any) => c.tenant_id === tenantId || c.device_id === deviceId) });
     }
   }
 

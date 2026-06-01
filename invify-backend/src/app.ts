@@ -303,6 +303,7 @@ app.post('/api/admin/audit/log', authenticate, async (req: Request, res: Respons
 
 // ─── SUPPORT & COMPLAINTS ROUTES ─────────────────────────────────────────────
 app.post('/api/mobile/complaints', SupportController.createComplaint);
+app.get('/api/mobile/complaints', SupportController.getMobileComplaints);
 app.get('/api/admin/complaints', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.listComplaints);
 app.patch('/api/admin/complaints/:id/status', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.updateComplaintStatus);
 
