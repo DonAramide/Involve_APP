@@ -281,7 +281,9 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { Notify } from 'quasar'
+import { useQuasar } from 'quasar'
+
+const $q = useQuasar()
 
 // Filter input states
 const searchQuery = ref('')
@@ -300,7 +302,7 @@ const loadMockData = () => {
     { appName: 'Legacy Logistics Sync', packageName: 'com.thirdparty.logisync', version: '0.9.1', signatureStatus: 'UNKNOWN', tenant: 'tenant-logistics-beta', deviceCount: 12, trustState: 'SUSPICIOUS', lastSeen: '1h ago', integrityState: 'DEGRADED', runtimeState: 'Suspended', rolloutChannel: 'Sideloaded', crashSpike: false, certHash: 'UNKNOWN_MISSING_CERTIFICATE', sideloadSafe: false, permissionSummary: 'Location (Background), Storage' },
     { appName: 'Rogue Cryptocurrency Miner', packageName: 'com.miner.hidden', version: '1.0.0', signatureStatus: 'INVALID', tenant: 'global', deviceCount: 3, trustState: 'BLOCKED', lastSeen: 'never', integrityState: 'COMPROMISED', runtimeState: 'Killed', rolloutChannel: 'Malware', crashSpike: true, certHash: 'f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2', sideloadSafe: false, permissionSummary: 'android.permission.SYSTEM_ALERT_WINDOW, Boot complete' },
   ]
-  Notify.create({ type: 'info', message: 'Injected 4 mock package records for UI validation.', position: 'top-right' })
+  $q.notify({ type: 'info', message: 'Injected 4 mock package records for UI validation.', position: 'top-right' })
 }
 
 const isFetchingLive = ref(false)
@@ -313,7 +315,7 @@ const fetchLiveData = () => {
       appName: 'Live Tracker Agent', packageName: 'com.invify.tracker.live', version: '3.0.0-rc1', signatureStatus: 'VERIFIED', tenant: 'global', deviceCount: 4120, trustState: 'TRUSTED', lastSeen: 'just now', integrityState: 'NOMINAL', runtimeState: 'Foreground', rolloutChannel: 'Canary', crashSpike: false, certHash: 'a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e', sideloadSafe: true, permissionSummary: 'Location (High Accuracy)'
     })
     isFetchingLive.value = false
-    Notify.create({ type: 'positive', message: 'Successfully fetched live fleet data stream.', position: 'top-right' })
+    $q.notify({ type: 'positive', message: 'Successfully fetched live fleet data stream.', position: 'top-right' })
   }, 1200)
 }
 
@@ -368,7 +370,7 @@ const getTrustIconColor = (state) => {
 const triggerAppDependencyRollback = (appObj) => {
   if (!appObj) return
 
-  Notify.create({
+  $q.notify({
     type: 'warning',
     message: `Auditable dependency-aware rollback payload emitted targeting package [${appObj.packageName}]`,
     position: 'bottom-right'
