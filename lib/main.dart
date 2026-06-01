@@ -460,7 +460,22 @@ class _InvolveAppState extends State<InvolveApp> {
   @override
   void initState() {
     super.initState();
-    _initSocket();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkEmergencyLock();
+      _initSocket();
+    });
+  }
+  
+  Future<void> _checkEmergencyLock() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isLocked = prefs.getBool('is_emergency_locked') ?? false;
+    final passcode = prefs.getString('emergency_lock_passcode');
+    
+    if (isLocked && passcode != null) {
+      if (_navigatorKey.currentContext != null) {
+        import_socket_service.SocketService().showEmergencyLockScreen(_navigatorKey.currentContext!, passcode);
+      }
+    }
   }
 
   Future<void> _initSocket() async {

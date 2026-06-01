@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:developer';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -44,10 +45,42 @@ class SocketService {
       }
     });
 
-    _socket!.on('app_broadcast', (data) {
+    _socket!.on('app_broadcast', (data) async {
       debugPrint('[SocketService] Broadcast received from server: $data');
       if (data != null && data['message'] != null) {
         _showBroadcastBanner(data['message']);
+        
+        // Save broadcast to history
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final historyStr = prefs.getString('broadcast_history') ?? '[]';
+          final List<dynamic> history = jsonDecode(historyStr);
+          history.insert(0, {
+            'message': data['message'],
+            'time': DateTime.now().toIso8601String(),
+            'read': false
+          });
+          await prefs.setString('broadcast_history', jsonEncode(history));
+          
+          // Optionally trigger an event here so the UI can update the badge
+        } catch (e) {
+          debugPrint('Error saving broadcast: $e');
+        }
+      }
+    });
+
+    _socket!.on('emergency_lock', (data) async {
+      debugPrint('[SocketService] Emergency Lock received: $data');
+      if (data != null && data['passcode'] != null) {
+        final passcode = data['passcode'].toString();
+        
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('emergency_lock_passcode', passcode);
+        await prefs.setBool('is_emergency_locked', true);
+        
+        if (navigatorKey?.currentContext != null) {
+          showEmergencyLockScreen(navigatorKey!.currentContext!, passcode);
+        }
       }
     });
 
@@ -144,6 +177,71 @@ class SocketService {
           },
         ),
       ),
+    );
+  }
+
+  void showEmergencyLockScreen(BuildContext context, String correctPasscode) {
+    // Pop any existing dialogs to force lock screen on top
+    while (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return PopScope(
+          canPop: false,
+          child: Scaffold(
+            backgroundColor: Colors.red[900],
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock_outline, size: 100, color: Colors.white),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'SYSTEM LOCKED',
+                      style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'This application has been locked by the administrator. Please contact enterprise support for the unlock passcode.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.white70),
+                    ),
+                    const SizedBox(height: 48),
+                    TextField(
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Enter 4-Digit Passcode',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      maxLength: 4,
+                      style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
+                      onChanged: (val) {
+                        if (val == correctPasscode) {
+                          SharedPreferences.getInstance().then((prefs) {
+                            prefs.setBool('is_emergency_locked', false);
+                            prefs.remove('emergency_lock_passcode');
+                          });
+                          Navigator.of(ctx).pop(); // Dismiss lock screen
+                          scaffoldMessengerKey.currentState?.showSnackBar(const SnackBar(content: Text('System Unlocked Successfully', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green));
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

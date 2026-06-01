@@ -307,6 +307,25 @@ app.get('/api/mobile/complaints', SupportController.getMobileComplaints);
 app.get('/api/admin/complaints', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.listComplaints);
 app.patch('/api/admin/complaints/:id/status', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.updateComplaintStatus);
 
+// ─── EMERGENCY APPLOCK ─────────────────────────────────────────────
+app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'internal_staff']), (req: Request, res: Response) => {
+  try {
+    const { tenant_id, passcode } = req.body;
+    if (!tenant_id || !passcode) {
+      return res.status(400).json({ success: false, message: 'Missing tenant_id or passcode' });
+    }
+    
+    // The `io` instance is created at the bottom of app.ts, so we can access it lazily
+    process.nextTick(() => {
+      io.to(`tenant:${tenant_id}`).emit('emergency_lock', { action: 'lock', passcode });
+    });
+    
+    return res.json({ success: true, message: 'Emergency lock signal broadcasted' });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // 3. 404 HANDLER
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Endpoint not found' });

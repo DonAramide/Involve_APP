@@ -55,6 +55,7 @@ import 'package:involve_app/features/invoicing/presentation/pages/customer_looku
 import 'package:involve_app/features/admin/presentation/pages/system_setup_page.dart';
 
 import 'package:involve_app/services/terminal_sync_service.dart';
+import '../widgets/notification_bell.dart';
 
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -152,6 +153,7 @@ class _DashboardPageState extends State<DashboardPage> {
             foregroundColor: Colors.white,
             centerTitle: false,
             actions: [
+              const NotificationBell(),
               if (settings?.showDateTime == true) const LiveDateTimeWidget(),
               const SizedBox(width: 4),
               if (settings?.showSyncStatus == true)
