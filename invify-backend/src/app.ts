@@ -45,11 +45,13 @@ import { PosController } from './controllers/pos.controller';
 import { TerminalController, terminalUploadMiddleware } from './controllers/terminal.controller';
 import { SearchController } from './controllers/search.controller';
 import { OrchestrationController } from './controllers/orchestration.controller';
+import { AgentController } from './modules/agent-portal/agent.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
 
 const app = express();
+
 const PORT = process.env.PORT || 3004;
 
 // 1. GLOBAL MIDDLEWARE
@@ -107,7 +109,16 @@ app.post('/admin/tenants', authenticate, checkRole(['super_admin']), AdminContro
 app.patch('/admin/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
 app.patch('/admin/tenants/:id/status', authenticate, checkRole(['super_admin']), AdminController.updateTenantStatus);
 app.post('/admin/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);
+
+// Admin Agent Onboarding routes
+app.get('/admin/agents', authenticate, checkRole(['super_admin']), AgentController.listAgents);
+app.post('/admin/agents/onboard', authenticate, checkRole(['super_admin']), AgentController.onboardAgent);
 app.post('/admin/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
+
+// Agent Portal Routes
+app.post('/api/agent/login', AgentController.login);
+app.post('/api/agent/change-password', AgentController.changePassword);
+app.get('/api/agent/dashboard', AgentController.getDashboard);
 
 // Orchestration Endpoints
 app.get('/api/orchestration/context', authenticate, checkRole(['super_admin']), OrchestrationController.getContext);
