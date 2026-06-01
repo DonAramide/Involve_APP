@@ -135,7 +135,10 @@ export class AdminController {
       }
       if (name) {
         const queryStr = String(name).toLowerCase();
-        data = data.filter(t => t.name.toLowerCase().includes(queryStr));
+        data = data.filter(t => 
+          t.name.toLowerCase().includes(queryStr) || 
+          (t as any).agent_code?.toLowerCase().includes(queryStr)
+        );
       }
       
       return res.status(200).json(data);
@@ -148,7 +151,7 @@ export class AdminController {
 
       if (type) query = query.eq('type', type);
       if (status) query = query.eq('status', status);
-      if (name) query = query.ilike('name', `%${name}%`);
+      if (name) query = query.or(`name.ilike.%${name}%,agent_code.ilike.%${name}%`);
 
       const { data, error } = await query.order('created_at', { ascending: false });
 
@@ -180,7 +183,10 @@ export class AdminController {
         }
         if (name) {
           const queryStr = String(name).toLowerCase();
-          fallbackData = fallbackData.filter(t => t.name.toLowerCase().includes(queryStr));
+          fallbackData = fallbackData.filter(t => 
+            t.name.toLowerCase().includes(queryStr) || 
+            (t as any).agent_code?.toLowerCase().includes(queryStr)
+          );
         }
         
         return res.status(200).json(fallbackData);

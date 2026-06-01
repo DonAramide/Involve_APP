@@ -131,6 +131,7 @@ import 'package:involve_app/features/dashboard/presentation/pages/about_page.dar
 import 'package:involve_app/features/help/presentation/pages/help_page.dart';
 import 'package:involve_app/features/school/presentation/pages/app_user_guide_page.dart';
 import 'package:involve_app/core/sync/presentation/pages/device_sync_page.dart';
+import 'package:involve_app/features/support/presentation/pages/complaint_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -716,6 +717,7 @@ class _InvolveAppState extends State<InvolveApp> {
               '/lesson_notes_list': (_) => const LessonNotesListPage(),
               '/about': (_) => const AboutPage(),
               '/help': (_) => const HelpPage(),
+              '/complaint': (_) => const ComplaintPage(),
               '/user_guide': (_) => const AppUserGuidePage(),
               '/device_sync': (_) => const DeviceSyncPage(),
             },

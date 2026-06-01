@@ -13,7 +13,10 @@
             impact="READ_ONLY: Primary operational record."
           />
         </h1>
-        <div class="text-muted">Manage business organizations and schools.</div>
+        <div class="text-muted row items-center">
+          Manage business organizations and schools.
+          <q-badge color="indigo-7" class="q-ml-sm">{{ rows.length }} Total</q-badge>
+        </div>
       </div>
       <div class="col-auto">
         <q-btn 
@@ -31,7 +34,7 @@
     <q-card class="bg-panel q-mb-lg shadow-2 border-indigo no-shadow">
       <q-card-section class="row q-col-gutter-md items-center">
         <div class="col-12 col-md-4">
-          <q-input v-model="filter.name" label="Search by Name" :dark="prefs.isDarkMode" filled dense @update:model-value="fetchTenants">
+          <q-input v-model="filter.name" label="Search by Name or Agent Code" :dark="prefs.isDarkMode" filled dense @update:model-value="fetchTenants">
             <template v-slot:append>
               <q-icon name="search" />
             </template>

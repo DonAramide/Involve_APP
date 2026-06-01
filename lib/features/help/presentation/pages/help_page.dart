@@ -143,6 +143,21 @@ class _HelpPageState extends State<HelpPage> {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           GestureDetector(
+            onTap: () {
+              Navigator.pushNamed(context, '/complaint');
+            },
+            child: const Card(
+              color: Color(0xFFFDE68A),
+              child: ListTile(
+                leading: Icon(Icons.support_agent, color: Colors.deepOrange),
+                title: Text('Submit Support Ticket', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                subtitle: Text('Report technical issues or account complaints directly.', style: TextStyle(color: Colors.deepOrange)),
+                trailing: Icon(Icons.arrow_forward_ios, color: Colors.deepOrange, size: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
             onTap: () async {
               final Uri emailUri = Uri.parse('mailto:info.iips.ng@gmail.com?subject=Support Request');
               if (await canLaunchUrl(emailUri)) {

@@ -60,7 +60,7 @@
     "name": "invify001",
     "type": "school",
     "plan": "standard",
-    "status": "active",
+    "status": "suspended",
     "created_at": "2026-05-23T06:13:55.715Z",
     "agent_code": "AAA001",
     "location": "Lagos, Nigeria",

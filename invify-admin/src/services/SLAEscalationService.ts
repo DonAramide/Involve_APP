@@ -28,7 +28,7 @@ class SLAEscalationEngine {
 
     // Trigger Notification
     NotificationEngine.dispatchNotification({
-      category: target.category,
+      category: target.category as any,
       priority: 'High',
       title: `SLA Escalation (Level ${target.escalationLevel})`,
       message: `SLA ${slaId} for ${target.entityType} has been escalated.`,

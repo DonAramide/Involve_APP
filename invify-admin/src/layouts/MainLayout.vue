@@ -796,6 +796,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Compliance Audits', path: `${tScope}/governance/compliance`, icon: 'fact_check', color: 'green-4', badge: '99.8%', badgeBg: 'green-10', badgeColor: 'green-3' },
         { label: 'Audit Trail Ledger', path: '/governance/audit-trail', icon: 'history_edu', color: 'blue-5' },
         { label: 'User Device Approvals', path: '/governance/user-devices', icon: 'phonelink_lock', color: 'red-4' },
+        { label: 'Enterprise Support Desk', path: '/governance/support', icon: 'headset_mic', color: 'amber-4', badge: 'TICKETS', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Policy Governance', path: '/governance/policy', icon: 'policy', color: 'indigo-3' },
         { label: 'Integrity Center', path: '/governance/integrity', icon: 'security', color: 'grey-4' },
         { label: 'Trust Scoring', path: '/governance/trust', icon: 'thumb_up', color: 'cyan-3' },

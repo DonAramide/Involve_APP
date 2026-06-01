@@ -1,0 +1,28 @@
+{
+  "complaints": [
+    {
+      "id": "comp-1001",
+      "title": "Terminal Not Connecting to Network",
+      "description": "My N3 terminal is showing connection timeout error since yesterday.",
+      "category": "technical",
+      "urgency": "high",
+      "status": "pending",
+      "tenant_id": "tenant-1779640483822",
+      "tenant_name": "My Business",
+      "device_id": "DSPREAD-POS-XM1AJQ",
+      "created_at": "2026-06-01T10:00:00Z"
+    },
+    {
+      "id": "comp-1002",
+      "title": "Missing settlement for yesterday",
+      "description": "I did 3 transactions yesterday but it hasn't reflected in my wallet balance.",
+      "category": "finance",
+      "urgency": "critical",
+      "status": "in_progress",
+      "tenant_id": "tenant-1779662125243",
+      "tenant_name": "myde",
+      "device_id": null,
+      "created_at": "2026-05-31T14:30:00Z"
+    }
+  ]
+}

@@ -105,6 +105,23 @@
   ],
   "audit_log": [
     {
+      "id": "audit-1780271271269-3xbzp",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "20330002",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "M1AJQ",
+      "admin_id": "M1AJQ",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": null,
+        "androidId": "M1AJQ",
+        "enrollmentKey": "NJBI-RCQB-F7GR-HL2X-25OU-Z4IM"
+      },
+      "created_at": "2026-05-31T23:47:51.269Z"
+    },
+    {
       "id": "audit-1780216749151-9ypyz",
       "action_type": "SYNC_SUCCESS",
       "terminal_id": "20330002",

@@ -231,7 +231,7 @@ class ApprovalEngineService {
       entityReference: newApproval.entityId,
       module: 'Approval Engine',
       category: 'Approvals',
-      priority: newApproval.priority || 'Medium',
+      priority: (newApproval.priority as 'Critical' | 'High' | 'Medium' | 'Low') || 'Medium',
       assignedTo: newApproval.checker || 'system'
     })
 
@@ -241,6 +241,15 @@ class ApprovalEngineService {
   updateStatus(approvalId: string, status: ApprovalRequest['status'], actor: string) {
     const target = this.approvals.value.find(a => a.approvalId === approvalId)
     if (target) {
+      // ── SECURITY GATE: Self-Approval Guard ────────────────────────────────
+      // DEFECT-001 Fix: A maker cannot approve their own request.
+      // This guard operates at the service layer — even direct API calls cannot bypass it.
+      if ((status === 'Approved' || status === 'Rejected') && actor === target.maker) {
+        console.error(`[ApprovalEngine] SELF-APPROVAL BLOCKED: Actor '${actor}' is the maker of ${approvalId}.`)
+        return { error: 'SELF_APPROVAL_FORBIDDEN', message: 'A maker cannot approve or reject their own request.' }
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       target.status = status
       const timestamp = new Date().toISOString()
       const ctx = this.getClientContext(actor)

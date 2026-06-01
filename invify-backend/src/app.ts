@@ -38,6 +38,7 @@ import { NotificationController } from './controllers/notification.controller';
 import { OTPController } from './controllers/otp.controller';
 import { AuthController } from './controllers/auth.controller';
 import { DeviceController } from './controllers/device.controller';
+import { SupportController } from './controllers/support.controller';
 import { LookupController } from './controllers/lookup.controller';
 import { CustomerController } from './controllers/customer.controller';
 import { PosController } from './controllers/pos.controller';
@@ -264,6 +265,47 @@ app.post('/api/notifications/read-all', authenticate, NotificationController.mar
 app.get('/api/finance/virtual-account/:studentId', authenticate, StudentController.getVirtualAccount);
 app.post('/api/finance/customer-virtual-account/:customerId', authenticate, CustomerController.getVirtualAccount);
 
+// ─── GOVERNANCE AUDIT LEDGER ROUTES ────────────────────────────────────────
+
+// GET /api/admin/audit/ledger  ─  Unified multi-source audit ledger
+app.get('/api/admin/audit/ledger', authenticate, checkRole(['super_admin', 'internal_staff']), async (req: Request, res: Response) => {
+  try {
+    const result = await GovAuditService.getLedger(req.query as any);
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/admin/audit/log  ─  Write a governance/maker-checker audit entry
+app.post('/api/admin/audit/log', authenticate, async (req: Request, res: Response) => {
+  try {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+    const user = (req as any).user || {};
+    await GovAuditService.logAction({
+      id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      module: req.body.module || 'GOVERNANCE',
+      action: req.body.action || 'UNKNOWN_ACTION',
+      user_email: user.email || req.body.user_email || 'unknown',
+      user_name: user.name || req.body.user_name || (user.email?.split('@')[0]?.toUpperCase() || 'Unknown'),
+      ip_address: ip,
+      location: req.body.location,
+      target: req.body.target || '-',
+      status: req.body.status || 'success',
+      metadata: req.body.metadata || {}
+    });
+    res.json({ success: true, message: 'Audit entry logged.' });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ─── SUPPORT & COMPLAINTS ROUTES ─────────────────────────────────────────────
+app.post('/api/mobile/complaints', SupportController.createComplaint);
+app.get('/api/admin/complaints', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.listComplaints);
+app.patch('/api/admin/complaints/:id/status', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.updateComplaintStatus);
+
 // 3. 404 HANDLER
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Endpoint not found' });
@@ -326,45 +368,11 @@ setTimeout(() => {
   try { GovAuditService.seedSampleLogs(); } catch {}
 }, 3000);
 
-// ─── GOVERNANCE AUDIT LEDGER ROUTES ─────────────────────────────────────────
-
-// GET /api/admin/audit/ledger  ─  Unified multi-source audit ledger
-app.get('/api/admin/audit/ledger', authenticate, checkRole(['super_admin', 'internal_staff']), async (req: Request, res: Response) => {
-  try {
-    const result = await GovAuditService.getLedger(req.query as any);
-    res.json({ success: true, ...result });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// POST /api/admin/audit/log  ─  Write a governance/maker-checker audit entry
-app.post('/api/admin/audit/log', authenticate, async (req: Request, res: Response) => {
-  try {
-    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
-    const user = (req as any).user || {};
-    await GovAuditService.logAction({
-      id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      timestamp: new Date().toISOString(),
-      module: req.body.module || 'GOVERNANCE',
-      action: req.body.action || 'UNKNOWN_ACTION',
-      user_email: user.email || req.body.user_email || 'unknown',
-      user_name: user.name || req.body.user_name || (user.email?.split('@')[0]?.toUpperCase() || 'Unknown'),
-      ip_address: ip,
-      location: req.body.location,
-      target: req.body.target || '-',
-      status: req.body.status || 'success',
-      metadata: req.body.metadata || {}
-    });
-    res.json({ success: true, message: 'Audit entry logged.' });
-  } catch (err: any) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-
-server.listen(PORT, () => {
-  console.log(`🚀 Invify SaaS (TS) running on port ${PORT} in ${process.env.NODE_ENV} mode`);
-});
+// Only bind to a port when NOT running inside Jest/Supertest
+if (process.env.NODE_ENV !== 'test') {
+  server.listen(PORT, () => {
+    console.log(`🚀 Invify SaaS (TS) running on port ${PORT} in ${process.env.NODE_ENV} mode`);
+  });
+}
 
 export default app;

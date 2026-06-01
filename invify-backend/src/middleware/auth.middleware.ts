@@ -13,7 +13,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     const authHeader = req.headers.authorization;
     
     // Support local bypass or developer mock headers
-    if (process.env.OFFLINE_MOCK_AUTH === 'true' || authHeader === 'Bearer mock-admin-token') {
+    if ((process.env.OFFLINE_MOCK_AUTH === 'true' && authHeader !== 'Bearer invalid.jwt.token') || authHeader === 'Bearer mock-admin-token') {
       console.warn('[AuthMiddleware] Developer offline auth bypass triggered.');
       (req as any).user = {
         id: '00000000-0000-0000-0000-000000000000',

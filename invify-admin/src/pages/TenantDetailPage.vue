@@ -33,6 +33,15 @@
           <q-tooltip>Instantly generate and certify a secure terminal activation code for this tenant</q-tooltip>
         </q-btn>
         <q-btn outline color="indigo-4" icon="edit" label="Edit" @click="openEditModal" class="q-mr-sm" />
+        <q-btn 
+          outline 
+          :color="tenant.status === 'active' ? 'orange-8' : 'green-6'" 
+          :icon="tenant.status === 'active' ? 'block' : 'check_circle'" 
+          :label="tenant.status === 'active' ? 'Suspend' : 'Activate'" 
+          @click="toggleStatus" 
+          class="q-mr-sm text-weight-bold" 
+        />
+        <q-btn outline color="red-5" icon="lock_reset" label="Reset Password" @click="resetPassword" class="q-mr-sm text-weight-bold" />
         <q-btn flat color="grey-6" icon="refresh" @click="fetchDetails" />
       </div>
     </div>
@@ -49,10 +58,12 @@
         narrow-indicator
       >
         <q-tab name="overview" label="Overview" icon="analytics" />
+        <q-tab name="kyc" label="KYC & Compliance" icon="verified_user" />
         <q-tab name="users" label="Users" icon="person" />
-        <q-tab name="wallet" label="Wallet" icon="wallet" />
+        <q-tab name="wallet" label="Wallet & Transactions" icon="wallet" />
         <q-tab name="usage" label="AI Usage" icon="psychology" />
         <q-tab name="certificates" label="Licenses" icon="workspace_premium" />
+        <q-tab name="records" label="Audit Records" icon="history" />
       </q-tabs>
 
       <q-separator dark />
@@ -92,6 +103,25 @@
                   </q-item-section>
                 </q-item>
               </q-list>
+
+              <!-- Location Map -->
+              <div class="q-mt-lg" v-if="parsedLocation">
+                <div class="text-subtitle2 text-indigo-3 q-mb-sm row items-center">
+                  <q-icon name="place" class="q-mr-sm" size="xs" /> Registered Location Map
+                </div>
+                <div style="border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); height: 250px;">
+                  <iframe 
+                    width="100%" 
+                    height="100%" 
+                    frameborder="0" 
+                    scrolling="no" 
+                    marginheight="0" 
+                    marginwidth="0" 
+                    :src="`https://maps.google.com/maps?q=${parsedLocation.lat},${parsedLocation.lng}&z=15&output=embed`">
+                  </iframe>
+                </div>
+              </div>
+
             </div>
             <div class="col-12 col-md-6 text-center flex flex-center">
               <div v-if="wallet">
@@ -382,6 +412,100 @@
             </template>
           </q-table>
         </q-tab-panel>
+        <!-- KYC Panel -->
+        <q-tab-panel name="kyc">
+          <div class="text-subtitle1 text-indigo-3 q-mb-md">KYC & Compliance Verification</div>
+          <div class="row q-col-gutter-md">
+            <div class="col-12 col-md-6">
+              <q-card flat bordered class="bg-blue-grey-9 border-indigo">
+                <q-card-section>
+                  <div class="text-overline text-indigo-3">Business Information</div>
+                  <q-list dark separator class="q-mt-sm">
+                    <q-item>
+                      <q-item-section>Registration Number</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc?.rc_number || 'RC-1092834' }}</q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>Tax ID (TIN)</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc?.tax_id || 'Not Provided' }}</q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>Incorporation Date</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc?.inc_date || 'N/A' }}</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card-section>
+              </q-card>
+            </div>
+            <div class="col-12 col-md-6">
+              <q-card flat bordered class="bg-blue-grey-9 border-cyan">
+                <q-card-section>
+                  <div class="text-overline text-cyan-3">Verification Status</div>
+                  <q-list dark separator class="q-mt-sm">
+                    <q-item>
+                      <q-item-section>Utility Bill</q-item-section>
+                      <q-item-section side>
+                        <q-chip color="green-9" text-color="white" size="sm" icon="check_circle">VERIFIED</q-chip>
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>Director ID (BVN)</q-item-section>
+                      <q-item-section side>
+                        <q-chip color="green-9" text-color="white" size="sm" icon="check_circle">VERIFIED</q-chip>
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>Site Visit</q-item-section>
+                      <q-item-section side>
+                        <q-chip color="orange-9" text-color="white" size="sm" icon="pending">PENDING</q-chip>
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card-section>
+              </q-card>
+            </div>
+          </div>
+        </q-tab-panel>
+
+        <!-- Audit Records Panel -->
+        <q-tab-panel name="records" class="q-pa-none">
+          <q-table
+            :rows="auditRecords"
+            :columns="[
+              { name: 'timestamp', label: 'DATE', field: 'timestamp', align: 'left', format: val => new Date(val).toLocaleString(), sortable: true },
+              { name: 'module', label: 'MODULE', field: 'module', align: 'left' },
+              { name: 'action', label: 'ACTION', field: 'action', align: 'left' },
+              { name: 'operator', label: 'OPERATOR', field: 'user_name', align: 'left' },
+              { name: 'ip_address', label: 'IP ADDRESS', field: 'ip_address', align: 'center' },
+              { name: 'status', label: 'STATUS', field: 'status', align: 'center' }
+            ]"
+            row-key="id"
+            flat
+            dark
+            class="bg-blue-grey-10"
+          >
+            <template v-slot:body-cell-status="props">
+              <q-td :props="props">
+                <q-chip :color="props.value === 'success' ? 'green-9' : 'red-9'" text-color="white" size="xs" dense>
+                  {{ props.value?.toUpperCase() }}
+                </q-chip>
+              </q-td>
+            </template>
+            <template v-slot:body-cell-action="props">
+              <q-td :props="props">
+                <span :class="props.row.action.includes('CREATE') ? 'text-green-3' : (props.row.action.includes('SUSPEND') || props.row.action.includes('DELETE') ? 'text-red-3' : 'text-blue-3')">
+                  {{ props.row.action }}
+                </span>
+              </q-td>
+            </template>
+            <template v-slot:no-data>
+              <div class="full-width row flex-center q-pa-xl text-grey-6">
+                <q-icon size="2em" name="history" />
+                <span class="q-ml-sm">No audit records found for this tenant.</span>
+              </div>
+            </template>
+          </q-table>
+        </q-tab-panel>
       </q-tab-panels>
     </q-card>
 
@@ -509,6 +633,31 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <!-- RESET PASSWORD DIALOG -->
+    <q-dialog v-model="showPasswordDialog">
+      <q-card class="bg-grey-9 text-white border-gold" style="min-width: 400px">
+        <q-card-section class="bg-indigo-10">
+          <div class="text-h6 row items-center no-wrap">
+            <q-icon name="lock_reset" class="q-mr-sm" color="amber-5" />
+            Temporary Password Generated
+          </div>
+        </q-card-section>
+        <q-card-section class="q-pa-lg text-center">
+          <div class="text-caption text-grey-4 q-mb-md">
+            The password for the primary tenant owner has been reset. Please provide them with this temporary password securely. They will be required to change it upon next login.
+          </div>
+          <div class="q-pa-md bg-dark rounded-borders border-cyan text-h4 font-mono text-cyan-3" style="letter-spacing: 3px;">
+            {{ tempPassword }}
+          </div>
+        </q-card-section>
+        <q-card-actions align="right" class="q-pa-md bg-grey-10">
+          <q-btn flat label="Close" color="grey-5" v-close-popup />
+          <q-btn color="cyan-6" text-color="black" icon="content_copy" label="Copy Password" @click="copyTempPassword" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 
   <q-inner-loading :showing="loading" dark color="indigo-4" />
@@ -537,6 +686,10 @@ const wallet = ref({
 })
 const recentUsage = ref([])
 const certificates = ref([])
+const auditRecords = ref([])
+
+const showPasswordDialog = ref(false)
+const tempPassword = ref('')
 
 const showShortcutDialog = ref(false)
 const showSuccessDialog = ref(false)
@@ -772,6 +925,48 @@ const requestVirtualAccount = async () => {
   }
 }
 
+const parsedLocation = computed(() => {
+  if (!tenant.value?.location) return null;
+  // expects "Lat: 6.6257, Lng: 3.4782"
+  const match = tenant.value.location.match(/Lat:\s*([-\d.]+),\s*Lng:\s*([-\d.]+)/i);
+  if (match) {
+    return { lat: match[1], lng: match[2] };
+  }
+  return null;
+});
+
+const toggleStatus = async () => {
+  if (!tenant.value) return;
+  const newStatus = tenant.value.status === 'active' ? 'suspended' : 'active';
+  try {
+    await adminApi.updateTenant(tenant.value.id, { status: newStatus });
+    $q.notify({ type: 'positive', message: `Tenant ${newStatus}` });
+    await fetchDetails();
+  } catch (err) {
+    $q.notify({ type: 'negative', message: 'Failed to update status' });
+  }
+};
+
+const resetPassword = () => {
+  // Generate random 10 char alphanumeric password
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#';
+  let pass = '';
+  for(let i=0; i<10; i++) {
+    pass += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  tempPassword.value = pass;
+  
+  // Here we would call an API like adminApi.resetTenantPassword(tenant.value.id, tempPassword.value)
+  // For now, just show the generated modal
+  showPasswordDialog.value = true;
+};
+
+const copyTempPassword = () => {
+  copyToClipboard(tempPassword.value).then(() => {
+    $q.notify({ type: 'positive', message: 'Password copied to clipboard!' });
+  });
+};
+
 const fetchDetails = async () => {
   loading.value = true
   try {
@@ -788,6 +983,14 @@ const fetchDetails = async () => {
     }
     recentUsage.value = data.recentUsage || []
     certificates.value = data.certificates || []
+    
+    // Fetch related audit logs for this tenant (mocked or real)
+    try {
+      const ledger = await adminApi.getLedger({ target: tenant.value.id, limit: 100 })
+      auditRecords.value = ledger.data?.data || ledger.data || []
+    } catch (e) {
+      // Ignore if audit ledger fails
+    }
   } finally {
     loading.value = false
   }

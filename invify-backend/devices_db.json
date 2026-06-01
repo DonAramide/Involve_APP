@@ -1,6 +1,18 @@
 {
   "devices": [
     {
+      "id": "dev-1780273208466",
+      "device_id": "unknown",
+      "device_suffix": "XXXXXX",
+      "tenant_id": "tenant-invi001",
+      "status": "active",
+      "last_seen": "2026-06-01T00:28:56.946Z",
+      "created_at": "2026-06-01T00:20:08.466Z",
+      "tenants": {
+        "plan": "standard"
+      }
+    },
+    {
       "id": "dev-1779516835718",
       "device_id": "PPR1.180610.011",
       "device_suffix": "610011",

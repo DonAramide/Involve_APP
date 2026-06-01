@@ -1,3 +1,196 @@
 {
-  "logs": []
+  "logs": [
+    {
+      "id": "gov-1780273738002-ylgcg",
+      "timestamp": "2026-06-01T00:28:58.002Z",
+      "module": "TEST",
+      "action": "TEST_ACTION",
+      "user_email": "superadmin@invify.app",
+      "user_name": "SUPERADMIN",
+      "ip_address": "::ffff:127.0.0.1",
+      "location": "Unknown Location",
+      "target": "-",
+      "status": "success",
+      "metadata": {}
+    },
+    {
+      "id": "gov-1780273691926-nyfv2",
+      "timestamp": "2026-06-01T00:28:11.926Z",
+      "module": "TEST",
+      "action": "TEST_ACTION",
+      "user_email": "superadmin@invify.app",
+      "user_name": "SUPERADMIN",
+      "ip_address": "::ffff:127.0.0.1",
+      "location": "Unknown Location",
+      "target": "-",
+      "status": "success",
+      "metadata": {}
+    },
+    {
+      "id": "gov-1780273409214-2pv8f",
+      "timestamp": "2026-06-01T00:23:29.214Z",
+      "module": "TEST",
+      "action": "TEST_ACTION",
+      "user_email": "superadmin@invify.app",
+      "user_name": "SUPERADMIN",
+      "ip_address": "::ffff:127.0.0.1",
+      "location": "Unknown Location",
+      "target": "-",
+      "status": "success",
+      "metadata": {}
+    },
+    {
+      "id": "gov-1780273269407-mzzdo",
+      "timestamp": "2026-06-01T00:21:09.407Z",
+      "module": "TEST",
+      "action": "TEST_ACTION",
+      "user_email": "superadmin@invify.app",
+      "user_name": "SUPERADMIN",
+      "ip_address": "::ffff:127.0.0.1",
+      "location": "Unknown Location",
+      "target": "-",
+      "status": "success",
+      "metadata": {}
+    },
+    {
+      "id": "gov-1780273206271-2qdft",
+      "timestamp": "2026-06-01T00:20:06.271Z",
+      "module": "TEST",
+      "action": "TEST_ACTION",
+      "user_email": "superadmin@invify.app",
+      "user_name": "SUPERADMIN",
+      "ip_address": "::ffff:127.0.0.1",
+      "location": "Unknown Location",
+      "target": "-",
+      "status": "success",
+      "metadata": {}
+    },
+    {
+      "id": "gov-log-001",
+      "timestamp": "2026-05-31T22:17:09.666Z",
+      "module": "MAKER_CHECKER",
+      "action": "APPROVAL_GRANTED",
+      "user_email": "superadmin@invify.app",
+      "user_name": "System Administrator",
+      "ip_address": "192.168.1.14",
+      "location": "Local Network",
+      "target": "TERMINAL_ASSIGNMENT:2215850F",
+      "status": "approved",
+      "metadata": {
+        "approvalId": "APR-2024-001",
+        "riskScore": 72
+      }
+    },
+    {
+      "id": "gov-log-002",
+      "timestamp": "2026-05-31T21:47:09.666Z",
+      "module": "AUTH",
+      "action": "LOGIN_SUCCESS",
+      "user_email": "ops@invify.app",
+      "user_name": "Operations Staff",
+      "ip_address": "192.168.1.20",
+      "location": "Local Network",
+      "target": "Admin Portal",
+      "status": "success",
+      "metadata": {
+        "role": "INTERNAL_STAFF",
+        "device": "Chrome/Windows"
+      }
+    },
+    {
+      "id": "gov-log-003",
+      "timestamp": "2026-05-31T20:32:09.666Z",
+      "module": "DEVICE",
+      "action": "DEVICE_BLOCKED",
+      "user_email": "superadmin@invify.app",
+      "user_name": "System Administrator",
+      "ip_address": "192.168.1.14",
+      "location": "Local Network",
+      "target": "dev-UNKN-003 (ops-staff@invify.app)",
+      "status": "blocked",
+      "metadata": {
+        "reason": "Unrecognized device flagged by security review"
+      }
+    },
+    {
+      "id": "gov-log-004",
+      "timestamp": "2026-05-31T19:32:09.666Z",
+      "module": "MAKER_CHECKER",
+      "action": "APPROVAL_REJECTED",
+      "user_email": "security@invify.app",
+      "user_name": "Security Lead",
+      "ip_address": "192.168.1.8",
+      "location": "Local Network",
+      "target": "BULK_PAYOUT_REQUEST:TXN-88811",
+      "status": "rejected",
+      "metadata": {
+        "approvalId": "APR-2024-002",
+        "reason": "Exceeds daily limit threshold"
+      }
+    },
+    {
+      "id": "gov-log-005",
+      "timestamp": "2026-05-31T17:32:09.666Z",
+      "module": "USER_MGMT",
+      "action": "USER_CREATED",
+      "user_email": "superadmin@invify.app",
+      "user_name": "System Administrator",
+      "ip_address": "192.168.1.14",
+      "location": "Local Network",
+      "target": "new-ops-staff@invify.app",
+      "status": "success",
+      "metadata": {
+        "role": "INTERNAL_STAFF",
+        "department": "Operations"
+      }
+    },
+    {
+      "id": "gov-log-006",
+      "timestamp": "2026-05-31T14:32:09.666Z",
+      "module": "SYSTEM",
+      "action": "AUDIT_ARCHIVE_RUN",
+      "user_email": "system@invify.internal",
+      "user_name": "Invify System",
+      "ip_address": "127.0.0.1",
+      "location": "Local Network",
+      "target": "archived_audit_logs.json",
+      "status": "success",
+      "metadata": {
+        "archivedCount": 47,
+        "retentionHours": 72
+      }
+    },
+    {
+      "id": "gov-log-007",
+      "timestamp": "2026-05-30T22:32:09.666Z",
+      "module": "GOVERNANCE",
+      "action": "POLICY_UPDATED",
+      "user_email": "superadmin@invify.app",
+      "user_name": "System Administrator",
+      "ip_address": "192.168.1.14",
+      "location": "Local Network",
+      "target": "AML_POLICY_V2",
+      "status": "success",
+      "metadata": {
+        "version": "2.1.0",
+        "changes": "Updated KYC threshold to ₦5,000,000"
+      }
+    },
+    {
+      "id": "gov-log-008",
+      "timestamp": "2026-05-30T10:32:09.666Z",
+      "module": "AUTH",
+      "action": "FAILED_LOGIN",
+      "user_email": "unknown@external.com",
+      "user_name": "Unknown",
+      "ip_address": "102.89.47.28",
+      "location": "Lagos, Lagos, Nigeria",
+      "target": "Admin Portal",
+      "status": "failed",
+      "metadata": {
+        "attempts": 3,
+        "blocked": false
+      }
+    }
+  ]
 }

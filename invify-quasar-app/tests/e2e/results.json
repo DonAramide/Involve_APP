@@ -1,0 +1,1086 @@
+{
+  "config": {
+    "configFile": "C:\\dev\\Involve_APP\\invify-quasar-app\\playwright.config.ts",
+    "rootDir": "C:/dev/Involve_APP/invify-quasar-app/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/dev/Involve_APP/invify-quasar-app/tests/e2e/evidence",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "C:/dev/Involve_APP/invify-quasar-app/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "tests/e2e/playwright-report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "tests/e2e/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "uat-scenarios.spec.ts",
+      "file": "uat-scenarios.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "UAT-FIN-01 | Finance — Transaction Ledger loads and displays entries",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3888,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:34:37.509Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-01-F-1d731--loads-and-displays-entries-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-01-F-1d731--loads-and-displays-entries-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-01-F-1d731--loads-and-displays-entries-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-31393fa7cc21e47302c5",
+          "file": "uat-scenarios.spec.ts",
+          "line": 30,
+          "column": 1
+        },
+        {
+          "title": "UAT-FIN-02 | Finance — Global Ledger page loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3324,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:34:41.753Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-02-Finance-—-Global-Ledger-page-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-02-Finance-—-Global-Ledger-page-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-02-Finance-—-Global-Ledger-page-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-3fb98ad997c1783d70de",
+          "file": "uat-scenarios.spec.ts",
+          "line": 43,
+          "column": 1
+        },
+        {
+          "title": "UAT-FIN-03 | Finance — Settlement page loads with batch status",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3032,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:34:45.286Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-03-F-254b2-age-loads-with-batch-status-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-03-F-254b2-age-loads-with-batch-status-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FIN-03-F-254b2-age-loads-with-batch-status-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-158b772c84600ecb2f82",
+          "file": "uat-scenarios.spec.ts",
+          "line": 56,
+          "column": 1
+        },
+        {
+          "title": "UAT-TRS-01 | Treasury — Wallet Management page loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2910,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:34:48.444Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-01-T-faa00-allet-Management-page-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-01-T-faa00-allet-Management-page-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-01-T-faa00-allet-Management-page-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-84ab2c3a8f77686ac075",
+          "file": "uat-scenarios.spec.ts",
+          "line": 68,
+          "column": 1
+        },
+        {
+          "title": "UAT-TRS-02 | Treasury — Revenue Engine page loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2973,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:34:51.456Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-02-T-cf2ea-—-Revenue-Engine-page-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-02-T-cf2ea-—-Revenue-Engine-page-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-02-T-cf2ea-—-Revenue-Engine-page-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-194f65ae6c048453206d",
+          "file": "uat-scenarios.spec.ts",
+          "line": 80,
+          "column": 1
+        },
+        {
+          "title": "UAT-TRS-03 | Treasury — Audit Lineage page loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2976,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:34:54.541Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-03-Treasury-—-Audit-Lineage-page-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-03-Treasury-—-Audit-Lineage-page-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-TRS-03-Treasury-—-Audit-Lineage-page-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-07625d70377a591404a5",
+          "file": "uat-scenarios.spec.ts",
+          "line": 92,
+          "column": 1
+        },
+        {
+          "title": "UAT-FRD-01 | Fraud — Fraud Monitoring Center loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3093,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:34:57.624Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-01-F-e70e5-aud-Monitoring-Center-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-01-F-e70e5-aud-Monitoring-Center-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-01-F-e70e5-aud-Monitoring-Center-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-6de574d670fa7d7dd456",
+          "file": "uat-scenarios.spec.ts",
+          "line": 104,
+          "column": 1
+        },
+        {
+          "title": "UAT-FRD-02 | Fraud — Case Management page loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2986,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:00.830Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-02-Fraud-—-Case-Management-page-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-02-Fraud-—-Case-Management-page-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-02-Fraud-—-Case-Management-page-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-e4ae18144355b29243ef",
+          "file": "uat-scenarios.spec.ts",
+          "line": 116,
+          "column": 1
+        },
+        {
+          "title": "UAT-FRD-03 | Fraud — Quarantine Center page loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3257,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:03.920Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-03-F-da257-uarantine-Center-page-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-03-F-da257-uarantine-Center-page-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-FRD-03-F-da257-uarantine-Center-page-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-55cdb7b3675a2c988baa",
+          "file": "uat-scenarios.spec.ts",
+          "line": 128,
+          "column": 1
+        },
+        {
+          "title": "UAT-CMP-01 | Compliance — Compliance Center loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4014,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:07.298Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-01-C-d0db1-e-—-Compliance-Center-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-01-C-d0db1-e-—-Compliance-Center-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-01-C-d0db1-e-—-Compliance-Center-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-e6a69bd39b5c36c8288f",
+          "file": "uat-scenarios.spec.ts",
+          "line": 140,
+          "column": 1
+        },
+        {
+          "title": "UAT-CMP-02 | Compliance — Policy Governance loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3961,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:11.480Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-02-C-56aff-e-—-Policy-Governance-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-02-C-56aff-e-—-Policy-Governance-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-02-C-56aff-e-—-Policy-Governance-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-aa130eb0cf42326e0dea",
+          "file": "uat-scenarios.spec.ts",
+          "line": 152,
+          "column": 1
+        },
+        {
+          "title": "UAT-CMP-03 | Compliance — Immutable Audit Lineage loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3773,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:15.614Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-03-C-51fe3-mutable-Audit-Lineage-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-03-C-51fe3-mutable-Audit-Lineage-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-CMP-03-C-51fe3-mutable-Audit-Lineage-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-b07d0c03216696435f63",
+          "file": "uat-scenarios.spec.ts",
+          "line": 164,
+          "column": 1
+        },
+        {
+          "title": "UAT-OPS-01 | Operations — Notification Center loads with entries",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3480,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:19.514Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-01-O-3501d-n-Center-loads-with-entries-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-01-O-3501d-n-Center-loads-with-entries-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-01-O-3501d-n-Center-loads-with-entries-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-f5fcecacf342fb34c79a",
+          "file": "uat-scenarios.spec.ts",
+          "line": 176,
+          "column": 1
+        },
+        {
+          "title": "UAT-OPS-02 | Operations — SLA Command Center loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3382,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:23.104Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-02-O-4353c--—-SLA-Command-Center-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-02-O-4353c--—-SLA-Command-Center-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-02-O-4353c--—-SLA-Command-Center-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-1bcfb293db32a09e478c",
+          "file": "uat-scenarios.spec.ts",
+          "line": 188,
+          "column": 1
+        },
+        {
+          "title": "UAT-OPS-03 | Operations — Workflow Automation Center loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3466,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:26.606Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-03-O-d1d0d-low-Automation-Center-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-03-O-d1d0d-low-Automation-Center-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-03-O-d1d0d-low-Automation-Center-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-c4456cf7b0f23dfdcf31",
+          "file": "uat-scenarios.spec.ts",
+          "line": 200,
+          "column": 1
+        },
+        {
+          "title": "UAT-OPS-04 | Operations — Governance Approval Engine loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3602,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:30.196Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-04-O-fbad7-nance-Approval-Engine-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-04-O-fbad7-nance-Approval-Engine-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-OPS-04-O-fbad7-nance-Approval-Engine-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-8993a6a33bfe4d72037b",
+          "file": "uat-scenarios.spec.ts",
+          "line": 212,
+          "column": 1
+        },
+        {
+          "title": "UAT-EXE-01 | Executive — Governance Command Center loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3493,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:33.914Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-01-E-9bbcd-rnance-Command-Center-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-01-E-9bbcd-rnance-Command-Center-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-01-E-9bbcd-rnance-Command-Center-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-ffa39fe0083b253d196e",
+          "file": "uat-scenarios.spec.ts",
+          "line": 227,
+          "column": 1
+        },
+        {
+          "title": "UAT-EXE-02 | Executive — Executive Command Center loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3709,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:37.522Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-02-E-6fb64-cutive-Command-Center-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-02-E-6fb64-cutive-Command-Center-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-02-E-6fb64-cutive-Command-Center-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-8effeb62047335bdb55d",
+          "file": "uat-scenarios.spec.ts",
+          "line": 239,
+          "column": 1
+        },
+        {
+          "title": "UAT-EXE-03 | Executive — AI Insights Center loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3832,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:41.348Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-03-E-83993--—-AI-Insights-Center-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-03-E-83993--—-AI-Insights-Center-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-03-E-83993--—-AI-Insights-Center-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-ec122c72f4dad4464291",
+          "file": "uat-scenarios.spec.ts",
+          "line": 251,
+          "column": 1
+        },
+        {
+          "title": "UAT-EXE-04 | Executive — Platform Integrity Center loads",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 30000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3858,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-06-01T00:35:45.302Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "screenshot",
+                      "contentType": "image/png",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-04-E-3a446-form-Integrity-Center-loads-chromium\\test-finished-1.png"
+                    },
+                    {
+                      "name": "video",
+                      "contentType": "video/webm",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-04-E-3a446-form-Integrity-Center-loads-chromium\\video.webm"
+                    },
+                    {
+                      "name": "trace",
+                      "contentType": "application/zip",
+                      "path": "C:\\dev\\Involve_APP\\invify-quasar-app\\tests\\e2e\\evidence\\uat-scenarios-UAT-EXE-04-E-3a446-form-Integrity-Center-loads-chromium\\trace.zip"
+                    }
+                  ]
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "06238d2afe1ad38ffcf1-bc351ca99a71f676d793",
+          "file": "uat-scenarios.spec.ts",
+          "line": 263,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-06-01T00:34:36.460Z",
+    "duration": 73327.433,
+    "expected": 20,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

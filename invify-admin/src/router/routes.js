@@ -158,6 +158,11 @@ const routes = [
         meta: { title: 'Governance Command Center', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
       },
       { 
+        path: 'governance/support', 
+        component: () => import('pages/governance/SupportDeskPage.vue'),
+        meta: { title: 'Enterprise Support Desk', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
+      },
+      { 
         path: 'tenant/:tenantId/governance/compliance', 
         component: () => import('pages/governance/ComplianceCenterPage.vue'),
         meta: { title: 'Tenant Compliance Scope', workspace: 'governance', permission: 'read_governance', requireTenantScope: true, requiresAuth: true }

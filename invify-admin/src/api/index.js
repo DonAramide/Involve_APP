@@ -53,6 +53,10 @@ export const adminApi = {
   blockUserDevice: (id) => api.post('/api/admin/user-devices/block', { id }),
   triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
 
+  // Support & Complaints
+  getComplaints: () => api.get('/admin/complaints'),
+  updateComplaintStatus: (id, status) => api.patch(`/admin/complaints/${id}/status`, { status }),
+
   // Retention & Insights
   getRetentionSuggestion: () => api.get('/admin/retention/suggestion'),
   getAtRisk: () => api.get('/admin/retention/at-risk'),

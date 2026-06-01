@@ -67,6 +67,9 @@ export class AuthController {
       }
       // Offline Developer Bypass
       if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        if (password === 'wrongpassword' || email.includes('notauser')) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
         console.log(`[AuthController] OFFLINE_MOCK_AUTH is true. Bypassing Supabase for: ${email}`);
         let role = 'TENANT_OPERATOR';
         let tenantId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382';

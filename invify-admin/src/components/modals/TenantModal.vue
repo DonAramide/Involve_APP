@@ -57,6 +57,21 @@
           >
             <q-card class="bg-blue-grey-10">
               <q-card-section class="q-gutter-sm">
+                <q-select
+                  v-model="selectedAgent"
+                  :options="agentOptions"
+                  label="Select Support Agent"
+                  dark filled dense
+                  class="q-mb-sm"
+                  @update:model-value="onAgentSelected"
+                >
+                  <template v-slot:no-option>
+                    <q-item>
+                      <q-item-section class="text-grey">No agents available</q-item-section>
+                    </q-item>
+                  </template>
+                </q-select>
+
                 <q-input 
                   v-model="form.support_phone" 
                   label="Agent Phone" 
@@ -98,6 +113,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useDialogPluginComponent } from 'quasar'
+import { adminApi } from '../../api'
 
 const props = defineProps({
   tenant: { type: Object, default: null },
@@ -109,6 +125,9 @@ defineEmits([...useDialogPluginComponent.emits])
 const { dialogRef, onDialogHide, onDialogOK } = useDialogPluginComponent()
 
 const loading = ref(false)
+const agentOptions = ref([])
+const selectedAgent = ref(null)
+
 const form = ref({
   name: '',
   type: 'school',
@@ -119,11 +138,30 @@ const form = ref({
   support_whatsapp: ''
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (props.isEdit && props.tenant) {
     form.value = { ...props.tenant }
   }
+
+  try {
+    const { data } = await adminApi.getUsers();
+    agentOptions.value = (data.data || data || []).map(u => ({
+      label: `${u.full_name || u.email} (${u.role})`,
+      value: u.id,
+      user: u
+    }));
+  } catch (err) {
+    console.warn('Failed to fetch agents for dropdown', err);
+  }
 })
+
+const onAgentSelected = (opt) => {
+  if (opt && opt.user) {
+    form.value.support_phone = opt.user.phone || ''
+    form.value.support_email = opt.user.email || ''
+    form.value.support_whatsapp = opt.user.phone || ''
+  }
+}
 
 const onSubmit = () => {
   loading.value = true
