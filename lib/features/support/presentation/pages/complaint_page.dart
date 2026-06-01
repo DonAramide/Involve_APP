@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../data/support_service.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../settings/presentation/bloc/settings_bloc.dart';
 
 class ComplaintPage extends StatefulWidget {
   const ComplaintPage({Key? key}) : super(key: key);
@@ -35,7 +37,10 @@ class _ComplaintPageState extends State<ComplaintPage> {
 
   Future<void> _fetchIssues() async {
     setState(() => _isLoadingIssues = true);
-    final issues = await _supportService.getComplaints();
+    final settings = context.read<SettingsBloc>().state.settings;
+    final fallbackId = settings?.organizationName.replaceAll(' ', '-').toLowerCase() ?? 'unknown-tenant';
+    
+    final issues = await _supportService.getComplaints(fallbackTenantId: fallbackId);
     setState(() {
       _myIssues = issues;
       _isLoadingIssues = false;
@@ -47,6 +52,10 @@ class _ComplaintPageState extends State<ComplaintPage> {
 
     setState(() => _isSubmitting = true);
     
+    final settings = context.read<SettingsBloc>().state.settings;
+    final fallbackName = settings?.organizationName;
+    final fallbackId = settings?.organizationName.replaceAll(' ', '-').toLowerCase();
+    
     final success = await _supportService.submitComplaint(
       title: _titleController.text,
       description: _descController.text,
@@ -55,6 +64,8 @@ class _ComplaintPageState extends State<ComplaintPage> {
       incidentDate: _incidentDate != null ? "${_incidentDate!.year}-${_incidentDate!.month.toString().padLeft(2, '0')}-${_incidentDate!.day.toString().padLeft(2, '0')}" : null,
       incidentTime: _incidentTime != null ? "${_incidentTime!.hour.toString().padLeft(2, '0')}:${_incidentTime!.minute.toString().padLeft(2, '0')}" : null,
       attachmentPath: _attachmentPath,
+      fallbackTenantName: fallbackName,
+      fallbackTenantId: fallbackId,
     );
     
     setState(() => _isSubmitting = false);

@@ -15,11 +15,15 @@ class SupportService {
     String? incidentDate,
     String? incidentTime,
     String? attachmentPath,
+    String? fallbackTenantName,
+    String? fallbackTenantId,
   }) async {
     try {
       final config = await TerminalSyncService.loadCachedConfig();
-      final tenantId = config?.tenantId ?? await SecurityService().getTenantId();
-      final tenantName = config?.businessName ?? 'Mobile App User';
+      String tenantId = config?.tenantId ?? await SecurityService().getTenantId();
+      if (tenantId.isEmpty) tenantId = fallbackTenantId ?? 'unknown-tenant';
+      
+      final tenantName = config?.businessName ?? fallbackTenantName ?? 'Mobile App User';
       final deviceId = config?.posSerialNumber ?? await SecurityService().getPersistentDeviceId();
 
       final response = await http.post(
@@ -45,10 +49,11 @@ class SupportService {
     }
   }
 
-  Future<List<dynamic>> getComplaints() async {
+  Future<List<dynamic>> getComplaints({String? fallbackTenantId}) async {
     try {
       final config = await TerminalSyncService.loadCachedConfig();
-      final tenantId = config?.tenantId ?? await SecurityService().getTenantId();
+      String tenantId = config?.tenantId ?? await SecurityService().getTenantId();
+      if (tenantId.isEmpty) tenantId = fallbackTenantId ?? 'unknown-tenant';
       final deviceId = config?.posSerialNumber ?? await SecurityService().getPersistentDeviceId();
       
       final queryParams = [];
