@@ -168,7 +168,6 @@ class _DashboardPageState extends State<DashboardPage> {
             foregroundColor: Colors.white,
             centerTitle: false,
             actions: [
-              const NotificationBell(),
               if (settings?.showDateTime == true) const LiveDateTimeWidget(),
               const SizedBox(width: 4),
               if (settings?.showSyncStatus == true)
@@ -248,6 +247,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   );
                 },
               ),
+              const NotificationBell(),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert),
                 onSelected: (value) {
