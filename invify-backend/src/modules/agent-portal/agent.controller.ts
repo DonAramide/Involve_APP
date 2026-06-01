@@ -7,7 +7,9 @@ export interface Agent {
   passwordHash: string; // Storing plain mock passwords for simplicity in prototype
   isFirstLogin: boolean;
   name: string;
+  email?: string;
   phone?: string;
+  whatsappNumber?: string;
   address?: string;
   passportImage?: string; // base64 or url
   idCard?: string; // base64 or url
@@ -25,7 +27,9 @@ const mockAgents: Agent[] = [
     passwordHash: 'AAA000',
     isFirstLogin: true,
     name: 'Master Setup Agent',
+    email: 'master@invify.app',
     phone: '+2348000000000',
+    whatsappNumber: '+2348000000000',
     address: '1 Master Admin Way',
     kycStatus: 'VERIFIED',
     commissions: 0,
@@ -45,10 +49,10 @@ export class AgentController {
    */
   static async onboardAgent(req: Request, res: Response) {
     try {
-      const { agentCode, name, phone, address, passportImage, idCard } = req.body;
+      const { agentCode, name, email, phone, whatsappNumber, address, passportImage, idCard } = req.body;
       
-      if (!agentCode || !name) {
-        return res.status(400).json({ success: false, message: 'Agent code and name are required' });
+      if (!agentCode || !name || !email) {
+        return res.status(400).json({ success: false, message: 'Agent code, name, and email are required' });
       }
 
       if (mockAgents.find(a => a.agentCode === agentCode)) {
@@ -61,7 +65,9 @@ export class AgentController {
         passwordHash: agentCode, // Default password is the code
         isFirstLogin: true,
         name,
+        email,
         phone,
+        whatsappNumber,
         address,
         passportImage,
         idCard,
@@ -198,7 +204,9 @@ export class AgentController {
         id: a.id,
         agentCode: a.agentCode,
         name: a.name,
+        email: a.email,
         phone: a.phone,
+        whatsappNumber: a.whatsappNumber,
         kycStatus: a.kycStatus,
         isFirstLogin: a.isFirstLogin,
         points: a.points,
