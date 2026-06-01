@@ -78,7 +78,9 @@
     "created_at": "2026-05-24T16:34:43.822Z",
     "support_phone": "",
     "support_email": "",
-    "support_whatsapp": ""
+    "support_whatsapp": "",
+    "emergency_lock_code": "ZCSSTA",
+    "is_emergency_locked": true
   },
   {
     "id": "tenant-1779711092175",
