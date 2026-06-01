@@ -488,20 +488,20 @@ class _InvolveAppState extends State<InvolveApp> {
     
     final deviceId = await DeviceInfoService.getDeviceSuffix();
     
-    // If the cached config lacks the new tenant fields, sync seamlessly in the background
-    if (config != null && config.tenantId == null) {
+    // If the cached config lacks the new tenant fields or is entirely null, sync seamlessly in the background
+    if (config == null || config.tenantId == null) {
       try {
-        debugPrint('[Socket Initialization] Config has null tenantId. Triggering background sync with businessName: ${config.businessName}');
+        debugPrint('[Socket Initialization] Config is null or lacks tenantId. Triggering background sync...');
         config = await TerminalSyncService.syncTerminalConfig(
           deviceId: deviceId,
-          businessName: config.businessName, // Pass businessName so the backend can fallback to mapping via tenants_db.json
+          businessName: config?.businessName, // Pass businessName so the backend can fallback to mapping via tenants_db.json
         );
         debugPrint('[Socket Initialization] Background sync complete. New tenantId: ${config?.tenantId}, plan: ${config?.plan}, type: ${config?.type}');
       } catch (e) {
         debugPrint('[Socket Initialization] Background sync failed: $e');
       }
     } else {
-      debugPrint('[Socket Initialization] Using cached config. tenantId: ${config?.tenantId}, plan: ${config?.plan}, type: ${config?.type}');
+      debugPrint('[Socket Initialization] Using cached config. tenantId: ${config.tenantId}, plan: ${config.plan}, type: ${config.type}');
     }
 
     // Attempt to connect immediately with cached or updated details
