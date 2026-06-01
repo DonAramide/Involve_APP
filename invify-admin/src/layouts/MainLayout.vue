@@ -224,6 +224,12 @@
             </template>
             <q-list :dark="prefs.isDarkMode" class="bg-panel text-caption">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs">Backend Continuity Sync</q-item-label>
+              
+              <q-item clickable v-close-popup @click="showUserProfile = true" class="hover-bg">
+                <q-item-section avatar><q-icon name="account_circle" size="xs" color="purple-4" /></q-item-section>
+                <q-item-section class="text-white">View My Profile</q-item-section>
+              </q-item>
+              
               <q-item clickable v-close-popup @click="fetchPreferencesFromBackend" class="hover-bg">
                 <q-item-section avatar><q-icon name="cloud_download" size="xs" color="blue-5" /></q-item-section>
                 <q-item-section class="text-white">Pull Cloud Profile Context</q-item-section>
@@ -479,6 +485,52 @@
       </q-card>
     </q-dialog>
 
+    <!-- User Profile Modal -->
+    <q-dialog v-model="showUserProfile">
+      <q-card style="min-width: 350px" class="bg-blue-grey-10 text-white">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">My Profile</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        
+        <q-card-section class="text-center q-pt-lg">
+          <q-avatar size="80px" color="primary" text-color="white" class="q-mb-md">
+            {{ operatorEmail ? operatorEmail.charAt(0).toUpperCase() : 'U' }}
+          </q-avatar>
+          <div class="text-h6">{{ operatorEmail }}</div>
+          <div class="text-subtitle1 text-grey-4">{{ getRoleLabel(operatorRole) }}</div>
+        </q-card-section>
+        
+        <q-card-section>
+          <q-list dark bordered separator class="rounded-borders">
+            <q-item>
+              <q-item-section avatar>
+                <q-icon name="badge" color="blue-3" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>Access Role</q-item-label>
+                <q-item-label caption class="text-grey-4">{{ operatorRole }}</q-item-label>
+              </q-item-section>
+            </q-item>
+            <q-item>
+              <q-item-section avatar>
+                <q-icon name="verified_user" color="green-4" />
+              </q-item-section>
+              <q-item-section>
+                <q-item-label>Status</q-item-label>
+                <q-item-label caption class="text-grey-4">Active Session</q-item-label>
+              </q-item-section>
+            </q-item>
+          </q-list>
+        </q-card-section>
+        
+        <q-card-actions align="center" class="q-pa-md">
+          <q-btn color="primary" label="Close" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-layout>
 </template>
 
@@ -504,6 +556,7 @@ const $q = useQuasar()
 
 // New State for Modals
 const isSearchOpen = ref(false)
+const showUserProfile = ref(false)
 const isAlertDrawerOpen = ref(false)
 const systemAlertCount = ref(0)
 const hasCriticalAlerts = ref(false)

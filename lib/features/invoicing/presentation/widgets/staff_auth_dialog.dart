@@ -230,7 +230,7 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
                 token: 'offline_staff_auth',
                 role: 'staff',
                 tenantId: 'local',
-                staffId: _selectedStaff!.id,
+                staffId: _selectedStaff!.id.toString(),
               );
             }
           }

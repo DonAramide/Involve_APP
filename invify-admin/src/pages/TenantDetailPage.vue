@@ -117,7 +117,7 @@
                     scrolling="no" 
                     marginheight="0" 
                     marginwidth="0" 
-                    :src="`https://maps.google.com/maps?q=${parsedLocation.lat},${parsedLocation.lng}&z=15&output=embed`">
+                    :src="`https://maps.google.com/maps?q=${parsedLocation.query}&z=15&output=embed`">
                   </iframe>
                 </div>
               </div>
@@ -926,13 +926,13 @@ const requestVirtualAccount = async () => {
 }
 
 const parsedLocation = computed(() => {
-  if (!tenant.value?.location) return null;
+  if (!tenant.value?.location || tenant.value.location === 'N/A') return null;
   // expects "Lat: 6.6257, Lng: 3.4782"
   const match = tenant.value.location.match(/Lat:\s*([-\d.]+),\s*Lng:\s*([-\d.]+)/i);
   if (match) {
-    return { lat: match[1], lng: match[2] };
+    return { query: `${match[1]},${match[2]}` };
   }
-  return null;
+  return { query: encodeURIComponent(tenant.value.location) };
 });
 
 const toggleStatus = async () => {
