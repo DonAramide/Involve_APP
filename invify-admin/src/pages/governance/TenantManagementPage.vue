@@ -117,17 +117,6 @@
               >
                 <q-tooltip class="bg-black text-purple-2 text-caption">Grant temporary 15m dual-attribution override context</q-tooltip>
               </q-btn>
-              <q-btn
-                dense
-                flat
-                size="xs"
-                color="red-5"
-                icon="lock"
-                class="bg-red-focus q-px-xs text-weight-bold text-metric-sm border-purple-muted q-ml-sm"
-                @click="triggerEmergencyLock(t)"
-              >
-                <q-tooltip class="bg-black text-red-2 text-caption">Emergency App Lock</q-tooltip>
-              </q-btn>
             </div>
           </q-item>
         </q-list>
@@ -246,30 +235,6 @@ const promptImpersonationHandshake = (tenantNode) => {
   targetTenantRecord.value = tenantNode
   auditReasonInput.value = ''
   openImpersonateDialog.value = true
-}
-
-const triggerEmergencyLock = (tenantNode) => {
-  const passcode = Math.floor(1000 + Math.random() * 9000).toString()
-  $q.dialog({
-    title: 'Emergency Lock',
-    message: `Are you sure you want to trigger an emergency lock for ${tenantNode.name}?<br><br>The new unlock passcode will be: <strong class="text-h6">${passcode}</strong>.<br><br>Please save this code before proceeding!`,
-    html: true,
-    cancel: true,
-    persistent: true,
-    color: 'red-9'
-  }).onOk(async () => {
-    try {
-      await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/admin/emergency-lock', {
-        tenant_id: tenantNode.id,
-        passcode: passcode
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
-      })
-      $q.notify({ type: 'positive', message: 'Emergency lock broadcasted successfully to all devices.' })
-    } catch (e) {
-      $q.notify({ type: 'negative', message: 'Failed to broadcast emergency lock.' })
-    }
-  })
 }
 
 const executeImpersonationHandshake = async () => {

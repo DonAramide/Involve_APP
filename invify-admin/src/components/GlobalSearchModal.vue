@@ -23,7 +23,21 @@
         <div v-if="!searchQuery" class="q-pa-lg text-center text-muted font-mono">
           <q-icon name="manage_search" size="xl" class="q-mb-md opacity-50" />
           <div class="text-subtitle1">Global Smart Search</div>
-          <div class="text-caption">Type an exact ID (e.g., CAS-2026-881) to instantly open the investigation drawer, or search for names.</div>
+          <div class="text-caption q-mb-lg">Type an exact ID (e.g., CAS-2026-881) to instantly open the investigation drawer, or search for names.</div>
+          
+          <div v-if="searchHistory.length > 0" class="text-left">
+            <div class="text-caption text-indigo-3 q-mb-sm">Recent Searches:</div>
+            <q-list dark dense class="font-mono text-caption">
+              <q-item v-for="(history, index) in searchHistory" :key="index" clickable v-ripple class="rounded-borders hover-bg q-mb-xs" @click="searchQuery = history; onInput(history)">
+                <q-item-section avatar style="min-width: 32px">
+                  <q-icon name="history" size="xs" color="grey-6" />
+                </q-item-section>
+                <q-item-section>
+                  <q-item-label class="text-grey-4">{{ history }}</q-item-label>
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
         </div>
 
         <div v-else-if="isLoading" class="q-pa-lg flex flex-center">
@@ -82,6 +96,7 @@ const isOpen = computed({
 const searchQuery = ref('')
 const isLoading = ref(false)
 const results = ref([])
+const searchHistory = ref([])
 
 let searchTimeout = null
 
@@ -180,11 +195,16 @@ const onInput = (val) => {
 }
 
 const handleSelect = (result) => {
+  if (searchQuery.value && !searchHistory.value.includes(searchQuery.value)) {
+    searchHistory.value.unshift(searchQuery.value)
+    if (searchHistory.value.length > 5) searchHistory.value.pop()
+    localStorage.setItem('invify_search_history', JSON.stringify(searchHistory.value))
+  }
+
   isOpen.value = false
   searchQuery.value = ''
   if (result.route) {
     router.push(result.route)
-    // In a real implementation, you would also pass the ID via query params or a global state store to automatically open the drawer on the target page.
   }
 }
 
@@ -198,6 +218,14 @@ const handleKeydown = (e) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
+  try {
+    const history = localStorage.getItem('invify_search_history')
+    if (history) {
+      searchHistory.value = JSON.parse(history)
+    }
+  } catch (e) {
+    console.error('Failed to parse search history', e)
+  }
 })
 
 onUnmounted(() => {

@@ -135,7 +135,7 @@ const routes = [
       { 
         path: 'governance/tenants-elevation', 
         component: () => import('pages/governance/TenantManagementPage.vue'),
-        meta: { title: 'Tenants Access & Elevation', workspace: 'governance', permission: 'read_governance', requiresAuth: true }
+        meta: { title: 'Tenants Access & Elevation', keywords: ['Tenant Management Page', 'Tenants', 'Identity Matrix'], workspace: 'governance', permission: 'read_governance', requiresAuth: true }
       },
       { 
         path: 'governance/audit-trail', 

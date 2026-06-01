@@ -6,7 +6,7 @@
       "description": "I lovet this ",
       "category": "finance",
       "urgency": "critical",
-      "status": "pending",
+      "status": "resolved",
       "tenant_id": "tenant-1779640483822",
       "tenant_name": "My Business",
       "device_id": "VM3041056610_Android",
