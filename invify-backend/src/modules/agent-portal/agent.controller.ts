@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
+import { io } from '../../app';
 
 const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
 
@@ -330,6 +331,16 @@ export class AgentController {
       console.log(`TARGET COUNT: ${agentTenants.length} active terminals`);
       console.log(`PAYLOAD: "${message}"`);
       console.log(`==============================================\n`);
+      
+      // ACTUALLY EMIT TO ALL SOCKETS BELONGING TO THESE TENANTS
+      agentTenants.forEach((tenant: any) => {
+        const room = `tenant:${tenant.id}`;
+        io.to(room).emit('app_broadcast', {
+          message: message,
+          sender: `Agent ${agent.agentCode}`,
+          timestamp: new Date().toISOString()
+        });
+      });
       
       return res.status(200).json({ 
         success: true, 
