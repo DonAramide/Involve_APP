@@ -116,6 +116,41 @@ class _ComplaintPageState extends State<ComplaintPage> {
     }
   }
 
+  void _showIssueDetails(dynamic issue) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${issue['id'] ?? 'Unknown'}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Title: ${issue['title']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Category: ${(issue['category'] ?? '').toUpperCase()}'),
+              Text('Urgency: ${(issue['urgency'] ?? '').toUpperCase()}'),
+              Text('Status: ${(issue['status'] ?? 'pending').toUpperCase()}', style: const TextStyle(color: Colors.deepOrange)),
+              const SizedBox(height: 12),
+              const Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('${issue['description']}'),
+              const SizedBox(height: 12),
+              const Text('Assigned To:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Support Team', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+              if (issue['incident_date'] != null) ...[
+                const SizedBox(height: 12),
+                Text('Incident Date/Time: ${issue['incident_date']}'),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('CLOSE')),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles();
     if (result != null) {
@@ -280,6 +315,7 @@ class _ComplaintPageState extends State<ComplaintPage> {
           return Card(
             elevation: 1,
             child: ListTile(
+              onTap: () => _showIssueDetails(issue),
               title: Text(issue['title'] ?? 'Untitled', style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
