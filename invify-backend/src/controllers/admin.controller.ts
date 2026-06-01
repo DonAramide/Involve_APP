@@ -25,6 +25,8 @@ interface MockTenant {
   support_phone?: string;
   support_email?: string;
   support_whatsapp?: string;
+  emergency_lock_code?: string;
+  is_emergency_locked?: boolean;
 }
 
 export class AdminController {
