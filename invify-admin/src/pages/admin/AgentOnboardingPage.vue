@@ -21,13 +21,34 @@
             required
           />
           <q-input
+            v-model="newAgent.email"
+            dark filled dense
+            type="email"
+            label="Email Address"
+            placeholder="agent@example.com"
+            class="bg-panel-darker text-caption"
+            required
+          />
+          <q-input
             v-model="newAgent.phone"
             dark filled dense
-            label="Phone Number"
+            label="Primary Phone Number"
             placeholder="+1234567890"
             class="bg-panel-darker text-caption"
             required
           />
+          <div class="row items-center justify-between no-wrap op-gap-8">
+            <q-input
+              v-model="newAgent.whatsappNumber"
+              dark filled dense
+              label="WhatsApp Number"
+              placeholder="+1234567890"
+              class="bg-panel-darker text-caption col"
+              :disable="sameAsPhone"
+              required
+            />
+            <q-checkbox v-model="sameAsPhone" dark dense label="Same as Phone" color="cyan-3" class="text-caption text-muted" />
+          </div>
           <q-input
             v-model="newAgent.address"
             dark filled dense
@@ -119,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 
@@ -131,9 +152,27 @@ const loadingList = ref(false)
 
 const newAgent = ref({
   name: '',
+  email: '',
   phone: '',
+  whatsappNumber: '',
   address: '',
   agentCode: ''
+})
+
+const sameAsPhone = ref(false)
+
+watch(sameAsPhone, (val) => {
+  if (val) {
+    newAgent.value.whatsappNumber = newAgent.value.phone
+  } else {
+    newAgent.value.whatsappNumber = ''
+  }
+})
+
+watch(() => newAgent.value.phone, (newPhone) => {
+  if (sameAsPhone.value) {
+    newAgent.value.whatsappNumber = newPhone
+  }
 })
 
 const passportFile = ref(null)
@@ -184,7 +223,9 @@ const onboardAgent = async () => {
     const token = localStorage.getItem('invify_access_token')
     await axios.post('http://localhost:3004/admin/agents/onboard', {
       name: newAgent.value.name,
+      email: newAgent.value.email,
       phone: newAgent.value.phone,
+      whatsappNumber: newAgent.value.whatsappNumber,
       address: newAgent.value.address,
       passportImage,
       idCard,
@@ -195,7 +236,10 @@ const onboardAgent = async () => {
     
     $q.notify({ type: 'positive', message: `Agent ${code} provisioned successfully`, position: 'top-right' })
     newAgent.value.name = ''
+    newAgent.value.email = ''
     newAgent.value.phone = ''
+    newAgent.value.whatsappNumber = ''
+    sameAsPhone.value = false
     newAgent.value.address = ''
     newAgent.value.agentCode = ''
     passportFile.value = null
