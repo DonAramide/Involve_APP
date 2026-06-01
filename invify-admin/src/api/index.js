@@ -54,8 +54,8 @@ export const adminApi = {
   triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
 
   // Support & Complaints
-  getComplaints: () => api.get('/admin/complaints'),
-  updateComplaintStatus: (id, status) => api.patch(`/admin/complaints/${id}/status`, { status }),
+  getComplaints: () => api.get('/api/admin/complaints'),
+  updateComplaintStatus: (id, status) => api.patch(`/api/admin/complaints/${id}/status`, { status }),
 
   // Retention & Insights
   getRetentionSuggestion: () => api.get('/admin/retention/suggestion'),

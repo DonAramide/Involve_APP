@@ -469,6 +469,24 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  void _verifyAndNavigateToCloudMetrics(BuildContext context) {
+    final settingsBloc = context.read<SettingsBloc>();
+    
+    // Reset auth state to ensure listener catches new success
+    settingsBloc.add(ResetSystemAuth());
+    
+    // Show password dialog
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PasswordDialog(bloc: settingsBloc),
+    ).then((authorized) {
+      if (authorized == true && context.mounted) {
+        Navigator.pushNamed(context, '/admin_hub');
+      }
+    });
+  }
+
   void _verifyAndNavigateToFinance(BuildContext context, String routeName) {
     final settingsBloc = context.read<SettingsBloc>();
     
@@ -573,7 +591,7 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'CLOUD METRICS',
           icon: Icons.cloud_done_outlined,
           color: Colors.indigo,
-          onTap: () => _verifyAndNavigateToAdminHub(context),
+          onTap: () => _verifyAndNavigateToCloudMetrics(context),
         ),
         _DashboardMenuItem(
           id: 'finance_analytics',

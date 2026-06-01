@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../../services/terminal_sync_service.dart';
-import '../../features/settings/domain/services/security_service.dart';
+import '../../../services/terminal_sync_service.dart';
+import '../../settings/domain/services/security_service.dart';
 
 class SupportService {
   // Using global ngrok url for device testing
