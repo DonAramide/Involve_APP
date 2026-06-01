@@ -87,7 +87,7 @@
             <q-file v-model="idCardFile" dark filled dense label="Upload Government ID" accept="image/*,application/pdf" class="bg-panel-darker text-caption" required>
               <template v-slot:prepend><q-icon name="badge" /></template>
             </q-file>
-            <q-input v-model="newAgent.agentCode" dark filled dense label="Custom Agent Code (Optional)" placeholder="e.g. BTA123" class="bg-panel-darker text-caption" maxlength="6" hint="Leave blank to auto-generate" />
+            <q-input v-model="newAgent.agentCode" dark filled dense label="Agent Code" class="bg-panel-darker text-caption" maxlength="6" hint="Auto-generated from phone number" />
             
             <q-btn type="submit" dense color="cyan-3" text-color="black" label="Provision Agent & Verify KYC" :loading="loading" class="q-mt-md text-weight-bold full-width" />
           </q-form>
@@ -224,6 +224,19 @@ watch(sameAsPhone, (val) => {
 watch(() => newAgent.value.phone, (newPhone) => {
   if (sameAsPhone.value) {
     newAgent.value.whatsappNumber = newPhone
+  }
+  
+  if (newPhone) {
+    const digits = newPhone.replace(/\D/g, '')
+    if (digits.length >= 10) {
+      const last10 = digits.slice(-10)
+      const num = parseInt(last10, 10)
+      newAgent.value.agentCode = num.toString(36).toUpperCase().padStart(6, '0').substring(0, 6)
+    } else {
+      newAgent.value.agentCode = ''
+    }
+  } else {
+    newAgent.value.agentCode = ''
   }
 })
 
