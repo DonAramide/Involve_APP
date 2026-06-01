@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/terminal_sync_service.dart';
+import '../../features/settings/domain/services/security_service.dart';
 
 class SupportService {
   // Using global ngrok url for device testing
@@ -16,10 +17,10 @@ class SupportService {
     String? attachmentPath,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final tenantId = prefs.getString('tenant_id') ?? 'unknown-tenant';
-      final tenantName = prefs.getString('tenant_name') ?? 'Mobile App User';
-      final deviceId = prefs.getString('device_id') ?? 'unknown-device';
+      final config = await TerminalSyncService.loadCachedConfig();
+      final tenantId = config?.tenantId ?? await SecurityService().getTenantId();
+      final tenantName = config?.businessName ?? 'Mobile App User';
+      final deviceId = config?.posSerialNumber ?? await SecurityService().getPersistentDeviceId();
 
       final response = await http.post(
         Uri.parse('$baseUrl/api/mobile/complaints'),
@@ -46,13 +47,13 @@ class SupportService {
 
   Future<List<dynamic>> getComplaints() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final tenantId = prefs.getString('tenant_id');
-      final deviceId = prefs.getString('device_id');
+      final config = await TerminalSyncService.loadCachedConfig();
+      final tenantId = config?.tenantId ?? await SecurityService().getTenantId();
+      final deviceId = config?.posSerialNumber ?? await SecurityService().getPersistentDeviceId();
       
       final queryParams = [];
-      if (tenantId != null) queryParams.add('tenant_id=$tenantId');
-      if (deviceId != null) queryParams.add('device_id=$deviceId');
+      if (tenantId != null && tenantId.isNotEmpty) queryParams.add('tenant_id=$tenantId');
+      if (deviceId != null && deviceId.isNotEmpty) queryParams.add('device_id=$deviceId');
       
       final queryString = queryParams.isNotEmpty ? '?${queryParams.join('&')}' : '';
       
