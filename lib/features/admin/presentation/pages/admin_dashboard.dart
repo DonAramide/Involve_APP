@@ -11,6 +11,8 @@ import 'admin_finance_dashboard.dart';
 import 'account_setup_page.dart';
 import '../../../../core/utils/progress_dialog_utils.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../../core/services/finance_api_client.dart';
+import 'package:get_it/get_it.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -20,14 +22,33 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
+  int? _subscriptionDaysRemaining;
+
   @override
   void initState() {
     super.initState();
     _loadData();
+    _fetchSubscriptionStatus();
   }
 
   void _loadData() {
     context.read<AdminBloc>().add(LoadAdminDashboard());
+  }
+
+  Future<void> _fetchSubscriptionStatus() async {
+    try {
+      final client = GetIt.I<FinanceApiClient>();
+      final response = await client.get('/api/subscription/status');
+      if (response.data != null && response.data['success'] == true) {
+        if (mounted) {
+          setState(() {
+            _subscriptionDaysRemaining = response.data['daysRemaining'];
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[AdminDashboard] Failed to fetch subscription status: $e');
+    }
   }
 
   @override
@@ -57,6 +78,28 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (_subscriptionDaysRemaining != null && _subscriptionDaysRemaining! <= 6)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      border: Border.all(color: Colors.red.shade200),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Colors.red),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '⚠️ Your subscription expires in $_subscriptionDaysRemaining day(s). Please renew to avoid service interruption.',
+                            style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 _buildMetricSection(context, state.metrics),
                 const SizedBox(height: 24),
                 _buildQuickActions(context, state.isMasterMode),
