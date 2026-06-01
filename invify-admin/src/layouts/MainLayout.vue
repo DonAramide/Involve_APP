@@ -915,6 +915,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },
+        { label: 'Agent Governance & Onboarding', path: '/admin/agents', icon: 'support_agent', color: 'amber-4', badge: 'Field Ops', badgeBg: 'amber-10', badgeColor: 'amber-2' },
         { label: 'Enterprise Billing & Fees', path: '/admin/billing', icon: 'payments', color: 'teal-4', badge: 'Finance', badgeBg: 'teal-10', badgeColor: 'teal-2' },
         { label: 'EMV POS Gateway', path: '/admin/pos-gateway', icon: 'point_of_sale', color: 'purple-4', badge: 'LIVE', badgeBg: 'purple-10', badgeColor: 'purple-2' },
         { label: 'Contact Maintenance', path: '/admin/contact', icon: 'contact_phone', color: 'grey-4' }
@@ -995,6 +996,7 @@ const getMenuDescription = (label) => {
     'Tenants Identity Matrix': 'Manage tenant registrations, approve incoming business profiles, provision database schemas, and view indices.',
     'Operators Access Profiles': 'Configure internal administrative operator profiles, map RBAC scopes, and verify MFA parameters.',
     'Tenant Orchestration': 'Authoritatively manage backend feature flags, reactive JSON branding tokens, and tier consumption limits.',
+    'Agent Governance & Onboarding': 'Provision field agents, monitor commissions, and manage terminal onboarding delegation credentials.',
     'Enterprise Billing & Fees': 'Govern subscription plans, transaction processing fees, settlement splits, and live treasury logs.',
     'EMV POS Gateway': 'Live switchboard for routing EMV card transactions between Cpoint-Kimono (HTTPS REST), Medusa (ISO8583 TCP), and NIBSS — with real-time failover, terminal key cache management, and a full transaction log.'
   }

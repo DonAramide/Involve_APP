@@ -26073,5 +26073,19 @@
     "route": "/tenant/:catchAll(.*)*",
     "pageTitle": "ErrorNotFound.vue",
     "keywords": []
+  },
+  {
+    "id": "nav-admin-agents",
+    "text": "Agent Governance & Onboarding",
+    "type": "navigation",
+    "path": "/admin/agents",
+    "pageTitle": "Agent Governance & Onboarding"
+  },
+  {
+    "id": "nav-admin-agents-provision",
+    "text": "Provision New Agent",
+    "type": "action",
+    "path": "/admin/agents",
+    "pageTitle": "Agent Governance & Onboarding"
   }
 ]
