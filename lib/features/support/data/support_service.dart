@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SupportService {
-  // Replace with dynamic config in production
-  final String baseUrl = 'http://10.0.2.2:3004'; // Android Emulator alias for localhost
+  // Using global ngrok url for device testing
+  final String baseUrl = 'https://bertie-archegoniate-causelessly.ngrok-free.dev';
 
   Future<bool> submitComplaint({
     required String title,

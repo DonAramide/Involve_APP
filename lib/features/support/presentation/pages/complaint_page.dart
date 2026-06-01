@@ -121,10 +121,13 @@ class _ComplaintPageState extends State<ComplaintPage> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Support & Complaints'),
+          title: const Text('Support & Complaints', style: TextStyle(color: Colors.white)),
           backgroundColor: const Color(0xFF1E293B),
+          iconTheme: const IconThemeData(color: Colors.white),
           bottom: const TabBar(
             indicatorColor: Colors.amber,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
             tabs: [
               Tab(text: 'New Issue'),
               Tab(text: 'My Tracking'),
