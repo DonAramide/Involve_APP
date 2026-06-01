@@ -67,6 +67,16 @@ const routes = [
       // PRIORITY WORKSPACE 1: FLEET OPERATIONS
       // ==========================================
       { 
+        path: 'admin/orchestration', 
+        component: () => import('pages/admin/TenantOrchestrationCenterPage.vue'),
+        meta: { title: 'Tenant Orchestration', workspace: 'admin', permission: 'admin_tenant_orchestration', requiresAuth: true }
+      },
+      { 
+        path: 'admin/agents', 
+        component: () => import('pages/admin/AgentOnboardingPage.vue'),
+        meta: { title: 'Agent Governance', workspace: 'admin', permission: 'admin_agent_management', requiresAuth: true }
+      },
+      { 
         path: 'fleet/overview', 
         component: () => import('pages/fleet/FleetOverviewPage.vue'),
         meta: { title: 'Fleet Overview', workspace: 'fleet', permission: 'read_fleet', requiresAuth: true }
