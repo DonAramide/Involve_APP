@@ -413,6 +413,7 @@ export class AdminController {
       console.error('[AdminController] resetTenantPasswords Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
+  }
 
   /**
    * POST /admin/broadcast
