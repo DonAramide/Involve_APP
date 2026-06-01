@@ -7,7 +7,12 @@
         </h1>
         <div class="text-muted">Manage complaints and technical requests from the mobile app ecosystem.</div>
       </div>
-      <div class="col-auto">
+      <div class="col-auto row q-gutter-x-sm items-center">
+        <q-input v-model="searchQuery" dense outlined placeholder="Search history..." dark class="bg-dark text-white" style="width: 250px">
+          <template v-slot:append>
+            <q-icon name="search" color="grey-5" />
+          </template>
+        </q-input>
         <q-btn flat color="grey-6" icon="refresh" @click="fetchComplaints" />
       </div>
     </div>
@@ -22,6 +27,7 @@
       bordered
       :dark="prefs.isDarkMode"
       class="bg-panel shadow-2 no-shadow"
+      :filter="searchQuery"
       :pagination="pagination"
     >
       <template v-slot:body-cell-tenant_name="props">
@@ -131,6 +137,7 @@ const loading = ref(false)
 const complaints = ref([])
 const showDialog = ref(false)
 const selectedComplaint = ref(null)
+const searchQuery = ref('')
 
 const pagination = ref({
   sortBy: 'created_at',

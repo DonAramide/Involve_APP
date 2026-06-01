@@ -83,9 +83,15 @@ export class SupportController {
     }
 
     try {
+      const localData = getLocalDB().complaints;
       const { data, error } = await supabase.from('complaints').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-      return res.json({ success: true, data });
+      
+      const merged = [...data, ...localData];
+      const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+      unique.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      return res.json({ success: true, data: unique });
     } catch (err: any) {
       return res.json({ success: true, data: getLocalDB().complaints });
     }
@@ -103,6 +109,8 @@ export class SupportController {
        return res.json({ success: true, data: db.complaints.filter((c: any) => c.tenant_id === tenantId || c.device_id === deviceId) });
     }
     try {
+      const localData = getLocalDB().complaints.filter((c: any) => c.tenant_id === tenantId || c.device_id === deviceId);
+      
       let query = supabase.from('complaints').select('*').order('created_at', { ascending: false });
       if (tenantId && deviceId) {
         query = query.or(`tenant_id.eq.${tenantId},device_id.eq.${deviceId}`);
@@ -113,7 +121,12 @@ export class SupportController {
       }
       const { data, error } = await query;
       if (error) throw error;
-      return res.json({ success: true, data });
+      
+      const merged = [...data, ...localData];
+      const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+      unique.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      return res.json({ success: true, data: unique });
     } catch(err: any) {
        return res.json({ success: true, data: getLocalDB().complaints.filter((c: any) => c.tenant_id === tenantId || c.device_id === deviceId) });
     }
