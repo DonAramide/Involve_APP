@@ -38,6 +38,19 @@ const routes = [
     meta: { requiresAuth: true, title: 'Accept Invite' }
   },
 
+  // ==========================================
+  // AGENT PORTAL WORKSPACE
+  // ==========================================
+  {
+    path: '/agent',
+    component: () => import('layouts/AgentLayout.vue'),
+    children: [
+      { path: '', redirect: '/agent/dashboard' },
+      { path: 'login', component: () => import('pages/agent/AgentLoginPage.vue') },
+      { path: 'dashboard', component: () => import('pages/agent/AgentDashboardPage.vue') }
+    ]
+  },
+
   // Master layout bounding verified workspace shells
   {
     path: '/',
