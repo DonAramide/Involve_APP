@@ -315,6 +315,26 @@ app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'i
       return res.status(400).json({ success: false, message: 'Missing tenant_id or passcode' });
     }
     
+    // Save to local DB if in offline mode
+    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      const fs = require('fs');
+      const path = require('path');
+      const dbPath = path.join(process.cwd(), 'tenants_db.json');
+      if (fs.existsSync(dbPath)) {
+        const data = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
+        const index = data.findIndex((t: any) => t.id === tenant_id);
+        if (index !== -1) {
+          data[index].emergency_lock_code = passcode;
+          data[index].is_emergency_locked = true;
+          fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+        }
+      }
+    } else {
+      // Supabase flow (fire and forget for now)
+      const { supabase } = require('./db/supabase');
+      supabase.from('tenants').update({ emergency_lock_code: passcode, is_emergency_locked: true }).eq('id', tenant_id).then();
+    }
+
     // The `io` instance is created at the bottom of app.ts, so we can access it lazily
     process.nextTick(() => {
       io.to(`tenant:${tenant_id}`).emit('emergency_lock', { action: 'lock', passcode });

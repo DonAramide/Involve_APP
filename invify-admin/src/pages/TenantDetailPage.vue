@@ -50,6 +50,10 @@
           class="q-mr-sm text-weight-bold animate-pulse-amber" 
         />
         <q-btn flat color="grey-6" icon="refresh" @click="fetchDetails" />
+        <div v-if="tenant?.is_emergency_locked" class="q-ml-sm q-px-sm q-py-xs bg-red-1 text-red-10 rounded-borders text-caption text-weight-bold row items-center">
+          <q-icon name="lock" size="xs" class="q-mr-xs" />
+          CODE: {{ tenant.emergency_lock_code }}
+        </div>
       </div>
     </div>
 
@@ -756,7 +760,11 @@ const openActivationShortcut = () => {
 }
 
 const triggerEmergencyLock = () => {
-  const passcode = Math.floor(1000 + Math.random() * 9000).toString()
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let passcode = ''
+  for (let i = 0; i < 6; i++) {
+    passcode += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
   $q.dialog({
     title: 'Emergency Lock',
     message: `Are you sure you want to trigger an emergency lock for ${tenant.value.name}?<br><br>The new unlock passcode will be: <strong class="text-h6">${passcode}</strong>.<br><br>Please save this code before proceeding!`,
@@ -770,6 +778,10 @@ const triggerEmergencyLock = () => {
         tenant_id: tenant.value.id,
         passcode: passcode
       })
+      if (tenant.value) {
+        tenant.value.is_emergency_locked = true
+        tenant.value.emergency_lock_code = passcode
+      }
       $q.notify({ type: 'positive', message: 'Emergency lock broadcasted successfully to all devices.' })
     } catch (e) {
       console.error(e)

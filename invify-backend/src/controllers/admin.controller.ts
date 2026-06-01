@@ -439,7 +439,9 @@ export class AdminController {
           created_at: tenantCreatedAt,
           virtual_account_number: match?.virtual_account_number || null,
           virtual_account_bank: match?.virtual_account_bank || null,
-          virtual_account_status: match?.virtual_account_status || null
+          virtual_account_status: match?.virtual_account_status || null,
+          emergency_lock_code: match?.emergency_lock_code || null,
+          is_emergency_locked: match?.is_emergency_locked || false
         },
         users: [
           { id: 'usr-1', name: 'Admin User', role: 'admin' }

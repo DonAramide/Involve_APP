@@ -200,15 +200,17 @@ class SocketService {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.lock_outline, size: 100, color: Colors.white),
-                    const SizedBox(height: 24),
+                    Image.asset('assets/images/logo_transparent.png', height: 80),
+                    const SizedBox(height: 16),
+                    const Icon(Icons.lock_outline, size: 80, color: Colors.white),
+                    const SizedBox(height: 16),
                     const Text(
                       'SYSTEM LOCKED',
                       style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2),
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'This application has been locked by the administrator. Please contact enterprise support for the unlock passcode.',
+                      'This application has been locked by the administrator. Please contact your admin/agent on the phone assigned to the tenant for the unlock passcode.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 16, color: Colors.white70),
                     ),
@@ -217,15 +219,16 @@ class SocketService {
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
-                        hintText: 'Enter 4-Digit Passcode',
+                        hintText: 'Enter 6-Character Code',
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                       ),
-                      keyboardType: TextInputType.number,
+                      keyboardType: TextInputType.text,
+                      textCapitalization: TextCapitalization.characters,
                       textAlign: TextAlign.center,
-                      maxLength: 4,
+                      maxLength: 6,
                       style: const TextStyle(fontSize: 24, letterSpacing: 8, fontWeight: FontWeight.bold),
                       onChanged: (val) {
-                        if (val == correctPasscode) {
+                        if (val.trim().toUpperCase() == correctPasscode.toUpperCase()) {
                           SharedPreferences.getInstance().then((prefs) {
                             prefs.setBool('is_emergency_locked', false);
                             prefs.remove('emergency_lock_passcode');
