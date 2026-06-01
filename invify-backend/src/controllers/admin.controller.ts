@@ -1017,4 +1017,90 @@ export class AdminController {
       return res.status(500).json({ error: error.message });
     }
   }
+
+  /**
+   * POST /admin/subscriptions/extend
+   * Extends subscriptions for a specific tenant or in bulk based on agentCode/type.
+   */
+  static async extendSubscription(req: Request, res: Response) {
+    try {
+      const { tenantId, agentCode, type, daysToExtend } = req.body;
+      if (!daysToExtend || typeof daysToExtend !== 'number') {
+        return res.status(400).json({ success: false, message: 'Invalid daysToExtend parameter' });
+      }
+
+      const tenants = AdminController.getLocalData();
+      let updatedCount = 0;
+
+      for (const t of tenants) {
+        let match = false;
+        if (tenantId && t.id === tenantId) match = true;
+        if (agentCode && t.agent_code === agentCode) match = true;
+        if (type && t.type === type && !tenantId && !agentCode) match = true;
+        
+        if (match) {
+          // Default to current date if no expiry exists
+          const currentExpiry = t.subscription_end_date ? new Date(t.subscription_end_date) : new Date();
+          // Add days
+          currentExpiry.setDate(currentExpiry.getDate() + daysToExtend);
+          t.subscription_end_date = currentExpiry.toISOString();
+          updatedCount++;
+        }
+      }
+
+      AdminController.saveLocalData(tenants);
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully extended subscription for ${updatedCount} tenant(s) by ${daysToExtend} days.`,
+        updatedCount
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
+   * GET /api/subscription/status
+   * Returns the number of days left on the current tenant's subscription.
+   */
+  static async getSubscriptionStatus(req: Request, res: Response) {
+    try {
+      // In a real flow, tenantId comes from req.user
+      // For mock, we can accept it in query or fallback
+      const tenantId = req.query.tenantId as string;
+      const tenants = AdminController.getLocalData();
+      
+      let targetTenant = null;
+      if (tenantId) {
+        targetTenant = tenants.find(t => t.id === tenantId);
+      } else {
+        // Fallback to first if none provided (for simple mobile testing)
+        targetTenant = tenants[0];
+      }
+
+      if (!targetTenant) {
+        return res.status(404).json({ success: false, message: 'Tenant not found' });
+      }
+
+      // Default to 6 days from now for testing the countdown
+      const defaultExpiry = new Date();
+      defaultExpiry.setDate(defaultExpiry.getDate() + 6);
+      
+      const expiryStr = targetTenant.subscription_end_date || defaultExpiry.toISOString();
+      const expiryDate = new Date(expiryStr);
+      
+      const diffTime = expiryDate.getTime() - new Date().getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      return res.status(200).json({
+        success: true,
+        tenantId: targetTenant.id,
+        daysRemaining: diffDays,
+        expiresAt: expiryDate.toISOString()
+      });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }

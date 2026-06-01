@@ -139,6 +139,11 @@ app.get('/admin/settings', authenticate, checkRole(['super_admin']), AdminContro
 app.patch('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.updateGlobalSettings);
 app.post('/admin/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
 
+// Subscriptions
+app.post('/admin/subscriptions/extend', authenticate, checkRole(['super_admin']), AdminController.extendSubscription);
+app.get('/api/subscription/status', AdminController.getSubscriptionStatus);
+
+// API Endpoints for Admin (Invify Pro App / Operator App)
 // User Device Controls & Audit Archiving (Super Admin only)
 app.get('/api/admin/user-devices', authenticate, checkRole(['super_admin']), UserController.listDevices);
 app.post('/api/admin/user-devices/approve', authenticate, checkRole(['super_admin']), UserController.approveDevice);
