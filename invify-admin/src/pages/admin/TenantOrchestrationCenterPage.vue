@@ -107,11 +107,26 @@
           </div>
           <p class="text-caption text-muted">Synchronously re-scales operational resource threshold boundaries.</p>
 
-          <div class="row q-gutter-xs justify-between">
+          <div class="row q-gutter-xs justify-between q-mb-md">
             <q-btn size="sm" outline color="info" label="PRO" @click="elevatePlanTier('PRO')" />
             <q-btn size="sm" outline color="accent" label="ENTERPRISE" @click="elevatePlanTier('ENTERPRISE')" />
             <q-btn size="sm" outline color="negative" label="CUSTOM" @click="elevatePlanTier('CUSTOM_FEDERATION')" />
           </div>
+
+          <q-separator class="q-my-md border-main" />
+
+          <div class="text-subtitle2 text-weight-bold text-amber-5 q-mb-xs">
+            <q-icon name="update" class="q-mr-xs" /> Subscription Lifecycle
+          </div>
+          <p class="text-caption text-muted q-mb-sm">Extend the operational runway for the targeted execution context.</p>
+          <q-btn
+            unelevated
+            color="amber-5"
+            class="full-width text-black"
+            label="Extend Active Subscription"
+            icon="add_task"
+            @click="showExtensionDialog = true"
+          />
         </q-card>
 
         <!-- Dynamic Branding Tokens Customizer -->
@@ -339,6 +354,69 @@
       </div>
     </div>
   </q-page>
+
+  <!-- Subscription Extension Dialog -->
+  <q-dialog v-model="showExtensionDialog" persistent>
+    <q-card style="min-width: 400px" class="bg-panel text-main border-main">
+      <q-card-section class="bg-panel-darker border-bottom-main row items-center justify-between">
+        <div class="text-h6 text-amber-5"><q-icon name="update" class="q-mr-xs"/> Extend Subscription</div>
+        <q-btn icon="close" flat round dense v-close-popup :dark="prefs.isDarkMode" />
+      </q-card-section>
+
+      <q-card-section class="q-pt-md">
+        <p class="text-caption text-muted">
+          Extend subscription expiry date globally for all matching tenants or a specific tenant constraint.
+        </p>
+
+        <q-select
+          filled dense
+          :dark="prefs.isDarkMode"
+          v-model="extensionTargetType"
+          :options="['Specific Tenant', 'All Tenants Under Agent', 'All Tenants by Industry']"
+          label="Target Scope"
+          class="q-mb-md"
+        />
+
+        <q-input
+          v-if="extensionTargetType === 'All Tenants Under Agent'"
+          filled dense
+          :dark="prefs.isDarkMode"
+          v-model="extensionAgentCode"
+          label="Agent Code (e.g. AAA000)"
+          class="q-mb-md"
+        />
+
+        <q-select
+          v-if="extensionTargetType === 'All Tenants by Industry'"
+          filled dense
+          :dark="prefs.isDarkMode"
+          v-model="extensionIndustry"
+          :options="industryOptions"
+          label="Industry"
+          class="q-mb-md"
+        />
+
+        <div v-if="extensionTargetType === 'Specific Tenant'" class="bg-panel-darker q-pa-sm border-radius-xs font-monospace text-caption text-secondary q-mb-md">
+          <strong>Target:</strong> {{ selectedTenantId }}
+        </div>
+
+        <q-input
+          filled dense
+          type="number"
+          :dark="prefs.isDarkMode"
+          v-model.number="extensionDays"
+          label="Days to Extend"
+          hint="Input free days to grant"
+          class="q-mb-md"
+        />
+      </q-card-section>
+
+      <q-card-actions align="right" class="bg-panel-darker border-top-main">
+        <q-btn flat label="Cancel" color="muted" v-close-popup />
+        <q-btn flat label="Execute Extension" color="amber-5" @click="executeSubscriptionExtension" :loading="isExtending" />
+      </q-card-actions>
+    </q-card>
+  </q-dialog>
 </template>
 
 <script setup>
