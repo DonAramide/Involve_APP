@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../data/support_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../settings/presentation/bloc/settings_bloc.dart';
+import '../../../settings/presentation/bloc/settings_bloc.dart';
 
 class ComplaintPage extends StatefulWidget {
   const ComplaintPage({Key? key}) : super(key: key);
