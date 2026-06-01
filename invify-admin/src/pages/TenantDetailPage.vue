@@ -106,8 +106,8 @@
 
               <!-- Location Map -->
               <div class="q-mt-lg" v-if="parsedLocation">
-                <div class="text-subtitle2 text-indigo-3 q-mb-sm row items-center">
-                  <q-icon name="place" class="q-mr-sm" size="xs" /> Registered Location Map
+                <div class="text-subtitle2 text-indigo-3 q-mb-sm row items-center cursor-pointer" @click="openGoogleMaps(parsedLocation.query)">
+                  <q-icon name="place" class="q-mr-sm" size="xs" /> Registered Location Map (Click to View)
                 </div>
                 <div style="border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); height: 250px;">
                   <iframe 
@@ -934,6 +934,10 @@ const parsedLocation = computed(() => {
   }
   return { query: encodeURIComponent(tenant.value.location) };
 });
+
+const openGoogleMaps = (query) => {
+  window.open(`https://maps.google.com/maps?q=${query}`, '_blank');
+};
 
 const toggleStatus = async () => {
   if (!tenant.value) return;

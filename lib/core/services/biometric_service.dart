@@ -32,7 +32,6 @@ class BiometricService {
     try {
       return await _auth.authenticate(
         localizedReason: reason,
-        stickyAuth: true,
         biometricOnly: true,
       );
     } on PlatformException catch (_) {

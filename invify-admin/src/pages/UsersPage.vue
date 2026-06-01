@@ -226,6 +226,7 @@ const lastInviteLink = ref('')
 const form = ref({ id: '', name: '', email: '', role: 'staff', tenantId: null })
 
 const isPlatformRole = (role) => {
+  if (!role) return false;
   return [
     'super_admin',
     'admin_finance',
@@ -234,7 +235,7 @@ const isPlatformRole = (role) => {
     'admin_ops',
     'admin_executive',
     'admin_deploy'
-  ].includes(role)
+  ].includes(role.toLowerCase())
 }
 
 // Watch role change to clean tenant selection for platform-level roles
@@ -340,7 +341,11 @@ const inviteMember = async () => {
 const openModal = (user = null) => {
   if (user) {
     isEditing.value = true
-    form.value = { ...user }
+    form.value = { 
+      ...user,
+      role: user.role ? user.role.toLowerCase() : 'staff',
+      tenantId: user.tenant_id || null
+    }
   } else {
     isEditing.value = false
     form.value = { id: '', name: '', email: '', role: 'staff', tenantId: null }
