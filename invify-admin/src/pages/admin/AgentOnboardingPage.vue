@@ -15,11 +15,49 @@
           <q-input
             v-model="newAgent.name"
             dark filled dense
-            label="Agent Name"
+            label="Full Legal Name"
             placeholder="e.g. John Doe"
             class="bg-panel-darker text-caption"
             required
           />
+          <q-input
+            v-model="newAgent.phone"
+            dark filled dense
+            label="Phone Number"
+            placeholder="+1234567890"
+            class="bg-panel-darker text-caption"
+            required
+          />
+          <q-input
+            v-model="newAgent.address"
+            dark filled dense
+            type="textarea"
+            rows="2"
+            label="Full Residential Address"
+            placeholder="123 Main St..."
+            class="bg-panel-darker text-caption"
+            required
+          />
+          <q-file
+            v-model="passportFile"
+            dark filled dense
+            label="Upload Passport Photo"
+            accept="image/*"
+            class="bg-panel-darker text-caption"
+            required
+          >
+            <template v-slot:prepend><q-icon name="face" /></template>
+          </q-file>
+          <q-file
+            v-model="idCardFile"
+            dark filled dense
+            label="Upload Government ID"
+            accept="image/*,application/pdf"
+            class="bg-panel-darker text-caption"
+            required
+          >
+            <template v-slot:prepend><q-icon name="badge" /></template>
+          </q-file>
           <q-input
             v-model="newAgent.agentCode"
             dark filled dense
@@ -29,7 +67,7 @@
             maxlength="6"
             hint="Leave blank to auto-generate"
           />
-          <q-btn type="submit" dense color="cyan-3" text-color="black" label="Provision Agent" :loading="loading" class="q-mt-sm text-weight-bold" />
+          <q-btn type="submit" dense color="cyan-3" text-color="black" label="Provision Agent & Verify KYC" :loading="loading" class="q-mt-sm text-weight-bold" />
         </q-form>
       </div>
 
@@ -45,20 +83,29 @@
               <tr>
                 <th class="q-pa-xs">Agent Code</th>
                 <th class="q-pa-xs">Name</th>
-                <th class="q-pa-xs">Status</th>
+                <th class="q-pa-xs">KYC Status</th>
+                <th class="q-pa-xs">Profile Status</th>
                 <th class="q-pa-xs">Commissions</th>
               </tr>
             </thead>
             <tbody class="text-caption" style="font-size: 11px;">
               <tr v-for="agent in agents" :key="agent.id" class="hover-row border-bottom-light">
                 <td class="q-pa-xs text-metric-mono text-amber-4 text-weight-bold">{{ agent.agentCode }}</td>
-                <td class="q-pa-xs text-main">{{ agent.name }}</td>
+                <td class="q-pa-xs text-main">
+                  <div>{{ agent.name }}</div>
+                  <div class="text-muted" style="font-size: 9px;">{{ agent.phone }}</div>
+                </td>
                 <td class="q-pa-xs">
-                  <q-chip dense size="xs" :color="agent.isFirstLogin ? 'amber-10' : 'green-10'" :text-color="agent.isFirstLogin ? 'amber-2' : 'green-2'">
+                  <q-chip dense size="xs" :color="agent.kycStatus === 'VERIFIED' ? 'green-10' : 'amber-10'" :text-color="agent.kycStatus === 'VERIFIED' ? 'green-2' : 'amber-2'">
+                    {{ agent.kycStatus || 'PENDING' }}
+                  </q-chip>
+                </td>
+                <td class="q-pa-xs">
+                  <q-chip dense size="xs" :color="agent.isFirstLogin ? 'blue-grey-8' : 'green-10'" :text-color="agent.isFirstLogin ? 'blue-grey-2' : 'green-2'">
                     {{ agent.isFirstLogin ? 'PENDING ACTIVATION' : 'ACTIVE' }}
                   </q-chip>
                 </td>
-                <td class="q-pa-xs text-metric-mono text-green-4">${{ agent.commissions.toFixed(2) }}</td>
+                <td class="q-pa-xs text-metric-mono text-green-4">${{ agent.commissions?.toFixed(2) || '0.00' }}</td>
               </tr>
               <tr v-if="agents.length === 0 && !loadingList">
                 <td colspan="4" class="q-pa-md text-center text-muted">No agents provisioned yet.</td>
@@ -84,8 +131,20 @@ const loadingList = ref(false)
 
 const newAgent = ref({
   name: '',
+  phone: '',
+  address: '',
   agentCode: ''
 })
+
+const passportFile = ref(null)
+const idCardFile = ref(null)
+
+const toBase64 = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+});
 
 const generateCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -117,9 +176,18 @@ const onboardAgent = async () => {
   try {
     const code = newAgent.value.agentCode.trim().toUpperCase() || generateCode()
     
+    let passportImage = ''
+    let idCard = ''
+    if (passportFile.value) passportImage = await toBase64(passportFile.value)
+    if (idCardFile.value) idCard = await toBase64(idCardFile.value)
+
     const token = localStorage.getItem('invify_access_token')
     await axios.post('http://localhost:3004/admin/agents/onboard', {
       name: newAgent.value.name,
+      phone: newAgent.value.phone,
+      address: newAgent.value.address,
+      passportImage,
+      idCard,
       agentCode: code
     }, {
       headers: { Authorization: `Bearer ${token}` }
@@ -127,7 +195,11 @@ const onboardAgent = async () => {
     
     $q.notify({ type: 'positive', message: `Agent ${code} provisioned successfully`, position: 'top-right' })
     newAgent.value.name = ''
+    newAgent.value.phone = ''
+    newAgent.value.address = ''
     newAgent.value.agentCode = ''
+    passportFile.value = null
+    idCardFile.value = null
     fetchAgents()
   } catch (err) {
     const msg = err.response?.data?.message || err.message
