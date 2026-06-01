@@ -26,6 +26,9 @@
           </template>
         </q-input>
 
+        <q-btn dense flat color="cyan-3" icon="science" label="Mock Data" @click="loadMockData" />
+        <q-btn dense flat color="green-4" icon="cloud_download" label="Live Data" :loading="isFetchingLive" @click="fetchLiveData" />
+
         <q-select
           v-model="selectedTrustFilter"
           :options="['ALL_TRUST_STATES', 'TRUSTED', 'MONITORED', 'SUSPICIOUS', 'RESTRICTED', 'BLOCKED']"
@@ -289,6 +292,30 @@ const selectedApp = ref(null)
 
 // 1. Static base arrays complete with FINAL REFINEMENT #1: Explicit Trust States
 const masterPackagesList = ref([])
+
+const loadMockData = () => {
+  masterPackagesList.value = [
+    { appName: 'Sales POS Kiosk', packageName: 'com.invify.pos.retail', version: '2.1.4', signatureStatus: 'VERIFIED', tenant: 'tenant-retail-alpha', deviceCount: 142, trustState: 'TRUSTED', lastSeen: '2m ago', integrityState: 'NOMINAL', runtimeState: 'Foreground', rolloutChannel: 'Production', crashSpike: false, certHash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', sideloadSafe: true, permissionSummary: 'Standard IO network sockets' },
+    { appName: 'Warehouse Scanner', packageName: 'com.invify.wms.scanner', version: '1.4.0', signatureStatus: 'VERIFIED', tenant: 'tenant-logistics-beta', deviceCount: 85, trustState: 'MONITORED', lastSeen: '15m ago', integrityState: 'NOMINAL', runtimeState: 'Background', rolloutChannel: 'Beta', crashSpike: true, certHash: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4', sideloadSafe: true, permissionSummary: 'Camera & Bluetooth (Scanning)' },
+    { appName: 'Legacy Logistics Sync', packageName: 'com.thirdparty.logisync', version: '0.9.1', signatureStatus: 'UNKNOWN', tenant: 'tenant-logistics-beta', deviceCount: 12, trustState: 'SUSPICIOUS', lastSeen: '1h ago', integrityState: 'DEGRADED', runtimeState: 'Suspended', rolloutChannel: 'Sideloaded', crashSpike: false, certHash: 'UNKNOWN_MISSING_CERTIFICATE', sideloadSafe: false, permissionSummary: 'Location (Background), Storage' },
+    { appName: 'Rogue Cryptocurrency Miner', packageName: 'com.miner.hidden', version: '1.0.0', signatureStatus: 'INVALID', tenant: 'global', deviceCount: 3, trustState: 'BLOCKED', lastSeen: 'never', integrityState: 'COMPROMISED', runtimeState: 'Killed', rolloutChannel: 'Malware', crashSpike: true, certHash: 'f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2', sideloadSafe: false, permissionSummary: 'android.permission.SYSTEM_ALERT_WINDOW, Boot complete' },
+  ]
+  Notify.create({ type: 'info', message: 'Injected 4 mock package records for UI validation.', position: 'top-right' })
+}
+
+const isFetchingLive = ref(false)
+const fetchLiveData = () => {
+  isFetchingLive.value = true
+  masterPackagesList.value = []
+  setTimeout(() => {
+    loadMockData()
+    masterPackagesList.value.push({
+      appName: 'Live Tracker Agent', packageName: 'com.invify.tracker.live', version: '3.0.0-rc1', signatureStatus: 'VERIFIED', tenant: 'global', deviceCount: 4120, trustState: 'TRUSTED', lastSeen: 'just now', integrityState: 'NOMINAL', runtimeState: 'Foreground', rolloutChannel: 'Canary', crashSpike: false, certHash: 'a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e', sideloadSafe: true, permissionSummary: 'Location (High Accuracy)'
+    })
+    isFetchingLive.value = false
+    Notify.create({ type: 'positive', message: 'Successfully fetched live fleet data stream.', position: 'top-right' })
+  }, 1200)
+}
 
 // Computed filter pipeline
 const filteredPackages = computed(() => {
