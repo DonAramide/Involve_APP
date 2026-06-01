@@ -44,6 +44,7 @@ import { CustomerController } from './controllers/customer.controller';
 import { PosController } from './controllers/pos.controller';
 import { TerminalController, terminalUploadMiddleware } from './controllers/terminal.controller';
 import { SearchController } from './controllers/search.controller';
+import { OrchestrationController } from './controllers/orchestration.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
@@ -104,6 +105,15 @@ app.post('/ai/lesson-note/refresh', authenticate, AIController.refreshLessonNote
 app.get('/admin/tenants', authenticate, checkRole(['super_admin']), AdminController.listTenants);
 app.post('/admin/tenants', authenticate, checkRole(['super_admin']), AdminController.createTenant);
 app.patch('/admin/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
+app.patch('/admin/tenants/:id/status', authenticate, checkRole(['super_admin']), AdminController.updateTenantStatus);
+app.post('/admin/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);
+app.post('/admin/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
+
+// Orchestration Endpoints
+app.get('/api/orchestration/context', authenticate, checkRole(['super_admin']), OrchestrationController.getContext);
+app.post('/api/orchestration/onboarding/provision', authenticate, checkRole(['super_admin']), OrchestrationController.provisionOnboarding);
+app.post('/api/orchestration/modules/enable', authenticate, checkRole(['super_admin']), OrchestrationController.enableModule);
+app.post('/api/orchestration/tiers/elevate', authenticate, checkRole(['super_admin']), OrchestrationController.elevateTier);
 app.get('/admin/dashboard-stats', authenticate, checkRole(['super_admin']), AdminController.getDashboardStats);
 app.get('/admin/audit-logs', authenticate, checkRole(['super_admin']), TerminalController.getAuditLog);
 app.patch('/admin/profile', authenticate, AdminController.updateProfile);

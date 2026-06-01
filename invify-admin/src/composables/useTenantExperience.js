@@ -55,11 +55,13 @@ export function useTenantExperience() {
     isLoadingContext.value = true
     try {
       const operatorRole = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
-      const res = await axios.get('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/orchestration/context', {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const res = await axios.get(`${API_BASE}/api/orchestration/context`, {
         params: { tenantId: targetTenantId },
         headers: {
           'X-Tenant-ID': targetTenantId,
-          'X-Operator-Role': operatorRole
+          'X-Operator-Role': operatorRole,
+          'Authorization': `Bearer ${localStorage.getItem('invify_token') || ''}`
         }
       })
 
