@@ -766,14 +766,13 @@ const triggerEmergencyLock = () => {
     color: 'red-9'
   }).onOk(async () => {
     try {
-      await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/admin/emergency-lock', {
+      await adminApi.emergencyLock({
         tenant_id: tenant.value.id,
         passcode: passcode
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
       })
       $q.notify({ type: 'positive', message: 'Emergency lock broadcasted successfully to all devices.' })
     } catch (e) {
+      console.error(e)
       $q.notify({ type: 'negative', message: 'Failed to broadcast emergency lock.' })
     }
   })

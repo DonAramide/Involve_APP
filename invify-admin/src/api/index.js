@@ -52,6 +52,7 @@ export const adminApi = {
   approveUserDevice: (id) => api.post('/api/admin/user-devices/approve', { id }),
   blockUserDevice: (id) => api.post('/api/admin/user-devices/block', { id }),
   triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
+  emergencyLock: (data) => api.post('/api/admin/emergency-lock', data),
 
   // Support & Complaints
   getComplaints: () => api.get('/api/admin/complaints'),
