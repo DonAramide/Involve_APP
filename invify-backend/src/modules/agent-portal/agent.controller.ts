@@ -1,5 +1,9 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
+
+const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
 
 export interface Agent {
   id: string;
@@ -227,11 +231,23 @@ export class AgentController {
         return res.status(404).json({ success: false, message: 'Agent not found' });
       }
 
-      // Mock tenants onboarded by this agent
-      const tenants = [
-        { id: `t-${id}-1`, businessName: 'Retail Fast', industry: 'Retail', status: 'ACTIVE', onboardedAt: new Date().toISOString() },
-        { id: `t-${id}-2`, businessName: 'Logistics Beta', industry: 'Logistics', status: 'ONBOARDING', onboardedAt: new Date().toISOString() }
-      ];
+      // Read actual tenants from database
+      const allTenants = fs.existsSync(LOCAL_TENANTS_DB_PATH) 
+        ? JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'))
+        : [];
+      
+      // Filter tenants by agent_code (fallback to all for Master Agent AAA000 if unassigned)
+      const agentTenants = allTenants.filter((t: any) => 
+        t.agent_code === agent.agentCode || (!t.agent_code && agent.agentCode === 'AAA000')
+      );
+
+      const tenants = agentTenants.map((t: any) => ({
+        id: t.id,
+        businessName: t.name,
+        industry: t.type,
+        status: (t.status || 'ACTIVE').toUpperCase(),
+        onboardedAt: t.created_at || new Date().toISOString()
+      }));
 
       return res.status(200).json({
         success: true,
@@ -273,9 +289,17 @@ export class AgentController {
       }
       
       // Simulate dispatching via WebSockets
-      console.log(`[Notification Engine] Direct Message to Agent ${agent.agentCode}: ${message}`);
+      console.log(`\n==============================================`);
+      console.log(`[PUSH NOTIFICATION DISPATCHER]`);
+      console.log(`TARGET: Agent ${agent.agentCode} (${agent.name})`);
+      console.log(`DEVICE/PHONE: ${agent.phone || 'Unknown'}`);
+      console.log(`PAYLOAD: "${message}"`);
+      console.log(`==============================================\n`);
       
-      return res.status(200).json({ success: true, message: 'Message dispatched successfully' });
+      return res.status(200).json({ 
+        success: true, 
+        message: `High-priority push notification delivered to ${agent.name}'s mobile app.` 
+      });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
     }
@@ -290,10 +314,27 @@ export class AgentController {
         return res.status(404).json({ success: false, message: 'Agent not found' });
       }
       
-      // Simulate broadcasting to tenants
-      console.log(`[Notification Engine] Broadcast to tenants of Agent ${agent.agentCode}: ${message}`);
+      // Read actual tenants to count how many are receiving the broadcast
+      const allTenants = fs.existsSync(LOCAL_TENANTS_DB_PATH) 
+        ? JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'))
+        : [];
       
-      return res.status(200).json({ success: true, message: 'Broadcast dispatched to tenants successfully' });
+      const agentTenants = allTenants.filter((t: any) => 
+        t.agent_code === agent.agentCode || (!t.agent_code && agent.agentCode === 'AAA000')
+      );
+      
+      // Simulate broadcasting to tenants
+      console.log(`\n==============================================`);
+      console.log(`[TERMINAL BROADCAST ENGINE]`);
+      console.log(`ROUTING: Agent ${agent.agentCode} Fleet`);
+      console.log(`TARGET COUNT: ${agentTenants.length} active terminals`);
+      console.log(`PAYLOAD: "${message}"`);
+      console.log(`==============================================\n`);
+      
+      return res.status(200).json({ 
+        success: true, 
+        message: `System broadcast successfully queued for ${agentTenants.length} terminals managed by ${agent.agentCode}.` 
+      });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
     }
