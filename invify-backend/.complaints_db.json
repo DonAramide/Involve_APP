@@ -1,12 +1,26 @@
 {
   "complaints": [
     {
+      "id": "comp-1780317655094-489",
+      "title": "help",
+      "description": "I lovet this ",
+      "category": "finance",
+      "urgency": "critical",
+      "status": "pending",
+      "tenant_id": "tenant-1779640483822",
+      "tenant_name": "My Business",
+      "device_id": "VM3041056610_Android",
+      "incident_date": "2026-06-01 13:40",
+      "attachment_url": null,
+      "created_at": "2026-06-01T12:40:55.094Z"
+    },
+    {
       "id": "comp-1780315754749-103",
       "title": "test",
       "description": "the company announced thanks",
       "category": "technical",
       "urgency": "normal",
-      "status": "resolved",
+      "status": "pending",
       "tenant_id": "unknown-tenant",
       "tenant_name": "Mobile App User",
       "device_id": "unknown-device",

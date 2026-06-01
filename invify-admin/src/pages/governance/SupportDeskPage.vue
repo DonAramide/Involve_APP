@@ -8,7 +8,19 @@
         <div class="text-muted">Manage complaints and technical requests from the mobile app ecosystem.</div>
       </div>
       <div class="col-auto row q-gutter-x-sm items-center">
-        <q-input v-model="searchQuery" dense outlined placeholder="Search history..." dark class="bg-dark text-white" style="width: 250px">
+        <q-select 
+          v-model="filterStatus" 
+          :options="[{label:'All Status', value:''}, {label:'Pending', value:'pending'}, {label:'In Progress', value:'in_progress'}, {label:'Resolved', value:'resolved'}]" 
+          dense outlined dark class="bg-dark text-white" style="width: 140px"
+          emit-value map-options
+        />
+        <q-select 
+          v-model="filterCategory" 
+          :options="[{label:'All Category', value:''}, {label:'Technical', value:'technical'}, {label:'Finance', value:'finance'}, {label:'Account', value:'account'}, {label:'General', value:'general'}]" 
+          dense outlined dark class="bg-dark text-white" style="width: 150px"
+          emit-value map-options
+        />
+        <q-input v-model="searchQuery" dense outlined placeholder="Search history..." dark class="bg-dark text-white" style="width: 200px">
           <template v-slot:append>
             <q-icon name="search" color="grey-5" />
           </template>
@@ -19,7 +31,7 @@
 
     <!-- Table -->
     <q-table
-      :rows="complaints"
+      :rows="filteredComplaints"
       :columns="columns"
       row-key="id"
       :loading="loading"
@@ -125,7 +137,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../../api'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
@@ -138,6 +150,16 @@ const complaints = ref([])
 const showDialog = ref(false)
 const selectedComplaint = ref(null)
 const searchQuery = ref('')
+const filterStatus = ref('')
+const filterCategory = ref('')
+
+const filteredComplaints = computed(() => {
+  return complaints.value.filter(c => {
+    if (filterStatus.value && c.status !== filterStatus.value) return false;
+    if (filterCategory.value && c.category !== filterCategory.value) return false;
+    return true;
+  });
+});
 
 const pagination = ref({
   sortBy: 'created_at',

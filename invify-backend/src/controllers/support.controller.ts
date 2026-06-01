@@ -35,8 +35,9 @@ export class SupportController {
   static async createComplaint(req: Request, res: Response) {
     try {
       const { title, description, category, urgency, tenant_id, tenant_name, device_id, incident_date, attachment_url } = req.body;
+      const ticketId = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
       const newComplaint = {
-        id: `comp-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        id: ticketId,
         title,
         description,
         category: category || 'general',
