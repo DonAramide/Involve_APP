@@ -1,6 +1,7 @@
 // invify-admin/src/composables/useTenantExperience.js
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import { setCssVar } from 'quasar'
 
 const CACHE_KEY = 'invify_cached_experience_payload'
 
@@ -93,11 +94,12 @@ export function useTenantExperience() {
    * Colorizes elements programmatically without injecting heavy global static rules.
    */
   const applyThemeOverrides = (brandObj) => {
-    if (!typeof window !== 'undefined' && document?.documentElement?.style) {
+    if (typeof window !== 'undefined' && document?.documentElement?.style) {
+      if (brandObj?.primary) setCssVar('primary', brandObj.primary)
+      if (brandObj?.secondary) setCssVar('secondary', brandObj.secondary)
+      if (brandObj?.accent) setCssVar('accent', brandObj.accent)
+      
       const root = document.documentElement
-      if (brandObj?.primary) root.style.setProperty('--q-primary', brandObj.primary)
-      if (brandObj?.secondary) root.style.setProperty('--q-secondary', brandObj.secondary)
-      if (brandObj?.accent) root.style.setProperty('--q-accent', brandObj.accent)
       if (brandObj?.darkBg) root.style.setProperty('--invify-dark-bg', brandObj.darkBg)
       if (brandObj?.cardBg) root.style.setProperty('--invify-card-bg', brandObj.cardBg)
       if (brandObj?.fontFamily) root.style.setProperty('--invify-font-family', brandObj.fontFamily)
