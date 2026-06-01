@@ -42,6 +42,13 @@
           class="q-mr-sm text-weight-bold" 
         />
         <q-btn outline color="red-5" icon="lock_reset" label="Reset Password" @click="resetPassword" class="q-mr-sm text-weight-bold" />
+        <q-btn 
+          color="red-10" 
+          icon="lock" 
+          label="Emergency Lock" 
+          @click="triggerEmergencyLock" 
+          class="q-mr-sm text-weight-bold animate-pulse-amber" 
+        />
         <q-btn flat color="grey-6" icon="refresh" @click="fetchDetails" />
       </div>
     </div>
@@ -746,6 +753,30 @@ const openActivationShortcut = () => {
   shortcutConfig.value.planIndex = getPlanIndex(tenant.value.plan)
   shortcutConfig.value.deviceSuffix = Math.floor(1000 + Math.random() * 9000).toString()
   showShortcutDialog.value = true
+}
+
+const triggerEmergencyLock = () => {
+  const passcode = Math.floor(1000 + Math.random() * 9000).toString()
+  $q.dialog({
+    title: 'Emergency Lock',
+    message: `Are you sure you want to trigger an emergency lock for ${tenant.value.name}?<br><br>The new unlock passcode will be: <strong class="text-h6">${passcode}</strong>.<br><br>Please save this code before proceeding!`,
+    html: true,
+    cancel: true,
+    persistent: true,
+    color: 'red-9'
+  }).onOk(async () => {
+    try {
+      await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/admin/emergency-lock', {
+        tenant_id: tenant.value.id,
+        passcode: passcode
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
+      })
+      $q.notify({ type: 'positive', message: 'Emergency lock broadcasted successfully to all devices.' })
+    } catch (e) {
+      $q.notify({ type: 'negative', message: 'Failed to broadcast emergency lock.' })
+    }
+  })
 }
 
 const getPlanIndex = (planName) => {
