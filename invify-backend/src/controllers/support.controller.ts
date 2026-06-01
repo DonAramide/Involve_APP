@@ -4,7 +4,7 @@ import { supabase } from '../db/supabase';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const LOCAL_DB_PATH = path.join(process.cwd(), 'complaints_db.json');
+const LOCAL_DB_PATH = path.join(process.cwd(), '.complaints_db.json');
 
 function getLocalDB() {
   try {
