@@ -228,20 +228,45 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { useQuasar } from 'quasar'
 import { adminApi } from '../../api'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import EnterpriseManualTooltip from '../../components/common/EnterpriseManualTooltip.vue'
 
 const { prefs } = useOperatorPreferences()
+const $q = useQuasar()
 
 const loading = ref(false)
 const openCreateDialog = ref(false)
 const activeTierTab = ref('ALL')
 
 const tenants = ref([])
+const baseOperatorsList = ref([])
+
+const fetchOperators = async () => {
+  try {
+    const res = await adminApi.getUsers()
+    const rawUsers = res.data || []
+    baseOperatorsList.value = rawUsers.map(u => ({
+      id: u.id,
+      email: u.email,
+      role: (u.role || '').toUpperCase(),
+      tenantId: u.tenant_id || 'global-platform',
+      isMfaEnabled: !!u.is_mfa_enabled,
+      status: u.is_active ? 'ACTIVE' : 'SUSPENDED'
+    }))
+  } catch (e) {
+    console.error('Failed to fetch operators:', e)
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to retrieve operator profiles from server telemetry context.',
+      position: 'bottom-right'
+    })
+  }
+}
 
 onMounted(async () => {
+  loading.value = true
   try {
     const res = await adminApi.getTenants()
     tenants.value = res.data || []
@@ -253,6 +278,8 @@ onMounted(async () => {
       { id: 'tenant-omega', name: 'Omega Retail Group' }
     ]
   }
+  await fetchOperators()
+  loading.value = false
 })
 
 const targetScopeOptions = computed(() => {
@@ -272,15 +299,6 @@ const hierarchyRoles = [
   { label: 'Tier 4: Tenant Operators', value: 'TENANT_OPERATOR' },
   { label: 'Tier 5: Pro Customers', value: 'PRO_CUSTOMER' }
 ]
-
-const baseOperatorsList = ref([
-  { id: 'usr-sa-001', email: 'superadmin@IIPS.app', role: 'SUPER_ADMIN', tenantId: 'global-platform', isMfaEnabled: true, status: 'ACTIVE' },
-  { id: 'usr-st-002', email: 'sec-staff-node@IIPS.app', role: 'INTERNAL_STAFF', tenantId: 'global-platform', isMfaEnabled: true, status: 'ACTIVE' },
-  { id: 'usr-ta-003', email: 'admin@fintech-alpha.dev', role: 'TENANT_ADMIN', tenantId: 'tenant-alpha', isMfaEnabled: false, status: 'ACTIVE' },
-  { id: 'usr-to-004', email: 'kiosk-agent@fintech-alpha.dev', role: 'TENANT_OPERATOR', tenantId: 'tenant-alpha', isMfaEnabled: false, status: 'ACTIVE' },
-  { id: 'usr-pc-005', email: 'pro-user@IIPS.app', role: 'PRO_CUSTOMER', tenantId: 'tenant-beta', isMfaEnabled: true, status: 'ACTIVE' },
-  { id: 'usr-to-006', email: 'suspended-node@omega-retail.com', role: 'TENANT_OPERATOR', tenantId: 'tenant-omega', isMfaEnabled: true, status: 'SUSPENDED' }
-])
 
 const filteredOperators = computed(() => {
   if (activeTierTab.value === 'ALL') return baseOperatorsList.value
@@ -305,23 +323,34 @@ const getRoleBadgeColor = (roleStr) => {
 const executeCreationPipeline = async () => {
   loading.value = true
   try {
-    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/operators', {
+    const isPlatform = [
+      'SUPER_ADMIN',
+      'INTERNAL_STAFF'
+    ].includes(newOp.value.role)
+
+    const payload = {
       email: newOp.value.email,
       password: newOp.value.password,
-      role: newOp.value.role,
-      targetTenantId: newOp.value.targetTenantId
-    }, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
+      role: newOp.value.role.toLowerCase(),
+      tenantId: isPlatform || newOp.value.targetTenantId === 'global-platform' ? null : newOp.value.targetTenantId
+    }
+
+    const res = await adminApi.createUser(payload)
+    const u = res.data
+
+    baseOperatorsList.value.unshift({
+      id: u?.id || `usr-${Date.now()}`,
+      email: u?.email || newOp.value.email,
+      role: (u?.role || newOp.value.role).toUpperCase(),
+      tenantId: u?.tenant_id || newOp.value.targetTenantId,
+      isMfaEnabled: !!u?.is_mfa_enabled,
+      status: u?.is_active !== false ? 'ACTIVE' : 'SUSPENDED'
     })
 
-    // Merge optimistically atop live viewing arrays
-    baseOperatorsList.value.unshift({
-      id: res.data?.operator?.id || `usr-${Date.now()}`,
-      email: newOp.value.email,
-      role: newOp.value.role,
-      tenantId: newOp.value.targetTenantId,
-      isMfaEnabled: false,
-      status: 'ACTIVE'
+    $q.notify({
+      type: 'positive',
+      message: 'Enterprise operator profile provisioned successfully.',
+      position: 'bottom-right'
     })
 
     openCreateDialog.value = false
@@ -329,34 +358,54 @@ const executeCreationPipeline = async () => {
     newOp.value.email = ''
     newOp.value.password = ''
   } catch (err) {
-    // If backend disconnected, append to UI locally for workflow validation loops
-    baseOperatorsList.value.unshift({
-      id: `usr-mock-${Date.now()}`,
-      email: newOp.value.email,
-      role: newOp.value.role,
-      tenantId: newOp.value.targetTenantId,
-      isMfaEnabled: false,
-      status: 'ACTIVE'
+    console.error('Failed to create operator:', err)
+    const errMsg = err.response?.data?.error || err.message || 'Unknown credential sync failure.'
+    $q.notify({
+      type: 'negative',
+      message: `Failed to commit operator profile: ${errMsg}`,
+      position: 'bottom-right'
     })
-    openCreateDialog.value = false
   } finally {
     loading.value = false
   }
 }
 
 const confirmSuspension = async (opNode) => {
-  opNode.status = 'SUSPENDED'
   try {
-    await axios.post(`https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/operators/${opNode.id}/suspend`, {
-      reason: 'Operator intervention trace suspension trigger.'
-    }, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
+    await adminApi.updateUser(opNode.id, { is_active: false })
+    opNode.status = 'SUSPENDED'
+    $q.notify({
+      type: 'info',
+      message: `Operator ${opNode.email} suspended successfully.`,
+      position: 'bottom-right'
     })
-  } catch (e) {}
+  } catch (e) {
+    console.error('Failed to suspend operator:', e)
+    $q.notify({
+      type: 'negative',
+      message: `Failed to suspend operator: ${e.message}`,
+      position: 'bottom-right'
+    })
+  }
 }
 
-const restoreOperator = (opNode) => {
-  opNode.status = 'ACTIVE'
+const restoreOperator = async (opNode) => {
+  try {
+    await adminApi.updateUser(opNode.id, { is_active: true })
+    opNode.status = 'ACTIVE'
+    $q.notify({
+      type: 'positive',
+      message: `Operator ${opNode.email} restored/unsuspended successfully.`,
+      position: 'bottom-right'
+    })
+  } catch (e) {
+    console.error('Failed to restore operator:', e)
+    $q.notify({
+      type: 'negative',
+      message: `Failed to restore operator: ${e.message}`,
+      position: 'bottom-right'
+    })
+  }
 }
 </script>
 

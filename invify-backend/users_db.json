@@ -1,0 +1,62 @@
+[
+  {
+    "id": "usr-sa-001",
+    "name": "Super Admin Master",
+    "email": "superadmin@IIPS.app",
+    "role": "super_admin",
+    "tenant_id": null,
+    "is_mfa_enabled": true,
+    "is_active": true,
+    "created_at": "2026-06-03T16:44:39.659Z"
+  },
+  {
+    "id": "usr-st-002",
+    "name": "Security Staff Node",
+    "email": "sec-staff-node@IIPS.app",
+    "role": "internal_staff",
+    "tenant_id": null,
+    "is_mfa_enabled": true,
+    "is_active": true,
+    "created_at": "2026-06-03T16:44:39.659Z"
+  },
+  {
+    "id": "usr-ta-003",
+    "name": "Alpha Tenant Admin",
+    "email": "admin@fintech-alpha.dev",
+    "role": "tenant_admin",
+    "tenant_id": "00000000-0000-0000-0000-000000000001",
+    "is_mfa_enabled": false,
+    "is_active": true,
+    "created_at": "2026-06-03T16:44:39.659Z"
+  },
+  {
+    "id": "usr-to-004",
+    "name": "Kiosk Agent",
+    "email": "kiosk-agent@fintech-alpha.dev",
+    "role": "tenant_operator",
+    "tenant_id": "00000000-0000-0000-0000-000000000001",
+    "is_mfa_enabled": false,
+    "is_active": true,
+    "created_at": "2026-06-03T16:44:39.659Z"
+  },
+  {
+    "id": "usr-pc-005",
+    "name": "Pro Customer",
+    "email": "pro-user@IIPS.app",
+    "role": "pro_customer",
+    "tenant_id": "00000000-0000-0000-0000-000000000002",
+    "is_mfa_enabled": true,
+    "is_active": true,
+    "created_at": "2026-06-03T16:44:39.659Z"
+  },
+  {
+    "id": "usr-to-006",
+    "name": "Suspended Node",
+    "email": "suspended-node@omega-retail.com",
+    "role": "tenant_operator",
+    "tenant_id": "00000000-0000-0000-0000-000000000003",
+    "is_mfa_enabled": true,
+    "is_active": false,
+    "created_at": "2026-06-03T16:44:39.659Z"
+  }
+]
