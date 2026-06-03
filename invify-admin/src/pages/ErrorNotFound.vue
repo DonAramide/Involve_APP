@@ -14,7 +14,7 @@
         color="white"
         text-color="blue"
         unelevated
-        to="/"
+        @click="goHome"
         label="Go Home"
         no-caps
       />
@@ -22,10 +22,19 @@
   </div>
 </template>
 
-<script>
-import { defineComponent } from 'vue'
+<script setup>
+import { useRouter, useRoute } from 'vue-router'
 
-export default defineComponent({
-  name: 'ErrorNotFound'
-})
+const router = useRouter()
+const route = useRoute()
+
+const goHome = () => {
+  if (route.path.startsWith('/agent')) {
+    router.push('/agent/login')
+  } else if (route.path.startsWith('/tenant')) {
+    router.push('/tenant/dashboard')
+  } else {
+    router.push('/login')
+  }
+}
 </script>

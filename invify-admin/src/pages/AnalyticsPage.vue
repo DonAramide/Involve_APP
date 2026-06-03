@@ -79,7 +79,7 @@
              <div class="text-h6 text-weight-bold q-mb-lg">Revenue Mix</div>
              <div class="text-center q-pa-md">
                 <div class="text-h3 text-weight-bolder text-green-4 q-mb-xs">
-                   <span class="text-caption">₦</span>{{ (stats?.revenue?.mrrEstimate || 0).toLocaleString() }}
+                   <span class="text-caption">{{ currentCurrency.symbol }}</span>{{ (stats?.revenue?.mrrEstimate || 0).toLocaleString() }}
                 </div>
                 <div class="text-subtitle2 text-grey-4 uppercase letter-spacing-1">Estimated MRR</div>
              </div>
@@ -106,6 +106,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, onMounted, computed } from 'vue'
 import { adminApi } from '../api'
 
@@ -118,7 +121,7 @@ const kpis = computed(() => {
     { label: 'Active (7-Day)', value: stats.value.activation.wau, icon: 'bolt', color: 'indigo-4', sub: 'Weekly Active Schools' },
     { label: 'Cache Hit Rate', value: stats.value.usage.cacheHitRate + '%', icon: 'speed', color: 'green-4', sub: 'Cost efficiency signal' },
     { label: 'Staff Population', value: stats.value.growth.totalTeachers, icon: 'people', color: 'blue-4', sub: 'Total registered teachers' },
-    { label: 'MRR (Est)', value: '₦' + (stats.value.revenue.mrrEstimate || 0).toLocaleString(), icon: 'trending_up', color: 'teal-4', sub: 'Monthly Recurring Revenue' }
+    { label: 'MRR (Est)', value: currentCurrency.symbol + (stats.value.revenue.mrrEstimate || 0).toLocaleString(), icon: 'trending_up', color: 'teal-4', sub: 'Monthly Recurring Revenue' }
   ]
 })
 

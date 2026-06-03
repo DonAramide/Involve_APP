@@ -84,7 +84,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Wallet Float</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">₦18.4B</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}18.4B</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -161,17 +161,17 @@
             </template>
             <template v-slot:body-cell-currentBalance="props">
               <q-td :props="props" class="font-mono text-right text-weight-bold" :class="props.value < 0 ? 'text-red-4' : 'text-main'">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-availableBalance="props">
               <q-td :props="props" class="font-mono text-right text-green-4 text-weight-bold">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-pendingBalance="props">
               <q-td :props="props" class="font-mono text-right text-amber-4 text-weight-bold">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-riskScore="props">
@@ -272,10 +272,10 @@
                 <div class="col-6">
                   <div class="enterprise-subpanel q-pa-md border-muted rounded-borders full-height bg-dark">
                     <div class="text-caption text-muted font-mono q-mb-sm border-bottom q-pb-xs">Live Balances</div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Current Balance:</span><span :class="selectedWallet.currentBalance < 0 ? 'text-red-4' : 'text-main'">₦{{ selectedWallet.currentBalance.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Pending Credits:</span><span class="text-amber-4">₦{{ selectedWallet.pendingBalance.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Held/Reserved:</span><span class="text-red-4">₦0</span></div>
-                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Available Balance:</span><span class="text-green-4 text-h6" style="line-height: 1;">₦{{ selectedWallet.availableBalance.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Current Balance:</span><span :class="selectedWallet.currentBalance < 0 ? 'text-red-4' : 'text-main'">{{ currentCurrency.symbol }}{{ selectedWallet.currentBalance.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Pending Credits:</span><span class="text-amber-4">{{ currentCurrency.symbol }}{{ selectedWallet.pendingBalance.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Held/Reserved:</span><span class="text-red-4">{{ currentCurrency.symbol }}0</span></div>
+                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Available Balance:</span><span class="text-green-4 text-h6" style="line-height: 1;">{{ currentCurrency.symbol }}{{ selectedWallet.availableBalance.toLocaleString() }}</span></div>
                   </div>
                 </div>
               </div>
@@ -285,10 +285,10 @@
             <q-tab-panel name="balance" class="q-pa-md column">
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                 <div class="text-weight-bold q-mb-md">Balance Reconciliation (Last 30 Days)</div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Opening Balance:</span><span class="text-main">₦4,200,000</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Total Credits (In):</span><span class="text-green-4">+ ₦12,500,000</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Total Debits (Out):</span><span class="text-red-4">- ₦8,450,000</span></div>
-                <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Calculated Closing:</span><span class="text-main">₦8,250,000</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Opening Balance:</span><span class="text-main">{{ currentCurrency.symbol }}4,200,000</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Total Credits (In):</span><span class="text-green-4">+ {{ currentCurrency.symbol }}12,500,000</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Total Debits (Out):</span><span class="text-red-4">- {{ currentCurrency.symbol }}8,450,000</span></div>
+                <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Calculated Closing:</span><span class="text-main">{{ currentCurrency.symbol }}8,250,000</span></div>
               </div>
             </q-tab-panel>
 
@@ -366,6 +366,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('all')

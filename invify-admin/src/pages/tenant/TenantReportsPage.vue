@@ -57,7 +57,7 @@
                   :style="`height: ${(val / 2000000) * 100}%; background: linear-gradient(180deg, #d8b4fe 0%, rgba(216, 180, 254, 0.1) 100%);`"
                 >
                   <q-tooltip class="bg-indigo-10 text-white text-metric-mono">
-                    {{ label }}: ₦{{ val.toLocaleString() }}
+                    {{ label }}: {{ currentCurrency.symbol }}{{ val.toLocaleString() }}
                   </q-tooltip>
                 </div>
                 <span class="text-metric-mono text-grey-6 q-mt-xs font-mono" style="font-size: 10px;">{{ label }}</span>
@@ -96,6 +96,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 

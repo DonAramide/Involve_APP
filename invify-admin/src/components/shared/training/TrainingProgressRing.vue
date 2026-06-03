@@ -1,0 +1,1 @@
+<template><div>SVG Ring 0-100%</div></template>

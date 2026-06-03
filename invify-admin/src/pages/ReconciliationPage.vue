@@ -196,6 +196,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, onMounted } from 'vue'
 import { reconciliationApi, attendanceApi } from '../api'
 import { useQuasar } from 'quasar'
@@ -220,7 +223,7 @@ const allStudents = ref([])
 const columns = [
   { name: 'createdAt', label: 'DATE', field: 'createdAt', format: val => new Date(val).toLocaleString(), align: 'left', sortable: true },
   { name: 'reference', label: 'REFERENCE', field: 'reference', align: 'left' },
-  { name: 'amount', label: 'AMOUNT', field: 'amount', format: val => `₦${Number(val).toLocaleString()}`, align: 'right' },
+  { name: 'amount', label: 'AMOUNT', field: 'amount', format: val => `${currentCurrency.symbol}${Number(val).toLocaleString()}`, align: 'right' },
   { name: 'issueType', label: 'DETECTION', field: 'issueType', align: 'left' },
   { name: 'actions', label: 'ACTIONS', align: 'center' }
 ]

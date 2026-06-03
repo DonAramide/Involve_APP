@@ -352,7 +352,7 @@
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                 <div class="text-weight-bold q-mb-md">Financial Impact Assessment</div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Financial Effect:</span><span class="text-red-4 text-weight-bold">POTENTIAL LOSS</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Affected Amount:</span><span class="text-red-4">₦2,500,000</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Affected Amount:</span><span class="text-red-4">{{ currentCurrency.symbol }}2,500,000</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Ledger Impact:</span><span class="text-main">None (Reverted)</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Treasury Impact:</span><span class="text-main">None</span></div>
               </div>
@@ -386,6 +386,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('events')

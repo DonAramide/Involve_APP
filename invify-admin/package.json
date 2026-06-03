@@ -4,29 +4,62 @@
   "description": "IIPS Admin Panel with Engine Unit Tests",
   "private": true,
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
     "test": "jest --forceExit --runInBand --verbose",
     "test:coverage": "jest --forceExit --runInBand --coverage --verbose",
     "test:watch": "jest --watch"
   },
   "devDependencies": {
+    "@quasar/vite-plugin": "^1.6.0",
     "@types/jest": "^29.5.14",
+    "@vitejs/plugin-vue": "^5.0.4",
     "jest": "^29.7.0",
+    "sass-embedded": "^1.99.0",
     "ts-jest": "^29.4.11",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vite": "^5.2.8"
   },
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
     "rootDir": ".",
-    "testMatch": ["**/tests/**/*.test.ts"],
-    "moduleFileExtensions": ["ts", "js", "json"],
+    "testMatch": [
+      "**/tests/**/*.test.ts"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "js",
+      "json"
+    ],
     "transform": {
-      "^.+\\.tsx?$": ["ts-jest", { "tsconfig": "tsconfig.json" }]
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.json"
+        }
+      ]
     },
     "collectCoverageFrom": [
       "src/services/*.ts"
     ],
-    "coverageReporters": ["text", "text-summary", "json-summary"],
+    "coverageReporters": [
+      "text",
+      "text-summary",
+      "json-summary"
+    ],
     "coverageDirectory": "coverage"
+  },
+  "dependencies": {
+    "@quasar/extras": "^1.16.9",
+    "@supabase/supabase-js": "^2.104.0",
+    "apexcharts": "^5.13.0",
+    "axios": "^1.6.8",
+    "pinia": "^3.0.4",
+    "qrcode.vue": "^3.9.1",
+    "quasar": "^2.15.1",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0",
+    "vue3-apexcharts": "^1.11.1"
   }
 }

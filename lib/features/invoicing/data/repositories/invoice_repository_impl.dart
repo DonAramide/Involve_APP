@@ -42,6 +42,20 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     final invoiceSyncId = _uuid.v4();
 
     await db.transaction(() async {
+      String? finalCustomerId = invoice.customerId;
+
+      if (finalCustomerId == null && invoice.customerName != null && invoice.customerName!.trim().isNotEmpty) {
+        finalCustomerId = _uuid.v4();
+        await db.into(db.customers).insert(
+          CustomersCompanion.insert(
+            id: finalCustomerId,
+            name: invoice.customerName!.trim(),
+            phone: Value(invoice.customerPhone),
+            address: Value(invoice.customerAddress),
+          ),
+        );
+      }
+
       final invoiceId = await db.into(db.invoices).insert(
             InvoicesCompanion.insert(
               invoiceNumber: invoice.invoiceNumber,
@@ -55,7 +69,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               amountPaid: Value(invoice.amountPaid),
               balanceAmount: Value(invoice.balanceAmount),
               customerName: Value(invoice.customerName),
-              customerId: Value(invoice.customerId),
+              customerId: Value(finalCustomerId),
               customerAddress: Value(invoice.customerAddress),
               paymentMethod: Value(invoice.paymentMethod),
               staffId: Value(invoice.staffId),
@@ -172,7 +186,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       }
 
       // 4. Update Customer Balance if customer is associated with invoice
-      if (invoice.customerId != null) {
+      if (finalCustomerId != null) {
         final double balanceChange;
         
         if (invoice.invoiceNumber.startsWith('PMT-')) {
@@ -193,11 +207,10 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         }
         
         await db.customUpdate(
-          'UPDATE customers SET balance = balance + ?, updated_at = ? WHERE id = ?',
+          'UPDATE customers SET balance = balance + ? WHERE id = ?',
           variables: [
             Variable.withReal(balanceChange),
-            Variable.withDateTime(now),
-            Variable.withString(invoice.customerId!)
+            Variable.withString(finalCustomerId)
           ],
           updates: {db.customers},
         );
@@ -450,10 +463,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       // Propagate balance update to customer master balance
       if (invoice.customerId != null) {
         await db.customUpdate(
-          'UPDATE customers SET balance = balance - ?, updated_at = ? WHERE id = ?',
+          'UPDATE customers SET balance = balance - ? WHERE id = ?',
           variables: [
             Variable.withReal(additionalAmount),
-            Variable.withDateTime(now),
             Variable.withString(invoice.customerId!)
           ],
           updates: {db.customers},

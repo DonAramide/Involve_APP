@@ -81,7 +81,7 @@
         
         <template v-slot:body-cell-amount="props">
           <q-td :props="props" class="text-metric-mono font-mono text-weight-bold">
-            ₦{{ props.value.toLocaleString() }}
+            {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
           </q-td>
         </template>
 
@@ -102,6 +102,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 
@@ -198,7 +201,7 @@ const triggerPdfExport = () => {
 const viewInvoice = (row) => {
   $q.dialog({
     title: 'Receipt Detail Lineage',
-    message: `Reference: ${row.ref}\nTimestamp: ${row.date}\nChannel: ${row.type}\nAmount: ₦${row.amount.toLocaleString()}\nAudit status: Validated`,
+    message: `Reference: ${row.ref}\nTimestamp: ${row.date}\nChannel: ${row.type}\nAmount: {{ currentCurrency.symbol }}${row.amount.toLocaleString()}\nAudit status: Validated`,
     dark: true
   })
 }

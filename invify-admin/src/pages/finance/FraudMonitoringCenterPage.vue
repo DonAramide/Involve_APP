@@ -59,7 +59,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Fraud Loss Exposure</div>
-          <div class="text-h5 text-metric-mono text-amber-4">₦14.5M</div>
+          <div class="text-h5 text-metric-mono text-amber-4">{{ currentCurrency.symbol }}14.5M</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -156,7 +156,7 @@
             </template>
             <template v-slot:body-cell-exposure="props">
               <q-td :props="props" class="font-mono text-right text-amber-4 text-weight-bold">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-riskScore="props">
@@ -274,7 +274,7 @@
                     <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Linked Wallet:</span><span class="text-indigo-4">{{ selectedCase.wallet }}</span></div>
                     <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Linked Terminal:</span><span class="text-indigo-4">{{ selectedCase.terminal || 'N/A' }}</span></div>
                     <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Linked Device:</span><span class="text-cyan-4">{{ selectedCase.device || 'N/A' }}</span></div>
-                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Total Exposure:</span><span class="text-red-4 text-h6" style="line-height: 1;">₦{{ selectedCase.exposure.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Total Exposure:</span><span class="text-red-4 text-h6" style="line-height: 1;">{{ currentCurrency.symbol }}{{ selectedCase.exposure.toLocaleString() }}</span></div>
                   </div>
                 </div>
               </div>
@@ -353,6 +353,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('investigation')

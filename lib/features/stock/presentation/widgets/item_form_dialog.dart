@@ -13,6 +13,7 @@ import '../bloc/stock_state.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import '../../../../core/utils/terminology.dart';
+import '../../../../core/widgets/barcode_scanner_dialog.dart';
 
 class ItemFormDialog extends StatefulWidget {
   final Item? item;
@@ -29,6 +30,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   late String _name;
   final _priceController = TextEditingController();
   final _costPriceController = TextEditingController();
+  final _barcodeController = TextEditingController();
   late int _stockQty;
   ItemCategory _legacyCategory = ItemCategory.drink; // Fallback
   int? _selectedCategoryId;
@@ -47,6 +49,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
     _name = widget.item?.name ?? '';
     _priceController.text = widget.item == null ? '0' : (widget.item!.price % 1 == 0 ? widget.item!.price.toInt().toString() : widget.item!.price.toString());
     _costPriceController.text = widget.item == null ? '0' : (widget.item!.costPrice % 1 == 0 ? widget.item!.costPrice.toInt().toString() : widget.item!.costPrice.toString());
+    _barcodeController.text = widget.item?.barcode ?? '';
     _stockQty = widget.item?.stockQty ?? 0;
     _legacyCategory = widget.item?.category ?? ItemCategory.drink;
     _selectedCategoryId = widget.item?.categoryId;
@@ -79,6 +82,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
   void dispose() {
     _priceController.dispose();
     _costPriceController.dispose();
+    _barcodeController.dispose();
     super.dispose();
   }
 
@@ -229,6 +233,27 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
                 validator: (val) => InputValidator.validateNotEmpty(val, 'Item Name'),
               ),
               
+              TextFormField(
+                controller: _barcodeController,
+                decoration: InputDecoration(
+                  labelText: 'Barcode (Optional)',
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    onPressed: () async {
+                      final result = await showDialog<String>(
+                        context: context,
+                        builder: (ctx) => const BarcodeScannerDialog(),
+                      );
+                      if (result != null && result.isNotEmpty) {
+                        setState(() {
+                          _barcodeController.text = result;
+                        });
+                      }
+                    },
+                  ),
+                ),
+              ),
+
               // Conditional Fields based on Type
               if (_type == 'product') ...[
                 BlocBuilder<StockBloc, StockState>(
@@ -389,6 +414,7 @@ class _ItemFormDialogState extends State<ItemFormDialog> {
         serviceCategory: _serviceCategory,
         requiresTimeTracking: _billingType == 'per_day' || _billingType == 'per_hour' || _billingType == 'per_half_day',
         businessMode: _businessMode,
+        barcode: _barcodeController.text.trim().isEmpty ? null : _barcodeController.text.trim(),
       );
 
       if (widget.item == null) {

@@ -16,15 +16,15 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Total Debits:</span>
-            <span class="text-green-4 text-weight-bold">₦5,000,000</span>
+            <span class="text-green-4 text-weight-bold">{{ currentCurrency.symbol }}5,000,000</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Total Credits:</span>
-            <span class="text-amber-4 text-weight-bold">₦5,000,000</span>
+            <span class="text-amber-4 text-weight-bold">{{ currentCurrency.symbol }}5,000,000</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Difference:</span>
-            <q-badge color="green-10" text-color="green-3">₦0</q-badge>
+            <q-badge color="green-10" text-color="green-3">{{ currentCurrency.symbol }}0</q-badge>
           </div>
           <q-icon name="check_circle" color="green-4" size="sm" />
         </div>
@@ -41,13 +41,13 @@
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left">
           <div class="text-operator-title text-muted">Total Ledger Assets</div>
-          <div class="text-h4 text-metric-mono text-cyan-4">₦4.2B <span class="text-caption text-muted">System Float</span></div>
+          <div class="text-h4 text-metric-mono text-cyan-4">{{ currentCurrency.symbol }}4.2B <span class="text-caption text-muted">System Float</span></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left">
           <div class="text-operator-title text-muted">Tenant Liabilities</div>
-          <div class="text-h4 text-metric-mono text-indigo-4">₦3.8B <span class="text-caption text-muted">Held in Wallets</span></div>
+          <div class="text-h4 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}3.8B <span class="text-caption text-muted">Held in Wallets</span></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
@@ -168,12 +168,12 @@
             </template>
             <template v-slot:body-cell-debit="props">
               <q-td :props="props" class="font-mono text-green-4 text-right">
-                {{ props.row.type === 'DEBIT' ? '₦' + props.row.amount.toLocaleString() : '-' }}
+                {{ props.row.type === 'DEBIT' ? currentCurrency.symbol + props.row.amount.toLocaleString() : '-' }}
               </q-td>
             </template>
             <template v-slot:body-cell-credit="props">
               <q-td :props="props" class="font-mono text-amber-4 text-right">
-                {{ props.row.type === 'CREDIT' ? '₦' + props.row.amount.toLocaleString() : '-' }}
+                {{ props.row.type === 'CREDIT' ? currentCurrency.symbol + props.row.amount.toLocaleString() : '-' }}
               </q-td>
             </template>
           </q-table>
@@ -191,15 +191,15 @@
                   </div>
                   <div class="row justify-between q-mb-xs">
                     <span class="text-muted text-caption">Opening:</span>
-                    <span>₦{{ bal.opening.toLocaleString() }}</span>
+                    <span>{{ currentCurrency.symbol }}{{ bal.opening.toLocaleString() }}</span>
                   </div>
                   <div class="row justify-between q-mb-xs">
                     <span class="text-muted text-caption">Movement:</span>
-                    <span :class="bal.movement >= 0 ? 'text-green-4' : 'text-amber-4'">{{ bal.movement >= 0 ? '+' : '' }}₦{{ bal.movement.toLocaleString() }}</span>
+                    <span :class="bal.movement >= 0 ? 'text-green-4' : 'text-amber-4'">{{ bal.movement >= 0 ? '+' : '' }}{{ currentCurrency.symbol }}{{ bal.movement.toLocaleString() }}</span>
                   </div>
                   <div class="row justify-between text-weight-bold q-mt-sm border-top q-pt-sm">
                     <span class="text-muted text-caption">Closing:</span>
-                    <span class="text-h6" style="line-height:1">₦{{ bal.closing.toLocaleString() }}</span>
+                    <span class="text-h6" style="line-height:1">{{ currentCurrency.symbol }}{{ bal.closing.toLocaleString() }}</span>
                   </div>
                 </div>
               </div>
@@ -234,11 +234,11 @@
                   </div>
                   <div class="row justify-between q-mb-xs">
                     <span class="text-muted text-caption">Total Debits:</span>
-                    <span class="text-green-4">₦{{ batch.debits.toLocaleString() }}</span>
+                    <span class="text-green-4">{{ currentCurrency.symbol }}{{ batch.debits.toLocaleString() }}</span>
                   </div>
                   <div class="row justify-between q-mb-xs">
                     <span class="text-muted text-caption">Total Credits:</span>
-                    <span class="text-amber-4">₦{{ batch.credits.toLocaleString() }}</span>
+                    <span class="text-amber-4">{{ currentCurrency.symbol }}{{ batch.credits.toLocaleString() }}</span>
                   </div>
                 </div>
               </div>
@@ -274,7 +274,7 @@
             <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-cyan-left" style="width: 280px;" v-if="selectedLedger.type === 'DEBIT'">
               <div class="text-cyan-4 text-weight-bold">Debit Origin</div>
               <div class="text-muted text-caption">{{ selectedLedger.flow.debit }}</div>
-              <div class="text-green-4 text-weight-bold q-mt-xs">₦{{ selectedLedger.amount.toLocaleString() }}</div>
+              <div class="text-green-4 text-weight-bold q-mt-xs">{{ currentCurrency.symbol }}{{ selectedLedger.amount.toLocaleString() }}</div>
             </div>
             <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-indigo-left" style="width: 280px;" v-else>
               <div class="text-indigo-4 text-weight-bold">Debit Origin</div>
@@ -295,7 +295,7 @@
             <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-amber-left" style="width: 280px;" v-if="selectedLedger.type === 'CREDIT'">
               <div class="text-amber-4 text-weight-bold">Credit Destination</div>
               <div class="text-muted text-caption">{{ selectedLedger.flow.credit }}</div>
-              <div class="text-amber-4 text-weight-bold q-mt-xs">₦{{ selectedLedger.amount.toLocaleString() }}</div>
+              <div class="text-amber-4 text-weight-bold q-mt-xs">{{ currentCurrency.symbol }}{{ selectedLedger.amount.toLocaleString() }}</div>
             </div>
             <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-indigo-left" style="width: 280px;" v-else>
               <div class="text-indigo-4 text-weight-bold">Credit Destination</div>
@@ -346,6 +346,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeTab = ref('coa')

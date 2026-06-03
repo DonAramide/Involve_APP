@@ -76,7 +76,7 @@
 
         <template v-slot:body-cell-discrepancy="props">
           <q-td :props="props" class="text-metric-mono font-mono text-weight-bold text-red-4">
-            ₦{{ props.value.toLocaleString() }}
+            {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
           </q-td>
         </template>
 
@@ -103,6 +103,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 import SecureFinanceGate from '../../components/finance/SecureFinanceGate.vue'
@@ -153,7 +156,7 @@ const runAuditSequence = () => {
 const solveMatch = (row) => {
   $q.dialog({
     title: 'Discrepancy Resolution Override',
-    message: `A delta mismatch of ₦${row.delta.toLocaleString()} was found on Batch ${row.batch}. Discrepancy trace maps to terminal DSP-9044. Do you approve manual balance reconciliation authorization?`,
+    message: `A delta mismatch of {{ currentCurrency.symbol }}${row.delta.toLocaleString()} was found on Batch ${row.batch}. Discrepancy trace maps to terminal DSP-9044. Do you approve manual balance reconciliation authorization?`,
     cancel: true,
     dark: true
   }).onOk(() => {

@@ -74,7 +74,7 @@
                   type="number"
                   label="Flat Processing Fee (₦)"
                   dark filled dense
-                  prefix="₦"
+                  :prefix="currentCurrency.symbol"
                   label-color="teal-3"
                   class="font-mono bg-black-transparent"
                 />
@@ -85,7 +85,7 @@
                   type="number"
                   label="SMS/Telemetry Unit Cost (₦)"
                   dark filled dense
-                  prefix="₦"
+                  :prefix="currentCurrency.symbol"
                   label-color="teal-3"
                   class="font-mono bg-black-transparent"
                 />
@@ -117,7 +117,7 @@
                   type="number"
                   label="Hypothetical Transaction Size"
                   dark filled dense
-                  prefix="₦"
+                  :prefix="currentCurrency.symbol"
                   label-color="teal-3"
                   class="font-mono bg-black-transparent"
                 />
@@ -126,11 +126,11 @@
                 <div class="bg-black-transparent border-grey-9 q-pa-md rounded-borders">
                   <div class="row justify-between q-mb-xs">
                     <span class="text-grey-5 text-caption">Platform Share:</span>
-                    <span class="text-weight-bold text-teal-4 font-mono">₦{{ platformShare.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
+                    <span class="text-weight-bold text-teal-4 font-mono">{{ currentCurrency.symbol }}{{ platformShare.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
                   </div>
                   <div class="row justify-between">
                     <span class="text-grey-5 text-caption">Merchant Net:</span>
-                    <span class="text-weight-bold text-white font-mono">₦{{ merchantNet.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
+                    <span class="text-weight-bold text-white font-mono">{{ currentCurrency.symbol }}{{ merchantNet.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) }}</span>
                   </div>
                 </div>
               </div>
@@ -149,14 +149,14 @@
             <div class="col-6">
               <q-card class="bg-card-dark border-grey-9 q-pa-md text-center">
                 <div class="text-grey-5 text-caption font-mono text-uppercase tracking-wider" style="font-size: 9px; letter-spacing: 1px;">TOTAL GTV</div>
-                <div class="text-h5 text-weight-bolder text-white q-mt-sm font-mono">₦{{ simulatedGTV.toLocaleString() }}</div>
+                <div class="text-h5 text-weight-bolder text-white q-mt-sm font-mono">{{ currentCurrency.symbol }}{{ simulatedGTV.toLocaleString() }}</div>
                 <div class="text-caption text-teal-4 font-mono text-weight-bold q-mt-xs">+18.5% MTD</div>
               </q-card>
             </div>
             <div class="col-6">
               <q-card class="bg-card-dark border-grey-9 q-pa-md text-center">
                 <div class="text-grey-5 text-caption font-mono text-uppercase tracking-wider" style="font-size: 9px; letter-spacing: 1px;">PLATFORM REVENUE</div>
-                <div class="text-h5 text-weight-bolder text-teal-4 q-mt-sm font-mono">₦{{ simulatedRev.toLocaleString() }}</div>
+                <div class="text-h5 text-weight-bolder text-teal-4 q-mt-sm font-mono">{{ currentCurrency.symbol }}{{ simulatedRev.toLocaleString() }}</div>
                 <div class="text-caption text-grey-6 font-mono q-mt-xs">Target Met</div>
               </q-card>
             </div>
@@ -187,8 +187,8 @@
                   <q-item-label caption class="text-grey-5 font-mono" style="font-size: 10px;">{{ log.date }}</q-item-label>
                 </q-item-section>
                 <q-item-section side class="text-right">
-                  <span class="text-metric-mono font-mono text-teal-4 text-weight-bold" style="font-size: 11px;">+₦{{ log.feeCollected.toLocaleString() }}</span>
-                  <span class="text-grey-6 font-mono" style="font-size: 9.5px;">GTV: ₦{{ log.volume.toLocaleString() }}</span>
+                  <span class="text-metric-mono font-mono text-teal-4 text-weight-bold" style="font-size: 11px;">+{{ currentCurrency.symbol }}{{ log.feeCollected.toLocaleString() }}</span>
+                  <span class="text-grey-6 font-mono" style="font-size: 9.5px;">GTV: {{ currentCurrency.symbol }}{{ log.volume.toLocaleString() }}</span>
                 </q-item-section>
               </q-item>
             </q-list>
@@ -203,6 +203,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 

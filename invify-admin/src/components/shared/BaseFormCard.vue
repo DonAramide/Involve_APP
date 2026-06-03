@@ -1,0 +1,1 @@
+<template><div>Base Form Card</div></template>

@@ -57,7 +57,7 @@
                    <q-card-section class="text-center q-pa-lg">
                       <div class="text-overline text-indigo-3">{{ plan.name }}</div>
                       <div class="text-h3 text-weight-bolder q-mt-sm">
-                        <span class="text-caption">₦</span>{{ plan.price }}<span class="text-caption text-grey-6">/mo</span>
+                        <span class="text-caption">{{ currentCurrency.symbol }}</span>{{ plan.price }}<span class="text-caption text-grey-6">/mo</span>
                       </div>
                       <div class="text-caption text-grey-6 q-mt-xs">{{ plan.subtitle }}</div>
                    </q-card-section>
@@ -115,6 +115,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, onMounted, computed } from 'vue'
 import { billingApi } from '../api'
 

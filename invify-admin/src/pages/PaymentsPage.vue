@@ -95,7 +95,7 @@
 
       <template v-slot:body-cell-amount="props">
         <q-td :props="props">
-          <div class="text-weight-bold text-subtitle2">₦{{ Number(props.value).toLocaleString() }}</div>
+          <div class="text-weight-bold text-subtitle2">{{ currentCurrency.symbol }}{{ Number(props.value).toLocaleString() }}</div>
         </q-td>
       </template>
 
@@ -209,6 +209,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, onMounted, computed } from 'vue'
 import { adminApi } from '../api'
 

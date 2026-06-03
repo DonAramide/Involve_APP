@@ -167,7 +167,7 @@ class ServicesRepositoryImpl implements IServicesRepository {
     Uint8List? image,
   }) async {
     final id = const Uuid().v4();
-    final row = await db.into(db.customers).insertReturning(CustomersCompanion.insert(
+    await db.into(db.customers).insert(CustomersCompanion.insert(
       id: id,
       name: name,
       phone: Value(phone),
@@ -176,6 +176,8 @@ class ServicesRepositoryImpl implements IServicesRepository {
       image: Value(image),
       createdAt: Value(DateTime.now()),
     ));
+    
+    final row = await (db.select(db.customers)..where((t) => t.id.equals(id))).getSingle();
     return _mapCustomer(row);
   }
 

@@ -59,7 +59,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 80;
+  int get schemaVersion => 81;
 
   @override
   MigrationStrategy get migration {
@@ -413,6 +413,10 @@ class AppDatabase extends _$AppDatabase {
           await _safeAddColumn(m, students, students.virtualAccountNumber);
           await _safeAddColumn(m, students, students.virtualAccountBank);
           await _safeAddColumn(m, students, students.virtualAccountStatus);
+        }
+        if (from < 81) {
+          // Schema V81: Add barcode field to Items table
+          await _safeAddColumn(m, items, items.barcode);
         }
       },
       beforeOpen: (details) async {

@@ -333,6 +333,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useQuasar } from 'quasar'
 
@@ -401,7 +404,7 @@ const INDUSTRY_MANIFEST = {
       title: 'SKU Checkout Dispersion Speed',
       subtitle: 'Daily transaction frequency registered across active physical POS nodes.',
       labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
-      tooltipPrefix: 'Daily Sales: ₦',
+      tooltipPrefix: 'Daily Sales: {{ currentCurrency.symbol }}',
       maxVal: 1500000,
       data: [620000, 890000, 740000, 950000, 1100000, 1340000, 820000]
     },
@@ -424,7 +427,7 @@ const INDUSTRY_MANIFEST = {
       title: 'Daily RevPAR Trend',
       subtitle: 'Average room revenue generated dynamically via settlement networks.',
       labels: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
-      tooltipPrefix: 'RevPAR: ₦',
+      tooltipPrefix: 'RevPAR: {{ currentCurrency.symbol }}',
       maxVal: 20000,
       data: [11200, 12500, 11800, 13400, 16800, 18500, 14200]
     },
@@ -495,7 +498,7 @@ const dynamicChartData = computed(() => {
 const getDynamicKpiValue = (key) => {
   const currentVal = dynamicKpis.value[activeIndustry.value]?.[key] || 0
   if (key === 'revenue') {
-    return `₦${currentVal.toLocaleString()}`
+    return `${currentCurrency.symbol}${currentVal.toLocaleString()}`
   }
   if (key === 'attendance' || key === 'stockIndex' || key === 'rooms' || key === 'dispatchRate') {
     return `${currentVal}%`
@@ -634,7 +637,7 @@ onMounted(() => {
         desc: isFee ? 'Term Fees Deposited' : 'Student Check-in Recorded',
         ref: `TX-${randId}`,
         device: 'MOB-CHECK-01',
-        valueFormatted: isFee ? `₦${amount.toLocaleString()}` : `Present (Grade ${Math.floor(Math.random() * 3) + 10})`,
+        valueFormatted: isFee ? `${currentCurrency.symbol}${amount.toLocaleString()}` : `Present (Grade ${Math.floor(Math.random() * 3) + 10})`,
         icon: isFee ? 'payments' : 'check_circle',
         color: isFee ? 'green-4' : 'green-4'
       }
@@ -654,7 +657,7 @@ onMounted(() => {
         desc: isSale ? 'POS Checkout Approved' : 'Stock Inventory Deducted',
         ref: `TX-${randId}`,
         device: 'POS-TERM-02',
-        valueFormatted: isSale ? `₦${amount.toLocaleString()}` : `SKU-INV-${Math.floor(Math.random() * 800) + 100} (1 Unit)`,
+        valueFormatted: isSale ? `${currentCurrency.symbol}${amount.toLocaleString()}` : `SKU-INV-${Math.floor(Math.random() * 800) + 100} (1 Unit)`,
         icon: isSale ? 'payments' : 'inventory_2',
         color: isSale ? 'green-4' : 'amber-4'
       }
@@ -671,7 +674,7 @@ onMounted(() => {
         desc: isBooking ? 'Guest Room Checked In' : 'F&B Checkout Cleared',
         ref: `TX-${randId}`,
         device: 'RECEPT-POS-01',
-        valueFormatted: isBooking ? `Room ${Math.floor(Math.random() * 300) + 101} (Standard)` : `₦${amount.toLocaleString()}`,
+        valueFormatted: isBooking ? `Room ${Math.floor(Math.random() * 300) + 101} (Standard)` : `${currentCurrency.symbol}${amount.toLocaleString()}`,
         icon: isBooking ? 'king_bed' : 'restaurant',
         color: isBooking ? 'green-4' : 'cyan-4'
       }

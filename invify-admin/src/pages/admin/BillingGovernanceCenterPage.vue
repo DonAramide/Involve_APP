@@ -48,7 +48,7 @@
                   </q-badge>
                 </div>
                 <div class="text-h5 text-weight-bolder text-indigo-3 font-mono q-mb-md">
-                  ₦{{ plan.monthlyCost.toLocaleString() }}<span class="text-caption text-grey-6">/mo</span>
+                  {{ currentCurrency.symbol }}{{ plan.monthlyCost.toLocaleString() }}<span class="text-caption text-grey-6">/mo</span>
                 </div>
                 
                 <div class="column q-gutter-y-xs q-mb-md text-caption text-grey-5 font-mono" style="font-size: 10px;">
@@ -93,7 +93,7 @@
                     v-model.number="fee.flatAmount"
                     type="number"
                     dark dense filled
-                    prefix="₦"
+                    :prefix="currentCurrency.symbol"
                     class="font-mono bg-panel text-caption"
                     :disable="fee.type === 'PERCENTAGE'"
                   />
@@ -128,14 +128,14 @@
             <div class="col-6">
               <q-card class="bg-card-dark border-grey-9 q-pa-md text-center shadow-24">
                 <div class="text-grey-5 text-caption font-mono text-uppercase tracking-wider" style="font-size: 9px; letter-spacing: 1px;">PLATFORM MRR EST.</div>
-                <div class="text-h5 text-weight-bolder text-white q-mt-sm font-mono">₦{{ mrrEstimate.toLocaleString() }}</div>
+                <div class="text-h5 text-weight-bolder text-white q-mt-sm font-mono">{{ currentCurrency.symbol }}{{ mrrEstimate.toLocaleString() }}</div>
                 <div class="text-caption text-green-4 font-mono text-weight-bold q-mt-xs">↑ 12.4% vs Last Month</div>
               </q-card>
             </div>
             <div class="col-6">
               <q-card class="bg-card-dark border-grey-9 q-pa-md text-center shadow-24">
                 <div class="text-grey-5 text-caption font-mono text-uppercase tracking-wider" style="font-size: 9px; letter-spacing: 1px;">FEE YIELD MTD</div>
-                <div class="text-h5 text-weight-bolder text-indigo-4 q-mt-sm font-mono">₦{{ feeYield.toLocaleString() }}</div>
+                <div class="text-h5 text-weight-bolder text-indigo-4 q-mt-sm font-mono">{{ currentCurrency.symbol }}{{ feeYield.toLocaleString() }}</div>
                 <div class="text-caption text-grey-6 font-mono q-mt-xs">Aggregated POS Volume</div>
               </q-card>
             </div>
@@ -181,6 +181,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 import { useQuasar } from 'quasar'
 

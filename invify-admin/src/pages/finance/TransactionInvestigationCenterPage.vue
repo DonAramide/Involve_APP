@@ -83,7 +83,7 @@
         
         <template v-slot:body-cell-amount="props">
           <q-td :props="props" class="font-mono text-weight-bold" :class="props.row.type === 'CREDIT' ? 'text-green-4' : 'text-amber-4'">
-            {{ props.row.type === 'CREDIT' ? '+' : '-' }}₦{{ props.value.toLocaleString() }}
+            {{ props.row.type === 'CREDIT' ? '+' : '-' }}{{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
           </q-td>
         </template>
 
@@ -179,7 +179,7 @@
                 <div class="col-12 col-md-6">
                   <div class="text-operator-title text-muted q-mb-sm">Financial Core</div>
                   <div class="enterprise-subpanel q-pa-sm border-muted rounded-borders font-mono text-caption">
-                    <div class="row justify-between q-mb-xs"><span>Amount:</span> <span class="text-white text-h6" style="line-height:1">₦{{ selectedTx.amount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs"><span>Amount:</span> <span class="text-white text-h6" style="line-height:1">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</span></div>
                     <div class="row justify-between q-mb-xs"><span>Currency:</span> <span class="text-white">NGN</span></div>
                     <div class="row justify-between q-mb-xs"><span>Type:</span> <span :class="selectedTx.type === 'CREDIT' ? 'text-green-4' : 'text-amber-4'">{{ selectedTx.type }}</span></div>
                     <div class="row justify-between q-mb-xs"><span>Channel:</span> <span class="text-white">{{ selectedTx.channel }}</span></div>
@@ -193,7 +193,7 @@
                     <div class="row justify-between q-mb-xs"><span>Tenant ID:</span> <span class="text-cyan-3">{{ selectedTx.tenantId }}</span></div>
                     <div class="row justify-between q-mb-xs"><span>Name:</span> <span class="text-white">Future Leaders Academy</span></div>
                     <div class="row justify-between q-mb-xs"><span>Type:</span> <span class="text-white">{{ selectedTx.tenantType }}</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Wallet Bal:</span> <span class="text-green-4">₦2,500,000</span></div>
+                    <div class="row justify-between q-mb-xs"><span>Wallet Bal:</span> <span class="text-green-4">{{ currentCurrency.symbol }}2,500,000</span></div>
                   </div>
                 </div>
 
@@ -331,21 +331,21 @@
                     <tr class="border-bottom hover-bg">
                       <td class="q-pa-sm text-cyan-3">1010-PLATFORM-FLOAT</td>
                       <td class="q-pa-sm">Asset</td>
-                      <td class="q-pa-sm text-right text-green-4">₦{{ selectedTx.amount.toLocaleString() }}</td>
+                      <td class="q-pa-sm text-right text-green-4">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</td>
                       <td class="q-pa-sm text-right text-muted">-</td>
                     </tr>
                     <tr class="hover-bg">
                       <td class="q-pa-sm text-indigo-3">2020-TENANT-WALLET</td>
                       <td class="q-pa-sm">Liability</td>
                       <td class="q-pa-sm text-right text-muted">-</td>
-                      <td class="q-pa-sm text-right text-amber-4">₦{{ selectedTx.amount.toLocaleString() }}</td>
+                      <td class="q-pa-sm text-right text-amber-4">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</td>
                     </tr>
                   </tbody>
                   <tfoot class="bg-dark border-top text-weight-bold">
                     <tr>
                       <td colspan="2" class="q-pa-sm">PARITY CHECK: MATCHED</td>
-                      <td class="q-pa-sm text-right">₦{{ selectedTx.amount.toLocaleString() }}</td>
-                      <td class="q-pa-sm text-right">₦{{ selectedTx.amount.toLocaleString() }}</td>
+                      <td class="q-pa-sm text-right">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</td>
+                      <td class="q-pa-sm text-right">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -383,6 +383,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed } from 'vue'
 
 const searchQuery = ref('')

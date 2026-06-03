@@ -236,7 +236,7 @@
             <div class="col-6"><strong>Host:</strong> {{ selectedTx.host }}</div>
             <div class="col-6"><strong>Business Owner:</strong> {{ selectedTx.tenantId }}</div>
             <div class="col-6"><strong>Terminal ID:</strong> {{ selectedTx.terminalId }}</div>
-            <div class="col-6"><strong>Amount:</strong> ₦{{ selectedTx.amount }}</div>
+            <div class="col-6"><strong>Amount:</strong> {{ currentCurrency.symbol }}{{ selectedTx.amount }}</div>
             <div class="col-6"><strong>Card:</strong> {{ selectedTx.maskedPan }}</div>
             <div class="col-6"><strong>Date:</strong> {{ new Date(selectedTx.date).toLocaleString() }}</div>
             <div class="col-6"><strong>RRN:</strong> {{ selectedTx.rrn || 'N/A' }}</div>
@@ -255,6 +255,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed, onMounted } from 'vue'
 import api from '../../api'
 import { useQuasar } from 'quasar'

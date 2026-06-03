@@ -30,7 +30,7 @@
 
           <div class="q-my-lg">
             <div class="text-caption text-grey-4 text-weight-medium">AVAILABLE FOR IMMEDIATE SETTLEMENT</div>
-            <div class="text-h3 text-weight-bold text-white text-metric-mono q-mt-xs">₦{{ availableBalance.toLocaleString() }}</div>
+            <div class="text-h3 text-weight-bold text-white text-metric-mono q-mt-xs">{{ currentCurrency.symbol }}{{ availableBalance.toLocaleString() }}</div>
           </div>
 
           <div class="row items-center justify-between">
@@ -52,7 +52,7 @@
             
             <div class="row q-col-gutter-md q-mb-md">
               <div class="col-12 col-sm-8">
-                <q-input v-model.number="withdrawalAmount" type="number" dark outlined dense prefix="₦" placeholder="Enter transfer amount..." class="font-mono text-caption" />
+                <q-input v-model.number="withdrawalAmount" type="number" dark outlined dense :prefix="currentCurrency.symbol" placeholder="Enter transfer amount..." class="font-mono text-caption" />
               </div>
               <div class="col-12 col-sm-4">
                 <q-btn unelevated color="green-10" label="Initiate Payout" :loading="withdrawing" @click="dispatchPayout" class="full-width text-weight-bold letter-spacing-1 h-full" style="min-height: 40px;" />
@@ -129,7 +129,7 @@
               </div>
               
               <div class="text-right">
-                <div class="text-metric-mono font-mono text-weight-bold text-white">₦{{ log.amount.toLocaleString() }}</div>
+                <div class="text-metric-mono font-mono text-weight-bold text-white">{{ currentCurrency.symbol }}{{ log.amount.toLocaleString() }}</div>
                 <div class="text-metric-sm text-grey-6 font-mono q-mt-xs">{{ log.time }}</div>
               </div>
             </div>
@@ -143,6 +143,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 
@@ -244,7 +247,7 @@ const dispatchPayout = () => {
     })
     localStorage.setItem('tenant_transactions', JSON.stringify(transactions))
 
-    $q.notify({ type: 'positive', message: `Withdrawal of ₦${withdrawalAmount.value.toLocaleString()} successfully routed to corporate node.` })
+    $q.notify({ type: 'positive', message: `Withdrawal of {{ currentCurrency.symbol }}${withdrawalAmount.value.toLocaleString()} successfully routed to corporate node.` })
     withdrawalAmount.value = null
   }, 1500)
 }

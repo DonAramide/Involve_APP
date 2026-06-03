@@ -339,6 +339,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
@@ -515,7 +518,7 @@ const MOCK_LOGS = [
     location: 'Local Network',
     target: 'AML_POLICY_V2',
     status: 'success',
-    metadata: { version: '2.1.0', changes: 'Updated KYC threshold to ₦5,000,000' }
+    metadata: { version: '2.1.0', changes: 'Updated KYC threshold to {{ currentCurrency.symbol }}5,000,000' }
   },
   {
     id: 'mock-008',

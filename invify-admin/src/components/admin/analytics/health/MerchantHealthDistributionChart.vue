@@ -1,0 +1,1 @@
+<template><div>Health Chart</div></template>

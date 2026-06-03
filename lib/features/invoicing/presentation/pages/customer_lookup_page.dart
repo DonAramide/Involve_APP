@@ -51,13 +51,17 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
     }
   }
 
-  void _filterCustomers(String query) {
+  bool _showDebtorsOnly = false;
+
+  void _filterCustomers([String? query]) {
+    if (query != null) _searchQuery = query;
     setState(() {
-      _searchQuery = query;
-      _filteredCustomers = _allCustomers
-          .where((c) => c.name.toLowerCase().contains(query.toLowerCase()) || 
-                       (c.phone != null && c.phone!.contains(query)))
-          .toList();
+      _filteredCustomers = _allCustomers.where((c) {
+        final matchesSearch = c.name.toLowerCase().contains(_searchQuery.toLowerCase()) || 
+                             (c.phone != null && c.phone!.contains(_searchQuery));
+        final matchesDebtor = !_showDebtorsOnly || c.balance > 0;
+        return matchesSearch && matchesDebtor;
+      }).toList();
     });
   }
 
@@ -107,6 +111,18 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
               onChanged: _filterCustomers,
             ),
           ),
+          SwitchListTile(
+            title: const Text('Show Debtors Only', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: const Text('Only show customers owing balance'),
+            value: _showDebtorsOnly,
+            onChanged: (val) {
+              setState(() => _showDebtorsOnly = val);
+              _filterCustomers();
+            },
+            secondary: const Icon(Icons.money_off, color: Colors.red),
+            dense: true,
+            activeColor: Colors.red,
+          ),
           if (_selectedRange != null)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -149,9 +165,26 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
                               child: customer.image == null ? Text(name[0].toUpperCase()) : null,
                             ),
                             title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            subtitle: customer.balance != 0 
-                                ? Text('Balance: ₦${customer.balance.toStringAsFixed(2)}', style: TextStyle(color: customer.balance > 0 ? Colors.red : Colors.green)) 
-                                : null,
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (customer.phone != null && customer.phone!.isNotEmpty)
+                                  Text(customer.phone!, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                                const SizedBox(height: 4),
+                                Text(
+                                  customer.balance > 0 
+                                      ? 'Owing: ₦${customer.balance.toStringAsFixed(2)}' 
+                                      : customer.balance < 0 
+                                          ? 'Credit: ₦${(-customer.balance).toStringAsFixed(2)}'
+                                          : 'Status: No Debt',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: customer.balance > 0 ? Colors.red : (customer.balance < 0 ? Colors.green : Colors.grey),
+                                  ),
+                                ),
+                              ],
+                            ),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () {
                               Navigator.push(
@@ -167,6 +200,82 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
                           );
                         },
                       ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddCustomerDialog,
+        child: const Icon(Icons.person_add),
+      ),
+    );
+  }
+
+  Future<void> _showAddCustomerDialog() async {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final emailController = TextEditingController();
+    final addressController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Register New Customer'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Customer Name (Required)'),
+                textCapitalization: TextCapitalization.words,
+              ),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(labelText: 'Phone Number'),
+                keyboardType: TextInputType.phone,
+              ),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Email Address'),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              TextField(
+                controller: addressController,
+                decoration: const InputDecoration(labelText: 'Address'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Customer name is required')),
+                );
+                return;
+              }
+              try {
+                final repo = context.read<IServicesRepository>();
+                await repo.createCustomer(
+                  name: nameController.text.trim(),
+                  phone: phoneController.text.trim(),
+                  email: emailController.text.trim(),
+                  address: addressController.text.trim(),
+                );
+                Navigator.pop(context);
+                _loadCustomers();
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error saving customer: $e')),
+                );
+              }
+            },
+            child: const Text('Save'),
           ),
         ],
       ),

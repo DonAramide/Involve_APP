@@ -65,7 +65,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Transaction Vol</div>
-          <div class="text-h5 text-metric-mono text-green-4">₦450.2M <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}450.2M <q-icon name="trending_up" size="xs"/></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -89,7 +89,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Settlement Value</div>
-          <div class="text-h5 text-metric-mono text-purple-4">₦448.5M</div>
+          <div class="text-h5 text-metric-mono text-purple-4">{{ currentCurrency.symbol }}448.5M</div>
         </div>
       </div>
     </div>
@@ -276,9 +276,9 @@
                 <div class="col-6">
                   <div class="enterprise-subpanel q-pa-md border-muted rounded-borders full-height bg-dark">
                     <div class="text-caption text-muted font-mono q-mb-sm border-bottom q-pb-xs">Revenue & Processing Hooks</div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Total Processed Vol:</span><span class="text-green-4">₦14,250,000</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Total Processed Vol:</span><span class="text-green-4">{{ currentCurrency.symbol }}14,250,000</span></div>
                     <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Terminal Txns:</span><span class="text-main">{{ selectedTerminal.txnCount }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Terminal Revenue Generated:</span><span class="text-purple-4">₦125,000</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Terminal Revenue Generated:</span><span class="text-purple-4">{{ currentCurrency.symbol }}125,000</span></div>
                     <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Settlement Mapping:</span><span class="text-indigo-4">SET-BATCH-841</span></div>
                   </div>
                 </div>
@@ -354,6 +354,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('fleet')

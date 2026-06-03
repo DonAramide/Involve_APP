@@ -24,7 +24,7 @@
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Outstanding Exposure:</span>
-            <span class="text-amber-4 text-weight-bold">₦12.5M</span>
+            <span class="text-amber-4 text-weight-bold">{{ currentCurrency.symbol }}12.5M</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Failed Settlements:</span>
@@ -63,7 +63,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Settled Today</div>
-          <div class="text-h5 text-metric-mono text-green-4">₦4.2B <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}4.2B <q-icon name="trending_up" size="xs"/></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -81,13 +81,13 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Settlement Fees Collected</div>
-          <div class="text-h5 text-metric-mono text-purple-4">₦1.2M</div>
+          <div class="text-h5 text-metric-mono text-purple-4">{{ currentCurrency.symbol }}1.2M</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Treasury Float</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">₦450.5M</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}450.5M</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -162,7 +162,7 @@
             </template>
             <template v-slot:body-cell-netAmount="props">
               <q-td :props="props" class="font-mono text-weight-bold text-green-4 text-right">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-riskScore="props">
@@ -256,10 +256,10 @@
                 <div class="col-6">
                   <div class="enterprise-subpanel q-pa-md border-muted rounded-borders full-height">
                     <div class="text-caption text-muted font-mono q-mb-sm border-bottom q-pb-xs">Settlement Financials</div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Gross Amount:</span><span class="text-main">₦{{ selectedSettlement.grossAmount.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Fees:</span><span class="text-red-4">- ₦{{ selectedSettlement.feeAmount.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Commission:</span><span class="text-red-4">- ₦{{ selectedSettlement.commissionAmount.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Net Amount:</span><span class="text-green-4">₦{{ selectedSettlement.netAmount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Gross Amount:</span><span class="text-main">{{ currentCurrency.symbol }}{{ selectedSettlement.grossAmount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Fees:</span><span class="text-red-4">- {{ currentCurrency.symbol }}{{ selectedSettlement.feeAmount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Commission:</span><span class="text-red-4">- {{ currentCurrency.symbol }}{{ selectedSettlement.commissionAmount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Net Amount:</span><span class="text-green-4">{{ currentCurrency.symbol }}{{ selectedSettlement.netAmount.toLocaleString() }}</span></div>
                   </div>
                 </div>
                 <div class="col-6">
@@ -292,7 +292,7 @@
                 <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-indigo-left" style="width: 300px;">
                   <div class="text-indigo-4 text-weight-bold">Settlement Batch Engine</div>
                   <div class="text-muted text-caption">{{ selectedSettlement.id }}</div>
-                  <div class="text-green-4 text-weight-bold q-mt-xs">Net: ₦{{ selectedSettlement.netAmount.toLocaleString() }}</div>
+                  <div class="text-green-4 text-weight-bold q-mt-xs">Net: {{ currentCurrency.symbol }}{{ selectedSettlement.netAmount.toLocaleString() }}</div>
                 </div>
                 <div class="q-py-xs"><q-icon name="arrow_downward" color="grey-6" size="sm" /></div>
 
@@ -359,6 +359,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('batches')

@@ -258,9 +258,9 @@ const industryNavigationTree = computed(() => {
   const mode = activeIndustry.value.toLowerCase()
   if (mode === 'school') {
     return [
-      { label: 'Curriculum & Courses', path: '/curriculum', icon: 'school', color: 'indigo-4', mode: 'SCHOOL' },
-      { label: 'Daily Lesson Notes', path: '/notes', icon: 'menu_book', color: 'indigo-3', mode: 'SCHOOL' },
-      { label: 'Student Attendance Tracker', path: '/attendance', icon: 'how_to_reg', color: 'green-4', mode: 'SCHOOL' }
+      { label: 'Curriculum & Courses', path: '/tenant/curriculum', icon: 'school', color: 'indigo-4', mode: 'SCHOOL' },
+      { label: 'Daily Lesson Notes', path: '/tenant/notes', icon: 'menu_book', color: 'indigo-3', mode: 'SCHOOL' },
+      { label: 'Student Attendance Tracker', path: '/tenant/attendance', icon: 'how_to_reg', color: 'green-4', mode: 'SCHOOL' }
     ]
   } else if (mode === 'retail') {
     return [

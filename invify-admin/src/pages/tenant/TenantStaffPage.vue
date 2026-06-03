@@ -110,7 +110,7 @@
             </template>
 
             <template v-slot:body-cell-actions="props">
-              <q-td :props="props" class="text-center">
+              <q-td :props="props" class="text-center row items-center justify-center q-gutter-x-xs">
                 <!-- Suspend / Activate Toggle - Disabled if logged-in user is Finance -->
                 <q-btn 
                   flat 
@@ -125,6 +125,40 @@
                   <q-tooltip class="bg-indigo-10 text-white font-mono">
                     <span v-if="activeUserRole === 'FINANCE'">Finance Viewport: Mutate blocked</span>
                     <span v-else>{{ props.row.status === 'ACTIVE' ? 'Suspend Account' : 'Re-Activate Account' }}</span>
+                  </q-tooltip>
+                </q-btn>
+
+                <!-- Reset Auth Code / Password -->
+                <q-btn 
+                  flat 
+                  dense 
+                  round 
+                  size="sm" 
+                  :color="activeUserRole === 'FINANCE' ? 'grey-7' : 'amber-4'" 
+                  icon="vpn_key"
+                  :disabled="activeUserRole === 'FINANCE'"
+                  @click="resetOperatorPassword(props.row)"
+                >
+                  <q-tooltip class="bg-indigo-10 text-white font-mono">
+                    <span v-if="activeUserRole === 'FINANCE'">Finance Viewport: Mutate blocked</span>
+                    <span v-else>Reset Auth Code / Password</span>
+                  </q-tooltip>
+                </q-btn>
+
+                <!-- Change Security Role -->
+                <q-btn 
+                  flat 
+                  dense 
+                  round 
+                  size="sm" 
+                  :color="activeUserRole === 'FINANCE' ? 'grey-7' : 'cyan-4'" 
+                  icon="admin_panel_settings"
+                  :disabled="activeUserRole === 'FINANCE'"
+                  @click="changeOperatorRole(props.row)"
+                >
+                  <q-tooltip class="bg-indigo-10 text-white font-mono">
+                    <span v-if="activeUserRole === 'FINANCE'">Finance Viewport: Mutate blocked</span>
+                    <span v-else>Change Security Role</span>
                   </q-tooltip>
                 </q-btn>
               </q-td>
@@ -337,6 +371,78 @@ const toggleOperatorState = (row) => {
       operator: 'owner@business.com',
       time: 'Just now',
       action: `Modified status of ${row.staffId} to ${nextStatus}.`,
+      ip: '197.210.8.44'
+    })
+  })
+}
+
+const resetOperatorPassword = (row) => {
+  if (activeUserRole.value === 'FINANCE') {
+    $q.notify({ type: 'negative', message: 'Action Rejected: Finance Scope is read-only compliant.' })
+    return
+  }
+
+  $q.dialog({
+    title: 'Reset Operator Auth Code / Password',
+    message: `Enter new 4-digit security code for ${row.name}:`,
+    prompt: {
+      model: '',
+      type: 'password',
+      maxLength: 4,
+      filled: true,
+      dark: true
+    },
+    cancel: true,
+    dark: true
+  }).onOk((newCode) => {
+    if (!newCode || newCode.length !== 4 || isNaN(newCode)) {
+      $q.notify({ type: 'negative', message: 'Auth code must be a 4-digit number.' })
+      return
+    }
+    
+    // Simulate updating code
+    $q.notify({ type: 'positive', message: `Auth code reset successfully for ${row.name}.` })
+    
+    auditLogs.value.unshift({
+      id: Date.now(),
+      operator: 'owner@business.com',
+      time: 'Just now',
+      action: `Reset security auth code for ${row.staffId}.`,
+      ip: '197.210.8.44'
+    })
+  })
+}
+
+const changeOperatorRole = (row) => {
+  if (activeUserRole.value === 'FINANCE') {
+    $q.notify({ type: 'negative', message: 'Action Rejected: Finance Scope is read-only compliant.' })
+    return
+  }
+
+  $q.dialog({
+    title: 'Change Security Role',
+    message: `Choose a new role for ${row.name}:`,
+    options: {
+      type: 'radio',
+      model: row.role,
+      items: [
+        { label: 'Admin (Full access)', value: 'ADMIN' },
+        { label: 'Finance (Read only)', value: 'FINANCE' },
+        { label: 'Staff (Standard operational)', value: 'STAFF' }
+      ]
+    },
+    cancel: true,
+    dark: true
+  }).onOk((newRole) => {
+    const oldRole = row.role
+    row.role = newRole
+    $q.notify({ type: 'positive', message: `Security role for ${row.name} updated from ${oldRole} to ${newRole}.` })
+    
+    auditLogs.value.unshift({
+      id: Date.now(),
+      operator: 'owner@business.com',
+      time: 'Just now',
+      action: `Changed security role of ${row.staffId} to ${newRole}.`,
       ip: '197.210.8.44'
     })
   })

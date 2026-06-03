@@ -62,7 +62,7 @@
               </q-item-section>
               <q-item-section side>
                 <div :class="tx.amount > 0 ? 'text-green-4' : 'text-red-4'" class="text-weight-bold">
-                  {{ tx.amount > 0 ? '+' : '' }}{{ tx.amount.toLocaleString() }} NGN
+                  {{ tx.amount > 0 ? '+' : '' }}{{ tx.amount.toLocaleString() }} {{ currentCurrency.code }}
                 </div>
               </q-item-section>
             </q-item>
@@ -198,21 +198,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
 import ContextualIntelligenceSettingsPanel from '../components/contextual/ContextualIntelligenceSettingsPanel.vue'
+import { useCurrency } from '../composables/useCurrency'
 
 const $q = useQuasar()
 const { prefs } = useOperatorPreferences()
+const { currentCurrency } = useCurrency()
 
-const stats = [
-  { label: 'Platform Revenue', value: '₦4.2M', icon: 'payments', trend: 12.5 },
+const stats = computed(() => [
+  { label: 'Platform Revenue', value: `${currentCurrency.value.symbol}4.2M`, icon: 'payments', trend: 12.5 },
   { label: 'Active Tenants', value: '184', icon: 'business', trend: 4.2 },
   { label: 'AI Generations', value: '54,208', icon: 'psychology', trend: 28.1 },
   { label: 'Active Subscriptions', value: '142', icon: 'receipt_long', trend: -2.4 }
-]
+])
 
 const recentTransactions = [
   { tenant: 'Heritage High School', ref: 'QU-847291', date: '2 min ago', amount: 50000 },

@@ -16,10 +16,10 @@
       "id": "dev-1779516835718",
       "device_id": "PPR1.180610.011",
       "device_suffix": "610011",
-      "tenant_id": "tenant-1779640483822",
+      "tenant_id": "tenant-1779711092175",
       "status": "active",
-      "business_name": "My Business",
-      "phone": "081234568256",
+      "business_name": "My01",
+      "phone": "08123212321232",
       "industry": "retail",
       "theme_color": "#6366F1",
       "device_info": {
@@ -29,12 +29,14 @@
         "model": "SM-T397U",
         "brand": "samsung",
         "osVersion": "9",
-        "isPhysicalDevice": true
+        "isPhysicalDevice": true,
+        "androidId": "PPR1.180610.011",
+        "serialNumber": null
       },
-      "last_seen": "2026-05-25T12:11:32.406Z",
+      "last_seen": "2026-06-01T17:08:30.670Z",
       "created_at": "2026-05-23T06:13:55.718Z",
       "tenants": {
-        "name": "My Business",
+        "name": "My01",
         "plan": "standard"
       }
     },

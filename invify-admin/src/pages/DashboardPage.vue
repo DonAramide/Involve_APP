@@ -176,6 +176,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed, inject, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import EnterpriseDataGrid from '../components/grid/EnterpriseDataGrid.vue'
@@ -385,9 +388,9 @@ const kpiCards = computed(() => {
   if (activeWorkspace.value === 'finance') {
     if (financeSubMode.value === 'payouts') {
       return {
-        kpi1: { label: 'Pending Settlement', value: '₦ 89.2M', unit: 'Escrow', sub: 'T+0 & T+1 Processing', border: 'border-cyan-left', dot: 'pulse-healthy' },
-        kpi2: { label: 'Cleared Today', value: '₦ 412M', unit: 'Paid', sub: 'Successful disbursements', border: 'border-indigo-left', icon: 'payments' },
-        kpi3: { label: 'Held Funds', value: '₦ 1.2M', unit: 'Locked', sub: 'Awaiting manual clearing', border: 'border-amber-left', dot: 'pulse-warning' },
+        kpi1: { label: 'Pending Settlement', value: '{{ currentCurrency.symbol }} 89.2M', unit: 'Escrow', sub: 'T+0 & T+1 Processing', border: 'border-cyan-left', dot: 'pulse-healthy' },
+        kpi2: { label: 'Cleared Today', value: '{{ currentCurrency.symbol }} 412M', unit: 'Paid', sub: 'Successful disbursements', border: 'border-indigo-left', icon: 'payments' },
+        kpi3: { label: 'Held Funds', value: '{{ currentCurrency.symbol }} 1.2M', unit: 'Locked', sub: 'Awaiting manual clearing', border: 'border-amber-left', dot: 'pulse-warning' },
         kpi4: { label: 'Failed Transfers', value: '2', unit: 'Drops', sub: 'Bank network API timeouts', border: 'border-red-left', dot: 'pulse-critical' }
       }
     }

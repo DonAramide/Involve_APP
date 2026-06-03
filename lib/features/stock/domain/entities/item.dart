@@ -25,6 +25,7 @@ class Item extends Equatable {
   final String businessMode;
   final String? syncId;
   final bool isDefault;
+  final String? barcode;
 
   const Item({
     this.id,
@@ -43,6 +44,7 @@ class Item extends Equatable {
     this.businessMode = 'retail',
     this.syncId,
     this.isDefault = false,
+    this.barcode,
   });
 
   Item copyWith({
@@ -62,6 +64,7 @@ class Item extends Equatable {
     String? businessMode,
     String? syncId,
     bool? isDefault,
+    String? barcode,
   }) {
     return Item(
       id: id ?? this.id,
@@ -80,6 +83,7 @@ class Item extends Equatable {
       businessMode: businessMode ?? this.businessMode,
       syncId: syncId ?? this.syncId,
       isDefault: isDefault ?? this.isDefault,
+      barcode: barcode ?? this.barcode,
     );
   }
 
@@ -101,6 +105,7 @@ class Item extends Equatable {
         businessMode,
         syncId,
         isDefault,
+        barcode,
       ];
 }
 

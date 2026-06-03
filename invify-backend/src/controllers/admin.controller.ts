@@ -73,6 +73,15 @@ export class AdminController {
     if (!data.broadcast_message) data.broadcast_message = '';
     if (data.audit_retention_hours === undefined) data.audit_retention_hours = 72;
     if (data.enforce_device_control === undefined) data.enforce_device_control = false;
+    
+    // Commission settings
+    if (data.commissions === undefined) {
+      data.commissions = {
+        globalDefaultOnboardingFee: 10.0,
+        globalDefaultRevSharePercentage: 5.0
+      };
+    }
+    
     return data;
   }
 
@@ -118,6 +127,34 @@ export class AdminController {
       return res.status(200).json(data);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async getGlobalCommissions(req: Request, res: Response) {
+    try {
+      const settings = AdminController.getGlobalSettingsData();
+      return res.status(200).json({ success: true, commissions: settings.commissions });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  static async updateGlobalCommissions(req: Request, res: Response) {
+    try {
+      const { globalDefaultOnboardingFee, globalDefaultRevSharePercentage } = req.body;
+      const settings = AdminController.getGlobalSettingsData();
+      
+      settings.commissions = {
+        ...settings.commissions,
+        globalDefaultOnboardingFee: globalDefaultOnboardingFee ?? settings.commissions?.globalDefaultOnboardingFee ?? 10.0,
+        globalDefaultRevSharePercentage: globalDefaultRevSharePercentage ?? settings.commissions?.globalDefaultRevSharePercentage ?? 5.0,
+      };
+      
+      AdminController.saveGlobalSettingsData(settings);
+      
+      return res.status(200).json({ success: true, commissions: settings.commissions });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 

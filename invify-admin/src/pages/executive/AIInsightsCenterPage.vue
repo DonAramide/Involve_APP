@@ -53,7 +53,7 @@
         <div class="enterprise-panel q-pa-md full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg" @click="activeCategory = 'revenue'">
           <div class="text-subtitle2 text-muted text-uppercase tracking-wider">Revenue Forecast (30D)</div>
           <div class="text-h3 text-metric-mono text-green-4 q-mt-sm">↑ 12%</div>
-          <div class="text-caption text-green-3 font-mono q-mt-xs">Expected: ₦145M | Confidence: 92%</div>
+          <div class="text-caption text-green-3 font-mono q-mt-xs">Expected: {{ currentCurrency.symbol }}145M | Confidence: 92%</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
@@ -375,6 +375,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed } from 'vue'
 
 const activeCategory = ref('all')
@@ -392,7 +395,7 @@ const allInsights = ref([
     id: 'INS-001',
     category: 'revenue',
     title: 'Revenue expected to increase by 12% next month',
-    summary: 'Based on current transaction velocity and historical seasonal patterns in the School segment, gross platform revenue is projected to hit ₦145M.',
+    summary: 'Based on current transaction velocity and historical seasonal patterns in the School segment, gross platform revenue is projected to hit {{ currentCurrency.symbol }}145M.',
     color: 'green',
     icon: 'trending_up',
     confidence: 92,
@@ -420,7 +423,7 @@ const allInsights = ref([
     entities: ['Primary Settlement Account', 'Guaranty Trust Partner'],
     riskWeight: 'HIGH',
     actionText: 'Open Treasury Workspace',
-    suggestedActions: ['Prepare a ₦50M liquidity buffer for Monday morning settlements.', 'Review pending Ledger batches to prioritize School payouts.']
+    suggestedActions: ['Prepare a {{ currentCurrency.symbol }}50M liquidity buffer for Monday morning settlements.', 'Review pending Ledger batches to prioritize School payouts.']
   },
   {
     id: 'INS-003',
@@ -448,7 +451,7 @@ const allInsights = ref([
     icon: 'policy',
     confidence: 85,
     modelName: 'RegRisk_Engine',
-    reasoningPreview: 'Transaction volume nearing ₦100M monthly limit without Tier 4 KYC.',
+    reasoningPreview: 'Transaction volume nearing {{ currentCurrency.symbol }}100M monthly limit without Tier 4 KYC.',
     explanationText: 'The compliance engine predicts that at the current daily processing rate, the tenant will breach the Tier 3 limits within 4 days, which legally requires an immediate freeze or escalation to Tier 4 EDD.',
     signals: ['Run-rate Txn Volume', 'Current KYC Tier Limits'],
     entities: ['BetKing (TEN-RET-992)'],

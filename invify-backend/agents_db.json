@@ -1,0 +1,34 @@
+[
+  {
+    "id": "0f3e5b1c-1d46-44ed-845f-0aa714bf6c14",
+    "agentCode": "AAA000",
+    "passwordHash": "AAA000",
+    "isFirstLogin": true,
+    "name": "Master Setup Agent",
+    "email": "master@invify.app",
+    "phone": "+2348000000000",
+    "whatsappNumber": "+2348000000000",
+    "address": "1 Master Admin Way",
+    "kycStatus": "VERIFIED",
+    "status": "ACTIVE",
+    "commissions": 0,
+    "points": 0,
+    "createdAt": "2026-06-02T19:23:43.138Z"
+  },
+  {
+    "id": "e4db380f-4e18-469c-bbf9-7bb7d1e99283",
+    "agentCode": "AGT-2060",
+    "passwordHash": "123456",
+    "isFirstLogin": false,
+    "name": "Ara ola",
+    "email": "ara@ola.com",
+    "phone": "018456555555555",
+    "kycStatus": "REJECTED",
+    "status": "ACTIVE",
+    "commissions": 0,
+    "points": 0,
+    "createdAt": "2026-06-02T22:42:10.297Z",
+    "passportImage": "https://usc1.contabostorage.com/0d205683f3b543beb7298e9b68e26b0f:iips.stargazer.bucket/agents/passports/ara_ola_com_passport_1780442095965.png",
+    "idCard": "https://usc1.contabostorage.com/0d205683f3b543beb7298e9b68e26b0f:iips.stargazer.bucket/agents/ids/ara_ola_com_id_1780442620676.png"
+  }
+]

@@ -115,6 +115,7 @@ import 'package:involve_app/features/dashboard/presentation/pages/calculator_pag
 import 'package:involve_app/features/settings/presentation/pages/settings_page.dart';
 import 'package:involve_app/features/settings/presentation/pages/super_admin_settings_page.dart';
 import 'package:involve_app/features/admin/presentation/pages/system_setup_page.dart';
+import 'package:involve_app/features/admin/presentation/pages/cloud_metrics_page.dart';
 import 'package:involve_app/features/activation/presentation/pages/go_pro_page.dart';
 import 'package:involve_app/features/services/presentation/pages/create_job_page.dart';
 import 'package:involve_app/features/services/presentation/pages/jobs_list_page.dart';
@@ -705,6 +706,7 @@ class _InvolveAppState extends State<InvolveApp> {
               '/executive_finance': (_) => const ExecutiveFinanceDashboard(),
               '/defaulters': (_) => const DefaultersPage(),
               '/admin_hub': (_) => const AdminDashboardPage(),
+              '/cloud_metrics': (_) => const CloudMetricsPage(),
               '/admin_finance': (_) => const AdminFinanceDashboardPage(),
               '/api_keys': (_) => const ApiKeyManagementPage(),
               '/inventory_report': (_) => const InventoryReportPage(),

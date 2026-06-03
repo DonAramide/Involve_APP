@@ -13,6 +13,17 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     const authHeader = req.headers.authorization;
     
     // Support local bypass or developer mock headers
+    if (authHeader && authHeader.startsWith('Bearer mock-agent-token-')) {
+      const agentId = authHeader.replace('Bearer mock-agent-token-', '');
+      (req as any).user = {
+        id: agentId,
+        role: 'AGENT',
+        email: 'agent@invify.app',
+        tenantId: null
+      };
+      return next();
+    }
+
     if ((process.env.OFFLINE_MOCK_AUTH === 'true' && authHeader !== 'Bearer invalid.jwt.token') || authHeader === 'Bearer mock-admin-token') {
       console.warn('[AuthMiddleware] Developer offline auth bypass triggered.');
       (req as any).user = {

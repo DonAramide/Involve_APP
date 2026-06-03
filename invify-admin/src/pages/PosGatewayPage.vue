@@ -75,15 +75,15 @@
                   <div class="row items-center q-gutter-sm">
                     <q-input
                       v-model.number="config.splitThresholdNaira"
-                      type="number" dense filled prefix="₦" suffix="NGN"
+                      type="number" dense filled :prefix="currentCurrency.symbol" suffix="NGN"
                       style="max-width:160px"
                       :dark="prefs.isDarkMode" hide-bottom-space
                       :rules="[v => v > 0 || 'Must be > 0']"
                       @blur="saveConfig"
                     />
                     <div class="text-caption text-secondary">
-                      &lt;₦{{ Number(config.splitThresholdNaira || 50000).toLocaleString() }} → Medusa<br>
-                      ≥₦{{ Number(config.splitThresholdNaira || 50000).toLocaleString() }} → Kimono
+                      &lt;{{ currentCurrency.symbol }}{{ Number(config.splitThresholdNaira || 50000).toLocaleString() }} → Medusa<br>
+                      ≥{{ currentCurrency.symbol }}{{ Number(config.splitThresholdNaira || 50000).toLocaleString() }} → Kimono
                     </div>
                   </div>
                 </div>
@@ -263,12 +263,12 @@
               <!-- Amount Greater Than -->
               <div class="col-12 col-sm-6 col-md-2">
                 <q-input v-model.number="fAmountMin" type="number" dense filled clearable
-                  label="Amount Greater (₦)" prefix="₦" :dark="prefs.isDarkMode" />
+                  label="Amount Greater (₦)" :prefix="currentCurrency.symbol" :dark="prefs.isDarkMode" />
               </div>
               <!-- Amount Less Than -->
               <div class="col-12 col-sm-6 col-md-2">
                 <q-input v-model.number="fAmountMax" type="number" dense filled clearable
-                  label="Amount Less (₦)" prefix="₦" :dark="prefs.isDarkMode" />
+                  label="Amount Less (₦)" :prefix="currentCurrency.symbol" :dark="prefs.isDarkMode" />
               </div>
               <!-- Date -->
               <div class="col-12 col-sm-6 col-md-2">
@@ -355,7 +355,7 @@
           </template>
           <template v-slot:body-cell-amount="props">
             <q-td :props="props">
-              <span class="text-weight-bold">₦{{ Number(props.value).toLocaleString() }}</span>
+              <span class="text-weight-bold">{{ currentCurrency.symbol }}{{ Number(props.value).toLocaleString() }}</span>
             </q-td>
           </template>
           <template v-slot:body-cell-actions="props">
@@ -405,7 +405,7 @@
             <div class="col-6"><div class="text-caption text-secondary">Host</div><div class="font-mono text-weight-bold">{{ selectedTx.host }}</div></div>
             <div class="col-6"><div class="text-caption text-secondary">Response Code</div>
               <div class="font-mono text-weight-bold" :class="selectedTx.statusCode === '00' ? 'text-green-4' : 'text-red-4'">{{ selectedTx.statusCode }}</div></div>
-            <div class="col-6"><div class="text-caption text-secondary">Amount</div><div class="text-weight-bold">₦{{ Number(selectedTx.amount).toLocaleString() }}</div></div>
+            <div class="col-6"><div class="text-caption text-secondary">Amount</div><div class="text-weight-bold">{{ currentCurrency.symbol }}{{ Number(selectedTx.amount).toLocaleString() }}</div></div>
             <div class="col-6"><div class="text-caption text-secondary">Terminal</div><div class="font-mono text-weight-bold">{{ selectedTx.terminalId }}</div></div>
             <div class="col-6"><div class="text-caption text-secondary">RRN</div><div class="font-mono text-weight-bold">{{ selectedTx.rrn }}</div></div>
             <div class="col-6"><div class="text-caption text-secondary">STAN</div><div class="font-mono text-weight-bold">{{ selectedTx.stan }}</div></div>
@@ -431,6 +431,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
@@ -514,7 +517,7 @@ const kpiCards = computed(() => {
   const rate     = all.length ? ((approved.length / all.length) * 100).toFixed(1) : '0.0'
   return [
     { label: 'Total Transactions', value: all.length,                           sub: 'All time in-memory',        icon: 'receipt_long',   color: 'purple-4', valueColor: '#a78bfa' },
-    { label: 'Total Volume',       value: `₦${total.toLocaleString()}`,          sub: 'Sum of all amounts',        icon: 'payments',       color: 'teal-4',   valueColor: '#2dd4bf' },
+    { label: 'Total Volume',       value: `${currentCurrency.symbol}${total.toLocaleString()}`,          sub: 'Sum of all amounts',        icon: 'payments',       color: 'teal-4',   valueColor: '#2dd4bf' },
     { label: 'Approval Rate',      value: `${rate}%`,                            sub: `${approved.length} approved`, icon: 'check_circle', color: 'green-4',  valueColor: '#4ade80' },
     { label: 'Declined',           value: declined.length,                       sub: `${declined.length} failed`, icon: 'cancel',         color: 'red-4',    valueColor: '#f87171' },
   ]
@@ -584,7 +587,7 @@ const hostBarOpts = computed(() => ({
 // Avg amount by host
 const avgAmountSeries = computed(() => {
   const hosts = ['KIMONO', 'MEDUSA', 'NIBSS']
-  return [{ name: 'Avg ₦', data: hosts.map(h => {
+  return [{ name: 'Avg {{ currentCurrency.symbol }}', data: hosts.map(h => {
     const txs = history.value.filter(t => t.host === h)
     return txs.length ? Math.round(txs.reduce((s, t) => s + (t.amount || 0), 0) / txs.length) : 0
   })}]
@@ -593,7 +596,7 @@ const avgAmountOpts = computed(() => ({
   ...darkChartBase,
   colors: ['#fbbf24'],
   xaxis:  { categories: ['Kimono', 'Medusa', 'NIBSS'], labels: { style: { colors: '#8899aa' } } },
-  yaxis:  { labels: { formatter: v => `₦${v.toLocaleString()}`, style: { colors: '#8899aa' } } },
+  yaxis:  { labels: { formatter: v => `${currentCurrency.symbol}${v.toLocaleString()}`, style: { colors: '#8899aa' } } },
   plotOptions: { bar: { borderRadius: 5, horizontal: true } },
   dataLabels: { enabled: false },
   legend: { show: false },

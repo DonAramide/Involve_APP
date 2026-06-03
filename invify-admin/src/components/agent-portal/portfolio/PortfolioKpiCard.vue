@@ -1,0 +1,1 @@
+<template><div>KPI Card</div></template>

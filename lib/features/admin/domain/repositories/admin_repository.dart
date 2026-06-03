@@ -42,8 +42,26 @@ class AdminRepositoryImpl implements IAdminRepository {
 
   @override
   Future<List<Map<String, dynamic>>> getAuditLogs() async {
-    final response = await client.get('/admin/audit-logs');
-    return List<Map<String, dynamic>>.from(response.data);
+    try {
+      final response = await client.get('/admin/audit-logs');
+      final dataList = response.data['data'] as List? ?? [];
+      return dataList.map((log) => {
+        'action': log['action_type'] ?? 'System Event',
+        'timestamp': log['created_at'] != null ? _formatDate(log['created_at']) : 'N/A',
+        ...Map<String, dynamic>.from(log),
+      }).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  String _formatDate(String isoString) {
+    try {
+      final date = DateTime.parse(isoString).toLocal();
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return isoString;
+    }
   }
 
   @override

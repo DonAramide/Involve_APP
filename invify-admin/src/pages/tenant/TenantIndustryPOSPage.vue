@@ -41,7 +41,7 @@
                 <q-card clickable @click="addToCart(item)" class="item-card border-grey-9 q-pa-md transition-3 text-center cursor-pointer">
                   <q-icon :name="item.icon" :color="activeManifest.color + '-4'" size="md" class="q-mb-sm" />
                   <div class="text-caption text-weight-bold text-white ellipsis">{{ item.name }}</div>
-                  <div class="text-metric-mono font-mono text-grey-5 q-mt-xs">₦{{ item.price.toLocaleString() }}</div>
+                  <div class="text-metric-mono font-mono text-grey-5 q-mt-xs">{{ currentCurrency.symbol }}{{ item.price.toLocaleString() }}</div>
                 </q-card>
               </div>
             </div>
@@ -59,11 +59,11 @@
               <q-item v-for="(cartItem, idx) in cart" :key="idx" class="q-py-sm">
                 <q-item-section>
                   <q-item-label class="text-weight-bold text-white text-caption">{{ cartItem.name }}</q-item-label>
-                  <q-item-label caption class="text-grey-5 font-mono">1 x ₦{{ cartItem.price.toLocaleString() }}</q-item-label>
+                  <q-item-label caption class="text-grey-5 font-mono">1 x {{ currentCurrency.symbol }}{{ cartItem.price.toLocaleString() }}</q-item-label>
                 </q-item-section>
                 <q-item-section side>
                   <div class="row items-center op-gap-8">
-                    <span class="text-white font-mono text-caption text-weight-bold">₦{{ cartItem.price.toLocaleString() }}</span>
+                    <span class="text-white font-mono text-caption text-weight-bold">{{ currentCurrency.symbol }}{{ cartItem.price.toLocaleString() }}</span>
                     <q-btn flat round dense color="red-4" icon="delete" size="xs" @click="removeFromCart(idx)" />
                   </div>
                 </q-item-section>
@@ -76,16 +76,16 @@
             <div class="column q-gap-6 text-caption text-grey-5 font-mono q-mb-md">
               <div class="row justify-between">
                 <span>Subtotal</span>
-                <span class="text-white">₦{{ subtotal.toLocaleString() }}</span>
+                <span class="text-white">{{ currentCurrency.symbol }}{{ subtotal.toLocaleString() }}</span>
               </div>
               <div class="row justify-between">
                 <span>Gateway Processor Fee ({{ activeProcessor.fee * 100 }}%)</span>
-                <span class="text-white">₦{{ processingFee.toLocaleString() }}</span>
+                <span class="text-white">{{ currentCurrency.symbol }}{{ processingFee.toLocaleString() }}</span>
               </div>
               <q-separator dark class="opacity-5 q-my-xs" />
               <div class="row justify-between text-weight-bold">
                 <span class="text-white">Total Ledger Balance</span>
-                <span :class="`text-${activeManifest.color}-4`" style="font-size: 15px;">₦{{ grandTotal.toLocaleString() }}</span>
+                <span :class="`text-${activeManifest.color}-4`" style="font-size: 15px;">{{ currentCurrency.symbol }}{{ grandTotal.toLocaleString() }}</span>
               </div>
             </div>
           </div>
@@ -185,6 +185,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed } from 'vue'
 import { useQuasar } from 'quasar'
 

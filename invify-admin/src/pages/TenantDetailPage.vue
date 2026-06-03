@@ -137,7 +137,7 @@
             <div class="col-12 col-md-6 text-center flex flex-center">
               <div v-if="wallet">
                 <div class="text-overline text-grey-5">Current Wallet Balance</div>
-                <div class="text-h2 text-weight-bolder text-cyan-4">₦{{ (wallet.balance || 0).toLocaleString() }}</div>
+                <div class="text-h2 text-weight-bolder text-cyan-4">{{ currentCurrency.symbol }}{{ (wallet.balance || 0).toLocaleString() }}</div>
                 <div class="text-caption text-grey-6 q-mt-xs">
                   {{ wallet.updated_at ? `Last updated ${new Date(wallet.updated_at).toLocaleTimeString()}` : 'No balance history yet' }}
                 </div>
@@ -281,7 +281,7 @@
                     <!-- Quasar SDK Wallet Object info fallback -->
                     <div v-else>
                       <div class="text-h6 text-indigo-2">{{ wallet.subAccount.walletType?.toUpperCase() || 'SCHOOL_WALLET' }}</div>
-                      <div class="text-h4 text-weight-bold letter-spacing-1 q-my-sm text-cyan-4">₦{{ (wallet.subAccount.balance || 0).toLocaleString() }}</div>
+                      <div class="text-h4 text-weight-bold letter-spacing-1 q-my-sm text-cyan-4">{{ currentCurrency.symbol }}{{ (wallet.subAccount.balance || 0).toLocaleString() }}</div>
                       <div class="text-caption text-grey-5">Wallet ID: <span class="text-grey-4">{{ wallet.subAccount.id }}</span></div>
                       <div class="text-caption text-grey-6">Owner Type: {{ wallet.subAccount.ownerType?.toUpperCase() || 'SCHOOL' }}</div>
                     </div>
@@ -323,7 +323,7 @@
                   <q-card flat bordered class="bg-blue-grey-9 border-indigo">
                     <q-card-section class="q-pa-sm">
                       <div class="text-caption text-indigo-3 text-weight-bold">{{ w.walletType?.toUpperCase() || 'WALLET' }}</div>
-                      <div class="text-h6 text-white q-my-xs">₦{{ (w.balance || 0).toLocaleString() }}</div>
+                      <div class="text-h6 text-white q-my-xs">{{ currentCurrency.symbol }}{{ (w.balance || 0).toLocaleString() }}</div>
                       <div class="text-caption text-grey-5 ellipsis">Owner: {{ w.ownerType?.toUpperCase() }}</div>
                       <div class="text-caption text-grey-6 ellipsis" style="font-size: 10px;">{{ w.id }}</div>
                     </q-card-section>
@@ -351,7 +351,7 @@
               >
                 <template v-slot:body-cell-amount="props">
                   <q-td :props="props" :class="props.row.amount >= 0 ? 'text-green-4' : 'text-red-4'">
-                    {{ props.row.amount >= 0 ? '+' : '' }}₦{{ Math.abs(props.row.amount).toLocaleString() }}
+                    {{ props.row.amount >= 0 ? '+' : '' }}{{ currentCurrency.symbol }}{{ Math.abs(props.row.amount).toLocaleString() }}
                   </q-td>
                 </template>
                 <template v-slot:body-cell-type="props">
@@ -675,6 +675,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar, copyToClipboard } from 'quasar'

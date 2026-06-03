@@ -1,0 +1,1 @@
+<template><div>Ranking Table</div></template>

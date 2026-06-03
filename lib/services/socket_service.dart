@@ -148,6 +148,14 @@ class SocketService {
     _socket!.onDisconnect((_) => log('Socket disconnected'));
   }
 
+  void onEvent(String event, void Function(dynamic) callback) {
+    _socket?.on(event, callback);
+  }
+
+  void offEvent(String event, [void Function(dynamic)? callback]) {
+    _socket?.off(event, callback);
+  }
+
   void _showBroadcastBanner(String message) {
     // Show real-time notification
     scaffoldMessengerKey.currentState?.showSnackBar(

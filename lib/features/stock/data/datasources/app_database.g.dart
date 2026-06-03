@@ -539,6 +539,12 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
       type: DriftSqlType.string,
       requiredDuringInsert: false,
       defaultValue: const Constant('retail'));
+  static const VerificationMeta _barcodeMeta =
+      const VerificationMeta('barcode');
+  @override
+  late final GeneratedColumn<String> barcode = GeneratedColumn<String>(
+      'barcode', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -598,6 +604,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
         serviceCategory,
         requiresTimeTracking,
         businessMode,
+        barcode,
         syncId,
         updatedAt,
         createdAt,
@@ -688,6 +695,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
           businessMode.isAcceptableOrUnknown(
               data['business_mode']!, _businessModeMeta));
     }
+    if (data.containsKey('barcode')) {
+      context.handle(_barcodeMeta,
+          barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta));
+    }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
           syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
@@ -749,6 +760,8 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, ItemTable> {
           DriftSqlType.bool, data['${effectivePrefix}requires_time_tracking'])!,
       businessMode: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}business_mode'])!,
+      barcode: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}barcode']),
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -785,6 +798,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
   final String? serviceCategory;
   final bool requiresTimeTracking;
   final String businessMode;
+  final String? barcode;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -806,6 +820,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       this.serviceCategory,
       required this.requiresTimeTracking,
       required this.businessMode,
+      this.barcode,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -837,6 +852,9 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
     }
     map['requires_time_tracking'] = Variable<bool>(requiresTimeTracking);
     map['business_mode'] = Variable<String>(businessMode);
+    if (!nullToAbsent || barcode != null) {
+      map['barcode'] = Variable<String>(barcode);
+    }
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
     }
@@ -877,6 +895,9 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           : Value(serviceCategory),
       requiresTimeTracking: Value(requiresTimeTracking),
       businessMode: Value(businessMode),
+      barcode: barcode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(barcode),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -912,6 +933,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       requiresTimeTracking:
           serializer.fromJson<bool>(json['requiresTimeTracking']),
       businessMode: serializer.fromJson<String>(json['businessMode']),
+      barcode: serializer.fromJson<String?>(json['barcode']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -938,6 +960,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       'serviceCategory': serializer.toJson<String?>(serviceCategory),
       'requiresTimeTracking': serializer.toJson<bool>(requiresTimeTracking),
       'businessMode': serializer.toJson<String>(businessMode),
+      'barcode': serializer.toJson<String?>(barcode),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -962,6 +985,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           Value<String?> serviceCategory = const Value.absent(),
           bool? requiresTimeTracking,
           String? businessMode,
+          Value<String?> barcode = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -985,6 +1009,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
             : this.serviceCategory,
         requiresTimeTracking: requiresTimeTracking ?? this.requiresTimeTracking,
         businessMode: businessMode ?? this.businessMode,
+        barcode: barcode.present ? barcode.value : this.barcode,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -1017,6 +1042,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
       businessMode: data.businessMode.present
           ? data.businessMode.value
           : this.businessMode,
+      barcode: data.barcode.present ? data.barcode.value : this.barcode,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -1043,6 +1069,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           ..write('serviceCategory: $serviceCategory, ')
           ..write('requiresTimeTracking: $requiresTimeTracking, ')
           ..write('businessMode: $businessMode, ')
+          ..write('barcode: $barcode, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -1054,27 +1081,29 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      name,
-      category,
-      price,
-      costPrice,
-      stockQty,
-      minStockQty,
-      $driftBlobEquality.hash(image),
-      categoryId,
-      type,
-      billingType,
-      serviceCategory,
-      requiresTimeTracking,
-      businessMode,
-      syncId,
-      updatedAt,
-      createdAt,
-      deviceId,
-      isDeleted,
-      isDefault);
+  int get hashCode => Object.hashAll([
+        id,
+        name,
+        category,
+        price,
+        costPrice,
+        stockQty,
+        minStockQty,
+        $driftBlobEquality.hash(image),
+        categoryId,
+        type,
+        billingType,
+        serviceCategory,
+        requiresTimeTracking,
+        businessMode,
+        barcode,
+        syncId,
+        updatedAt,
+        createdAt,
+        deviceId,
+        isDeleted,
+        isDefault
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1093,6 +1122,7 @@ class ItemTable extends DataClass implements Insertable<ItemTable> {
           other.serviceCategory == this.serviceCategory &&
           other.requiresTimeTracking == this.requiresTimeTracking &&
           other.businessMode == this.businessMode &&
+          other.barcode == this.barcode &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -1116,6 +1146,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
   final Value<String?> serviceCategory;
   final Value<bool> requiresTimeTracking;
   final Value<String> businessMode;
+  final Value<String?> barcode;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -1137,6 +1168,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     this.serviceCategory = const Value.absent(),
     this.requiresTimeTracking = const Value.absent(),
     this.businessMode = const Value.absent(),
+    this.barcode = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -1159,6 +1191,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     this.serviceCategory = const Value.absent(),
     this.requiresTimeTracking = const Value.absent(),
     this.businessMode = const Value.absent(),
+    this.barcode = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -1183,6 +1216,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     Expression<String>? serviceCategory,
     Expression<bool>? requiresTimeTracking,
     Expression<String>? businessMode,
+    Expression<String>? barcode,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -1206,6 +1240,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       if (requiresTimeTracking != null)
         'requires_time_tracking': requiresTimeTracking,
       if (businessMode != null) 'business_mode': businessMode,
+      if (barcode != null) 'barcode': barcode,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -1230,6 +1265,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       Value<String?>? serviceCategory,
       Value<bool>? requiresTimeTracking,
       Value<String>? businessMode,
+      Value<String?>? barcode,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -1251,6 +1287,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
       serviceCategory: serviceCategory ?? this.serviceCategory,
       requiresTimeTracking: requiresTimeTracking ?? this.requiresTimeTracking,
       businessMode: businessMode ?? this.businessMode,
+      barcode: barcode ?? this.barcode,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -1306,6 +1343,9 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
     if (businessMode.present) {
       map['business_mode'] = Variable<String>(businessMode.value);
     }
+    if (barcode.present) {
+      map['barcode'] = Variable<String>(barcode.value);
+    }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
     }
@@ -1344,6 +1384,7 @@ class ItemsCompanion extends UpdateCompanion<ItemTable> {
           ..write('serviceCategory: $serviceCategory, ')
           ..write('requiresTimeTracking: $requiresTimeTracking, ')
           ..write('businessMode: $businessMode, ')
+          ..write('barcode: $barcode, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -20049,6 +20090,7 @@ typedef $$ItemsTableCreateCompanionBuilder = ItemsCompanion Function({
   Value<String?> serviceCategory,
   Value<bool> requiresTimeTracking,
   Value<String> businessMode,
+  Value<String?> barcode,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -20071,6 +20113,7 @@ typedef $$ItemsTableUpdateCompanionBuilder = ItemsCompanion Function({
   Value<String?> serviceCategory,
   Value<bool> requiresTimeTracking,
   Value<String> businessMode,
+  Value<String?> barcode,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -20191,6 +20234,9 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<String> get businessMode => $composableBuilder(
       column: $table.businessMode, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get barcode => $composableBuilder(
+      column: $table.barcode, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -20345,6 +20391,9 @@ class $$ItemsTableOrderingComposer
       column: $table.businessMode,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get barcode => $composableBuilder(
+      column: $table.barcode, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
 
@@ -20431,6 +20480,9 @@ class $$ItemsTableAnnotationComposer
 
   GeneratedColumn<String> get businessMode => $composableBuilder(
       column: $table.businessMode, builder: (column) => column);
+
+  GeneratedColumn<String> get barcode =>
+      $composableBuilder(column: $table.barcode, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -20575,6 +20627,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<String?> serviceCategory = const Value.absent(),
             Value<bool> requiresTimeTracking = const Value.absent(),
             Value<String> businessMode = const Value.absent(),
+            Value<String?> barcode = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -20597,6 +20650,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             serviceCategory: serviceCategory,
             requiresTimeTracking: requiresTimeTracking,
             businessMode: businessMode,
+            barcode: barcode,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -20619,6 +20673,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             Value<String?> serviceCategory = const Value.absent(),
             Value<bool> requiresTimeTracking = const Value.absent(),
             Value<String> businessMode = const Value.absent(),
+            Value<String?> barcode = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -20641,6 +20696,7 @@ class $$ItemsTableTableManager extends RootTableManager<
             serviceCategory: serviceCategory,
             requiresTimeTracking: requiresTimeTracking,
             businessMode: businessMode,
+            barcode: barcode,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,

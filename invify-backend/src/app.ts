@@ -46,6 +46,7 @@ import { TerminalController, terminalUploadMiddleware } from './controllers/term
 import { SearchController } from './controllers/search.controller';
 import { OrchestrationController } from './controllers/orchestration.controller';
 import { AgentController } from './modules/agent-portal/agent.controller';
+import { CloudMetricsController } from './controllers/cloud-metrics.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
@@ -59,11 +60,12 @@ app.use(helmet());
 app.use(cors());   
 app.use(morgan('dev')); 
 app.use(express.json({
+  limit: '50mb',
   verify: (req: any, res, buf) => {
     req.rawBody = buf; // Capture raw body for signature verification
   }
 })); 
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 
 // 2. ROUTES
@@ -115,15 +117,23 @@ app.post('/admin/agents/onboard', authenticate, checkRole(['super_admin', 'admin
 app.get('/admin/agents', authenticate, checkRole(['super_admin', 'admin']), AgentController.listAgents);
 app.get('/admin/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AgentController.getAgentProfile);
 app.patch('/admin/agents/:id/status', authenticate, checkRole(['super_admin', 'admin']), AgentController.updateAgentStatus);
+app.patch('/admin/agents/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), AgentController.updateAgentKyc);
+app.get('/admin/agents/:id/commissions', authenticate, checkRole(['super_admin']), AgentController.getAgentCommissions);
+app.patch('/admin/agents/:id/commissions', authenticate, checkRole(['super_admin']), AgentController.updateAgentCommissions);
 app.post('/admin/agents/:id/message', authenticate, checkRole(['super_admin', 'admin']), AgentController.messageAgent);
 app.post('/admin/agents/:id/message-tenants', authenticate, checkRole(['super_admin', 'admin']), AgentController.messageAgentTenants);
 
 app.post('/admin/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
 
 // Agent Portal Routes
+app.post('/api/agent/register', AgentController.register);
 app.post('/api/agent/login', AgentController.login);
 app.post('/api/agent/change-password', AgentController.changePassword);
-app.get('/api/agent/dashboard', AgentController.getDashboard);
+app.post('/api/agent/resolve-suspension', AgentController.resolveSuspension);
+app.get('/api/agent/dashboard', authenticate, AgentController.getDashboard);
+
+import activationRoutes from './routes/activation.routes';
+app.use(activationRoutes);
 
 // Orchestration Endpoints
 app.get('/api/orchestration/context', authenticate, checkRole(['super_admin']), OrchestrationController.getContext);
@@ -134,9 +144,22 @@ app.get('/admin/dashboard-stats', authenticate, checkRole(['super_admin']), Admi
 app.get('/admin/audit-logs', authenticate, checkRole(['super_admin']), TerminalController.getAuditLog);
 app.patch('/admin/profile', authenticate, AdminController.updateProfile);
 
+// Cloud Metrics API Endpoints
+const cloudMetricsController = new CloudMetricsController();
+app.get('/cloud-metrics/overview', authenticate, cloudMetricsController.getOverview);
+app.get('/cloud-metrics/sync-health', authenticate, cloudMetricsController.getSyncHealth);
+app.get('/cloud-metrics/terminals', authenticate, cloudMetricsController.getTerminals);
+app.get('/cloud-metrics/devices', authenticate, cloudMetricsController.getDevices);
+app.get('/cloud-metrics/backups', authenticate, cloudMetricsController.getBackups);
+app.get('/cloud-metrics/activity-feed', authenticate, cloudMetricsController.getActivityFeed);
+app.get('/cloud-metrics/alerts', authenticate, cloudMetricsController.getAlerts);
+
+
 // Global Settings (Super Admin Only)
 app.get('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.getGlobalSettings);
 app.patch('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.updateGlobalSettings);
+app.get('/admin/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.getGlobalCommissions);
+app.patch('/admin/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.updateGlobalCommissions);
 app.post('/admin/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
 
 // Subscriptions

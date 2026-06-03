@@ -69,37 +69,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Gross Revenue (MTD)</div>
-          <div class="text-h5 text-metric-mono text-green-4">₦1.24B <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}1.24B <q-icon name="trending_up" size="xs"/></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Net Revenue (Margin)</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">₦984M <span class="text-caption text-muted">(79%)</span></div>
+          <div class="text-h5 text-metric-mono text-cyan-4">{{ currentCurrency.symbol }}984M <span class="text-caption text-muted">(79%)</span></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Rev Per Tenant</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">₦142.5K</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}142.5K</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Rev Per Txn</div>
-          <div class="text-h5 text-metric-mono text-amber-5">₦14.20</div>
+          <div class="text-h5 text-metric-mono text-amber-5">{{ currentCurrency.symbol }}14.20</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Recurring / Comm Vol</div>
-          <div class="text-h5 text-metric-mono text-purple-4">₦45M / ₦120M</div>
+          <div class="text-h5 text-metric-mono text-purple-4">{{ currentCurrency.symbol }}45M / {{ currentCurrency.symbol }}120M</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Forecast (End of Mo)</div>
-          <div class="text-h5 text-metric-mono text-main">₦2.1B <span class="text-green-4">+5%</span></div>
+          <div class="text-h5 text-metric-mono text-main">{{ currentCurrency.symbol }}2.1B <span class="text-green-4">+5%</span></div>
         </div>
       </div>
     </div>
@@ -166,17 +166,17 @@
             </template>
             <template v-slot:body-cell-revenueAmount="props">
               <q-td :props="props" class="font-mono text-right text-green-4 text-weight-bold">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-costAmount="props">
               <q-td :props="props" class="font-mono text-right text-red-4">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-netRevenue="props">
               <q-td :props="props" class="font-mono text-right text-main text-weight-bold">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-margin="props">
@@ -296,9 +296,9 @@
                 <div class="col-6">
                   <div class="enterprise-subpanel q-pa-md border-muted rounded-borders full-height bg-dark">
                     <div class="text-caption text-muted font-mono q-mb-sm border-bottom q-pb-xs">Profitability Profile</div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Gross Revenue:</span><span class="text-green-4">₦{{ selectedRevenue.revenueAmount.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Processing Cost:</span><span class="text-red-4">₦{{ selectedRevenue.costAmount.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Net Profit:</span><span class="text-main text-h6" style="line-height: 1;">₦{{ selectedRevenue.netRevenue.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Gross Revenue:</span><span class="text-green-4">{{ currentCurrency.symbol }}{{ selectedRevenue.revenueAmount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Processing Cost:</span><span class="text-red-4">{{ currentCurrency.symbol }}{{ selectedRevenue.costAmount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Net Profit:</span><span class="text-main text-h6" style="line-height: 1;">{{ currentCurrency.symbol }}{{ selectedRevenue.netRevenue.toLocaleString() }}</span></div>
                     <div class="row justify-between q-mt-sm font-mono"><span class="text-muted">Margin:</span><span class="text-cyan-4">{{ selectedRevenue.margin }}%</span></div>
                     <div class="row justify-between q-mt-xs font-mono"><span class="text-muted">Growth (MoM):</span><span :class="selectedRevenue.growth > 0 ? 'text-green-4' : 'text-red-4'">{{ selectedRevenue.growth > 0 ? '+' : '' }}{{ selectedRevenue.growth }}%</span></div>
                   </div>
@@ -310,10 +310,10 @@
             <q-tab-panel name="breakdown" class="q-pa-md column">
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                 <div class="text-weight-bold q-mb-md">Revenue Stream Breakdown</div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Transaction Fee Revenue:</span><span class="text-main">₦{{ (selectedRevenue.revenueAmount * 0.6).toLocaleString() }} (60%)</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Terminal Rental Revenue:</span><span class="text-main">₦{{ (selectedRevenue.revenueAmount * 0.25).toLocaleString() }} (25%)</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Commission Revenue:</span><span class="text-main">₦{{ (selectedRevenue.revenueAmount * 0.1).toLocaleString() }} (10%)</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Settlement Surcharges:</span><span class="text-main">₦{{ (selectedRevenue.revenueAmount * 0.05).toLocaleString() }} (5%)</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Transaction Fee Revenue:</span><span class="text-main">{{ currentCurrency.symbol }}{{ (selectedRevenue.revenueAmount * 0.6).toLocaleString() }} (60%)</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Terminal Rental Revenue:</span><span class="text-main">{{ currentCurrency.symbol }}{{ (selectedRevenue.revenueAmount * 0.25).toLocaleString() }} (25%)</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Commission Revenue:</span><span class="text-main">{{ currentCurrency.symbol }}{{ (selectedRevenue.revenueAmount * 0.1).toLocaleString() }} (10%)</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Settlement Surcharges:</span><span class="text-main">{{ currentCurrency.symbol }}{{ (selectedRevenue.revenueAmount * 0.05).toLocaleString() }} (5%)</span></div>
               </div>
             </q-tab-panel>
 
@@ -340,7 +340,7 @@
             <q-tab-panel name="forecasting" class="q-pa-md column">
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                 <div class="text-weight-bold q-mb-md text-purple-3"><q-icon name="auto_graph" class="q-mr-xs" /> AI Predictive Analytics</div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Projected Revenue (Next Period):</span><span class="text-main">₦{{ (selectedRevenue.revenueAmount * 1.05).toLocaleString() }}</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Projected Revenue (Next Period):</span><span class="text-main">{{ currentCurrency.symbol }}{{ (selectedRevenue.revenueAmount * 1.05).toLocaleString() }}</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Growth Forecast:</span><span class="text-green-4">+5.0%</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Predicted Margin:</span><span class="text-main">80%</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Seasonality Impact:</span><span class="text-amber-4">HIGH (Back-to-school peak)</span></div>
@@ -369,6 +369,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('analysis')

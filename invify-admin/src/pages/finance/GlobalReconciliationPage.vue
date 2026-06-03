@@ -23,7 +23,7 @@
         <div class="row items-center op-gap-4">
           <div class="enterprise-subpanel q-px-md q-py-xs rounded-borders text-right border-muted">
             <div class="text-metric-mono text-grey-5" style="font-size: 10px;">GLOBAL VOLUME 24H</div>
-            <div class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">₦ 842.5M</div>
+            <div class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">{{ currentCurrency.symbol }} 842.5M</div>
           </div>
           <q-btn unelevated color="amber-5" text-color="black" icon="sync" label="Force Ledger Sync" class="text-weight-bold text-caption" />
         </div>
@@ -46,11 +46,11 @@
             <div class="panel-body q-pa-md">
               <div class="row items-end justify-between q-mb-md">
                 <div>
-                  <div class="text-metric-mono text-cyan-3" style="font-size: 20px;">₦ 520.1M</div>
+                  <div class="text-metric-mono text-cyan-3" style="font-size: 20px;">{{ currentCurrency.symbol }} 520.1M</div>
                   <div class="text-caption text-muted" style="font-size: 10px;">Card Networks (61%)</div>
                 </div>
                 <div class="text-right">
-                  <div class="text-metric-mono text-purple-3" style="font-size: 20px;">₦ 322.4M</div>
+                  <div class="text-metric-mono text-purple-3" style="font-size: 20px;">{{ currentCurrency.symbol }} 322.4M</div>
                   <div class="text-caption text-muted" style="font-size: 10px;">In-App Transfers (39%)</div>
                 </div>
               </div>
@@ -85,7 +85,7 @@
                     <q-item-label class="text-muted" style="font-size: 10px;">T+1 Settlement Wait</q-item-label>
                   </q-item-section>
                   <q-item-section side class="text-right">
-                    <div class="text-metric-mono text-green-3">₦ 142.5M</div>
+                    <div class="text-metric-mono text-green-3">{{ currentCurrency.symbol }} 142.5M</div>
                     <div class="text-metric-sm text-grey-6">Due 14:00 GMT</div>
                   </q-item-section>
                 </q-item>
@@ -95,7 +95,7 @@
                     <q-item-label class="text-muted" style="font-size: 10px;">T+0 Instant Disburse</q-item-label>
                   </q-item-section>
                   <q-item-section side class="text-right">
-                    <div class="text-metric-mono text-green-3">₦ 89.2M</div>
+                    <div class="text-metric-mono text-green-3">{{ currentCurrency.symbol }} 89.2M</div>
                     <div class="text-metric-sm text-grey-6">Processing...</div>
                   </q-item-section>
                 </q-item>
@@ -105,7 +105,7 @@
                     <q-item-label class="text-muted" style="font-size: 10px;">Wallet Reconciled</q-item-label>
                   </q-item-section>
                   <q-item-section side class="text-right">
-                    <div class="text-metric-mono text-green-3">₦ 41.0M</div>
+                    <div class="text-metric-mono text-green-3">{{ currentCurrency.symbol }} 41.0M</div>
                     <div class="text-metric-sm text-grey-6">Due 17:00 GMT</div>
                   </q-item-section>
                 </q-item>
@@ -165,6 +165,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 import SecureFinanceGate from '../../components/finance/SecureFinanceGate.vue'
 
@@ -177,11 +180,11 @@ const columns = [
 ]
 
 const discrepancies = ref([
-  { id: 1, tenant: 'Alpha Retail Chain', type: 'POS Double-Spend Rejection', severity: 'CRITICAL', delta: '₦ 14,500' },
-  { id: 2, tenant: 'Global Network', type: 'Orphaned Gateway Callback', severity: 'HIGH', delta: '₦ 1,200,000' },
-  { id: 3, tenant: 'EduCore Schools', type: 'Unmatched Parent Transfer', severity: 'CRITICAL', delta: '₦ 42,000' },
-  { id: 4, tenant: 'Logistics Prime', type: 'Terminal Batch Desync', severity: 'HIGH', delta: '₦ 8,400' },
-  { id: 5, tenant: 'Global Network', type: 'Provider Settlement Lag', severity: 'HIGH', delta: '₦ 4,500,000' }
+  { id: 1, tenant: 'Alpha Retail Chain', type: 'POS Double-Spend Rejection', severity: 'CRITICAL', delta: '{{ currentCurrency.symbol }} 14,500' },
+  { id: 2, tenant: 'Global Network', type: 'Orphaned Gateway Callback', severity: 'HIGH', delta: '{{ currentCurrency.symbol }} 1,200,000' },
+  { id: 3, tenant: 'EduCore Schools', type: 'Unmatched Parent Transfer', severity: 'CRITICAL', delta: '{{ currentCurrency.symbol }} 42,000' },
+  { id: 4, tenant: 'Logistics Prime', type: 'Terminal Batch Desync', severity: 'HIGH', delta: '{{ currentCurrency.symbol }} 8,400' },
+  { id: 5, tenant: 'Global Network', type: 'Provider Settlement Lag', severity: 'HIGH', delta: '{{ currentCurrency.symbol }} 4,500,000' }
 ])
 </script>
 

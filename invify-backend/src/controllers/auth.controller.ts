@@ -65,6 +65,23 @@ export class AuthController {
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' });
       }
+
+      // 0. Check Maintenance Mode Global Lockout
+      const settingsPath = path.join(process.cwd(), 'global_settings.json');
+      if (fs.existsSync(settingsPath)) {
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        if (settings.is_maintenance_locked) {
+          const emailLower = (email || '').toLowerCase();
+          const isSuperAdmin = emailLower === 'sysadmin@iips.app' || emailLower === 'superadmin@iips.app' || emailLower.includes('admin') || emailLower.includes('iips');
+          
+          if (!isSuperAdmin) {
+            return res.status(403).json({
+              error: 'MAINTENANCE_LOCK',
+              message: settings.maintenance_message || 'System is currently under maintenance. Please try again later.'
+            });
+          }
+        }
+      }
       // Offline Developer Bypass
       if (process.env.OFFLINE_MOCK_AUTH === 'true') {
         if (password === 'wrongpassword' || email.includes('notauser')) {

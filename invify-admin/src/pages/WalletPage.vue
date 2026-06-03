@@ -11,7 +11,7 @@
           <div class="column items-center">
             <div class="text-overline text-indigo-3 letter-spacing-1">TOTAL AVAILABLE BALANCE</div>
             <div class="text-h1 text-weight-bolder text-cyan-4 q-my-md animate-pop">
-              ₦{{ balance.toLocaleString() }}
+              {{ currentCurrency.symbol }}{{ balance.toLocaleString() }}
             </div>
             <q-btn 
               outline 
@@ -100,6 +100,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, onMounted, computed } from 'vue'
 import { adminApi } from '../api'
 

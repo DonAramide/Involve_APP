@@ -47,7 +47,16 @@ const routes = [
     children: [
       { path: '', redirect: '/agent/dashboard' },
       { path: 'login', component: () => import('pages/agent/AgentLoginPage.vue') },
-      { path: 'dashboard', component: () => import('pages/agent/AgentDashboardPage.vue') }
+      { path: 'signup', component: () => import('pages/agent/AgentSignupPage.vue') },
+      { path: 'success', component: () => import('pages/agent/AgentSuccessPage.vue') },
+      { path: 'dashboard', component: () => import('pages/agent/AgentDashboardPage.vue') },
+      { path: 'coming-soon/:module', component: () => import('pages/agent/ComingSoonPage.vue') },
+      { path: 'notifications', component: () => import('pages/agent-portal/AgentNotificationsPage.vue') },
+      { path: 'profile', component: () => import('pages/agent-portal/AgentProfilePage.vue') },
+      { path: 'leads', component: () => import('pages/agent-portal/leads/LeadKanbanPage.vue') },
+      { path: 'portfolio', component: () => import('pages/agent-portal/portfolio/TenantPortfolioPage.vue') },
+      { path: 'training', component: () => import('pages/agent-portal/training/CourseCatalogPage.vue') },
+      { path: 'wallet', component: () => import('pages/agent-portal/wallet/AgentWalletDashboardPage.vue') }
     ]
   },
 
@@ -310,10 +319,11 @@ const routes = [
       { path: 'admin/tenants', component: () => import('pages/TenantsPage.vue'), meta: { workspace: 'admin', title: 'Tenants', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/users', component: () => import('pages/UsersPage.vue'), meta: { workspace: 'admin', title: 'Operators', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/settings', component: () => import('pages/admin/PlatformOverviewPage.vue'), meta: { workspace: 'admin', title: 'Platform Overview', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'admin/config', component: () => import('pages/admin/PlatformConfigPage.vue'), meta: { workspace: 'admin', title: 'Platform Configuration', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/config', component: () => import('pages/admin/PlatformConfigPage.vue'), meta: { workspace: 'admin', title: 'Platform Configuration', permission: 'admin_deploy', requiresAuth: true, keywords: ['maintenance', 'maintenance mode', 'maintenance mode controls', 'system lockout', 'lockout'] } },
       { path: 'admin/contact', component: () => import('pages/governance/ContactMaintenancePage.vue'), meta: { workspace: 'admin', title: 'Contact Maintenance', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/orchestration', component: () => import('pages/admin/TenantOrchestrationCenterPage.vue'), meta: { workspace: 'admin', title: 'Tenant Orchestration', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/billing', component: () => import('pages/admin/BillingGovernanceCenterPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Billing & Revenue', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'admin/agents/commissions', component: () => import('pages/admin/AgentCommissionsPage.vue'), meta: { workspace: 'admin', title: 'Agent Commissions & Billing', keywords: ['commission', 'bill', 'payout', 'agent fee'], permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/pos-gateway', component: () => import('pages/PosGatewayPage.vue'), meta: { workspace: 'admin', title: 'EMV POS Gateway', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'automation/policy', component: () => import('pages/automation/PolicyIntelligencePage.vue'), meta: { workspace: 'automation', title: 'Policy Intelligence', permission: 'write_policies', requiresAuth: true } },
       { path: 'automation/workflows', component: () => import('pages/automation/WorkflowExecutionCenterPage.vue'), meta: { workspace: 'automation', title: 'Workflow Execution & Audit', permission: 'write_policies', requiresAuth: true } },
@@ -357,6 +367,11 @@ const routes = [
       { path: 'staff', component: () => import('pages/tenant/TenantStaffPage.vue'), meta: { title: 'Staff Governance & RBAC', requiresAuth: true } },
       { path: 'reports', component: () => import('pages/tenant/TenantReportsPage.vue'), meta: { title: 'Business Reports', requiresAuth: true } },
       { path: 'settings', component: () => import('pages/tenant/TenantSettingsPage.vue'), meta: { title: 'Portal Customization', requiresAuth: true } },
+      
+      // Dynamic School Mode Routes nested under Tenant Layout namespace
+      { path: 'curriculum', component: () => import('pages/CurriculumPage.vue'), meta: { requiresAuth: true } },
+      { path: 'notes', component: () => import('pages/LessonNotePage.vue'), meta: { workspace: 'ai', title: 'AI Lesson Planner', requiresAuth: true } },
+      { path: 'attendance', component: () => import('pages/AttendancePage.vue'), meta: { requiresAuth: true } },
       
       // Dynamic Retail Mode Routes
       { path: 'retail/pos', component: () => import('pages/tenant/TenantIndustryPOSPage.vue'), meta: { title: 'POS Checkout Register', requiresAuth: true } },

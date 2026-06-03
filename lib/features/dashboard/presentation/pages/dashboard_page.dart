@@ -481,7 +481,7 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (dialogContext) => PasswordDialog(bloc: settingsBloc),
     ).then((authorized) {
       if (authorized == true && context.mounted) {
-        Navigator.pushNamed(context, '/system_setup');
+        Navigator.pushNamed(context, '/admin_hub');
       }
     });
   }
@@ -608,7 +608,9 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'CLOUD METRICS',
           icon: Icons.cloud_done_outlined,
           color: Colors.indigo,
-          onTap: () => _verifyAndNavigateToCloudMetrics(context),
+          onTap: () {
+            Navigator.pushNamed(context, '/cloud_metrics');
+          },
         ),
         _DashboardMenuItem(
           id: 'finance_analytics',

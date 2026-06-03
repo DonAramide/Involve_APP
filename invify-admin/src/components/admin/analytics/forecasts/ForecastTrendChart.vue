@@ -1,0 +1,1 @@
+<template><div>Trend Chart</div></template>

@@ -68,7 +68,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Mismatch Amount</div>
-          <div class="text-h5 text-metric-mono text-red-4">₦142.5K</div>
+          <div class="text-h5 text-metric-mono text-red-4">{{ currentCurrency.symbol }}142.5K</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -149,7 +149,7 @@
             </template>
             <template v-slot:body-cell-difference="props">
               <q-td :props="props" class="font-mono text-weight-bold" :class="props.value === 0 ? 'text-green-4' : 'text-red-4'">
-                {{ props.value === 0 ? '₦0' : '₦' + props.value.toLocaleString() }}
+                {{ props.value === 0 ? '₦0' : currentCurrency.symbol + props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-riskScore="props">
@@ -276,9 +276,9 @@
                 <div class="col-6">
                   <div class="enterprise-subpanel q-pa-md border-muted rounded-borders full-height">
                     <div class="text-caption text-muted font-mono q-mb-sm border-bottom q-pb-xs">Reconciliation Integrity</div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Expected Amount:</span><span class="text-main">₦{{ selectedRecon.expectedAmount.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Actual Amount:</span><span class="text-main">₦{{ selectedRecon.actualAmount.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Difference:</span><span :class="selectedRecon.difference === 0 ? 'text-green-4' : 'text-red-4'">₦{{ selectedRecon.difference.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Expected Amount:</span><span class="text-main">{{ currentCurrency.symbol }}{{ selectedRecon.expectedAmount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Actual Amount:</span><span class="text-main">{{ currentCurrency.symbol }}{{ selectedRecon.actualAmount.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Difference:</span><span :class="selectedRecon.difference === 0 ? 'text-green-4' : 'text-red-4'">{{ currentCurrency.symbol }}{{ selectedRecon.difference.toLocaleString() }}</span></div>
                   </div>
                 </div>
                 <div class="col-6">
@@ -369,6 +369,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('queues')
@@ -463,7 +466,7 @@ const exceptions = ref([
   {
     id: 'EXC-2026-001',
     type: 'Amount Mismatch',
-    description: 'Ledger recorded ₦1,250,000 but Bank confirmed ₦1,200,000 for Settlement SET-2026-300002.',
+    description: 'Ledger recorded {{ currentCurrency.symbol }}1,250,000 but Bank confirmed {{ currentCurrency.symbol }}1,200,000 for Settlement SET-2026-300002.',
     reconRecord: reconRecords.value[1]
   },
   {

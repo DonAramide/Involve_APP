@@ -1,5 +1,17 @@
 [
   {
+    "text": "Maintenance Mode Controls",
+    "route": "/admin/config",
+    "pageTitle": "Platform Configuration",
+    "keywords": ["maintenance", "lockout", "super admin"]
+  },
+  {
+    "text": "System Lockout & Maintenance",
+    "route": "/admin/config",
+    "pageTitle": "Platform Configuration",
+    "keywords": ["maintenance", "lockout", "super admin"]
+  },
+  {
     "text": "tier.label",
     "route": "/login",
     "pageTitle": "Enterprise Portal Login",

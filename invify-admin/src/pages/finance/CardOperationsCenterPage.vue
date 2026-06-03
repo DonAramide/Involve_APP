@@ -65,13 +65,13 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Total Card Spend (30d)</div>
-          <div class="text-h5 text-metric-mono text-green-4">₦142.5B <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}142.5B <q-icon name="trending_up" size="xs"/></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Spend / Card Success</div>
-          <div class="text-h5 text-metric-mono text-amber-5">₦41,900 / 99.4%</div>
+          <div class="text-h5 text-metric-mono text-amber-5">{{ currentCurrency.symbol }}41,900 / 99.4%</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -83,7 +83,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Chargeback / Dispute Vol</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">₦2.4M / 14</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}2.4M / 14</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -170,12 +170,12 @@
             </template>
             <template v-slot:body-cell-currentBalance="props">
               <q-td :props="props" class="font-mono text-right text-weight-bold">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-spendLimit="props">
               <q-td :props="props" class="font-mono text-right text-muted">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-riskScore="props">
@@ -204,7 +204,7 @@
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders bg-dark column op-gap-8">
                 <div class="text-caption text-muted font-mono">Dispute DISP-2026-001</div>
                 <div class="row justify-between"><span class="text-muted">Card:</span><span class="text-cyan-4">**** 4111</span></div>
-                <div class="row justify-between"><span class="text-muted">Amount:</span><span class="text-red-4">₦14,500</span></div>
+                <div class="row justify-between"><span class="text-muted">Amount:</span><span class="text-red-4">{{ currentCurrency.symbol }}14,500</span></div>
                 <div class="row justify-between"><span class="text-muted">Reason:</span><span class="text-main">Fraudulent Use</span></div>
                 <div class="q-mt-sm"><q-badge color="amber-10" text-color="amber-3">INVESTIGATING</q-badge></div>
                 <q-btn outline size="xs" color="cyan-4" label="Review Evidence" class="q-mt-sm" />
@@ -214,7 +214,7 @@
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders bg-dark column op-gap-8">
                 <div class="text-caption text-muted font-mono">Dispute DISP-2026-002</div>
                 <div class="row justify-between"><span class="text-muted">Card:</span><span class="text-cyan-4">**** 8824</span></div>
-                <div class="row justify-between"><span class="text-muted">Amount:</span><span class="text-red-4">₦5,000</span></div>
+                <div class="row justify-between"><span class="text-muted">Amount:</span><span class="text-red-4">{{ currentCurrency.symbol }}5,000</span></div>
                 <div class="row justify-between"><span class="text-muted">Reason:</span><span class="text-main">Duplicate Charge</span></div>
                 <div class="q-mt-sm"><q-badge color="green-10" text-color="green-3">RESOLVED</q-badge></div>
                 <q-btn outline size="xs" color="grey-6" label="View Resolution" class="q-mt-sm" />
@@ -296,9 +296,9 @@
                 <div class="col-6">
                   <div class="enterprise-subpanel q-pa-md border-muted rounded-borders full-height bg-dark">
                     <div class="text-caption text-muted font-mono q-mb-sm border-bottom q-pb-xs">Limits & Balances</div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Linked Wallet Balance:</span><span class="text-main">₦{{ selectedCard.currentBalance.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Daily Spend Limit:</span><span class="text-amber-4">₦{{ selectedCard.spendLimit.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Available Limit:</span><span class="text-green-4 text-h6" style="line-height: 1;">₦{{ Math.min(selectedCard.currentBalance, selectedCard.spendLimit).toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Linked Wallet Balance:</span><span class="text-main">{{ currentCurrency.symbol }}{{ selectedCard.currentBalance.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Daily Spend Limit:</span><span class="text-amber-4">{{ currentCurrency.symbol }}{{ selectedCard.spendLimit.toLocaleString() }}</span></div>
+                    <div class="row justify-between q-mt-sm border-top q-pt-sm font-mono text-weight-bold"><span class="text-muted">Available Limit:</span><span class="text-green-4 text-h6" style="line-height: 1;">{{ currentCurrency.symbol }}{{ Math.min(selectedCard.currentBalance, selectedCard.spendLimit).toLocaleString() }}</span></div>
                   </div>
                 </div>
               </div>
@@ -387,6 +387,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('directory')

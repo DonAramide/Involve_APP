@@ -24,26 +24,31 @@
       <div class="col-12 col-lg-8">
         <q-card class="bg-card-dark border-grey-9 q-pa-lg fit">
           <div class="text-h6 text-weight-bold text-white q-mb-xs">Dynamic Module Provisioning Matrix</div>
-          <div class="text-caption text-grey-5 q-mb-md">Toggle authoritative capabilities in real-time. Toggles will instantly modify the active sidebar workspace layout.</div>
+          <div class="text-caption text-grey-5 q-mb-md">This layout shows the workspace operational module assigned to this tenant. Each business profile is configured for exactly one mode of operation.</div>
+
+          <div class="q-pa-md rounded-borders border-grey-9 bg-red-10 text-red-3 row items-center op-gap-8 text-caption q-mb-md font-mono" style="border: 1px solid rgba(239, 68, 68, 0.2);">
+            <q-icon name="info" size="sm" color="red-4" />
+            <span><strong>PROVISIONING LOCK:</strong> Workspaces are locked to their administration-assigned mode. To switch this business to a different mode, please contact Invify Super Admin.</span>
+          </div>
 
           <div class="column q-gutter-y-sm">
             <div 
               v-for="mod in modules" 
               :key="mod.id" 
               class="q-pa-md rounded-borders border-grey-9 row items-center justify-between transition-3"
-              :class="activeModule === mod.id ? 'active-module' : 'bg-black-transparent'"
-              @click="switchModule(mod.id)"
+              :class="activeModule === mod.id ? 'active-module' : 'bg-black-transparent opacity-50'"
+              style="cursor: not-allowed;"
             >
               <div class="row items-center op-gap-12 col">
-                <q-icon :name="mod.icon" :color="activeModule === mod.id ? mod.color : 'grey-5'" size="sm" />
+                <q-icon :name="mod.icon" :color="activeModule === mod.id ? mod.color : 'grey-7'" size="sm" />
                 <div class="col">
-                  <div class="text-caption text-weight-bold text-white">{{ mod.name }}</div>
-                  <div class="text-caption text-grey-5" style="font-size: 11px;">{{ mod.desc }}</div>
+                  <div class="text-caption text-weight-bold" :class="activeModule === mod.id ? 'text-white' : 'text-grey-7'">{{ mod.name }}</div>
+                  <div class="text-caption text-grey-7" style="font-size: 11px;">{{ mod.desc }}</div>
                 </div>
               </div>
               <div class="row items-center op-gap-8">
                 <q-badge color="indigo-10" text-color="indigo-3" class="text-metric-sm text-weight-bold" v-if="activeModule === mod.id">ACTIVE PREFERENCE</q-badge>
-                <q-radio v-model="activeModule" :val="mod.id" dark color="indigo-4" />
+                <q-radio v-model="activeModule" :val="mod.id" dark color="indigo-4" disable />
               </div>
             </div>
           </div>

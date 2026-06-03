@@ -25,6 +25,7 @@
     "morgan": "^1.10.0",
     "multer": "^2.1.1",
     "pdfkit": "^0.18.0",
+    "pg": "^8.21.0",
     "socket.io": "^4.8.3",
     "xlsx": "^0.18.5"
   },
@@ -51,7 +52,9 @@
     "testMatch": [
       "**/test/**/*.test.ts"
     ],
-    "setupFiles": ["<rootDir>/test/jest.setup.ts"],
+    "setupFiles": [
+      "<rootDir>/test/jest.setup.ts"
+    ],
     "moduleFileExtensions": [
       "ts",
       "js",

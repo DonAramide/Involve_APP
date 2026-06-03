@@ -23,6 +23,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/widgets/barcode_scanner_dialog.dart';
 
 class CreateInvoicePage extends StatefulWidget {
   const CreateInvoicePage({super.key});
@@ -334,9 +335,11 @@ class _ItemSelectorState extends State<_ItemSelector> {
               }
               
               // Apply search filter
-              if (_searchQuery.isNotEmpty) {
+              if (_searchQuery.trim().isNotEmpty) {
+                final query = _searchQuery.trim().toLowerCase();
                 filteredItems = filteredItems
-                    .where((i) => i.name.toLowerCase().contains(_searchQuery))
+                    .where((i) => i.name.toLowerCase().contains(query) ||
+                                  (i.barcode != null && i.barcode!.toLowerCase().contains(query)))
                     .toList();
               }
 
@@ -357,7 +360,18 @@ class _ItemSelectorState extends State<_ItemSelector> {
                               _searchController.clear();
                             },
                           )
-                        : null,
+                        : IconButton(
+                            icon: const Icon(Icons.qr_code_scanner),
+                            onPressed: () async {
+                              final result = await showDialog<String>(
+                                context: context,
+                                builder: (ctx) => const BarcodeScannerDialog(),
+                              );
+                              if (result != null && result.isNotEmpty) {
+                                _searchController.text = result;
+                              }
+                            },
+                          ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1109,66 +1123,68 @@ class _CartSummary extends StatelessWidget {
         builder: (context, setState) {
           return AlertDialog(
             title: const Text('Apply Discount'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Toggle Button for Discount Type
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => selectedType = DiscountType.amount),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: selectedType == DiscountType.amount ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: selectedType == DiscountType.amount ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Toggle Button for Discount Type
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() => selectedType = DiscountType.amount),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: selectedType == DiscountType.amount ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: selectedType == DiscountType.amount ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
+                              ),
+                              child: const Text('AMOUNT', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                             ),
-                            child: const Text('AMOUNT', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => selectedType = DiscountType.percentage),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: selectedType == DiscountType.percentage ? Colors.white : Colors.transparent,
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: selectedType == DiscountType.percentage ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setState(() => selectedType = DiscountType.percentage),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: selectedType == DiscountType.percentage ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: selectedType == DiscountType.percentage ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : null,
+                              ),
+                              child: const Text('PERCENTAGE', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                             ),
-                            child: const Text('PERCENTAGE', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: controller,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    labelText: selectedType == DiscountType.amount ? 'Discount Amount ($currency)' : 'Discount Percentage (%)',
-                    border: const OutlineInputBorder(),
-                    prefixText: selectedType == DiscountType.amount ? currency : null,
-                    suffixText: selectedType == DiscountType.percentage ? '%' : null,
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: controller,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      labelText: selectedType == DiscountType.amount ? 'Discount Amount ($currency)' : 'Discount Percentage (%)',
+                      border: const OutlineInputBorder(),
+                      prefixText: selectedType == DiscountType.amount ? currency : null,
+                      suffixText: selectedType == DiscountType.percentage ? '%' : null,
+                    ),
                   ),
-                ),
-                if (selectedType == DiscountType.percentage) ...[
-                  const SizedBox(height: 8),
-                  const Text('Enter percentage (0-100) to apply to subtotal + tax.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  if (selectedType == DiscountType.percentage) ...[
+                    const SizedBox(height: 8),
+                    const Text('Enter percentage (0-100) to apply to subtotal + tax.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  ],
                 ],
-              ],
+              ),
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
@@ -1255,86 +1271,88 @@ void _showCustomerDialog(BuildContext context, String? currentName, String? curr
         title: Text(settings?.customerInfoLabel ?? 'Customer Information'),
         content: Form(
           key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (selectedCustomerId != null)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                      const SizedBox(width: 8),
-                      const Expanded(child: Text('Linked to Customer Profile', style: TextStyle(color: Colors.green, fontSize: 12))),
-                      InkWell(
-                        onTap: () => setState(() => selectedCustomerId = null),
-                        child: const Icon(Icons.close, color: Colors.grey, size: 16),
-                      ),
-                    ],
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (selectedCustomerId != null)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                        const SizedBox(width: 8),
+                        const Expanded(child: Text('Linked to Customer Profile', style: TextStyle(color: Colors.green, fontSize: 12))),
+                        InkWell(
+                          onTap: () => setState(() => selectedCustomerId = null),
+                          child: const Icon(Icons.close, color: Colors.grey, size: 16),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  TextButton.icon(
+                    onPressed: () async {
+                      final ServiceCustomer? customer = await _showCustomerPicker(context);
+                      if (customer != null) {
+                        setState(() {
+                          selectedCustomerId = customer.id;
+                          nameController.text = customer.name;
+                          phoneController.text = customer.phone ?? '';
+                          addrController.text = customer.address ?? '';
+                        });
+                      }
+                    },
+                    icon: const Icon(Icons.search),
+                    label: const Text('Search Existing Customer'),
                   ),
-                )
-              else
-                TextButton.icon(
-                  onPressed: () async {
-                    final ServiceCustomer? customer = await _showCustomerPicker(context);
-                    if (customer != null) {
-                      setState(() {
-                        selectedCustomerId = customer.id;
-                        nameController.text = customer.name;
-                        phoneController.text = customer.phone ?? '';
-                        addrController.text = customer.address ?? '';
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.search),
-                  label: const Text('Search Existing Customer'),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: nameController,
+                decoration: InputDecoration(
+                  labelText: settings?.customerNameLabel ?? 'Customer Name', 
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.person),
                 ),
-              const SizedBox(height: 16),
+                autofocus: true,
+                validator: (val) {
+                  final label = settings?.customerLabel.toLowerCase() ?? 'customer';
+                  return (val == null || val.trim().isEmpty) ? 'Please enter $label name' : null;
+                },
+              ),
+              const SizedBox(height: 12),
               TextFormField(
-                controller: nameController,
-              decoration: InputDecoration(
-                labelText: settings?.customerNameLabel ?? 'Customer Name', 
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.person),
+                controller: phoneController,
+                decoration: InputDecoration(
+                  labelText: settings?.customerPhoneLabel ?? 'Customer Phone', 
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.phone),
+                  hintText: 'e.g. 08012345678',
+                ),
+                keyboardType: TextInputType.phone,
+                validator: (val) {
+                  if (val == null || val.isEmpty) return 'Phone number required';
+                  final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
+                  if (digitsOnly.length < 11 || digitsOnly.length > 15) {
+                    return 'Phone must be 11 to 15 digits';
+                  }
+                  return null;
+                },
               ),
-              autofocus: true,
-              validator: (val) {
-                final label = settings?.customerLabel.toLowerCase() ?? 'customer';
-                return (val == null || val.trim().isEmpty) ? 'Please enter $label name' : null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: phoneController,
-              decoration: InputDecoration(
-                labelText: settings?.customerPhoneLabel ?? 'Customer Phone', 
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.phone),
-                hintText: 'e.g. 08012345678',
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: addrController,
+                decoration: InputDecoration(
+                  labelText: settings?.customerAddressLabel ?? 'Customer Address', 
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.location_on),
+                ),
+                maxLines: 2,
               ),
-              keyboardType: TextInputType.phone,
-              validator: (val) {
-                if (val == null || val.isEmpty) return 'Phone number required';
-                final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
-                if (digitsOnly.length < 11 || digitsOnly.length > 15) {
-                  return 'Phone must be 11 to 15 digits';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: addrController,
-              decoration: InputDecoration(
-                labelText: settings?.customerAddressLabel ?? 'Customer Address', 
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.location_on),
-              ),
-              maxLines: 2,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [

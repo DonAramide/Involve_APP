@@ -21,6 +21,7 @@ class Items extends Table {
   TextColumn get serviceCategory => text().nullable()(); // 'Hotel', 'Lounge', etc.
   BoolColumn get requiresTimeTracking => boolean().withDefault(const Constant(false))();
   TextColumn get businessMode => text().withDefault(const Constant('retail'))(); // 'retail' or 'school'
+  TextColumn get barcode => text().nullable()();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

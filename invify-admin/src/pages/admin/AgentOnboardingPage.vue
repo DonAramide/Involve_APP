@@ -51,7 +51,7 @@
                     {{ agent.status || 'ACTIVE' }}
                   </q-chip>
                 </td>
-                <td class="q-pa-xs text-metric-mono text-green-4">${{ agent.commissions?.toFixed(2) || '0.00' }}</td>
+                <td class="q-pa-xs text-metric-mono text-green-4">{{ currentCurrency.symbol }}{{ agent.commissions?.toFixed(2) || '0.00' }}</td>
               </tr>
               <tr v-if="agents.length === 0 && !loadingList">
                 <td colspan="6" class="q-pa-md text-center text-muted">No agents provisioned yet.</td>
@@ -95,19 +95,83 @@
       </q-card>
     </q-dialog>
 
+    <!-- Suspension Dialog -->
+    <q-dialog v-model="showSuspendDialog" persistent backdrop-filter="blur(4px)">
+      <q-card class="bg-panel border-muted font-inter text-main" style="width: 450px; max-width: 90vw;">
+        <q-card-section class="row items-center q-pb-none border-bottom bg-panel-darker">
+          <div class="text-weight-bold text-subtitle1 text-red-4">Suspend Agent</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="column op-gap-12 q-pt-md">
+          <div class="text-caption text-muted">
+            Provide the suspension message displayed to the agent at login, and optionally require them to perform an action to reactivate.
+          </div>
+          
+          <q-input 
+            v-model="suspensionForm.suspensionReason" 
+            dark filled dense type="textarea" rows="3"
+            label="Suspension Reason / Message"
+            placeholder="e.g. Your account has been temporarily flagged for high risk transactions."
+            class="bg-panel-darker text-caption"
+            required
+          />
+
+          <q-select
+            v-model="suspensionForm.requiredAction"
+            :options="actionOptionsList"
+            label="Required Action at Login"
+            dark filled dense
+            emit-value
+            map-options
+            class="bg-panel-darker text-caption"
+          />
+
+          <template v-if="suspensionForm.requiredAction === 'ANSWER_QUESTION'">
+            <q-input
+              v-model="suspensionForm.actionQuestion"
+              dark filled dense
+              label="Verification Question"
+              placeholder="e.g. Verify your manager's phone number or business ID"
+              class="bg-panel-darker text-caption"
+              required
+            />
+            <q-input
+              v-model="suspensionForm.actionAnswer"
+              dark filled dense
+              label="Expected Answer"
+              placeholder="e.g. +2348000000000"
+              class="bg-panel-darker text-caption"
+            />
+          </template>
+        </q-card-section>
+
+        <q-card-actions align="right" class="border-top q-pa-md bg-panel-darker">
+          <q-btn flat label="Cancel" color="grey" v-close-popup />
+          <q-btn label="Confirm Suspension" color="red-8" @click="confirmSuspension" :loading="loadingStatus" class="text-weight-bold" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <!-- Agent Profile Drawer -->
-    <q-dialog v-model="showProfileDialog" position="right" maximized transition-show="slide-left" transition-hide="slide-right">
-      <q-card class="bg-panel text-main font-inter border-left-muted column no-wrap" style="width: 500px; max-width: 100vw; height: 100vh;">
+    <q-dialog v-model="showProfileDialog" position="right" seamless transition-show="slide-left" transition-hide="slide-right">
+      <q-card class="bg-panel text-main font-inter border-left-muted column no-wrap drawer-shadow" style="width: 500px; max-width: 100vw; height: 100vh;">
         <q-card-section class="row items-center justify-between bg-panel-darker border-bottom shrink-0 q-pa-sm">
           <div class="row items-center op-gap-8">
             <q-btn icon="close" flat round dense v-close-popup size="sm" />
             <div class="text-weight-bold text-subtitle2">Agent Profile Inspector</div>
           </div>
-          <q-btn v-if="selectedAgent" :loading="loadingStatus" dense size="sm" 
-                 :color="selectedAgent.status === 'SUSPENDED' ? 'green-10' : 'red-10'"
-                 :text-color="selectedAgent.status === 'SUSPENDED' ? 'green-2' : 'red-2'"
-                 :label="selectedAgent.status === 'SUSPENDED' ? 'REACTIVATE AGENT' : 'SUSPEND AGENT'" 
-                 @click="toggleAgentStatus" class="text-weight-bold q-px-sm" />
+          <template v-if="selectedAgent">
+            <q-btn v-if="selectedAgent.status === 'PENDING_APPROVAL'" :loading="loadingStatus" dense size="sm" 
+                   color="green-8" text-color="white" label="APPROVE & ACTIVATE AGENT" 
+                   @click="approveAgentStatus" class="text-weight-bold q-px-sm" />
+            <q-btn v-else :loading="loadingStatus" dense size="sm" 
+                   :color="selectedAgent.status === 'SUSPENDED' ? 'green-10' : 'red-10'"
+                   :text-color="selectedAgent.status === 'SUSPENDED' ? 'green-2' : 'red-2'"
+                   :label="selectedAgent.status === 'SUSPENDED' ? 'REACTIVATE AGENT' : 'SUSPEND AGENT'" 
+                   @click="toggleAgentStatus" class="text-weight-bold q-px-sm" />
+          </template>
         </q-card-section>
 
         <q-card-section class="col overflow-auto custom-scrollbar q-pa-none">
@@ -138,6 +202,41 @@
                 <div class="row"><div class="col-4 text-muted">WhatsApp</div><div class="col-8">{{ selectedAgent.whatsappNumber || 'N/A' }}</div></div>
                 <div class="row"><div class="col-4 text-muted">Address</div><div class="col-8">{{ selectedAgent.address || 'N/A' }}</div></div>
                 <div class="row"><div class="col-4 text-muted">Created</div><div class="col-8">{{ new Date(selectedAgent.createdAt).toLocaleDateString() }}</div></div>
+              </div>
+
+              <!-- KYC Documentation -->
+              <div class="column op-gap-8">
+                <div class="text-caption text-weight-bold text-muted" style="font-size: 10px; letter-spacing: 0.5px;">KYC DOCUMENTATION</div>
+                <div class="row q-col-gutter-sm">
+                  <div class="col-6">
+                    <div class="bg-panel-darker rounded-borders border-muted q-pa-sm text-center column justify-center items-center" style="min-height: 120px;">
+                      <div class="text-caption text-muted q-mb-xs" style="font-size: 10px;">Passport Photo</div>
+                      <q-img v-if="selectedAgent.passportImage" :src="selectedAgent.passportImage" spinner-color="cyan" style="max-height: 90px; width: 90px; border-radius: 4px;" contain />
+                      <div v-else class="text-caption text-grey q-py-md">No image uploaded</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="bg-panel-darker rounded-borders border-muted q-pa-sm text-center column justify-center items-center" style="min-height: 120px;">
+                      <div class="text-caption text-muted q-mb-xs" style="font-size: 10px;">Government ID</div>
+                      <q-img v-if="selectedAgent.idCard && selectedAgent.idCard.startsWith('data:image')" :src="selectedAgent.idCard" spinner-color="cyan" style="max-height: 90px; width: 90px; border-radius: 4px;" contain />
+                      <div v-else-if="selectedAgent.idCard" class="q-py-md">
+                        <q-btn dense size="xs" color="cyan-9" icon="open_in_new" label="View ID Document" @click="openIdCard(selectedAgent.idCard)" />
+                      </div>
+                      <div v-else class="text-caption text-grey q-py-md">No ID uploaded</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- KYC Decisions -->
+              <div v-if="selectedAgent.kycStatus === 'PENDING' || selectedAgent.kycStatus === 'REJECTED' || !selectedAgent.kycStatus" class="row op-gap-8">
+                <q-btn color="green-8" text-color="white" label="Approve KYC" icon="check" size="sm" class="col text-weight-bold" :loading="loadingKyc" @click="updateKycStatus('VERIFIED')" />
+                <q-btn color="red-8" text-color="white" label="Reject KYC" icon="close" size="sm" class="col text-weight-bold" :loading="loadingKyc" @click="updateKycStatus('REJECTED')" />
+              </div>
+              <div v-else-if="selectedAgent.kycStatus === 'VERIFIED'" class="bg-green-10 text-green-2 border-green rounded-borders q-pa-sm text-center row items-center justify-center op-gap-8">
+                <q-icon name="verified" size="sm" color="green-4" />
+                <span class="text-caption text-weight-bold" style="font-size: 11px;">KYC VERIFIED & APPROVED</span>
+                <q-btn flat dense size="xs" color="red-2" label="Revert" class="q-ml-auto" @click="updateKycStatus('PENDING')" :loading="loadingKyc" />
               </div>
 
               <!-- Messaging Actions -->
@@ -188,8 +287,10 @@
 import { ref, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
+import { useCurrency } from '../../composables/useCurrency'
 
 const $q = useQuasar()
+const { currentCurrency } = useCurrency()
 
 const agents = ref([])
 const loading = ref(false)
@@ -199,6 +300,23 @@ const showProvisionDialog = ref(false)
 const showProfileDialog = ref(false)
 const loadingProfile = ref(false)
 const loadingStatus = ref(false)
+const loadingKyc = ref(false)
+const showSuspendDialog = ref(false)
+const suspensionForm = ref({
+  suspensionReason: '',
+  requiredAction: 'NONE',
+  actionQuestion: '',
+  actionAnswer: ''
+})
+const actionOptionsList = [
+  { label: 'None (Manual Review Required)', value: 'NONE' },
+  { label: 'Upload Passport Photo', value: 'UPLOAD_PASSPORT' },
+  { label: 'Upload Government ID', value: 'UPLOAD_ID' },
+  { label: 'Update Residential Address', value: 'UPDATE_ADDRESS' },
+  { label: 'Update Phone Number', value: 'UPDATE_PHONE' },
+  { label: 'Update WhatsApp Number', value: 'UPDATE_WHATSAPP' },
+  { label: 'Answer Verification Question', value: 'ANSWER_QUESTION' }
+]
 const selectedAgent = ref(null)
 const selectedAgentTenants = ref([])
 
@@ -340,27 +458,119 @@ const openAgentProfile = async (id) => {
   }
 }
 
-const toggleAgentStatus = async () => {
+const approveAgentStatus = async () => {
   if (!selectedAgent.value) return
   loadingStatus.value = true
-  
-  const newStatus = selectedAgent.value.status === 'SUSPENDED' ? 'ACTIVE' : 'SUSPENDED'
-  
   try {
     const token = localStorage.getItem('invify_access_token')
     await axios.patch(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/status`, {
-      status: newStatus
+      status: 'ACTIVE'
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })
     
-    selectedAgent.value.status = newStatus
-    $q.notify({ type: 'positive', message: `Agent status updated to ${newStatus}`, position: 'top-right' })
+    selectedAgent.value.status = 'ACTIVE'
+    selectedAgent.value.kycStatus = 'VERIFIED'
+    $q.notify({ type: 'positive', message: `Agent approved and activated successfully`, position: 'top-right' })
     fetchAgents() // Refresh list in background
   } catch (err) {
-    $q.notify({ type: 'negative', message: `Failed to update status: ${err.message}`, position: 'top-right' })
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Failed to approve agent: ${msg}`, position: 'top-right' })
   } finally {
     loadingStatus.value = false
+  }
+}
+
+const toggleAgentStatus = async () => {
+  if (!selectedAgent.value) return
+  
+  if (selectedAgent.value.status === 'SUSPENDED') {
+    loadingStatus.value = true
+    try {
+      const token = localStorage.getItem('invify_access_token')
+      await axios.patch(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/status`, {
+        status: 'ACTIVE'
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      
+      selectedAgent.value.status = 'ACTIVE'
+      $q.notify({ type: 'positive', message: `Agent status updated to ACTIVE`, position: 'top-right' })
+      fetchAgents() // Refresh list in background
+    } catch (err) {
+      $q.notify({ type: 'negative', message: `Failed to update status: ${err.message}`, position: 'top-right' })
+    } finally {
+      loadingStatus.value = false
+    }
+  } else {
+    suspensionForm.value = {
+      suspensionReason: '',
+      requiredAction: 'NONE',
+      actionQuestion: '',
+      actionAnswer: ''
+    }
+    showSuspendDialog.value = true
+  }
+}
+
+const confirmSuspension = async () => {
+  if (!suspensionForm.value.suspensionReason.trim()) {
+    $q.notify({ type: 'warning', message: 'Suspension reason is required', position: 'top-right' })
+    return
+  }
+  
+  loadingStatus.value = true
+  try {
+    const token = localStorage.getItem('invify_access_token')
+    await axios.patch(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/status`, {
+      status: 'SUSPENDED',
+      suspensionReason: suspensionForm.value.suspensionReason,
+      requiredAction: suspensionForm.value.requiredAction,
+      actionQuestion: suspensionForm.value.actionQuestion,
+      actionAnswer: suspensionForm.value.actionAnswer
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    selectedAgent.value.status = 'SUSPENDED'
+    $q.notify({ type: 'positive', message: 'Agent has been suspended', position: 'top-right' })
+    showSuspendDialog.value = false
+    fetchAgents() // Refresh list in background
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Failed to suspend agent: ${msg}`, position: 'top-right' })
+  } finally {
+    loadingStatus.value = false
+  }
+}
+
+const updateKycStatus = async (newKycStatus) => {
+  if (!selectedAgent.value) return
+  loadingKyc.value = true
+  
+  try {
+    const token = localStorage.getItem('invify_access_token')
+    await axios.patch(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/kyc`, {
+      kycStatus: newKycStatus
+    }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    
+    selectedAgent.value.kycStatus = newKycStatus
+    $q.notify({ type: 'positive', message: `Agent KYC status updated to ${newKycStatus}`, position: 'top-right' })
+    fetchAgents() // Refresh list in background
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Failed to update KYC status: ${msg}`, position: 'top-right' })
+  } finally {
+    loadingKyc.value = false
+  }
+}
+
+const openIdCard = (idCard) => {
+  const newTab = window.open()
+  if (newTab) {
+    newTab.document.write(`<iframe src="${idCard}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`)
   }
 }
 

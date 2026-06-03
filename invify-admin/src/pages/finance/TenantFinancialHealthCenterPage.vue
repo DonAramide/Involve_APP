@@ -59,7 +59,7 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Avg Tenant Revenue</div>
-          <div class="text-h5 text-metric-mono text-green-4">₦1.4M <span class="text-caption text-muted">(+8%)</span></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}1.4M <span class="text-caption text-muted">(+8%)</span></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
@@ -154,7 +154,7 @@
             </template>
             <template v-slot:body-cell-revenue="props">
               <q-td :props="props" class="font-mono text-right text-green-4 text-weight-bold">
-                ₦{{ props.value.toLocaleString() }}
+                {{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
               </q-td>
             </template>
             <template v-slot:body-cell-growthScore="props">
@@ -280,9 +280,9 @@
             <q-tab-panel name="financial" class="q-pa-md column">
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                 <div class="text-weight-bold q-mb-md text-green-4">Financial & Profitability Metrics</div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Gross Revenue Generated:</span><span class="text-main">₦{{ selectedTenant.revenue.toLocaleString() }}</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Platform Cost / Support Cost:</span><span class="text-red-4">₦{{ (selectedTenant.revenue * 0.15).toLocaleString() }}</span></div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Net Profitability:</span><span class="text-green-4 text-weight-bold">₦{{ (selectedTenant.revenue * 0.85).toLocaleString() }}</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Gross Revenue Generated:</span><span class="text-main">{{ currentCurrency.symbol }}{{ selectedTenant.revenue.toLocaleString() }}</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Platform Cost / Support Cost:</span><span class="text-red-4">{{ currentCurrency.symbol }}{{ (selectedTenant.revenue * 0.15).toLocaleString() }}</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Net Profitability:</span><span class="text-green-4 text-weight-bold">{{ currentCurrency.symbol }}{{ (selectedTenant.revenue * 0.85).toLocaleString() }}</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Margin:</span><span class="text-cyan-4">85%</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Transaction Volume (Period):</span><span class="text-main">{{ selectedTenant.txnVolume.toLocaleString() }}</span></div>
               </div>
@@ -325,7 +325,7 @@
             <q-tab-panel name="forecasting" class="q-pa-md column">
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                 <div class="text-weight-bold q-mb-md text-purple-3"><q-icon name="auto_graph" class="q-mr-xs" /> Predictive Tenant Analytics</div>
-                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Projected Revenue (Next Quarter):</span><span class="text-main">₦{{ (selectedTenant.revenue * 1.15).toLocaleString() }}</span></div>
+                <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Projected Revenue (Next Quarter):</span><span class="text-main">{{ currentCurrency.symbol }}{{ (selectedTenant.revenue * 1.15).toLocaleString() }}</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Growth Forecast:</span><span class="text-green-4">+15.0%</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Churn Prediction:</span><span class="text-main">Extremely Low</span></div>
                 <div class="row justify-between q-mb-xs font-mono"><span class="text-muted">Seasonality Impact:</span><span class="text-amber-4">HIGH</span></div>
@@ -353,6 +353,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 
 const activeWorkspaceTab = ref('directory')

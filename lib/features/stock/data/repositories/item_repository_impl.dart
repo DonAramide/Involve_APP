@@ -57,6 +57,7 @@ class ItemRepositoryImpl implements ItemRepository {
             createdAt: Value(now),
             isDeleted: const Value(false),
             isDefault: Value(item.isDefault),
+            barcode: Value(item.barcode),
           ),
         );
   }
@@ -81,6 +82,7 @@ class ItemRepositoryImpl implements ItemRepository {
             updatedAt: Value(DateTime.now()),
             isDeleted: const Value(false),
             isDefault: Value(item.isDefault),
+            barcode: Value(item.barcode),
           ),
         );
   }
@@ -330,6 +332,7 @@ class ItemRepositoryImpl implements ItemRepository {
       businessMode: row.businessMode,
       syncId: row.syncId,
       isDefault: row.isDefault,
+      barcode: row.barcode,
     );
   }
 }

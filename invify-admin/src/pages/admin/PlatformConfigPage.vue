@@ -52,6 +52,36 @@
             </div>
           </q-card-section>
         </q-card>
+
+        <q-card flat class="enterprise-panel bg-panel border-main q-mt-md">
+          <q-card-section>
+            <div class="text-h6 q-mb-md text-main text-red-4">Maintenance Mode Controls</div>
+            <div class="row q-col-gutter-md items-center">
+              <div class="col-12 col-md-6 column op-gap-16">
+                <q-toggle 
+                  v-model="mockSettings.isMaintenanceLocked" 
+                  color="red-6" 
+                  label="Enforce Maintenance Mode Global Lockout" 
+                  dark 
+                />
+                <q-input 
+                  v-model="mockSettings.maintenanceMessage" 
+                  outlined dense dark type="textarea" rows="2"
+                  label="Maintenance Message to Show Users" 
+                  placeholder="System is currently under maintenance. Please try again later."
+                />
+              </div>
+              <div class="col-12 col-md-6">
+                <q-banner rounded class="bg-red-10 text-red-2 border-critical">
+                  <template v-slot:avatar>
+                    <q-icon name="report_problem" color="red-4" />
+                  </template>
+                  Activating Maintenance Mode will immediately prevent logins for all normal tenant operator and agent accounts globally. Only Super Admins will be permitted to access.
+                </q-banner>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
       </q-tab-panel>
 
       <!-- LOCALIZATION TAB (Contains existing currency logic) -->
@@ -213,7 +243,9 @@ const mockSettings = ref({
   logoUrl: 'https://cdn.invify.com/enterprise-logo.png',
   hideInvifyWatermark: false,
   auditArchiveHours: 72,
-  enforceDeviceControl: false
+  enforceDeviceControl: false,
+  isMaintenanceLocked: false,
+  maintenanceMessage: 'System is currently under maintenance. Please try again later.'
 });
 
 const currencyColumns = [
@@ -225,7 +257,7 @@ const currencyColumns = [
 ];
 
 const defaultCurrencies = [
-  { name: 'Naira', code: 'NGN', symbol: '₦' },
+  { name: 'Naira', code: 'NGN', symbol: currentCurrency.symbol },
   { name: 'US Dollar', code: 'USD', symbol: '$' },
   { name: 'Euro', code: 'EUR', symbol: '€' },
   { name: 'British Pound', code: 'GBP', symbol: '£' },
@@ -260,6 +292,8 @@ async function fetchSettings() {
       mockSettings.value.hideInvifyWatermark = data.hide_invify_watermark !== undefined ? data.hide_invify_watermark : (data.hideInvifyWatermark !== undefined ? data.hideInvifyWatermark : mockSettings.value.hideInvifyWatermark);
       mockSettings.value.auditArchiveHours = data.audit_retention_hours !== undefined ? data.audit_retention_hours : (data.auditArchiveHours !== undefined ? data.auditArchiveHours : 72);
       mockSettings.value.enforceDeviceControl = data.enforce_device_control !== undefined ? data.enforce_device_control : (data.enforceDeviceControl !== undefined ? data.enforceDeviceControl : false);
+      mockSettings.value.isMaintenanceLocked = data.is_maintenance_locked !== undefined ? data.is_maintenance_locked : false;
+      mockSettings.value.maintenanceMessage = data.maintenance_message || 'System is currently under maintenance. Please try again later.';
     }
   } catch (err) {
     console.error('Failed to load global platform settings:', err);
@@ -279,7 +313,9 @@ async function saveAllSettings() {
       logo_url: mockSettings.value.logoUrl,
       hide_invify_watermark: mockSettings.value.hideInvifyWatermark,
       audit_retention_hours: Number(mockSettings.value.auditArchiveHours),
-      enforce_device_control: mockSettings.value.enforceDeviceControl
+      enforce_device_control: mockSettings.value.enforceDeviceControl,
+      is_maintenance_locked: mockSettings.value.isMaintenanceLocked,
+      maintenance_message: mockSettings.value.maintenanceMessage
     };
     await adminApi.updateGlobalSettings(payload);
     $q.notify({

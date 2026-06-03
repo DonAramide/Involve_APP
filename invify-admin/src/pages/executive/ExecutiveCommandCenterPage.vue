@@ -115,15 +115,15 @@
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel q-pa-md full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg" @click="openDrawer('Revenue')">
           <div class="text-subtitle2 text-muted text-uppercase tracking-wider">Gross Revenue (YTD) / Net</div>
-          <div class="text-h3 text-metric-mono text-green-4 q-mt-sm">₦1.24B</div>
-          <div class="text-caption text-green-3 font-mono q-mt-xs">Net: ₦984M (79% Margin) <q-icon name="trending_up"/></div>
+          <div class="text-h3 text-metric-mono text-green-4 q-mt-sm">{{ currentCurrency.symbol }}1.24B</div>
+          <div class="text-caption text-green-3 font-mono q-mt-xs">Net: {{ currentCurrency.symbol }}984M (79% Margin) <q-icon name="trending_up"/></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel q-pa-md full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg" @click="openDrawer('Transactions')">
           <div class="text-subtitle2 text-muted text-uppercase tracking-wider">Total Txn Volume / Value</div>
           <div class="text-h3 text-metric-mono text-cyan-4 q-mt-sm">14.2M</div>
-          <div class="text-caption text-cyan-3 font-mono q-mt-xs">Value: ₦84.5B <q-icon name="trending_up"/></div>
+          <div class="text-caption text-cyan-3 font-mono q-mt-xs">Value: {{ currentCurrency.symbol }}84.5B <q-icon name="trending_up"/></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
@@ -137,7 +137,7 @@
         <div class="enterprise-panel q-pa-md full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg" @click="openDrawer('Treasury')">
           <div class="text-subtitle2 text-muted text-uppercase tracking-wider">Settlement Success / Treasury</div>
           <div class="text-h3 text-metric-mono text-indigo-4 q-mt-sm">99.8%</div>
-          <div class="text-caption text-indigo-3 font-mono q-mt-xs">Float: ₦4.2B | Exposure: LOW</div>
+          <div class="text-caption text-indigo-3 font-mono q-mt-xs">Float: {{ currentCurrency.symbol }}4.2B | Exposure: LOW</div>
         </div>
       </div>
     </div>
@@ -304,6 +304,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 

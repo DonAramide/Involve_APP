@@ -37,6 +37,12 @@ export class SearchController {
       if (qLower.includes('revenue') || qLower.includes('show merchant revenue')) {
         results.push({ type: 'AI COMMAND', title: 'Analyze Merchant Revenue', subtitle: 'Routing to Revenue Operations', icon: 'auto_awesome', color: 'purple', route: '/finance/revenue' });
       }
+      if (qLower.includes('commission') || qLower.includes('agent fee') || qLower.includes('payout')) {
+        results.push({ type: 'AI COMMAND', title: 'Agent Commissions & Billing', subtitle: 'Configure RevShare & Onboarding Fees', icon: 'payments', color: 'green', route: '/admin/agents/commissions' });
+      }
+      if (qLower.includes('bill') || qLower.includes('invoice')) {
+        results.push({ type: 'AI COMMAND', title: 'Billing Center', subtitle: 'Manage Billing and Invoices', icon: 'receipt', color: 'green', route: '/finance/billing' });
+      }
 
       // 2. Exact Entity ID Lookups from Databases (Offline / Supabase Fallback)
       // We will read the local DBs for simplicity if offline auth is true, else try supabase.

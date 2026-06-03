@@ -54,6 +54,13 @@ export const adminApi = {
   triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
   emergencyLock: (data) => api.post('/api/admin/emergency-lock', data),
 
+  // Commissions
+  listAgents: (params) => api.get('/admin/agents', { params }),
+  getGlobalCommissions: () => api.get('/admin/settings/commissions'),
+  updateGlobalCommissions: (data) => api.patch('/admin/settings/commissions', data),
+  getAgentCommissions: (id) => api.get(`/admin/agents/${id}/commissions`),
+  updateAgentCommissions: (id, data) => api.patch(`/admin/agents/${id}/commissions`, data),
+
   // Support & Complaints
   getComplaints: () => api.get('/api/admin/complaints'),
   updateComplaintStatus: (id, status) => api.patch(`/api/admin/complaints/${id}/status`, { status }),

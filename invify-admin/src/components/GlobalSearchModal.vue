@@ -145,6 +145,7 @@ const onInput = (val) => {
       const seen = new Set()
       
       for (const entry of uiSearchIndex) {
+        if (!entry || !entry.route) continue
         if (entry.route.startsWith('/tenant/')) continue // Exclude merchant portal
         if (entry.route.includes(':')) continue // Exclude dynamic routes
         
@@ -180,14 +181,28 @@ const onInput = (val) => {
       results.value = merged
     } catch (error) {
       console.error('Search API Error:', error)
-      results.value = [{ 
-        type: 'ERROR', 
-        title: 'Intelligence Engine Offline', 
-        subtitle: 'Unable to process search query at this time.', 
-        icon: 'error_outline', 
-        color: 'red', 
-        route: '' 
-      }]
+      
+      // Even if offline, we can still provide the local frontend matches and AI fallback
+      const qLower = val.toLowerCase()
+      const fallbackRoutes = router.getRoutes()
+        .filter(r => r.meta?.title && !r.path.includes(':') && !r.path.startsWith('/tenant/') && 
+                     (r.meta.title.toLowerCase().includes(qLower) || r.path.toLowerCase().includes(qLower)))
+        .map(r => ({
+          type: 'NAVIGATION', title: r.meta.title, subtitle: `Open Workspace • ${r.path}`, icon: 'view_list', color: 'blue', route: r.path
+        }))
+
+      if (fallbackRoutes.length > 0) {
+        results.value = fallbackRoutes.slice(0, 5)
+      } else {
+        results.value = [{ 
+          type: 'GLOBAL', 
+          title: `Ask AI to find "${val}"`, 
+          subtitle: 'Execute Natural Language Query (Backend Offline)', 
+          icon: 'travel_explore', 
+          color: 'purple', 
+          route: '/executive/ai-insights' 
+        }]
+      }
     } finally {
       isLoading.value = false
     }

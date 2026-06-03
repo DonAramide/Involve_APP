@@ -255,7 +255,7 @@
                     <div class="row justify-between"><span>OPERATOR:</span><span>SYSTEM ADMIN</span></div>
                     <div class="row justify-between text-white text-weight-bold q-mt-xs border-top q-pt-xs" style="border-color: rgba(255,255,255,0.04);">
                       <span>TOTAL DUE:</span>
-                      <span>₦50,000.00</span>
+                      <span>{{ currentCurrency.symbol }}50,000.00</span>
                     </div>
                   </div>
 
@@ -388,7 +388,7 @@
                   </div>
                   <div class="row items-center justify-between q-mt-sm q-pa-sm rounded-borders" style="background: #05070d !important; border: 1px solid rgba(255,255,255,0.06) !important;">
                     <span style="color: #9ca3af !important;" class="text-caption">Initial Balance:</span>
-                    <strong class="text-green-4 text-metric-mono font-mono text-weight-bolder" style="color: #34d399 !important;">₦{{ (form.plan === 'enterprise' ? 100000 : 50000).toLocaleString() }}</strong>
+                    <strong class="text-green-4 text-metric-mono font-mono text-weight-bolder" style="color: #34d399 !important;">{{ currentCurrency.symbol }}{{ (form.plan === 'enterprise' ? 100000 : 50000).toLocaleString() }}</strong>
                   </div>
                 </div>
 
@@ -465,6 +465,9 @@
 </template>
 
 <script setup>
+import { useCurrency } from '../composables/useCurrency';
+const { currentCurrency } = useCurrency();
+
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar, copyToClipboard } from 'quasar'
@@ -594,7 +597,7 @@ const handleProvisioningStart = async () => {
     await addLog('🔑 Creating administrator credentials and force-reset parameters...', 'text-grey-5', 600)
     await addLog(`👤 User ID registered successfully: ${res.data.userId}`, 'text-green-4', 500)
     await addLog('💼 Provisioning isolated digital Quasar wallets...', 'text-indigo-4', 600)
-    await addLog(`💰 Wallet balance initialized: ₦${res.data.walletBalance.toLocaleString()}`, 'text-green-4', 500)
+    await addLog(`💰 Wallet balance initialized: {{ currentCurrency.symbol }}${res.data.walletBalance.toLocaleString()}`, 'text-green-4', 500)
     await addLog('📅 Validating sub-ledger billing contracts...', 'text-grey-5', 600)
     await addLog('🚀 Synchronizing telemetry webhooks with mobile gateways...', 'text-cyan-4', 500)
     await addLog('🎉 ENTERPRISE PROVISIONING COMPLETED SUCCESSFULLY. NODE ONLINE!', 'text-green-5 text-weight-bold', 600)
