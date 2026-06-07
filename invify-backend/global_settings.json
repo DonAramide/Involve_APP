@@ -2,5 +2,11 @@
   "support_phone": "+234 800 INVIFY",
   "support_email": "info.iips.ng@gmail.com",
   "support_whatsapp": "+2348023552282",
-  "broadcast_message": "sup from broad"
+  "broadcast_message": "sup from broad",
+  "audit_retention_hours": 72,
+  "enforce_device_control": false,
+  "commissions": {
+    "globalDefaultOnboardingFee": 10,
+    "globalDefaultRevSharePercentage": 5
+  }
 }

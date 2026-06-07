@@ -528,7 +528,7 @@ const gateways = ref([
 
 const loadLookupData = async () => {
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const API_BASE = import.meta.env.VITE_API_URL || ''
     const res = await axios.get(`${API_BASE}/public/lookup`)
     if (res.data) {
       if (res.data.gateways && res.data.gateways.length > 0) {
@@ -580,7 +580,7 @@ const handleProvisioningStart = async () => {
   await addLog('🧬 Provisioning [ORGANIZATION] DB schemas and isolated tables...', 'text-indigo-4', 700)
   
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const API_BASE = import.meta.env.VITE_API_URL || ''
     const res = await axios.post(`${API_BASE}/public/onboarding/provision`, {
       email: form.value.email,
       password: form.value.password,
@@ -629,7 +629,7 @@ const copyUserCredentials = () => {
 
 const shareViaWhatsApp = () => {
   const text = encodeURIComponent(
-    `Hello! Your new Invify Enterprise Profile is ready.\n\nEmail: ${form.value.email}\nPassword: ${form.value.password}\n\nPlease access the console at http://localhost:5173/login\n\nSecurity Notice: You must override this temporary password upon your first login.`
+    `Hello! Your new Invify Enterprise Profile is ready.\n\nEmail: ${form.value.email}\nPassword: ${form.value.password}\n\nPlease access the console at ${window.location.origin}/login\n\nSecurity Notice: You must override this temporary password upon your first login.`
   )
   window.open(`https://wa.me/?text=${text}`, '_blank')
 }

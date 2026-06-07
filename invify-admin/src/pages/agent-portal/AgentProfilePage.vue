@@ -194,6 +194,34 @@
 
       </div>
     </div>
+
+    <!-- MFA Setup Modal -->
+    <q-dialog v-model="showMfaModal" persistent>
+      <q-card class="bg-panel text-main" style="min-width: 400px">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6">Setup Authenticator</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        <q-card-section class="column flex-center op-gap-16 q-pt-md">
+          <div class="bg-white q-pa-sm rounded-borders">
+            <qrcode-vue v-if="mfaSetupData.qrCodeUri" :value="mfaSetupData.qrCodeUri" :size="200" level="M" />
+          </div>
+          <div class="text-caption text-center text-muted">
+            Scan this QR code with Google Authenticator or Authy.
+          </div>
+          <div class="text-metric-mono text-amber-4 text-center">
+            Secret: {{ mfaSetupData.secret }}
+          </div>
+          <q-input dark outlined v-model="mfaVerifyCode" label="Enter 6-digit Code" color="amber-4" class="full-width" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" color="white" v-close-popup />
+          <q-btn label="Verify & Enable" color="amber-4" text-color="black" @click="verifyMfa" :loading="saving" :disable="!mfaVerifyCode || mfaVerifyCode.length < 6" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
@@ -213,6 +241,9 @@ const profile = ref(null)
 const kycDocs = ref([])
 const sessions = ref([])
 const qrData = ref({})
+const showMfaModal = ref(false)
+const mfaSetupData = ref({})
+const mfaVerifyCode = ref('')
 
 const activeTab = ref('personal')
 
@@ -247,10 +278,10 @@ const fetchProfileData = async () => {
     const headers = { Authorization: `Bearer ${token}` }
     
     const [pRes, kycRes, secRes, qrRes] = await Promise.all([
-      axios.get('http://localhost:3004/api/agent/profile', { headers }),
-      axios.get('http://localhost:3004/api/agent/profile/kyc', { headers }),
-      axios.get('http://localhost:3004/api/agent/security/sessions', { headers }),
-      axios.get('http://localhost:3004/api/agent/profile/qr', { headers })
+      axios.get('/api/agent/profile', { headers }),
+      axios.get('/api/agent/profile/kyc', { headers }),
+      axios.get('/api/agent/security/sessions', { headers }),
+      axios.get('/api/agent/profile/id-card', { headers })
     ])
 
     profile.value = pRes.data.data
@@ -281,7 +312,7 @@ const updateProfile = async () => {
   saving.value = true
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.patch('http://localhost:3004/api/agent/profile', formData.value, {
+    await axios.patch('/api/agent/profile', formData.value, {
       headers: { Authorization: `Bearer ${token}` }
     })
     $q.notify({ type: 'positive', message: 'Profile updated successfully' })
@@ -296,7 +327,7 @@ const updateProfile = async () => {
 const simulatePhotoUpload = async () => {
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.post('http://localhost:3004/api/agent/profile/photo', {}, {
+    await axios.post('/api/agent/profile/photo', {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
     $q.notify({ type: 'positive', message: 'Photo updated' })
@@ -309,7 +340,7 @@ const simulatePhotoUpload = async () => {
 const simulateKycUpload = async (type) => {
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.post('http://localhost:3004/api/agent/profile/kyc', { type }, {
+    await axios.post('/api/agent/profile/kyc', { type }, {
       headers: { Authorization: `Bearer ${token}` }
     })
     $q.notify({ type: 'positive', message: `${type} document uploaded` })
@@ -333,7 +364,7 @@ const promptBvn = () => {
     }
     try {
       const token = localStorage.getItem('invify_agent_token')
-      await axios.post('http://localhost:3004/api/agent/profile/kyc', { type: 'BVN', document_number: data }, {
+      await axios.post('/api/agent/profile/kyc', { type: 'BVN', document_number: data }, {
         headers: { Authorization: `Bearer ${token}` }
       })
       $q.notify({ type: 'positive', message: 'BVN linked successfully' })
@@ -363,7 +394,7 @@ const changePassword = async () => {
   saving.value = true
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.post('http://localhost:3004/api/agent/security/change-password', securityData.value, {
+    await axios.post('/api/agent/security/change-password', securityData.value, {
       headers: { Authorization: `Bearer ${token}` }
     })
     $q.notify({ type: 'positive', message: 'Password updated' })
@@ -381,13 +412,37 @@ const toggleMfa = async () => {
   
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.post(`http://localhost:3004${endpoint}`, {}, {
+    const res = await axios.post(endpoint, {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    $q.notify({ type: 'positive', message: isEnabled ? 'MFA Disabled' : 'MFA Enabled' })
-    await fetchProfileData()
+    
+    if (isEnabled) {
+      $q.notify({ type: 'positive', message: 'MFA Disabled' })
+      await fetchProfileData()
+    } else {
+      mfaSetupData.value = res.data
+      mfaVerifyCode.value = ''
+      showMfaModal.value = true
+    }
   } catch (err) {
     $q.notify({ type: 'negative', message: 'Failed to update MFA settings' })
+  }
+}
+
+const verifyMfa = async () => {
+  saving.value = true
+  try {
+    const token = localStorage.getItem('invify_agent_token')
+    await axios.post('/api/agent/security/mfa/verify', { code: mfaVerifyCode.value }, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    $q.notify({ type: 'positive', message: 'MFA Enabled & Verified' })
+    showMfaModal.value = false
+    await fetchProfileData()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: 'Invalid verification code' })
+  } finally {
+    saving.value = false
   }
 }
 </script>

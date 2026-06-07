@@ -424,7 +424,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 import { useTenantExperience } from '../../composables/useTenantExperience'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import EnterpriseManualTooltip from '../../components/common/EnterpriseManualTooltip.vue'

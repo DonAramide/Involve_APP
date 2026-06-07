@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3004',
+  baseURL: import.meta.env.VITE_API_URL || '',
   timeout: 30000,
   headers: {
     'ngrok-skip-browser-warning': 'true'
@@ -34,6 +34,7 @@ export const adminApi = {
   createTenant: (data) => api.post('/admin/tenants', data),
   updateTenant: (id, data) => api.patch(`/admin/tenants/${id}`, data),
   getTenantDetails: (id) => api.get(`/admin/tenants/${id}/details`),
+  getTenantKyc: (id) => api.get(`/api/tenant/${id}/kyc`),
   provisionVirtualAccount: (id) => api.post(`/admin/tenants/${id}/provision-virtual-account`),
   getLedger: (params) => api.get('/admin/ledger', { params }),
   getPayments: (params) => api.get('/admin/payments', { params }),
@@ -92,6 +93,11 @@ export const deviceApi = {
   createActivation: (data) => api.post('/devices/activations', data),
   validateCode: (data) => api.post('/devices/validate', data),
   updateDevice: (id, data) => api.patch(`/devices/${id}`, data),
+
+  // Telemetry & Fleet Visibility
+  getDeviceStatus: (deviceId) => api.get(`/api/devices/${deviceId}/status`),
+  getDeviceTelemetry: (deviceId) => api.get(`/api/devices/${deviceId}/telemetry`),
+  getDeviceAlerts: (deviceId) => api.get(`/api/devices/${deviceId}/alerts`),
 };
 
 export const billingApi = {
@@ -133,4 +139,39 @@ export const searchApi = {
   globalSearch: (q) => api.get(`/api/search?q=${encodeURIComponent(q)}`)
 };
 
+export const commissionApi = {
+  getApprovals: () => api.get('/admin/commissions/approvals'),
+  approveCommission: (id) => api.post(`/admin/commissions/approvals/${id}/approve`),
+  rejectCommission: (id, data) => api.post(`/admin/commissions/approvals/${id}/reject`, data),
+  executeClawback: (data) => api.post('/admin/commissions/clawback', data),
+  getAuditHistory: () => api.get('/admin/commissions/audit'),
+  getAgentProgress: () => api.get('/admin/commissions/agents/progress'),
+  getPlansAndTargets: () => api.get('/admin/commissions/plans'),
+  getCampaignsAndBudgets: () => api.get('/admin/commissions/budgets'),
+  simulate: (data) => api.post('/admin/commissions/simulate', data),
+
+  // Plans & Targets CRUD Endpoints
+  createProgram: (data) => api.post('/admin/commissions/programs', data),
+  updateProgram: (id, data) => api.put(`/admin/commissions/programs/${id}`, data),
+  deleteProgram: (id) => api.delete(`/admin/commissions/programs/${id}`),
+  createVersion: (id, data) => api.post(`/admin/commissions/programs/${id}/versions`, data),
+  cloneVersion: (id, data) => api.post(`/admin/commissions/versions/${id}/clone`, data),
+  activateVersion: (id) => api.post(`/admin/commissions/versions/${id}/activate`),
+  updateVersionRules: (id, data) => api.put(`/admin/commissions/versions/${id}/rules`, data),
+  deleteVersion: (id) => api.delete(`/admin/commissions/versions/${id}`),
+
+  createCategoryRule: (data) => api.post('/admin/commissions/category-rules', data),
+  updateCategoryRule: (id, data) => api.put(`/admin/commissions/category-rules/${id}`, data),
+  deleteCategoryRule: (id) => api.delete(`/admin/commissions/category-rules/${id}`),
+
+  createPerformanceRule: (data) => api.post('/admin/commissions/performance-rules', data),
+  updatePerformanceRule: (id, data) => api.put(`/admin/commissions/performance-rules/${id}`, data),
+  deletePerformanceRule: (id) => api.delete(`/admin/commissions/performance-rules/${id}`),
+
+  createTerminalRule: (data) => api.post('/admin/commissions/terminal-rules', data),
+  updateTerminalRule: (id, data) => api.put(`/admin/commissions/terminal-rules/${id}`, data),
+  deleteTerminalRule: (id) => api.delete(`/admin/commissions/terminal-rules/${id}`),
+};
+
+export { api };
 export default api;

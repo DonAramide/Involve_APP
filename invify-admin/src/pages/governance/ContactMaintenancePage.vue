@@ -168,7 +168,7 @@ import { adminApi } from '../../api'
 import axios from 'axios'
 
 const $q = useQuasar()
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+const API_BASE = import.meta.env.VITE_API_URL || ''
 
 // Contact form state
 const selectedTenant = ref('global')

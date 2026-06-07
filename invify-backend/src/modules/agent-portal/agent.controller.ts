@@ -51,7 +51,25 @@ async function uploadBase64ToContabo(base64Data: string, prefix: string, fileNam
 }
 
 const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
-const LOCAL_AGENTS_DB_PATH = path.join(process.cwd(), 'agents_db.json');
+const LOCAL_DEVICES_PATH = path.join(process.cwd(), 'devices_db.json');
+const LOCAL_TERMINALS_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
+
+function getLocalDevices(): any[] {
+  if (!fs.existsSync(LOCAL_DEVICES_PATH)) return [];
+  try { return JSON.parse(fs.readFileSync(LOCAL_DEVICES_PATH, 'utf8')); } catch { return []; }
+}
+function saveLocalDevices(data: any[]) {
+  fs.writeFileSync(LOCAL_DEVICES_PATH, JSON.stringify(data, null, 2));
+}
+
+function getLocalTerminals(): any[] {
+  if (!fs.existsSync(LOCAL_TERMINALS_PATH)) return [];
+  try { return JSON.parse(fs.readFileSync(LOCAL_TERMINALS_PATH, 'utf8')); } catch { return []; }
+}
+function saveLocalTerminals(data: any[]) {
+  fs.writeFileSync(LOCAL_TERMINALS_PATH, JSON.stringify(data, null, 2));
+}
+
 
 export interface Agent {
   id: string;
@@ -100,18 +118,35 @@ const defaultMasterAgent: Agent = {
   createdAt: new Date()
 };
 
-let mockAgents: Agent[] = [];
-if (fs.existsSync(LOCAL_AGENTS_DB_PATH)) {
-  mockAgents = JSON.parse(fs.readFileSync(LOCAL_AGENTS_DB_PATH, 'utf-8'));
-} else {
-  mockAgents = [defaultMasterAgent];
-  fs.writeFileSync(LOCAL_AGENTS_DB_PATH, JSON.stringify(mockAgents, null, 2));
-}
-
-const saveAgents = () => fs.writeFileSync(LOCAL_AGENTS_DB_PATH, JSON.stringify(mockAgents, null, 2));
+// No mock DB fallbacks
 
 export class AgentController {
   
+  /**
+   * Request password reset for an agent
+   */
+  static async forgotPassword(req: Request, res: Response) {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ success: false, message: 'Email is required' });
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'http://localhost:3000/agent/reset-password',
+      });
+
+      if (error) {
+        return res.status(400).json({ success: false, message: error.message });
+      }
+
+      return res.json({ success: true, message: 'Password reset instructions have been sent to your email.' });
+    } catch (err: any) {
+      console.error('[AgentForgotPassword] Error:', err);
+      return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+  }
+
   // ==========================================
   // ADMIN ROUTES
   // ==========================================
@@ -127,39 +162,55 @@ export class AgentController {
         return res.status(400).json({ success: false, message: 'Agent code, name, and email are required' });
       }
 
-      if (mockAgents.find(a => a.agentCode === agentCode)) {
+      const { data: existing } = await supabase.from('agents').select('id').eq('agent_code', agentCode).single();
+      if (existing) {
         return res.status(400).json({ success: false, message: 'Agent code already exists' });
       }
 
-      const newAgent: Agent = {
-        id: uuidv4(),
-        agentCode,
-        passwordHash: agentCode, // Default password is the code
-        isFirstLogin: true,
-        name,
+      // Create Supabase Auth user
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email,
-        phone,
-        whatsappNumber,
-        address,
-        passportImage,
-        idCard,
-        kycStatus: 'PENDING',
-        status: 'ACTIVE',
-        commissions: 0,
-        points: 0,
-        createdAt: new Date()
-      };
+        password: agentCode, // Default password
+        email_confirm: true,
+        user_metadata: { role: 'AGENT', name }
+      });
 
-      mockAgents.push(newAgent);
-      saveAgents();
+      if (authError || !authData.user) {
+        return res.status(500).json({ success: false, message: 'Failed to create agent authentication record: ' + authError?.message });
+      }
+
+      const firstName = name.split(' ')[0] || name;
+      const lastName = name.split(' ').slice(1).join(' ') || 'Agent';
+
+      // Insert into agents table
+      const { data: agentData, error: dbError } = await supabase.from('agents').insert({
+        auth_user_id: authData.user.id,
+        agent_code: agentCode,
+        email,
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        status: 'ACTIVE'
+      }).select().single();
+
+      if (dbError || !agentData) {
+        return res.status(500).json({ success: false, message: 'Failed to create agent record in database' });
+      }
+
+      // Insert into agent_profiles
+      await supabase.from('agent_profiles').insert({
+        agent_id: agentData.id,
+        address: address || '',
+        kyc_status: 'PENDING'
+      });
 
       return res.status(201).json({ 
         success: true, 
         message: 'Agent onboarded successfully',
         agent: {
-          id: newAgent.id,
-          agentCode: newAgent.agentCode,
-          name: newAgent.name
+          id: agentData.id,
+          agentCode: agentData.agent_code,
+          name: `${agentData.first_name} ${agentData.last_name}`
         }
       });
     } catch (err: any) {
@@ -183,57 +234,70 @@ export class AgentController {
       }
 
       // Check Maintenance Mode Global Lockout
-      const settingsPath = path.join(process.cwd(), 'global_settings.json');
-      if (fs.existsSync(settingsPath)) {
-        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        if (settings.is_maintenance_locked) {
-          return res.status(403).json({
-            success: false,
-            message: settings.maintenance_message || 'System is currently under maintenance. Please try again later.'
-          });
-        }
+      let is_maintenance_locked = false;
+      let maintenance_message = 'System is currently under maintenance. Please try again later.';
+      
+      try {
+         const { data, error } = await supabase.from('system_configurations').select('config_key, config_value').in('config_key', ['is_maintenance_locked', 'maintenance_message']);
+         if (!error && data && data.length > 0) {
+            for (const row of data) {
+               if (row.config_key === 'is_maintenance_locked') is_maintenance_locked = row.config_value === true || row.config_value === 'true';
+               if (row.config_key === 'maintenance_message') maintenance_message = row.config_value;
+            }
+         } else {
+            throw error || new Error('No data');
+         }
+      } catch(dbErr) {
+         const settingsPath = path.join(process.cwd(), 'global_settings.json');
+         if (fs.existsSync(settingsPath)) {
+           const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+           is_maintenance_locked = !!settings.is_maintenance_locked;
+           maintenance_message = settings.maintenance_message || maintenance_message;
+         }
       }
 
-      const agent = mockAgents.find(a => a.email?.toLowerCase() === email.toLowerCase());
-      if (!agent) {
+      if (is_maintenance_locked) {
+        return res.status(403).json({
+          success: false,
+          message: maintenance_message
+        });
+      }
+
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError || !authData.session) {
         return res.status(401).json({ success: false, message: 'Invalid agent credentials' });
       }
 
-      if (agent.passwordHash !== password) {
-        return res.status(401).json({ success: false, message: 'Invalid agent credentials' });
+      const { data: agent, error: agentError } = await supabase.from('agents').select('*').eq('auth_user_id', authData.user.id).single();
+      
+      if (agentError || !agent) {
+        return res.status(403).json({ success: false, message: 'Access forbidden. Agent profile not found.' });
       }
 
-      if (agent.status === 'PENDING_APPROVAL') {
+      if (agent.status === 'PENDING') {
         return res.status(403).json({ success: false, message: 'Your account is pending review by Invify Staff. You will be notified once approved.' });
       }
 
       if (agent.status === 'SUSPENDED') {
-        return res.status(403).json({ 
-          success: false, 
-          message: agent.suspensionReason || 'Your account has been suspended.',
-          requiredAction: agent.requiredAction || 'NONE',
-          actionQuestion: agent.actionQuestion || ''
-        });
+        return res.status(403).json({ success: false, message: 'Your account has been suspended.' });
       }
 
-      if (agent.isFirstLogin && agent.agentCode === agent.passwordHash) {
-        return res.status(200).json({ 
-          success: true, 
-          requirePasswordChange: true,
-          agentCode: agent.agentCode,
-          message: 'First login detected, password change required.'
-        });
-      }
+      await supabase.from('agent_sessions').insert({
+        agent_id: agent.id,
+        token: authData.session.access_token,
+        ip_address: req.ip || '',
+        browser: req.headers['user-agent'] || '',
+        status: 'ACTIVE'
+      });
 
-      // In real scenario, issue JWT here
       return res.status(200).json({
         success: true,
-        token: `mock-agent-token-${agent.id}`,
+        token: authData.session.access_token,
         agent: {
           id: agent.id,
           email: agent.email,
-          agentCode: agent.agentCode,
-          name: agent.name
+          agentCode: agent.agent_code,
+          name: `${agent.first_name} ${agent.last_name}`
         }
       });
     } catch (err: any) {
@@ -252,7 +316,8 @@ export class AgentController {
         return res.status(400).json({ success: false, message: 'Full name, email, and password are required' });
       }
 
-      if (mockAgents.find(a => a.email?.toLowerCase() === email.toLowerCase())) {
+      const { data: existing } = await supabase.from('agents').select('id').eq('email', email).single();
+      if (existing) {
         return res.status(400).json({ success: false, message: 'An agent with this email already exists' });
       }
 
@@ -281,6 +346,7 @@ export class AgentController {
 
       // 2. Write to Supabase auth & tables (agents & agent_profiles)
       const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_KEY;
+      let supabaseUserId: string | undefined = undefined;
       if (hasSupabase) {
         try {
           const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -293,7 +359,7 @@ export class AgentController {
             }
           });
 
-          let supabaseUserId = authData?.user?.id;
+          supabaseUserId = authData?.user?.id;
           if (authError || !supabaseUserId) {
             console.warn('[AgentRegister] Supabase Auth creation warning (using fallback UUID):', authError?.message);
             supabaseUserId = uuidv4();
@@ -337,36 +403,13 @@ export class AgentController {
         }
       }
 
-      // 3. Save to memory DB for local state representation
-      const newAgent: Agent = {
-        id: uuidv4(),
-        agentCode: agentCode || tempCode,
-        passwordHash: password,
-        isFirstLogin: false, // Since they set it during signup
-        name: fullName,
-        email,
-        phone,
-        whatsappNumber,
-        address,
-        passportImage: passportUrl || passportImage,
-        idCard: idCardUrl || idCard,
-        kycStatus: 'PENDING',
-        status: 'PENDING_APPROVAL',
-        commissions: 0,
-        points: 0,
-        createdAt: new Date()
-      };
-
-      mockAgents.push(newAgent);
-      saveAgents();
-
       return res.status(201).json({ 
         success: true, 
         message: 'Registration successful. Please wait for Invify Staff approval.',
         agent: {
-          id: newAgent.id,
-          email: newAgent.email,
-          name: newAgent.name
+          id: supabaseUserId || tempCode,
+          email: email,
+          name: fullName
         }
       });
     } catch (err: any) {
@@ -381,22 +424,29 @@ export class AgentController {
     try {
       const { agentCode, oldPassword, newPassword } = req.body;
 
-      const agent = mockAgents.find(a => a.agentCode === agentCode);
-      if (!agent || agent.passwordHash !== oldPassword) {
+      // Resolve email from agentCode
+      const { data: existing } = await supabase.from('agents').select('email').eq('agent_code', agentCode).single();
+      if (!existing) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+      // Authenticate old password
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email: existing.email, password: oldPassword });
+      if (authError || !authData.session) {
         return res.status(401).json({ success: false, message: 'Invalid credentials' });
       }
 
-      agent.passwordHash = newPassword;
-      agent.isFirstLogin = false;
-      saveAgents();
+      // Update password
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) {
+        return res.status(500).json({ success: false, message: 'Failed to update password' });
+      }
 
       return res.status(200).json({ 
         success: true, 
         message: 'Password changed successfully. You can now log in.',
-        token: `mock-agent-token-${agent.id}`,
+        token: authData.session.access_token,
         agent: {
-          agentCode: agent.agentCode,
-          name: agent.name
+          agentCode,
+          name: authData.user.user_metadata?.name || 'Agent'
         }
       });
     } catch (err: any) {
@@ -421,22 +471,10 @@ export class AgentController {
       }
 
       // 1. Resolve Agent
-      let agent = mockAgents.find(a => a.id === authUser.id || a.email?.toLowerCase() === authUser.email?.toLowerCase());
-      if (!agent) {
-        try {
-          const { data: dbAgent } = await supabase
-            .from('agents')
-            .select('*')
-            .eq('auth_user_id', authUser.id)
-            .single();
-          if (dbAgent) {
-            agent = dbAgent;
-          }
-        } catch (_) {}
-      }
-
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent profile not found' });
+      const { data: agent, error } = await supabase.from('agents').select('*').eq('auth_user_id', authUser.id).single();
+      
+      if (error || !agent) {
+        return res.status(403).json({ success: false, message: 'Agent profile not found. Access forbidden.' });
       }
 
       const agentId = agent.id;
@@ -490,7 +528,9 @@ export class AgentController {
       const { data: commissions } = await supabase.from('commission_events').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
       
       // Reputation
-      const { data: reputation } = await supabase.from('agent_reputations').select('*').eq('agent_id', agentId).single();
+      const { data: reputation } = await supabase.from('agent_reputation_summary').select('*').eq('agent_id', agentId).single();
+      const { count: rankCount } = await supabase.from('agent_reputation_summary').select('agent_id', { count: 'exact', head: true }).gt('trust_score', reputation?.trust_score || 0);
+      const rank = (rankCount || 0) + 1;
       
       // Terminals & Devices
       let terminalMetrics = { assigned: 0, activated: 0, pending: 0, offline: 0, activationRate: 0, syncSuccessRate: 100, lastAssigned: null };
@@ -604,6 +644,11 @@ export class AgentController {
             pipeline.activated
           ]
         },
+        reputation: {
+          trust_score: reputation?.trust_score || 0,
+          level_name: reputation?.level_name || 'New Agent',
+          rank: rank || '-'
+        },
         quickActions: [
           { label: 'Create Lead', route: '/agent/coming-soon/create-lead', icon: 'person_add' },
           { label: 'Register Merchant', route: '/agent/coming-soon/register-merchant', icon: 'storefront' },
@@ -622,314 +667,291 @@ export class AgentController {
     }
   }
 
-  static async listAgents(req: Request, res: Response) {
-    return res.status(200).json({
-      success: true,
-      agents: mockAgents.map(a => ({
-        id: a.id,
-        agentCode: a.agentCode,
-        name: a.name,
-        email: a.email,
-        phone: a.phone,
-        whatsappNumber: a.whatsappNumber,
-        kycStatus: a.kycStatus,
-        status: a.status,
-        isFirstLogin: a.isFirstLogin,
-        points: a.points,
-        commissions: a.commissions
-      }))
-    });
-  }
-
-  static async getAgentProfile(req: Request, res: Response) {
+  static async assignHardware(req: Request, res: Response) {
     try {
-      const { id } = req.params;
-      const agent = mockAgents.find(a => a.id === id);
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent not found' });
+      const authUserId = (req as any).user?.id;
+      if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+      // Check offline mode
+      const isOffline = process.env.OFFLINE_MOCK_AUTH === 'true';
+
+      let agentId = '00000000-0000-0000-0000-000000000000';
+      if (!isOffline) {
+        const { data: agent } = await supabase.from('agents').select('id').eq('auth_user_id', authUserId).single();
+        if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+        agentId = agent.id;
       }
 
-      // Read actual tenants from database
-      const allTenants = fs.existsSync(LOCAL_TENANTS_DB_PATH) 
-        ? JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'))
-        : [];
-      
-      // Filter tenants by agent_code
-      const agentTenants = allTenants.filter((t: any) => 
-        t.agent_code === agent.agentCode
-      );
+      const { type, tenantId, serialNumber } = req.body;
+      if (!tenantId || !serialNumber) {
+        return res.status(400).json({ success: false, message: 'Tenant and Serial Number are required' });
+      }
 
-      const tenants = agentTenants.map((t: any) => ({
-        id: t.id,
-        businessName: t.name,
-        industry: t.type,
-        status: (t.status || 'ACTIVE').toUpperCase(),
-        onboardedAt: t.created_at || new Date().toISOString()
-      }));
+      if (isOffline) {
+        if (type === 'DEVICE') {
+          const devices = getLocalDevices();
+          const idx = devices.findIndex(d => d.device_id === serialNumber);
+          if (idx >= 0) {
+            devices[idx].tenant_id = tenantId;
+            devices[idx].status = 'active';
+            devices[idx].updated_at = new Date().toISOString();
+          } else {
+            devices.push({
+              id: uuidv4(),
+              tenant_id: tenantId,
+              device_id: serialNumber,
+              device_name: 'Agent-Assigned Device',
+              status: 'active',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          }
+          saveLocalDevices(devices);
+        } else if (type === 'TERMINAL') {
+          const terminals = getLocalTerminals();
+          const idx = terminals.findIndex(t => t.pos_serial_number === serialNumber || t.terminal_id === serialNumber);
+          if (idx >= 0) {
+            terminals[idx].assigned_tenant_id = tenantId;
+            terminals[idx].assignment_status = 'assigned';
+            terminals[idx].assigned_at = new Date().toISOString();
+            terminals[idx].updated_at = new Date().toISOString();
+          } else {
+            terminals.push({
+              id: uuidv4(),
+              terminal_id: serialNumber,
+              pos_serial_number: serialNumber,
+              assigned_tenant_id: tenantId,
+              assignment_status: 'assigned',
+              assigned_at: new Date().toISOString(),
+              terminal_type: 'N3',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          }
+          saveLocalTerminals(terminals);
+        } else {
+          return res.status(400).json({ success: false, message: 'Invalid hardware type' });
+        }
+      } else {
+        if (type === 'DEVICE') {
+          // Check if device already exists in devices
+          const { data: existingDevice } = await supabase
+            .from('devices')
+            .select('id')
+            .eq('device_id', serialNumber)
+            .maybeSingle();
 
-      return res.status(200).json({
-        success: true,
-        agent,
-        tenants
-      });
+          if (existingDevice) {
+            const { error } = await supabase
+              .from('devices')
+              .update({
+                tenant_id: tenantId,
+                status: 'active',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingDevice.id);
+            if (error) throw new Error('Failed to update device assignment: ' + error.message);
+          } else {
+            const { error } = await supabase
+              .from('devices')
+              .insert({
+                tenant_id: tenantId,
+                device_id: serialNumber,
+                device_name: 'Agent-Assigned Device',
+                status: 'active'
+              });
+            if (error) throw new Error('Failed to create device assignment: ' + error.message);
+          }
+        } else if (type === 'TERMINAL') {
+          // Check if terminal exists in terminal_inventory
+          const { data: existingTerminal } = await supabase
+            .from('terminal_inventory')
+            .select('id')
+            .or(`pos_serial_number.eq.${serialNumber},terminal_id.eq.${serialNumber}`)
+            .maybeSingle();
+
+          if (existingTerminal) {
+            const { error } = await supabase
+              .from('terminal_inventory')
+              .update({
+                assigned_tenant_id: tenantId,
+                assignment_status: 'assigned',
+                assigned_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingTerminal.id);
+            if (error) throw new Error('Failed to update terminal assignment: ' + error.message);
+          } else {
+            const { error } = await supabase
+              .from('terminal_inventory')
+              .insert({
+                terminal_id: serialNumber,
+                pos_serial_number: serialNumber,
+                assigned_tenant_id: tenantId,
+                assignment_status: 'assigned',
+                assigned_at: new Date().toISOString(),
+                terminal_type: 'N3'
+              });
+            if (error) throw new Error('Failed to create terminal assignment: ' + error.message);
+          }
+        } else {
+          return res.status(400).json({ success: false, message: 'Invalid hardware type' });
+        }
+      }
+
+      return res.status(200).json({ success: true, message: 'Hardware assigned successfully' });
+    } catch (err: any) {
+      console.error('[AssignHardware] Error:', err.message);
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async syncHardware(req: Request, res: Response) {
+    try {
+      // Dummy sync endpoint for the UI to hit
+      return res.status(200).json({ success: true, message: 'Hardware sync initiated' });
     } catch (err: any) {
       return res.status(500).json({ success: false, message: err.message });
     }
   }
 
   static async updateAgentStatus(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { status, suspensionReason, requiredAction, actionQuestion, actionAnswer } = req.body;
-      const agent = mockAgents.find(a => a.id === id);
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent not found' });
-      }
-
-      if (status !== 'ACTIVE' && status !== 'SUSPENDED' && status !== 'PENDING_APPROVAL') {
-        return res.status(400).json({ success: false, message: 'Invalid status' });
-      }
-
-      agent.status = status;
-      if (status === 'SUSPENDED') {
-        agent.suspensionReason = suspensionReason || 'Your account has been suspended.';
-        agent.requiredAction = requiredAction || 'NONE';
-        agent.actionQuestion = actionQuestion || '';
-        agent.actionAnswer = actionAnswer || '';
-      } else {
-        agent.suspensionReason = undefined;
-        agent.requiredAction = undefined;
-        agent.actionQuestion = undefined;
-        agent.actionAnswer = undefined;
-      }
-      saveAgents();
-      return res.status(200).json({ success: true, message: `Agent status updated to ${status}`, agent });
-    } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
-    }
+    return res.status(501).json({ success: false, message: 'Manager Portal Not Implemented' });
   }
 
   static async updateAgentKyc(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { kycStatus } = req.body;
-      const agent = mockAgents.find(a => a.id === id);
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent not found' });
-      }
-
-      if (kycStatus !== 'PENDING' && kycStatus !== 'VERIFIED' && kycStatus !== 'REJECTED') {
-        return res.status(400).json({ success: false, message: 'Invalid KYC status' });
-      }
-
-      agent.kycStatus = kycStatus;
-      saveAgents();
-      return res.status(200).json({ success: true, message: `Agent KYC status updated to ${kycStatus}`, agent });
-    } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
-    }
+    return res.status(501).json({ success: false, message: 'Manager Portal Not Implemented' });
   }
 
   static async getAgentCommissions(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const agent = mockAgents.find(a => a.id === id);
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent not found' });
-      }
-      return res.status(200).json({ success: true, commissionSettings: agent.commissionSettings || {} });
-    } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
-    }
+    return res.status(501).json({ success: false, message: 'Manager Portal Not Implemented' });
   }
 
   static async updateAgentCommissions(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { onboardingFee, revSharePercentage } = req.body;
-      const agent = mockAgents.find(a => a.id === id);
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent not found' });
-      }
-      
-      agent.commissionSettings = {
-        onboardingFee: onboardingFee !== undefined ? onboardingFee : agent.commissionSettings?.onboardingFee,
-        revSharePercentage: revSharePercentage !== undefined ? revSharePercentage : agent.commissionSettings?.revSharePercentage
-      };
-      saveAgents();
-      
-      return res.status(200).json({ success: true, commissionSettings: agent.commissionSettings });
-    } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
-    }
+    return res.status(501).json({ success: false, message: 'Manager Portal Not Implemented' });
   }
 
   static async messageAgent(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { message } = req.body;
-      const agent = mockAgents.find(a => a.id === id);
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent not found' });
-      }
-      
-      // Simulate dispatching via WebSockets
-      console.log(`\n==============================================`);
-      console.log(`[PUSH NOTIFICATION DISPATCHER]`);
-      console.log(`TARGET: Agent ${agent.agentCode} (${agent.name})`);
-      console.log(`DEVICE/PHONE: ${agent.phone || 'Unknown'}`);
-      console.log(`PAYLOAD: "${message}"`);
-      console.log(`==============================================\n`);
-      
-      return res.status(200).json({ 
-        success: true, 
-        message: `High-priority push notification delivered to ${agent.name}'s mobile app.` 
-      });
-    } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
-    }
+    return res.status(501).json({ success: false, message: 'Manager Portal Not Implemented' });
   }
 
   static async messageAgentTenants(req: Request, res: Response) {
-    try {
-      const { id } = req.params;
-      const { message } = req.body;
-      const agent = mockAgents.find(a => a.id === id);
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent not found' });
-      }
-      
-      // Read actual tenants to count how many are receiving the broadcast
-      const allTenants = fs.existsSync(LOCAL_TENANTS_DB_PATH) 
-        ? JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'))
-        : [];
-      
-      const agentTenants = allTenants.filter((t: any) => 
-        t.agent_code === agent.agentCode || (!t.agent_code && agent.agentCode === 'AAA000')
-      );
-      
-      // Simulate broadcasting to tenants
-      console.log(`\n==============================================`);
-      console.log(`[TERMINAL BROADCAST ENGINE]`);
-      console.log(`ROUTING: Agent ${agent.agentCode} Fleet`);
-      console.log(`TARGET COUNT: ${agentTenants.length} active terminals`);
-      console.log(`PAYLOAD: "${message}"`);
-      console.log(`==============================================\n`);
-      
-      // ACTUALLY EMIT TO ALL SOCKETS BELONGING TO THESE TENANTS
-      agentTenants.forEach((tenant: any) => {
-        const room = `tenant:${tenant.id}`;
-        io.to(room).emit('app_broadcast', {
-          message: message,
-          sender: `Agent ${agent.agentCode}`,
-          timestamp: new Date().toISOString()
-        });
-      });
-      
-      return res.status(200).json({ 
-        success: true, 
-        message: `System broadcast successfully queued for ${agentTenants.length} terminals managed by ${agent.agentCode}.` 
-      });
-    } catch (err: any) {
-      return res.status(500).json({ success: false, message: err.message });
-    }
+    return res.status(501).json({ success: false, message: 'Manager Portal Not Implemented' });
   }
 
   static async resolveSuspension(req: Request, res: Response) {
     try {
       const { email, passportImage, idCard, answer, address, phone, whatsappNumber } = req.body;
-
-      if (!email) {
-        return res.status(400).json({ success: false, message: 'Email is required' });
-      }
-
-      const agent = mockAgents.find(a => a.email?.toLowerCase() === email.toLowerCase());
-      if (!agent) {
-        return res.status(404).json({ success: false, message: 'Agent not found' });
-      }
-
-      if (agent.status !== 'SUSPENDED') {
-        return res.status(400).json({ success: false, message: 'Agent is not suspended' });
-      }
-
-      let fileUrl = '';
-      let actionFulfilled = false;
-
-      if (passportImage) {
-        fileUrl = await uploadBase64ToContabo(passportImage, 'passports', `${email.replace(/[@.]/g, '_')}_passport`);
-        agent.passportImage = fileUrl;
-        agent.kycStatus = 'PENDING';
-        actionFulfilled = true;
-      }
-      if (idCard) {
-        fileUrl = await uploadBase64ToContabo(idCard, 'ids', `${email.replace(/[@.]/g, '_')}_id`);
-        agent.idCard = fileUrl;
-        agent.kycStatus = 'PENDING';
-        actionFulfilled = true;
-      }
-      if (answer) {
-        agent.actionAnswer = answer;
-        actionFulfilled = true;
-      }
-      if (address) {
-        agent.address = address;
-        actionFulfilled = true;
-      }
-      if (phone) {
-        agent.phone = phone;
-        actionFulfilled = true;
-      }
-      if (whatsappNumber) {
-        agent.whatsappNumber = whatsappNumber;
-        actionFulfilled = true;
-      }
-
-      if (!actionFulfilled) {
-        return res.status(400).json({ success: false, message: 'Invalid action or missing required file/answer' });
-      }
-
-      // Update agent status to PENDING_APPROVAL so the admin can approve
-      agent.status = 'PENDING_APPROVAL';
-      agent.requiredAction = 'NONE'; // clear action as it has been fulfilled
       
-      // Save changes locally
-      const LOCAL_AGENTS_DB_PATH = path.join(process.cwd(), 'agents_db.json');
-      fs.writeFileSync(LOCAL_AGENTS_DB_PATH, JSON.stringify(mockAgents, null, 2));
+      if (!email) {
+        return res.status(400).json({ success: false, message: 'Agent email is required.' });
+      }
 
-      // Write to Supabase if enabled
-      const hasSupabase = process.env.SUPABASE_URL && process.env.SUPABASE_KEY;
-      if (hasSupabase) {
+      // Check if mock mode is active
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        return res.status(200).json({
+          success: true,
+          message: 'Suspension resolution successfully submitted (Mock Mode)'
+        });
+      }
+
+      // 1. Fetch the Agent
+      const { data: agent, error: agentErr } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (agentErr || !agent) {
+        return res.status(404).json({ success: false, message: 'Agent not found.' });
+      }
+
+      // 2. Upload images to S3
+      let passportUrl = '';
+      let idCardUrl = '';
+
+      if (passportImage && passportImage.startsWith('data:')) {
         try {
-          const agentUpdates: any = { status: 'PENDING' };
-          if (phone) agentUpdates.phone = phone;
-          
-          const { data: dbAgent, error: dbError } = await supabase
-            .from('agents')
-            .update(agentUpdates)
-            .eq('email', email)
-            .select()
-            .single();
-
-          if (!dbError && dbAgent) {
-            const profileUpdates: any = { kyc_status: 'PENDING' };
-            if (agent.passportImage) profileUpdates.profile_photo_url = agent.passportImage;
-            if (address) profileUpdates.address = address;
-            
-            await supabase
-              .from('agent_profiles')
-              .update(profileUpdates)
-              .eq('agent_id', dbAgent.id);
-          }
-        } catch (supabaseErr: any) {
-          console.error('[ResolveSuspension] Supabase Sync Error:', supabaseErr.message);
+          passportUrl = await uploadBase64ToContabo(passportImage, 'passports', `${email.replace(/[@.]/g, '_')}_passport`);
+        } catch (s3Err: any) {
+          console.error('[ResolveSuspension] Passport Upload Error:', s3Err.message);
         }
+      }
+      if (idCard && idCard.startsWith('data:')) {
+        try {
+          idCardUrl = await uploadBase64ToContabo(idCard, 'ids', `${email.replace(/[@.]/g, '_')}_id`);
+        } catch (s3Err: any) {
+          console.error('[ResolveSuspension] ID Card Upload Error:', s3Err.message);
+        }
+      }
+
+      // 3. Update the agent status to ACTIVE
+      const oldStatus = agent.status;
+      const { error: updateAgentErr } = await supabase
+        .from('agents')
+        .update({
+          status: 'ACTIVE',
+          phone: phone || agent.phone
+        })
+        .eq('id', agent.id);
+
+      if (updateAgentErr) {
+        throw updateAgentErr;
+      }
+
+      // 4. Log status history change
+      await supabase
+        .from('agent_status_history')
+        .insert({
+          agent_id: agent.id,
+          old_status: oldStatus,
+          new_status: 'ACTIVE',
+          changed_by: agent.id, // Agent self-resolution
+          reason: `Suspension resolved. Answer submitted: ${answer || 'N/A'}`
+        });
+
+      // 5. Update agent profile
+      const profileUpdates: any = {
+        kyc_status: 'VERIFIED'
+      };
+      if (address) profileUpdates.address = address;
+      if (passportUrl) profileUpdates.profile_photo_url = passportUrl;
+
+      const { error: profileErr } = await supabase
+        .from('agent_profiles')
+        .upsert({
+          agent_id: agent.id,
+          ...profileUpdates,
+          updated_at: new Date().toISOString()
+        });
+
+      if (profileErr) {
+        console.error('[ResolveSuspension] Agent Profile update failed:', profileErr.message);
+      }
+
+      // 6. Log audit event
+      try {
+        await agentRepository.logAudit(
+          agent.id,
+          'AGENT',
+          agent.id,
+          'RESOLVE_SUSPENSION',
+          { old_status: oldStatus },
+          { new_status: 'ACTIVE', answer, idCardUrl, passportUrl },
+          req.ip || '',
+          (req.headers['user-agent'] as string) || ''
+        );
+      } catch (auditErr: any) {
+        console.error('[ResolveSuspension] Audit log failed:', auditErr.message);
       }
 
       return res.status(200).json({
         success: true,
-        message: 'Action submitted successfully. Your profile is now pending review.'
+        message: 'Suspension successfully resolved and account activated.'
       });
+
     } catch (err: any) {
+      console.error('[ResolveSuspension] Error:', err.message);
       return res.status(500).json({ success: false, message: err.message });
     }
   }

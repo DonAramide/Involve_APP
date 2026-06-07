@@ -78,7 +78,7 @@ const fetchTenants = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('token') || 'mock-admin-token-123'
-    const res = await axios.get('http://localhost:3004/api/admin/tenant/listAll', {
+    const res = await axios.get('/api/admin/tenant/listAll', {
       headers: { Authorization: `Bearer ${token}` }
     })
     tenants.value = res.data.data || []

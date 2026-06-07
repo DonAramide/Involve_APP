@@ -1,6 +1,19 @@
 {
   "logs": [
     {
+      "id": "gov-1780505102655-7txr1",
+      "timestamp": "2026-06-03T16:45:02.655Z",
+      "module": "TEST",
+      "action": "TEST_ACTION",
+      "user_email": "superadmin@invify.app",
+      "user_name": "SUPERADMIN",
+      "ip_address": "::ffff:127.0.0.1",
+      "location": "Unknown Location",
+      "target": "-",
+      "status": "success",
+      "metadata": {}
+    },
+    {
       "id": "gov-1780273738002-ylgcg",
       "timestamp": "2026-06-01T00:28:58.002Z",
       "module": "TEST",

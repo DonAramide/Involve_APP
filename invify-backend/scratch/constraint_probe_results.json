@@ -1,0 +1,63 @@
+{
+  "results": [
+    {
+      "probe": "no_plan_id",
+      "payload": {
+        "agent_id": "6376e7f7-f3cf-4f0a-8a01-79e8cec79491",
+        "event_type": "PROBE_TEST",
+        "amount": 0.01,
+        "new_state": "PENDING"
+      },
+      "success": false,
+      "error": "null value in column \"plan_id\" of relation \"commission_events\" violates not-null constraint"
+    },
+    {
+      "probe": "with_plan_version_id",
+      "payload": {
+        "agent_id": "6376e7f7-f3cf-4f0a-8a01-79e8cec79491",
+        "event_type": "PROBE_TEST",
+        "amount": 0.01,
+        "plan_id": "744efd51-8d91-46b2-97c5-c81f9e0803c7",
+        "new_state": "PENDING"
+      },
+      "success": false,
+      "error": "null value in column \"release_date\" of relation \"commission_events\" violates not-null constraint"
+    },
+    {
+      "probe": "full_no_plan_id",
+      "payload": {
+        "agent_id": "6376e7f7-f3cf-4f0a-8a01-79e8cec79491",
+        "event_type": "PROBE_FULL",
+        "amount": 0.02,
+        "previous_state": "PENDING",
+        "new_state": "APPROVED",
+        "reference_id": null,
+        "metadata": {
+          "probe": true
+        }
+      },
+      "success": false,
+      "error": "null value in column \"plan_id\" of relation \"commission_events\" violates not-null constraint"
+    },
+    {
+      "probe": "workflow_ticket_approved",
+      "payload": {
+        "agent_id": "6376e7f7-f3cf-4f0a-8a01-79e8cec79491",
+        "event_type": "TICKET_APPROVED",
+        "amount": 100,
+        "previous_state": "PENDING",
+        "new_state": "APPROVED",
+        "reference_id": null,
+        "metadata": {
+          "operatorId": "probe-operator",
+          "oldValue": null,
+          "newValue": null
+        }
+      },
+      "success": false,
+      "error": "null value in column \"plan_id\" of relation \"commission_events\" violates not-null constraint"
+    }
+  ],
+  "agentId": "6376e7f7-f3cf-4f0a-8a01-79e8cec79491",
+  "planVersionId": "744efd51-8d91-46b2-97c5-c81f9e0803c7"
+}

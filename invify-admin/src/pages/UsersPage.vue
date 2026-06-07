@@ -402,7 +402,7 @@ const forceResetPassword = (user) => {
       return
     }
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+      const API_BASE = import.meta.env.VITE_API_URL || ''
       await axios.post(`${API_BASE}/api/auth/reset-password`, {
         userId: user.id,
         newPassword: newPassword

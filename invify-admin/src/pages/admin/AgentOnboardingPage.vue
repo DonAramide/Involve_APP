@@ -53,7 +53,7 @@
                 </td>
                 <td class="q-pa-xs text-metric-mono text-green-4">{{ currentCurrency.symbol }}{{ agent.commissions?.toFixed(2) || '0.00' }}</td>
               </tr>
-              <tr v-if="agents.length === 0 && !loadingList">
+              <tr v-if="(!agents || agents.length === 0) && !loadingList">
                 <td colspan="6" class="q-pa-md text-center text-muted">No agents provisioned yet.</td>
               </tr>
             </tbody>
@@ -381,10 +381,10 @@ const fetchAgents = async () => {
   loadingList.value = true
   try {
     const token = localStorage.getItem('invify_access_token')
-    const res = await axios.get('http://localhost:3004/admin/agents', {
+    const res = await axios.get('/admin/agents', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    agents.value = res.data.agents
+    agents.value = res.data.agents || []
   } catch (err) {
     const msg = err.response?.data?.message || err.message
     $q.notify({ type: 'negative', message: `Failed to fetch agents: ${msg}`, position: 'top-right' })
@@ -404,7 +404,7 @@ const onboardAgent = async () => {
     if (idCardFile.value) idCard = await toBase64(idCardFile.value)
 
     const token = localStorage.getItem('invify_access_token')
-    await axios.post('http://localhost:3004/admin/agents/onboard', {
+    await axios.post('/admin/agents/onboard', {
       name: newAgent.value.name,
       email: newAgent.value.email,
       phone: newAgent.value.phone,
@@ -445,7 +445,7 @@ const openAgentProfile = async (id) => {
   
   try {
     const token = localStorage.getItem('invify_access_token')
-    const res = await axios.get(`http://localhost:3004/admin/agents/${id}`, {
+    const res = await axios.get(`/admin/agents/${id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     selectedAgent.value = res.data.agent
@@ -463,7 +463,7 @@ const approveAgentStatus = async () => {
   loadingStatus.value = true
   try {
     const token = localStorage.getItem('invify_access_token')
-    await axios.patch(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/status`, {
+    await axios.patch(`/admin/agents/${selectedAgent.value.id}/status`, {
       status: 'ACTIVE'
     }, {
       headers: { Authorization: `Bearer ${token}` }
@@ -488,7 +488,7 @@ const toggleAgentStatus = async () => {
     loadingStatus.value = true
     try {
       const token = localStorage.getItem('invify_access_token')
-      await axios.patch(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/status`, {
+      await axios.patch(`/admin/agents/${selectedAgent.value.id}/status`, {
         status: 'ACTIVE'
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -522,7 +522,7 @@ const confirmSuspension = async () => {
   loadingStatus.value = true
   try {
     const token = localStorage.getItem('invify_access_token')
-    await axios.patch(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/status`, {
+    await axios.patch(`/admin/agents/${selectedAgent.value.id}/status`, {
       status: 'SUSPENDED',
       suspensionReason: suspensionForm.value.suspensionReason,
       requiredAction: suspensionForm.value.requiredAction,
@@ -550,7 +550,7 @@ const updateKycStatus = async (newKycStatus) => {
   
   try {
     const token = localStorage.getItem('invify_access_token')
-    await axios.patch(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/kyc`, {
+    await axios.patch(`/admin/agents/${selectedAgent.value.id}/kyc`, {
       kycStatus: newKycStatus
     }, {
       headers: { Authorization: `Bearer ${token}` }
@@ -592,7 +592,7 @@ const promptMessageAgent = () => {
     if (!data.trim()) return
     try {
       const token = localStorage.getItem('invify_access_token')
-      await axios.post(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/message`, {
+      await axios.post(`/admin/agents/${selectedAgent.value.id}/message`, {
         message: data
       }, { headers: { Authorization: `Bearer ${token}` }})
       $q.notify({ type: 'positive', message: 'Message dispatched successfully', position: 'top-right' })
@@ -620,7 +620,7 @@ const promptMessageTenants = () => {
     if (!data.trim()) return
     try {
       const token = localStorage.getItem('invify_access_token')
-      await axios.post(`http://localhost:3004/admin/agents/${selectedAgent.value.id}/message-tenants`, {
+      await axios.post(`/admin/agents/${selectedAgent.value.id}/message-tenants`, {
         message: data
       }, { headers: { Authorization: `Bearer ${token}` }})
       $q.notify({ type: 'positive', message: 'Broadcast dispatched to tenants', position: 'top-right' })

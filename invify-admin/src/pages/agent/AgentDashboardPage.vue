@@ -93,7 +93,25 @@
           </div>
         </div>
 
-        <!-- ROW 3: Action Required & Alerts -->
+        <!-- ROW 3: Reputation Summary -->
+        <div class="row op-gap-16 shrink-0 cursor-pointer hover-card" @click="$router.push('/agent/reputation')">
+          <div class="col bg-panel border-muted rounded-borders q-pa-md row items-center justify-between">
+            <div>
+              <div class="text-caption text-muted text-uppercase text-weight-bold q-mb-xs">Trust Score</div>
+              <div class="text-h4 text-weight-bold text-amber-4">{{ payload.reputation?.trust_score || 0 }}</div>
+            </div>
+            <div class="text-center">
+              <div class="text-caption text-muted text-uppercase text-weight-bold q-mb-xs">Level</div>
+              <div class="text-h6">{{ payload.reputation?.level_name || 'New Agent' }}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-caption text-muted text-uppercase text-weight-bold q-mb-xs">Global Rank</div>
+              <div class="text-h4 text-weight-bold">#{{ payload.reputation?.rank || '-' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ROW 4: Action Required & Alerts -->
         <div class="row op-gap-16 shrink-0">
           <!-- Tasks -->
           <div class="col bg-panel border-muted rounded-borders q-pa-md column">
@@ -108,7 +126,7 @@
                     <div class="text-muted" style="font-size: 10px;">{{ task.text }}</div>
                   </div>
                 </div>
-                <q-btn dense flat color="amber-4" label="Execute" size="sm" @click="$router.push('/agent/coming-soon/task')" />
+                <q-btn dense flat color="amber-4" label="Execute" size="sm" @click="$q.notify({type: 'info', message: 'Task Execution Module coming soon.'})" />
               </div>
             </div>
           </div>
@@ -138,7 +156,7 @@
             <div class="column op-gap-8">
               <q-btn color="amber-4" text-color="black" icon="person_add" label="Create Lead" class="full-width" no-caps @click="$router.push('/agent/leads')" />
               <q-btn outline color="amber-4" icon="storefront" label="Register Merchant" class="full-width" no-caps @click="$router.push('/agent/portfolio')" />
-              <q-btn outline color="grey-4" icon="upload_file" label="Upload KYC Documents" class="full-width" no-caps @click="$router.push('/agent/coming-soon/upload-kyc')" />
+              <q-btn outline color="grey-4" icon="upload_file" label="Upload KYC Documents" class="full-width" no-caps @click="kycModal.open()" />
             </div>
           </div>
 
@@ -246,7 +264,7 @@
                   </td>
                   <td class="q-pa-sm text-muted">Pending</td>
                   <td class="q-pa-sm">
-                    <q-btn dense flat color="amber-4" icon="upload_file" size="sm" @click="$router.push('/agent/coming-soon/upload-kyc')">
+                    <q-btn dense flat color="amber-4" icon="upload_file" size="sm" @click="kycModal.open()">
                       <q-tooltip>Upload KYC</q-tooltip>
                     </q-btn>
                   </td>
@@ -265,9 +283,9 @@
           <div class="col-xs-12 col-md-4 bg-panel border-muted rounded-borders q-pa-md column justify-between">
             <div class="text-weight-bold q-mb-sm text-caption">DEPLOYMENT ACTIONS</div>
             <div class="column op-gap-8">
-              <q-btn color="amber-4" text-color="black" icon="add_to_queue" label="Assign Device" class="full-width" no-caps @click="$router.push('/agent/coming-soon/assign-device')" />
-              <q-btn outline color="amber-4" icon="point_of_sale" label="Assign Terminal" class="full-width" no-caps @click="$router.push('/agent/coming-soon/assign-terminal')" />
-              <q-btn outline color="grey-4" icon="sync" label="Sync Device" class="full-width" no-caps @click="$router.push('/agent/coming-soon/sync-device')" />
+              <q-btn color="amber-4" text-color="black" icon="add_to_queue" label="Assign Device" class="full-width" no-caps @click="hardwareModal.open('DEVICE')" />
+              <q-btn outline color="amber-4" icon="point_of_sale" label="Assign Terminal" class="full-width" no-caps @click="hardwareModal.open('TERMINAL')" />
+              <q-btn outline color="grey-4" icon="sync" label="Sync Device" class="full-width" no-caps @click="syncDevice()" />
             </div>
           </div>
 
@@ -368,7 +386,7 @@
                     <td class="q-pa-sm text-muted">{{ c.type || 'ONBOARDING' }}</td>
                     <td class="q-pa-sm text-weight-bold text-green-4">${{ (c.amount || 0).toLocaleString() }}</td>
                     <td class="q-pa-sm text-right">
-                      <q-btn dense flat color="amber-4" icon="chevron_right" size="sm" @click="$router.push('/agent/coming-soon/commission-details')" />
+                      <q-btn dense flat color="amber-4" icon="chevron_right" size="sm" @click="$q.notify({type: 'info', message: 'Commission Details coming soon.'})" />
                     </td>
                   </tr>
                 </tbody>
@@ -400,54 +418,14 @@
       </q-tab-panel>
 
       <!-- ANALYTICS TAB -->
-      <q-tab-panel name="analytics" class="q-pa-none column op-gap-16">
-        <!-- Visual Charts Row -->
-        <div class="row op-gap-16 shrink-0">
-          <div class="col bg-panel border-muted rounded-borders q-pa-md column">
-            <div class="text-weight-bold text-caption q-mb-sm">MERCHANT GROWTH</div>
-            <div v-if="!payload.analytics?.merchantGrowth?.length" class="flex flex-center col text-center column text-muted q-py-xl">
-              <q-icon name="show_chart" size="xl" class="q-mb-sm" color="grey-8"/>
-              No merchant activity yet.
-            </div>
-            <apexchart v-else type="area" height="200" :options="growthChartOptions" :series="growthSeries" />
+      <q-tab-panel name="analytics" class="q-pa-none column flex-center op-gap-16">
+        <div class="text-center column flex-center q-pa-xl">
+          <q-icon name="insights" size="4rem" color="blue-4" class="q-mb-md" />
+          <div class="text-h6 text-weight-bold">Intelligence & Analytics Center</div>
+          <div class="text-caption text-muted q-mt-sm q-mb-lg" style="max-width: 320px;">
+            Access full performance tracking, territory intelligence, operational risk signals, and gamification trends powered by our new fast-sync engine.
           </div>
-          
-          <div class="col bg-panel border-muted rounded-borders q-pa-md column">
-            <div class="text-weight-bold text-caption q-mb-sm">COMMISSION TREND</div>
-            <div v-if="!payload.analytics?.commissionTrend?.length" class="flex flex-center col text-center column text-muted q-py-xl">
-              <q-icon name="account_balance_wallet" size="xl" class="q-mb-sm" color="grey-8"/>
-              No commission history yet.
-            </div>
-            <apexchart v-else type="bar" height="200" :options="commissionChartOptions" :series="commissionSeries" />
-          </div>
-        </div>
-
-        <!-- Territory Intelligence -->
-        <div class="bg-panel border-muted rounded-borders q-pa-md column shrink-0">
-          <div class="text-weight-bold text-caption q-mb-sm">TERRITORY INTELLIGENCE & HEALTH SCORES</div>
-          <div class="row op-gap-16 items-center">
-            <div class="col bg-panel-darker q-pa-md rounded-borders border-muted row justify-between items-center">
-              <div>
-                <div class="text-caption text-muted">Assigned Territory</div>
-                <div class="text-h6 text-purple-3">{{ payload.territory?.name || agentInfo?.territory || 'Region Default' }}</div>
-              </div>
-              <q-icon name="my_location" size="md" color="purple-3" />
-            </div>
-            <div class="col bg-panel-darker q-pa-md rounded-borders border-muted row justify-between items-center">
-              <div>
-                <div class="text-caption text-muted">Density Rank</div>
-                <div class="text-h6 text-green-3">Top 15% (Tier 1)</div>
-              </div>
-              <q-icon name="trending_up" size="md" color="green-3" />
-            </div>
-            <div class="col bg-panel-darker q-pa-md rounded-borders border-muted row justify-between items-center">
-              <div>
-                <div class="text-caption text-muted">Opportunity Index</div>
-                <div class="text-h6 text-amber-3">High Activity</div>
-              </div>
-              <q-icon name="bolt" size="md" color="amber-3" />
-            </div>
-          </div>
+          <q-btn color="blue-4" text-color="black" label="Open Analytics Center" icon="open_in_new" no-caps @click="$router.push('/agent/analytics')" />
         </div>
       </q-tab-panel>
 
@@ -504,15 +482,27 @@
       </q-tab-panel>
 
     </q-tab-panels>
+    
+    <AgentKYCUploadModal ref="kycModal" />
+    <AgentHardwareAssignmentModal ref="hardwareModal" />
   </q-page>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
+import { api } from 'boot/axios'
 import { useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
+import VueApexCharts from 'vue3-apexcharts'
+import AgentKYCUploadModal from './components/AgentKYCUploadModal.vue'
+import AgentHardwareAssignmentModal from './components/AgentHardwareAssignmentModal.vue'
 
 const $q = useQuasar()
+const router = useRouter()
+const apexchart = VueApexCharts
+const kycModal = ref(null)
+const hardwareModal = ref(null)
 const loading = ref(true)
 const agentInfo = ref(null)
 const payload = ref({})
@@ -539,6 +529,19 @@ const kpiConfig = [
   { key: 'earnedCommissions', label: 'Earned Commissions', icon: 'account_balance_wallet', iconColor: 'green-4', isCurrency: true, colorClass: 'text-green-4' }
 ]
 
+const syncDevice = async () => {
+  try {
+    loading.value = true
+    await api.post('/agent/hardware/sync')
+    $q.notify({ type: 'positive', message: 'Hardware sync initiated successfully' })
+    await fetchDashboardData()
+  } catch (err) {
+    $q.notify({ type: 'negative', message: 'Failed to sync hardware' })
+  } finally {
+    loading.value = false
+  }
+}
+
 const fetchDashboardData = async () => {
   loading.value = true
   try {
@@ -548,12 +551,12 @@ const fetchDashboardData = async () => {
       return
     }
 
-    const authRes = await axios.get('http://localhost:3004/api/agent/profile', {
+    const authRes = await axios.get('/api/agent/profile', {
       headers: { Authorization: `Bearer ${token}` }
     })
     agentInfo.value = authRes.data.data
 
-    const dashRes = await axios.get('http://localhost:3004/api/agent/dashboard', {
+    const dashRes = await axios.get('/api/agent/dashboard', {
       headers: { Authorization: `Bearer ${token}` }
     })
     

@@ -98,7 +98,7 @@ const fetchWallet = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('agent_token') || 'mock-agent-token-123'
-    const res = await axios.get('http://localhost:3004/api/finance/wallet/dashboard', {
+    const res = await axios.get('/api/finance/wallet/dashboard', {
       headers: { Authorization: `Bearer ${token}` }
     })
     walletData.value = res.data.data?.wallet || {}

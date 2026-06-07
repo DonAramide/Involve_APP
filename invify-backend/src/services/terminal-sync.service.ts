@@ -46,15 +46,32 @@ export class TerminalSyncService {
     let tenantDetails: any = null;
 
     try {
-      const fs = require('fs');
-      const path = require('path');
-      const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
-      if (fs.existsSync(GLOBAL_SETTINGS_PATH)) {
-        const globalSettings = JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
-        if (globalSettings.support_phone) supportPhone = globalSettings.support_phone;
-        if (globalSettings.support_email) supportEmail = globalSettings.support_email;
-        if (globalSettings.support_whatsapp) supportWhatsapp = globalSettings.support_whatsapp;
-        if (globalSettings.broadcast_message) broadcastMessage = globalSettings.broadcast_message;
+      try {
+        const { data, error } = await supabase.from('system_configurations')
+          .select('config_key, config_value')
+          .in('config_key', ['support_phone', 'support_email', 'support_whatsapp', 'broadcast_message']);
+        
+        if (!error && data && data.length > 0) {
+          for (const row of data) {
+            if (row.config_key === 'support_phone') supportPhone = row.config_value;
+            if (row.config_key === 'support_email') supportEmail = row.config_value;
+            if (row.config_key === 'support_whatsapp') supportWhatsapp = row.config_value;
+            if (row.config_key === 'broadcast_message') broadcastMessage = row.config_value;
+          }
+        } else {
+          throw error || new Error('No DB data');
+        }
+      } catch (dbErr) {
+        const fs = require('fs');
+        const path = require('path');
+        const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
+        if (fs.existsSync(GLOBAL_SETTINGS_PATH)) {
+          const globalSettings = JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
+          if (globalSettings.support_phone) supportPhone = globalSettings.support_phone;
+          if (globalSettings.support_email) supportEmail = globalSettings.support_email;
+          if (globalSettings.support_whatsapp) supportWhatsapp = globalSettings.support_whatsapp;
+          if (globalSettings.broadcast_message) broadcastMessage = globalSettings.broadcast_message;
+        }
       }
 
       // Check if terminal is assigned to a Tenant or if we have a businessName from the app

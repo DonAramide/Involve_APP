@@ -7,7 +7,18 @@ const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
 const ARCHIVE_FILE_PATH = path.join(process.cwd(), 'archived_audit_logs.json');
 const TERMINAL_DB_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
 
-function getGlobalSettings() {
+async function getGlobalSettings() {
+  try {
+    const { data, error } = await supabase.from('system_configurations')
+      .select('config_value')
+      .eq('config_key', 'audit_retention_hours')
+      .single();
+    if (!error && data) {
+      return { audit_retention_hours: parseInt(data.config_value, 10) };
+    }
+  } catch(dbErr) {}
+
+  // Fallback
   try {
     if (fs.existsSync(GLOBAL_SETTINGS_PATH)) {
       return JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
@@ -39,7 +50,7 @@ export class AuditArchiveService {
    * to archived_audit_logs.json and pruned from active databases/local mock JSON files.
    */
   static async runArchiving(): Promise<{ archivedCount: number }> {
-    const settings = getGlobalSettings();
+    const settings = await getGlobalSettings();
     const retentionHours = settings.audit_retention_hours || 72;
     const cutoffTime = new Date(Date.now() - retentionHours * 60 * 60 * 1000);
     const cutoffIso = cutoffTime.toISOString();

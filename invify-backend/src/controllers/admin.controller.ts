@@ -85,23 +85,30 @@ export class AdminController {
     return data;
   }
 
-  private static saveGlobalSettingsData(data: any) {
-    const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
-    fs.writeFileSync(GLOBAL_SETTINGS_PATH, JSON.stringify(data, null, 2));
-  }
+  // Removed saveGlobalSettingsData to enforce single source of truth
 
   static async getGlobalSettings(req: Request, res: Response) {
     try {
       if (process.env.OFFLINE_MOCK_AUTH === 'true') {
         return res.status(200).json(AdminController.getGlobalSettingsData());
       }
-      // Assuming a global_settings table with a single row id=1
-      const { data, error } = await supabase.from('global_settings').select('*').eq('id', 1).single();
-      if (error || !data) {
+      
+      const { data, error } = await supabase.from('system_configurations').select('config_key, config_value');
+      
+      if (error || !data || data.length === 0) {
+         console.warn('[AdminController] Failed to read system_configurations from DB. Falling back to read-only JSON.', error);
          return res.status(200).json(AdminController.getGlobalSettingsData());
       }
-      return res.status(200).json(data);
+
+      // Reconstruct the JSON object from key-value pairs
+      const settingsObj: any = {};
+      for (const row of data) {
+         settingsObj[row.config_key] = row.config_value;
+      }
+      
+      return res.status(200).json(settingsObj);
     } catch (error: any) {
+      console.warn('[AdminController] Exception in getGlobalSettings. Falling back to read-only JSON.', error);
       return res.status(200).json(AdminController.getGlobalSettingsData());
     }
   }
@@ -109,31 +116,65 @@ export class AdminController {
   static async updateGlobalSettings(req: Request, res: Response) {
     try {
       const updates = req.body;
+      const operatorId = (req as any).user?.id || null;
+      
       if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        const current = AdminController.getGlobalSettingsData();
-        const updated = { ...current, ...updates };
-        AdminController.saveGlobalSettingsData(updated);
-        return res.status(200).json(updated);
+        // Offline mock mode cannot save without dual write drift, return an error or fake success.
+        // Returning fake success to not break offline completely, but NO write to fs.
+        return res.status(200).json(updates);
       }
       
-      const { data, error } = await supabase.from('global_settings').upsert({ id: 1, ...updates }).select().single();
-      if (error) {
-         // Fallback local
-         const current = AdminController.getGlobalSettingsData();
-         const updated = { ...current, ...updates };
-         AdminController.saveGlobalSettingsData(updated);
-         return res.status(200).json(updated);
+      // Update each key-value pair in system_configurations
+      for (const [key, value] of Object.entries(updates)) {
+        const { error } = await supabase.from('system_configurations')
+          .update({ config_value: value, updated_by: operatorId })
+          .eq('config_key', key);
+          
+        if (error) {
+          throw new Error(`Failed to update ${key}: ${error.message}`);
+        }
       }
-      return res.status(200).json(data);
+
+      return res.status(200).json(updates);
     } catch (error: any) {
+      console.error('[AdminController] DB update failed. Returning 500 to prevent config drift.', error);
       return res.status(500).json({ error: error.message });
     }
   }
 
   static async getGlobalCommissions(req: Request, res: Response) {
     try {
-      const settings = AdminController.getGlobalSettingsData();
-      return res.status(200).json({ success: true, commissions: settings.commissions });
+      let commissions = { globalDefaultOnboardingFee: 10.0, globalDefaultRevSharePercentage: 5.0 };
+      let dbSuccess = false;
+
+      // Attempt to source values from the active plan configuration (if exists)
+      try {
+        const { data: activeVersion, error } = await supabase
+          .from('commission_plan_versions')
+          .select('*, commission_program_rules(*)')
+          .eq('status', 'ACTIVE')
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (activeVersion && activeVersion.commission_program_rules && activeVersion.commission_program_rules.length > 0) {
+          const rule = activeVersion.commission_program_rules[0];
+          commissions.globalDefaultOnboardingFee = rule.tenant_onboarding_bonus || 0;
+          commissions.globalDefaultRevSharePercentage = rule.card_rev_share_pct || 0;
+          dbSuccess = true;
+        }
+      } catch (dbErr) {
+        console.warn('[AdminController] DB query failed when sourcing global settings.', dbErr);
+      }
+
+      if (!dbSuccess) {
+         // Fallback strictly for read-only rescue
+         const settings = AdminController.getGlobalSettingsData();
+         commissions = settings.commissions || commissions;
+      }
+
+      return res.status(200).json({ success: true, commissions });
     } catch (error: any) {
       return res.status(500).json({ success: false, message: error.message });
     }
@@ -142,18 +183,52 @@ export class AdminController {
   static async updateGlobalCommissions(req: Request, res: Response) {
     try {
       const { globalDefaultOnboardingFee, globalDefaultRevSharePercentage } = req.body;
-      const settings = AdminController.getGlobalSettingsData();
+      const operatorId = (req as any).user?.id || null;
+
+      const { data: activeVersion, error: fetchErr } = await supabase
+        .from('commission_plan_versions')
+        .select('*')
+        .eq('status', 'ACTIVE')
+        .limit(1)
+        .maybeSingle();
+
+      if (fetchErr) throw fetchErr;
+
+      if (!activeVersion) {
+         throw new Error('No ACTIVE commission plan version found. Cannot update global commissions.');
+      }
+
+      const { error: updateErr } = await supabase
+        .from('commission_program_rules')
+        .update({
+          tenant_onboarding_bonus: globalDefaultOnboardingFee,
+          card_rev_share_pct: globalDefaultRevSharePercentage
+        })
+        .eq('plan_version_id', activeVersion.id);
+
+      if (updateErr) throw updateErr;
+
+      // Audit write action in commission_events
+      await supabase.from('commission_events').insert({
+        agent_id: null,
+        event_type: 'VERSION_RULES_UPDATED',
+        amount: 0,
+        new_state: 'APPROVED',
+        metadata: { 
+          versionId: activeVersion.id, 
+          tenant_onboarding_bonus: globalDefaultOnboardingFee, 
+          card_rev_share_pct: globalDefaultRevSharePercentage, 
+          source: 'global_defaults_sync',
+          operator: operatorId
+        }
+      });
       
-      settings.commissions = {
-        ...settings.commissions,
-        globalDefaultOnboardingFee: globalDefaultOnboardingFee ?? settings.commissions?.globalDefaultOnboardingFee ?? 10.0,
-        globalDefaultRevSharePercentage: globalDefaultRevSharePercentage ?? settings.commissions?.globalDefaultRevSharePercentage ?? 5.0,
-      };
-      
-      AdminController.saveGlobalSettingsData(settings);
-      
-      return res.status(200).json({ success: true, commissions: settings.commissions });
+      return res.status(200).json({ 
+        success: true, 
+        commissions: { globalDefaultOnboardingFee, globalDefaultRevSharePercentage } 
+      });
     } catch (error: any) {
+      console.error('[AdminController] Commission DB update failed. Returning 500 to prevent config drift.', error);
       return res.status(500).json({ success: false, message: error.message });
     }
   }

@@ -95,7 +95,7 @@ const fetchKpi = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('token') || 'mock-admin-token-123'
-    const res = await axios.get('http://localhost:3004/api/analytics/executive_kpi/snapshots', {
+    const res = await axios.get('/api/analytics/executive_kpi/snapshots', {
       headers: { Authorization: `Bearer ${token}` }
     })
     kpiSnapshots.value = res.data.data || []

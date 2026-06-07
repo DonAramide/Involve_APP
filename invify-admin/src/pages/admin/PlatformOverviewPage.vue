@@ -391,13 +391,13 @@
                   <span class="text-white text-weight-bold">{{ rec.title }}</span>
                 </div>
                 <div class="row q-gutter-xs">
-                  <q-badge color="purple-10" text-color="purple-3" size="xs">Conf: {{ rec.confidence }}%</q-badge>
-                  <q-badge :color="rec.priorityColor" text-color="white" size="xs">{{ rec.priority.toUpperCase() }}</q-badge>
+                  <q-badge color="purple-10" text-color="purple-3" size="xs">Conf: {{ rec.confidence || 95 }}%</q-badge>
+                  <q-badge :color="rec.priorityColor || 'purple-5'" text-color="white" size="xs">{{ (rec.priority || 'HIGH').toUpperCase() }}</q-badge>
                 </div>
               </div>
               
               <div class="text-grey-5 q-mb-sm" style="font-size: 11px;">
-                Recommended: <span class="text-cyan-3">{{ rec.action }}</span>
+                Recommended: <span class="text-cyan-3">{{ rec.action || rec.description }}</span>
               </div>
               
               <div class="row justify-between items-center">
@@ -443,10 +443,17 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
+import { io } from 'socket.io-client'
+import VueApexCharts from 'vue3-apexcharts'
+import { DashboardProviderFactory } from '../../services/dashboard/DashboardProviderFactory'
+import type { 
+  KpiData, RadarChartData, MapNode, AlertData, GovernanceCard, Recommendation,
+  HardwareResource, InfraChartSeries, ActiveModule, TenantMatrixRow
+} from '../../services/dashboard/DashboardDataProvider'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -455,305 +462,24 @@ const $q = useQuasar()
 const timeRange = ref('Last 24 Hours')
 const syncTimer = ref(0)
 const refreshing = ref(false)
+const pageLoading = ref(true)
+const pageError = ref(false)
+const errorMessage = ref('')
 
-// Increment timer
-let syncInterval = null
-onMounted(() => {
-  syncInterval = setInterval(() => {
-    syncTimer.value++
-  }, 1000)
-})
-onUnmounted(() => {
-  if (syncInterval) clearInterval(syncInterval)
-})
+// Dashboard Data Refs
+const kpis = ref<KpiData[]>([])
+const radarChartOptions = ref<any>(null)
+const radarChartSeries = ref<any[]>([])
+const mapNodes = ref<MapNode[]>([])
+const alerts = ref<AlertData[]>([])
+const governanceCards = ref<GovernanceCard[]>([])
+const aiRecommendations = ref<Recommendation[]>([])
+const hardwareResources = ref<Record<string, HardwareResource>>({})
+const infraChartSeries = ref<InfraChartSeries[]>([])
+const activeModules = ref<ActiveModule[]>([])
+const tenantMatrix = ref<TenantMatrixRow[]>([])
 
-const refreshDashboard = () => {
-  refreshing.value = true
-  setTimeout(() => {
-    refreshing.value = false
-    syncTimer.value = 0
-    $q.notify({
-      type: 'positive',
-      message: 'Platform telemetry refreshed successfully.',
-      position: 'top-right',
-      color: 'green-9'
-    })
-  }, 800)
-}
-
-const navigateRoute = (path) => {
-  if (path) router.push(path)
-}
-
-// KPI Data
-const kpis = ref([
-  { 
-    label: 'Platform Health Score', 
-    value: '98.6%', 
-    status: 'Excellent', 
-    statusBg: 'green-10', 
-    statusColor: 'green-2', 
-    icon: 'monitor_heart', 
-    colorName: 'green-4', 
-    color: '#00E676', 
-    sparkline: 'M0 25 Q15 5, 30 20 T60 5 T100 15', 
-    trendUp: true, 
-    trendColor: 'green-4', 
-    comparison: '2.4% vs yesterday' 
-  },
-  { 
-    label: 'Active Tenants', 
-    value: '128', 
-    status: 'Active', 
-    statusBg: 'purple-10', 
-    statusColor: 'purple-2', 
-    icon: 'storefront', 
-    colorName: 'purple-4', 
-    color: '#8B5CF6', 
-    sparkline: 'M0 25 L15 15 L35 25 L55 10 L75 22 L100 5', 
-    trendUp: true, 
-    trendColor: 'purple-4', 
-    comparison: '5 vs yesterday' 
-  },
-  { 
-    label: 'Total Transactions', 
-    value: '24.58M', 
-    status: 'Stable', 
-    statusBg: 'cyan-10', 
-    statusColor: 'cyan-2', 
-    icon: 'account_balance_wallet', 
-    colorName: 'cyan-4', 
-    color: '#00B8FF', 
-    sparkline: 'M0 25 Q20 25, 40 10 T80 20 T100 5', 
-    trendUp: true, 
-    trendColor: 'green-4', 
-    comparison: '12.7% vs yesterday' 
-  },
-  { 
-    label: 'System Uptime', 
-    value: '99.98%', 
-    status: 'Excellent', 
-    statusBg: 'green-10', 
-    statusColor: 'green-2', 
-    icon: 'schedule', 
-    colorName: 'green-4', 
-    color: '#00E676', 
-    sparkline: 'M0 10 L25 10 L50 8 L75 10 L100 10', 
-    trendUp: true, 
-    trendColor: 'green-4', 
-    comparison: '0.02% vs yesterday' 
-  },
-  { 
-    label: 'Security Posture', 
-    value: 'A+', 
-    status: 'Excellent', 
-    statusBg: 'amber-10', 
-    statusColor: 'amber-2', 
-    icon: 'security', 
-    colorName: 'amber-4', 
-    color: '#FFC107', 
-    sparkline: 'M0 15 L20 15 L40 18 L60 12 L80 15 L100 15', 
-    trendUp: true, 
-    trendColor: 'grey-5', 
-    comparison: 'No threats detected' 
-  },
-  { 
-    label: 'Open Incidents', 
-    value: '3', 
-    status: 'High Priority', 
-    statusBg: 'red-10', 
-    statusColor: 'red-2', 
-    icon: 'warning', 
-    colorName: 'red-4', 
-    color: '#FF5252', 
-    sparkline: 'M0 10 L20 25 L40 15 L60 28 L80 10 L100 20', 
-    trendUp: false, 
-    trendColor: 'green-4', 
-    comparison: '2 vs yesterday' 
-  }
-])
-
-// Radar chart options & series
-const radarChartOptions = {
-  chart: {
-    toolbar: { show: false },
-    background: 'transparent'
-  },
-  colors: ['#00B8FF', '#8B5CF6'],
-  xaxis: {
-    categories: ['Infrastructure', 'Applications', 'Security', 'Governance', 'Operations', 'Data Integrity', 'Compliance', 'Availability'],
-    labels: {
-      style: {
-        colors: ['#9e9e9e', '#9e9e9e', '#9e9e9e', '#9e9e9e', '#9e9e9e', '#9e9e9e', '#9e9e9e', '#9e9e9e'],
-        fontSize: '10px',
-        fontFamily: 'monospace'
-      }
-    }
-  },
-  yaxis: {
-    show: false,
-    max: 100
-  },
-  stroke: {
-    width: 2
-  },
-  fill: {
-    opacity: 0.2
-  },
-  markers: {
-    size: 3
-  },
-  legend: {
-    show: true,
-    position: 'bottom',
-    labels: { colors: '#ffffff' },
-    fontFamily: 'monospace'
-  }
-}
-
-const radarChartSeries = [
-  {
-    name: 'Current Performance',
-    data: [99, 98, 98, 96, 97, 98, 99, 100]
-  },
-  {
-    name: 'Target Baseline',
-    data: [98, 95, 95, 95, 95, 95, 95, 99]
-  }
-]
-
-// Map node targets
-const mapNodes = ref([
-  { tenant: 'Lagos Hub Network', location: 'Nigeria', x: 48, y: 55, status: 'high', color: '#00E676', activity: 38.4 },
-  { tenant: 'Acme School Group', location: 'UK', x: 46, y: 22, status: 'medium', color: '#FFC107', activity: 12.8 },
-  { tenant: 'New York Retail Grid', location: 'USA', x: 23, y: 25, status: 'high', color: '#00E676', activity: 41.2 },
-  { tenant: 'Cairo Services Co', location: 'Egypt', x: 52, y: 40, status: 'low', color: '#00B8FF', activity: 4.1 },
-  { tenant: 'Beta Logistics', location: 'Germany', x: 49, y: 26, status: 'risk', color: '#FF5252', activity: 0 }
-])
-
-// Real-time alerts data
-const alerts = ref([
-  { severity: 'Critical', badgeColor: 'red-9', icon: 'gpp_bad', color: 'red-4', description: 'High Risk Login Attempt Blocked', entity: 'Tenant T-10082', time: '2m ago' },
-  { severity: 'High', badgeColor: 'orange-9', icon: 'schedule', color: 'orange-4', description: 'Settlement Batch Processing Delayed', entity: 'Batch #SB-77891', time: '18m ago' },
-  { severity: 'Medium', badgeColor: 'amber-9', icon: 'block', color: 'amber-4', description: 'Workflow Execution Failed', entity: 'Tenant T-10045', time: '32m ago' },
-  { severity: 'Low', badgeColor: 'green-9', icon: 'check_circle', color: 'green-4', description: 'New Tenant Onboarded Successfully', entity: 'Tenant T-10521', time: '1h ago' },
-  { severity: 'Medium', badgeColor: 'amber-9', icon: 'warning', color: 'amber-4', description: 'License Usage Threshold Reached', entity: 'Tenant T-10012', time: '2h ago' }
-])
-
-// Resources progress metrics
-const hardwareResources = ref({
-  cpu: { label: 'CPU Usage', value: 24, color: 'cyan-4' },
-  memory: { label: 'Memory Usage', value: 48, color: 'purple-4' },
-  storage: { label: 'Disk Space', value: 32, color: 'teal-4' },
-  network: { label: 'Network I/O', value: 18, color: 'amber-4' }
-})
-
-// Real-time hardware load timeline chart
-const infraChartOptions = {
-  chart: {
-    toolbar: { show: false },
-    background: 'transparent',
-    sparkline: { enabled: true }
-  },
-  colors: ['#00B8FF', '#8B5CF6', '#26A69A', '#FFC107'],
-  stroke: { curve: 'smooth', width: 1.5 },
-  fill: {
-    type: 'gradient',
-    gradient: { opacityFrom: 0.1, opacityTo: 0 }
-  },
-  tooltip: {
-    theme: 'dark',
-    x: { show: false }
-  }
-}
-
-const infraChartSeries = ref([
-  { name: 'CPU Load', data: [22, 25, 23, 27, 24, 26, 24, 25, 23, 24] },
-  { name: 'Memory Load', data: [47, 48, 48, 49, 48, 48, 48, 48, 47, 48] },
-  { name: 'Disk Space', data: [32, 32, 32, 32, 32, 32, 32, 32, 32, 32] },
-  { name: 'Network I/O', data: [15, 18, 17, 20, 18, 19, 17, 18, 16, 18] }
-])
-
-// Simulate real-time metric variations
-let timelineInterval = null
-onMounted(() => {
-  timelineInterval = setInterval(() => {
-    // Modify current gauges slightly
-    hardwareResources.value.cpu.value = Math.max(10, Math.min(95, hardwareResources.value.cpu.value + Math.floor(Math.random() * 5) - 2))
-    hardwareResources.value.memory.value = Math.max(30, Math.min(95, hardwareResources.value.memory.value + Math.floor(Math.random() * 3) - 1))
-    hardwareResources.value.network.value = Math.max(5, Math.min(80, hardwareResources.value.network.value + Math.floor(Math.random() * 7) - 3))
-
-    // Shift timeline array series
-    infraChartSeries.value.forEach(s => {
-      const last = s.data[s.data.length - 1]
-      let delta = Math.floor(Math.random() * 5) - 2
-      if (s.name === 'Memory Load') delta = Math.floor(Math.random() * 3) - 1
-      if (s.name === 'Disk Space') delta = 0 // Disk remains flat
-      const newVal = Math.max(0, Math.min(100, last + delta))
-      s.data.shift()
-      s.data.push(newVal)
-    })
-  }, 3000)
-})
-onUnmounted(() => {
-  if (timelineInterval) clearInterval(timelineInterval)
-})
-
-// Top Active modules
-const activeModules = ref([
-  { name: 'Financial Ledger', icon: 'account_balance', usage: 92 },
-  { name: 'Payment Processing', icon: 'payment', usage: 78 },
-  { name: 'Workflow Engine', icon: 'account_tree', usage: 67 },
-  { name: 'Compliance Center', icon: 'gpp_maybe', usage: 54 },
-  { name: 'Fraud Monitoring', icon: 'security', usage: 41 },
-  { name: 'Notification Engine', icon: 'notifications_active', usage: 38 },
-  { name: 'AI Insights', icon: 'insights', usage: 32 }
-])
-
-// Governance Matrices
-const governanceCards = ref([
-  { label: 'Approvals Pending', value: '41', icon: 'fact_check', color: 'purple-4', badgeBg: 'purple-10', comparison: '↑ 6 today', route: '/governance/approvals' },
-  { label: 'SLA At Risk', value: '12', icon: 'alarm', color: 'red-4', badgeBg: 'red-10', comparison: '↑ 3 today', route: '/governance/sla' },
-  { label: 'Policies Violated', value: '0', icon: 'policy', color: 'green-4', badgeBg: 'green-10', comparison: 'No change', route: '/governance/policy' },
-  { label: 'Workflows Running', value: '187', icon: 'sync', color: 'cyan-4', badgeBg: 'cyan-10', comparison: '↑ 24 today', route: '/automation/workflows' },
-  { label: 'Audit Events Tracked', value: '1.24M', icon: 'receipt_long', color: 'indigo-4', badgeBg: 'indigo-10', comparison: '↑ 18.6% today', route: '/observability/audit' },
-  { label: 'Quarantine Items', value: '2', icon: 'gpp_bad', color: 'orange-4', badgeBg: 'orange-10', comparison: '↓ 1 today', route: '/governance/quarantine' }
-])
-
-// Tenant Intelligence Center
-const tenantMatrixColumns = [
-  { name: 'name', label: 'TENANT NAME', align: 'left', field: 'name' },
-  { name: 'revenue', label: 'REVENUE', align: 'left', field: 'revenue' },
-  { name: 'score', label: 'HEALTH SCORE', align: 'center', field: 'score' },
-  { name: 'risk', label: 'RISK LEVEL', align: 'center', field: 'risk' },
-  { name: 'growth', label: 'GROWTH', align: 'right', field: 'growth' }
-]
-
-const tenantMatrix = ref([
-  { name: 'Lagos Hub Network', revenue: 'NGN 4,500,200', score: 98, risk: 'Low', growth: '+14.2%' },
-  { name: 'Acme School Group', revenue: 'NGN 1,890,500', score: 92, risk: 'Medium', growth: '+8.4%' },
-  { name: 'NY Retail Grid', revenue: 'USD 8,420', score: 96, risk: 'Low', growth: '+22.1%' },
-  { name: 'Cairo Services Co', revenue: 'EGP 32,800', score: 84, risk: 'Medium', growth: '+3.8%' },
-  { name: 'Beta Logistics', revenue: 'EUR 1,200', score: 76, risk: 'High', growth: '-1.2%' }
-])
-
-// AI Insights Cards
-const aiRecommendations = ref([
-  { title: 'SLA Limit Violation Risk', action: 'Assign additional reviewers to the KYC validation queues.', confidence: 94, impact: 'High Risk (SLA Breach)', priority: 'high', priorityColor: 'red-9' },
-  { title: 'Treasury Capacity Threshold', action: 'Increase settlement buffer by 18% to absorb local payment demand spikes.', confidence: 89, impact: 'Medium Risk (Liquidity Constraint)', priority: 'medium', priorityColor: 'amber-9' }
-])
-
-const executeRecommendation = (rec) => {
-  $q.notify({
-    type: 'positive',
-    message: `Executing optimization plan: "${rec.title}" successfully.`,
-    position: 'top-right',
-    color: 'purple-9',
-    icon: 'auto_awesome'
-  })
-}
-
-// Quick Actions Toolbar Configuration
+// Quick Actions Configuration
 const quickActions = ref([
   { label: 'Add New Tenant', icon: 'storefront', route: '/admin/tenants' },
   { label: 'Create Operator', icon: 'person_add', route: '/admin/users' },
@@ -764,7 +490,157 @@ const quickActions = ref([
   { label: 'Security Center', icon: 'security', route: '/governance/quarantine' },
   { label: 'Billing & Licensing', icon: 'payments', route: '/admin/billing' }
 ])
+
+const tenantMatrixColumns = [
+  { name: 'name', label: 'TENANT NAME', align: 'left', field: 'name' },
+  { name: 'revenue', label: 'REVENUE', align: 'left', field: 'revenue' },
+  { name: 'score', label: 'HEALTH SCORE', align: 'center', field: 'score' },
+  { name: 'risk', label: 'RISK LEVEL', align: 'center', field: 'risk' },
+  { name: 'growth', label: 'GROWTH', align: 'right', field: 'growth' }
+]
+
+// Real-time hardware load timeline chart base options
+const infraChartOptions = {
+  chart: { toolbar: { show: false }, background: 'transparent', sparkline: { enabled: true } },
+  colors: ['#00B8FF', '#8B5CF6', '#26A69A', '#FFC107'],
+  stroke: { curve: 'smooth', width: 1.5 },
+  fill: { type: 'gradient', gradient: { opacityFrom: 0.1, opacityTo: 0 } },
+  tooltip: { theme: 'dark', x: { show: false } }
+}
+
+const navigateRoute = (path: string) => {
+  if (path) router.push(path)
+}
+
+const executeRecommendation = (rec: Recommendation) => {
+  $q.notify({
+    type: 'positive',
+    message: `Executing optimization plan: "${rec.title}" successfully.`,
+    position: 'top-right',
+    color: 'purple-9',
+    icon: 'auto_awesome'
+  })
+}
+
+// Data Provider Initialization
+const initializeDashboard = async () => {
+  pageLoading.value = true
+  pageError.value = false
+  refreshing.value = true
+  
+  try {
+    const provider = DashboardProviderFactory.getInstance()
+    
+    // Fetch all dashboard data concurrently
+    const [
+      kpiData,
+      healthData,
+      tenantData,
+      alertsData,
+      govData,
+      recData,
+      hardwareData,
+      infraData,
+      modulesData,
+      matrixData
+    ] = await Promise.all([
+      provider.getOverviewKPIs(),
+      provider.getSystemHealth(),
+      provider.getTenantIntelligence(),
+      provider.getRecentAlerts(),
+      provider.getGovernanceMetrics(),
+      provider.getRecommendations(),
+      provider.getHardwareResources(),
+      provider.getInfraChartSeries(),
+      provider.getActiveModules(),
+      provider.getTenantMatrix()
+    ])
+
+    // Hydrate state
+    kpis.value = kpiData
+    radarChartOptions.value = healthData.options
+    radarChartSeries.value = healthData.series
+    mapNodes.value = tenantData
+    alerts.value = alertsData
+    governanceCards.value = govData
+    aiRecommendations.value = recData
+    hardwareResources.value = hardwareData
+    infraChartSeries.value = infraData
+    activeModules.value = modulesData
+    tenantMatrix.value = matrixData
+    
+    syncTimer.value = 0
+  } catch (err: any) {
+    console.error('[Dashboard] Error fetching provider data:', err)
+    pageError.value = true
+    errorMessage.value = err.message || 'The specified dashboard provider is unavailable.'
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to load platform dashboard data',
+      position: 'top-right'
+    })
+  } finally {
+    pageLoading.value = false
+    refreshing.value = false
+  }
+}
+
+// Refresh wrapper
+const refreshDashboard = () => {
+  initializeDashboard()
+
+  // Initialize Socket.io connection to backend
+  const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3004');
+  
+  socket.on('connect', () => {
+    console.log('[Socket] Connected to telemetry stream');
+    socket.emit('join_room', { type: 'admin' });
+  });
+
+  socket.on('system_telemetry', (data: any) => {
+    if (data && data.cpu) {
+      hardwareResources.value = data;
+    }
+  });
+
+  socket.on('agent_locations', (locations: any[]) => {
+    // Map geographical coordinates (lat/lng) to UI percentage map (x/y)
+    mapNodes.value = locations.map(loc => ({
+      tenant: loc.name,
+      location: 'Live',
+      x: ((loc.lng + 180) / 360) * 100,
+      y: ((90 - loc.lat) / 180) * 100,
+      status: 'medium',
+      color: '#00E676',
+      activity: 100
+    }));
+  });
+
+  socket.on('disconnect', () => {
+    console.log('[Socket] Disconnected from telemetry stream');
+  });
+
+  onUnmounted(() => {
+    socket.disconnect();
+  });
+
+}
+
+// Increment timer
+let syncInterval: any = null
+onMounted(() => {
+  initializeDashboard()
+  syncInterval = setInterval(() => {
+    syncTimer.value++
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (syncInterval) clearInterval(syncInterval)
+})
+
 </script>
+
 
 <style scoped>
 .command-center-page {

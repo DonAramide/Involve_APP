@@ -11,6 +11,7 @@ export default defineConfig({
       'layouts': fileURLToPath(new URL('./src/layouts', import.meta.url)),
       'pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
       'api': fileURLToPath(new URL('./src/api', import.meta.url)),
+      'boot/axios': fileURLToPath(new URL('./src/api/index.js', import.meta.url)),
     }
   },
   plugins: [

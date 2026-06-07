@@ -1,4 +1,59 @@
 {
-  "archived_at": "2026-05-31T22:32:43.113Z",
-  "logs": []
+  "archived_at": "2026-06-04T19:15:56.291Z",
+  "logs": [
+    {
+      "id": "audit-1780333603981-jovru",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": "610011",
+      "admin_id": "610011",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": null,
+        "androidId": null,
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-01T17:06:43.981Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1780333203989-e8ve1",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": "610011",
+      "admin_id": "610011",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": null,
+        "androidId": null,
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-01T17:00:03.989Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1780333074160-pbs52",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": "610011",
+      "admin_id": "610011",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": null,
+        "androidId": null,
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-01T16:57:54.160Z",
+      "source_origin": "terminal_audit_log_local"
+    }
+  ]
 }

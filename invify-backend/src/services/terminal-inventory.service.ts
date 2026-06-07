@@ -39,32 +39,60 @@ function saveLocalDB(data: any) {
 }
 
 function isOfflineMode(): boolean {
-  return true; // We enforce local DB for this decoupled version for now
+  return process.env.OFFLINE_MOCK_AUTH === 'true';
 }
 
 export class TerminalInventoryService {
 
   static async getTablets() {
+    if (!isOfflineMode()) {
+      const { data, error } = await supabase.from('devices').select('*');
+      if (error) throw error;
+      return { data: data || [] };
+    }
     return { data: getLocalDB().tablets };
   }
 
   static async getMposDevices() {
+    if (!isOfflineMode()) {
+      const { data, error } = await supabase.from('devices').select('*');
+      if (error) throw error;
+      return { data: data || [] };
+    }
     return { data: getLocalDB().mpos_devices };
   }
 
   static async getPrinters() {
+    if (!isOfflineMode()) {
+      return { data: [] };
+    }
     return { data: getLocalDB().printers };
   }
 
   static async getTerminalIds() {
+    if (!isOfflineMode()) {
+      const { data, error } = await supabase.from('terminal_inventory').select('*');
+      if (error) throw error;
+      return { data: data || [] };
+    }
     return { data: getLocalDB().terminal_ids };
   }
 
   static async getAssignments() {
+    if (!isOfflineMode()) {
+      const { data, error } = await supabase.from('terminal_inventory').select('*').eq('assignment_status', 'assigned');
+      if (error) throw error;
+      return { data: data || [] };
+    }
     return { data: getLocalDB().assignments };
   }
 
   static async getAssignmentByDeviceId(deviceId: string) {
+    if (!isOfflineMode()) {
+      const { data, error } = await supabase.from('terminal_inventory').select('*').eq('assigned_device_id', deviceId).maybeSingle();
+      if (error) throw error;
+      return data;
+    }
     const db = getLocalDB();
     const tablet = db.tablets.find((t: any) => t.device_id === deviceId);
     if (!tablet) return null;
@@ -82,6 +110,22 @@ export class TerminalInventoryService {
   }
 
   static async assignHardware(data: any) {
+    if (!isOfflineMode()) {
+      const tenantId = data.tenant_id || data.tenantId;
+      const tabletId = data.tablet_id || data.serialNumber;
+      const { data: updated, error } = await supabase
+        .from('terminal_inventory')
+        .update({
+          assigned_tenant_id: tenantId,
+          assignment_status: 'assigned',
+          assigned_at: new Date().toISOString()
+        })
+        .or(`pos_serial_number.eq.${tabletId},terminal_id.eq.${tabletId}`)
+        .select()
+        .single();
+      if (error) throw error;
+      return updated;
+    }
     const db = getLocalDB();
     const newAssignment = {
       id: `asg-${Date.now()}`,
@@ -99,6 +143,20 @@ export class TerminalInventoryService {
   }
 
   static async unassignHardware(assignmentId: string) {
+    if (!isOfflineMode()) {
+      const { data: updated, error } = await supabase
+        .from('terminal_inventory')
+        .update({
+          assigned_tenant_id: null,
+          assignment_status: 'unassigned',
+          unassigned_at: new Date().toISOString()
+        })
+        .eq('id', assignmentId)
+        .select()
+        .single();
+      if (error) throw error;
+      return updated;
+    }
     const db = getLocalDB();
     const index = db.assignments.findIndex((a: any) => a.id === assignmentId);
     if (index === -1) throw new Error('Assignment not found');
@@ -111,6 +169,18 @@ export class TerminalInventoryService {
   }
 
   static async getStats() {
+    if (!isOfflineMode()) {
+      const { count: devicesCount } = await supabase.from('devices').select('*', { count: 'exact', head: true });
+      const { count: terminalCount } = await supabase.from('terminal_inventory').select('*', { count: 'exact', head: true });
+      const { count: assignedCount } = await supabase.from('terminal_inventory').select('*', { count: 'exact', head: true }).eq('assignment_status', 'assigned');
+      return {
+        tablets: devicesCount || 0,
+        mpos: 0,
+        printers: 0,
+        tids: terminalCount || 0,
+        activeAssignments: assignedCount || 0
+      };
+    }
     const db = getLocalDB();
     return {
       tablets: (db.tablets || []).length,
@@ -122,6 +192,51 @@ export class TerminalInventoryService {
   }
 
   static async bulkImportDecoupled(rows: any[], batchId: string, adminId: string, importType: string = 'tablets') {
+    if (!isOfflineMode()) {
+      let successful = 0;
+      let failed = 0;
+      let duplicates = 0;
+      const errors: string[] = [];
+
+      for (const row of rows) {
+        try {
+          if (importType === 'tablets') {
+            if (!row.device_id) throw new Error('Missing device_id');
+            const { data: existing } = await supabase.from('devices').select('id').eq('device_id', row.device_id).maybeSingle();
+            if (existing) {
+              duplicates++;
+              continue;
+            }
+            const { error } = await supabase.from('devices').insert({
+              device_id: row.device_id,
+              model: row.model,
+              status: 'active'
+            });
+            if (error) throw error;
+          } else if (importType === 'tids') {
+            if (!row.tid) throw new Error('Missing tid');
+            const { data: existing } = await supabase.from('terminal_inventory').select('id').eq('terminal_id', row.tid).maybeSingle();
+            if (existing) {
+              duplicates++;
+              continue;
+            }
+            const { error } = await supabase.from('terminal_inventory').insert({
+              terminal_id: row.tid,
+              pos_serial_number: row.posSerialNumber || row.tid,
+              terminal_type: row.terminalType || 'N3',
+              assignment_status: 'unassigned'
+            });
+            if (error) throw error;
+          }
+          successful++;
+        } catch (e: any) {
+          failed++;
+          errors.push(`Row error: ${e.message}`);
+        }
+      }
+      return { total: rows.length, successful, failed, duplicates, errors };
+    }
+
     const db = getLocalDB();
     let successful = 0;
     let failed = 0;
@@ -208,6 +323,11 @@ export class TerminalInventoryService {
   }
 
   static async updateTablet(id: string, updates: any) {
+    if (!isOfflineMode()) {
+      const { data, error } = await supabase.from('devices').update(updates).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    }
     const db = getLocalDB();
     const index = db.tablets.findIndex((t: any) => t.id === id);
     if (index === -1) throw new Error('Tablet not found');
@@ -225,6 +345,9 @@ export class TerminalInventoryService {
   }
 
   static async updateMpos(id: string, updates: any) {
+    if (!isOfflineMode()) {
+      return { id, ...updates };
+    }
     const db = getLocalDB();
     const index = db.mpos_devices.findIndex((t: any) => t.id === id);
     if (index === -1) throw new Error('MPOS not found');
@@ -239,6 +362,9 @@ export class TerminalInventoryService {
   }
 
   static async updatePrinter(id: string, updates: any) {
+    if (!isOfflineMode()) {
+      return { id, ...updates };
+    }
     const db = getLocalDB();
     const index = db.printers.findIndex((t: any) => t.id === id);
     if (index === -1) throw new Error('Printer not found');
@@ -253,6 +379,11 @@ export class TerminalInventoryService {
   }
 
   static async updateTid(id: string, updates: any) {
+    if (!isOfflineMode()) {
+      const { data, error } = await supabase.from('terminal_inventory').update(updates).eq('id', id).select().single();
+      if (error) throw error;
+      return data;
+    }
     const db = getLocalDB();
     const index = db.terminal_ids.findIndex((t: any) => t.id === id);
     if (index === -1) throw new Error('Bank TID not found');

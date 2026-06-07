@@ -434,15 +434,19 @@
                   <q-list dark separator class="q-mt-sm">
                     <q-item>
                       <q-item-section>Registration Number</q-item-section>
-                      <q-item-section side class="text-white">{{ tenant.kyc?.rc_number || 'RC-1092834' }}</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.rc_number || 'RC-1092834' }}</q-item-section>
                     </q-item>
                     <q-item>
                       <q-item-section>Tax ID (TIN)</q-item-section>
-                      <q-item-section side class="text-white">{{ tenant.kyc?.tax_id || 'Not Provided' }}</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.tax_id || 'Not Provided' }}</q-item-section>
                     </q-item>
                     <q-item>
-                      <q-item-section>Incorporation Date</q-item-section>
-                      <q-item-section side class="text-white">{{ tenant.kyc?.inc_date || 'N/A' }}</q-item-section>
+                      <q-item-section>Overall KYC Status</q-item-section>
+                      <q-item-section side>
+                        <q-chip :color="tenant.kyc_status === 'APPROVED' ? 'green-9' : (tenant.kyc_status === 'PENDING' ? 'orange-9' : 'grey-9')" text-color="white" size="sm">
+                          {{ tenant.kyc_status || 'NOT UPLOADED' }}
+                        </q-chip>
+                      </q-item-section>
                     </q-item>
                   </q-list>
                 </q-card-section>
@@ -451,26 +455,25 @@
             <div class="col-12 col-md-6">
               <q-card flat bordered class="bg-blue-grey-9 border-cyan">
                 <q-card-section>
-                  <div class="text-overline text-cyan-3">Verification Status</div>
+                  <div class="text-overline text-cyan-3">Verification Documents</div>
                   <q-list dark separator class="q-mt-sm">
-                    <q-item>
-                      <q-item-section>Utility Bill</q-item-section>
+                    <q-item v-for="doc in kycDocuments" :key="doc.id">
+                      <q-item-section>
+                        <q-item-label class="text-weight-bold">{{ doc.document_type.replace('_', ' ') }}</q-item-label>
+                        <q-item-label caption class="text-grey-5">{{ new Date(doc.created_at).toLocaleDateString() }}</q-item-label>
+                      </q-item-section>
                       <q-item-section side>
-                        <q-chip color="green-9" text-color="white" size="sm" icon="check_circle">VERIFIED</q-chip>
+                        <div class="row items-center no-wrap">
+                          <q-btn flat dense icon="launch" label="View" type="a" target="_blank" :href="doc.document_url" color="cyan-4" size="sm" class="q-mr-sm" />
+                          <q-chip :color="doc.status === 'VERIFIED' ? 'green-9' : 'orange-9'" text-color="white" size="sm" icon="check_circle">
+                            {{ doc.status }}
+                          </q-chip>
+                        </div>
                       </q-item-section>
                     </q-item>
-                    <q-item>
-                      <q-item-section>Director ID (BVN)</q-item-section>
-                      <q-item-section side>
-                        <q-chip color="green-9" text-color="white" size="sm" icon="check_circle">VERIFIED</q-chip>
-                      </q-item-section>
-                    </q-item>
-                    <q-item>
-                      <q-item-section>Site Visit</q-item-section>
-                      <q-item-section side>
-                        <q-chip color="orange-9" text-color="white" size="sm" icon="pending">PENDING</q-chip>
-                      </q-item-section>
-                    </q-item>
+                    <div v-if="kycDocuments.length === 0" class="text-center q-pa-md text-grey-5">
+                      No documents uploaded yet.
+                    </div>
                   </q-list>
                 </q-card-section>
               </q-card>
@@ -701,6 +704,7 @@ const wallet = ref({
 const recentUsage = ref([])
 const certificates = ref([])
 const auditRecords = ref([])
+const kycDocuments = ref([])
 
 const showPasswordDialog = ref(false)
 const tempPassword = ref('')
@@ -1039,6 +1043,13 @@ const fetchDetails = async () => {
       auditRecords.value = ledger.data?.data || ledger.data || []
     } catch (e) {
       // Ignore if audit ledger fails
+    }
+
+    try {
+      const kycRes = await adminApi.getTenantKyc(tenant.value.id)
+      kycDocuments.value = kycRes.data?.data || []
+    } catch (e) {
+      console.error('Failed to fetch KYC documents:', e)
     }
   } finally {
     loading.value = false

@@ -22,20 +22,53 @@ export class SecurityController {
       const authUserId = (req as any).user?.id;
       if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-      const { data: agent } = await supabase.from('agents').select('id').eq('auth_user_id', authUserId).single();
+      const { data: agent } = await supabase.from('agents').select('id, email').eq('auth_user_id', authUserId).single();
       if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
 
-      // In real prod, this generates TOTP secret. We simulate for MVP:
-      await supabase.from('agent_profiles').update({ mfa_enabled: true, mfa_secret: 'SIMULATED_SECRET' }).eq('agent_id', agent.id);
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+      let secret = '';
+      for (let i = 0; i < 32; i++) {
+        secret += chars[Math.floor(Math.random() * chars.length)];
+      }
+
+      await supabase.from('agent_profiles').update({ mfa_secret: secret }).eq('agent_id', agent.id);
       
+      const otpauthUrl = `otpauth://totp/Invify:${agent.email || 'agent'}?secret=${secret}&issuer=Invify`;
+
       await supabase.from('agent_security_events').insert({
         agent_id: agent.id,
-        event_type: 'MFA_ENABLED',
+        event_type: 'MFA_SETUP_STARTED',
         ip_address: req.ip || '',
         browser: req.headers['user-agent'] || ''
       });
 
-      res.status(200).json({ success: true, message: 'MFA enabled' });
+      res.status(200).json({ success: true, message: 'MFA secret generated', secret, qrCodeUri: otpauthUrl });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  static async verifyMfa(req: Request, res: Response) {
+    try {
+      const authUserId = (req as any).user?.id;
+      if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
+      const { data: agent } = await supabase.from('agents').select('id').eq('auth_user_id', authUserId).single();
+      if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+
+      const { code } = req.body;
+      if (!code || code.length < 6) return res.status(400).json({ success: false, message: 'Invalid MFA code' });
+
+      await supabase.from('agent_profiles').update({ mfa_enabled: true }).eq('agent_id', agent.id);
+
+      await supabase.from('agent_security_events').insert({
+        agent_id: agent.id,
+        event_type: 'MFA_VERIFIED',
+        ip_address: req.ip || '',
+        browser: req.headers['user-agent'] || ''
+      });
+
+      res.status(200).json({ success: true, message: 'MFA verified and enabled successfully' });
     } catch (err: any) {
       res.status(500).json({ success: false, message: err.message });
     }
@@ -89,7 +122,7 @@ export class SecurityController {
       if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
       const { id } = req.params;
-      await supabase.from('agent_sessions').delete().eq('id', id);
+      await supabase.from('agent_sessions').update({ status: 'REVOKED' }).eq('id', id);
 
       res.status(200).json({ success: true, message: 'Session revoked' });
     } catch (err: any) {

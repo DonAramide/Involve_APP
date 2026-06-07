@@ -24,7 +24,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       return next();
     }
 
-    if ((process.env.OFFLINE_MOCK_AUTH === 'true' && authHeader !== 'Bearer invalid.jwt.token') || authHeader === 'Bearer mock-admin-token') {
+    const isMockAllowed = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'staging';
+
+    if (isMockAllowed && ((process.env.OFFLINE_MOCK_AUTH === 'true' && authHeader !== 'Bearer invalid.jwt.token') || authHeader === 'Bearer mock-admin-token')) {
       console.warn('[AuthMiddleware] Developer offline auth bypass triggered.');
       (req as any).user = {
         id: '00000000-0000-0000-0000-000000000000',

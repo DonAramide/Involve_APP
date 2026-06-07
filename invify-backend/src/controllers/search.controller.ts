@@ -37,8 +37,26 @@ export class SearchController {
       if (qLower.includes('revenue') || qLower.includes('show merchant revenue')) {
         results.push({ type: 'AI COMMAND', title: 'Analyze Merchant Revenue', subtitle: 'Routing to Revenue Operations', icon: 'auto_awesome', color: 'purple', route: '/finance/revenue' });
       }
-      if (qLower.includes('commission') || qLower.includes('agent fee') || qLower.includes('payout')) {
-        results.push({ type: 'AI COMMAND', title: 'Agent Commissions & Billing', subtitle: 'Configure RevShare & Onboarding Fees', icon: 'payments', color: 'green', route: '/admin/agents/commissions' });
+      if (qLower.includes('commission') || qLower.includes('agent fee') || qLower.includes('payout') || qLower.includes('incentive')) {
+        results.push({ type: 'AI COMMAND', title: 'Incentive Management Defaults', subtitle: 'Global Default Commission Rates & Overrides', icon: 'settings', color: 'green', route: '/admin/agents/commissions?tab=defaults' });
+      }
+      if (qLower.includes('approval') || qLower.includes('payout queue') || qLower.includes('approve commission')) {
+        results.push({ type: 'AI COMMAND', title: 'Commission Approval Queue', subtitle: 'Approve, Reject, or Reverse Agent Payouts', icon: 'grading', color: 'green', route: '/admin/agents/commissions?tab=approvals' });
+      }
+      if (qLower.includes('audit') || qLower.includes('ledger') || qLower.includes('clawback')) {
+        results.push({ type: 'AI COMMAND', title: 'Commission Audit & History', subtitle: 'Lifecycle Events Log, Ledgers, and Clawbacks', icon: 'history', color: 'green', route: '/admin/agents/commissions?tab=audit' });
+      }
+      if (qLower.includes('progress') || qLower.includes('tier') || qLower.includes('performance')) {
+        results.push({ type: 'AI COMMAND', title: 'Agent Incentive Progress', subtitle: 'Tenants onboarded, terminals deployed, and active plan tracking', icon: 'trending_up', color: 'green', route: '/admin/agents/commissions?tab=progress' });
+      }
+      if (qLower.includes('plan') || qLower.includes('rules') || qLower.includes('target')) {
+        results.push({ type: 'AI COMMAND', title: 'Incentive Plans & Targets', subtitle: 'Program Versions, MC Category exceptions, and Target thresholds', icon: 'assignment', color: 'green', route: '/admin/agents/commissions?tab=plans' });
+      }
+      if (qLower.includes('campaign') || qLower.includes('budget') || qLower.includes('roi')) {
+        results.push({ type: 'AI COMMAND', title: 'Campaigns & Budgets Workspace', subtitle: 'Budget utilization, ROI metrics, and Campaign alerts', icon: 'campaign', color: 'green', route: '/admin/agents/commissions?tab=budgets' });
+      }
+      if (qLower.includes('simulate') || qLower.includes('simulator') || qLower.includes('dry-run')) {
+        results.push({ type: 'AI COMMAND', title: 'Deterministic Commission Simulator', subtitle: 'Simulate onboarding payouts & revshare splits in-memory', icon: 'psychology', color: 'green', route: '/admin/agents/commissions?tab=simulator' });
       }
       if (qLower.includes('bill') || qLower.includes('invoice')) {
         results.push({ type: 'AI COMMAND', title: 'Billing Center', subtitle: 'Manage Billing and Invoices', icon: 'receipt', color: 'green', route: '/finance/billing' });

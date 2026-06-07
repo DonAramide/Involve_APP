@@ -39,7 +39,15 @@
           :loading="loading"
         />
         
-        <div class="row justify-center q-mt-sm">
+        <div class="row justify-between items-center q-mt-sm">
+          <q-btn
+            flat
+            color="grey-4"
+            label="Forgot Password?"
+            class="text-caption text-weight-regular"
+            @click="showForgotPasswordDialog = true"
+            no-caps
+          />
           <q-btn
             flat
             color="amber-4"
@@ -164,6 +172,44 @@
       </q-card>
     </q-dialog>
 
+    <!-- Forgot Password Dialog -->
+    <q-dialog v-model="showForgotPasswordDialog" persistent backdrop-filter="blur(4px)">
+      <q-card class="bg-panel border-muted font-inter text-main" style="width: 400px; max-width: 90vw;">
+        <q-card-section class="row items-center q-pb-none border-bottom bg-panel-darker">
+          <div class="text-weight-bold text-subtitle1 row items-center op-gap-8">
+            <q-icon name="lock_reset" color="amber-4" />
+            <span>Reset Password</span>
+          </div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="q-pt-md">
+          <div class="text-caption text-muted q-mb-md">
+            Enter your email address and we will send you a link to reset your password.
+          </div>
+          <q-form @submit="handleForgotPassword" class="column op-gap-12">
+            <q-input
+              v-model="forgotPasswordEmail"
+              dark filled dense
+              label="Email Address"
+              type="email"
+              class="bg-panel-darker"
+              required
+            />
+            <q-btn
+              type="submit"
+              color="amber-4"
+              text-color="black"
+              label="Send Reset Link"
+              class="text-weight-bold q-mt-sm full-width"
+              :loading="forgotPasswordLoading"
+            />
+          </q-form>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
@@ -188,6 +234,10 @@ const showConfirmPassword = ref(false)
 const requirePasswordChange = ref(false)
 const loading = ref(false)
 const agentCode = ref('')
+
+const showForgotPasswordDialog = ref(false)
+const forgotPasswordEmail = ref('')
+const forgotPasswordLoading = ref(false)
 
 const showResolveDialog = ref(false)
 const suspensionAction = ref('NONE')
@@ -259,7 +309,7 @@ const submitResolution = async () => {
       whatsappNumber: resolutionWhatsapp.value
     }
 
-    const res = await axios.post('http://localhost:3004/api/agent/resolve-suspension', payload)
+    const res = await axios.post('/api/agent/resolve-suspension', payload)
     $q.notify({ type: 'positive', message: res.data.message || 'Verification details submitted successfully!', position: 'top-right' })
     showResolveDialog.value = false
     passportUploadFile.value = null
@@ -285,7 +335,7 @@ const handleLogin = async () => {
 
   loading.value = true
   try {
-    const res = await axios.post('http://localhost:3004/api/agent/login', {
+    const res = await axios.post('/api/agent/login', {
       email: email.value.trim(),
       password: password.value
     })
@@ -331,7 +381,7 @@ const handleChangePassword = async () => {
 
   loading.value = true
   try {
-    const res = await axios.post('http://localhost:3004/api/agent/change-password', {
+    const res = await axios.post('/api/agent/change-password', {
       agentCode: agentCode.value.trim().toUpperCase(),
       oldPassword: password.value,
       newPassword: newPassword.value
@@ -347,6 +397,28 @@ const handleChangePassword = async () => {
     $q.notify({ type: 'negative', message: `Update failed: ${msg}`, position: 'top-right' })
   } finally {
     loading.value = false
+  }
+}
+
+const handleForgotPassword = async () => {
+  if (!forgotPasswordEmail.value) {
+    $q.notify({ type: 'warning', message: 'Please enter your email', position: 'top-right' })
+    return
+  }
+
+  forgotPasswordLoading.value = true
+  try {
+    const res = await axios.post('/api/agent/forgot-password', {
+      email: forgotPasswordEmail.value.trim()
+    })
+    $q.notify({ type: 'positive', message: res.data.message || 'Reset link sent!', position: 'top-right' })
+    showForgotPasswordDialog.value = false
+    forgotPasswordEmail.value = ''
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message
+    $q.notify({ type: 'negative', message: `Failed to send reset link: ${msg}`, position: 'top-right' })
+  } finally {
+    forgotPasswordLoading.value = false
   }
 }
 </script>

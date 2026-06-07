@@ -76,7 +76,7 @@ const fetchLeads = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('token') || 'mock-admin-token-123'
-    const res = await axios.get('http://localhost:3004/api/admin/lead/listAll', {
+    const res = await axios.get('/api/admin/lead/listAll', {
       headers: { Authorization: `Bearer ${token}` }
     })
     leads.value = res.data.data || []

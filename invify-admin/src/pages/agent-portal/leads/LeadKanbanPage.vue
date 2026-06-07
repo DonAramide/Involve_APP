@@ -1,3 +1,4 @@
+<template>
   <q-page class="q-pa-md bg-main text-main font-inter column op-gap-16">
     <div class="row items-center justify-between border-bottom q-pb-sm shrink-0">
       <div class="row items-center op-gap-8 no-wrap">
@@ -38,23 +39,30 @@
               <q-badge :color="lead.score > 80 ? 'green-4' : 'amber-4'" text-color="black">{{ lead.score || 0 }} pts</q-badge>
               <div class="text-metric-mono text-muted" style="font-size: 10px;">{{ new Date(lead.created_at || lead.createdAt).toLocaleDateString() }}</div>
             </div>
+            <div class="q-mt-sm row justify-end">
+              <q-btn dense outline size="sm" color="amber-4" label="Convert" @click.stop="convertLead(lead.id)" v-if="stage.id !== 'active' && stage.id !== 'approved'" />
+            </div>
           </div>
         </div>
       </div>
     </div>
+    
+    <AgentLeadModal ref="leadModal" @created="fetchLeads" />
   </q-page>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import axios from 'axios'
+import { api } from 'boot/axios'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
+import AgentLeadModal from '../../agent/components/AgentLeadModal.vue'
 
 const $q = useQuasar()
 const router = useRouter()
 const loading = ref(true)
 const rawLeads = ref([])
+const leadModal = ref(null)
 
 const fetchLeads = async () => {
   loading.value = true
@@ -66,9 +74,7 @@ const fetchLeads = async () => {
       return
     }
 
-    const res = await axios.get('http://localhost:3004/api/agent-portal/lead/list', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/agent/leads')
     rawLeads.value = res.data.data || []
   } catch (err) {
     console.error('Failed to fetch leads', err)
@@ -109,7 +115,23 @@ const stages = computed(() => {
 })
 
 const createLead = () => {
-  router.push('/agent/coming-soon/create-lead')
+  if (leadModal.value) {
+    leadModal.value.open()
+  }
+}
+
+const convertLead = async (leadId) => {
+  try {
+    loading.value = true
+    await api.post(`/agent-portal/lead/${leadId}/convert`)
+    $q.notify({ type: 'positive', message: 'Lead converted successfully', position: 'top-right' })
+    await fetchLeads()
+  } catch (err) {
+    console.error('Failed to convert lead', err)
+    $q.notify({ type: 'negative', message: 'Failed to convert lead', position: 'top-right' })
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

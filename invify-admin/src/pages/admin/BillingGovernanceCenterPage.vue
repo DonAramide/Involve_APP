@@ -64,7 +64,7 @@
                 </div>
                 
                 <q-space />
-                <q-btn outline dense color="indigo-5" class="full-width font-mono" style="font-size: 10px;" label="CONFIGURE LIMITS" />
+                <q-btn outline dense color="indigo-5" class="full-width font-mono" style="font-size: 10px;" label="CONFIGURE LIMITS" @click="configureLimits(plan)" />
               </div>
             </div>
           </div>
@@ -258,6 +258,16 @@ const rollbackFee = (audit) => {
       operatorId: 'sys_admin_root',
       reason: 'Emergency supervisor rollback'
     })
+  })
+}
+
+const configureLimits = (plan) => {
+  $q.dialog({
+    title: `Configure Limits - ${plan.tier}`,
+    message: 'Live configuration of plan limits is currently under development. These values are simulated mock data.',
+    color: 'indigo-8',
+    ok: 'Understood',
+    dark: true
   })
 }
 </script>

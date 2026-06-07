@@ -70,6 +70,28 @@ export class ProfileController {
     }
   }
 
+  static async getIdCard(req: Request, res: Response) {
+    try {
+      const authUserId = (req as any).user?.id;
+      if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
+      
+      const profile = await profileService.getProfile(authUserId);
+      
+      const idCardData = {
+        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim(),
+        agentCode: profile.agent_code,
+        email: profile.email,
+        phone: profile.phone_number,
+        territory: profile.territory || 'Unassigned',
+        qrData: Buffer.from(`invify:agent:${profile.agent_code}`).toString('base64')
+      };
+
+      res.status(200).json({ success: true, data: idCardData });
+    } catch (err: any) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   static async getQrCode(req: Request, res: Response) {
     try {
       const authUserId = (req as any).user?.id;

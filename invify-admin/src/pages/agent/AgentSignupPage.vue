@@ -173,7 +173,7 @@ const handleSignup = async () => {
       agentCode: code
     }
 
-    const res = await axios.post('http://localhost:3004/api/agent/register', payload)
+    const res = await axios.post('/api/agent/register', payload)
     
     $q.notify({ type: 'positive', message: res.data.message || 'Registration submitted successfully! Please wait for approval.', position: 'top-right' })
     router.push('/agent/success')

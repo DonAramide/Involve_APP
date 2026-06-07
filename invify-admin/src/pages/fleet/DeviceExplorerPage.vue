@@ -102,7 +102,163 @@
             <div><span class="text-muted">OTA:</span> <span class="text-metric-mono text-amber-5">{{ selectedDevice.otaStatus }}</span></div>
           </div>
 
+          <!-- ─── DEVICE INFORMATION ── P6D Telemetry Visibility ─── -->
+          <q-separator dark class="q-my-md bg-[#22282d]" />
+          <div class="text-operator-title text-cyan-5 q-mb-xs row items-center justify-between">
+            <span>Device Information</span>
+            <span class="text-metric-mono text-muted" style="font-size: 9px;">TELEMETRY_STREAM // STAGING_SOURCE</span>
+          </div>
+
+          <!-- No Telemetry State -->
+          <div v-if="!deviceTelemetry" class="bg-main q-pa-md rounded-borders border-main text-center q-mb-md">
+            <q-icon name="signal_wifi_off" size="md" color="grey-6" class="q-mb-xs" />
+            <div class="text-caption text-muted">No Telemetry Received</div>
+            <div class="text-metric-mono text-grey-7" style="font-size: 9px;">Awaiting initial heartbeat from edge device.</div>
+          </div>
+
+          <!-- Telemetry Data Panel -->
+          <div v-else class="q-mb-md column op-gap-8">
+
+            <!-- Status Badges Row -->
+            <div class="row items-center op-gap-8 q-mb-xs">
+              <!-- Battery Badge -->
+              <q-badge
+                :color="deviceTelemetry.battery_level >= 80 ? 'green-10' : deviceTelemetry.battery_level >= 30 ? 'amber-10' : 'red-10'"
+                :text-color="deviceTelemetry.battery_level >= 80 ? 'green-3' : deviceTelemetry.battery_level >= 30 ? 'amber-3' : 'red-3'"
+                class="q-px-sm"
+              >
+                <q-icon :name="deviceTelemetry.battery_level >= 80 ? 'battery_full' : deviceTelemetry.battery_level >= 30 ? 'battery_std' : 'battery_alert'" size="xs" class="q-mr-xs" />
+                Battery: {{ deviceTelemetry.battery_level }}%
+              </q-badge>
+
+              <!-- Connectivity Badge -->
+              <q-badge
+                :color="connectivityBadge.bg"
+                :text-color="connectivityBadge.fg"
+                class="q-px-sm"
+              >
+                <q-icon name="wifi" size="xs" class="q-mr-xs" />
+                {{ connectivityBadge.label }}
+              </q-badge>
+
+              <!-- Charging Badge -->
+              <q-badge
+                :color="deviceTelemetry.is_charging ? 'cyan-10' : 'grey-8'"
+                :text-color="deviceTelemetry.is_charging ? 'cyan-3' : 'grey-5'"
+                class="q-px-sm"
+              >
+                <q-icon :name="deviceTelemetry.is_charging ? 'battery_charging_full' : 'power_off'" size="xs" class="q-mr-xs" />
+                {{ deviceTelemetry.is_charging ? 'Charging' : 'Not Charging' }}
+              </q-badge>
+            </div>
+
+            <!-- Core Telemetry Grid -->
+            <div class="bg-main rounded-borders border-main q-pa-sm column op-gap-4" style="font-size: 11px;">
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Device ID</span>
+                <span class="text-metric-mono text-cyan-3">{{ deviceTelemetry.device_id }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Tenant ID</span>
+                <span class="text-metric-mono text-main">{{ deviceTelemetry.tenant_id }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Last Seen</span>
+                <span class="text-metric-mono text-green-4">{{ deviceTelemetry.last_seen ? new Date(deviceTelemetry.last_seen).toLocaleString() : '—' }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Device Time</span>
+                <span class="text-metric-mono text-main">{{ deviceTelemetry.updated_at ? new Date(deviceTelemetry.updated_at).toLocaleString() : '—' }}</span>
+              </div>
+              <q-separator dark class="bg-[#22282d]" />
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Battery Level</span>
+                <span class="text-metric-mono" :class="deviceTelemetry.battery_level >= 80 ? 'text-green-4' : deviceTelemetry.battery_level >= 30 ? 'text-amber-4' : 'text-red-4'">{{ deviceTelemetry.battery_level }}%</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Charging Status</span>
+                <span class="text-metric-mono text-main">{{ deviceTelemetry.is_charging ? 'CHARGING' : 'DISCHARGING' }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Network Status</span>
+                <span class="text-metric-mono text-blue-4">{{ deviceTelemetry.network_status || '—' }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">SIM Operator</span>
+                <span class="text-metric-mono text-main">{{ deviceTelemetry.sim_operator || '—' }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">SIM Network Type</span>
+                <span class="text-metric-mono text-main">{{ deviceTelemetry.sim_network_type || '—' }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">SIM Present</span>
+                <span class="text-metric-mono" :class="parsedPayload?.sim_present ? 'text-green-4' : 'text-red-4'">{{ parsedPayload?.sim_present != null ? (parsedPayload.sim_present ? 'YES' : 'NO') : '—' }}</span>
+              </div>
+              <q-separator dark class="bg-[#22282d]" />
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Uptime</span>
+                <span class="text-metric-mono text-main">{{ formatUptime(deviceTelemetry.uptime) }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Telemetry Sequence</span>
+                <span class="text-metric-mono text-purple-4">#{{ deviceTelemetry.telemetry_seq }}</span>
+              </div>
+              <q-separator dark class="bg-[#22282d]" />
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Latitude</span>
+                <span class="text-metric-mono text-amber-4">{{ deviceTelemetry.location?.latitude ?? '—' }}</span>
+              </div>
+              <div class="row items-center justify-between text-caption">
+                <span class="text-muted">Longitude</span>
+                <span class="text-metric-mono text-amber-4">{{ deviceTelemetry.location?.longitude ?? '—' }}</span>
+              </div>
+            </div>
+
+            <!-- SIM Details Table -->
+            <div v-if="parsedPayload?.sim_details && parsedPayload.sim_details.length > 0" class="q-mt-xs">
+              <div class="text-operator-title text-muted q-mb-xs" style="font-size: 10px;">SIM Details</div>
+              <q-markup-table flat bordered dense dark class="bg-main border-main" style="font-size: 10px;">
+                <thead>
+                  <tr class="bg-panel">
+                    <th class="text-left text-muted">Slot</th>
+                    <th class="text-left text-muted">Name</th>
+                    <th class="text-left text-muted">Phone</th>
+                    <th v-if="isSuperAdmin" class="text-left text-muted">IMSI</th>
+                    <th v-if="isSuperAdmin" class="text-left text-muted">ICCID</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(sim, idx) in parsedPayload.sim_details" :key="idx">
+                    <td class="text-metric-mono text-main">{{ sim.slot_index }}</td>
+                    <td class="text-metric-mono text-main">{{ sim.display_name || '—' }}</td>
+                    <td class="text-metric-mono text-cyan-3">{{ sim.phone_number || '—' }}</td>
+                    <td v-if="isSuperAdmin" class="text-metric-mono text-amber-4">{{ sim.imsi || '—' }}</td>
+                    <td v-if="isSuperAdmin" class="text-metric-mono text-amber-4">{{ sim.iccid || '—' }}</td>
+                  </tr>
+                </tbody>
+              </q-markup-table>
+            </div>
+
+            <!-- Raw Telemetry Viewer -->
+            <q-expansion-item
+              dense
+              header-class="bg-panel text-muted text-caption border-main rounded-borders"
+              expand-icon-class="text-grey-5"
+              label="View Raw Telemetry"
+              icon="data_object"
+              class="q-mt-xs"
+            >
+              <div class="bg-main q-pa-sm rounded-borders border-main" style="max-height: 300px; overflow: auto;">
+                <pre class="text-metric-mono text-secondary q-ma-none" style="font-size: 10px; white-space: pre-wrap; word-break: break-all;">{{ rawTelemetryJson }}</pre>
+              </div>
+            </q-expansion-item>
+          </div>
+
+          <q-separator dark class="q-my-md bg-[#22282d]" />
+
           <!-- FINAL REFINEMENT #5: Unified Operational Timelines -->
+
           <div class="text-operator-title text-blue-5 q-mb-xs row items-center justify-between">
             <span>Unified Chronological Narrative</span>
             <span class="text-metric-mono text-muted" style="font-size: 9px;">COMPOSITE MERGED LOGS</span>
@@ -288,11 +444,82 @@ const handleExternalGridPreset = (presetKey) => {
 const drawerOpen = ref(false)
 const selectedDevice = ref(null)
 
+// ─── P6D TELEMETRY STATE ────────────────────────────────────────────────────
+const deviceTelemetry = ref(null)
+const rawTelemetryPayload = ref(null)
+
+const isSuperAdmin = computed(() => {
+  const role = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
+  return role === 'SUPER_ADMIN'
+})
+
+const parsedPayload = computed(() => {
+  if (!rawTelemetryPayload.value) return null
+  if (typeof rawTelemetryPayload.value === 'string') {
+    try { return JSON.parse(rawTelemetryPayload.value) } catch { return null }
+  }
+  return rawTelemetryPayload.value
+})
+
+const connectivityBadge = computed(() => {
+  if (!deviceTelemetry.value) return { bg: 'grey-8', fg: 'grey-5', label: 'Unknown' }
+  const lastSeen = deviceTelemetry.value.last_seen ? new Date(deviceTelemetry.value.last_seen) : null
+  if (!lastSeen) return { bg: 'red-10', fg: 'red-3', label: 'Offline' }
+  const diffMs = Date.now() - lastSeen.getTime()
+  if (diffMs < 600000) return { bg: 'green-10', fg: 'green-3', label: 'Online' }
+  if (diffMs < 1800000) return { bg: 'amber-10', fg: 'amber-3', label: 'Stale' }
+  return { bg: 'red-10', fg: 'red-3', label: 'Offline' }
+})
+
+const rawTelemetryJson = computed(() => {
+  if (!rawTelemetryPayload.value) return '{}'
+  try {
+    return JSON.stringify(
+      typeof rawTelemetryPayload.value === 'string'
+        ? JSON.parse(rawTelemetryPayload.value)
+        : rawTelemetryPayload.value,
+      null, 2
+    )
+  } catch { return String(rawTelemetryPayload.value) }
+})
+
+const formatUptime = (seconds) => {
+  if (!seconds && seconds !== 0) return '—'
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (d > 0) return `${d}d ${h}h ${m}m`
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
+}
+
+const fetchDeviceTelemetry = async (deviceId) => {
+  deviceTelemetry.value = null
+  rawTelemetryPayload.value = null
+  try {
+    const { data } = await deviceApi.getDeviceStatus(deviceId)
+    if (data) {
+      deviceTelemetry.value = data
+      // Also fetch the latest raw payload from telemetry history
+      try {
+        const histRes = await deviceApi.getDeviceTelemetry(deviceId)
+        if (histRes.data && Array.isArray(histRes.data) && histRes.data.length > 0) {
+          rawTelemetryPayload.value = histRes.data[0].payload
+        }
+      } catch { /* telemetry history unavailable */ }
+    }
+  } catch {
+    // No telemetry available — UI will show "No Telemetry Received"
+    deviceTelemetry.value = null
+  }
+}
+
 const openDeviceDrawer = (id) => {
   const target = baseDevicesArray.value.find(d => d.deviceId === id)
   if (target) {
     selectedDevice.value = { ...target }
     drawerOpen.value = true
+    fetchDeviceTelemetry(id)
   }
 }
 

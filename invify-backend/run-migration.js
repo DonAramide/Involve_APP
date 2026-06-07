@@ -17,7 +17,7 @@ async function run() {
   
   try {
     await client.connect();
-    const sqlPath = 'C:/Users/IIPS/.gemini/antigravity/brain/5dfbdbfb-1b90-49da-a08c-ebffcdd9bfe1/artifacts/migration_phase2.sql';
+    const sqlPath = 'C:/dev/Involve_APP/invify-backend/agent_system_phase7_migration.sql';
     const sql = fs.readFileSync(sqlPath, 'utf8');
     
     await client.query(sql);

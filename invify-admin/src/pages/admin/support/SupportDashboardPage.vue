@@ -109,7 +109,7 @@ const fetchTickets = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('token') || 'mock-admin-token-123'
-    const res = await axios.get('http://localhost:3004/api/support/tickets/list', {
+    const res = await axios.get('/api/support/tickets/list', {
       headers: { Authorization: `Bearer ${token}` }
     })
     tickets.value = res.data.data || []

@@ -621,7 +621,7 @@ const executeOtpResetPassword = async () => {
       userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // Admin UUID
     }
     
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const API_BASE = import.meta.env.VITE_API_URL || ''
     const res = await axios.post(`${API_BASE}/api/auth/reset-password`, {
       userId: userId,
       newPassword: otpForm.value.newPassword
@@ -661,7 +661,7 @@ const executeLoginPass = async () => {
   successMessage.value = ''
 
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const API_BASE = import.meta.env.VITE_API_URL || ''
     // Dispatch network request natively targeting backend API
     const res = await axios.post(`${API_BASE}/api/auth/login`, {
       email: form.value.email,
@@ -731,7 +731,7 @@ const executeMfaVerification = async () => {
   errorMessage.value = ''
 
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const API_BASE = import.meta.env.VITE_API_URL || ''
     const res = await axios.post(`${API_BASE}/api/auth/mfa/verify`, {
       userId: activeUserId.value,
       tokenCode: form.value.totpCode,
@@ -755,7 +755,7 @@ const executeResetPassword = async () => {
   successMessage.value = ''
   
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const API_BASE = import.meta.env.VITE_API_URL || ''
     const res = await axios.post(`${API_BASE}/api/auth/reset-password`, {
       userId: activeUserId.value,
       newPassword: resetForm.value.newPassword

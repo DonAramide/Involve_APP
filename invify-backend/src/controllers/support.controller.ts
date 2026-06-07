@@ -85,15 +85,35 @@ export class SupportController {
 
     try {
       const localData = getLocalDB().complaints;
-      const { data, error } = await supabase.from('complaints').select('*').order('created_at', { ascending: false });
-      if (error) throw error;
+      const { data: complaintsData, error: cError } = await supabase.from('complaints').select('*');
+      if (cError) throw cError;
+
+      // Fetch Agent support tickets
+      const { data: supportTicketsData } = await supabase.from('support_tickets').select('*');
       
-      const merged = [...data, ...localData];
+      // Adapt support_tickets to match complaints structure for merging:
+      const adaptedSupportTickets = (supportTicketsData || []).map((t: any) => ({
+        id: t.id,
+        title: t.subject,
+        description: t.description,
+        category: 'Agent Support',
+        urgency: t.priority,
+        status: t.status?.toLowerCase() || 'pending',
+        tenant_id: t.tenant_id || t.agent_id,
+        tenant_name: `Agent Ticket (Agent: ${t.agent_id})`,
+        device_id: null,
+        incident_date: null,
+        attachment_url: null,
+        created_at: t.created_at
+      }));
+
+      const merged = [...(complaintsData || []), ...adaptedSupportTickets, ...localData];
       const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
       unique.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       return res.json({ success: true, data: unique });
     } catch (err: any) {
+      console.error('[listComplaints] error:', err.message);
       return res.json({ success: true, data: getLocalDB().complaints });
     }
   }
@@ -149,10 +169,48 @@ export class SupportController {
     }
 
     try {
-      const { data, error } = await supabase.from('complaints').update({ status }).eq('id', id).select().single();
-      if (error) throw error;
-      return res.json({ success: true, data });
+      // 1. Try updating complaints table
+      const { data: cData } = await supabase
+        .from('complaints')
+        .update({ status })
+        .eq('id', id)
+        .select()
+        .maybeSingle();
+
+      if (cData) {
+        return res.json({ success: true, data: cData });
+      }
+
+      // 2. Try updating support_tickets table (Agent tickets)
+      const mappedStatus = status.toUpperCase();
+      const { data: sData } = await supabase
+        .from('support_tickets')
+        .update({ status: mappedStatus })
+        .eq('id', id)
+        .select()
+        .maybeSingle();
+
+      if (sData) {
+        const adapted = {
+          id: sData.id,
+          title: sData.subject,
+          description: sData.description,
+          category: 'Agent Support',
+          urgency: sData.priority,
+          status: sData.status?.toLowerCase() || 'pending',
+          tenant_id: sData.tenant_id || sData.agent_id,
+          tenant_name: `Agent Ticket (Agent: ${sData.agent_id})`,
+          device_id: null,
+          incident_date: null,
+          attachment_url: null,
+          created_at: sData.created_at
+        };
+        return res.json({ success: true, data: adapted });
+      }
+
+      throw new Error('Complaint or Ticket not found');
     } catch (err: any) {
+      console.error('[updateComplaintStatus] error:', err.message);
       const db = getLocalDB();
       const comp = db.complaints.find((c: any) => c.id === id);
       if (comp) comp.status = status;

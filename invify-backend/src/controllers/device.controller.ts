@@ -540,7 +540,48 @@ export class DeviceController {
       DeviceController.saveLocalData(local);
       return res.status(200).json({ success: true, message: 'Device onboarded and registered successfully', record: onboardedRecord });
     } catch (error: any) {
-      console.error('[DeviceController] onboardDevice Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/devices/:deviceId/status
+   */
+  static async getDeviceStatus(req: Request, res: Response) {
+    try {
+      const { deviceId } = req.params;
+      const { data, error } = await supabase.from('device_status').select('*').eq('device_id', deviceId).single();
+      if (error) throw error;
+      return res.status(200).json(data);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/devices/:deviceId/telemetry
+   */
+  static async getDeviceTelemetry(req: Request, res: Response) {
+    try {
+      const { deviceId } = req.params;
+      const { data, error } = await supabase.from('device_telemetry').select('*').eq('device_id', deviceId).order('created_at', { ascending: false }).limit(50);
+      if (error) throw error;
+      return res.status(200).json(data);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/devices/:deviceId/alerts
+   */
+  static async getDeviceAlerts(req: Request, res: Response) {
+    try {
+      const { deviceId } = req.params;
+      const { data, error } = await supabase.from('device_alerts').select('*').eq('device_id', deviceId).order('created_at', { ascending: false });
+      if (error) throw error;
+      return res.status(200).json(data);
+    } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
   }

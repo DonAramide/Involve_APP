@@ -11,6 +11,7 @@ import '../../../../core/services/service_locator.dart';
 import '../../../school_finance/domain/repositories/finance_repository_new.dart';
 import '../../../../core/utils/progress_dialog_utils.dart';
 import '../../../activation/presentation/pages/activation_page.dart';
+import '../../../activation/presentation/pages/tenant_kyc_upload_page.dart';
 import '../../../../core/license/storage_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -517,6 +518,24 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                           onPressed: () async {
                             FocusScope.of(context).unfocus();
                             
+                            // 1. Mandatory KYC Upload for Pro users
+                            final kycCompleted = await Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const TenantKycUploadPage()),
+                            );
+
+                            if (kycCompleted != true) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('KYC is mandatory for the Pro version. Please upload the required documents.'),
+                                    backgroundColor: Colors.orange.shade800,
+                                  ),
+                                );
+                              }
+                              return; // Stop the upgrade process if KYC isn't completed
+                            }
+
                             // Save data locally first as per user rule: "if you have gto save data save it"
                             if (state.settings != null) {
                               final updatedSettings = state.settings!.copyWith(

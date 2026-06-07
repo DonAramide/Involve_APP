@@ -78,7 +78,7 @@
             </tr>
           </thead>
           <tbody class="text-caption" style="font-size: 12px;">
-            <tr v-for="t in filteredTenants" :key="t.id" class="border-bottom-light hover-row">
+            <tr v-for="t in filteredTenants" :key="t.id" class="border-bottom-light hover-row cursor-pointer" @click="openMerchantDetail(t)">
               <td class="q-pa-sm text-main text-weight-bold">{{ t.business_name || t.businessName || 'Unknown' }}</td>
               <td class="q-pa-sm text-muted">{{ t.industry_type || t.industry || 'Unknown' }}</td>
               <td class="q-pa-sm">
@@ -96,6 +96,8 @@
         </table>
       </div>
     </div>
+    
+    <MerchantDetailDrawer ref="merchantDrawer" @updated="fetchTenants" />
   </q-page>
 </template>
 
@@ -104,12 +106,20 @@ import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
 import { useRouter } from 'vue-router'
+import MerchantDetailDrawer from '../../../components/agent-portal/portfolio/MerchantDetailDrawer.vue'
 
 const $q = useQuasar()
 const router = useRouter()
 const search = ref('')
 const loading = ref(true)
 const tenants = ref([])
+const merchantDrawer = ref(null)
+
+const openMerchantDetail = (tenant) => {
+  if (merchantDrawer.value) {
+    merchantDrawer.value.open(tenant)
+  }
+}
 
 const fetchTenants = async () => {
   loading.value = true
@@ -121,7 +131,7 @@ const fetchTenants = async () => {
       return
     }
 
-    const res = await axios.get('http://localhost:3004/api/agent-portal/tenant/list', {
+    const res = await axios.get('/api/agent-portal/tenant/list', {
       headers: { Authorization: `Bearer ${token}` }
     })
     tenants.value = res.data.data || []

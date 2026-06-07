@@ -298,20 +298,20 @@ const fetchDashboardData = async () => {
     const headers = { Authorization: `Bearer ${token}` }
     
     const [wRes, lRes, cRes, wdRes, bRes] = await Promise.all([
-      axios.get('http://localhost:3004/api/agent/wallet', { headers }),
-      axios.get('http://localhost:3004/api/agent/wallet/ledger', { headers }),
-      axios.get('http://localhost:3004/api/agent/wallet/commissions', { headers }),
-      axios.get('http://localhost:3004/api/agent/wallet/withdrawals', { headers }),
-      axios.get('http://localhost:3004/api/agent/wallet/bank-account', { headers })
+      axios.get('/api/agent/wallet', { headers }),
+      axios.get('/api/agent/wallet/ledger', { headers }),
+      axios.get('/api/agent/wallet/commissions', { headers }),
+      axios.get('/api/agent/wallet/withdrawals', { headers }),
+      axios.get('/api/agent/wallet/bank', { headers })
     ])
 
     kpiData.value = wRes.data.data
     ledger.value = lRes.data.data || []
-    commissions.value = cRes.data.data || []
+    commissions.value = cRes.data.data?.list || []
     withdrawals.value = wdRes.data.data || []
     bankAccounts.value = bRes.data.data || []
 
-    processCharts()
+    processCharts(cRes.data.data?.aggregated, wRes.data.data?.timeseries)
 
   } catch (err) {
     console.error(err)
@@ -322,29 +322,23 @@ const fetchDashboardData = async () => {
   }
 }
 
-const processCharts = () => {
-  // Aggregate commissions
-  const cats = { MERCHANT_ONBOARDING: 0, MERCHANT_ACTIVATION: 0, BONUS: 0 }
-  commissions.value.forEach(c => {
-    if (cats[c.event_type] !== undefined) cats[c.event_type] += Number(c.amount)
-    else cats.BONUS += Number(c.amount)
-  })
-  commissionCategories.value = cats
-  donutSeries.value = [cats.MERCHANT_ONBOARDING, cats.MERCHANT_ACTIVATION, cats.BONUS]
+const processCharts = (aggregated, timeseries) => {
+  // Map Donut chart to real backend aggregation
+  commissionCategories.value = aggregated || { MERCHANT_ONBOARDING: 0, MERCHANT_ACTIVATION: 0, BONUS: 0 }
+  donutSeries.value = [
+    commissionCategories.value.MERCHANT_ONBOARDING || 0,
+    commissionCategories.value.MERCHANT_ACTIVATION || 0,
+    commissionCategories.value.BONUS || 0
+  ]
 
-  // Mock trend data for UI purposes until timeseries aggregation is built
-  trendSeries.value = [{
-    name: 'Earnings',
-    data: [
-      kpiData.value.thisMonthEarnings * 0.1,
-      kpiData.value.thisMonthEarnings * 0.3,
-      kpiData.value.thisMonthEarnings * 0.2,
-      kpiData.value.thisMonthEarnings * 0.5,
-      kpiData.value.thisMonthEarnings * 0.4,
-      kpiData.value.thisMonthEarnings * 0.8,
-      kpiData.value.thisMonthEarnings
-    ]
-  }]
+  // Map Trend chart to real backend timeseries
+  if (timeseries) {
+    trendOptions.value.xaxis.categories = timeseries.categories
+    trendSeries.value = [{
+      name: 'Earnings',
+      data: timeseries.data
+    }]
+  }
 }
 
 onMounted(fetchDashboardData)
@@ -353,7 +347,7 @@ const submitWithdrawal = async () => {
   submitting.value = true
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.post('http://localhost:3004/api/agent/wallet/withdrawals', {
+    await axios.post('/api/agent/wallet/withdraw', {
       amount: withdrawalForm.value.amount,
       password: withdrawalForm.value.password,
       bank_name: primaryBank.value.bank_name,
@@ -363,6 +357,11 @@ const submitWithdrawal = async () => {
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })
+    
+    // Optimistically reflect pending balance shift
+    kpiData.value.availableBalance -= withdrawalForm.value.amount;
+    kpiData.value.pendingEarnings += withdrawalForm.value.amount;
+    
     $q.notify({ type: 'positive', message: 'Withdrawal requested successfully' })
     showWithdrawalModal.value = false
     withdrawalForm.value = { amount: 0, password: '' }
@@ -378,7 +377,7 @@ const submitBank = async () => {
   submitting.value = true
   try {
     const token = localStorage.getItem('invify_agent_token')
-    await axios.post('http://localhost:3004/api/agent/wallet/bank-account', bankForm.value, {
+    await axios.post('/api/agent/wallet/bank', bankForm.value, {
       headers: { Authorization: `Bearer ${token}` }
     })
     $q.notify({ type: 'positive', message: 'Bank account linked successfully' })

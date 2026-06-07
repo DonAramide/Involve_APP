@@ -7,11 +7,20 @@ import * as path from 'path';
 
 async function validateDeviceOrBlock(userId: string, email: string, req: Request): Promise<{ allowed: boolean; errorResponse?: any }> {
   try {
-    const p = path.join(process.cwd(), 'global_settings.json');
     let enforce = false;
-    if (fs.existsSync(p)) {
-      const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
-      enforce = !!data.enforce_device_control;
+    try {
+      const { data, error } = await supabase.from('system_configurations').select('config_value').eq('config_key', 'enforce_device_control').single();
+      if (!error && data) {
+         enforce = data.config_value === true || data.config_value === 'true';
+      } else {
+         throw error || new Error('No data');
+      }
+    } catch(dbErr) {
+      const p = path.join(process.cwd(), 'global_settings.json');
+      if (fs.existsSync(p)) {
+        const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
+        enforce = !!data.enforce_device_control;
+      }
     }
     if (!enforce) return { allowed: true };
 
@@ -67,19 +76,37 @@ export class AuthController {
       }
 
       // 0. Check Maintenance Mode Global Lockout
-      const settingsPath = path.join(process.cwd(), 'global_settings.json');
-      if (fs.existsSync(settingsPath)) {
-        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        if (settings.is_maintenance_locked) {
-          const emailLower = (email || '').toLowerCase();
-          const isSuperAdmin = emailLower === 'sysadmin@iips.app' || emailLower === 'superadmin@iips.app' || emailLower.includes('admin') || emailLower.includes('iips');
-          
-          if (!isSuperAdmin) {
-            return res.status(403).json({
-              error: 'MAINTENANCE_LOCK',
-              message: settings.maintenance_message || 'System is currently under maintenance. Please try again later.'
-            });
-          }
+      let is_maintenance_locked = false;
+      let maintenance_message = 'System is currently under maintenance. Please try again later.';
+      
+      try {
+         const { data, error } = await supabase.from('system_configurations').select('config_key, config_value').in('config_key', ['is_maintenance_locked', 'maintenance_message']);
+         if (!error && data && data.length > 0) {
+            for (const row of data) {
+               if (row.config_key === 'is_maintenance_locked') is_maintenance_locked = row.config_value === true || row.config_value === 'true';
+               if (row.config_key === 'maintenance_message') maintenance_message = row.config_value;
+            }
+         } else {
+            throw error || new Error('No data');
+         }
+      } catch(dbErr) {
+         const settingsPath = path.join(process.cwd(), 'global_settings.json');
+         if (fs.existsSync(settingsPath)) {
+           const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+           is_maintenance_locked = !!settings.is_maintenance_locked;
+           maintenance_message = settings.maintenance_message || maintenance_message;
+         }
+      }
+
+      if (is_maintenance_locked) {
+        const emailLower = (email || '').toLowerCase();
+        const isSuperAdmin = emailLower === 'sysadmin@iips.app' || emailLower === 'superadmin@iips.app' || emailLower.includes('admin') || emailLower.includes('iips');
+        
+        if (!isSuperAdmin) {
+          return res.status(403).json({
+            error: 'MAINTENANCE_LOCK',
+            message: maintenance_message
+          });
         }
       }
       // Offline Developer Bypass

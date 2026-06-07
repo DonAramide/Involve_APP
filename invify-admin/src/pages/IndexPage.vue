@@ -229,7 +229,7 @@ const saving = ref(false)
 
 const loadLookupConfig = async () => {
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const API_BASE = import.meta.env.VITE_API_URL || ''
     const res = await axios.get(`${API_BASE}/public/lookup`)
     if (res.data) {
       gateways.value = res.data.gateways || []
@@ -263,7 +263,7 @@ const removeIndustry = (index) => {
 const saveLookupData = async () => {
   saving.value = true
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3004'
+    const API_BASE = import.meta.env.VITE_API_URL || ''
     const res = await axios.post(`${API_BASE}/admin/lookup`, {
       gateways: gateways.value,
       industries: industries.value
