@@ -1037,16 +1037,31 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             SizedBox(width: 8),
             Text('Purchase Successful')
           ]),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Amount: ${result.transaction!.amount}'),
-              Text('RRN: ${result.transaction!.rrn}'),
-              Text('STAN: ${result.transaction!.stan}'),
-              Text('Card: ${result.transaction!.maskedPan}'),
-              const Text('Status: Approved'),
-            ],
+          content: Builder(
+            builder: (ctx) {
+              final amtStr = result.transaction!.amount ?? '0';
+              final amtValue = (double.tryParse(amtStr) ?? 0) / 100;
+              final formattedAmount = CurrencyFormatter.formatWithSymbol(amtValue, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦');
+
+              String maskPan(String pan) {
+                if (pan.length < 10) return pan;
+                return '${pan.substring(0, 4)}********${pan.substring(pan.length - 4)}';
+              }
+              final maskedPan = maskPan(result.transaction!.maskedPan ?? '');
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Amount: $formattedAmount', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Text('RRN: ${result.transaction!.rrn}'),
+                  Text('STAN: ${result.transaction!.stan}'),
+                  Text('Card: $maskedPan'),
+                  const Text('Status: Approved', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                ],
+              );
+            }
           ),
           actions: [
             TextButton(
