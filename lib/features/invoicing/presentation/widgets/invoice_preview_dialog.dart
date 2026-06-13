@@ -21,6 +21,9 @@ import 'package:involve_app/services/mpos_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
+import 'package:involve_app/core/offline/offline_webhook_service.dart';
+import 'package:dio/dio.dart';
+
 
 class InvoicePreviewDialog extends StatefulWidget {
   final InvoiceBloc invoiceBloc;
@@ -394,11 +397,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           }
 
                           if (result.status == 'payment_success' || result.status == 'payment_failed') {
-                            final financeRepo = context.read<FinanceRepository>();
-                            final endpoint = webhookUrl?.isNotEmpty == true ? webhookUrl! : '/api/pos/transaction';
-                            final backendResponse = await financeRepo.apiClient.post(
-                              endpoint,
-                              data: {
+                            await _processWebhookAndSuccess(context, webhookUrl ?? '', result, {
                                 'terminalId': terminalId,
                                 'amount': amountToCharge,
                                 'isDeviceProcessed': true,
@@ -417,23 +416,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                   'quantity': i.quantity,
                                   'price': i.item.price,
                                 }).toList(),
-                              },
-                            );
-                            if (!mounted) return;
-                            if (result.status == 'payment_failed') {
-                              final msg = result.transaction?.message ?? 'Unknown Error';
-                              await showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('POS Declined'),
-                                  content: Text('Transaction declined by MPOS ($msg).'),
-                                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                                ),
-                              );
-                              return;
-                            } else if (backendResponse.statusCode != 200) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment approved but failed to sync to server.')));
-                            }
+                            });
                           } else if (result.status == 'emv_data_ready' && result.emvData != null) {
                             final financeRepo = context.read<FinanceRepository>();
                             final backendResponse = await financeRepo.apiClient.post(
@@ -674,11 +657,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         if (!mounted) return;
 
                         if (result.status == 'payment_success' || result.status == 'payment_failed') {
-                          final financeRepo = context.read<FinanceRepository>();
-                          final endpoint = webhookUrl?.isNotEmpty == true ? webhookUrl! : '/api/pos/transaction';
-                          final backendResponse = await financeRepo.apiClient.post(
-                            endpoint,
-                            data: {
+                          await _processWebhookAndSuccess(context, webhookUrl ?? '', result, {
                               'terminalId': terminalId,
                               'amount': amountToCharge,
                               'isDeviceProcessed': true,
@@ -691,23 +670,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               },
                               'emvData': result.emvData?.toJson(),
                               'transactionResponse': result.transaction?.toJson(),
-                            },
-                          );
-                          if (!mounted) return;
-                          if (result.status == 'payment_failed') {
-                            final msg = result.transaction?.message ?? 'Unknown Error';
-                            await showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('POS Declined'),
-                                content: Text('Transaction declined by MPOS ($msg).'),
-                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                              ),
-                            );
-                            return;
-                          } else if (backendResponse.statusCode != 200) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment approved but failed to sync to server.')));
-                          }
+                          });
                         } else if (result.status == 'emv_data_ready' && result.emvData != null) {
                           final financeRepo = context.read<FinanceRepository>();
                           final backendResponse = await financeRepo.apiClient.post(
@@ -1011,5 +974,107 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         ],
       ),
     );
+  }
+
+  Future<void> _processWebhookAndSuccess(
+      BuildContext context,
+      String webhookUrl,
+      MposTransactionResult result,
+      Map<String, dynamic> data) async {
+    final financeRepo = context.read<FinanceRepository>();
+    final endpoint = webhookUrl.isNotEmpty ? webhookUrl : '/api/pos/transaction';
+    
+    Response? backendResponse;
+    final offlineService = OfflineWebhookService(financeRepo.apiClient.dio);
+    try {
+      await offlineService.syncQueue();
+      backendResponse = await financeRepo.apiClient.post(endpoint, data: data);
+    } catch (e) {
+      debugPrint('[Webhook] Failed to sync to server: $e');
+      // Enqueue for offline sync
+      await offlineService.enqueuePayload(endpoint, data);
+    }
+
+    if (!mounted) return;
+
+    if (result.status == 'payment_failed') {
+      final msg = result.transaction?.message ?? 'Unknown Error';
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('POS Declined'),
+          content: Text('Transaction declined by MPOS ($msg).'),
+          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+        ),
+      );
+      return;
+    }
+
+    if (backendResponse != null && backendResponse.statusCode != 200 && backendResponse.statusCode != 201) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment approved but failed to sync to server (Queued).')));
+    }
+
+    // Success Screen & Print Receipt
+    if (result.status == 'payment_success' && result.transaction != null) {
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Row(children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Purchase Successful')
+          ]),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Amount: ${result.transaction!.amount}'),
+              Text('RRN: ${result.transaction!.rrn}'),
+              Text('STAN: ${result.transaction!.stan}'),
+              Text('Card: ${result.transaction!.maskedPan}'),
+              const Text('Status: Approved'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _printPosReceipt(result.transaction!);
+                Navigator.pop(ctx);
+              },
+              child: const Text('PRINT RECEIPT & CLOSE'),
+            )
+          ],
+        ),
+      );
+    }
+  }
+
+  void _printPosReceipt(MposTransactionResponse tx) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final String merchantName = _terminalConfig?.businessName ?? settings?.businessName ?? 'MERCHANT';
+    final String merchantId = _terminalConfig?.terminalId ?? 'N/A';
+
+    final commands = [
+      PrintCommand.text(merchantName, isBold: true, align: PrintAlignment.center, size: PrintSize.large),
+      PrintCommand.text('Terminal ID: $merchantId', align: PrintAlignment.center),
+      PrintCommand.text('--------------------------------', align: PrintAlignment.center),
+      PrintCommand.text('PURCHASE RECEIPT', isBold: true, align: PrintAlignment.center),
+      PrintCommand.text('--------------------------------', align: PrintAlignment.center),
+      PrintCommand.text('Card Holder: ${tx.cardHolderName ?? ""}'),
+      PrintCommand.text('Card Type: ${tx.appLabel ?? ""}'),
+      PrintCommand.text('PAN: ${tx.maskedPan ?? ""}'),
+      PrintCommand.text('Amount: ${tx.amount ?? ""}', isBold: true),
+      PrintCommand.text('Auth Code: ${tx.authCode ?? ""}'),
+      PrintCommand.text('RRN: ${tx.rrn ?? ""}'),
+      PrintCommand.text('STAN: ${tx.stan ?? ""}'),
+      PrintCommand.text('Expiry: ${tx.cardExpireDate ?? ""}'),
+      PrintCommand.text('Date: ${tx.dateTime ?? ""}'),
+      PrintCommand.text('--------------------------------', align: PrintAlignment.center),
+      PrintCommand.text('APPROVED', isBold: true, align: PrintAlignment.center, size: PrintSize.large),
+      PrintCommand.text('--------------------------------', align: PrintAlignment.center),
+      PrintCommand.feed(3),
+    ];
+    context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58)); // Assuming 58mm
   }
 }
