@@ -365,38 +365,31 @@ const routes = [
     component: () => import('layouts/TenantLayout.vue'),
     meta: { requiresAuth: true },
     children: [
-      { path: 'dashboard', component: () => import('pages/tenant/TenantDashboardPage.vue'), meta: { title: 'Business Operations Hub', requiresAuth: true } },
-      { path: 'transactions', component: () => import('pages/tenant/TenantTransactionsPage.vue'), meta: { title: 'Transactions Ledger', requiresAuth: true } },
-      { path: 'wallet', component: () => import('pages/tenant/TenantWalletPage.vue'), meta: { title: 'Wallet & Treasury', requiresAuth: true } },
-      { path: 'reconciliation', component: () => import('pages/tenant/TenantReconciliationPage.vue'), meta: { title: 'Discrepancy Reconciliation', requiresAuth: true } },
-      { path: 'staff', component: () => import('pages/tenant/TenantStaffPage.vue'), meta: { title: 'Staff Governance & RBAC', requiresAuth: true } },
-      { path: 'reports', component: () => import('pages/tenant/TenantReportsPage.vue'), meta: { title: 'Business Reports', requiresAuth: true } },
-      { path: 'settings', component: () => import('pages/tenant/TenantSettingsPage.vue'), meta: { title: 'Portal Customization', requiresAuth: true } },
+      { path: 'dashboard', component: () => import('src/domains/tenant/dashboard/pages/TenantDashboardPage.vue'), meta: { title: 'Business Operations Hub', requiresAuth: true, permission: 'tenant.dashboard.view' } },
+      { path: 'transactions', component: () => import('src/domains/tenant/transactions/pages/TenantTransactionsPage.vue'), meta: { title: 'Transactions Ledger', requiresAuth: true, permission: 'tenant.transaction.view' } },
+      { path: 'wallet', component: () => import('src/domains/tenant/wallets/pages/TenantWalletPage.vue'), meta: { title: 'Wallet & Treasury', requiresAuth: true, permission: 'tenant.wallet.view' } },
+      { path: 'reconciliation', component: () => import('src/domains/tenant/ledger/pages/TenantReconciliationPage.vue'), meta: { title: 'Discrepancy Reconciliation', requiresAuth: true, permission: 'tenant.ledger.view' } },
+      { path: 'staff', component: () => import('src/domains/tenant/users/pages/TenantUsersPage.vue'), meta: { title: 'Staff Governance & RBAC', requiresAuth: true, permission: 'tenant.users.manage' } },
+      { path: 'roles', component: () => import('src/domains/tenant/users/pages/TenantRolesPage.vue'), meta: { title: 'Roles & Permissions', requiresAuth: true, permission: 'tenant.roles.view' } },
+      { path: 'invitations', component: () => import('src/domains/tenant/users/pages/TenantInvitationsPage.vue'), meta: { title: 'Invitations', requiresAuth: true, permission: 'tenant.invitations.manage' } },
+      { path: 'activity', component: () => import('src/domains/tenant/users/pages/TenantActivityPage.vue'), meta: { title: 'Activity Audit', requiresAuth: true, permission: 'tenant.activity.view' } },
+      { path: 'reports', component: () => import('src/domains/tenant/reports/pages/TenantReportsPage.vue'), meta: { title: 'Business Reports', requiresAuth: true, permission: 'tenant.reports.view' } },
+      { path: 'settings', component: () => import('src/domains/tenant/settings/pages/TenantSettingsPage.vue'), meta: { title: 'Portal Customization', requiresAuth: true, permission: 'tenant.settings.manage' } },
+      // Additional Domain placeholders that are lazy-loaded
+      { path: 'settlements', component: () => import('src/domains/tenant/settlements/pages/TenantSettlementsPage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Settlements', requiresAuth: true, permission: 'tenant.settlement.view' } },
+      { path: 'payouts', component: () => import('src/domains/tenant/payouts/pages/TenantPayoutsPage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Payouts', requiresAuth: true, permission: 'tenant.payout.create' } },
+      { path: 'devices', component: () => import('src/domains/tenant/devices/pages/TenantDevicesPage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Devices', requiresAuth: true, permission: 'tenant.devices.view' } },
+      { path: 'terminals', component: () => import('src/domains/tenant/terminals/pages/TenantTerminalsPage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Terminals', requiresAuth: true, permission: 'tenant.terminals.view' } },
+      { path: 'compliance', component: () => import('src/domains/tenant/compliance/pages/TenantCompliancePage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Compliance', requiresAuth: true, permission: 'tenant.compliance.view' } },
+      { path: 'audit', component: () => import('src/domains/tenant/audit/pages/TenantAuditPage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Audit Logs', requiresAuth: true, permission: 'tenant.audit.view' } },
+      { path: 'analytics', component: () => import('src/domains/tenant/analytics/pages/TenantAnalyticsPage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Analytics', requiresAuth: true, permission: 'tenant.analytics.view' } },
       
       // Dynamic School Mode Routes nested under Tenant Layout namespace
       { path: 'curriculum', component: () => import('pages/CurriculumPage.vue'), meta: { requiresAuth: true } },
       { path: 'notes', component: () => import('pages/LessonNotePage.vue'), meta: { workspace: 'ai', title: 'AI Lesson Planner', requiresAuth: true } },
       { path: 'attendance', component: () => import('pages/AttendancePage.vue'), meta: { requiresAuth: true } },
       
-      // Dynamic Retail Mode Routes
-      { path: 'retail/pos', component: () => import('pages/tenant/TenantIndustryPOSPage.vue'), meta: { title: 'POS Checkout Register', requiresAuth: true } },
-      { path: 'retail/inventory', component: () => import('pages/tenant/TenantIndustryInventoryPage.vue'), meta: { title: 'SKU Inventory Matrix', requiresAuth: true } },
-      { path: 'retail/invoices', component: () => import('pages/tenant/TenantIndustryBillingPage.vue'), meta: { title: 'Billing Invoices', requiresAuth: true } },
-
-      // Dynamic Hospitality Mode Routes
-      { path: 'hospitality/rooms', component: () => import('pages/tenant/TenantIndustryInventoryPage.vue'), meta: { title: 'Room Occupancy Matrix', requiresAuth: true } },
-      { path: 'hospitality/bookings', component: () => import('pages/tenant/TenantIndustryBillingPage.vue'), meta: { title: 'Reservations & Bookings', requiresAuth: true } },
-      { path: 'hospitality/billing', component: () => import('pages/tenant/TenantIndustryPOSPage.vue'), meta: { title: 'Service Billing', requiresAuth: true } },
-
-      // Dynamic Logistics Mode Routes
-      { path: 'logistics/fleet', component: () => import('pages/tenant/TenantIndustryInventoryPage.vue'), meta: { title: 'Fleet Vehicle Matrix', requiresAuth: true } },
-      { path: 'logistics/dispatch', component: () => import('pages/tenant/TenantIndustryBillingPage.vue'), meta: { title: 'Driver Dispatch Grid', requiresAuth: true } },
-      { path: 'logistics/analytics', component: () => import('pages/tenant/TenantIndustryPOSPage.vue'), meta: { title: 'Delivery Analytics', requiresAuth: true } },
-
-      // Dynamic Healthcare Mode Routes
-      { path: 'healthcare/patients', component: () => import('pages/tenant/TenantIndustryInventoryPage.vue'), meta: { title: 'Patient Registry', requiresAuth: true } },
-      { path: 'healthcare/pharmacy', component: () => import('pages/tenant/TenantIndustryPOSPage.vue'), meta: { title: 'Pharmacy Dispensaries', requiresAuth: true } },
-      { path: 'healthcare/schedule', component: () => import('pages/tenant/TenantIndustryBillingPage.vue'), meta: { title: 'Schedules & Appointments', requiresAuth: true } }
+      // Removed legacy dynamic industry routes
     ]
   },
   {

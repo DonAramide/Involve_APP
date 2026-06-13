@@ -481,6 +481,8 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 _buildHistorySummaryRow('Total', invoice.totalAmount, context, isTotal: true),
                 const SizedBox(height: 4),
                 _buildHistorySummaryRow('Paid', invoice.amountPaid, context),
+                if (invoice.changeGiven > 0)
+                  _buildHistorySummaryRow('Change Given', invoice.changeGiven, context, color: Colors.green),
                 if (invoice.balanceAmount > 0)
                   _buildHistorySummaryRow('Balance', invoice.balanceAmount, context, color: Colors.red, isBold: true),
               ],
@@ -567,6 +569,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
               DataColumn(label: Text('Customer', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Method', style: TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(label: Text('Amount', style: TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(label: Text('Change', style: TextStyle(fontWeight: FontWeight.bold))),
               if (context.read<SettingsBloc>().state.settings?.customReceiptPricingEnabled == true)
                 DataColumn(label: Text('Printed', style: TextStyle(fontWeight: FontWeight.bold))),
             ],
@@ -591,6 +594,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                     ),
                   ),
                   DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                  DataCell(Text(CurrencyFormatter.formatWithSymbol(invoice.changeGiven, symbol: currency), style: TextStyle(fontSize: 12, color: invoice.changeGiven > 0 ? Colors.green : null))),
                   if (context.read<SettingsBloc>().state.settings?.customReceiptPricingEnabled == true)
                     DataCell(Text(
                       invoice.totalPrintAmount != null 
@@ -730,16 +734,23 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
+                _exportSalesCSV(context);
+              },
+              child: const Text('CSV (SALES)'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
                 _generateReport(context, reports.ReportType.standard);
               },
-              child: const Text('STANDARD SALES'),
+              child: const Text('PDF (SALES)'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 _generateReport(context, reports.ReportType.activity);
               },
-              child: const Text('DETAILED ACTIVITY LOG'),
+              child: const Text('PDF (ACTIVITY)'),
             ),
           ],
         ),
@@ -748,6 +759,37 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please wait for data to load before exporting.')),
       );
+    }
+  }
+
+  void _exportSalesCSV(BuildContext context) async {
+    final historyState = context.read<HistoryBloc>().state;
+    final settingsState = context.read<SettingsBloc>().state;
+    
+    if (historyState is HistoryLoaded && settingsState.settings != null) {
+      try {
+        final repo = context.read<HistoryBloc>().getHistory.repository;
+        final start = _selectedRange?.start ?? DateTime(2020);
+        final end = _selectedRange?.end ?? DateTime.now();
+        final stockReturns = await repo.getStockReturnsByDateRange(start, end);
+
+        if (!context.mounted) return;
+
+        await reports.ReportGenerator.exportSalesCSV(
+          invoices: historyState.invoices,
+          settings: settingsState.settings!,
+          dateRange: _selectedRange != null 
+            ? InvReportDateRange(start: _selectedRange!.start, end: _selectedRange!.end)
+            : null,
+          stockReturns: stockReturns,
+        );
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Export failed: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 

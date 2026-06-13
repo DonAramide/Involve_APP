@@ -94,7 +94,7 @@ export class TerminalInventoryService {
       return data;
     }
     const db = getLocalDB();
-    const tablet = db.tablets.find((t: any) => t.device_id === deviceId);
+    const tablet = db.tablets.find((t: any) => t.device_id === deviceId || t.serial_number === deviceId);
     if (!tablet) return null;
     
     const assignment = db.assignments.find((a: any) => a.tablet_id === tablet.id && a.status === 'ACTIVE');

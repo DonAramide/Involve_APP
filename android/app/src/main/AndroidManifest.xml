@@ -49,6 +49,9 @@
     
     <!-- Camera Permission for Student Photos -->
     <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- Phone State Permission for Hardware Serial -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <!-- Network Permissions for WiFi Printing -->
     <uses-permission android:name="android.permission.INTERNET" />

@@ -68,27 +68,37 @@ internal object ParamUtils {
         LogUtil.i(">>>>>> START DOWNLOAD KEYS <<<<<<")
         var result: Int
 
+        val activeHost = terminalParameters?.activeHost ?: com.demo.mpossdk.open.ActiveHost.MEDUSA
+        val masterKeyHex = if (activeHost == com.demo.mpossdk.open.ActiveHost.MEDUSA) {
+            Constants.MASTER_KEY
+        } else {
+            terminalParameters?.tmk ?: Constants.MASTER_KEY
+        }
+        val pinKeyHex = if (activeHost == com.demo.mpossdk.open.ActiveHost.MEDUSA) {
+            Constants.PIN_KEY
+        } else {
+            terminalParameters?.tpk ?: Constants.PIN_KEY
+        }
+
         val mKeyIndex = 0
         val wKeyIndex = 1
         result = PedApi.PEDWriteMKey_Api(
             mKeyIndex,
             0x03,
-            CommonConvert.hexStringToByte(Constants.MASTER_KEY)
-            //CommonConvert.hexStringToByte(terminalParameters.tmk)
+            CommonConvert.hexStringToByte(masterKeyHex)
         )
         LogUtil.e("PEDWriteMKey_Api: $result")
 
-        val tripleDESUtils = TripleDESUtils(CommonConvert.hexStringToByte(Constants.MASTER_KEY))
-        val encoded = tripleDESUtils.encode(CommonConvert.hexStringToByte(Constants.PIN_KEY))
+        val tripleDESUtils = TripleDESUtils(CommonConvert.hexStringToByte(masterKeyHex))
+        val encoded = tripleDESUtils.encode(CommonConvert.hexStringToByte(pinKeyHex))
         if (result == 0) {
             result = PedApi.PEDWriteWKey_Api(
                 mKeyIndex,
                 wKeyIndex,
                 0x83,
                 encoded
-                //CommonConvert.hexStringToByte(terminalParameters.tpk2)
             )
-            LogUtil.e("PEDWriteMKey_Api: $result")
+            LogUtil.e("PEDWriteWKey_Api: $result")
         }
 
         LogUtil.i(">>>>>> END DOWNLOAD KEYS <<<<<<")
@@ -349,9 +359,9 @@ internal object ParamUtils {
         result = CommonApi.Common_AddCapk_Api(capk)
         if (result != -1) {
             LogUtil.i(">>>>> ADDED VERVE CAPK 3 <<<<<")
-
-            onParamLoaded()
         }
+
+        onParamLoaded()
 
         LogUtil.i(">>>>>> END LOAD CAPK <<<<<<")
     }

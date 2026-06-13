@@ -53,6 +53,7 @@ import com.vanstone.vm20sdk.utils.ByteUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import java.io.IOException
 import java.util.Calendar
 import java.util.Date
@@ -188,25 +189,102 @@ internal class ConnectingDeviceActivity : AppCompatActivity(), SerialInputOutput
                     return
                 }
 
+                val targetSerialNumber = intent.getStringExtra("targetSerialNumber")
+                val lastUsedMac = sessionManager.getDeviceMac()
+
+                LogUtil.i("setupCommunicationMode: targetSerialNumber=$targetSerialNumber, lastUsedMac=$lastUsedMac")
+                for (device in bondedDevices) {
+                    LogUtil.i("Bonded Device: name=${device.name}, address=${device.address}")
+                }
+
+                var matchingDevice: android.bluetooth.BluetoothDevice? = null
+                if (!targetSerialNumber.isNullOrEmpty()) {
+                    matchingDevice = bondedDevices.find { device ->
+                        isDeviceMatch(device.name, targetSerialNumber)
+                    }
+                }
+
+                if (matchingDevice == null && !lastUsedMac.isNullOrEmpty()) {
+                    matchingDevice = bondedDevices.find { device ->
+                        device.address != null && device.address.equals(lastUsedMac, ignoreCase = true)
+                    }
+                }
+
+                if (matchingDevice != null) {
+                    LogUtil.i("Auto-connecting to bonded device: ${matchingDevice.name} [${matchingDevice.address}]")
+                    autoSelectDevice(matchingDevice)
+                    return
+                }
+
                 val bluetoothDevices = mutableListOf<String>()
                 for (device in bondedDevices) {
                     bluetoothDevices.add("${device.name} | ${device.address}")
-
-                    /**
-                     * This means that we have established connection with
-                     * this device before already so no need to show list of
-                     * devices again
-                     */
-//                    if (sessionManager.getDeviceMac() == device.address) {
-//                        SystemApi.setMacAddr(device.address)
-//                        navigateToProcessingScreen()
-//                        return
-//                    }
                 }
 
                 showBluetoothDeviceDialog(bluetoothDevices)
             }
         }
+    }
+
+    private fun isDeviceMatch(deviceName: String?, targetSerial: String): Boolean {
+        if (deviceName == null) return false
+        val cleanDeviceName = deviceName.replace("[^a-zA-Z0-9]".toRegex(), "").lowercase()
+        val cleanTargetSerial = targetSerial.replace("[^a-zA-Z0-9]".toRegex(), "").lowercase()
+
+        val normDeviceName = cleanDeviceName.removeSuffix("android")
+        val normTargetSerial = cleanTargetSerial.removeSuffix("android")
+
+        val match = normDeviceName.contains(normTargetSerial) || normTargetSerial.contains(normDeviceName)
+        LogUtil.i("Comparing deviceName='$deviceName' (norm='$normDeviceName') with targetSerial='$targetSerial' (norm='$normTargetSerial') -> match=$match")
+        return match
+    }
+
+    private fun autoSelectDevice(device: android.bluetooth.BluetoothDevice) {
+        CoroutineScope(Dispatchers.IO).launch {
+            sessionManager.setDeviceName(device.name ?: "")
+            sessionManager.setDeviceMac(device.address)
+            sessionManager.setConnectionMode(BLUETOOTH)
+            SystemApi.setMacAddr(sessionManager.getDeviceMac())
+
+            val calendar = Calendar.getInstance().apply {
+                time = Date()
+            }
+
+            val year = calendar.get(Calendar.YEAR)
+            val month = calendar.get(Calendar.MONTH) + 1
+            val day = calendar.get(Calendar.DAY_OF_MONTH)
+            val week = calendar.get(Calendar.WEEK_OF_YEAR)
+            val hour = calendar.get(Calendar.HOUR_OF_DAY)
+            val minute = calendar.get(Calendar.MINUTE)
+            val second = calendar.get(Calendar.SECOND)
+
+            val dateUser = DateUser()
+            dateUser.year = year.toShort()
+            dateUser.mon = month.toByte()
+            dateUser.day = day.toByte()
+            dateUser.dow = week.toByte()
+
+            val timeUser = TimeUser()
+            timeUser.hour = hour.toByte()
+            timeUser.min = minute.toByte()
+            timeUser.sec = second.toByte()
+
+            val result = SystemApi.SetTime_Api(dateUser, timeUser)
+            if (result == 0) {
+                LogUtil.i("Time set successfully via auto-connect")
+            }
+        }
+
+        try {
+            MposSdk.pairResultListener(
+                PairResultListener.OnSuccess(
+                    "Device pairing successful"
+                )
+            )
+        } catch (e: Exception) {
+            LogUtil.e("Failed to trigger pairResultListener: ${e.message}")
+        }
+        finish()
     }
 
     private fun navigateToProcessingScreen() {

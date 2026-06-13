@@ -48,4 +48,8 @@ internal data class TerminalParameters(
     var bankName: String? = null,
     var bankLogo: String? = null,
     var hostType: String? = null,
+    var activeHost: com.demo.mpossdk.open.ActiveHost = com.demo.mpossdk.open.ActiveHost.EXPRESS_PAY,
+    var expressPayBaseUrl: String? = null,
+    var expressPayAuthToken: String? = null,
+    var timeoutSeconds: Int? = null,
 )

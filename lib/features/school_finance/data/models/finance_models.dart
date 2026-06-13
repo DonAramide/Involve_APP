@@ -105,3 +105,49 @@ class StudentFinanceSummary extends Equatable {
   @override
   List<Object?> get props => [totalFees, totalPaid, outstandingBalance, currentBalance];
 }
+
+// ── Transaction Audit Model ───────────────────────────────────────────
+
+class TransactionAuditModel extends Equatable {
+  final String id;
+  final String type; // INVOICE, POS
+  final String paymentMethod;
+  final double amount;
+  final String status;
+  final String staffName;
+  final DateTime date;
+  final List<dynamic> items;
+  final String customerName;
+  final String reference;
+
+  const TransactionAuditModel({
+    required this.id,
+    required this.type,
+    required this.paymentMethod,
+    required this.amount,
+    required this.status,
+    required this.staffName,
+    required this.date,
+    required this.items,
+    required this.customerName,
+    required this.reference,
+  });
+
+  factory TransactionAuditModel.fromJson(Map<String, dynamic> json) {
+    return TransactionAuditModel(
+      id: json['id'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      paymentMethod: json['paymentMethod'] as String? ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      status: json['status'] as String? ?? 'Pending',
+      staffName: json['staffName'] as String? ?? 'System',
+      date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
+      items: json['items'] as List<dynamic>? ?? [],
+      customerName: json['customerName'] as String? ?? '',
+      reference: json['reference'] as String? ?? '',
+    );
+  }
+
+  @override
+  List<Object?> get props => [id, type, paymentMethod, amount, status, staffName, date, items, customerName, reference];
+}

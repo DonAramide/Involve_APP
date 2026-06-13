@@ -200,7 +200,7 @@ class _TenantKycUploadPageState extends State<TenantKycUploadPage> {
               
               _buildDocumentCard(
                 title: 'Government Issued ID',
-                subtitle: 'Passport, Driver\\'s License, or National ID',
+                subtitle: "Passport, Driver's License, or National ID",
                 documentType: 'GOVT_ID',
                 icon: Icons.badge,
                 isRequired: true,

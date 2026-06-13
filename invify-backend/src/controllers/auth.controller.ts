@@ -109,8 +109,10 @@ export class AuthController {
           });
         }
       }
+      const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+
       // Offline Developer Bypass
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      if (process.env.OFFLINE_MOCK_AUTH === 'true' && variantService.isLocal()) {
         if (password === 'wrongpassword' || email.includes('notauser')) {
           return res.status(401).json({ error: 'Invalid credentials' });
         }
@@ -156,7 +158,7 @@ export class AuthController {
       if (authError || !authData.user || !authData.session) {
         // Dynamic Developer Bypass for local environment sandbox presets
         const devAccounts = ['olive@invify.com', 'sysadmin@IIPS.app', 'superadmin@iips.app'];
-        if (devAccounts.includes(email)) {
+        if (devAccounts.includes(email) && variantService.isLocal()) {
           console.log(`[AuthController] Dev sandbox credentials bypass activated for: ${email}`);
           
           let role = 'TENANT_OPERATOR';
@@ -244,7 +246,8 @@ export class AuthController {
                                  error.message?.includes('timeout') ||
                                  error.code === 'UND_ERR_CONNECT_TIMEOUT';
                                  
-      if (isConnectionFailure) {
+      const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+      if (isConnectionFailure && variantService.isLocal()) {
         console.log('[AuthController] Network/Supabase connectivity timeout detected. Activating Local Developer Fallback Auth Matrix...');
         
         // Map common dev accounts or default dynamically

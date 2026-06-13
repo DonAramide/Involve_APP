@@ -55,5 +55,7 @@ data class EmvDetailResult(
     val cardVerificationValue: String? = null,
     val acquirerInstitutionId: String? = null,
     val terminalId: String? = null,
-    val packedIsoMessage: String? = null
+    val packedIsoMessage: String? = null,
+    val serverIP: String? = null,
+    val port: Int? = null
 ) : Parcelable

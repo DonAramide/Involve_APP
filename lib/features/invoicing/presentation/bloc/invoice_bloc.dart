@@ -159,6 +159,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
         academicYearName: state.academicYearName,
         studentImage: state.studentImage,
         warrantyDuration: state.warrantyDuration,
+        changeGiven: event.changeGiven ?? 0.0,
       );
 
       await repository.saveInvoice(invoice);

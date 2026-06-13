@@ -6,6 +6,9 @@ import 'package:involve_app/features/invoicing/domain/entities/report_date_range
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 
 import 'package:involve_app/features/invoicing/domain/entities/stock_return.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
 import 'package:involve_app/features/settings/domain/entities/staff.dart';
 
 class ReportPreviewPage extends StatelessWidget {
@@ -33,6 +36,28 @@ class ReportPreviewPage extends StatelessWidget {
         title: Text(reportType == ReportType.activity ? 'Activity Report Preview' : 'Sales Report Preview'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
+        actions: [
+          if (reportType == ReportType.standard)
+            IconButton(
+              icon: const Icon(Icons.print_outlined),
+              tooltip: 'Thermal Print',
+              onPressed: () {
+                final commands = ReportGenerator.buildSalesThermalCommands(
+                  invoices: invoices,
+                  settings: settings,
+                  dateRange: dateRange,
+                  stockReturns: stockReturns,
+                );
+                context.read<PrinterBloc>().add(PrintCommandsEvent(
+                  commands,
+                  settings.paperWidth,
+                ));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Sent to thermal printer...')),
+                );
+              },
+            ),
+        ],
       ),
       body: PdfPreview(
         build: (format) async {

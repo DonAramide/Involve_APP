@@ -21,6 +21,7 @@ import 'package:involve_app/features/services/presentation/pages/customers_list_
 import 'about_page.dart';
 import 'contact_page.dart';
 import 'calculator_page.dart';
+import 'package:involve_app/features/dashboard/presentation/pages/transaction_audit_page.dart';
 import '../widgets/recent_transactions_widget.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
@@ -580,6 +581,16 @@ class _DashboardPageState extends State<DashboardPage> {
         icon: Icons.assessment,
         color: Colors.green,
         onTap: () => Navigator.pushNamed(context, '/invoice_history'),
+      ),
+      _DashboardMenuItem(
+        id: 'transaction_history',
+        title: 'TRANSACTION HISTORY',
+        icon: Icons.receipt_long,
+        color: Colors.indigo,
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const TransactionAuditPage()),
+        ),
       ),
       _DashboardMenuItem(
         id: 'calculator',

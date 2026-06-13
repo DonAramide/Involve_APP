@@ -10,11 +10,16 @@ export class ApprovalWorkflowService {
       .from('approval_queue')
       .select('*')
       .eq('id', ticketId)
-      .eq('status', 'PENDING')
+      .in('status', ['PENDING', 'UNDER_REVIEW'])
       .single();
 
     if (fetchErr || !ticket) {
-      console.error('[ApprovalWorkflow] Ticket not found or not in PENDING state');
+      console.error('[ApprovalWorkflow] Ticket not found or not in valid state');
+      return false;
+    }
+
+    if (ticket.maker_id === operatorId) {
+      console.error('[ApprovalWorkflow] SELF-APPROVAL RESTRICTED BY GOVERNANCE POLICY');
       return false;
     }
 
@@ -58,6 +63,11 @@ export class ApprovalWorkflowService {
 
     if (fetchErr || !ticket) {
       console.error('[ApprovalWorkflow] Ticket not found');
+      return false;
+    }
+
+    if (ticket.maker_id === operatorId) {
+      console.error('[ApprovalWorkflow] SELF-APPROVAL RESTRICTED BY GOVERNANCE POLICY');
       return false;
     }
 
@@ -117,6 +127,51 @@ export class ApprovalWorkflowService {
         oldValue: null,
         newValue: { agentId, amount, reason, justification }
       }
+    });
+
+    return true;
+  }
+
+  /**
+   * Escalates a pending ticket to the SUPER_ADMIN global queue.
+   */
+  static async escalateTicket(ticketId: string, operatorId: string): Promise<boolean> {
+    const { data: ticket, error: fetchErr } = await supabaseAdmin
+      .from('approval_queue')
+      .select('*')
+      .eq('id', ticketId)
+      .single();
+
+    if (fetchErr || !ticket) {
+      console.error('[ApprovalWorkflow] Ticket not found');
+      return false;
+    }
+
+    if (ticket.maker_id === operatorId) {
+      console.error('[ApprovalWorkflow] CANNOT ESCALATE OWN TICKET');
+      return false;
+    }
+
+    const { error } = await supabaseAdmin
+      .from('approval_queue')
+      .update({ status: 'ESCALATED' })
+      .eq('id', ticketId);
+
+    if (error) {
+      console.error('[ApprovalWorkflow] Failed to escalate ticket:', error);
+      return false;
+    }
+
+    // Immutable Audit Log
+    const newValue = { ...ticket, status: 'ESCALATED', updated_at: new Date().toISOString() };
+    await supabaseAdmin.from('commission_events').insert({
+      agent_id: ticket.agent_id || 'system',
+      event_type: 'APPROVAL_ESCALATED',
+      amount: ticket.amount || 0,
+      previous_state: ticket.status,
+      new_state: 'ESCALATED',
+      reference_id: ticketId,
+      metadata: { operatorId, oldValue: ticket, newValue }
     });
 
     return true;

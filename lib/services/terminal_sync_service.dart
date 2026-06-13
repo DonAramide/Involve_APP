@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
+import 'dart:developer' as developer;
 
 /// Terminal configuration synced from the Invify backend.
 class TerminalConfig {
@@ -25,6 +26,26 @@ class TerminalConfig {
   final String? tenantId;
   final String? plan;
   final String? type;
+  final String? activeHost;
+  final String? expressPayHost;
+  final int? expressPayPort;
+
+  // New Phase X parameters
+  final Map<String, dynamic>? primaryHost;
+  final Map<String, dynamic>? secondaryHost;
+  final Map<String, dynamic>? routingRules;
+  final List<dynamic>? thresholdRules;
+  final Map<String, dynamic>? tenantPolicy;
+  final String? expressPayBaseUrl;
+  final String? expressPayAuthToken;
+  final String? merchantCode;
+  final String? terminalGroup;
+  final String? sslProfile;
+  final String? kimonoIp;
+  final int? kimonoPort;
+  final bool kimonoSSL;
+  final Map<String, dynamic>? kimonoKeys;
+  final Map<String, dynamic>? kimonoFallbackParameters;
 
   const TerminalConfig({
     required this.assigned,
@@ -46,6 +67,24 @@ class TerminalConfig {
     this.tenantId,
     this.plan,
     this.type,
+    this.activeHost,
+    this.expressPayHost,
+    this.expressPayPort,
+    this.primaryHost,
+    this.secondaryHost,
+    this.routingRules,
+    this.thresholdRules,
+    this.tenantPolicy,
+    this.expressPayBaseUrl,
+    this.expressPayAuthToken,
+    this.merchantCode,
+    this.terminalGroup,
+    this.sslProfile,
+    this.kimonoIp,
+    this.kimonoPort,
+    this.kimonoSSL = false,
+    this.kimonoKeys,
+    this.kimonoFallbackParameters,
   });
 
   factory TerminalConfig.notAssigned() {
@@ -76,6 +115,24 @@ class TerminalConfig {
       tenantId: json['tenantId']?.toString(),
       plan: json['plan']?.toString(),
       type: json['type']?.toString(),
+      activeHost: json['activeHost']?.toString(),
+      expressPayHost: json['expressPayHost']?.toString(),
+      expressPayPort: (json['expressPayPort'] as num?)?.toInt(),
+      primaryHost: json['primaryHost'] != null ? Map<String, dynamic>.from(json['primaryHost'] as Map) : null,
+      secondaryHost: json['secondaryHost'] != null ? Map<String, dynamic>.from(json['secondaryHost'] as Map) : null,
+      routingRules: json['routingRules'] != null ? Map<String, dynamic>.from(json['routingRules'] as Map) : null,
+      thresholdRules: json['thresholdRules'] != null ? List<dynamic>.from(json['thresholdRules'] as List) : null,
+      tenantPolicy: json['tenantPolicy'] != null ? Map<String, dynamic>.from(json['tenantPolicy'] as Map) : null,
+      expressPayBaseUrl: json['expressPayBaseUrl']?.toString(),
+      expressPayAuthToken: json['expressPayAuthToken']?.toString(),
+      merchantCode: json['merchantCode']?.toString(),
+      terminalGroup: json['terminalGroup']?.toString(),
+      sslProfile: json['sslProfile']?.toString(),
+      kimonoIp: json['kimonoIp']?.toString(),
+      kimonoPort: (json['kimonoPort'] as num?)?.toInt(),
+      kimonoSSL: json['kimonoSSL'] == true,
+      kimonoKeys: json['kimonoKeys'] != null ? Map<String, dynamic>.from(json['kimonoKeys'] as Map) : null,
+      kimonoFallbackParameters: json['kimonoFallbackParameters'] != null ? Map<String, dynamic>.from(json['kimonoFallbackParameters'] as Map) : null,
     );
   }
 
@@ -99,6 +156,24 @@ class TerminalConfig {
     'tenantId': tenantId,
     'plan': plan,
     'type': type,
+    'activeHost': activeHost,
+    'expressPayHost': expressPayHost,
+    'expressPayPort': expressPayPort,
+    'primaryHost': primaryHost,
+    'secondaryHost': secondaryHost,
+    'routingRules': routingRules,
+    'thresholdRules': thresholdRules,
+    'tenantPolicy': tenantPolicy,
+    'expressPayBaseUrl': expressPayBaseUrl,
+    'expressPayAuthToken': expressPayAuthToken,
+    'merchantCode': merchantCode,
+    'terminalGroup': terminalGroup,
+    'sslProfile': sslProfile,
+    'kimonoIp': kimonoIp,
+    'kimonoPort': kimonoPort,
+    'kimonoSSL': kimonoSSL,
+    'kimonoKeys': kimonoKeys,
+    'kimonoFallbackParameters': kimonoFallbackParameters,
   };
 
   @override
@@ -156,8 +231,9 @@ class TerminalSyncService {
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
-        debugPrint('[TerminalSync] Received response: ${response.body}');
         final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final prettyString = const JsonEncoder.withIndent('  ').convert(data);
+        debugPrint('[TerminalSync] Received response: \n$prettyString');
         final config = TerminalConfig.fromJson(data);
 
         // Persist config to secure storage for offline fallback
@@ -215,6 +291,19 @@ class TerminalSyncService {
       }
     } catch (_) {}
     return await _getCachedConfig() ?? TerminalConfig.notAssigned();
+  }
+
+  static Future<void> recordKeyExchangeSuccess(String deviceId) async {
+    try {
+      final payload = {'deviceId': deviceId};
+      await http.post(
+        Uri.parse('$_baseUrl/api/mobile/terminal/keyexchange-success'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
+      );
+    } catch (e) {
+      debugPrint('[TerminalSync] Failed to record key exchange success: $e');
+    }
   }
 
   /// Retrieve the locally cached terminal config (for offline use).

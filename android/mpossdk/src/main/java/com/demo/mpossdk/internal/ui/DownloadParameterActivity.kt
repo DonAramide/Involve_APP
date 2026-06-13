@@ -69,6 +69,9 @@ internal class DownloadParameterActivity : AppCompatActivity() {
                     is KeyExchangeResult.Loading -> {
 
                     }
+                    is KeyExchangeResult.Progress -> {
+                        // Progress state handled elsewhere
+                    }
                     is KeyExchangeResult.OnSuccess -> {
                         if (sessionManager.getTerminalParameters() == null) {
                             LogUtil.e("download parameter failed")

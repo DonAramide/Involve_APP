@@ -23,7 +23,7 @@ class LicenseService {
       if (DateTime.now().isAfter(license.expiryDate)) return null;
 
       // 3. Check Device ID Binding
-      final currentDeviceSuffix = await DeviceInfoService.getDeviceSuffix();
+      final currentDeviceSuffix = await DeviceInfoService.getShortDeviceSuffix();
       final expectedHash = DeviceInfoService.encodeSuffix(currentDeviceSuffix);
       
       // The licenseId in the license model actually holds the encoded device suffix hash

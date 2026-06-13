@@ -29,9 +29,11 @@ export class InviteController {
         await NotificationService.sendInviteEmail(email, tenant?.name || 'Invify School', inviteLink);
       }
 
+      const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+
       return res.status(201).json({
         message: isNew ? 'Invite sent successfully' : 'Active invite already exists',
-        inviteLink: process.env.NODE_ENV === 'development' ? inviteLink : undefined // Dev-only leak
+        inviteLink: variantService.isLocal() ? inviteLink : undefined // Dev-only leak
       });
     } catch (error: any) {
       console.error('[InviteController] sendInvite Error:', error.message);

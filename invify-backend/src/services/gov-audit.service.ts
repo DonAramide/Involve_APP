@@ -120,6 +120,46 @@ function normalizeDeviceLog(raw: any): AuditEntry {
 
 export class GovAuditService {
   /**
+   * Logs a high-risk RBAC permission grant to guarantee an immutable audit trail.
+   */
+  static async logRbacGrant(actorId: string, targetUserId: string, oldRole: string, newRole: string, reqIp?: string): Promise<void> {
+    const entry: any = {
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      module: 'GOVERNANCE',
+      action: 'RBAC_PERMISSION_GRANTED',
+      user_email: actorId,
+      user_name: 'SYSTEM',
+      target: targetUserId,
+      status: 'approved',
+      metadata: {
+        old_role: oldRole,
+        new_role: newRole
+      },
+      ip_address: reqIp || '127.0.0.1',
+      location: 'Local Network'
+    };
+
+    const db = getGovAuditDb();
+    db.logs.unshift(entry);
+    saveGovAuditDb(db);
+
+    try {
+      await supabase.from('audit_logs').insert({
+        id: entry.id,
+        module: entry.module,
+        action: entry.action,
+        user_email: entry.user_email,
+        metadata: entry.metadata,
+        ip_address: entry.ip_address,
+        timestamp: entry.timestamp
+      });
+    } catch (e) {
+      console.error('[GovAuditService] Error pushing RBAC log:', e);
+    }
+  }
+
+  /**
    * Log a governance/maker-checker action with IP and location context.
    */
   static async logAction(entry: Omit<AuditEntry, 'location'> & { location?: string }): Promise<void> {

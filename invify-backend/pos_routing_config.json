@@ -1,0 +1,110 @@
+{
+  "activeHost": "nibss",
+  "failoverOrder": [
+    "express_pay",
+    "kimono",
+    "medusa",
+    "nibss"
+  ],
+  "splitThresholdNaira": 50000,
+  "thresholdRulesMatrix": [],
+  "tenantRoutingProfiles": [
+    {
+      "profileId": "prof_1781362986933",
+      "scopeType": "Tenant",
+      "targetValue": "tenant-1779640483822",
+      "category": "Retail",
+      "preferredHosts": [
+        "nibss"
+      ],
+      "fallbackHosts": [],
+      "processOnDevice": false,
+      "webhookUrl": ""
+    }
+  ],
+  "hosts": [
+    {
+      "hostCode": "nibss",
+      "isActive": true,
+      "ip": "196.6.103.18",
+      "port": 4018,
+      "kimonoKeys": {},
+      "kimonoFallbackParameters": {
+        "merchantId": "",
+        "uniqueId": "",
+        "institutionId": "",
+        "settlementAccount": "",
+        "keyLabel": ""
+      },
+      "nibssConfig": {
+        "institutionCode": "",
+        "terminalId": "",
+        "merchantId": "",
+        "ctmk": "66D4AF3321D8564E9F6F35411755E730",
+        "ptspCode": "GA"
+      },
+      "timeoutSeconds": 60,
+      "sslEnabled": true,
+      "hostName": "NIBSS",
+      "priority": 1,
+      "status": "ONLINE",
+      "supportedCardSchemes": [
+        "MASTERCARD",
+        "VISA"
+      ],
+      "supportedTransactionTypes": [
+        "PURCHASE"
+      ],
+      "supportedTenantCategories": [
+        "School",
+        "Retail"
+      ]
+    },
+    {
+      "hostCode": "express_pay",
+      "isActive": false,
+      "ip": "196.6.103.18",
+      "port": 4018,
+      "kimonoKeys": {},
+      "kimonoFallbackParameters": {
+        "merchantId": "",
+        "uniqueId": "",
+        "institutionId": "",
+        "settlementAccount": "",
+        "keyLabel": ""
+      },
+      "baseUrl": " http://80.88.8.56:552/api/GetPlainMasterKey",
+      "authToken": "c2a66bc3e3a1054e0431f4f11b7a91d8:2df7bec06eb039c80b5117898601a0f769aa1b12f3b1277712cfc03a7851ae93002068990803e4d6daa056c584aecbcb53ccdcc7d929fddb8f7f346c96242b2ea0bbdbb0e8b0c65a6340ffafdfb97e1b",
+      "hostName": "Express Pay",
+      "timeoutSeconds": 60,
+      "priority": 2,
+      "sslEnabled": true,
+      "supportedCardSchemes": [
+        "VISA",
+        "MASTERCARD",
+        "VERVE"
+      ],
+      "supportedTransactionTypes": [
+        "PURCHASE"
+      ],
+      "supportedTenantCategories": [
+        "School",
+        "Retail"
+      ],
+      "merchantCode": " 45FA0B59D2D5B0A7D06DD4B5C5C67D412B51330000000000000000000000000000000000000000000000000000000000",
+      "terminalGroup": " "
+    },
+    {
+      "hostCode": "medusa",
+      "isActive": false,
+      "ip": "",
+      "port": 0
+    },
+    {
+      "hostCode": "kimono",
+      "isActive": false,
+      "ip": "",
+      "port": 0
+    }
+  ]
+}

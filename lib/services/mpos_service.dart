@@ -1,26 +1,67 @@
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
 class MposService {
   static const MethodChannel _channel = MethodChannel('com.invify.app/mpos');
+  
+  static final StreamController<String> _progressController = StreamController<String>.broadcast();
+  Stream<String> get progressStream => _progressController.stream;
+
+  MposService() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onProgressUpdate') {
+        final message = call.arguments['message'] as String;
+        _progressController.add(message);
+      }
+    });
+  }
 
   /// Initiates the pairing process with the Aisino POS device.
-  Future<MposResult> pairDevice() async {
+  Future<MposResult> pairDevice({String? posSerialNumber}) async {
     try {
-      final result = await _channel.invokeMethod<Map<Object?, Object?>>('pairDevice');
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'pairDevice',
+        {
+          'posSerialNumber': posSerialNumber,
+        },
+      );
       return MposResult.fromMap(result);
     } on PlatformException catch (e) {
-      return MposResult(status: 'failure', message: e.message);
+      print('PlatformException: ${e.message}'); return MposResult(status: 'failure', message: e.message ?? 'Unknown Platform Exception');
     }
   }
 
   /// Loads parameters into the paired POS device.
-  Future<MposResult> loadParams() async {
+  Future<MposResult> loadParams({
+    String activeHost = 'MEDUSA',
+    String? expressPayBaseUrl,
+    String? expressPayAuthToken,
+    String? ipAddress,
+    String? portNumber,
+    bool enableSsl = false,
+    String? terminalId,
+    String? key1,
+    int? timeoutSeconds,
+  }) async {
     try {
-      final result = await _channel.invokeMethod<Map<Object?, Object?>>('loadParams');
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'loadParams',
+        {
+          'activeHost': activeHost,
+          'expressPayBaseUrl': expressPayBaseUrl,
+          'expressPayAuthToken': expressPayAuthToken,
+          'ipAddress': ipAddress,
+          'portNumber': portNumber,
+          'enableSsl': enableSsl,
+          'terminalId': terminalId,
+          'key1': key1,
+          'timeoutSeconds': timeoutSeconds,
+        },
+      );
       return MposResult.fromMap(result);
     } on PlatformException catch (e) {
-      return MposResult(status: 'failure', message: e.message);
+      return MposResult(status: 'failure', message: e.message ?? 'Unknown Platform Exception: ${e.code}');
     }
   }
 
@@ -30,7 +71,9 @@ class MposService {
   /// [terminalId] The terminal ID for the transaction.
   Future<MposTransactionResponse> initiatePayment({
     required double amount,
-    required String terminalId,
+    String? terminalId,
+    String activeHost = 'MEDUSA',
+    bool processOnDevice = false,
   }) async {
     try {
       final result = await _channel.invokeMethod<Map<Object?, Object?>>(
@@ -38,6 +81,8 @@ class MposService {
         {
           'amount': amount,
           'terminalId': terminalId,
+          'activeHost': activeHost,
+          'processOnDevice': processOnDevice,
         },
       );
       
@@ -66,7 +111,7 @@ class MposService {
       final result = await _channel.invokeMethod<Map<Object?, Object?>>('unpairDevice');
       return MposResult.fromMap(result);
     } on PlatformException catch (e) {
-      return MposResult(status: 'failure', message: e.message);
+      print('PlatformException: ${e.message}'); return MposResult(status: 'failure', message: e.message ?? 'Unknown Platform Exception');
     }
   }
 }
@@ -195,5 +240,25 @@ class MposTransactionData {
       transactionType: map['transactionType']?.toString(),
       paymentSuccess: map['paymentSuccess'] == true,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'aid': aid,
+      'amount': amount,
+      'cashbackAmount': cashbackAmount,
+      'appLabel': appLabel,
+      'authCode': authCode,
+      'cardExpireDate': cardExpireDate,
+      'cardHolderName': cardHolderName,
+      'dateTime': dateTime,
+      'maskedPan': maskedPan,
+      'message': message,
+      'rrn': rrn,
+      'stan': stan,
+      'statusCode': statusCode,
+      'transactionType': transactionType,
+      'paymentSuccess': paymentSuccess,
+    };
   }
 }

@@ -1,8 +1,11 @@
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class DeviceInfoService {
   static final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
+  static const MethodChannel _mposChannel = MethodChannel('com.invify.app/mpos');
 
   /// Returns the last 6 uppercase alphanumeric characters of the device ID.
   /// Uses MachineGUID on Windows/Linux, AndroidID on Android, IdentifierForVendor on iOS.
@@ -14,8 +17,28 @@ class DeviceInfoService {
         final webInfo = await _deviceInfo.webBrowserInfo;
         deviceId = webInfo.userAgent ?? 'WEB-CLIENT';
       } else if (defaultTargetPlatform == TargetPlatform.android) {
-        final androidInfo = await _deviceInfo.androidInfo;
-        deviceId = androidInfo.id; // unique ID
+        try {
+          var status = await Permission.phone.status;
+          if (!status.isGranted) {
+            status = await Permission.phone.request();
+          }
+          if (status.isGranted) {
+            final hardwareSerial = await _mposChannel.invokeMethod<String>('getHardwareSerial');
+            if (hardwareSerial != null && hardwareSerial.toLowerCase() != 'unknown' && hardwareSerial.isNotEmpty) {
+              deviceId = hardwareSerial;
+            } else {
+              final androidInfo = await _deviceInfo.androidInfo;
+              deviceId = androidInfo.id;
+            }
+          } else {
+            final androidInfo = await _deviceInfo.androidInfo;
+            deviceId = androidInfo.id;
+          }
+        } catch (e) {
+          debugPrint('Failed to get hardware serial: $e');
+          final androidInfo = await _deviceInfo.androidInfo;
+          deviceId = androidInfo.id;
+        }
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final iosInfo = await _deviceInfo.iosInfo;
         deviceId = iosInfo.identifierForVendor ?? 'IOS-DEVICE';
@@ -30,13 +53,16 @@ class DeviceInfoService {
       debugPrint('Error getting device info: $e');
     }
 
-    // Clean and extract last 6 chars
+    // Clean and return the full hardware serial/device ID
     final cleanId = deviceId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
-    if (cleanId.length < 6) {
-      // Pad if too short (rare)
-      return cleanId.padLeft(6, 'X');
-    }
-    return cleanId.substring(cleanId.length - 6);
+    return cleanId.isEmpty ? 'UNKNOWN' : cleanId;
+  }
+
+  /// Returns the last 6 characters of the full device ID for activation purposes.
+  static Future<String> getShortDeviceSuffix() async {
+    final fullId = await getDeviceSuffix();
+    if (fullId == 'UNKNOWN' || fullId.length <= 6) return fullId;
+    return fullId.substring(fullId.length - 6);
   }
 
   /// Hashes a device suffix string (e.g. 6 chars) into a robust 16-bit integer (0-65535).
@@ -76,14 +102,33 @@ class DeviceInfoService {
         osVersion = webInfo.appVersion ?? 'unknown';
       } else if (defaultTargetPlatform == TargetPlatform.android) {
         final androidInfo = await _deviceInfo.androidInfo;
-        deviceId = androidInfo.id;
+        
+        try {
+          var status = await Permission.phone.status;
+          if (!status.isGranted) {
+            status = await Permission.phone.request();
+          }
+          if (status.isGranted) {
+            final hardwareSerial = await _mposChannel.invokeMethod<String>('getHardwareSerial');
+            if (hardwareSerial != null && hardwareSerial.toLowerCase() != 'unknown' && hardwareSerial.isNotEmpty) {
+              deviceId = hardwareSerial;
+              serialNumber = hardwareSerial;
+            } else {
+              deviceId = androidInfo.id;
+            }
+          } else {
+            deviceId = androidInfo.id;
+          }
+        } catch (e) {
+          debugPrint('Failed to get hardware serial: $e');
+          deviceId = androidInfo.id;
+        }
+
         os = 'Android';
         model = androidInfo.model;
         brand = androidInfo.brand;
         osVersion = androidInfo.version.release;
         isPhysicalDevice = androidInfo.isPhysicalDevice;
-        // The serialNumber getter was completely removed from device_info_plus in version 4.0.0+
-        // because it requires READ_PHONE_STATE permissions and is deprecated in Android 10+.
       } else if (defaultTargetPlatform == TargetPlatform.iOS) {
         final iosInfo = await _deviceInfo.iosInfo;
         deviceId = iosInfo.identifierForVendor ?? 'IOS-DEVICE';

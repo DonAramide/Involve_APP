@@ -2,6 +2,7 @@
 import { TerminalInventoryService } from './terminal-inventory.service';
 import { TerminalAuditService } from './terminal-audit.service';
 import { supabase } from '../db/supabase';
+import { PosService } from './pos.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -123,12 +124,64 @@ export class TerminalSyncService {
       metadata: { serialNumber, androidId, enrollmentKey },
     });
 
+    const routingConfig = await PosService.getRoutingConfig();
+
+    const activeHosts = routingConfig.hosts
+      .filter((h: any) => h.isActive)
+      .sort((a: any, b: any) => a.priority - b.priority);
+
+    const expressPay = activeHosts.find((h: any) => h.hostCode === 'express_pay');
+    const kimono = activeHosts.find((h: any) => h.hostCode === 'kimono');
+
+    const primaryHost = activeHosts[0] || null;
+    const secondaryHost = activeHosts[1] || null;
+    const tertiaryHost = activeHosts[2] || null;
+
+    const tenantCategory = tenantDetails?.type || 'retail';
+    const tenantId = tenantDetails?.id;
+    
+    // In the future, we can extract agentCode or terminalGroup from the bundle/tenant for full matching.
+    const agentCode = null; 
+    const terminalGroup = null;
+
+    let tenantPolicy = null;
+    if (routingConfig.tenantRoutingProfiles) {
+      // 1. Tenant match (Highest Priority)
+      if (tenantId) {
+        tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => p.scopeType === 'Tenant' && p.targetValue === tenantId);
+      }
+      
+      // 2. Agent match
+      if (!tenantPolicy && agentCode) {
+        tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => p.scopeType === 'Agent' && p.targetValue === agentCode);
+      }
+      
+      // 3. Group match
+      if (!tenantPolicy && terminalGroup) {
+        tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => p.scopeType === 'Group' && p.targetValue === terminalGroup);
+      }
+      
+      // 4. Category / Default match (Lowest Priority)
+      if (!tenantPolicy) {
+        tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => {
+          if (p.scopeType === 'Category' && p.targetValue) {
+            return p.targetValue.toLowerCase() === tenantCategory.toLowerCase();
+          }
+          // Backward compatibility
+          if (!p.scopeType && p.category) {
+            return p.category.toLowerCase() === tenantCategory.toLowerCase();
+          }
+          return false;
+        });
+      }
+    }
+
     return {
       assigned: true,
       terminalId: bundle.terminal_id?.tid,
       mposTerminalId: bundle.mpos?.id,
       posSerialNumber: bundle.mpos?.serial_number,
-      businessName: tenantDetails?.name || 'Business mapped via Tenant DB', // Use tenant name if available
+      businessName: tenantDetails?.name || 'Business mapped via Tenant DB',
       terminalType: bundle.mpos?.hardware_type,
       configVersion: 1,
       syncedAt: new Date().toISOString(),
@@ -141,6 +194,35 @@ export class TerminalSyncService {
       tenantId: tenantDetails?.id,
       plan: tenantDetails?.plan,
       type: tenantDetails?.type,
+      activeHost: routingConfig.activeHost.toUpperCase(),
+      expressPayHost: expressPay?.ip || null,
+      expressPayPort: expressPay?.port || null,
+
+      primaryHost,
+      secondaryHost,
+      tertiaryHost,
+
+      routingRules: {
+        activeHost: routingConfig.activeHost,
+        failoverOrder: routingConfig.failoverOrder,
+        splitThresholdNaira: routingConfig.splitThresholdNaira,
+        processOnDevice: tenantPolicy?.processOnDevice ?? false,
+        webhookUrl: tenantPolicy?.webhookUrl ?? null,
+      },
+      thresholdRules: routingConfig.thresholdRulesMatrix,
+      tenantPolicy,
+
+      expressPayBaseUrl: expressPay?.baseUrl || null,
+      expressPayAuthToken: expressPay?.authToken || null,
+      merchantCode: expressPay?.merchantCode || null,
+      terminalGroup: expressPay?.terminalGroup || null,
+      sslProfile: expressPay?.sslProfile || null,
+
+      kimonoIp: kimono?.kimonoIp || kimono?.ip || null,
+      kimonoPort: kimono?.kimonoPort || kimono?.port || null,
+      kimonoSSL: kimono?.kimonoSSL || kimono?.sslEnabled || false,
+      kimonoKeys: kimono?.kimonoKeys || null,
+      kimonoFallbackParameters: kimono?.kimonoFallbackParameters || null
     };
   }
 
@@ -152,6 +234,19 @@ export class TerminalSyncService {
     if (!bundle) {
       return { assigned: false };
     }
+    const routingConfig = await PosService.getRoutingConfig();
+
+    const activeHosts = routingConfig.hosts
+      .filter((h: any) => h.isActive)
+      .sort((a: any, b: any) => a.priority - b.priority);
+
+    const expressPay = activeHosts.find((h: any) => h.hostCode === 'express_pay');
+    const kimono = activeHosts.find((h: any) => h.hostCode === 'kimono');
+
+    const primaryHost = activeHosts[0] || null;
+    const secondaryHost = activeHosts[1] || null;
+    const tertiaryHost = activeHosts[2] || null;
+
     return {
       assigned: true,
       terminalId: bundle.terminal_id?.tid,
@@ -159,6 +254,38 @@ export class TerminalSyncService {
       posSerialNumber: bundle.mpos?.serial_number,
       terminalType: bundle.mpos?.hardware_type,
       configVersion: 1,
+      activeHost: routingConfig.activeHost.toUpperCase(),
+      expressPayHost: expressPay?.ip || null,
+      expressPayPort: expressPay?.port || null,
+
+      primaryHost,
+      secondaryHost,
+      tertiaryHost,
+      expressPayBaseUrl: expressPay?.baseUrl || null,
+      expressPayAuthToken: expressPay?.authToken || null,
+      kimonoIp: kimono?.kimonoIp || kimono?.ip || null,
+      kimonoPort: kimono?.kimonoPort || kimono?.port || null,
+      kimonoSSL: kimono?.kimonoSSL || kimono?.sslEnabled || false
     };
+  }
+
+  static async recordKeyExchangeSuccess(deviceId: string) {
+    if (isOfflineMode()) {
+      const db = getLocalDB();
+      const index = db.tablets.findIndex((t: any) => t.device_id === deviceId);
+      if (index !== -1) {
+        db.tablets[index].last_key_exchange_at = new Date().toISOString();
+        saveLocalDB(db);
+        return { success: true };
+      }
+      return { success: false, message: 'Device not found' };
+    } else {
+      const { data, error } = await supabase.from('devices').update({
+        last_key_exchange_at: new Date().toISOString()
+      }).eq('device_id', deviceId);
+
+      if (error) throw error;
+      return { success: true };
+    }
   }
 }

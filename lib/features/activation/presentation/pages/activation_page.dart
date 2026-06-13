@@ -326,7 +326,7 @@ class _ActivationPageState extends State<ActivationPage> {
                                   const SizedBox(height: 24),
                                   // Device ID Display
                                   FutureBuilder<String>(
-                                    future: DeviceInfoService.getDeviceSuffix(),
+                                    future: DeviceInfoService.getShortDeviceSuffix(),
                                     builder: (context, snapshot) {
                                       if (!snapshot.hasData) return const SizedBox.shrink();
                                       return Container(

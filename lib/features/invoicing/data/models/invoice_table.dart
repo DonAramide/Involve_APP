@@ -46,6 +46,7 @@ class Invoices extends Table {
   TextColumn get academicYearName => text().nullable()();
   BlobColumn get studentImage => blob().nullable()();
   TextColumn get warrantyDuration => text().nullable()();
+  RealColumn get changeGiven => real().withDefault(const Constant(0.0))();
 }
 
 @DataClassName('InvoiceItemTable')

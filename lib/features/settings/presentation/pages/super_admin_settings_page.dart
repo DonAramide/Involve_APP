@@ -51,6 +51,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
 
   Uint8List? _selectedLogo;
   bool _confirmPriceOnSelection = false;
+  bool _allowGiveChange = false;
   bool _hasChanges = false;
 
   @override
@@ -65,6 +66,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       _taxIdController.text = settings.taxId ?? '';
       _selectedLogo = settings.logo;
       _confirmPriceOnSelection = settings.confirmPriceOnSelection;
+      _allowGiveChange = settings.allowGiveChange;
       _licenseBusinessNameController.text = settings.organizationName;
     }
     
@@ -256,6 +258,21 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                   ),
                   const SizedBox(height: 32),
                   
+                  _buildSectionHeader('Point of Sale'),
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    title: const Text('Allow Give Change (Card/Transfer)'),
+                    subtitle: const Text('Cashiers can give change to customers paying electronically'),
+                    value: _allowGiveChange,
+                    onChanged: (val) {
+                      setState(() {
+                        _allowGiveChange = val;
+                        _hasChanges = true;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 32),
+                  
                   const SizedBox(height: 48),
 
                    // License Generator Section
@@ -404,6 +421,8 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
         _descriptionController.text = settings.businessDescription ?? '';
         _taxIdController.text = settings.taxId ?? '';
         _selectedLogo = settings.logo;
+        _confirmPriceOnSelection = settings.confirmPriceOnSelection;
+        _allowGiveChange = settings.allowGiveChange;
         _hasChanges = false;
       });
     }
@@ -424,6 +443,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       taxId: _taxIdController.text,
       logo: _selectedLogo,
       confirmPriceOnSelection: _confirmPriceOnSelection,
+      allowGiveChange: _allowGiveChange,
     );
     
     settingsBloc.add(UpdateAppSettings(updatedSettings));

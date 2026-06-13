@@ -60,8 +60,15 @@ export class SystemTelemetryService {
     
     // Disk & Network are mocked here natively since raw node 'os' doesn't provide disk IO stats natively.
     // For a real prod app, you'd use a package or read /proc/diskstats in linux.
-    const diskPercentage = Math.floor(Math.random() * 5) + 30; // Float around 30-35%
-    const networkPercentage = Math.floor(Math.random() * 20) + 10; // Float around 10-30%
+    const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+    
+    let diskPercentage = 32;
+    let networkPercentage = 15;
+
+    if (variantService.isLocal()) {
+      diskPercentage = Math.floor(Math.random() * 5) + 30; // Float around 30-35%
+      networkPercentage = Math.floor(Math.random() * 20) + 10; // Float around 10-30%
+    }
 
     return {
       cpu: { label: 'CPU Usage', value: cpuUsage, color: 'cyan-4' },

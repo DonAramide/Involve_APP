@@ -718,7 +718,11 @@ const executeLoginPass = async () => {
         }, 1000)
         errorMessage.value = 'Continuous authentication failures exceeded threshold. Enforcing brute force security protocol.'
       } else {
-        errorMessage.value = err.response?.data?.message || err.message || 'Authentication handshakes rejected due to origin validation blocks.'
+        if (err.response?.status === 401) {
+          errorMessage.value = 'Invalid user name or password'
+        } else {
+          errorMessage.value = err.response?.data?.error || err.response?.data?.message || err.message || 'Authentication handshakes rejected due to origin validation blocks.'
+        }
       }
     }
   } finally {

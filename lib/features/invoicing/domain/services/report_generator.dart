@@ -3,7 +3,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
@@ -41,6 +41,7 @@ class ReportGenerator {
     final totalAmount = invoices.fold<double>(0, (sum, item) => sum + item.totalAmount);
     final totalPaid = invoices.fold<double>(0, (sum, item) => sum + item.amountPaid);
     final totalReturned = returns.fold<double>(0, (sum, item) => sum + item.amountReturned);
+    final totalChangeGiven = invoices.fold<double>(0, (sum, item) => sum + item.changeGiven);
     // Dynamic balance calculation based on net total in DB
     final totalBalance = (totalAmount - totalPaid).clamp(0.0, double.infinity);
 
@@ -170,8 +171,13 @@ class ReportGenerator {
                         'TOTAL RETURNED: ${settings.currency} ${CurrencyFormatter.format(totalReturned)}',
                         style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.orange),
                       ),
+                    if (totalChangeGiven > 0)
+                      pw.Text(
+                        'TOTAL CHANGE GIVEN: ${settings.currency} ${CurrencyFormatter.format(totalChangeGiven)}',
+                        style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: PdfColors.red),
+                      ),
                     pw.Text(
-                      'NET SALES: ${settings.currency} ${CurrencyFormatter.format(totalPaid - totalReturned)}',
+                      'NET SALES: ${settings.currency} ${CurrencyFormatter.format(totalPaid - totalReturned - totalChangeGiven)}',
                       style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: _getPrimaryColor(settings)),
                     ),
                     pw.Text(
@@ -213,7 +219,7 @@ class ReportGenerator {
                       children: [
                         pw.Text('CASH IN HAND', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
                         pw.Text(
-                          '${settings.currency} ${CurrencyFormatter.format(totalPaid)}',
+                          '${settings.currency} ${CurrencyFormatter.format(totalPaid - totalChangeGiven)}',
                           style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: _getPrimaryColor(settings)),
                         ),
                       ],
@@ -234,6 +240,75 @@ class ReportGenerator {
     );
 
     return pdf;
+  }
+
+  static List<PrintCommand> buildSalesThermalCommands({
+    required List<Invoice> invoices,
+    required AppSettings settings,
+    InvReportDateRange? dateRange,
+    List<StockReturn>? stockReturns,
+  }) {
+    final commands = <PrintCommand>[];
+    final List<StockReturn> returns = stockReturns ?? [];
+
+    if (settings.showLogo && settings.logo != null) {
+      commands.add(ImageCommand(bytes: settings.logo!));
+    }
+
+    commands.add(TextCommand(settings.organizationName.toUpperCase(), isBold: true, align: 'center'));
+    if (settings.address.isNotEmpty) commands.add(TextCommand(settings.address, align: 'center'));
+    commands.add(DividerCommand());
+
+    commands.add(TextCommand('SALES REPORT', isBold: true, align: 'center'));
+    if (dateRange != null) {
+      commands.add(TextCommand('${DateFormat('MMM dd').format(dateRange.start)} - ${DateFormat('MMM dd').format(dateRange.end)}', align: 'center'));
+    } else {
+      commands.add(TextCommand('As of: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}', align: 'center'));
+    }
+    commands.add(DividerCommand());
+
+    final totalAmount = invoices.fold<double>(0, (sum, item) => sum + item.totalAmount);
+    final totalPaid = invoices.fold<double>(0, (sum, item) => sum + item.amountPaid);
+    final totalReturned = returns.fold<double>(0, (sum, item) => sum + item.amountReturned);
+    final totalChangeGiven = invoices.fold<double>(0, (sum, item) => sum + item.changeGiven);
+
+    final methodSummary = <String, double>{
+      'Cash': 0.0,
+      'POS': 0.0,
+      'Transfer': 0.0,
+    };
+    for (final invoice in invoices) {
+      final method = invoice.paymentMethod ?? 'Other';
+      methodSummary[method] = (methodSummary[method] ?? 0.0) + invoice.amountPaid;
+    }
+
+    commands.add(TextCommand('Total Invoices: ${invoices.length}'));
+    commands.add(TextCommand('Period Total: ${CurrencyFormatter.formatWithSymbol(totalAmount, symbol: settings.currency)}'));
+    if (totalReturned > 0) {
+      commands.add(TextCommand('Total Returned: ${CurrencyFormatter.formatWithSymbol(totalReturned, symbol: settings.currency)}'));
+    }
+    if (totalChangeGiven > 0) {
+      commands.add(TextCommand('Change Given: ${CurrencyFormatter.formatWithSymbol(totalChangeGiven, symbol: settings.currency)}'));
+    }
+    commands.add(TextCommand('Net Sales: ${CurrencyFormatter.formatWithSymbol(totalPaid - totalReturned - totalChangeGiven, symbol: settings.currency)}', isBold: true));
+    
+    commands.add(DividerCommand());
+    commands.add(TextCommand('PAYMENT SUMMARY', isBold: true, align: 'center'));
+    commands.add(SizedBoxCommand(height: 1));
+    for (final entry in methodSummary.entries) {
+      commands.add(TextCommand('${entry.key}: ${CurrencyFormatter.formatWithSymbol(entry.value, symbol: settings.currency)}'));
+    }
+    commands.add(SizedBoxCommand(height: 1));
+    commands.add(TextCommand('CASH IN HAND: ${CurrencyFormatter.formatWithSymbol(totalPaid - totalChangeGiven, symbol: settings.currency)}', isBold: true));
+
+    commands.add(DividerCommand());
+    final footer = settings.businessMode == 'school' 
+      ? 'Generated by Involve' 
+      : 'Generated by Sales Involve';
+    commands.add(TextCommand(footer, align: 'center'));
+    commands.add(SizedBoxCommand(height: 3));
+
+    return commands;
   }
 
   static Future<void> generateSalesReport({
@@ -562,6 +637,69 @@ class ReportGenerator {
     commands.add(SizedBoxCommand(height: 3));
 
     return commands;
+  }
+
+  static Future<void> exportSalesCSV({
+    required List<Invoice> invoices,
+    required AppSettings settings,
+    InvReportDateRange? dateRange,
+    List<StockReturn>? stockReturns,
+  }) async {
+    try {
+      final csvContent = buildSalesCSV(invoices, stockReturns ?? [], settings);
+      final bytes = Uint8List.fromList(csvContent.codeUnits);
+      
+      final dateStr = dateRange != null
+          ? '_${DateFormat('yyyy-MM-dd').format(dateRange.start)}_to_${DateFormat('yyyy-MM-dd').format(dateRange.end)}'
+          : '';
+
+      await Printing.sharePdf(
+        bytes: bytes,
+        filename: 'Sales_Report$dateStr.csv',
+      );
+    } catch (e) {
+      debugPrint('Error sharing CSV: $e');
+      rethrow;
+    }
+  }
+
+  static String buildSalesCSV(List<Invoice> invoices, List<StockReturn> returns, AppSettings settings) {
+    final buffer = StringBuffer();
+    
+    // Header
+    buffer.writeln('Date,Invoice ID,Method,Total,Paid,Return,Change Given,Balance');
+
+    for (final invoice in invoices) {
+      final invoiceReturns = returns.where((r) => r.invoiceId == invoice.id).fold<double>(0, (s, r) => s + r.amountReturned);
+      final dynamicBalance = (invoice.totalAmount - invoice.amountPaid).clamp(0.0, double.infinity);
+      
+      buffer.writeln('${DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated)},'
+          '${invoice.invoiceNumber},'
+          '${invoice.paymentMethod ?? 'Other'},'
+          '${invoice.totalAmount},'
+          '${invoice.amountPaid},'
+          '${invoiceReturns},'
+          '${invoice.changeGiven},'
+          '${dynamicBalance}');
+    }
+
+    // Summary
+    buffer.writeln('');
+    buffer.writeln('SUMMARY');
+    final totalAmount = invoices.fold<double>(0, (sum, item) => sum + item.totalAmount);
+    final totalPaid = invoices.fold<double>(0, (sum, item) => sum + item.amountPaid);
+    final totalReturned = returns.fold<double>(0, (sum, item) => sum + item.amountReturned);
+    final totalChangeGiven = invoices.fold<double>(0, (sum, item) => sum + item.changeGiven);
+    
+    buffer.writeln('Total Invoices,${invoices.length}');
+    buffer.writeln('Period Total,${totalAmount}');
+    buffer.writeln('Total Paid,${totalPaid}');
+    buffer.writeln('Total Returned,${totalReturned}');
+    buffer.writeln('Change Given,${totalChangeGiven}');
+    buffer.writeln('Net Sales,${totalPaid - totalReturned - totalChangeGiven}');
+    buffer.writeln('Cash In Hand,${totalPaid - totalChangeGiven}');
+
+    return buffer.toString();
   }
 
   static Future<pw.Document> buildActivityReport({

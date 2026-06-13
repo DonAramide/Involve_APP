@@ -41,41 +41,44 @@ describe('Commission Security & Hardening Audit (PRG-1A)', () => {
     let originalEnv: string | undefined;
 
     beforeAll(() => {
-      originalEnv = process.env.NODE_ENV;
+      originalEnv = process.env.BUILD_VARIANT;
     });
 
     afterAll(() => {
-      process.env.NODE_ENV = originalEnv;
+      process.env.BUILD_VARIANT = originalEnv;
+      require('../src/config/build-variant').BuildVariantService.resetInstance();
     });
 
-    test('mock-admin-token works in test/development environments', async () => {
-      process.env.NODE_ENV = 'test';
+    test('mock-admin-token works in test/development environments (LOCAL variant)', async () => {
+      process.env.BUILD_VARIANT = 'LOCAL';
+      require('../src/config/build-variant').BuildVariantService.resetInstance();
       const res = await request(app)
         .post('/admin/commissions/programs')
         .set('Authorization', 'Bearer mock-admin-token')
         .send({ name: 'Test Program', description: 'Test' });
 
-      // In test, since NODE_ENV === 'test', it allows the mock token bypass.
-      // Even if database connection is failing, the auth check itself passes (so it does not return 401/403)
+      // In LOCAL variant, it allows the mock token bypass.
       expect(res.status).not.toBe(401);
       expect(res.status).not.toBe(403);
     });
 
-    test('mock-admin-token is strictly rejected with 401 in production builds', async () => {
-      process.env.NODE_ENV = 'production';
+    test('mock-admin-token is strictly rejected with 401 in PROD builds', async () => {
+      process.env.BUILD_VARIANT = 'PROD';
+      require('../src/config/build-variant').BuildVariantService.resetInstance();
       const res = await request(app)
         .post('/admin/commissions/programs')
         .set('Authorization', 'Bearer mock-admin-token')
         .send({ name: 'Production Test Program', description: 'Test' });
 
-      // In production/staging, mock-admin-token is not processed as a bypass,
+      // In PROD/STAGING, mock-admin-token is not processed as a bypass,
       // and it fails JWT check by Supabase, yielding 401.
       expect(res.status).toBe(401);
       expect(res.body.error).toBe('Invalid or expired session');
     });
 
-    test('mock-admin-token is strictly rejected with 401 in staging builds', async () => {
-      process.env.NODE_ENV = 'staging';
+    test('mock-admin-token is strictly rejected with 401 in STAGING builds', async () => {
+      process.env.BUILD_VARIANT = 'STAGING';
+      require('../src/config/build-variant').BuildVariantService.resetInstance();
       const res = await request(app)
         .post('/admin/commissions/programs')
         .set('Authorization', 'Bearer mock-admin-token')

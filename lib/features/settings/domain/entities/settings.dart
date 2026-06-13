@@ -67,6 +67,7 @@ class AppSettings extends Equatable {
   final Uint8List? adminSignature;
   final bool showAdminSignature;
   final bool warrantyEnabled;
+  final bool allowGiveChange;
 
 
   const AppSettings({
@@ -126,6 +127,7 @@ class AppSettings extends Equatable {
     this.adminSignature,
     this.showAdminSignature = false,
     this.warrantyEnabled = false,
+    this.allowGiveChange = false,
 
   });
 
@@ -186,6 +188,7 @@ class AppSettings extends Equatable {
     Uint8List? adminSignature,
     bool? showAdminSignature,
     bool? warrantyEnabled,
+    bool? allowGiveChange,
 
   }) {
     return AppSettings(
@@ -245,6 +248,7 @@ class AppSettings extends Equatable {
       adminSignature: adminSignature ?? this.adminSignature,
       showAdminSignature: showAdminSignature ?? this.showAdminSignature,
       warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
+      allowGiveChange: allowGiveChange ?? this.allowGiveChange,
 
     );
   }
@@ -307,6 +311,7 @@ class AppSettings extends Equatable {
         adminSignature,
         showAdminSignature,
         warrantyEnabled,
+        allowGiveChange,
 
       ];
 }

@@ -2242,6 +2242,14 @@ class $InvoicesTable extends Invoices
   late final GeneratedColumn<String> warrantyDuration = GeneratedColumn<String>(
       'warranty_duration', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _changeGivenMeta =
+      const VerificationMeta('changeGiven');
+  @override
+  late final GeneratedColumn<double> changeGiven = GeneratedColumn<double>(
+      'change_given', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -2277,7 +2285,8 @@ class $InvoicesTable extends Invoices
         termName,
         academicYearName,
         studentImage,
-        warrantyDuration
+        warrantyDuration,
+        changeGiven
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2474,6 +2483,12 @@ class $InvoicesTable extends Invoices
           warrantyDuration.isAcceptableOrUnknown(
               data['warranty_duration']!, _warrantyDurationMeta));
     }
+    if (data.containsKey('change_given')) {
+      context.handle(
+          _changeGivenMeta,
+          changeGiven.isAcceptableOrUnknown(
+              data['change_given']!, _changeGivenMeta));
+    }
     return context;
   }
 
@@ -2551,6 +2566,8 @@ class $InvoicesTable extends Invoices
           .read(DriftSqlType.blob, data['${effectivePrefix}student_image']),
       warrantyDuration: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}warranty_duration']),
+      changeGiven: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}change_given'])!,
     );
   }
 
@@ -2595,6 +2612,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
   final String? academicYearName;
   final Uint8List? studentImage;
   final String? warrantyDuration;
+  final double changeGiven;
   const InvoiceTable(
       {required this.id,
       required this.invoiceNumber,
@@ -2629,7 +2647,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       this.termName,
       this.academicYearName,
       this.studentImage,
-      this.warrantyDuration});
+      this.warrantyDuration,
+      required this.changeGiven});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -2709,6 +2728,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
     if (!nullToAbsent || warrantyDuration != null) {
       map['warranty_duration'] = Variable<String>(warrantyDuration);
     }
+    map['change_given'] = Variable<double>(changeGiven);
     return map;
   }
 
@@ -2788,6 +2808,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       warrantyDuration: warrantyDuration == null && nullToAbsent
           ? const Value.absent()
           : Value(warrantyDuration),
+      changeGiven: Value(changeGiven),
     );
   }
 
@@ -2829,6 +2850,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       academicYearName: serializer.fromJson<String?>(json['academicYearName']),
       studentImage: serializer.fromJson<Uint8List?>(json['studentImage']),
       warrantyDuration: serializer.fromJson<String?>(json['warrantyDuration']),
+      changeGiven: serializer.fromJson<double>(json['changeGiven']),
     );
   }
   @override
@@ -2869,6 +2891,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       'academicYearName': serializer.toJson<String?>(academicYearName),
       'studentImage': serializer.toJson<Uint8List?>(studentImage),
       'warrantyDuration': serializer.toJson<String?>(warrantyDuration),
+      'changeGiven': serializer.toJson<double>(changeGiven),
     };
   }
 
@@ -2906,7 +2929,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           Value<String?> termName = const Value.absent(),
           Value<String?> academicYearName = const Value.absent(),
           Value<Uint8List?> studentImage = const Value.absent(),
-          Value<String?> warrantyDuration = const Value.absent()}) =>
+          Value<String?> warrantyDuration = const Value.absent(),
+          double? changeGiven}) =>
       InvoiceTable(
         id: id ?? this.id,
         invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -2956,6 +2980,7 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         warrantyDuration: warrantyDuration.present
             ? warrantyDuration.value
             : this.warrantyDuration,
+        changeGiven: changeGiven ?? this.changeGiven,
       );
   InvoiceTable copyWithCompanion(InvoicesCompanion data) {
     return InvoiceTable(
@@ -3027,6 +3052,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
       warrantyDuration: data.warrantyDuration.present
           ? data.warrantyDuration.value
           : this.warrantyDuration,
+      changeGiven:
+          data.changeGiven.present ? data.changeGiven.value : this.changeGiven,
     );
   }
 
@@ -3066,7 +3093,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           ..write('termName: $termName, ')
           ..write('academicYearName: $academicYearName, ')
           ..write('studentImage: $studentImage, ')
-          ..write('warrantyDuration: $warrantyDuration')
+          ..write('warrantyDuration: $warrantyDuration, ')
+          ..write('changeGiven: $changeGiven')
           ..write(')'))
         .toString();
   }
@@ -3106,7 +3134,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
         termName,
         academicYearName,
         $driftBlobEquality.hash(studentImage),
-        warrantyDuration
+        warrantyDuration,
+        changeGiven
       ]);
   @override
   bool operator ==(Object other) =>
@@ -3145,7 +3174,8 @@ class InvoiceTable extends DataClass implements Insertable<InvoiceTable> {
           other.termName == this.termName &&
           other.academicYearName == this.academicYearName &&
           $driftBlobEquality.equals(other.studentImage, this.studentImage) &&
-          other.warrantyDuration == this.warrantyDuration);
+          other.warrantyDuration == this.warrantyDuration &&
+          other.changeGiven == this.changeGiven);
 }
 
 class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
@@ -3183,6 +3213,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
   final Value<String?> academicYearName;
   final Value<Uint8List?> studentImage;
   final Value<String?> warrantyDuration;
+  final Value<double> changeGiven;
   const InvoicesCompanion({
     this.id = const Value.absent(),
     this.invoiceNumber = const Value.absent(),
@@ -3218,6 +3249,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.academicYearName = const Value.absent(),
     this.studentImage = const Value.absent(),
     this.warrantyDuration = const Value.absent(),
+    this.changeGiven = const Value.absent(),
   });
   InvoicesCompanion.insert({
     this.id = const Value.absent(),
@@ -3254,6 +3286,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     this.academicYearName = const Value.absent(),
     this.studentImage = const Value.absent(),
     this.warrantyDuration = const Value.absent(),
+    this.changeGiven = const Value.absent(),
   })  : invoiceNumber = Value(invoiceNumber),
         subtotal = Value(subtotal),
         taxAmount = Value(taxAmount),
@@ -3295,6 +3328,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     Expression<String>? academicYearName,
     Expression<Uint8List>? studentImage,
     Expression<String>? warrantyDuration,
+    Expression<double>? changeGiven,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3331,6 +3365,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       if (academicYearName != null) 'academic_year_name': academicYearName,
       if (studentImage != null) 'student_image': studentImage,
       if (warrantyDuration != null) 'warranty_duration': warrantyDuration,
+      if (changeGiven != null) 'change_given': changeGiven,
     });
   }
 
@@ -3368,7 +3403,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       Value<String?>? termName,
       Value<String?>? academicYearName,
       Value<Uint8List?>? studentImage,
-      Value<String?>? warrantyDuration}) {
+      Value<String?>? warrantyDuration,
+      Value<double>? changeGiven}) {
     return InvoicesCompanion(
       id: id ?? this.id,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -3404,6 +3440,7 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
       academicYearName: academicYearName ?? this.academicYearName,
       studentImage: studentImage ?? this.studentImage,
       warrantyDuration: warrantyDuration ?? this.warrantyDuration,
+      changeGiven: changeGiven ?? this.changeGiven,
     );
   }
 
@@ -3512,6 +3549,9 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
     if (warrantyDuration.present) {
       map['warranty_duration'] = Variable<String>(warrantyDuration.value);
     }
+    if (changeGiven.present) {
+      map['change_given'] = Variable<double>(changeGiven.value);
+    }
     return map;
   }
 
@@ -3551,7 +3591,8 @@ class InvoicesCompanion extends UpdateCompanion<InvoiceTable> {
           ..write('termName: $termName, ')
           ..write('academicYearName: $academicYearName, ')
           ..write('studentImage: $studentImage, ')
-          ..write('warrantyDuration: $warrantyDuration')
+          ..write('warrantyDuration: $warrantyDuration, ')
+          ..write('changeGiven: $changeGiven')
           ..write(')'))
         .toString();
   }
@@ -4752,6 +4793,16 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("warranty_enabled" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _allowGiveChangeMeta =
+      const VerificationMeta('allowGiveChange');
+  @override
+  late final GeneratedColumn<bool> allowGiveChange = GeneratedColumn<bool>(
+      'allow_give_change', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("allow_give_change" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4809,7 +4860,8 @@ class $SettingsTable extends Settings
         currencySubunit,
         adminSignature,
         showAdminSignature,
-        warrantyEnabled
+        warrantyEnabled,
+        allowGiveChange
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5131,6 +5183,12 @@ class $SettingsTable extends Settings
           warrantyEnabled.isAcceptableOrUnknown(
               data['warranty_enabled']!, _warrantyEnabledMeta));
     }
+    if (data.containsKey('allow_give_change')) {
+      context.handle(
+          _allowGiveChangeMeta,
+          allowGiveChange.isAcceptableOrUnknown(
+              data['allow_give_change']!, _allowGiveChangeMeta));
+    }
     return context;
   }
 
@@ -5259,6 +5317,8 @@ class $SettingsTable extends Settings
           DriftSqlType.bool, data['${effectivePrefix}show_admin_signature'])!,
       warrantyEnabled: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}warranty_enabled'])!,
+      allowGiveChange: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}allow_give_change'])!,
     );
   }
 
@@ -5325,6 +5385,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final Uint8List? adminSignature;
   final bool showAdminSignature;
   final bool warrantyEnabled;
+  final bool allowGiveChange;
   const SettingsTable(
       {required this.id,
       required this.organizationName,
@@ -5381,7 +5442,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.currencySubunit,
       this.adminSignature,
       required this.showAdminSignature,
-      required this.warrantyEnabled});
+      required this.warrantyEnabled,
+      required this.allowGiveChange});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -5471,6 +5533,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     }
     map['show_admin_signature'] = Variable<bool>(showAdminSignature);
     map['warranty_enabled'] = Variable<bool>(warrantyEnabled);
+    map['allow_give_change'] = Variable<bool>(allowGiveChange);
     return map;
   }
 
@@ -5557,6 +5620,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           : Value(adminSignature),
       showAdminSignature: Value(showAdminSignature),
       warrantyEnabled: Value(warrantyEnabled),
+      allowGiveChange: Value(allowGiveChange),
     );
   }
 
@@ -5632,6 +5696,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       adminSignature: serializer.fromJson<Uint8List?>(json['adminSignature']),
       showAdminSignature: serializer.fromJson<bool>(json['showAdminSignature']),
       warrantyEnabled: serializer.fromJson<bool>(json['warrantyEnabled']),
+      allowGiveChange: serializer.fromJson<bool>(json['allowGiveChange']),
     );
   }
   @override
@@ -5698,6 +5763,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'adminSignature': serializer.toJson<Uint8List?>(adminSignature),
       'showAdminSignature': serializer.toJson<bool>(showAdminSignature),
       'warrantyEnabled': serializer.toJson<bool>(warrantyEnabled),
+      'allowGiveChange': serializer.toJson<bool>(allowGiveChange),
     };
   }
 
@@ -5757,7 +5823,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           String? currencySubunit,
           Value<Uint8List?> adminSignature = const Value.absent(),
           bool? showAdminSignature,
-          bool? warrantyEnabled}) =>
+          bool? warrantyEnabled,
+          bool? allowGiveChange}) =>
       SettingsTable(
         id: id ?? this.id,
         organizationName: organizationName ?? this.organizationName,
@@ -5827,6 +5894,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
             adminSignature.present ? adminSignature.value : this.adminSignature,
         showAdminSignature: showAdminSignature ?? this.showAdminSignature,
         warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
+        allowGiveChange: allowGiveChange ?? this.allowGiveChange,
       );
   SettingsTable copyWithCompanion(SettingsCompanion data) {
     return SettingsTable(
@@ -5960,6 +6028,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       warrantyEnabled: data.warrantyEnabled.present
           ? data.warrantyEnabled.value
           : this.warrantyEnabled,
+      allowGiveChange: data.allowGiveChange.present
+          ? data.allowGiveChange.value
+          : this.allowGiveChange,
     );
   }
 
@@ -6021,7 +6092,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('currencySubunit: $currencySubunit, ')
           ..write('adminSignature: $adminSignature, ')
           ..write('showAdminSignature: $showAdminSignature, ')
-          ..write('warrantyEnabled: $warrantyEnabled')
+          ..write('warrantyEnabled: $warrantyEnabled, ')
+          ..write('allowGiveChange: $allowGiveChange')
           ..write(')'))
         .toString();
   }
@@ -6083,7 +6155,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         currencySubunit,
         $driftBlobEquality.hash(adminSignature),
         showAdminSignature,
-        warrantyEnabled
+        warrantyEnabled,
+        allowGiveChange
       ]);
   @override
   bool operator ==(Object other) =>
@@ -6146,7 +6219,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           $driftBlobEquality.equals(
               other.adminSignature, this.adminSignature) &&
           other.showAdminSignature == this.showAdminSignature &&
-          other.warrantyEnabled == this.warrantyEnabled);
+          other.warrantyEnabled == this.warrantyEnabled &&
+          other.allowGiveChange == this.allowGiveChange);
 }
 
 class SettingsCompanion extends UpdateCompanion<SettingsTable> {
@@ -6206,6 +6280,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<Uint8List?> adminSignature;
   final Value<bool> showAdminSignature;
   final Value<bool> warrantyEnabled;
+  final Value<bool> allowGiveChange;
   const SettingsCompanion({
     this.id = const Value.absent(),
     this.organizationName = const Value.absent(),
@@ -6263,6 +6338,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.adminSignature = const Value.absent(),
     this.showAdminSignature = const Value.absent(),
     this.warrantyEnabled = const Value.absent(),
+    this.allowGiveChange = const Value.absent(),
   });
   SettingsCompanion.insert({
     this.id = const Value.absent(),
@@ -6321,6 +6397,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.adminSignature = const Value.absent(),
     this.showAdminSignature = const Value.absent(),
     this.warrantyEnabled = const Value.absent(),
+    this.allowGiveChange = const Value.absent(),
   })  : organizationName = Value(organizationName),
         address = Value(address),
         phone = Value(phone);
@@ -6381,6 +6458,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<Uint8List>? adminSignature,
     Expression<bool>? showAdminSignature,
     Expression<bool>? warrantyEnabled,
+    Expression<bool>? allowGiveChange,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -6456,6 +6534,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (showAdminSignature != null)
         'show_admin_signature': showAdminSignature,
       if (warrantyEnabled != null) 'warranty_enabled': warrantyEnabled,
+      if (allowGiveChange != null) 'allow_give_change': allowGiveChange,
     });
   }
 
@@ -6515,7 +6594,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String>? currencySubunit,
       Value<Uint8List?>? adminSignature,
       Value<bool>? showAdminSignature,
-      Value<bool>? warrantyEnabled}) {
+      Value<bool>? warrantyEnabled,
+      Value<bool>? allowGiveChange}) {
     return SettingsCompanion(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
@@ -6580,6 +6660,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       adminSignature: adminSignature ?? this.adminSignature,
       showAdminSignature: showAdminSignature ?? this.showAdminSignature,
       warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
+      allowGiveChange: allowGiveChange ?? this.allowGiveChange,
     );
   }
 
@@ -6761,6 +6842,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (warrantyEnabled.present) {
       map['warranty_enabled'] = Variable<bool>(warrantyEnabled.value);
     }
+    if (allowGiveChange.present) {
+      map['allow_give_change'] = Variable<bool>(allowGiveChange.value);
+    }
     return map;
   }
 
@@ -6822,7 +6906,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('currencySubunit: $currencySubunit, ')
           ..write('adminSignature: $adminSignature, ')
           ..write('showAdminSignature: $showAdminSignature, ')
-          ..write('warrantyEnabled: $warrantyEnabled')
+          ..write('warrantyEnabled: $warrantyEnabled, ')
+          ..write('allowGiveChange: $allowGiveChange')
           ..write(')'))
         .toString();
   }
@@ -21283,6 +21368,7 @@ typedef $$InvoicesTableCreateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> academicYearName,
   Value<Uint8List?> studentImage,
   Value<String?> warrantyDuration,
+  Value<double> changeGiven,
 });
 typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<int> id,
@@ -21319,6 +21405,7 @@ typedef $$InvoicesTableUpdateCompanionBuilder = InvoicesCompanion Function({
   Value<String?> academicYearName,
   Value<Uint8List?> studentImage,
   Value<String?> warrantyDuration,
+  Value<double> changeGiven,
 });
 
 final class $$InvoicesTableReferences
@@ -21485,6 +21572,9 @@ class $$InvoicesTableFilterComposer
   ColumnFilters<String> get warrantyDuration => $composableBuilder(
       column: $table.warrantyDuration,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get changeGiven => $composableBuilder(
+      column: $table.changeGiven, builder: (column) => ColumnFilters(column));
 
   $$CustomersTableFilterComposer get customerId {
     final $$CustomersTableFilterComposer composer = $composerBuilder(
@@ -21672,6 +21762,9 @@ class $$InvoicesTableOrderingComposer
       column: $table.warrantyDuration,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get changeGiven => $composableBuilder(
+      column: $table.changeGiven, builder: (column) => ColumnOrderings(column));
+
   $$CustomersTableOrderingComposer get customerId {
     final $$CustomersTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -21801,6 +21894,9 @@ class $$InvoicesTableAnnotationComposer
   GeneratedColumn<String> get warrantyDuration => $composableBuilder(
       column: $table.warrantyDuration, builder: (column) => column);
 
+  GeneratedColumn<double> get changeGiven => $composableBuilder(
+      column: $table.changeGiven, builder: (column) => column);
+
   $$CustomersTableAnnotationComposer get customerId {
     final $$CustomersTableAnnotationComposer composer = $composerBuilder(
         composer: this,
@@ -21922,6 +22018,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<String?> academicYearName = const Value.absent(),
             Value<Uint8List?> studentImage = const Value.absent(),
             Value<String?> warrantyDuration = const Value.absent(),
+            Value<double> changeGiven = const Value.absent(),
           }) =>
               InvoicesCompanion(
             id: id,
@@ -21958,6 +22055,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             academicYearName: academicYearName,
             studentImage: studentImage,
             warrantyDuration: warrantyDuration,
+            changeGiven: changeGiven,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -21994,6 +22092,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             Value<String?> academicYearName = const Value.absent(),
             Value<Uint8List?> studentImage = const Value.absent(),
             Value<String?> warrantyDuration = const Value.absent(),
+            Value<double> changeGiven = const Value.absent(),
           }) =>
               InvoicesCompanion.insert(
             id: id,
@@ -22030,6 +22129,7 @@ class $$InvoicesTableTableManager extends RootTableManager<
             academicYearName: academicYearName,
             studentImage: studentImage,
             warrantyDuration: warrantyDuration,
+            changeGiven: changeGiven,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>
@@ -22671,6 +22771,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<Uint8List?> adminSignature,
   Value<bool> showAdminSignature,
   Value<bool> warrantyEnabled,
+  Value<bool> allowGiveChange,
 });
 typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<int> id,
@@ -22729,6 +22830,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<Uint8List?> adminSignature,
   Value<bool> showAdminSignature,
   Value<bool> warrantyEnabled,
+  Value<bool> allowGiveChange,
 });
 
 class $$SettingsTableFilterComposer
@@ -22933,6 +23035,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<bool> get warrantyEnabled => $composableBuilder(
       column: $table.warrantyEnabled,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get allowGiveChange => $composableBuilder(
+      column: $table.allowGiveChange,
       builder: (column) => ColumnFilters(column));
 }
 
@@ -23147,6 +23253,10 @@ class $$SettingsTableOrderingComposer
   ColumnOrderings<bool> get warrantyEnabled => $composableBuilder(
       column: $table.warrantyEnabled,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get allowGiveChange => $composableBuilder(
+      column: $table.allowGiveChange,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SettingsTableAnnotationComposer
@@ -23325,6 +23435,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<bool> get warrantyEnabled => $composableBuilder(
       column: $table.warrantyEnabled, builder: (column) => column);
+
+  GeneratedColumn<bool> get allowGiveChange => $composableBuilder(
+      column: $table.allowGiveChange, builder: (column) => column);
 }
 
 class $$SettingsTableTableManager extends RootTableManager<
@@ -23409,6 +23522,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<Uint8List?> adminSignature = const Value.absent(),
             Value<bool> showAdminSignature = const Value.absent(),
             Value<bool> warrantyEnabled = const Value.absent(),
+            Value<bool> allowGiveChange = const Value.absent(),
           }) =>
               SettingsCompanion(
             id: id,
@@ -23467,6 +23581,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             adminSignature: adminSignature,
             showAdminSignature: showAdminSignature,
             warrantyEnabled: warrantyEnabled,
+            allowGiveChange: allowGiveChange,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -23525,6 +23640,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<Uint8List?> adminSignature = const Value.absent(),
             Value<bool> showAdminSignature = const Value.absent(),
             Value<bool> warrantyEnabled = const Value.absent(),
+            Value<bool> allowGiveChange = const Value.absent(),
           }) =>
               SettingsCompanion.insert(
             id: id,
@@ -23583,6 +23699,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             adminSignature: adminSignature,
             showAdminSignature: showAdminSignature,
             warrantyEnabled: warrantyEnabled,
+            allowGiveChange: allowGiveChange,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

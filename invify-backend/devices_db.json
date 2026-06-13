@@ -16,10 +16,10 @@
       "id": "dev-1779516835718",
       "device_id": "PPR1.180610.011",
       "device_suffix": "610011",
-      "tenant_id": "tenant-1779711092175",
+      "tenant_id": "tenant-1779640483822",
       "status": "active",
-      "business_name": "My01",
-      "phone": "08123212321232",
+      "business_name": "My Business",
+      "phone": "0810222555558",
       "industry": "retail",
       "theme_color": "#6366F1",
       "device_info": {
@@ -33,10 +33,10 @@
         "androidId": "PPR1.180610.011",
         "serialNumber": null
       },
-      "last_seen": "2026-06-01T17:08:30.670Z",
+      "last_seen": "2026-06-09T11:56:23.373Z",
       "created_at": "2026-05-23T06:13:55.718Z",
       "tenants": {
-        "name": "My01",
+        "name": "My Business",
         "plan": "standard"
       }
     },
@@ -94,6 +94,23 @@
     }
   ],
   "activations": [
+    {
+      "id": "act-1781291809232",
+      "activation_code": "NJJ6-QIIA-F7GR-HLYI-O4OL-XDSB",
+      "tenant_id": "tenant-1779640483822",
+      "duration_days": 30,
+      "plan_index": 0,
+      "device_suffix": "012KRB",
+      "device_id": "DSPREAD-POS-012KRB8MM-3218",
+      "status": "pending",
+      "is_used": false,
+      "created_at": "2026-06-12T19:16:49.232Z",
+      "created_by": "superadmin@iips.app",
+      "tenants": {
+        "name": "My Business",
+        "plan": "standard"
+      }
+    },
     {
       "id": "act-1780186704169",
       "activation_code": "NJBQ-WUAB-XU2T-NYQ5-2HVL-BHK5",

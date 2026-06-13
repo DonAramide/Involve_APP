@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:involve_app/core/services/api_service.dart';
 import 'package:involve_app/core/services/service_locator.dart';
 import 'dart:io';
 import 'package:path/path.dart' as path;
@@ -7,7 +6,13 @@ import 'package:involve_app/core/utils/device_info_service.dart';
 import '../../../settings/domain/services/security_service.dart';
 
 class TenantKycService {
-  final ApiService _apiService = sl<ApiService>();
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: 'https://api.invify.co',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+  ));
 
   Future<bool> uploadKycDocument({
     required File file,
@@ -31,7 +36,7 @@ class TenantKycService {
 
       // We use raw Dio post because ApiService might require auth token 
       // but this is onboarding so we might not have it yet. We pass tenant_id.
-      final response = await _apiService.client.post(
+      final response = await _dio.post(
         '/api/tenant/kyc/upload',
         data: formData,
         options: Options(
@@ -58,7 +63,7 @@ class TenantKycService {
       final suffix = await DeviceInfoService.getDeviceSuffix();
       final finalIdentifier = tenantId ?? suffix;
 
-      final response = await _apiService.client.get('/api/tenant/$finalIdentifier/kyc');
+      final response = await _dio.get('/api/tenant/$finalIdentifier/kyc');
       if (response.statusCode == 200) {
         return response.data['data'] ?? [];
       }

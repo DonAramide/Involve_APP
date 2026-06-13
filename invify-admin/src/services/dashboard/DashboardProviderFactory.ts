@@ -1,35 +1,28 @@
 import type { DashboardDataProvider } from './DashboardDataProvider';
 import { MockDashboardProvider } from './MockDashboardProvider';
-import { DevDashboardProvider } from './DevDashboardProvider';
 import { StagingDashboardProvider } from './StagingDashboardProvider';
 import { ProdDashboardProvider } from './ProdDashboardProvider';
+import { getBuildVariant, BuildVariant } from '../../config/buildVariant';
 
 export class DashboardProviderFactory {
   private static instance: DashboardDataProvider | null = null;
 
   static getInstance(): DashboardDataProvider {
     if (!this.instance) {
-      const mode = import.meta.env.VITE_DASHBOARD_DATA_MODE;
+      const variant = getBuildVariant();
       
-      switch (mode) {
-        case 'MOCK':
+      switch (variant) {
+        case BuildVariant.LOCAL:
           this.instance = new MockDashboardProvider();
           break;
-        case 'DEV':
-          this.instance = new DevDashboardProvider();
-          break;
-        case 'STAGING':
+        case BuildVariant.STAGING:
           this.instance = new StagingDashboardProvider();
           break;
-        case 'PROD':
+        case BuildVariant.PROD:
           this.instance = new ProdDashboardProvider();
           break;
-        default:
-          console.warn(`[DashboardProviderFactory] Unknown or missing VITE_DASHBOARD_DATA_MODE: '${mode}'. Defaulting to MOCK provider for safety.`);
-          this.instance = new MockDashboardProvider();
-          break;
       }
-      console.log(`[DashboardProviderFactory] Initialized provider for mode: ${mode || 'DEFAULT_MOCK'}`);
+      console.log(`[DashboardProviderFactory] Initialized provider for variant: ${variant}`);
     }
     
     return this.instance;

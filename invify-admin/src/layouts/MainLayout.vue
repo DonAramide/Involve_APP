@@ -602,7 +602,19 @@ const {
 const operatorEmail = ref(localStorage.getItem('operator_email') || 'sysadmin@IIPS.app')
 const operatorRole = ref(localStorage.getItem('operator_role') || 'SUPER_ADMIN')
 
-const getRoleLabel = (role) => {
+const operatorRolesArray = computed(() => {
+  if (!operatorRole.value) return []
+  return operatorRole.value.split(',').map(r => r.trim())
+})
+
+const hasRole = (roles) => {
+  const checkRoles = Array.isArray(roles) ? roles : [roles]
+  return operatorRolesArray.value.some(r => checkRoles.includes(r))
+}
+
+const isSuperAdmin = computed(() => hasRole('SUPER_ADMIN'))
+
+const getRoleLabel = (roleStr) => {
   const map = {
     SUPER_ADMIN: 'Operator Node',
     ADMIN_DEPLOY: 'Deploy Ops Node',
@@ -614,7 +626,8 @@ const getRoleLabel = (role) => {
     STAFF: 'Staff Node',
     OWNER: 'Tenant Owner'
   }
-  return map[role] || 'Workspace Node'
+  const roles = roleStr ? roleStr.split(',').map(r => r.trim()) : []
+  return roles.map(r => map[r] || 'Workspace Node').join(' + ')
 }
 
 const paletteRef = ref(null)
@@ -653,7 +666,7 @@ watch(() => prefs.value.isDarkMode, (isDark) => {
 
 const workspaces = computed(() => {
   const list = []
-  const isPlatformStaff = [
+  const isPlatformStaff = hasRole([
     'SUPER_ADMIN',
     'STAFF',
     'ADMIN_DEPLOY',
@@ -662,7 +675,7 @@ const workspaces = computed(() => {
     'ADMIN_EXECUTIVE',
     'ADMIN_FINANCE',
     'ADMIN_TREASURY'
-  ].includes(operatorRole.value)
+  ])
   
   // 1. Fleet Operations (accessible to all)
   list.push({ id: 'fleet', label: 'Fleet Operations', priority: true })
@@ -679,27 +692,27 @@ const workspaces = computed(() => {
   list.push({ id: 'observability', label: 'Observability', priority: true })
   
   // 5. AI Operational Intelligence (accessible exclusively to SUPER_ADMIN and EXECUTIVE)
-  if (['SUPER_ADMIN', 'ADMIN_EXECUTIVE'].includes(operatorRole.value)) {
+  if (hasRole(['SUPER_ADMIN', 'ADMIN_EXECUTIVE'])) {
     list.push({ id: 'ai', label: 'AI Operational Intelligence', priority: true })
   }
   
   // 6. Deployments (accessible exclusively to SUPER_ADMIN and DEPLOY)
-  if (['SUPER_ADMIN', 'ADMIN_DEPLOY'].includes(operatorRole.value)) {
+  if (hasRole(['SUPER_ADMIN', 'ADMIN_DEPLOY'])) {
     list.push({ id: 'deployments', label: 'Deployments', priority: false })
   }
   
   // 7. Applications (accessible exclusively to SUPER_ADMIN and OPS)
-  if (['SUPER_ADMIN', 'ADMIN_OPS'].includes(operatorRole.value)) {
+  if (hasRole(['SUPER_ADMIN', 'ADMIN_OPS'])) {
     list.push({ id: 'apps', label: 'Applications', priority: false })
   }
   
   // 8. Incident Response (accessible exclusively to SUPER_ADMIN and RISK)
-  if (['SUPER_ADMIN', 'ADMIN_RISK'].includes(operatorRole.value)) {
+  if (hasRole(['SUPER_ADMIN', 'ADMIN_RISK'])) {
     list.push({ id: 'incidents', label: 'Incident Response', priority: false })
   }
   
   // 9. Automation & Policy (accessible exclusively to SUPER_ADMIN and DEPLOY)
-  if (['SUPER_ADMIN', 'ADMIN_DEPLOY'].includes(operatorRole.value)) {
+  if (hasRole(['SUPER_ADMIN', 'ADMIN_DEPLOY'])) {
     list.push({ id: 'automation', label: 'Automation & Policy', priority: false })
   }
   
@@ -709,7 +722,7 @@ const workspaces = computed(() => {
   }
   
   // 11. Administration (accessible exclusively to SUPER_ADMIN and DEPLOY)
-  if (['SUPER_ADMIN', 'ADMIN_DEPLOY'].includes(operatorRole.value)) {
+  if (hasRole(['SUPER_ADMIN', 'ADMIN_DEPLOY'])) {
     list.push({ id: 'admin', label: 'Administration', priority: false })
   }
   
@@ -845,6 +858,7 @@ const activeNavigationTree = computed(() => {
     case 'governance':
       return [
         { label: 'Operator Governance', path: '/governance/operators', icon: 'manage_accounts', color: 'blue-4' },
+        { label: 'RBAC Capabilities & Matrix', path: '/governance/rbac-roles', icon: 'admin_panel_settings', color: 'amber-4' },
         { label: 'Approval Engine', path: '/governance/approvals', icon: 'fact_check', color: 'purple-4', badge: 'Queue', badgeBg: 'purple-10', badgeColor: 'purple-3' },
         { label: 'Compliance Audits', path: `${tScope}/governance/compliance`, icon: 'fact_check', color: 'green-4', badge: '99.8%', badgeBg: 'green-10', badgeColor: 'green-3' },
         { label: 'Audit Trail Ledger', path: '/governance/audit-trail', icon: 'history_edu', color: 'blue-5' },

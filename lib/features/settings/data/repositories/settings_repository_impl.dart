@@ -102,6 +102,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       adminSignature: Value(LogoCompressor.compress(settings.adminSignature)),
       showAdminSignature: Value(settings.showAdminSignature),
       warrantyEnabled: Value(settings.warrantyEnabled),
+      allowGiveChange: Value(settings.allowGiveChange),
     );
 
     if (existing == null) {
@@ -201,6 +202,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       adminSignature: row.adminSignature,
       showAdminSignature: row.showAdminSignature,
       warrantyEnabled: row.warrantyEnabled,
+      allowGiveChange: row.allowGiveChange,
     );
   }
 }

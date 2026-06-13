@@ -27,6 +27,7 @@ import java.io.IOException
 internal sealed class KeyExchangeResult {
     data class Error(val message: String): KeyExchangeResult()
     data object Loading: KeyExchangeResult()
+    data class Progress(val message: String): KeyExchangeResult()
     data class OnSuccess(val message: String): KeyExchangeResult()
 }
 
@@ -56,14 +57,21 @@ internal class KeyExchangeHandler(
     }
 
     private suspend fun doTMKTransaction() {
+        android.util.Log.e("flutter", "[NATIVE] Starting TMK Transaction... connecting to server")
         try {
             val channel = socketChannel.setup()
+            android.util.Log.e("flutter", "[NATIVE] Calling channel.connect()")
             channel.connect()
+            android.util.Log.e("flutter", "[NATIVE] channel.connect() succeeded! Downloading TMK...")
+            keyExchangeResult.update { KeyExchangeResult.Progress("Downloading TMK...") }
             val tmkRequest =
                 isoMessageBuilder.buildKeyExchangeMessage(ISOProcCode.TMK_DOWNLOAD_ISO_PROC_CODE)
 
+            android.util.Log.e("flutter", "[NATIVE] Calling channel.send(tmkRequest)")
             channel.send(tmkRequest)
+            android.util.Log.e("flutter", "[NATIVE] Calling channel.receive()")
             val response = channel.receive()
+            android.util.Log.e("flutter", "[NATIVE] Received response!")
             channel.disconnect()
 
             val responseCode = response.getString(39)
@@ -77,8 +85,38 @@ internal class KeyExchangeHandler(
             }
 
             val field53 = response.getString(53)
-            val masterKey =
-                ISOUtils.getDecryptedTMKFromHost(field53, terminalParameters?.ctmk!!).toString()
+            val masterKey = if (terminalParameters?.activeHost == com.demo.mpossdk.open.ActiveHost.EXPRESS_PAY) {
+                val baseUrl = terminalParameters?.expressPayBaseUrl ?: "http://80.88.8.56:552/api/GetPlainMasterKey"
+                val authToken = terminalParameters?.expressPayAuthToken ?: ""
+                val payload = "{\"MasterKey\":\"$field53\"}"
+                
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val url = java.net.URL(baseUrl)
+                    val conn = url.openConnection() as java.net.HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                    if (authToken.isNotEmpty()) {
+                        conn.setRequestProperty("Authorization", "Basic $authToken")
+                    }
+                    conn.doOutput = true
+                    val os = conn.outputStream
+                    os.write(payload.toByteArray(Charsets.UTF_8))
+                    os.flush()
+                    os.close()
+
+                    val responseCodeHttp = conn.responseCode
+                    if (responseCodeHttp == 200) {
+                        val reader = java.io.BufferedReader(java.io.InputStreamReader(conn.inputStream))
+                        val responseStr = reader.readText().replace("\"", "").trim()
+                        reader.close()
+                        responseStr
+                    } else {
+                        throw Exception("Express Pay API failed with code $responseCodeHttp")
+                    }
+                }
+            } else {
+                ISOUtils.getDecryptedTMKFromHost(field53, terminalParameters?.ctmk ?: "").toString()
+            }
 
             val eTmk = field53.substring(0, 32)
             val kcv = field53.substring(32, 38)
@@ -103,10 +141,10 @@ internal class KeyExchangeHandler(
             keyExchangeResult.update {
                 KeyExchangeResult.Error("TMK Failed\n${context.getString(R.string.network_error_please_check_your_connection_and_try_again)}")
             }
-        } catch (e: Exception) {
-            LogUtil.e(e.message ?: "An error occurred")
+        } catch (e: Throwable) {
+            android.util.Log.e("flutter", "[NATIVE] TMK Transaction failed with error: ${e.message}", e)
             keyExchangeResult.update {
-                KeyExchangeResult.Error("TMK Failed\n${context.getString(R.string.an_error_occurred)}")
+                KeyExchangeResult.Error("TMK Failed\n${context.getString(R.string.an_error_occurred)}: ${e.message}")
             }
         }
     }

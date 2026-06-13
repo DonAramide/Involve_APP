@@ -66,8 +66,10 @@ internal class ProcessingViewModel(
     val loadingLiveData = _loadingLiveData
 
     private var emvDetailResult: EmvDetailResult = EmvDetailResult()
+    private var currentPaymentRequest: PaymentRequest? = null
 
     fun startTransaction(paymentRequest: PaymentRequest) = coroutineScope.launch {
+        currentPaymentRequest = paymentRequest
         LcdApi.LedLightOn_Api(Led.LED_BLUE)
         SystemApi.Beep_Api(0)
 
@@ -367,14 +369,79 @@ internal class ProcessingViewModel(
 
             val prePack = isoMsg.pack()
             val hexString = org.jpos.iso.ISOUtil.hexString(prePack)
-            emvDetailResult = emvDetailResult.copy(packedIsoMessage = hexString)
-
-            _transactionStatusFlow.send(
-                com.demo.mpossdk.open.TransactionResult(
-                    status = "emv_data_ready",
-                    emvData = emvDetailResult
-                )
+            val terminalParameters = sessionManager.getTerminalParameters()
+            emvDetailResult = emvDetailResult.copy(
+                packedIsoMessage = hexString,
+                serverIP = terminalParameters?.serverIP,
+                port = terminalParameters?.port
             )
+
+            if (currentPaymentRequest?.processOnDevice == true) {
+                try {
+                    LcdApi.ScrCls_Api()
+                    LcdApi.ScrDisp_Api(1, 0, "Transmitting...", 0x08)
+                    
+                    val channel = socketChannel.setup()
+                    channel.connect()
+                    channel.send(isoMsg)
+                    
+                    LcdApi.ScrCls_Api()
+                    LcdApi.ScrDisp_Api(1, 0, "Receiving...", 0x08)
+                    val responseIsoMsg = channel.receive() as? org.jpos.iso.ISOMsg
+                    channel.disconnect()
+                    
+                    if (responseIsoMsg != null) {
+                        val responseCode = responseIsoMsg.getString(39)
+                        val mposResponse = com.demo.mpossdk.open.MposTransactionResponse(
+                            aid = emvDetailResult.aid,
+                            amount = emvDetailResult.amountAuthorisedNumeric,
+                            appLabel = emvDetailResult.applicationLabel,
+                            authCode = responseIsoMsg.getString(38),
+                            cardExpireDate = emvDetailResult.cardExpirationDate,
+                            cardHolderName = emvDetailResult.cardHolderName,
+                            dateTime = responseIsoMsg.getString(7),
+                            maskedPan = emvDetailResult.cardNo,
+                            rrn = responseIsoMsg.getString(37),
+                            stan = responseIsoMsg.getString(11),
+                            statusCode = responseCode,
+                            transactionType = emvDetailResult.transactionType
+                        )
+                        
+                        if (responseCode == "00") {
+                            _transactionStatusFlow.send(
+                                com.demo.mpossdk.open.TransactionResult(
+                                    status = "payment_success",
+                                    mposTransactionResponse = mposResponse,
+                                    emvData = emvDetailResult
+                                )
+                            )
+                        } else {
+                            val msg = "Declined (Code: $responseCode)"
+                            mposResponse.message = msg
+                            _transactionStatusFlow.send(
+                                com.demo.mpossdk.open.TransactionResult(
+                                    status = "payment_failed",
+                                    mposTransactionResponse = mposResponse,
+                                    emvData = emvDetailResult,
+                                    errorData = ErrorData(ErrorType.UNKNOWN_ERROR, msg)
+                                )
+                            )
+                        }
+                    } else {
+                        _errorFlow.send(ErrorData(ErrorType.UNKNOWN_ERROR, "No response from host"))
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    _errorFlow.send(ErrorData(ErrorType.UNKNOWN_ERROR, "Socket communication failed: ${e.message}"))
+                }
+            } else {
+                _transactionStatusFlow.send(
+                    com.demo.mpossdk.open.TransactionResult(
+                        status = "emv_data_ready",
+                        emvData = emvDetailResult
+                    )
+                )
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             _errorFlow.send(ErrorData(ErrorType.UNKNOWN_ERROR, "An error occurred extracting EMV data"))

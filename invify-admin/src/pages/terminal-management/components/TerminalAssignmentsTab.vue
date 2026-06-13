@@ -165,7 +165,7 @@ const getActiveIds = (field) => new Set(assignments.value.filter(a => a.status =
 
 const tabletOptions = computed(() => {
   const assigned = getActiveIds('tablet_id')
-  return tablets.value.filter(t => !assigned.has(t.id)).map(t => ({ label: `${t.device_id} (${t.model})`, value: t.id }))
+  return tablets.value.filter(t => !assigned.has(t.id)).map(t => ({ label: `${t.device_id} (${t.model}) - SN: ${t.serial_number}`, value: t.id }))
 })
 const mposOptions = computed(() => {
   const assigned = getActiveIds('mpos_id')

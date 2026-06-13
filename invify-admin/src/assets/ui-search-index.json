@@ -26099,5 +26099,26 @@
     "type": "action",
     "path": "/admin/agents",
     "pageTitle": "Agent Governance & Onboarding"
+  },
+  {
+    "id": "nav-admin-pos-gateway",
+    "text": "POS Switch Board & Routing",
+    "type": "navigation",
+    "route": "/admin/pos-gateway",
+    "pageTitle": "POS Switch Board"
+  },
+  {
+    "id": "nav-admin-pos-switch",
+    "text": "Process Transactions Directly on MPOS Device",
+    "type": "action",
+    "route": "/admin/pos-gateway",
+    "pageTitle": "POS Switch Board"
+  },
+  {
+    "id": "nav-admin-pos-webhook",
+    "text": "Webhook Endpoint URL",
+    "type": "action",
+    "route": "/admin/pos-gateway",
+    "pageTitle": "POS Switch Board"
   }
 ]

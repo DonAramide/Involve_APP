@@ -286,7 +286,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useQuasar } from 'quasar'
-import axios from 'axios'
+import axios from '../../api'
 import { useCurrency } from '../../composables/useCurrency'
 
 const $q = useQuasar()

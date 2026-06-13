@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { Notify } from 'quasar';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
@@ -16,6 +17,46 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login') {
+        localStorage.removeItem('invify_token');
+        localStorage.removeItem('invify_refresh_token');
+        localStorage.removeItem('operator_role');
+        localStorage.removeItem('operator_email');
+        localStorage.removeItem('mfa_status_verified');
+        localStorage.removeItem('impersonation_context');
+
+        Notify.create({
+          type: 'negative',
+          message: 'Session Expired: You have been logged out. Please log in again.',
+          position: 'top-right',
+          timeout: 4500,
+          icon: 'logout'
+        });
+
+        window.location.href = '/login';
+      }
+    } else if (error.response && error.response.status === 403) {
+      Notify.create({
+        type: 'warning',
+        message: 'Access Restricted: This feature is out of your control or operates in Read-Only mode for your role.',
+        position: 'top-right',
+        timeout: 4000,
+        icon: 'lock'
+      });
+      // Return empty data gracefully for GET requests so lists just appear empty instead of breaking the UI
+      if (error.config.method === 'get') {
+        return Promise.resolve({ data: [] });
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const onboardingApi = {
   signup: (data) => api.post('/public/onboarding/signup', data), // PUBLIC (Supports referralCode)
@@ -126,6 +167,7 @@ export const posApi = {
   // Routing configuration (super_admin only)
   getRoutingConfig:    ()     => api.get('/admin/pos/routing'),
   updateRoutingConfig: (data) => api.post('/admin/pos/routing', data),
+  getAffectedDevices: (params) => api.get('/admin/pos/routing/affected-devices', { params }),
 
   // Transaction history
   getHistory: () => api.get('/api/pos/history'),
@@ -133,6 +175,10 @@ export const posApi = {
   // Kimono terminal key refresh (super_admin only)
   refreshKimonoParams: (terminalId) =>
     api.post('/admin/pos/kimono-params/refresh', { terminalId }),
+
+  // Observability & Simulation
+  getObservabilityMetrics: () => api.get('/admin/pos/observability'),
+  simulateRoute: (data) => api.post('/admin/pos/simulate', data),
 };
 
 export const searchApi = {

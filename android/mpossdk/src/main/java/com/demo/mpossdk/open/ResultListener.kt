@@ -6,6 +6,7 @@ sealed class TransactionResultListener {
 
 sealed class ParamResultListener {
     data object onLoading: ParamResultListener()
+    data class OnProgress(val message: String) : ParamResultListener()
     data class OnSuccess(val message: String) : ParamResultListener()
     data class OnFailure(val errorData: ErrorData) : ParamResultListener()
 }

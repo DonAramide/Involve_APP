@@ -109,32 +109,93 @@ export interface KimonoTerminalParams {
   lastUpdateDate?: string;
 }
 
-// Routing configuration shape for all 3 hosts
+export interface SslCertMetadata {
+  issuer: string;
+  subject: string;
+  validFrom: string;
+  validTo: string;
+  serialNumber: string;
+  fingerprint: string;
+}
+
+export interface PosHostConfig {
+  hostName: string;
+  hostCode: 'medusa' | 'nibss' | 'kimono' | 'express_pay';
+  ip: string;
+  port: number;
+  sslEnabled: boolean;
+  sslCertMetadata: SslCertMetadata | null;
+  timeoutSeconds: number;
+  priority: number;
+  failoverPriority: number;
+  healthScore: number;
+  status: 'ONLINE' | 'OFFLINE';
+  thresholdMin: number;
+  thresholdMax: number;
+  supportedCardSchemes: string[];
+  supportedTerminalTypes: string[];
+  supportedTenantCategories: string[];
+  supportedTransactionTypes: string[];
+  isActive: boolean;
+  
+  // Host-specific details (ExpressPay / Kimono / NIBSS / Medusa)
+  baseUrl?: string;
+  authToken?: string;
+  merchantCode?: string;
+  terminalGroup?: string;
+  sslProfile?: string;
+  transactionPath?: string;
+  paramsPath?: string;
+  kimonoIp?: string;
+  kimonoPort?: number;
+  kimonoSSL?: boolean;
+  kimonoKeys?: {
+    masterKey: string;
+    pinKey: string;
+  };
+  kimonoFallbackParameters?: {
+    merchantId: string;
+    uniqueId: string;
+    institutionId: string;
+    settlementAccount: string;
+    keyLabel: string;
+    token: string;
+  };
+  nibssConfig?: {
+    institutionCode: string;
+    terminalId: string;
+    merchantId: string;
+    ctmk: string;
+    ptspCode: string;
+  };
+}
+
+export interface ThresholdRule {
+  minAmount: number;
+  maxAmount: number;
+  preferredHost: 'medusa' | 'nibss' | 'kimono' | 'express_pay';
+}
+
+export interface TenantRoutingProfile {
+  profileId?: string;
+  scopeType?: string;
+  targetValue?: string;
+  processOnDevice?: boolean;
+  webhookUrl?: string;
+  category: string; // Retail, School, Hospitality, etc.
+  preferredHosts: Array<'medusa' | 'nibss' | 'kimono' | 'express_pay'>;
+  fallbackHosts: Array<'medusa' | 'nibss' | 'kimono' | 'express_pay'>;
+  amountThresholds?: Array<{ min: number; max: number; host: 'medusa' | 'nibss' | 'kimono' | 'express_pay' }>;
+  transactionTypeRules?: Array<{ txType: string; host: 'medusa' | 'nibss' | 'kimono' | 'express_pay' }>;
+}
+
 export interface PosRoutingConfig {
-  activeHost: 'medusa' | 'nibss' | 'kimono';
-  failoverOrder: Array<'medusa' | 'nibss' | 'kimono'>;
-  /** Amount in NGN (naira) below which Medusa is used when toggle is NOT set to Kimono.
-   *  Default: 50000 (₦50,000). Amounts >= this value always go to Kimono. */
+  activeHost: 'medusa' | 'nibss' | 'kimono' | 'express_pay';
+  failoverOrder: Array<'medusa' | 'nibss' | 'kimono' | 'express_pay'>;
   splitThresholdNaira: number;
-  medusa: {
-    host: string;
-    port: number;
-    isActive: boolean;
-    thresholdAmount: number;
-  };
-  nibss: {
-    host: string;
-    port: number;
-    isActive: boolean;
-    thresholdAmount: number;
-  };
-  kimono: {
-    baseUrl: string;
-    transactionPath: string;
-    paramsPath: string;
-    isActive: boolean;
-    thresholdAmount: number;
-  };
+  thresholdRulesMatrix: ThresholdRule[];
+  tenantRoutingProfiles: TenantRoutingProfile[];
+  hosts: PosHostConfig[];
 }
 
 // Normalised response shape returned to mPOS after any route
@@ -149,7 +210,7 @@ export interface PosTransactionResult {
   rawHex?: string;                  // Only for Medusa/NIBSS TCP route
   isoFields?: Record<string, any>;  // Decoded ISO8583 field map (Medusa/NIBSS routes)
   kimonoResponse?: any;             // Full JSON from Cpoint for Kimono route
-  host: 'MEDUSA' | 'NIBSS' | 'KIMONO';
+  host: 'MEDUSA' | 'NIBSS' | 'KIMONO' | 'EXPRESS_PAY';
 }
 
 // Shape of each EMV field sent by the mPOS device
@@ -206,6 +267,8 @@ export interface MposEmvData {
 
   // For Medusa/NIBSS TCP route only
   packedIsoMessage?: string;        // Full ISO8583 message in hex
+  serverIP?: string;
+  port?: number;
 
   // Misc
   merchantLocation?: string;

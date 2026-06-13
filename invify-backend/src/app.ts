@@ -341,6 +341,7 @@ app.post('/api/pos/test-iso', authenticate, PosController.testIso);  // ISO8583 
 app.get('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.getRoutingConfig);
 app.post('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.updateRoutingConfig);
 app.post('/admin/pos/kimono-params/refresh', authenticate, checkRole(['super_admin']), PosController.refreshKimonoParams);
+app.get('/admin/pos/observability', authenticate, checkRole(['super_admin']), PosController.getObservabilityMetrics);
 
 // Terminal & Inventory Management Operations
 app.get('/api/admin/inventory/stats', authenticate, TerminalController.getStats);
@@ -355,6 +356,7 @@ app.patch('/api/admin/inventory/tids/:id', authenticate, TerminalController.upda
 app.post('/api/admin/inventory/upload', authenticate, terminalUploadMiddleware, TerminalController.importTerminals);
 app.post('/api/admin/inventory/assign', authenticate, TerminalController.assignHardware);
 app.get('/api/admin/inventory/assignments', authenticate, TerminalController.getAssignments);
+app.post('/api/admin/inventory/assignments/:id/unassign', authenticate, TerminalController.unassignHardware);
 app.get('/api/admin/inventory/audit', authenticate, TerminalController.getAuditLog);
 
 // ─── APK Fleet Deployment ────────────────────────────────────────────────

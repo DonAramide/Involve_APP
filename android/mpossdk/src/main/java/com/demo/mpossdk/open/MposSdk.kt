@@ -28,6 +28,7 @@ object MposSdk {
     lateinit var transactionListener: (TransactionResultListener) -> Unit
     lateinit var pairResultListener: (PairResultListener) -> Unit
     private lateinit var coroutineScope: CoroutineScope
+    private var appContext: Context? = null
     private var deviceInit = false
     private var deviceMac: String? = null
 
@@ -39,6 +40,7 @@ object MposSdk {
      * This function should be called in the onCreate() of your Application class
      */
     fun initMposDevice(context: Context) {
+        appContext = context.applicationContext
         val serviceLocator = ServiceLocator.getInstance(context)
         coroutineScope = serviceLocator.provideCoroutineScope()
         deviceMac = serviceLocator.provideSessionManager().getDeviceMac()
@@ -85,6 +87,17 @@ object MposSdk {
      *                      passing a boolean indicating success/failure and a message.
      */
     fun loadParams(paramResultListener: (ParamResultListener) -> Unit) {
+        val request = KeyExchangeRequest(
+            terminalId = "2214OTGF",
+            activeHost = ActiveHost.MEDUSA
+        )
+        loadParams(request, paramResultListener)
+    }
+
+    fun loadParams(
+        request: KeyExchangeRequest,
+        paramResultListener: (ParamResultListener) -> Unit
+    ) {
         paramResultListener(ParamResultListener.onLoading)
 
         if (!deviceInit) {
@@ -99,6 +112,10 @@ object MposSdk {
             return
         }
 
+        val context = appContext ?: return
+        val serviceLocator = ServiceLocator.getInstance(context)
+        deviceMac = serviceLocator.provideSessionManager().getDeviceMac()
+
         if (deviceMac == null) {
             paramResultListener(
                 ParamResultListener.OnFailure(
@@ -112,13 +129,151 @@ object MposSdk {
         }
 
         SystemApi.setMacAddr(deviceMac)
-        coroutineScope.launch {
-            SystemApi.Beep_Api(0)
-            ParamUtils.init {
-                SystemApi.Beep_Api(1)
 
+        coroutineScope.launch {
+            try {
+                val sessionManager = serviceLocator.provideSessionManager()
+
+                val finalTerminalId = if (request.terminalId.isNullOrEmpty()) "2214OTGF" else request.terminalId
+                
+                val terminalParameters = when (request.activeHost) {
+                    ActiveHost.MEDUSA -> {
+                        com.demo.mpossdk.internal.domain.model.TerminalParameters(
+                            terminalId = finalTerminalId,
+                            activeHost = ActiveHost.MEDUSA,
+                            serverIP = "core.medusang.com",
+                            port = 8080,
+                            timeoutSeconds = request.timeoutSeconds
+                        )
+                    }
+                    ActiveHost.NIBSS -> {
+                        val finalIp = if (request.ipAddress.isNullOrEmpty()) "196.6.103.18" else request.ipAddress
+                        val finalPort = request.portNumber?.toIntOrNull() ?: 5001
+                        val finalCtmk = if (request.key1.isNullOrEmpty()) "66D4AF3321D8564E9F6F35411755E730" else request.key1
+                        com.demo.mpossdk.internal.domain.model.TerminalParameters(
+                            terminalId = finalTerminalId,
+                            ctmk = finalCtmk,
+                            serverIP = finalIp,
+                            port = finalPort,
+                            enableSSL = true, // Required for NIBSS Prod
+                            activeHost = ActiveHost.NIBSS,
+                            timeoutSeconds = request.timeoutSeconds ?: 3600 // 60 mins fallback
+                        )
+                    }
+                    ActiveHost.EXPRESS_PAY -> {
+                        val finalBaseUrl = if (request.expressPayBaseUrl.isNullOrEmpty() || request.expressPayBaseUrl == "[SECRET_MASKED]") {
+                            "http://80.88.8.56:552/api/GetPlainMasterKey"
+                        } else {
+                            request.expressPayBaseUrl.trim()
+                        }
+
+                        val finalAuthToken = if (request.expressPayAuthToken.isNullOrEmpty() || request.expressPayAuthToken == "[SECRET_MASKED]") {
+                            "RXRyYW56YWN0UE9TOjdkNjY1YjgxLWQwZDctNDBhZS04Zjc5LWI2Yjg4MzVmOGZjMw=="
+                        } else {
+                            request.expressPayAuthToken.trim()
+                        }
+
+                        val finalIp = if (request.ipAddress.isNullOrEmpty()) "196.6.103.18" else request.ipAddress
+                        val finalPort = request.portNumber?.toIntOrNull() ?: 4018
+
+                        com.demo.mpossdk.internal.domain.model.TerminalParameters(
+                            terminalId = finalTerminalId,
+                            ctmk = request.key1 ?: "",
+                            serverIP = finalIp,
+                            port = finalPort,
+                            enableSSL = request.enableSsl,
+                            activeHost = ActiveHost.EXPRESS_PAY,
+                            expressPayBaseUrl = finalBaseUrl,
+                            expressPayAuthToken = finalAuthToken,
+                            timeoutSeconds = request.timeoutSeconds
+                        )
+                    }
+                }
+                
+                sessionManager.saveTerminalParameters(terminalParameters)
+
+                if (request.activeHost == ActiveHost.MEDUSA) {
+                    SystemApi.Beep_Api(0)
+                    ParamUtils.init(terminalParameters) {
+                        SystemApi.Beep_Api(1)
+                        paramResultListener(ParamResultListener.OnSuccess("Params Loaded successfully"))
+                    }
+                } else {
+
+                    val keyExchangeHandler = serviceLocator.provideKeyExchangeHandler()
+                    
+                    var collectJob: kotlinx.coroutines.Job? = null
+                    collectJob = launch {
+                        keyExchangeHandler.keyExchangeResultFlow.collect { result ->
+                            when (result) {
+                                is com.demo.mpossdk.internal.iso8583.KeyExchangeResult.Error -> {
+                                    paramResultListener(
+                                        ParamResultListener.OnFailure(
+                                            ErrorData(
+                                                ErrorType.UNKNOWN_ERROR,
+                                                result.message
+                                            )
+                                        )
+                                    )
+                                    collectJob?.cancel()
+                                }
+                                is com.demo.mpossdk.internal.iso8583.KeyExchangeResult.Loading -> {
+                                    paramResultListener(ParamResultListener.onLoading)
+                                }
+                                is com.demo.mpossdk.internal.iso8583.KeyExchangeResult.Progress -> {
+                                    paramResultListener(ParamResultListener.OnProgress(result.message))
+                                }
+                                is com.demo.mpossdk.internal.iso8583.KeyExchangeResult.OnSuccess -> {
+                                    val latestParams = sessionManager.getTerminalParameters() ?: terminalParameters
+                                    var attempts = 0
+                                    val maxAttempts = 6
+                                    var success = false
+
+                                    while (attempts < maxAttempts && !success) {
+                                        attempts++
+                                        paramResultListener(ParamResultListener.OnProgress("Injecting Keys (Attempt $attempts/$maxAttempts)..."))
+                                        try {
+                                            SystemApi.Beep_Api(0)
+                                            ParamUtils.init(latestParams) {
+                                                success = true
+                                                SystemApi.Beep_Api(1)
+                                                paramResultListener(ParamResultListener.OnSuccess("Params Loaded successfully"))
+                                            }
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("MposSdk", "Bluetooth injection failed on attempt $attempts", e)
+                                        }
+
+                                        if (success) {
+                                            break
+                                        }
+
+                                        if (attempts >= maxAttempts) {
+                                            paramResultListener(
+                                                ParamResultListener.OnFailure(
+                                                    ErrorData(
+                                                        ErrorType.UNKNOWN_ERROR,
+                                                        "Bluetooth connection to MPOS device failed. Please ensure the device is on and nearby."
+                                                    )
+                                                )
+                                            )
+                                        } else {
+                                            kotlinx.coroutines.delay(2000)
+                                        }
+                                    }
+                                    collectJob?.cancel()
+                                }
+                            }
+                        }
+                    }
+                    
+                    keyExchangeHandler.startKeyExchangeTransaction()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("flutter", "[NATIVE CRASH] Error in loadParams coroutine: ", e)
                 paramResultListener(
-                    ParamResultListener.OnSuccess("Params Loaded successfully")
+                    ParamResultListener.OnFailure(
+                        ErrorData(ErrorType.UNKNOWN_ERROR, "Native Key Exchange crashed: ${e.message}")
+                    )
                 )
             }
         }
@@ -133,7 +288,7 @@ object MposSdk {
      * [activity] - The Activity from which the pairing process is initiated.
      * [pairResultListener] - A callback function to receive the result of the pairing attempt.
      */
-    fun pairDevice(activity: Activity, pairResultListener: (PairResultListener) -> Unit) {
+    fun pairDevice(activity: Activity, posSerialNumber: String? = null, pairResultListener: (PairResultListener) -> Unit) {
         if (!deviceInit) {
             pairResultListener(
                 PairResultListener.OnFailure(
@@ -149,6 +304,9 @@ object MposSdk {
         this.pairResultListener = pairResultListener
 
         val intent = Intent(activity, ConnectingDeviceActivity::class.java)
+        if (posSerialNumber != null) {
+            intent.putExtra("posSerialNumber", posSerialNumber)
+        }
         activity.startActivity(intent)
     }
 

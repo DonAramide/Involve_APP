@@ -63,9 +63,11 @@ export class ReferralController {
 
       await ReferralNotificationService.sendInvite(tenant?.name || 'A School', email, referralLink);
 
+      const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+
       return res.status(200).json({ 
         message: 'Invitation sent successfully',
-        referralLink: process.env.NODE_ENV === 'development' ? referralLink : undefined
+        referralLink: variantService.isLocal() ? referralLink : undefined
       });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });

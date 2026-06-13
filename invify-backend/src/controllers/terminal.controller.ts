@@ -22,7 +22,7 @@ function parseFileToRows(buffer: Buffer, mimetype: string, originalName: string)
     const text = buffer.toString('utf-8');
     const lines = text.split('\n').filter(l => l.trim());
     if (lines.length === 0) return [];
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const headers = lines[0].split(',').map(h => h.replace(/^\uFEFF/, '').trim().replace(/"/g, ''));
     return lines.slice(1).map(line => {
       const vals = line.split(',').map(v => v.trim().replace(/"/g, ''));
       const row: any = {};
@@ -169,9 +169,13 @@ export class TerminalController {
 
       for (const file of files) {
         const rawRows = parseFileToRows(file.buffer, file.mimetype, file.originalname);
+        console.log('[DEBUG] rawRows:', JSON.stringify(rawRows));
         const normalizedRows = normalizeColumnNames(rawRows);
+        console.log('[DEBUG] normalizedRows:', JSON.stringify(normalizedRows));
         const importType = req.body.importType || 'tablets';
+        console.log('[DEBUG] importType:', importType);
         const result = await TerminalInventoryService.bulkImportDecoupled(normalizedRows, batchId, adminId, importType);
+        console.log('[DEBUG] result:', JSON.stringify(result));
         allResults.push({ filename: file.originalname, ...result });
       }
 
@@ -249,6 +253,18 @@ export class TerminalController {
       const { deviceId, enrollmentKey, serialNumber, androidId, businessName } = req.body;
       if (!deviceId) return res.status(400).json({ error: 'deviceId is required' });
       const result = await TerminalSyncService.syncTerminalForDevice(deviceId, enrollmentKey, serialNumber, androidId, businessName);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  // POST /api/mobile/terminal/keyexchange-success
+  static async keyExchangeSuccess(req: Request, res: Response) {
+    try {
+      const { deviceId } = req.body;
+      if (!deviceId) return res.status(400).json({ error: 'deviceId is required' });
+      const result = await TerminalSyncService.recordKeyExchangeSuccess(deviceId);
       return res.status(200).json(result);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });

@@ -166,6 +166,7 @@ class _SettingsPageState extends State<SettingsPage> {
         const Divider(),
       ],
 
+
       // Startup & State Persistence
       // Startup & State Persistence
       if (_matches('Startup & State Persistence', ['splash', 'last state', 'restore'])) ...[

@@ -12,20 +12,30 @@
  *    exclusively after token verification and RBAC assertion pipelines complete cleanly.
  */
 export function registerAuthBootstrapGuard(router) {
-  // Helper to determine role-based home landing path
-  const isPlatformStaffRole = (role) => [
-    'SUPER_ADMIN',
-    'STAFF',
-    'ADMIN_FINANCE',
-    'ADMIN_TREASURY',
-    'ADMIN_RISK',
-    'ADMIN_OPS',
-    'ADMIN_EXECUTIVE',
-    'ADMIN_DEPLOY'
-  ].includes(role)
+  // Helper to parse multiple roles
+  const getRolesArray = (roleStr) => {
+    if (!roleStr) return []
+    return roleStr.split(',').map(r => r.trim())
+  }
 
-  const getHomePath = (role) => {
-    if (isPlatformStaffRole(role)) {
+  // Helper to determine role-based home landing path
+  const hasPlatformStaffRole = (roleStr) => {
+    const roles = getRolesArray(roleStr)
+    const staffRoles = [
+      'SUPER_ADMIN',
+      'STAFF',
+      'ADMIN_FINANCE',
+      'ADMIN_TREASURY',
+      'ADMIN_RISK',
+      'ADMIN_OPS',
+      'ADMIN_EXECUTIVE',
+      'ADMIN_DEPLOY'
+    ]
+    return roles.some(r => staffRoles.includes(r))
+  }
+
+  const getHomePath = (roleStr) => {
+    if (hasPlatformStaffRole(roleStr)) {
       return '/fleet/overview'
     }
     return '/tenant/dashboard'
@@ -52,7 +62,7 @@ export function registerAuthBootstrapGuard(router) {
       }
       
       // Strict Tenant Isolation redirection
-      if (!isPlatformStaffRole(operatorRole)) {
+      if (!hasPlatformStaffRole(operatorRole)) {
         return next('/tenant/dashboard')
       }
 
@@ -116,7 +126,7 @@ export function registerAuthBootstrapGuard(router) {
       }
 
       // Gate 2.5: Platform Administration Layout Isolation (Strict Tenant Redirection)
-      if (!isPlatformStaffRole(operatorRole)) {
+      if (!hasPlatformStaffRole(operatorRole)) {
         const adminPathPrefixes = [
           '/fleet', '/governance', '/observability', '/ai', 
           '/deployments', '/apps', '/incidents', '/admin', 
@@ -127,28 +137,53 @@ export function registerAuthBootstrapGuard(router) {
           console.warn(`[TENANT ISOLATION ENFORCED] Standard tenant operator [${operatorRole}] attempted global administration workspace traversal to [${to.path}]. Redirection to tenant hub initialized.`)
           return next('/tenant/dashboard')
         }
+      } else {
+        // Block Platform Staff from accessing the Tenant Profile (TenantLayout routes)
+        if (to.matched.some(r => r.path === '/tenant')) {
+          console.warn(`[ADMIN ISOLATION ENFORCED] Platform staff [${operatorRole}] attempted direct tenant profile traversal to [${to.path}]. Redirection to admin hub initialized.`)
+          return next(getHomePath(operatorRole))
+        }
       }
 
       // Gate 3: Native RBAC Claim evaluations
       if (to.meta?.permission) {
-        // Simulated validation array matching the primary user tier matrix definitions
         const userScopeMatrix = {
-          SUPER_ADMIN: ['read_fleet', 'read_devices', 'read_tenant', 'soc_analyst', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'admin_deploy', 'write_fleet', 'read_telemetry', 'execute_actions', 'read_audit', 'write_policies', 'read_ai_intelligence', 'soc_communications', 'admin_agent_management'],
-          ADMIN_FINANCE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications'],
-          ADMIN_TREASURY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications'],
-          ADMIN_RISK: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'read_telemetry', 'read_audit', 'soc_communications'],
-          ADMIN_OPS: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications'],
-          ADMIN_EXECUTIVE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'read_ai_intelligence', 'soc_communications'],
-          ADMIN_DEPLOY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'admin_deploy', 'read_telemetry', 'read_audit', 'soc_communications'],
-          STAFF: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications'],
+          SUPER_ADMIN: ['read_fleet', 'read_devices', 'read_tenant', 'soc_analyst', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'admin_deploy', 'write_fleet', 'read_telemetry', 'execute_actions', 'read_audit', 'write_policies', 'read_ai_intelligence', 'soc_communications', 'admin_agent_management', 'create_requests', 'view_finance_queue', 'view_operations_queue', 'view_deployment_queue', 'view_governance_queue', 'approve_finance', 'approve_operations', 'approve_deployment', 'approve_governance'],
+          ADMIN_FINANCE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_finance_queue', 'approve_finance'],
+          ADMIN_TREASURY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_finance_queue', 'approve_finance'],
+          ADMIN_RISK: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'soc_quarantine', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_operations_queue', 'approve_operations'],
+          ADMIN_OPS: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_operations_queue', 'approve_operations'],
+          ADMIN_EXECUTIVE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'read_ai_intelligence', 'soc_communications', 'create_requests', 'view_finance_queue', 'view_operations_queue', 'approve_finance', 'approve_operations'],
+          ADMIN_DEPLOY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'admin_deploy', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_deployment_queue', 'approve_deployment'],
+          STAFF: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_own_requests'],
           TENANT_OPERATOR: ['read_fleet', 'read_devices', 'read_streams']
         }
 
-        const activePermissions = userScopeMatrix[operatorRole] || userScopeMatrix.SUPER_ADMIN
+        const rolesArray = getRolesArray(operatorRole)
+        let activePermissions = []
+        
+        if (rolesArray.includes('SUPER_ADMIN')) {
+          activePermissions = userScopeMatrix['SUPER_ADMIN']
+        } else {
+          rolesArray.forEach(r => {
+            if (userScopeMatrix[r]) {
+              activePermissions = activePermissions.concat(userScopeMatrix[r])
+            }
+          })
+          if (activePermissions.length === 0) activePermissions = userScopeMatrix['SUPER_ADMIN'] // fallback
+        }
+
         if (!activePermissions.includes(to.meta.permission)) {
           console.warn(`[RBAC GATEWAY DENIAL] Operator scope [${operatorRole}] missing required capability claim: [${to.meta.permission}]`)
-          // Deny lateral traversal directly to quarantine fallback screens or return to safe workspace base
-          return next(getHomePath(operatorRole))
+          
+          // Avoid infinite redirect loops
+          const homePath = getHomePath(operatorRole)
+          if (to.path !== homePath) {
+            return next(homePath)
+          } else {
+            // Fallback to error or simply stop navigation
+            return next(false)
+          }
         }
       }
 

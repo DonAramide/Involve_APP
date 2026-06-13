@@ -30,8 +30,8 @@
       </div>
     </q-banner>
 
-    <!-- MATRIX VIEW CONTAINER -->
-    <div class="enterprise-panel bg-panel column col">
+    <!-- MATRIX VIEW CONTAINER (SUPER_ADMIN ONLY) -->
+    <div v-if="isSuperAdmin" class="enterprise-panel bg-panel column col">
       <div class="panel-header bg-subpanel q-px-sm q-py-xs border-bottom row items-center justify-between text-metric-sm text-muted">
         <span class="col-4">Canonical Enterprise Capability Scope</span>
         <span class="col text-center text-blue-5">Super Admin</span>
@@ -84,6 +84,11 @@
         </q-list>
       </div>
     </div>
+    <div v-else class="enterprise-panel bg-panel column col flex flex-center text-center q-pa-lg">
+      <q-icon name="lock" size="xl" color="red-5" class="q-mb-md" />
+      <div class="text-h6 text-red-5 text-weight-bold">ACCESS RESTRICTED</div>
+      <div class="text-muted q-mt-sm">This critical governance console is explicitly restricted to SUPER_ADMIN operators.</div>
+    </div>
 
     <!-- Live Update Narrative Toast block -->
     <div class="row items-center justify-between border-top q-pt-xs text-metric-sm text-muted">
@@ -96,7 +101,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useQuasar } from 'quasar'
+
+const $q = useQuasar()
+const router = useRouter()
+
+const operatorRole = ref(localStorage.getItem('operator_role') || 'SUPER_ADMIN')
+const isSuperAdmin = computed(() => {
+  return operatorRole.value.split(',').map(r => r.trim()).includes('SUPER_ADMIN')
+})
 
 const lastActionMessage = ref('')
 
@@ -140,12 +155,45 @@ const capabilitiesMatrix = ref([
     code: 'CAP_AUDIT_LINEAGE_EXPORT',
     label: 'Export Immutable Operator Trace Matrices',
     tiers: { superAdmin: true, internalStaff: true, tenantAdmin: true, tenantOperator: false, proCustomer: false }
+  },
+  {
+    code: 'CAP_FINANCE_SETTLEMENTS',
+    label: 'Authorize Bulk Financial Settlements',
+    tiers: { superAdmin: true, internalStaff: true, tenantAdmin: false, tenantOperator: false, proCustomer: false }
+  },
+  {
+    code: 'CAP_APP_DEPLOYMENT',
+    label: 'Manage Enterprise App Deployments',
+    tiers: { superAdmin: true, internalStaff: true, tenantAdmin: true, tenantOperator: false, proCustomer: false }
+  },
+  {
+    code: 'CAP_ROUTING_GOVERNANCE',
+    label: 'Modify POS Gateway Routing Engines',
+    tiers: { superAdmin: true, internalStaff: false, tenantAdmin: false, tenantOperator: false, proCustomer: false }
+  },
+  {
+    code: 'CAP_ACCESS_ROLE_MUTATION',
+    label: 'Mutate Operator Access Roles and Privileges',
+    tiers: { superAdmin: true, internalStaff: false, tenantAdmin: false, tenantOperator: false, proCustomer: false }
   }
 ])
 
 const pushPolicyUpdate = (capCode, tierStr, newVal) => {
   lastActionMessage.value = `[Intent Synchronized] Capability scope "${capCode}" updated for target tier: ${tierStr} -> ${newVal}`
-  setTimeout(() => { lastActionMessage.value = '' }, 4000)
+  
+  $q.notify({
+    type: 'warning',
+    message: 'Global RBAC Rules Updated. Logging out active sessions to enforce new policies...',
+    position: 'top',
+    timeout: 3000
+  })
+
+  setTimeout(() => { 
+    lastActionMessage.value = ''
+    // Auto log the user out 
+    localStorage.removeItem('operator_session')
+    router.push('/login')
+  }, 3000)
 }
 </script>
 

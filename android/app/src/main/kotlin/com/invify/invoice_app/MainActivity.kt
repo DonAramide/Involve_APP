@@ -13,6 +13,7 @@ import com.demo.mpossdk.open.TransactionResultListener
 
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "com.invify.app/mpos"
+    private lateinit var mposChannel: MethodChannel
 
     // ── Kept at class level so the lambda stored in MposSdk.transactionListener
     //    can resolve it after ProcessingTransactionActivity finishes.
@@ -24,10 +25,12 @@ class MainActivity: FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        mposChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        mposChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "pairDevice" -> {
-                    MposSdk.pairDevice(this) { listener ->
+                    val posSerialNumber = call.argument<String>("posSerialNumber")
+                    MposSdk.pairDevice(this, posSerialNumber) { listener ->
                         when (listener) {
                             is PairResultListener.OnSuccess -> {
                                 mainHandler.post {
@@ -56,8 +59,68 @@ class MainActivity: FlutterActivity() {
                     val serialNumber = MposSdk.getMposSerialNumber(this)
                     result.success(serialNumber)
                 }
+                "getHardwareSerial" -> {
+                    try {
+                        var serial = ""
+                        try {
+                            val c = Class.forName("android.os.SystemProperties")
+                            val get = c.getMethod("get", String::class.java)
+                            val props = arrayOf("ril.serialnumber", "ro.serialno", "ro.boot.serialno", "sys.serialnumber")
+                            for (prop in props) {
+                                serial = get.invoke(c, prop) as String
+                                if (serial.isNotEmpty() && !serial.equals("unknown", ignoreCase = true) && !serial.equals("M1AJQ", ignoreCase = true)) {
+                                    break
+                                }
+                            }
+                        } catch (ignored: Exception) {}
+
+                        if (serial.isEmpty() || serial.equals("unknown", ignoreCase = true) || serial.equals("M1AJQ", ignoreCase = true)) {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                serial = android.os.Build.getSerial()
+                            } else {
+                                @Suppress("DEPRECATION")
+                                serial = android.os.Build.SERIAL
+                            }
+                        }
+                        result.success(serial)
+                    } catch (e: SecurityException) {
+                        // Fallback to Android ID if OS restricts physical serial number
+                        val androidId = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+                        result.success(androidId)
+                    } catch (e: Exception) {
+                        val androidId = android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID)
+                        result.success(androidId)
+                    }
+                }
                 "loadParams" -> {
-                    MposSdk.loadParams { listener ->
+                    val activeHostStr = call.argument<String>("activeHost") ?: "MEDUSA"
+                    val activeHost = try {
+                        com.demo.mpossdk.open.ActiveHost.valueOf(activeHostStr.uppercase())
+                    } catch (e: Exception) {
+                        com.demo.mpossdk.open.ActiveHost.MEDUSA
+                    }
+                    val expressPayBaseUrl = call.argument<String>("expressPayBaseUrl")
+                    val expressPayAuthToken = call.argument<String>("expressPayAuthToken")
+                    val ipAddress = call.argument<String>("ipAddress")
+                    val portNumber = call.argument<String>("portNumber")
+                    val enableSsl = call.argument<Boolean>("enableSsl") ?: false
+                    val terminalId = call.argument<String>("terminalId")
+                    val key1 = call.argument<String>("key1")
+                    val timeoutSeconds = call.argument<Int>("timeoutSeconds")
+
+                    val request = com.demo.mpossdk.open.KeyExchangeRequest(
+                        terminalId = terminalId,
+                        ipAddress = ipAddress,
+                        portNumber = portNumber,
+                        enableSsl = enableSsl,
+                        activeHost = activeHost,
+                        expressPayBaseUrl = expressPayBaseUrl,
+                        expressPayAuthToken = expressPayAuthToken,
+                        key1 = key1,
+                        timeoutSeconds = timeoutSeconds
+                    )
+
+                    MposSdk.loadParams(request) { listener ->
                         when (listener) {
                             is ParamResultListener.OnSuccess -> {
                                 mainHandler.post {
@@ -75,6 +138,11 @@ class MainActivity: FlutterActivity() {
                                     ))
                                 }
                             }
+                            is ParamResultListener.OnProgress -> {
+                                mainHandler.post {
+                                    mposChannel.invokeMethod("onProgressUpdate", mapOf("message" to listener.message))
+                                }
+                            }
                             is ParamResultListener.onLoading -> {
                                 // Ignore — MethodChannel expects exactly one reply.
                             }
@@ -84,6 +152,13 @@ class MainActivity: FlutterActivity() {
                 "initiatePayment" -> {
                     val amount     = call.argument<Double>("amount")     ?: 0.0
                     val terminalId = call.argument<String>("terminalId") ?: ""
+                    val activeHostStr = call.argument<String>("activeHost") ?: "MEDUSA"
+                    val activeHost = try {
+                        com.demo.mpossdk.open.ActiveHost.valueOf(activeHostStr.uppercase())
+                    } catch (e: Exception) {
+                        com.demo.mpossdk.open.ActiveHost.MEDUSA
+                    }
+                    val processOnDevice = call.argument<Boolean>("processOnDevice") ?: false
 
                     // ── Store result at class level so it outlives this lambda scope.
                     //    ProcessingTransactionActivity calls MposSdk.transactionListener
@@ -92,7 +167,12 @@ class MainActivity: FlutterActivity() {
                     pendingPaymentResult = result
                     resultReplied = false
 
-                    val paymentRequest = PaymentRequest(amount = amount, terminalId = terminalId)
+                    val paymentRequest = PaymentRequest(
+                        amount = amount, 
+                        terminalId = terminalId, 
+                        activeHost = activeHost,
+                        processOnDevice = processOnDevice
+                    )
 
                     MposSdk.initiatePayment(this, paymentRequest) { listener ->
                         when (listener) {
@@ -160,7 +240,9 @@ class MainActivity: FlutterActivity() {
                                         "cardVerificationValue"         to emvData.cardVerificationValue,
                                         "acquirerInstitutionId"         to emvData.acquirerInstitutionId,
                                         "terminalId"                    to emvData.terminalId,
-                                        "packedIsoMessage"              to emvData.packedIsoMessage
+                                        "packedIsoMessage"              to emvData.packedIsoMessage,
+                                        "serverIP"                      to emvData.serverIP,
+                                        "port"                          to emvData.port
                                     )
                                 }
 

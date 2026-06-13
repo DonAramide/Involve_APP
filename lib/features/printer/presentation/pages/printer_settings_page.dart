@@ -102,7 +102,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
         // Enforce validations and disconnect invalid hardware
         final connectedPrinterMac = context.read<PrinterBloc>().state.connectedDevice?.address;
         final isPrinterMismatch = config.printerMac != null && connectedPrinterMac != null && config.printerMac != connectedPrinterMac;
-        final isMposMismatch = config.posSerialNumber != null && mposSn != null && mposSn.isNotEmpty && config.posSerialNumber != mposSn;
+        final isMposMismatch = config.posSerialNumber != null && mposSn != null && mposSn.isNotEmpty && !_isDeviceNameMatch(config.posSerialNumber, mposSn);
 
         if (isPrinterMismatch) {
           context.read<PrinterBloc>().add(DisconnectPrinter());
@@ -134,7 +134,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                      Text('Terminal Unassigned'),
                    ],
                  ),
-                 content: Text('${config.message ?? "No terminal assigned to this device"}\n\nPlease contact Invify admin on $phoneDisplay.'),
+                 content: Text('${config.message ?? "No terminal assigned to this device"}\n\nDevice ID: $_deviceId\n\nPlease contact Invify admin on $phoneDisplay.'),
                  actions: [
                    TextButton(
                      onPressed: () => Navigator.of(ctx).pop(),
@@ -217,6 +217,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
               const SizedBox(height: 8),
               Text('Manufacturer: ${deviceInfo['brand'] ?? 'Unknown'}'),
               Text('Model: ${deviceInfo['model'] ?? 'Unknown'}'),
+              Text('Serial Number: ${deviceInfo['serialNumber'] ?? 'Unknown'}'),
               Text('OS Version: ${deviceInfo['osVersion'] ?? 'Unknown'}'),
               const SizedBox(height: 8),
               Text('License Suffix: ${deviceInfo['deviceSuffix'] ?? 'Unknown'}'),
@@ -493,7 +494,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                           } else {
                             final connectedPrinterMac = ctx.watch<PrinterBloc>().state.connectedDevice?.address;
                             final isPrinterMismatch = _terminalConfig!.printerMac != null && connectedPrinterMac != null && _terminalConfig!.printerMac != connectedPrinterMac;
-                            final isMposMismatch = _terminalConfig!.posSerialNumber != null && !isInvalidDevice && _terminalConfig!.posSerialNumber != _mposSerialNumber;
+                            final isMposMismatch = _terminalConfig!.posSerialNumber != null && !isInvalidDevice && !_isDeviceNameMatch(_terminalConfig!.posSerialNumber, _mposSerialNumber);
                             hasMismatch = isPrinterMismatch || isMposMismatch;
                             
                             isMissingMapping = _terminalConfig!.terminalId == null || _terminalConfig!.terminalId!.isEmpty;
@@ -653,7 +654,9 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
 
   Future<void> _pairDevice() async {
     try {
-      final result = await _mposService.pairDevice();
+      final result = await _mposService.pairDevice(
+        posSerialNumber: _terminalConfig?.posSerialNumber,
+      );
       if (!mounted) return;
       final isSuccess = result.status == 'success';
       ScaffoldMessenger.of(context).showSnackBar(
@@ -676,6 +679,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
   }
 
   Future<void> _downloadParams() async {
+    print('\n[DownloadParams] User clicked Download Params button!');
     if (_terminalConfig == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Terminal not provisioned. Sync first.'), backgroundColor: Colors.orange),
@@ -684,9 +688,61 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     }
     setState(() => _isLoadingParams = true);
     try {
-      final result = await _mposService.loadParams();
+      final terminalId = _terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId ?? '2214OTGF';
+      final activeHost = _terminalConfig?.activeHost ?? 'MEDUSA';
+      final ipAddress = _terminalConfig?.expressPayHost;
+      final portNumber = _terminalConfig?.expressPayPort?.toString();
+      final expressPayBaseUrl = _terminalConfig?.expressPayBaseUrl;
+      final expressPayAuthToken = _terminalConfig?.expressPayAuthToken;
+      final ctmk = _terminalConfig?.primaryHost?['kimonoKeys']?['ctmk']?.toString() ?? 
+                   _terminalConfig?.primaryHost?['kimonoFallbackParameters']?['key1']?.toString();
+      final timeoutRaw = _terminalConfig?.primaryHost?['timeout'];
+      final timeoutSeconds = timeoutRaw is int ? timeoutRaw : int.tryParse(timeoutRaw?.toString() ?? '');
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            content: Row(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: StreamBuilder<String>(
+                    stream: _mposService.progressStream,
+                    initialData: 'Starting Key Exchange...',
+                    builder: (context, snapshot) {
+                      return Text(snapshot.data ?? 'Processing...');
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      
+      print('[DownloadParams] Calling native _mposService.loadParams and waiting for response...');
+      final result = await _mposService.loadParams(
+        terminalId: terminalId,
+        activeHost: activeHost,
+        ipAddress: ipAddress,
+        portNumber: portNumber,
+        enableSsl: _terminalConfig?.primaryHost?['sslEnabled'] == true,
+        expressPayBaseUrl: expressPayBaseUrl,
+        expressPayAuthToken: expressPayAuthToken,
+        key1: ctmk,
+        timeoutSeconds: timeoutSeconds,
+      );
+      print('[DownloadParams] Native _mposService.loadParams returned: ${result.status} - ${result.message}');
       if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
       final isSuccess = result.status == 'success';
+      if (isSuccess) {
+        _printKeyExchangeReceipt();
+        TerminalSyncService.recordKeyExchangeSuccess(_deviceId);
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(isSuccess ? 'Params loaded successfully' : 'Failed to load params: ${result.message ?? "Unknown Error"}'),
@@ -702,6 +758,29 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     } finally {
       if (mounted) setState(() => _isLoadingParams = false);
     }
+  }
+
+  void _printKeyExchangeReceipt() {
+    final now = DateTime.now().toString().split('.')[0];
+    final commands = <PrintCommand>[
+      TextCommand('Terminal Parameters', isBold: true, align: 'center'),
+      SizedBoxCommand(height: 1),
+      TextCommand('KEY EXCHANGE', isBold: true, align: 'center'),
+      TextCommand('SUCCESSFUL', isBold: true, align: 'center'),
+      DividerCommand(),
+      TextCommand('Terminal ID: ${_terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId ?? "N/A"}'),
+      TextCommand('Tablet SN: $_deviceId'),
+      TextCommand('MPOS SN: ${_mposSerialNumber ?? "N/A"}'),
+      TextCommand('IP: ${_terminalConfig?.expressPayHost ?? "N/A"}'),
+      TextCommand('Port: ${_terminalConfig?.expressPayPort ?? "N/A"}'),
+      TextCommand('Merchant ID: ${_terminalConfig?.tenantId ?? "N/A"}'),
+      TextCommand('Merchant Name: ${_terminalConfig?.merchantName ?? _terminalConfig?.businessName ?? "N/A"}'),
+      TextCommand('SSL: ${_terminalConfig?.primaryHost?['sslEnabled'] == true ? "Enabled" : "Disabled"}'),
+      TextCommand('Date/Time: $now'),
+      TextCommand('App Version: 1.0.0'),
+      SizedBoxCommand(height: 3),
+    ];
+    context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
   }
 
   Widget _buildTerminalStatusCard() {
@@ -740,7 +819,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     final isPrinterMismatch = config.printerMac != null && connectedPrinterMac != null && config.printerMac != connectedPrinterMac;
 
     // Validate MPOS Match
-    final isMposMismatch = config.posSerialNumber != null && _mposSerialNumber != null && _mposSerialNumber!.isNotEmpty && config.posSerialNumber != _mposSerialNumber;
+    final isMposMismatch = config.posSerialNumber != null && _mposSerialNumber != null && _mposSerialNumber!.isNotEmpty && !_isDeviceNameMatch(config.posSerialNumber, _mposSerialNumber);
 
     return Column(
       children: [
@@ -936,5 +1015,16 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
     if (diff.inHours < 24) return '${diff.inHours}h ago';
     return '${dt.day}/${dt.month}/${dt.year}';
+  }
+
+  bool _isDeviceNameMatch(String? name1, String? name2) {
+    if (name1 == null || name2 == null) return false;
+    final clean1 = name1.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+    final clean2 = name2.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toLowerCase();
+
+    final norm1 = clean1.endsWith('android') ? clean1.substring(0, clean1.length - 7) : clean1;
+    final norm2 = clean2.endsWith('android') ? clean2.substring(0, clean2.length - 7) : clean2;
+
+    return norm1.contains(norm2) || norm2.contains(norm1);
   }
 }

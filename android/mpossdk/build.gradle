@@ -82,9 +82,14 @@ dependencies {
 
     implementation files('libs/AppSdkAidl.jar')
     implementation files('libs/misAndroidSdk_230404121933.jar')
-    implementation files('libs/jpos-2.1.7.jar')
+    implementation('org.jpos:jpos:2.1.10') {
+        exclude group: 'org.bouncycastle'
+    }
     implementation files('libs/bcprov-jdk15on-1.70.jar')
 
     //GSON
     implementation 'com.google.code.gson:gson:2.10.1'
+
+    // jdom2 for jPOS XML logging
+    implementation 'org.jdom:jdom2:2.0.6'
 }

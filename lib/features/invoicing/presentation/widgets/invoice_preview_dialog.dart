@@ -254,6 +254,33 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                 hintText: '0.00',
                               ),
                             ),
+                            Builder(
+                              builder: (context) {
+                                final amountReceivedText = double.tryParse(_amountReceivedController.text) ?? 0.0;
+                                final changeDue = (amountReceivedText - invoiceState.total).clamp(0.0, double.infinity);
+                                
+                                if (changeDue > 0) {
+                                  // Only show change due if it's cash OR if give change is allowed for electronic payments
+                                  final isElectronic = invoiceState.paymentMethod == 'POS' || invoiceState.paymentMethod == 'Transfer';
+                                  if (!isElectronic || settings?.allowGiveChange == true) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 8.0),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text('Change Due:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                                          Text(
+                                            CurrencyFormatter.formatWithSymbol(changeDue, symbol: settings?.currency ?? '₦'),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                }
+                                return const SizedBox.shrink();
+                              },
+                            ),
                           ],
                         ],
                         
@@ -292,7 +319,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             );
                             return;
                           }
-                          final terminalId = _terminalConfig!.posSerialNumber!; // Use the centralized config
+                          final terminalId = _terminalConfig!.terminalId ?? _terminalConfig!.mposTerminalId ?? '2214OTGF';
 
                           // Network Check
                           final connectivityResult = await Connectivity().checkConnectivity();
@@ -309,7 +336,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             return;
                           }
 
-                          final amountToCharge = invoiceState.total;
+                          final amountReceivedText = double.tryParse(_amountReceivedController.text) ?? 0.0;
+                          final amountToCharge = (settings?.allowGiveChange == true && amountReceivedText > invoiceState.total) 
+                              ? amountReceivedText 
+                              : invoiceState.total;
                           
                           final confirm = await showDialog<bool>(
                             context: context,
@@ -332,13 +362,79 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             builder: (_) => const Center(child: CircularProgressIndicator()),
                           );
                           
-                          final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
+                          final routingRules = _terminalConfig?.routingRules ?? {};
+                          final processOnDevice = routingRules['processOnDevice'] == true;
+                          final webhookUrl = routingRules['webhookUrl'] as String?;
+
+                          final activeHost = _terminalConfig?.activeHost ?? 'MEDUSA';
+                          var result = await MposService().initiatePayment(
+                            amount: amountToCharge,
+                            terminalId: terminalId,
+                            activeHost: activeHost,
+                            processOnDevice: processOnDevice,
+                          );
+
+                          // Fallback to secondary host if transaction fails
+                          if (result.status != 'payment_success' && _terminalConfig?.secondaryHost != null) {
+                            final secondaryHostName = _terminalConfig!.secondaryHost!['hostName'] as String?;
+                            if (secondaryHostName != null && secondaryHostName != activeHost) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Primary host failed. Falling back to secondary host: $secondaryHostName...')));
+                              result = await MposService().initiatePayment(
+                                amount: amountToCharge,
+                                terminalId: terminalId,
+                                activeHost: secondaryHostName,
+                                processOnDevice: processOnDevice,
+                              );
+                            }
+                          }
                           if (!mounted) return;
                           if (Navigator.canPop(context)) {
                             Navigator.pop(context); // Close loading
                           }
 
-                          if (result.status == 'emv_data_ready' && result.emvData != null) {
+                          if (result.status == 'payment_success' || result.status == 'payment_failed') {
+                            final financeRepo = context.read<FinanceRepository>();
+                            final endpoint = webhookUrl?.isNotEmpty == true ? webhookUrl! : '/api/pos/transaction';
+                            final backendResponse = await financeRepo.apiClient.post(
+                              endpoint,
+                              data: {
+                                'terminalId': terminalId,
+                                'amount': amountToCharge,
+                                'isDeviceProcessed': true,
+                                'deviceStatus': result.status,
+                                'tenantProfile': _terminalConfig?.tenantPolicy,
+                                'deviceInfo': {
+                                  'terminalId': _terminalConfig?.terminalId,
+                                  'mposTerminalId': _terminalConfig?.mposTerminalId,
+                                  'posSerialNumber': _terminalConfig?.posSerialNumber,
+                                },
+                                'emvData': result.emvData?.toJson(),
+                                'transactionResponse': result.transaction?.toJson(),
+                                'staffName': invoiceState.staffName,
+                                'items': invoiceState.items.map((i) => {
+                                  'name': i.item.name,
+                                  'quantity': i.quantity,
+                                  'price': i.item.price,
+                                }).toList(),
+                              },
+                            );
+                            if (!mounted) return;
+                            if (result.status == 'payment_failed') {
+                              final msg = result.transaction?.message ?? 'Unknown Error';
+                              await showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('POS Declined'),
+                                  content: Text('Transaction declined by MPOS ($msg).'),
+                                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+                                ),
+                              );
+                              return;
+                            } else if (backendResponse.statusCode != 200) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment approved but failed to sync to server.')));
+                            }
+                          } else if (result.status == 'emv_data_ready' && result.emvData != null) {
                             final financeRepo = context.read<FinanceRepository>();
                             final backendResponse = await financeRepo.apiClient.post(
                               '/api/pos/transaction',
@@ -346,6 +442,12 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                 'terminalId': terminalId,
                                 'amount': amountToCharge,
                                 'emvData': result.emvData!.toJson(),
+                                'staffName': invoiceState.staffName,
+                                'items': invoiceState.items.map((i) => {
+                                  'name': i.item.name,
+                                  'quantity': i.quantity,
+                                  'price': i.item.price,
+                                }).toList(),
                               },
                             );
                             if (!mounted) return;
@@ -401,11 +503,23 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           );
                           if (proceed != true) return;
                         }
+                        
+                        double changeGiven = 0.0;
+                        double finalAmountPaid = amountReceived;
+                        if (amountReceived > invoiceState.total) {
+                          if (settings?.allowGiveChange == true && (invoiceState.paymentMethod == 'POS' || invoiceState.paymentMethod == 'Transfer')) {
+                            changeGiven = amountReceived - invoiceState.total;
+                          } else {
+                            // For Cash, or if give change is disabled, we cap the recorded paid amount to total.
+                            finalAmountPaid = invoiceState.total;
+                          }
+                        }
 
                         final invoiceNumber = widget.invoiceBloc.calculationService.generateInvoiceNumber();
                         widget.invoiceBloc.add(SaveInvoice(
                           invoiceNumber: invoiceNumber,
-                          amountPaid: amountReceived,
+                          amountPaid: finalAmountPaid,
+                          changeGiven: changeGiven,
                         ));
 
                         await Future.delayed(const Duration(milliseconds: 300));
@@ -430,8 +544,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           discountType: invoiceState.discountType,
                           totalAmount: invoiceState.total,
                           paymentStatus: status,
-                          amountPaid: amountReceived,
-                          balanceAmount: (invoiceState.total - amountReceived).clamp(0, double.infinity),
+                          amountPaid: finalAmountPaid,
+                          balanceAmount: (invoiceState.total - finalAmountPaid).clamp(0, double.infinity),
                           customerName: invoiceState.customerName,
                           customerPhone: invoiceState.customerPhone,
                           customerAddress: invoiceState.customerAddress,
@@ -456,6 +570,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           academicYearName: invoiceState.academicYearName,
                           studentImage: invoiceState.studentImage,
                           warrantyDuration: invoiceState.warrantyDuration,
+                          changeGiven: changeGiven,
                         );
 
                         _printInvoice(context, invoice, settings!);
@@ -497,7 +612,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           );
                           return;
                         }
-                        final terminalId = _terminalConfig!.posSerialNumber!; // Use the centralized config
+                        final terminalId = _terminalConfig!.terminalId ?? _terminalConfig!.mposTerminalId ?? '2214OTGF';
 
                         final connectivityResult = await Connectivity().checkConnectivity();
                         if (!mounted) return;
@@ -530,10 +645,70 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending to POS terminal…')));
 
-                        final result = await MposService().initiatePayment(amount: amountToCharge, terminalId: terminalId);
+                        final routingRules = _terminalConfig?.routingRules ?? {};
+                        final processOnDevice = routingRules['processOnDevice'] == true;
+                        final webhookUrl = routingRules['webhookUrl'] as String?;
+
+                        final activeHost = _terminalConfig?.activeHost ?? 'MEDUSA';
+                        var result = await MposService().initiatePayment(
+                          amount: amountToCharge,
+                          terminalId: terminalId,
+                          activeHost: activeHost,
+                          processOnDevice: processOnDevice,
+                        );
+
+                        // Fallback to secondary host if transaction fails
+                        if (result.status != 'payment_success' && _terminalConfig?.secondaryHost != null) {
+                          final secondaryHostName = _terminalConfig!.secondaryHost!['hostName'] as String?;
+                          if (secondaryHostName != null && secondaryHostName != activeHost) {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Primary host failed. Falling back to secondary host: $secondaryHostName...')));
+                            result = await MposService().initiatePayment(
+                              amount: amountToCharge,
+                              terminalId: terminalId,
+                              activeHost: secondaryHostName,
+                              processOnDevice: processOnDevice,
+                            );
+                          }
+                        }
                         if (!mounted) return;
 
-                        if (result.status == 'emv_data_ready' && result.emvData != null) {
+                        if (result.status == 'payment_success' || result.status == 'payment_failed') {
+                          final financeRepo = context.read<FinanceRepository>();
+                          final endpoint = webhookUrl?.isNotEmpty == true ? webhookUrl! : '/api/pos/transaction';
+                          final backendResponse = await financeRepo.apiClient.post(
+                            endpoint,
+                            data: {
+                              'terminalId': terminalId,
+                              'amount': amountToCharge,
+                              'isDeviceProcessed': true,
+                              'deviceStatus': result.status,
+                              'tenantProfile': _terminalConfig?.tenantPolicy,
+                              'deviceInfo': {
+                                'terminalId': _terminalConfig?.terminalId,
+                                'mposTerminalId': _terminalConfig?.mposTerminalId,
+                                'posSerialNumber': _terminalConfig?.posSerialNumber,
+                              },
+                              'emvData': result.emvData?.toJson(),
+                              'transactionResponse': result.transaction?.toJson(),
+                            },
+                          );
+                          if (!mounted) return;
+                          if (result.status == 'payment_failed') {
+                            final msg = result.transaction?.message ?? 'Unknown Error';
+                            await showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text('POS Declined'),
+                                content: Text('Transaction declined by MPOS ($msg).'),
+                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+                              ),
+                            );
+                            return;
+                          } else if (backendResponse.statusCode != 200) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment approved but failed to sync to server.')));
+                          }
+                        } else if (result.status == 'emv_data_ready' && result.emvData != null) {
                           final financeRepo = context.read<FinanceRepository>();
                           final backendResponse = await financeRepo.apiClient.post(
                             '/api/pos/transaction',

@@ -16,11 +16,13 @@ export class OTPController {
 
       const code = await OTPService.generateOTP(phone);
       
+      const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+      
       return res.status(200).json({ 
         message: 'Verification code sent successfully via WhatsApp',
         // In dev mode, we might return the code for testing, 
         // but for production it should be hidden.
-        devCode: process.env.NODE_ENV === 'development' ? code : undefined
+        devCode: variantService.isLocal() ? code : undefined
       });
     } catch (error: any) {
       console.error('[OTPController] Send Error:', error.message);

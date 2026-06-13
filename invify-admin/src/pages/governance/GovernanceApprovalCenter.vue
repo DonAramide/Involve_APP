@@ -195,11 +195,19 @@
         </q-scroll-area>
 
         <!-- Drawer Footer Actions -->
-        <div class="q-pa-md border-top bg-dark row items-center justify-end op-gap-8" v-if="['Submitted', 'Under Review'].includes(selectedRequest.status)">
-          <q-btn outline color="red-4" label="Reject" class="font-mono text-caption" @click="updateStatus('Rejected')" />
-          <q-btn unelevated color="amber-5" text-color="black" label="Mark Reviewing" class="font-mono text-caption" v-if="selectedRequest.status === 'Submitted'" @click="updateStatus('Under Review')" />
-          <q-btn unelevated color="green-5" text-color="black" label="Approve Request" class="font-mono text-caption" v-if="selectedRequest.status === 'Under Review'" @click="updateStatus('Approved')" />
-        </div>
+          <div class="q-pa-md border-top bg-dark row items-center justify-end op-gap-8" v-if="['Submitted', 'Under Review'].includes(selectedRequest.status)">
+            <q-btn outline color="red-4" label="Reject" class="font-mono text-caption" v-if="canApproveCurrentDomain() && selectedRequest.maker !== currentUserEmail" @click="updateStatus('Rejected')" />
+            <q-btn unelevated color="amber-5" text-color="black" label="Mark Reviewing" class="font-mono text-caption" v-if="selectedRequest.status === 'Submitted' && canApproveCurrentDomain() && selectedRequest.maker !== currentUserEmail" @click="updateStatus('Under Review')" />
+            <q-btn unelevated color="orange-5" text-color="black" label="Escalate" class="font-mono text-caption" v-if="selectedRequest.status === 'Under Review' && canApproveCurrentDomain() && selectedRequest.maker !== currentUserEmail" @click="updateStatus('Escalated')" />
+            <q-btn unelevated color="green-5" text-color="black" label="Approve Request" class="font-mono text-caption" v-if="selectedRequest.status === 'Under Review' && canApproveCurrentDomain() && selectedRequest.maker !== currentUserEmail" @click="updateStatus('Approved')" />
+            
+            <div v-if="selectedRequest.maker === currentUserEmail" class="text-caption text-amber-5 font-mono q-ml-md">
+              <q-icon name="warning" class="q-mr-xs"/> Self-approval restricted by Governance Policy
+            </div>
+            <div v-else-if="!canApproveCurrentDomain()" class="text-caption text-red-4 font-mono q-ml-md">
+              <q-icon name="lock" class="q-mr-xs"/> Missing Domain Approval Permission
+            </div>
+          </div>
       </div>
     </q-drawer>
   </q-page>
@@ -213,6 +221,33 @@ const approvals = ref([])
 const drawerOpen = ref(false)
 const selectedRequest = ref(null)
 const activeTab = ref('overview')
+
+const currentUserEmail = ref(localStorage.getItem('operator_email') || 'current_user@invify.app')
+const userPermissions = ref([])
+
+onMounted(() => {
+  try {
+    const perms = localStorage.getItem('operator_permissions')
+    if (perms) {
+      userPermissions.value = JSON.parse(perms)
+    }
+  } catch (e) {
+    console.error('Failed to parse permissions')
+  }
+})
+
+const canApproveCurrentDomain = () => {
+  if (!selectedRequest.value) return false
+  const domain = selectedRequest.value.domain || 'OPERATIONS' // Default for legacy mock data
+  const permMap = {
+    'FINANCE': 'approve_finance',
+    'OPERATIONS': 'approve_operations',
+    'DEPLOYMENT': 'approve_deployment',
+    'GOVERNANCE': 'approve_governance'
+  }
+  const requiredPerm = permMap[domain]
+  return userPermissions.value.includes(requiredPerm) || userPermissions.value.includes('execute_actions')
+}
 
 const columns = [
   { name: 'approvalId', align: 'left', label: 'ID', field: 'approvalId', sortable: true },
@@ -231,9 +266,30 @@ const stats = computed(() => [
 ])
 
 const handleEngineUpdate = (data) => {
-  approvals.value = data
+  const isSuperAdmin = userPermissions.value.includes('view_all') || userPermissions.value.includes('execute_actions')
+  
+  const filteredData = data.filter(item => {
+    if (isSuperAdmin) return true
+    
+    const domain = item.domain || 'OPERATIONS'
+    const viewMap = {
+      'FINANCE': 'view_finance_queue',
+      'OPERATIONS': 'view_operations_queue',
+      'DEPLOYMENT': 'view_deployment_queue',
+      'GOVERNANCE': 'view_governance_queue'
+    }
+    const requiredView = viewMap[domain]
+    
+    // Maker can always view their own request
+    if (item.maker === currentUserEmail.value && userPermissions.value.includes('view_own_requests')) return true
+    
+    return userPermissions.value.includes(requiredView)
+  })
+
+  approvals.value = filteredData
+
   if (selectedRequest.value) {
-    const updated = data.find(a => a.approvalId === selectedRequest.value.approvalId)
+    const updated = filteredData.find(a => a.approvalId === selectedRequest.value.approvalId)
     if (updated) selectedRequest.value = { ...updated }
   }
 }
