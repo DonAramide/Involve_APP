@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/invoice_bloc.dart';
 import '../bloc/invoice_state.dart';
@@ -309,6 +310,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                     onPressed: (invoiceState.isSaving || invoiceState.isGeneratingAccount || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                       try {
+                        MposTransactionData? posTransactionData;
                         if (invoiceState.paymentMethod == 'POS') {
                           if (!mounted) return;
                           if (_terminalConfig == null || _terminalConfig!.posSerialNumber == null || _terminalConfig!.posSerialNumber!.isEmpty) {
@@ -358,7 +360,6 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           
                           if (confirm != true) return;
 
-                          MposTransactionData? posTransactionData;
                           if (!mounted) return;
                           showDialog(
                             context: context,
@@ -583,6 +584,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   ElevatedButton(
                     onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                       try {
+                      MposTransactionData? posTransactionData;
                       final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
 
                       if (invoiceState.paymentMethod == 'POS') {
