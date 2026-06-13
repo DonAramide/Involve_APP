@@ -98,6 +98,7 @@ class AppSettings extends Equatable {
     this.showSignatureSpace = false,
     this.paymentMethodsEnabled = false,
     this.primaryColor = 0xFF2196F3, // Colors.blue.value
+    this.mergePosReceipt = false,
     this.showDateTime = true,
     this.serviceBillingEnabled = false,
     this.serviceTypes = const [],

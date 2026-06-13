@@ -659,7 +659,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         }
                         if (!mounted) return;
 
+                        posTransactionData = result.transaction;
                         if (result.status == 'payment_success' || result.status == 'payment_failed') {
+                          final shouldPrint = !(settings?.mergePosReceipt ?? false);
                           await _processWebhookAndSuccess(context, webhookUrl ?? '', result, {
                               'terminalId': terminalId,
                               'amount': amountToCharge,
