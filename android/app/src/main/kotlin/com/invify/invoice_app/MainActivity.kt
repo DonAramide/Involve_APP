@@ -124,10 +124,14 @@ class MainActivity: FlutterActivity() {
                         when (listener) {
                             is ParamResultListener.OnSuccess -> {
                                 mainHandler.post {
-                                    result.success(mapOf(
+                                    val resultMap = mutableMapOf<String, Any>(
                                         "status" to "success",
                                         "message" to listener.message
-                                    ))
+                                    )
+                                    listener.params?.let {
+                                        resultMap["params"] = it
+                                    }
+                                    result.success(resultMap)
                                 }
                             }
                             is ParamResultListener.OnFailure -> {

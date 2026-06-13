@@ -740,7 +740,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       Navigator.of(context, rootNavigator: true).pop();
       final isSuccess = result.status == 'success';
       if (isSuccess) {
-        _printKeyExchangeReceipt();
+        _printKeyExchangeReceipt(result.params);
         TerminalSyncService.recordKeyExchangeSuccess(_deviceId);
       }
       ScaffoldMessenger.of(context).showSnackBar(
@@ -760,8 +760,13 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     }
   }
 
-  void _printKeyExchangeReceipt() {
+  void _printKeyExchangeReceipt(Map<String, dynamic>? params) {
     final now = DateTime.now().toString().split('.')[0];
+    final ip = params?['ipAddress']?.toString().isNotEmpty == true ? params!['ipAddress'] : _terminalConfig?.expressPayHost;
+    final port = params?['portNumber']?.toString().isNotEmpty == true ? params!['portNumber'] : _terminalConfig?.expressPayPort;
+    final merchantId = params?['merchantId']?.toString().isNotEmpty == true ? params!['merchantId'] : _terminalConfig?.tenantId;
+    final merchantName = params?['merchantName']?.toString().isNotEmpty == true ? params!['merchantName'] : (_terminalConfig?.merchantName ?? _terminalConfig?.businessName);
+
     final commands = <PrintCommand>[
       TextCommand('Terminal Parameters', isBold: true, align: 'center'),
       SizedBoxCommand(height: 1),
@@ -771,10 +776,10 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       TextCommand('Terminal ID: ${_terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId ?? "N/A"}'),
       TextCommand('Tablet SN: $_deviceId'),
       TextCommand('MPOS SN: ${_mposSerialNumber ?? "N/A"}'),
-      TextCommand('IP: ${_terminalConfig?.expressPayHost ?? "N/A"}'),
-      TextCommand('Port: ${_terminalConfig?.expressPayPort ?? "N/A"}'),
-      TextCommand('Merchant ID: ${_terminalConfig?.tenantId ?? "N/A"}'),
-      TextCommand('Merchant Name: ${_terminalConfig?.merchantName ?? _terminalConfig?.businessName ?? "N/A"}'),
+      TextCommand('IP: ${ip ?? "N/A"}'),
+      TextCommand('Port: ${port ?? "N/A"}'),
+      TextCommand('Merchant ID: ${merchantId ?? "N/A"}'),
+      TextCommand('Merchant Name: ${merchantName ?? "N/A"}'),
       TextCommand('SSL: ${_terminalConfig?.primaryHost?['sslEnabled'] == true ? "Enabled" : "Disabled"}'),
       TextCommand('Date/Time: $now'),
       TextCommand('App Version: 1.0.0'),

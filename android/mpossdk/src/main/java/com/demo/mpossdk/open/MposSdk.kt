@@ -196,7 +196,13 @@ object MposSdk {
                     SystemApi.Beep_Api(0)
                     ParamUtils.init(terminalParameters) {
                         SystemApi.Beep_Api(1)
-                        paramResultListener(ParamResultListener.OnSuccess("Params Loaded successfully"))
+                        val params = mapOf(
+                            "merchantId" to (terminalParameters.merchantNo ?: ""),
+                            "merchantName" to (terminalParameters.merchantName ?: ""),
+                            "ipAddress" to (terminalParameters.serverIP ?: ""),
+                            "portNumber" to terminalParameters.port.toString()
+                        )
+                        paramResultListener(ParamResultListener.OnSuccess("Params Loaded successfully", params))
                     }
                 } else {
 
@@ -237,7 +243,13 @@ object MposSdk {
                                             ParamUtils.init(latestParams) {
                                                 success = true
                                                 SystemApi.Beep_Api(1)
-                                                paramResultListener(ParamResultListener.OnSuccess("Params Loaded successfully"))
+                                                val params = mapOf(
+                                                    "merchantId" to (latestParams.merchantNo ?: ""),
+                                                    "merchantName" to (latestParams.merchantName ?: ""),
+                                                    "ipAddress" to (latestParams.serverIP ?: ""),
+                                                    "portNumber" to latestParams.port.toString()
+                                                )
+                                                paramResultListener(ParamResultListener.OnSuccess("Params Loaded successfully", params))
                                             }
                                         } catch (e: Exception) {
                                             android.util.Log.e("MposSdk", "Bluetooth injection failed on attempt $attempts", e)

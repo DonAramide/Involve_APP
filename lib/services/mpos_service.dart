@@ -119,14 +119,24 @@ class MposService {
 class MposResult {
   final String? status;
   final String? message;
+  final Map<String, dynamic>? params;
 
-  MposResult({this.status, this.message});
+  MposResult({this.status, this.message, this.params});
 
   factory MposResult.fromMap(Map<Object?, Object?>? map) {
     if (map == null) return MposResult();
+    
+    // Safely convert the inner map if it exists
+    Map<String, dynamic>? parsedParams;
+    if (map['params'] != null) {
+      final rawParams = map['params'] as Map<Object?, Object?>;
+      parsedParams = rawParams.map((key, value) => MapEntry(key.toString(), value));
+    }
+
     return MposResult(
       status: map['status']?.toString(),
       message: map['message']?.toString(),
+      params: parsedParams,
     );
   }
 }
