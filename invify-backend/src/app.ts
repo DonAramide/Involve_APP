@@ -249,6 +249,8 @@ app.get('/api/devices/:deviceId/alerts', authenticate, DeviceController.getDevic
 
 // Terminal Sync (Public for mobile app)
 app.post('/api/mobile/terminal/sync', TerminalController.mobileSync);
+app.post('/api/mobile/terminal/keyexchange-success', TerminalController.keyExchangeSuccess);
+app.get('/api/mobile/terminal/status', TerminalController.mobileStatus);
 
 // Terminal Admin APIs
 app.get('/api/admin/terminals', authenticate, checkRole(['super_admin', 'tenant_admin']), TerminalController.getTablets);

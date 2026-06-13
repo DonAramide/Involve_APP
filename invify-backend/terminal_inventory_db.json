@@ -213,6 +213,57 @@
   ],
   "audit_log": [
     {
+      "id": "audit-1781385807921-erq1p",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2070AL32",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": "NJJ6-QIIA-F7GR-HLYI-O4OL-XDSB"
+      },
+      "created_at": "2026-06-13T21:23:27.921Z"
+    },
+    {
+      "id": "audit-1781385538501-ciutl",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2070AL32",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": "NJJ6-QIIA-F7GR-HLYI-O4OL-XDSB"
+      },
+      "created_at": "2026-06-13T21:18:58.501Z"
+    },
+    {
+      "id": "audit-1781385439538-zv3ke",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2070AL32",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": "NJJ6-QIIA-F7GR-HLYI-O4OL-XDSB"
+      },
+      "created_at": "2026-06-13T21:17:19.539Z"
+    },
+    {
       "id": "audit-1781368207810-gblfr",
       "action_type": "SYNC_SUCCESS",
       "terminal_id": "2070AL32",
