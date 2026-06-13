@@ -358,6 +358,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           
                           if (confirm != true) return;
 
+                          MposTransactionData? posTransactionData;
                           if (!mounted) return;
                           showDialog(
                             context: context,
@@ -396,7 +397,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             Navigator.pop(context); // Close loading
                           }
 
+                          posTransactionData = result.transaction;
                           if (result.status == 'payment_success' || result.status == 'payment_failed') {
+                            final shouldPrint = !(settings?.mergePosReceipt ?? false);
                             await _processWebhookAndSuccess(context, webhookUrl ?? '', result, {
                                 'terminalId': terminalId,
                                 'amount': amountToCharge,
@@ -556,7 +559,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           changeGiven: changeGiven,
                         );
 
-                        _printInvoice(context, invoice, settings!);
+                        _printInvoice(context, invoice, settings!, posTx: posTransactionData);
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invoice saved!')));
                       } catch (e) {
                         if (!mounted) return;
@@ -670,7 +673,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               },
                               'emvData': result.emvData?.toJson(),
                               'transactionResponse': result.transaction?.toJson(),
-                          });
+                          }, shouldPrint: shouldPrint);
                         } else if (result.status == 'emv_data_ready' && result.emvData != null) {
                           final financeRepo = context.read<FinanceRepository>();
                           final backendResponse = await financeRepo.apiClient.post(
@@ -809,7 +812,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     );
   }
 
-  void _printInvoice(BuildContext context, Invoice invoice, AppSettings settings) {
+  void _printInvoice(BuildContext context, Invoice invoice, AppSettings settings, {MposTransactionData? posTx}) {
     final templateName = settings.defaultInvoiceTemplate ?? 'compact';
     final InvoiceTemplate template;
     if (templateName == 'detailed') template = DetailedInvoiceTemplate();
@@ -820,6 +823,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     else template = CompactInvoiceTemplate();
 
     final commands = template.generateCommands(invoice, settings);
+    if (posTx != null && settings.mergePosReceipt == true) {
+      commands.addAll(_getPosReceiptCommands(posTx, settings));
+      commands.add(SizedBoxCommand(height: 1));
+    }
     context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
   }
 
@@ -980,7 +987,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       BuildContext context,
       String webhookUrl,
       MposTransactionResponse result,
-      Map<String, dynamic> data) async {
+      Map<String, dynamic> data,
+      {bool shouldPrint = true}) async {
     final financeRepo = context.read<FinanceRepository>();
     final endpoint = webhookUrl.isNotEmpty ? webhookUrl : '/api/pos/transaction';
     
@@ -1050,31 +1058,64 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     }
   }
 
-  void _printPosReceipt(MposTransactionData tx) {
-    final settings = context.read<SettingsBloc>().state.settings;
+
+  String _maskPan(String? pan) {
+    if (pan == null || pan.length < 10) return pan ?? "";
+    return "${pan.substring(0, 4)}********${pan.substring(pan.length - 4)}";
+  }
+
+  String _formatPosAmount(String? rawAmount, String symbol) {
+    if (rawAmount == null || rawAmount.isEmpty) return "";
+    final doubleAmount = (double.tryParse(rawAmount) ?? 0) / 100;
+    return CurrencyFormatter.formatWithSymbol(doubleAmount, symbol: symbol);
+  }
+
+  String _formatPosDate(String? rawDate) {
+    if (rawDate == null || rawDate.length != 10) return rawDate ?? "";
+    try {
+      final now = DateTime.now();
+      final month = int.parse(rawDate.substring(0, 2));
+      final day = int.parse(rawDate.substring(2, 4));
+      final hour = int.parse(rawDate.substring(4, 6));
+      final minute = int.parse(rawDate.substring(6, 8));
+      final second = int.parse(rawDate.substring(8, 10));
+      final date = DateTime(now.year, month, day, hour, minute, second);
+      return DateFormat('dd MMM, HH:mm:ss').format(date);
+    } catch (e) {
+      return rawDate;
+    }
+  }
+
+  List<PrintCommand> _getPosReceiptCommands(MposTransactionData tx, AppSettings? settings) {
     final String merchantName = _terminalConfig?.businessName ?? settings?.organizationName ?? 'MERCHANT';
     final String merchantId = _terminalConfig?.terminalId ?? 'N/A';
+    final currency = settings?.currency ?? 'NGN';
 
-    final commands = [
-      TextCommand(merchantName, isBold: true, align: 'center'),
+    return [
+      TextCommand('--------------------------------', align: 'center'),
+      TextCommand('POS PAYMENT RECEIPT', isBold: true, align: 'center'),
+      TextCommand('--------------------------------', align: 'center'),
+      TextCommand(merchantName, align: 'center'),
       TextCommand('Terminal ID: $merchantId', align: 'center'),
-      TextCommand('--------------------------------', align: 'center'),
-      TextCommand('PURCHASE RECEIPT', isBold: true, align: 'center'),
-      TextCommand('--------------------------------', align: 'center'),
+      SizedBoxCommand(height: 1),
       TextCommand('Card Holder: ${tx.cardHolderName ?? ""}'),
       TextCommand('Card Type: ${tx.appLabel ?? ""}'),
-      TextCommand('PAN: ${tx.maskedPan ?? ""}'),
-      TextCommand('Amount: ${tx.amount ?? ""}', isBold: true),
+      TextCommand('PAN: ${_maskPan(tx.maskedPan)}'),
+      TextCommand('Amount: ${_formatPosAmount(tx.amount, currency)}', isBold: true),
       TextCommand('Auth Code: ${tx.authCode ?? ""}'),
       TextCommand('RRN: ${tx.rrn ?? ""}'),
       TextCommand('STAN: ${tx.stan ?? ""}'),
-      TextCommand('Expiry: ${tx.cardExpireDate ?? ""}'),
-      TextCommand('Date: ${tx.dateTime ?? ""}'),
+      TextCommand('Date: ${_formatPosDate(tx.dateTime)}'),
       TextCommand('--------------------------------', align: 'center'),
       TextCommand('APPROVED', isBold: true, align: 'center'),
       TextCommand('--------------------------------', align: 'center'),
-      SizedBoxCommand(height: 3),
     ];
+  }
+
+  void _printPosReceipt(MposTransactionData tx) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final commands = _getPosReceiptCommands(tx, settings);
+    commands.add(SizedBoxCommand(height: 1)); // Minimal space at end
     context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58)); // Assuming 58mm
   }
 }

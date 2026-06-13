@@ -59,7 +59,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
 
   @override
-  int get schemaVersion => 81;
+  int get schemaVersion => 82;
 
   @override
   MigrationStrategy get migration {
@@ -417,6 +417,10 @@ class AppDatabase extends _$AppDatabase {
         if (from < 81) {
           // Schema V81: Add barcode field to Items table
           await _safeAddColumn(m, items, items.barcode);
+        }
+        if (from < 82) {
+          // Schema V82: Add mergePosReceipt setting
+          await _safeAddColumn(m, settings, settings.mergePosReceipt);
         }
       },
       beforeOpen: (details) async {

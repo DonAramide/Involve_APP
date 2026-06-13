@@ -28,6 +28,7 @@ class Settings extends Table {
   BoolColumn get showSignatureSpace => boolean().withDefault(const Constant(false))();
   BoolColumn get paymentMethodsEnabled => boolean().withDefault(const Constant(false))();
   IntColumn get primaryColor => integer().withDefault(const Constant(0xFF2196F3))(); // Colors.blue.value
+  BoolColumn get mergePosReceipt => boolean().withDefault(const Constant(false))();
   
   // Security lockout columns
   IntColumn get failedAttempts => integer().withDefault(const Constant(0))();

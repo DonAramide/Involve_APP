@@ -4509,6 +4509,16 @@ class $SettingsTable extends Settings
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0xFF2196F3));
+  static const VerificationMeta _mergePosReceiptMeta =
+      const VerificationMeta('mergePosReceipt');
+  @override
+  late final GeneratedColumn<bool> mergePosReceipt = GeneratedColumn<bool>(
+      'merge_pos_receipt', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("merge_pos_receipt" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _failedAttemptsMeta =
       const VerificationMeta('failedAttempts');
   @override
@@ -4829,6 +4839,7 @@ class $SettingsTable extends Settings
         showSignatureSpace,
         paymentMethodsEnabled,
         primaryColor,
+        mergePosReceipt,
         failedAttempts,
         isLocked,
         lockedAt,
@@ -5000,6 +5011,12 @@ class $SettingsTable extends Settings
           _primaryColorMeta,
           primaryColor.isAcceptableOrUnknown(
               data['primary_color']!, _primaryColorMeta));
+    }
+    if (data.containsKey('merge_pos_receipt')) {
+      context.handle(
+          _mergePosReceiptMeta,
+          mergePosReceipt.isAcceptableOrUnknown(
+              data['merge_pos_receipt']!, _mergePosReceiptMeta));
     }
     if (data.containsKey('failed_attempts')) {
       context.handle(
@@ -5249,6 +5266,8 @@ class $SettingsTable extends Settings
           data['${effectivePrefix}payment_methods_enabled'])!,
       primaryColor: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}primary_color'])!,
+      mergePosReceipt: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}merge_pos_receipt'])!,
       failedAttempts: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}failed_attempts'])!,
       isLocked: attachedDatabase.typeMapping
@@ -5353,6 +5372,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showSignatureSpace;
   final bool paymentMethodsEnabled;
   final int primaryColor;
+  final bool mergePosReceipt;
   final int failedAttempts;
   final bool isLocked;
   final DateTime? lockedAt;
@@ -5411,6 +5431,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.showSignatureSpace,
       required this.paymentMethodsEnabled,
       required this.primaryColor,
+      required this.mergePosReceipt,
       required this.failedAttempts,
       required this.isLocked,
       this.lockedAt,
@@ -5487,6 +5508,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['show_signature_space'] = Variable<bool>(showSignatureSpace);
     map['payment_methods_enabled'] = Variable<bool>(paymentMethodsEnabled);
     map['primary_color'] = Variable<int>(primaryColor);
+    map['merge_pos_receipt'] = Variable<bool>(mergePosReceipt);
     map['failed_attempts'] = Variable<int>(failedAttempts);
     map['is_locked'] = Variable<bool>(isLocked);
     if (!nullToAbsent || lockedAt != null) {
@@ -5576,6 +5598,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showSignatureSpace: Value(showSignatureSpace),
       paymentMethodsEnabled: Value(paymentMethodsEnabled),
       primaryColor: Value(primaryColor),
+      mergePosReceipt: Value(mergePosReceipt),
       failedAttempts: Value(failedAttempts),
       isLocked: Value(isLocked),
       lockedAt: lockedAt == null && nullToAbsent
@@ -5656,6 +5679,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       paymentMethodsEnabled:
           serializer.fromJson<bool>(json['paymentMethodsEnabled']),
       primaryColor: serializer.fromJson<int>(json['primaryColor']),
+      mergePosReceipt: serializer.fromJson<bool>(json['mergePosReceipt']),
       failedAttempts: serializer.fromJson<int>(json['failedAttempts']),
       isLocked: serializer.fromJson<bool>(json['isLocked']),
       lockedAt: serializer.fromJson<DateTime?>(json['lockedAt']),
@@ -5729,6 +5753,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'showSignatureSpace': serializer.toJson<bool>(showSignatureSpace),
       'paymentMethodsEnabled': serializer.toJson<bool>(paymentMethodsEnabled),
       'primaryColor': serializer.toJson<int>(primaryColor),
+      'mergePosReceipt': serializer.toJson<bool>(mergePosReceipt),
       'failedAttempts': serializer.toJson<int>(failedAttempts),
       'isLocked': serializer.toJson<bool>(isLocked),
       'lockedAt': serializer.toJson<DateTime?>(lockedAt),
@@ -5792,6 +5817,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? showSignatureSpace,
           bool? paymentMethodsEnabled,
           int? primaryColor,
+          bool? mergePosReceipt,
           int? failedAttempts,
           bool? isLocked,
           Value<DateTime?> lockedAt = const Value.absent(),
@@ -5856,6 +5882,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         paymentMethodsEnabled:
             paymentMethodsEnabled ?? this.paymentMethodsEnabled,
         primaryColor: primaryColor ?? this.primaryColor,
+        mergePosReceipt: mergePosReceipt ?? this.mergePosReceipt,
         failedAttempts: failedAttempts ?? this.failedAttempts,
         isLocked: isLocked ?? this.isLocked,
         lockedAt: lockedAt.present ? lockedAt.value : this.lockedAt,
@@ -5946,6 +5973,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       primaryColor: data.primaryColor.present
           ? data.primaryColor.value
           : this.primaryColor,
+      mergePosReceipt: data.mergePosReceipt.present
+          ? data.mergePosReceipt.value
+          : this.mergePosReceipt,
       failedAttempts: data.failedAttempts.present
           ? data.failedAttempts.value
           : this.failedAttempts,
@@ -6061,6 +6091,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('showSignatureSpace: $showSignatureSpace, ')
           ..write('paymentMethodsEnabled: $paymentMethodsEnabled, ')
           ..write('primaryColor: $primaryColor, ')
+          ..write('mergePosReceipt: $mergePosReceipt, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt, ')
@@ -6124,6 +6155,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showSignatureSpace,
         paymentMethodsEnabled,
         primaryColor,
+        mergePosReceipt,
         failedAttempts,
         isLocked,
         lockedAt,
@@ -6186,6 +6218,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.showSignatureSpace == this.showSignatureSpace &&
           other.paymentMethodsEnabled == this.paymentMethodsEnabled &&
           other.primaryColor == this.primaryColor &&
+          other.mergePosReceipt == this.mergePosReceipt &&
           other.failedAttempts == this.failedAttempts &&
           other.isLocked == this.isLocked &&
           other.lockedAt == this.lockedAt &&
@@ -6248,6 +6281,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showSignatureSpace;
   final Value<bool> paymentMethodsEnabled;
   final Value<int> primaryColor;
+  final Value<bool> mergePosReceipt;
   final Value<int> failedAttempts;
   final Value<bool> isLocked;
   final Value<DateTime?> lockedAt;
@@ -6306,6 +6340,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showSignatureSpace = const Value.absent(),
     this.paymentMethodsEnabled = const Value.absent(),
     this.primaryColor = const Value.absent(),
+    this.mergePosReceipt = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -6365,6 +6400,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showSignatureSpace = const Value.absent(),
     this.paymentMethodsEnabled = const Value.absent(),
     this.primaryColor = const Value.absent(),
+    this.mergePosReceipt = const Value.absent(),
     this.failedAttempts = const Value.absent(),
     this.isLocked = const Value.absent(),
     this.lockedAt = const Value.absent(),
@@ -6426,6 +6462,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showSignatureSpace,
     Expression<bool>? paymentMethodsEnabled,
     Expression<int>? primaryColor,
+    Expression<bool>? mergePosReceipt,
     Expression<int>? failedAttempts,
     Expression<bool>? isLocked,
     Expression<DateTime>? lockedAt,
@@ -6491,6 +6528,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (paymentMethodsEnabled != null)
         'payment_methods_enabled': paymentMethodsEnabled,
       if (primaryColor != null) 'primary_color': primaryColor,
+      if (mergePosReceipt != null) 'merge_pos_receipt': mergePosReceipt,
       if (failedAttempts != null) 'failed_attempts': failedAttempts,
       if (isLocked != null) 'is_locked': isLocked,
       if (lockedAt != null) 'locked_at': lockedAt,
@@ -6563,6 +6601,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? showSignatureSpace,
       Value<bool>? paymentMethodsEnabled,
       Value<int>? primaryColor,
+      Value<bool>? mergePosReceipt,
       Value<int>? failedAttempts,
       Value<bool>? isLocked,
       Value<DateTime?>? lockedAt,
@@ -6624,6 +6663,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       paymentMethodsEnabled:
           paymentMethodsEnabled ?? this.paymentMethodsEnabled,
       primaryColor: primaryColor ?? this.primaryColor,
+      mergePosReceipt: mergePosReceipt ?? this.mergePosReceipt,
       failedAttempts: failedAttempts ?? this.failedAttempts,
       isLocked: isLocked ?? this.isLocked,
       lockedAt: lockedAt ?? this.lockedAt,
@@ -6741,6 +6781,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     }
     if (primaryColor.present) {
       map['primary_color'] = Variable<int>(primaryColor.value);
+    }
+    if (mergePosReceipt.present) {
+      map['merge_pos_receipt'] = Variable<bool>(mergePosReceipt.value);
     }
     if (failedAttempts.present) {
       map['failed_attempts'] = Variable<int>(failedAttempts.value);
@@ -6875,6 +6918,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('showSignatureSpace: $showSignatureSpace, ')
           ..write('paymentMethodsEnabled: $paymentMethodsEnabled, ')
           ..write('primaryColor: $primaryColor, ')
+          ..write('mergePosReceipt: $mergePosReceipt, ')
           ..write('failedAttempts: $failedAttempts, ')
           ..write('isLocked: $isLocked, ')
           ..write('lockedAt: $lockedAt, ')
@@ -22739,6 +22783,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showSignatureSpace,
   Value<bool> paymentMethodsEnabled,
   Value<int> primaryColor,
+  Value<bool> mergePosReceipt,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -22798,6 +22843,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showSignatureSpace,
   Value<bool> paymentMethodsEnabled,
   Value<int> primaryColor,
+  Value<bool> mergePosReceipt,
   Value<int> failedAttempts,
   Value<bool> isLocked,
   Value<DateTime?> lockedAt,
@@ -22921,6 +22967,10 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<int> get primaryColor => $composableBuilder(
       column: $table.primaryColor, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get mergePosReceipt => $composableBuilder(
+      column: $table.mergePosReceipt,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
@@ -23134,6 +23184,10 @@ class $$SettingsTableOrderingComposer
       column: $table.primaryColor,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get mergePosReceipt => $composableBuilder(
+      column: $table.mergePosReceipt,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts,
       builder: (column) => ColumnOrderings(column));
@@ -23340,6 +23394,9 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<int> get primaryColor => $composableBuilder(
       column: $table.primaryColor, builder: (column) => column);
 
+  GeneratedColumn<bool> get mergePosReceipt => $composableBuilder(
+      column: $table.mergePosReceipt, builder: (column) => column);
+
   GeneratedColumn<int> get failedAttempts => $composableBuilder(
       column: $table.failedAttempts, builder: (column) => column);
 
@@ -23490,6 +23547,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showSignatureSpace = const Value.absent(),
             Value<bool> paymentMethodsEnabled = const Value.absent(),
             Value<int> primaryColor = const Value.absent(),
+            Value<bool> mergePosReceipt = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -23549,6 +23607,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             showSignatureSpace: showSignatureSpace,
             paymentMethodsEnabled: paymentMethodsEnabled,
             primaryColor: primaryColor,
+            mergePosReceipt: mergePosReceipt,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,
@@ -23608,6 +23667,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showSignatureSpace = const Value.absent(),
             Value<bool> paymentMethodsEnabled = const Value.absent(),
             Value<int> primaryColor = const Value.absent(),
+            Value<bool> mergePosReceipt = const Value.absent(),
             Value<int> failedAttempts = const Value.absent(),
             Value<bool> isLocked = const Value.absent(),
             Value<DateTime?> lockedAt = const Value.absent(),
@@ -23667,6 +23727,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             showSignatureSpace: showSignatureSpace,
             paymentMethodsEnabled: paymentMethodsEnabled,
             primaryColor: primaryColor,
+            mergePosReceipt: mergePosReceipt,
             failedAttempts: failedAttempts,
             isLocked: isLocked,
             lockedAt: lockedAt,

@@ -52,6 +52,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   Uint8List? _selectedLogo;
   bool _confirmPriceOnSelection = false;
   bool _allowGiveChange = false;
+  bool _mergePosReceipt = false;
   bool _hasChanges = false;
 
   @override
@@ -67,6 +68,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       _selectedLogo = settings.logo;
       _confirmPriceOnSelection = settings.confirmPriceOnSelection;
       _allowGiveChange = settings.allowGiveChange;
+      _mergePosReceipt = settings.mergePosReceipt;
       _licenseBusinessNameController.text = settings.organizationName;
     }
     
@@ -271,6 +273,18 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                       });
                     },
                   ),
+                  const SizedBox(height: 16),
+                  SwitchListTile(
+                    title: const Text('Merge POS Receipt with Invoice'),
+                    subtitle: const Text('Instead of printing two separate slips, the POS receipt details will be appended directly to the bottom of the invoice.'),
+                    value: _mergePosReceipt,
+                    onChanged: (val) {
+                      setState(() {
+                        _mergePosReceipt = val;
+                        _hasChanges = true;
+                      });
+                    },
+                  ),
                   const SizedBox(height: 32),
                   
                   const SizedBox(height: 48),
@@ -423,6 +437,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
         _selectedLogo = settings.logo;
         _confirmPriceOnSelection = settings.confirmPriceOnSelection;
         _allowGiveChange = settings.allowGiveChange;
+      _mergePosReceipt = settings.mergePosReceipt;
         _hasChanges = false;
       });
     }

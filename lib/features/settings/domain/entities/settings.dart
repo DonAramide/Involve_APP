@@ -32,6 +32,7 @@ class AppSettings extends Equatable {
   final bool showSignatureSpace;
   final bool paymentMethodsEnabled;
   final int primaryColor;
+  final bool mergePosReceipt;
   final bool showDateTime;
   
   // Service Billing
