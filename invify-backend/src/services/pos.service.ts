@@ -358,6 +358,63 @@ export class PosService {
     return response;
   }
 
+  static async recordDeviceTransaction(params: {
+    tenantId: string;
+    terminalId: string;
+    amount: number;
+    emvData: any;
+    staffName?: string;
+    items?: any[];
+    deviceStatus?: string;
+    transactionResponse?: any;
+  }) {
+    const isApproved = params.deviceStatus === 'payment_success';
+    const txId = Math.random().toString(36).substring(7);
+    const entry = {
+      id:          txId,
+      tenantId:    params.tenantId || 'Unknown',
+      terminalId:  params.terminalId,
+      amount:      params.amount,
+      status:      isApproved ? 'Approved' : 'Declined',
+      statusCode:  isApproved ? '00' : '99',
+      date:        new Date().toISOString(),
+      host:        params.transactionResponse?.host || 'MPOS_DEVICE',
+      maskedPan:   params.emvData?.pan ? this.maskPan(params.emvData.pan) : (params.emvData?.cardNo ? this.maskPan(params.emvData.cardNo) : '**** ****'),
+      rrn:         params.transactionResponse?.rrn || params.emvData?.rrn || 'N/A',
+      stan:        params.transactionResponse?.stan || params.emvData?.stan || 'N/A',
+      authCode:    params.transactionResponse?.authCode || 'N/A',
+      staffName:   params.staffName || 'System',
+      items:       params.items || [],
+      rawRequest:  JSON.stringify({ source: 'device', terminalId: params.terminalId, amount: params.amount }),
+      rawResponse: JSON.stringify(params.transactionResponse || {}),
+    };
+    
+    this.transactionHistory.unshift(entry);
+    if (this.transactionHistory.length > 500) this.transactionHistory.pop();
+
+    if (process.env.OFFLINE_MOCK_AUTH !== 'true' && params.tenantId && params.tenantId !== 'default' && params.tenantId !== 'Unknown') {
+      supabase.from('pos_transaction_attempts').insert([{
+        id: txId,
+        tenant_id: params.tenantId,
+        terminal_id: params.terminalId,
+        amount: params.amount,
+        status: entry.status,
+        status_code: entry.statusCode,
+        host: entry.host,
+        masked_pan: entry.maskedPan,
+        rrn: entry.rrn,
+        stan: entry.stan,
+        auth_code: entry.authCode,
+        staff_name: entry.staffName,
+        items_jsonb: entry.items,
+        raw_request: { source: 'device' },
+        raw_response: params.transactionResponse || {}
+      }]).then();
+    }
+
+    return { paymentSuccess: isApproved, recordedId: txId, status: entry.status };
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   //  ROUTE 1: CPOINT-KIMONO (HTTPS REST)
   // ═══════════════════════════════════════════════════════════════════════════

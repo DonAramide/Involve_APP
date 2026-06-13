@@ -4,8 +4,22 @@ import { PosService } from '../services/pos.service';
 export class PosController {
   static async processTransaction(req: Request, res: Response) {
     try {
-      const { terminalId, amount, emvData, staffName, items } = req.body;
+      const { terminalId, amount, emvData, staffName, items, isDeviceProcessed, deviceStatus, transactionResponse } = req.body;
       const tenantId = req.headers['x-tenant-id'] as string || 'default';
+
+      if (isDeviceProcessed) {
+        const response = await PosService.recordDeviceTransaction({
+          tenantId,
+          terminalId,
+          amount,
+          emvData,
+          staffName,
+          items,
+          deviceStatus,
+          transactionResponse
+        });
+        return res.status(200).json(response);
+      }
 
       const response = await PosService.processTransaction({
         tenantId,
