@@ -140,6 +140,8 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   ['58mm', '80mm', '88mm'], 
                   (val) => _update(context, settings.copyWith(paperWidth: int.parse(val.replaceAll('mm', '')))),
                 ),
+                _buildSwitchTile('Merge POS Receipt into Invoice', settings.mergePosReceipt, (val) => _update(context, settings.copyWith(mergePosReceipt: val))),
+                _buildSwitchTile('Allow Give Change', settings.allowGiveChange, (val) => _update(context, settings.copyWith(allowGiveChange: val))),
                 const Divider(),
 
                 // 4. Account Details

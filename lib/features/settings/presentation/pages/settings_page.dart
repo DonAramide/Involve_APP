@@ -249,14 +249,6 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
         if (_matches('Show Sync Status'))
           _buildSwitchTile('Show Sync Status', settings.showSyncStatus, (val) => _update(context, settings.copyWith(showSyncStatus: val))),
-        if (_matches('Merge POS Receipt') || _matches('Allow Give Change')) ...[
-          _buildSectionHeader(context, 'Receipt & Print Settings'),
-          if (_matches('Merge POS Receipt'))
-            _buildSwitchTile('Merge POS Receipt into Invoice', settings.mergePosReceipt, (val) => _update(context, settings.copyWith(mergePosReceipt: val))),
-          if (_matches('Allow Give Change'))
-            _buildSwitchTile('Allow Give Change', settings.allowGiveChange, (val) => _update(context, settings.copyWith(allowGiveChange: val))),
-        ],
-
         if (_matches('Restore Backup'))
           ListTile(
             title: const Text('Restore Backup'),
