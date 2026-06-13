@@ -340,6 +340,7 @@ app.get('/api/pos/history', authenticate, PosController.getTransactionHistory);
 app.post('/api/pos/test-iso', authenticate, PosController.testIso);  // ISO8583 debug parser
 app.get('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.getRoutingConfig);
 app.post('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.updateRoutingConfig);
+app.get('/admin/pos/routing/affected-devices', authenticate, checkRole(['super_admin']), PosController.getAffectedDevices);
 app.post('/admin/pos/kimono-params/refresh', authenticate, checkRole(['super_admin']), PosController.refreshKimonoParams);
 app.get('/admin/pos/observability', authenticate, checkRole(['super_admin']), PosController.getObservabilityMetrics);
 

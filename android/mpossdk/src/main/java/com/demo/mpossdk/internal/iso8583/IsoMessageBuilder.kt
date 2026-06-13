@@ -93,12 +93,12 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
 
         val activeHost = terminalParameters?.activeHost ?: com.demo.mpossdk.open.ActiveHost.MEDUSA
         
-        if (activeHost == com.demo.mpossdk.open.ActiveHost.EXPRESS_PAY && terminalParameters != null) {
-            purchaseRequest.set(18, terminalParameters.mcc)
-            purchaseRequest.set(41, terminalParameters.terminalId)
-            purchaseRequest.set(42, terminalParameters.cardAcceptorId)
-            purchaseRequest.set(43, terminalParameters.cardAcceptorLocation)
-            purchaseRequest.set(49, terminalParameters.currencyCode)
+        if ((activeHost == com.demo.mpossdk.open.ActiveHost.EXPRESS_PAY || activeHost == com.demo.mpossdk.open.ActiveHost.NIBSS) && terminalParameters != null) {
+            purchaseRequest.set(18, terminalParameters.mcc ?: "5411")
+            purchaseRequest.set(41, terminalParameters.terminalId ?: emvDetailResult.terminalId)
+            purchaseRequest.set(42, terminalParameters.cardAcceptorId ?: "2214LA596401018")
+            purchaseRequest.set(43, terminalParameters.cardAcceptorLocation ?: "3LINE CARD MANAGEMENT LLA           LANG")
+            purchaseRequest.set(49, terminalParameters.currencyCode ?: "566")
         } else {
             // MEDUSA / Default
             purchaseRequest.set(18, "5411")
@@ -109,7 +109,7 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
         }
 
         // Set Field 59
-        val terminalId = if (activeHost == com.demo.mpossdk.open.ActiveHost.EXPRESS_PAY && terminalParameters != null) {
+        val terminalId = if ((activeHost == com.demo.mpossdk.open.ActiveHost.EXPRESS_PAY || activeHost == com.demo.mpossdk.open.ActiveHost.NIBSS) && terminalParameters != null) {
             terminalParameters.terminalId ?: ""
         } else {
             emvDetailResult.terminalId ?: ""
@@ -122,7 +122,7 @@ internal class IsoMessageBuilder(private val sessionManager: SessionManager){
         purchaseRequest.recalcBitMap()
 
         val prePack = purchaseRequest.pack()
-        val hashKey = if (activeHost == com.demo.mpossdk.open.ActiveHost.EXPRESS_PAY && terminalParameters != null) {
+        val hashKey = if ((activeHost == com.demo.mpossdk.open.ActiveHost.EXPRESS_PAY || activeHost == com.demo.mpossdk.open.ActiveHost.NIBSS) && terminalParameters != null) {
             terminalParameters.tsk ?: ""
         } else {
             Constants.MASTER_KEY
