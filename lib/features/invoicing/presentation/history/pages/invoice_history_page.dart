@@ -1021,7 +1021,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       const Text('TOTAL INVOICED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
                       Text(
                         CurrencyFormatter.formatWithSymbol(state.totalInvoiced, symbol: currency),
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary),
                       ),
                     ],
                   ),
@@ -1031,13 +1031,67 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                       const Text('TOTAL COLLECTED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
                       Text(
                         CurrencyFormatter.formatWithSymbol(state.totalSales, symbol: currency),
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
                       ),
                     ],
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              Builder(
+                builder: (context) {
+                  double totalCard = 0;
+                  double totalTransfer = 0;
+                  double totalCash = 0;
+                  
+                  for (final inv in state.invoices) {
+                    final method = (inv.paymentMethod ?? '').toLowerCase();
+                    if (method == 'pos' || method == 'card') {
+                      totalCard += inv.amountPaid;
+                    } else if (method == 'transfer') {
+                      totalTransfer += inv.amountPaid;
+                    } else if (method == 'cash') {
+                      totalCash += inv.amountPaid;
+                    }
+                  }
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Column(
+                        children: [
+                          const Text('CARD (POS)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                          Text(
+                            CurrencyFormatter.formatWithSymbol(totalCard, symbol: currency),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.orange),
+                          ),
+                        ],
+                      ),
+                      Container(height: 20, width: 1, color: Colors.grey[300]),
+                      Column(
+                        children: [
+                          const Text('TRANSFER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                          Text(
+                            CurrencyFormatter.formatWithSymbol(totalTransfer, symbol: currency),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.purple),
+                          ),
+                        ],
+                      ),
+                      Container(height: 20, width: 1, color: Colors.grey[300]),
+                      Column(
+                        children: [
+                          const Text('CASH', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
+                          Text(
+                            CurrencyFormatter.formatWithSymbol(totalCash, symbol: currency),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.teal),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                }
+              ),
+              const SizedBox(height: 16),
               Text(
                 '${state.invoices.length} Invoices',
                 style: TextStyle(
