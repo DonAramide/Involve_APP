@@ -23,6 +23,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42); // Logic for 58, 80, 88
     final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
+    final docType = (invoice.paymentMethod != null && invoice.paymentMethod != 'Pay Later') ? "RECEIPT" : "INVOICE";
 
     return [
       if (settings.showLogo && settings.logo != null) ImageCommand(bytes: settings.logo!),
@@ -30,8 +31,8 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
         TextCommand('CAC NO: ${settings.cacNumber}', align: 'right', isBold: true),
       TextCommand(settings.organizationName.toUpperCase(), align: 'center', isBold: true),
       if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
-      TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}', align: 'center'),
-      TextCommand('Invoice: ${invoice.invoiceNumber}', align: 'center'),
+      TextCommand('Date: ${DateFormat('dd MMM yyyy, HH:mm').format(invoice.dateCreated)}', align: 'center'),
+      TextCommand('$docType: ${invoice.invoiceNumber}', align: 'center'),
       if (invoice.customerName != null) 
         TextCommand('${settings.businessMode == 'school' ? 'Student' : 'Customer'}: ${invoice.customerName}', align: 'center'),
       if (invoice.customerPhone != null)
@@ -125,7 +126,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       TextCommand(settings.organizationName, align: 'center', isBold: true),
       if (settings.phone.isNotEmpty) TextCommand('Phone: ${settings.phone}', align: 'center'),
       TextCommand('-' * width),
-      TextCommand('INVOICE DETAIL', align: 'center', isBold: true),
+      TextCommand('${(invoice.paymentMethod != null && invoice.paymentMethod != 'Pay Later') ? "RECEIPT" : "INVOICE"} DETAIL', align: 'center', isBold: true),
       TextCommand('Number: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}'),
       if (invoice.customerName != null)
@@ -268,7 +269,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       if (invoice.customerPhone != null) TextCommand('Tel: ${invoice.customerPhone}'),
       if (invoice.customerAddress != null) TextCommand(invoice.customerAddress!),
       SizedBoxCommand(height: 1),
-      TextCommand('INVOICE #: ${invoice.invoiceNumber}', align: 'right'),
+      TextCommand('${(invoice.paymentMethod != null && invoice.paymentMethod != 'Pay Later') ? "RECEIPT" : "INVOICE"} #: ${invoice.invoiceNumber}', align: 'right'),
       TextCommand('DATE: ${invoice.dateCreated.toString().split(' ')[0]}', align: 'right'),
       if (invoice.paymentMethod != null) TextCommand('PAYMENT METHOD: ${invoice.paymentMethod}', align: 'right'),
       TextCommand('Sold By: ${invoice.staffName ?? "Admin"}', align: 'right'),

@@ -53,13 +53,19 @@ class ReceiptPreviewPage extends StatelessWidget {
         ],
       ),
       body: PdfPreview(
-        build: (format) => ReceiptService().generateReceiptPdf(
-          invoice, 
-          settings,
-          useCustomPricesOverride: actualUseCustom,
-          receiptTitle: receiptTitle,
-          userPlan: context.read<SettingsBloc>().state.userPlan,
-        ),
+        build: (format) {
+          String docType = (invoice.paymentMethod != null && invoice.paymentMethod != 'Pay Later') ? 'RECEIPT' : 'INVOICE';
+          String statusStr = invoice.balanceAmount <= 0 ? 'PAID' : (invoice.amountPaid > 0 ? 'PARTIAL PAID' : 'NOT YET PAID');
+          String derivedTitle = 'REPRINTED $docType ($statusStr)';
+          
+          return ReceiptService().generateReceiptPdf(
+            invoice, 
+            settings,
+            useCustomPricesOverride: actualUseCustom,
+            receiptTitle: receiptTitle ?? derivedTitle,
+            userPlan: context.read<SettingsBloc>().state.userPlan,
+          );
+        },
         pdfFileName: 'Invoice-${invoice.id}.pdf',
         canChangePageFormat: false,
       ),
@@ -110,6 +116,10 @@ class ReceiptPreviewPage extends StatelessWidget {
       );
       
       final commands = template.generateCommands(invoice, printSettings);
+      
+      String docType = (invoice.paymentMethod != null && invoice.paymentMethod != 'Pay Later') ? 'RECEIPT' : 'INVOICE';
+      String statusStr = invoice.balanceAmount <= 0 ? 'PAID' : (invoice.amountPaid > 0 ? 'PARTIAL PAID' : 'NOT YET PAID');
+      commands.insert(0, TextCommand('*** REPRINTED $docType ($statusStr) ***', align: 'center', isBold: true));
       
       printerBloc.add(PrintCommandsEvent(commands, settings.paperWidth)); 
       
