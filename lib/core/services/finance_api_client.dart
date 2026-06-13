@@ -217,6 +217,8 @@ class FinanceApiClient {
   late final Dio _dio;
   final String baseUrl;
 
+  Dio get dio => _dio;
+
   FinanceApiClient({
     required this.baseUrl,
     required Future<String?> Function() getToken,

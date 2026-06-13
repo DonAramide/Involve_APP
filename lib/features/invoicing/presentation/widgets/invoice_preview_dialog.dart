@@ -979,7 +979,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   Future<void> _processWebhookAndSuccess(
       BuildContext context,
       String webhookUrl,
-      MposTransactionResult result,
+      MposTransactionResponse result,
       Map<String, dynamic> data) async {
     final financeRepo = context.read<FinanceRepository>();
     final endpoint = webhookUrl.isNotEmpty ? webhookUrl : '/api/pos/transaction';
@@ -1050,30 +1050,30 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     }
   }
 
-  void _printPosReceipt(MposTransactionResponse tx) {
+  void _printPosReceipt(MposTransactionData tx) {
     final settings = context.read<SettingsBloc>().state.settings;
-    final String merchantName = _terminalConfig?.businessName ?? settings?.businessName ?? 'MERCHANT';
+    final String merchantName = _terminalConfig?.businessName ?? settings?.organizationName ?? 'MERCHANT';
     final String merchantId = _terminalConfig?.terminalId ?? 'N/A';
 
     final commands = [
-      PrintCommand.text(merchantName, isBold: true, align: PrintAlignment.center, size: PrintSize.large),
-      PrintCommand.text('Terminal ID: $merchantId', align: PrintAlignment.center),
-      PrintCommand.text('--------------------------------', align: PrintAlignment.center),
-      PrintCommand.text('PURCHASE RECEIPT', isBold: true, align: PrintAlignment.center),
-      PrintCommand.text('--------------------------------', align: PrintAlignment.center),
-      PrintCommand.text('Card Holder: ${tx.cardHolderName ?? ""}'),
-      PrintCommand.text('Card Type: ${tx.appLabel ?? ""}'),
-      PrintCommand.text('PAN: ${tx.maskedPan ?? ""}'),
-      PrintCommand.text('Amount: ${tx.amount ?? ""}', isBold: true),
-      PrintCommand.text('Auth Code: ${tx.authCode ?? ""}'),
-      PrintCommand.text('RRN: ${tx.rrn ?? ""}'),
-      PrintCommand.text('STAN: ${tx.stan ?? ""}'),
-      PrintCommand.text('Expiry: ${tx.cardExpireDate ?? ""}'),
-      PrintCommand.text('Date: ${tx.dateTime ?? ""}'),
-      PrintCommand.text('--------------------------------', align: PrintAlignment.center),
-      PrintCommand.text('APPROVED', isBold: true, align: PrintAlignment.center, size: PrintSize.large),
-      PrintCommand.text('--------------------------------', align: PrintAlignment.center),
-      PrintCommand.feed(3),
+      TextCommand(merchantName, isBold: true, align: 'center'),
+      TextCommand('Terminal ID: $merchantId', align: 'center'),
+      TextCommand('--------------------------------', align: 'center'),
+      TextCommand('PURCHASE RECEIPT', isBold: true, align: 'center'),
+      TextCommand('--------------------------------', align: 'center'),
+      TextCommand('Card Holder: ${tx.cardHolderName ?? ""}'),
+      TextCommand('Card Type: ${tx.appLabel ?? ""}'),
+      TextCommand('PAN: ${tx.maskedPan ?? ""}'),
+      TextCommand('Amount: ${tx.amount ?? ""}', isBold: true),
+      TextCommand('Auth Code: ${tx.authCode ?? ""}'),
+      TextCommand('RRN: ${tx.rrn ?? ""}'),
+      TextCommand('STAN: ${tx.stan ?? ""}'),
+      TextCommand('Expiry: ${tx.cardExpireDate ?? ""}'),
+      TextCommand('Date: ${tx.dateTime ?? ""}'),
+      TextCommand('--------------------------------', align: 'center'),
+      TextCommand('APPROVED', isBold: true, align: 'center'),
+      TextCommand('--------------------------------', align: 'center'),
+      SizedBoxCommand(height: 3),
     ];
     context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58)); // Assuming 58mm
   }
