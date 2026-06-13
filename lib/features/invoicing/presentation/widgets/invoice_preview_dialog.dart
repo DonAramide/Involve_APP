@@ -420,7 +420,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                   'quantity': i.quantity,
                                   'price': i.item.price,
                                 }).toList(),
-                            });
+                            }, shouldPrint: shouldPrint);
                           } else if (result.status == 'emv_data_ready' && result.emvData != null) {
                             final financeRepo = context.read<FinanceRepository>();
                             final backendResponse = await financeRepo.apiClient.post(
@@ -1066,10 +1066,12 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           actions: [
             TextButton(
               onPressed: () {
-                _printPosReceipt(result.transaction!);
+                if (shouldPrint) {
+                  _printPosReceipt(result.transaction!);
+                }
                 Navigator.pop(ctx);
               },
-              child: const Text('PRINT RECEIPT & CLOSE'),
+              child: Text(shouldPrint ? 'PRINT RECEIPT & CLOSE' : 'CLOSE'),
             )
           ],
         ),
@@ -1111,9 +1113,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     final currency = settings?.currency ?? 'NGN';
 
     return [
-      TextCommand('--------------------------------', align: 'center'),
+      TextCommand('================================', align: 'center'),
       TextCommand('POS PAYMENT RECEIPT', isBold: true, align: 'center'),
-      TextCommand('--------------------------------', align: 'center'),
+      TextCommand('================================', align: 'center'),
       TextCommand(merchantName, align: 'center'),
       TextCommand('Terminal ID: $merchantId', align: 'center'),
       SizedBoxCommand(height: 1),
@@ -1125,9 +1127,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       TextCommand('RRN: ${tx.rrn ?? ""}'),
       TextCommand('STAN: ${tx.stan ?? ""}'),
       TextCommand('Date: ${_formatPosDate(tx.dateTime)}'),
-      TextCommand('--------------------------------', align: 'center'),
+      TextCommand('================================', align: 'center'),
       TextCommand('APPROVED', isBold: true, align: 'center'),
-      TextCommand('--------------------------------', align: 'center'),
+      TextCommand('================================', align: 'center'),
     ];
   }
 
