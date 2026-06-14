@@ -270,7 +270,8 @@ class FinanceRepository {
   /// Fetches the unified transaction audit ledger (Cash, Transfer, POS Attempts).
   Future<List<TransactionAuditModel>> getTransactionAuditLedger() async {
     final response = await _client.get('/api/admin/audit/ledger');
-    final List<dynamic> data = response.data as List<dynamic>;
+    final Map<String, dynamic> responseData = response.data as Map<String, dynamic>;
+    final List<dynamic> data = responseData['data'] as List<dynamic>? ?? [];
     return data.map((json) => TransactionAuditModel.fromJson(json as Map<String, dynamic>)).toList();
   }
 }
