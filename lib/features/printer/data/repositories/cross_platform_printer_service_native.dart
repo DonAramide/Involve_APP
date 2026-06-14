@@ -196,7 +196,6 @@ class CrossPlatformPrinterService implements IPrinterService {
       }
     }
 
-    bytes += generator.feed(2);
     bytes += generator.cut();
 
     // Send data in chunks (iOS and some BLE printers have size limits)

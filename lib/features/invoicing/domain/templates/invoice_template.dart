@@ -32,7 +32,7 @@ abstract class InvoiceTemplate {
   double get columnSpacing;
   
   // Business data would be passed here
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings);
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType});
 }
 
 // Intermediary command representation for printing services

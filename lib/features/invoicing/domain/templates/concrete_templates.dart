@@ -19,7 +19,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
   double get columnSpacing => 2.0;
 
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42); // Logic for 58, 80, 88
     final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
@@ -81,6 +81,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       TextCommand('-' * width),
       if (showAccount && settings.bankName != null) ...[
         TextCommand('PAYMENT DETAILS', align: 'center', isBold: true),
+      if (copyType != null) TextCommand('*** ${copyType.toUpperCase()} ***', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}', align: 'center'),
         if (settings.accountNumber != null) TextCommand('Acc: ${settings.accountNumber}', align: 'center'),
         if (settings.accountName != null) TextCommand('Name: ${settings.accountName}', align: 'center'),
@@ -91,7 +92,7 @@ class CompactInvoiceTemplate extends InvoiceTemplate {
       ],
       TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
-      TextCommand('Powered by IIPS', align: 'center'),
+      TextCommand('Powered by Invify.iips.app', align: 'center'),
     ];
   }
 
@@ -114,7 +115,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
   double get columnSpacing => 8.0;
 
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
     final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
@@ -127,6 +128,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       if (settings.phone.isNotEmpty) TextCommand('Phone: ${settings.phone}', align: 'center'),
       TextCommand('-' * width),
       TextCommand('${(invoice.paymentMethod != null && invoice.paymentMethod != 'Pay Later') ? "RECEIPT" : "INVOICE"} DETAIL', align: 'center', isBold: true),
+      if (copyType != null) TextCommand('*** ${copyType.toUpperCase()} ***', align: 'center', isBold: true),
       TextCommand('Number: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${invoice.dateCreated.toString().split('.')[0]}'),
       if (invoice.customerName != null)
@@ -165,6 +167,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       if (showAccount && settings.bankName != null) ...[
         TextCommand('-' * width),
         TextCommand('ACCOUNT DETAILS', align: 'center', isBold: true),
+      if (copyType != null) TextCommand('*** ${copyType.toUpperCase()} ***', align: 'center', isBold: true),
         TextCommand('Bank: ${settings.bankName}'),
         if (settings.accountNumber != null) TextCommand('Account: ${settings.accountNumber}'),
         if (settings.accountName != null) TextCommand('Account Name: ${settings.accountName}'),
@@ -175,7 +178,7 @@ class DetailedInvoiceTemplate extends InvoiceTemplate {
       ],
       TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
-      TextCommand('Powered by IIPS', align: 'center'),
+      TextCommand('Powered by Invify.iips.app', align: 'center'),
     ];
   }
 
@@ -198,7 +201,7 @@ class MinimalistInvoiceTemplate extends InvoiceTemplate {
   double get columnSpacing => 1.0;
 
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
     final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
@@ -252,7 +255,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
   double get columnSpacing => 1.0;
 
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
     final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
@@ -317,7 +320,7 @@ class ProfessionalInvoiceTemplate extends InvoiceTemplate {
       ],
       TextCommand('-' * width),
       TextCommand(settings.receiptFooter, align: 'center'),
-      TextCommand('Powered by IIPS', align: 'center'),
+      TextCommand('Powered by Invify.iips.app', align: 'center'),
     ];
   }
 
@@ -382,7 +385,7 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
   double get columnSpacing => 1.0;
 
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
     const int width = 32;
     final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
@@ -442,7 +445,7 @@ class ModernProfessionalTemplate extends InvoiceTemplate {
       SizedBoxCommand(height: 2),
       TextCommand('THANK YOU FOR YOUR BUSINESS', align: 'center', isBold: true),
       TextCommand('-' * width),
-      TextCommand('Powered by IIPS', align: 'center'),
+      TextCommand('Powered by Invify.iips.app', align: 'center'),
     ];
   }
 
@@ -465,7 +468,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
   double get columnSpacing => 1.0;
 
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
     final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
@@ -482,6 +485,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
       if (invoice.staffName != null) TextCommand('SOLD BY: ${invoice.staffName!.toUpperCase()}'),
       TextCommand('-' * width),
       TextCommand('INV NO: ${invoice.invoiceNumber}'),
+        if (copyType != null) TextCommand('*** ${copyType.toUpperCase()} ***', align: 'center', isBold: true),
       TextCommand('DATE:   ${invoice.dateCreated.toString().split(' ')[0]}'),
       if (invoice.paymentMethod != null) TextCommand('METHOD: ${invoice.paymentMethod}'),
       TextCommand('-' * width),
@@ -512,7 +516,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
       ],
       TextCommand('-' * width),
       TextCommand('THANK YOU FOR YOUR BUSINESS!', align: 'center'),
-      TextCommand('Powered by IIPS', align: 'center'),
+      TextCommand('Powered by Invify.iips.app', align: 'center'),
     ];
   }
 
@@ -563,7 +567,7 @@ class ClassicBusinessTemplate extends InvoiceTemplate {
 
 abstract class SchoolBaseTemplate extends InvoiceTemplate {
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
     final showAccount = (settings.showAccountDetails || invoice.paymentMethod == 'Transfer' || invoice.paymentMethod == 'VirtualAccount') && invoice.balanceAmount > 0;
@@ -575,6 +579,7 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
       if (settings.phone.isNotEmpty) TextCommand('Tel: ${settings.phone}', align: 'center'),
       TextCommand('=' * width),
       TextCommand('SCHOOL RECEIPT', align: 'center', isBold: true),
+        if (copyType != null) TextCommand('*** ${copyType.toUpperCase()} ***', align: 'center', isBold: true),
       TextCommand('No: ${invoice.invoiceNumber}'),
       TextCommand('Date: ${DateFormat('yyyy-MM-dd HH:mm').format(invoice.dateCreated)}'),
       if (invoice.paymentMethod != null) TextCommand('Payment Method: ${invoice.paymentMethod}'),
@@ -632,7 +637,7 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
       SizedBoxCommand(height: 1),
       TextCommand(settings.receiptFooter, align: 'center'),
       TextCommand('Thank you for choosing ${settings.organizationName}!', align: 'center'),
-      TextCommand('Powered by IIPS', align: 'center'),
+      TextCommand('Powered by Invify.iips.app', align: 'center'),
     ];
   }
 
@@ -684,10 +689,10 @@ class SchoolAcademicTemplate extends SchoolBaseTemplate {
   double get columnSpacing => 2.0;
 
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
     final settings = orgSettings as AppSettings;
     final int width = settings.paperWidth == 58 ? 32 : (settings.paperWidth == 88 ? 52 : 42);
-    final commands = super.generateCommands(invoice, orgSettings);
+    final commands = super.generateCommands(invoice, orgSettings, copyType: copyType);
     
     // Insert Staff info before footer
     final footerIndex = commands.indexWhere((c) => c is TextCommand && c.text == settings.receiptFooter);
@@ -712,8 +717,8 @@ class SchoolTraditionalTemplate extends SchoolBaseTemplate {
   double get columnSpacing => 2.0;
 
   @override
-  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings) {
-    final commands = super.generateCommands(invoice, orgSettings);
+  List<PrintCommand> generateCommands(Invoice invoice, dynamic orgSettings, {String? copyType}) {
+    final commands = super.generateCommands(invoice, orgSettings, copyType: copyType);
     // Replace "=" with "*" for traditional voucher feel
     return commands.map((c) {
       if (c is TextCommand && c.text.contains('=')) {
@@ -736,3 +741,5 @@ String _formatServiceDates(String? metaStr) {
     return '';
   }
 }
+
+

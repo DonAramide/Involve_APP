@@ -141,6 +141,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   (val) => _update(context, settings.copyWith(paperWidth: int.parse(val.replaceAll('mm', '')))),
                 ),
                 _buildSwitchTile('Merge POS Receipt into Invoice', settings.mergePosReceipt, (val) => _update(context, settings.copyWith(mergePosReceipt: val))),
+                _buildSwitchTile('Enable Tenant Receipt Copy', settings.enableTenantReceiptCopy, (val) => _update(context, settings.copyWith(enableTenantReceiptCopy: val))),
                 _buildSwitchTile('Allow Give Change', settings.allowGiveChange, (val) => _update(context, settings.copyWith(allowGiveChange: val))),
                 const Divider(),
 

@@ -213,7 +213,40 @@ export class PosService {
   }
 
   static async getTransactionHistory(_tenantId: string) {
-    return this.transactionHistory;
+    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      return this.transactionHistory;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('pos_transaction_attempts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error || !data || data.length === 0) {
+        return this.transactionHistory;
+      }
+
+      return data.map(d => ({
+        id: d.id,
+        tenantId: d.tenant_id,
+        terminalId: d.terminal_id,
+        amount: d.amount,
+        status: d.status,
+        date: d.date || d.created_at,
+        host: d.host,
+        maskedPan: d.masked_pan,
+        rrn: d.rrn,
+        stan: d.stan,
+        statusCode: d.status_code,
+        authCode: d.auth_code,
+        staffName: d.staff_name,
+      }));
+    } catch (err) {
+      console.error('[POS Service] Error fetching history:', err);
+      return this.transactionHistory;
+    }
   }
 
   static async getObservabilityMetrics() {

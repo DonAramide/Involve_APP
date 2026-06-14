@@ -59,7 +59,6 @@ class JobReceiptTemplate {
     commands.add(SizedBoxCommand(height: 1));
     commands.add(TextCommand('Thank you for your business!', align: 'center'));
     commands.add(TextCommand('Powered by Invify', align: 'center'));
-    commands.add(SizedBoxCommand(height: 3)); // Extra padding for tear-off
 
     return commands;
   }

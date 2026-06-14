@@ -116,7 +116,6 @@ class BlueThermalPrinterService implements IPrinterService {
       }
     }
 
-    bytes += generator.feed(2);
     bytes += generator.cut();
 
     await bluetooth.writeBytes(Uint8List.fromList(bytes));

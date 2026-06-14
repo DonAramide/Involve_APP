@@ -33,6 +33,7 @@ class AppSettings extends Equatable {
   final bool paymentMethodsEnabled;
   final int primaryColor;
   final bool mergePosReceipt;
+  final bool enableTenantReceiptCopy;
   final bool showDateTime;
   
   // Service Billing
@@ -99,6 +100,7 @@ class AppSettings extends Equatable {
     this.paymentMethodsEnabled = false,
     this.primaryColor = 0xFF2196F3, // Colors.blue.value
     this.mergePosReceipt = false,
+    this.enableTenantReceiptCopy = false,
     this.showDateTime = true,
     this.serviceBillingEnabled = false,
     this.serviceTypes = const [],
@@ -161,6 +163,7 @@ class AppSettings extends Equatable {
     bool? showSignatureSpace,
     bool? paymentMethodsEnabled,
     int? primaryColor,
+    bool? enableTenantReceiptCopy,
     bool? showDateTime,
     bool? serviceBillingEnabled,
     List<String>? serviceTypes,
@@ -222,6 +225,7 @@ class AppSettings extends Equatable {
       showSignatureSpace: showSignatureSpace ?? this.showSignatureSpace,
       paymentMethodsEnabled: paymentMethodsEnabled ?? this.paymentMethodsEnabled,
       primaryColor: primaryColor ?? this.primaryColor,
+      enableTenantReceiptCopy: enableTenantReceiptCopy ?? this.enableTenantReceiptCopy,
       showDateTime: showDateTime ?? this.showDateTime,
       serviceBillingEnabled: serviceBillingEnabled ?? this.serviceBillingEnabled,
       serviceTypes: serviceTypes ?? this.serviceTypes,

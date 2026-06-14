@@ -140,7 +140,6 @@ class UsbPrinterService implements IPrinterService {
       }
 
       // Feed and cut
-      bytes += generator.feed(2);
       bytes += generator.cut();
 
       // Send to printer in chunks

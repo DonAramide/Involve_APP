@@ -299,7 +299,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const Center(child: Text('Powered by IIPS', style: TextStyle(fontSize: 10, color: Colors.grey))),
+                        const Center(child: Text('Powered by Invify.iips.app', style: TextStyle(fontSize: 10, color: Colors.grey))),
                       ],
                     ),
                   ),
@@ -560,7 +560,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           changeGiven: changeGiven,
                         );
 
-                        _printInvoice(context, invoice, settings!, posTx: posTransactionData);
+                        _printInvoice(context, invoice, settings!, posTx: posTransactionData, copyType: 'Customer Copy');
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invoice saved!')));
                       } catch (e) {
                         if (!mounted) return;
@@ -816,7 +816,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     );
   }
 
-  void _printInvoice(BuildContext context, Invoice invoice, AppSettings settings, {MposTransactionData? posTx}) {
+  void _printInvoice(BuildContext context, Invoice invoice, AppSettings settings, {MposTransactionData? posTx, String? copyType}) {
     final templateName = settings.defaultInvoiceTemplate ?? 'compact';
     final InvoiceTemplate template;
     if (templateName == 'detailed') template = DetailedInvoiceTemplate();
@@ -826,10 +826,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     else if (templateName == 'classic') template = ClassicBusinessTemplate();
     else template = CompactInvoiceTemplate();
 
-    final commands = template.generateCommands(invoice, settings);
+    final commands = template.generateCommands(invoice, settings, copyType: copyType);
     if (posTx != null && settings.mergePosReceipt == true) {
-      commands.addAll(_getPosReceiptCommands(posTx, settings));
-      commands.add(SizedBoxCommand(height: 1));
+      commands.addAll(_getPosReceiptCommands(posTx, settings, copyType: copyType));
     }
     context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
   }
@@ -994,7 +993,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       Map<String, dynamic> data,
       {bool shouldPrint = true}) async {
     final financeRepo = context.read<FinanceRepository>();
-    final endpoint = webhookUrl.isNotEmpty ? webhookUrl : '/api/pos/transaction';
+    final trimmedWebhook = webhookUrl.trim();
+    final endpoint = trimmedWebhook.isNotEmpty ? trimmedWebhook : '/api/pos/transaction';
     
     Response? backendResponse;
     final offlineService = OfflineWebhookService(financeRepo.apiClient.dio);
@@ -1028,7 +1028,14 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
     // Success Screen & Print Receipt
     if (result.status == 'payment_success' && result.transaction != null) {
-      await showDialog(
+      final enableTenantCopy = context.read<SettingsBloc>().state.settings?.enableTenantReceiptCopy ?? false;
+      
+      // Auto-print customer copy if it is separated from the main invoice
+      if (shouldPrint) {
+        _printPosReceipt(result.transaction!, copyType: 'Customer Copy');
+      }
+
+      showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
@@ -1064,14 +1071,19 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             }
           ),
           actions: [
+            if (enableTenantCopy)
+              TextButton(
+                onPressed: () {
+                  _printPosReceipt(result.transaction!, copyType: 'Tenant Copy');
+                  Navigator.pop(ctx);
+                },
+                child: const Text('PRINT TENANT COPY'),
+              ),
             TextButton(
               onPressed: () {
-                if (shouldPrint) {
-                  _printPosReceipt(result.transaction!);
-                }
                 Navigator.pop(ctx);
               },
-              child: Text(shouldPrint ? 'PRINT RECEIPT & CLOSE' : 'CLOSE'),
+              child: const Text('CLOSE'),
             )
           ],
         ),
@@ -1107,16 +1119,18 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     }
   }
 
-  List<PrintCommand> _getPosReceiptCommands(MposTransactionData tx, AppSettings? settings) {
+  List<PrintCommand> _getPosReceiptCommands(MposTransactionData tx, AppSettings? settings, {String? copyType}) {
     final String merchantName = _terminalConfig?.businessName ?? settings?.organizationName ?? 'MERCHANT';
     final String merchantId = _terminalConfig?.terminalId ?? 'N/A';
     final currency = settings?.currency ?? 'NGN';
+    final bool isMerged = settings?.mergePosReceipt ?? false;
 
     return [
       TextCommand('================================', align: 'center'),
       TextCommand('POS PAYMENT RECEIPT', isBold: true, align: 'center'),
+      if (copyType != null) TextCommand('*** ${copyType.toUpperCase()} ***', align: 'center', isBold: true),
       TextCommand('================================', align: 'center'),
-      TextCommand(merchantName, align: 'center'),
+      if (!isMerged) TextCommand(merchantName, align: 'center'),
       TextCommand('Terminal ID: $merchantId', align: 'center'),
       SizedBoxCommand(height: 1),
       TextCommand('Card Holder: ${tx.cardHolderName ?? ""}'),
@@ -1133,10 +1147,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     ];
   }
 
-  void _printPosReceipt(MposTransactionData tx) {
+  void _printPosReceipt(MposTransactionData tx, {String? copyType}) {
     final settings = context.read<SettingsBloc>().state.settings;
-    final commands = _getPosReceiptCommands(tx, settings);
-    commands.add(SizedBoxCommand(height: 1)); // Minimal space at end
+    final commands = _getPosReceiptCommands(tx, settings, copyType: copyType);
     context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58)); // Assuming 58mm
   }
 }

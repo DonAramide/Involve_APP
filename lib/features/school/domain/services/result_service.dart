@@ -238,7 +238,7 @@ class ResultService {
               ),
               pw.SizedBox(height: 20),
               pw.Center(
-                child: pw.Text('Powered by IIPS', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
+                child: pw.Text('Powered by Invify.iips.app', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
               ),
             ],
           );

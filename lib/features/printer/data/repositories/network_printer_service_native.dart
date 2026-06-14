@@ -86,7 +86,6 @@ class NetworkPrinterService implements IPrinterService {
       }
     }
 
-    bytes += generator.feed(2);
     bytes += generator.cut();
 
     _socket!.add(bytes);
