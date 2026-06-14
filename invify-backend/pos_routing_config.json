@@ -13,11 +13,11 @@
       "processOnDevice": true,
       "webhookUrl": " https://bertie-archegoniate-causelessly.ngrok-free.dev/api/pos/transactionFromMpos",
       "scopeType": "Tenant",
-      "targetValue": "tenant-1779640483822",
+      "targetValue": "",
       "profileId": "prof_1781362986933",
       "category": "Retail",
       "preferredHosts": [
-        "nibss"
+        "express_pay"
       ],
       "fallbackHosts": []
     }
@@ -74,7 +74,7 @@
         "keyLabel": ""
       },
       "baseUrl": " http://80.88.8.56:552/api/GetPlainMasterKey",
-      "authToken": "5eb02aba7ca949e6d3a389931bd9f016:8305f3f5fe19f208a54711a20626717d3dce3cd072cb21da14a1d92bd3c6df1769ed86fb27c5fac5ea901ef6f3d3ec22a288d712b6158c1a672198442a297451519c1222b9b9234d65d57fada053df12",
+      "authToken": "a222cbeadad0d46dd5ca76774034346f:e7d94f5b6a0402b200508d371c31f3295df4e5ebc14423555904b81cfc5d5922aa363c616b5fa6e8a48be129ddb0987e29b84c23ef6f5a55195d974bb37f37a0ce2d6507a254b51d4ae60672ee4c1b7c",
       "hostName": "Express Pay",
       "timeoutSeconds": 60,
       "priority": 2,

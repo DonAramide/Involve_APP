@@ -103,8 +103,9 @@ class OfflineWebhookService {
 
     for (final payload in validQueue) {
       try {
-        print('[OfflineWebhookService] Attempting to sync payload to ${payload.url}...');
-        final response = await _dio.post(payload.url, data: payload.data);
+        final cleanUrl = payload.url.trim();
+        print('[OfflineWebhookService] Attempting to sync payload to $cleanUrl...');
+        final response = await _dio.post(cleanUrl, data: payload.data);
         if (response.statusCode == 200 || response.statusCode == 201) {
           print('[OfflineWebhookService] Successfully synced payload ${payload.id}');
           pendingQueue.removeWhere((p) => p.id == payload.id);
