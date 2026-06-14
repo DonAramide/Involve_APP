@@ -35,6 +35,7 @@ import { ExecutiveFinanceController } from './controllers/finance.controller';
 import { DefaultersController } from './controllers/defaulters.controller';
 import { IntegrityController } from './controllers/integrity.controller';
 import { NotificationController } from './controllers/notification.controller';
+import { AuditController } from './controllers/audit.controller';
 import { OTPController } from './controllers/otp.controller';
 import { AuthController } from './controllers/auth.controller';
 import { DeviceController } from './controllers/device.controller';
@@ -335,6 +336,7 @@ app.get('/api/payout/history', authenticate, PayoutController.getHistory);
 
 // Executive Dashboard
 app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ExecutiveFinanceController.getSummary);
+app.get('/api/finance/audit/ledger', authenticate, AuditController.getTransactionLedger);
 
 // POS Operations (Medusa | Cpoint-Kimono | NIBSS)
 app.post('/api/pos/transaction', authenticate, PosController.processTransaction);
