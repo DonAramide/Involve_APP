@@ -2,6 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:convert';
+import '../../../services/terminal_sync_service.dart';
 
 class SecurityService {
   final _storage = const FlutterSecureStorage();
@@ -131,6 +132,11 @@ class SecurityService {
     final stored = await _storage.read(key: _tenantIdKey);
     if (stored != null && stored.isNotEmpty) {
       return stored;
+    }
+    // Fallback to Terminal Config if unassigned via manual setup
+    final config = await TerminalSyncService.loadCachedConfig();
+    if (config != null && config.tenantId != null && config.tenantId!.isNotEmpty) {
+      return config.tenantId!;
     }
     // Dynamic production auto-generation fallback if unassigned
     return '';
