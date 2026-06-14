@@ -213,6 +213,109 @@
   ],
   "audit_log": [
     {
+      "id": "audit-1781436037817-2xdhg",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Toggled host express_pay to enabled",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Toggled host express_pay to enabled"
+      },
+      "created_at": "2026-06-14T11:20:37.818Z"
+    },
+    {
+      "id": "audit-1781436033810-2n6ii",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Modified host settings for Express Pay",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Modified host settings for Express Pay"
+      },
+      "created_at": "2026-06-14T11:20:33.810Z"
+    },
+    {
+      "id": "audit-1781436026455-aul0z",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Toggled host nibss to disabled",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Toggled host nibss to disabled"
+      },
+      "created_at": "2026-06-14T11:20:26.456Z"
+    },
+    {
+      "id": "audit-1781434981195-c0wlm",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2070AL32",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": "NJJ6-QIIA-F7GR-HLYI-O4OL-XDSB"
+      },
+      "created_at": "2026-06-14T11:03:01.195Z"
+    },
+    {
+      "id": "audit-1781434980115-qao4c",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2070AL32",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": "NJJ6-QIIA-F7GR-HLYI-O4OL-XDSB"
+      },
+      "created_at": "2026-06-14T11:03:00.115Z"
+    },
+    {
       "id": "audit-1781422984077-1mu2k",
       "action_type": "SYNC_SUCCESS",
       "terminal_id": "2070AL32",
@@ -7068,91 +7171,6 @@
         "reason": "Modified host settings for Express Pay"
       },
       "created_at": "2026-06-11T11:02:08.930Z"
-    },
-    {
-      "id": "audit-1781174832540-qtlzv",
-      "action_type": "SYNC_SUCCESS",
-      "terminal_id": "2214OTGF",
-      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
-      "old_device_id": null,
-      "new_device_id": "M1AJQ",
-      "admin_id": "M1AJQ",
-      "reason": "Mobile device sync",
-      "ip_address": null,
-      "metadata": {
-        "serialNumber": null,
-        "androidId": "M1AJQ",
-        "enrollmentKey": null
-      },
-      "created_at": "2026-06-11T10:47:12.540Z"
-    },
-    {
-      "id": "audit-1781174434526-uriwm",
-      "action_type": "SYNC_SUCCESS",
-      "terminal_id": "20330002",
-      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
-      "old_device_id": null,
-      "new_device_id": "M1AJQ",
-      "admin_id": "M1AJQ",
-      "reason": "Mobile device sync",
-      "ip_address": null,
-      "metadata": {
-        "serialNumber": null,
-        "androidId": "M1AJQ",
-        "enrollmentKey": null
-      },
-      "created_at": "2026-06-11T10:40:34.526Z"
-    },
-    {
-      "id": "audit-1781173295204-11o9m",
-      "action_type": "SYNC_SUCCESS",
-      "terminal_id": "20330002",
-      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
-      "old_device_id": null,
-      "new_device_id": "M1AJQ",
-      "admin_id": "M1AJQ",
-      "reason": "Mobile device sync",
-      "ip_address": null,
-      "metadata": {
-        "serialNumber": null,
-        "androidId": "M1AJQ",
-        "enrollmentKey": null
-      },
-      "created_at": "2026-06-11T10:21:35.204Z"
-    },
-    {
-      "id": "audit-1781173170770-wo806",
-      "action_type": "SYNC_SUCCESS",
-      "terminal_id": "20330002",
-      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
-      "old_device_id": null,
-      "new_device_id": "M1AJQ",
-      "admin_id": "M1AJQ",
-      "reason": "Mobile device sync",
-      "ip_address": null,
-      "metadata": {
-        "serialNumber": null,
-        "androidId": "M1AJQ",
-        "enrollmentKey": null
-      },
-      "created_at": "2026-06-11T10:19:30.771Z"
-    },
-    {
-      "id": "audit-1781172362216-9v70m",
-      "action_type": "SYNC_SUCCESS",
-      "terminal_id": "20330002",
-      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
-      "old_device_id": null,
-      "new_device_id": "M1AJQ",
-      "admin_id": "M1AJQ",
-      "reason": "Mobile device sync",
-      "ip_address": null,
-      "metadata": {
-        "serialNumber": null,
-        "androidId": "M1AJQ",
-        "enrollmentKey": null
-      },
-      "created_at": "2026-06-11T10:06:02.216Z"
     }
   ]
 }

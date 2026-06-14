@@ -1,5 +1,5 @@
 {
-  "activeHost": "nibss",
+  "activeHost": "express_pay",
   "failoverOrder": [
     "express_pay",
     "kimono",
@@ -25,7 +25,7 @@
   "hosts": [
     {
       "hostCode": "nibss",
-      "isActive": true,
+      "isActive": false,
       "ip": "196.6.103.18",
       "port": 4018,
       "kimonoKeys": {},
@@ -62,7 +62,7 @@
     },
     {
       "hostCode": "express_pay",
-      "isActive": false,
+      "isActive": true,
       "ip": "196.6.103.18",
       "port": 4018,
       "kimonoKeys": {},
@@ -74,7 +74,7 @@
         "keyLabel": ""
       },
       "baseUrl": " http://80.88.8.56:552/api/GetPlainMasterKey",
-      "authToken": "feb8d7395da1be551f7104682a157430:cac2f74f502bdaefa36a9312690b40b44b4b4ce8572d7b9da17df6b86e7b39aed2be08013cd22289a648813533bf63ef99624d968a54747fd04af67498be7699d612710518c4044c8cbadc4d74b7171f",
+      "authToken": "5eb02aba7ca949e6d3a389931bd9f016:8305f3f5fe19f208a54711a20626717d3dce3cd072cb21da14a1d92bd3c6df1769ed86fb27c5fac5ea901ef6f3d3ec22a288d712b6158c1a672198442a297451519c1222b9b9234d65d57fada053df12",
       "hostName": "Express Pay",
       "timeoutSeconds": 60,
       "priority": 2,

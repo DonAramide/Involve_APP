@@ -401,7 +401,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           posTransactionData = result.transaction;
                           if (result.status == 'payment_success' || result.status == 'payment_failed') {
                             final shouldPrint = !(settings?.mergePosReceipt ?? false);
-                            await _processWebhookAndSuccess(context, webhookUrl ?? '', result, {
+                            final proceed = await _processWebhookAndSuccess(context, webhookUrl ?? '', result, {
                                 'terminalId': terminalId,
                                 'amount': amountToCharge,
                                 'isDeviceProcessed': true,
@@ -421,6 +421,12 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                   'price': i.item.price,
                                 }).toList(),
                             }, shouldPrint: shouldPrint);
+                            
+                            if (result.status == 'payment_failed') {
+                              if (!proceed) return;
+                              // Force the amount to 0 so the invoice saves as Unpaid
+                              _amountReceivedController.text = '0';
+                            }
                           } else if (result.status == 'emv_data_ready' && result.emvData != null) {
                             final financeRepo = context.read<FinanceRepository>();
                             final backendResponse = await financeRepo.apiClient.post(
@@ -986,7 +992,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     );
   }
 
-  Future<void> _processWebhookAndSuccess(
+  Future<bool> _processWebhookAndSuccess(
       BuildContext context,
       String webhookUrl,
       MposTransactionResponse result,
@@ -1007,19 +1013,30 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       await offlineService.enqueuePayload(endpoint, data);
     }
 
-    if (!mounted) return;
+    if (!mounted) return false;
 
     if (result.status == 'payment_failed') {
       final msg = result.transaction?.message ?? 'Unknown Error';
+      final formattedMsg = getIsoResponseMessage(msg);
+      bool proceed = false;
       await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('POS Declined'),
-          content: Text('Transaction declined by MPOS ($msg).'),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+          content: Text('Transaction declined by MPOS ($formattedMsg).\n\nDo you want to proceed by printing the receipt anyway?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+            ElevatedButton(
+              onPressed: () {
+                proceed = true;
+                Navigator.pop(ctx);
+              },
+              child: const Text('PRINT RECEIPT'),
+            )
+          ],
         ),
       );
-      return;
+      return proceed;
     }
 
     if (backendResponse != null && backendResponse.statusCode != 200 && backendResponse.statusCode != 201) {
@@ -1089,6 +1106,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         ),
       );
     }
+    
+    return true;
   }
 
 
