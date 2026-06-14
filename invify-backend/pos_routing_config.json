@@ -1,5 +1,5 @@
 {
-  "activeHost": "express_pay",
+  "activeHost": "nibss",
   "failoverOrder": [
     "express_pay",
     "kimono",
@@ -12,10 +12,16 @@
   "hosts": [
     {
       "hostCode": "express_pay",
-      "isActive": true,
+      "isActive": false,
       "ip": "",
       "port": 0,
-      "authToken": "47473366cac8a043ef42d5006d5dc8ca:5a5726855ce5b16529946b168edecce77006cf9e8204a27dcdcb6656e2cd85eb28894d936563dd723548fe14d098cea88d8765e5272ba9d12ff39947919dfa3bcdfb333d9344942691f93dc086b34473"
+      "authToken": "941b0bd629fba17fe4466e2cfaae73cc:b8ba1f7c62a23f8b59b65c793007da2c4a3b5c9f0796fc2f39fb101d5540c69dfed208fbb1a784dee577c8b545ee4d7075a195cb6104e6a221e85d93019ba359e0b14bb926aff8677dbd45d1f089e0dd"
+    },
+    {
+      "hostCode": "nibss",
+      "isActive": true,
+      "ip": "",
+      "port": 0
     }
   ]
 }

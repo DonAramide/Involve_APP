@@ -1,5 +1,5 @@
 {
-  "archived_at": "2026-06-14T14:12:04.975Z",
+  "archived_at": "2026-06-14T15:07:53.604Z",
   "logs": [
     {
       "id": "audit-1780333603981-jovru",
@@ -1475,6 +1475,354 @@
         ]
       },
       "created_at": "2026-06-11T13:02:07.346Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781190442427-jgl8p",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T15:07:22.427Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781190429242-rpl80",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T15:07:09.242Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781190406631-elycy",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T15:06:46.631Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781190399029-pk0q1",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T15:06:39.029Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781190348591-9v8fg",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Modified host settings for Express Pay",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Modified host settings for Express Pay"
+      },
+      "created_at": "2026-06-11T15:05:48.591Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781190346303-vlxjw",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Modified host settings for Express Pay",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Modified host settings for Express Pay"
+      },
+      "created_at": "2026-06-11T15:05:46.304Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781190299712-shlu7",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T15:04:59.712Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781189596200-l2ql6",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:53:16.200Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781189222555-2obfe",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:47:02.555Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781189186180-3xouf",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:46:26.180Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781189181543-vtjxv",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Modified host settings for Express Pay",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Modified host settings for Express Pay"
+      },
+      "created_at": "2026-06-11T14:46:21.543Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781189142481-wao2k",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:45:42.481Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781188475961-zu60g",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:34:35.961Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781188470991-btrp0",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:34:30.991Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781187988267-aoa6e",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:26:28.267Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781187972157-5e8s6",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:26:12.157Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781187932320-587zm",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Modified host settings for Express Pay",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Modified host settings for Express Pay"
+      },
+      "created_at": "2026-06-11T14:25:32.320Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781187802354-eo27j",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T14:23:22.354Z",
       "source_origin": "terminal_audit_log_local"
     }
   ]

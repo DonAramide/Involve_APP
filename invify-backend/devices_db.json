@@ -1,6 +1,34 @@
 {
   "devices": [
     {
+      "id": "dev-1781447834530",
+      "device_id": "R52M3011J7H",
+      "device_suffix": "R52M3011J7H",
+      "tenant_id": "tenant-8838236e-5664-4a28-86f7-233194437a64",
+      "status": "active",
+      "business_name": "Business Centre",
+      "phone": "09027033748",
+      "industry": "retail",
+      "theme_color": "#EC4899",
+      "device_info": {
+        "deviceId": "R52M3011J7H",
+        "deviceSuffix": "R52M3011J7H",
+        "os": "Android",
+        "model": "SM-T397U",
+        "brand": "samsung",
+        "osVersion": "8.1.0",
+        "isPhysicalDevice": true,
+        "androidId": "R52M3011J7H",
+        "serialNumber": "R52M3011J7H"
+      },
+      "last_seen": "2026-06-14T14:37:14.530Z",
+      "created_at": "2026-06-14T14:37:14.530Z",
+      "tenants": {
+        "name": "Business Centre",
+        "plan": "standard"
+      }
+    },
+    {
       "id": "dev-1780273208466",
       "device_id": "unknown",
       "device_suffix": "XXXXXX",
@@ -94,6 +122,23 @@
     }
   ],
   "activations": [
+    {
+      "id": "act-1781447988556",
+      "activation_code": "NJLE-UNAB-DPRU-ROLU-MCMG-EYEE",
+      "tenant_id": "tenant-8838236e-5664-4a28-86f7-233194437a64",
+      "duration_days": 30,
+      "plan_index": 1,
+      "device_suffix": "011J7H",
+      "device_id": "DSPREAD-POS-011J7H8MM-3934",
+      "status": "pending",
+      "is_used": false,
+      "created_at": "2026-06-14T14:39:48.557Z",
+      "created_by": "superadmin@invify.app",
+      "tenants": {
+        "name": "Business Centre",
+        "plan": "standard"
+      }
+    },
     {
       "id": "act-1781291809232",
       "activation_code": "NJJ6-QIIA-F7GR-HLYI-O4OL-XDSB",

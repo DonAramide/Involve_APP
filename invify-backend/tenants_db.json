@@ -95,5 +95,16 @@
     "support_phone": "+234234811111111",
     "support_email": "muyibitaliat12@gmail.com",
     "support_whatsapp": "234234811111111"
+  },
+  {
+    "id": "tenant-8838236e-5664-4a28-86f7-233194437a64",
+    "name": "Business Centre",
+    "type": "retail",
+    "plan": "standard",
+    "status": "active",
+    "agent_code": "AAA000",
+    "location": "Lat: 6.6304, Lng: 3.4831",
+    "device_id": "R52M3011J7H",
+    "created_at": "2026-06-14T14:37:14.523Z"
   }
 ]

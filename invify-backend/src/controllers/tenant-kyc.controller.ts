@@ -15,8 +15,20 @@ export class TenantKycController {
       }
 
       // 1. Simulate file upload by creating a CDN URL
-      // (In production, this uses Multer + Contabo S3. For now we mock the URL)
       const simulatedUrl = `https://storage.invify.app/tenants/kyc/${authUserId}_${type}_${Date.now()}.png`;
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        return res.status(200).json({
+          success: true,
+          message: 'KYC document uploaded successfully (Mock Mode)',
+          data: {
+            tenant_id: authUserId,
+            document_type: type,
+            document_url: simulatedUrl,
+            status: 'PENDING'
+          }
+        });
+      }
 
       // 2. Insert into tenant_kyc_documents table
       const { data: doc, error: insertError } = await supabase.from('tenant_kyc_documents').insert({
@@ -50,6 +62,13 @@ export class TenantKycController {
       const tenantId = req.params.id || (req as any).user?.id;
       if (!tenantId) {
         return res.status(400).json({ success: false, message: 'Tenant ID is required' });
+      }
+
+      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+        return res.status(200).json({
+          success: true,
+          data: []
+        });
       }
 
       const { data, error } = await supabase.from('tenant_kyc_documents').select('*').eq('tenant_id', tenantId);
