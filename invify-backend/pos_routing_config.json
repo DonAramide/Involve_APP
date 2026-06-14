@@ -1,5 +1,5 @@
 {
-  "activeHost": "nibss",
+  "activeHost": "express_pay",
   "failoverOrder": [
     "express_pay",
     "kimono",
@@ -11,17 +11,53 @@
   "tenantRoutingProfiles": [],
   "hosts": [
     {
+      "hostName": "Express Pay",
       "hostCode": "express_pay",
-      "isActive": false,
-      "ip": "",
-      "port": 0,
-      "authToken": "941b0bd629fba17fe4466e2cfaae73cc:b8ba1f7c62a23f8b59b65c793007da2c4a3b5c9f0796fc2f39fb101d5540c69dfed208fbb1a784dee577c8b545ee4d7075a195cb6104e6a221e85d93019ba359e0b14bb926aff8677dbd45d1f089e0dd"
+      "ip": "196.6.103.18",
+      "port": 4018,
+      "sslEnabled": false,
+      "sslCertMetadata": null,
+      "timeoutSeconds": 3600,
+      "priority": 1,
+      "failoverPriority": 1,
+      "healthScore": 100,
+      "status": "ONLINE",
+      "thresholdMin": 0,
+      "thresholdMax": 999999999,
+      "supportedCardSchemes": [],
+      "supportedTerminalTypes": [],
+      "supportedTenantCategories": [],
+      "supportedTransactionTypes": [],
+      "isActive": true,
+      "baseUrl": "http://80.88.8.56:552/api/GetPlainMasterKey",
+      "authToken": "7a8369f57eed7555816a21d215af4b04:d001f3515a94f5696888e6b7b3444a857c2933ac84f5cd0f2a587fb42100af2d85d4f4fd1196650f7fe22b8dd56a725fdf457237136633802ab38487957d48b9147252b80251a5a1ad9122b7b77255a6"
     },
     {
+      "hostName": "NIBSS",
       "hostCode": "nibss",
-      "isActive": true,
-      "ip": "",
-      "port": 0
+      "ip": "196.6.103.18",
+      "port": 5001,
+      "sslEnabled": true,
+      "sslCertMetadata": null,
+      "timeoutSeconds": 3600,
+      "priority": 2,
+      "failoverPriority": 2,
+      "healthScore": 100,
+      "status": "ONLINE",
+      "thresholdMin": 0,
+      "thresholdMax": 999999999,
+      "supportedCardSchemes": [],
+      "supportedTerminalTypes": [],
+      "supportedTenantCategories": [],
+      "supportedTransactionTypes": [],
+      "isActive": false,
+      "nibssConfig": {
+        "institutionCode": "",
+        "terminalId": "",
+        "merchantId": "",
+        "ctmk": "66D4AF3321D8564E9F6F35411755E730",
+        "ptspCode": ""
+      }
     }
   ]
 }

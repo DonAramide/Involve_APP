@@ -101,7 +101,57 @@ export class PosService {
     splitThresholdNaira: DEFAULT_SPLIT_THRESHOLD_NAIRA,
     thresholdRulesMatrix: [],
     tenantRoutingProfiles: [],
-    hosts: []
+    hosts: [
+      {
+        hostName: 'Express Pay',
+        hostCode: 'express_pay',
+        ip: '196.6.103.18',
+        port: 4018,
+        sslEnabled: false,
+        sslCertMetadata: null,
+        timeoutSeconds: 3600,
+        priority: 1,
+        failoverPriority: 1,
+        healthScore: 100,
+        status: 'ONLINE',
+        thresholdMin: 0,
+        thresholdMax: 999999999,
+        supportedCardSchemes: [],
+        supportedTerminalTypes: [],
+        supportedTenantCategories: [],
+        supportedTransactionTypes: [],
+        isActive: true,
+        baseUrl: 'http://80.88.8.56:552/api/GetPlainMasterKey',
+        authToken: 'RXRyYW56YWN0UE9TOjdkNjY1YjgxLWQwZDctNDBhZS04Zjc5LWI2Yjg4MzVmOGZjMw=='
+      },
+      {
+        hostName: 'NIBSS',
+        hostCode: 'nibss',
+        ip: '196.6.103.18',
+        port: 5001,
+        sslEnabled: true,
+        sslCertMetadata: null,
+        timeoutSeconds: 3600,
+        priority: 2,
+        failoverPriority: 2,
+        healthScore: 100,
+        status: 'ONLINE',
+        thresholdMin: 0,
+        thresholdMax: 999999999,
+        supportedCardSchemes: [],
+        supportedTerminalTypes: [],
+        supportedTenantCategories: [],
+        supportedTransactionTypes: [],
+        isActive: false,
+        nibssConfig: {
+          institutionCode: '',
+          terminalId: '',
+          merchantId: '',
+          ctmk: '66D4AF3321D8564E9F6F35411755E730',
+          ptspCode: ''
+        }
+      }
+    ]
   };
 
   static loadConfig() {
