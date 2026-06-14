@@ -394,7 +394,9 @@ app.post('/api/finance/customer-virtual-account/:customerId', authenticate, Cust
 // GET /api/admin/audit/ledger  ─  Unified multi-source audit ledger
 app.get('/api/admin/audit/ledger', authenticate, checkRole(['super_admin', 'internal_staff']), async (req: Request, res: Response) => {
   try {
-    const result = await GovAuditService.getLedger(req.query as any);
+    const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+    const query = { ...req.query, tenantId };
+    const result = await GovAuditService.getLedger(query as any);
     res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message });

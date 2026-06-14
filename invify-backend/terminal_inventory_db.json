@@ -213,6 +213,23 @@
   ],
   "audit_log": [
     {
+      "id": "audit-1781422984077-1mu2k",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2070AL32",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": "NJJ6-QIIA-F7GR-HLYI-O4OL-XDSB"
+      },
+      "created_at": "2026-06-14T07:43:04.077Z"
+    },
+    {
       "id": "audit-1781400019864-0ftdc",
       "action_type": "SYNC_SUCCESS",
       "terminal_id": "2070AL32",

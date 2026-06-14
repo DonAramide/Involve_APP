@@ -25,7 +25,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     }
 
     const variantService = require('../config/build-variant').BuildVariantService.getInstance();
-    const isMockAllowed = variantService.isLocal();
+    const isMockAllowed = variantService.isLocal() || process.env.BUILD_VARIANT === 'STAGING';
 
     if (isMockAllowed && process.env.OFFLINE_MOCK_AUTH === 'true' && authHeader !== 'Bearer invalid.jwt.token') {
       console.warn('[AuthMiddleware] Developer offline auth bypass triggered.');
@@ -33,7 +33,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         id: '00000000-0000-0000-0000-000000000000',
         email: 'superadmin@invify.app',
         role: 'super_admin',
-        tenantId: null
+        tenantId: req.headers['x-tenant-id'] || null
       };
       return next();
     }
