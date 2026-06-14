@@ -207,11 +207,81 @@
       "mpos_id": "mpos-1780133656325-0.3101378214529058",
       "printer_id": "prn-1780133845653-0.7210737488567118",
       "terminal_id_id": "tid-1781364691129-0.514471504795318",
-      "status": "ACTIVE",
-      "assigned_at": "2026-06-13T15:44:07.217Z"
+      "status": "UNASSIGNED",
+      "assigned_at": "2026-06-13T15:44:07.217Z",
+      "unassigned_at": "2026-06-14T13:03:44.624Z"
     }
   ],
   "audit_log": [
+    {
+      "id": "audit-1781442224627-sjcis",
+      "action_type": "UNASSIGNED",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "superadmin@invify.app",
+      "reason": null,
+      "ip_address": "::1",
+      "metadata": {
+        "id": "asg-1781365447217",
+        "tenant_id": "tenant-1779640483822",
+        "tablet_id": "tab-1781183983229-0.6739346413781415",
+        "mpos_id": "mpos-1780133656325-0.3101378214529058",
+        "printer_id": "prn-1780133845653-0.7210737488567118",
+        "terminal_id_id": "tid-1781364691129-0.514471504795318",
+        "status": "UNASSIGNED",
+        "assigned_at": "2026-06-13T15:44:07.217Z",
+        "unassigned_at": "2026-06-14T13:03:44.624Z"
+      },
+      "created_at": "2026-06-14T13:03:44.627Z"
+    },
+    {
+      "id": "audit-1781441875069-j6688",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Toggled host express_pay to enabled",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Toggled host express_pay to enabled"
+      },
+      "created_at": "2026-06-14T12:57:55.069Z"
+    },
+    {
+      "id": "audit-1781441874237-mq9ai",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Toggled host express_pay to disabled",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Toggled host express_pay to disabled"
+      },
+      "created_at": "2026-06-14T12:57:54.237Z"
+    },
     {
       "id": "audit-1781436250427-60mj3",
       "action_type": "ROUTING_CONFIG_UPDATE",
@@ -6820,61 +6890,6 @@
         ]
       },
       "created_at": "2026-06-11T13:02:07.346Z"
-    },
-    {
-      "id": "audit-1781182718267-qnntq",
-      "action_type": "BULK_IMPORT",
-      "terminal_id": null,
-      "mpos_terminal_id": null,
-      "old_device_id": null,
-      "new_device_id": null,
-      "admin_id": "superadmin@iips.app",
-      "reason": "Bulk import: Dev_Tablets_Template.csv",
-      "ip_address": "::1",
-      "metadata": {
-        "batchId": "batch-1781182718263",
-        "files": [
-          "Dev_Tablets_Template.csv"
-        ]
-      },
-      "created_at": "2026-06-11T12:58:38.267Z"
-    },
-    {
-      "id": "audit-1781182645800-e751b",
-      "action_type": "BULK_IMPORT",
-      "terminal_id": null,
-      "mpos_terminal_id": null,
-      "old_device_id": null,
-      "new_device_id": null,
-      "admin_id": "superadmin@iips.app",
-      "reason": "Bulk import: Dev_Tablets_Template.csv",
-      "ip_address": "::1",
-      "metadata": {
-        "batchId": "batch-1781182645798",
-        "files": [
-          "Dev_Tablets_Template.csv"
-        ]
-      },
-      "created_at": "2026-06-11T12:57:25.800Z"
-    },
-    {
-      "id": "audit-1781181907766-cajl6",
-      "action_type": "BULK_IMPORT",
-      "terminal_id": null,
-      "mpos_terminal_id": null,
-      "old_device_id": null,
-      "new_device_id": null,
-      "admin_id": "superadmin@iips.app",
-      "reason": "Bulk import: Tablets_Template.csv, Dev_Tablets_Template.csv",
-      "ip_address": "::1",
-      "metadata": {
-        "batchId": "batch-1781181907758",
-        "files": [
-          "Tablets_Template.csv",
-          "Dev_Tablets_Template.csv"
-        ]
-      },
-      "created_at": "2026-06-11T12:45:07.766Z"
     }
   ]
 }

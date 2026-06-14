@@ -1,5 +1,5 @@
 {
-  "archived_at": "2026-06-14T12:00:28.677Z",
+  "archived_at": "2026-06-14T12:59:27.921Z",
   "logs": [
     {
       "id": "audit-1780333603981-jovru",
@@ -893,6 +893,64 @@
         "reason": "Modified host settings for Express Pay"
       },
       "created_at": "2026-06-11T11:02:08.930Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781181907766-cajl6",
+      "action_type": "BULK_IMPORT",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "superadmin@iips.app",
+      "reason": "Bulk import: Tablets_Template.csv, Dev_Tablets_Template.csv",
+      "ip_address": "::1",
+      "metadata": {
+        "batchId": "batch-1781181907758",
+        "files": [
+          "Tablets_Template.csv",
+          "Dev_Tablets_Template.csv"
+        ]
+      },
+      "created_at": "2026-06-11T12:45:07.766Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781182718267-qnntq",
+      "action_type": "BULK_IMPORT",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "superadmin@iips.app",
+      "reason": "Bulk import: Dev_Tablets_Template.csv",
+      "ip_address": "::1",
+      "metadata": {
+        "batchId": "batch-1781182718263",
+        "files": [
+          "Dev_Tablets_Template.csv"
+        ]
+      },
+      "created_at": "2026-06-11T12:58:38.267Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781182645800-e751b",
+      "action_type": "BULK_IMPORT",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "superadmin@iips.app",
+      "reason": "Bulk import: Dev_Tablets_Template.csv",
+      "ip_address": "::1",
+      "metadata": {
+        "batchId": "batch-1781182645798",
+        "files": [
+          "Dev_Tablets_Template.csv"
+        ]
+      },
+      "created_at": "2026-06-11T12:57:25.800Z",
       "source_origin": "terminal_audit_log_local"
     }
   ]

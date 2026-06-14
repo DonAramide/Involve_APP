@@ -8,103 +8,14 @@
   ],
   "splitThresholdNaira": 50000,
   "thresholdRulesMatrix": [],
-  "tenantRoutingProfiles": [
-    {
-      "processOnDevice": true,
-      "webhookUrl": " https://bertie-archegoniate-causelessly.ngrok-free.dev/api/pos/transactionFromMpos",
-      "scopeType": "Tenant",
-      "targetValue": "",
-      "profileId": "prof_1781362986933",
-      "category": "Retail",
-      "preferredHosts": [
-        "express_pay"
-      ],
-      "fallbackHosts": []
-    }
-  ],
+  "tenantRoutingProfiles": [],
   "hosts": [
-    {
-      "hostCode": "nibss",
-      "isActive": false,
-      "ip": "196.6.103.18",
-      "port": 4018,
-      "kimonoKeys": {},
-      "kimonoFallbackParameters": {
-        "merchantId": "",
-        "uniqueId": "",
-        "institutionId": "",
-        "settlementAccount": "",
-        "keyLabel": ""
-      },
-      "nibssConfig": {
-        "institutionCode": "",
-        "terminalId": "",
-        "merchantId": "",
-        "ctmk": "66D4AF3321D8564E9F6F35411755E730",
-        "ptspCode": "GA"
-      },
-      "timeoutSeconds": 60,
-      "sslEnabled": true,
-      "hostName": "NIBSS",
-      "priority": 1,
-      "status": "ONLINE",
-      "supportedCardSchemes": [
-        "MASTERCARD",
-        "VISA"
-      ],
-      "supportedTransactionTypes": [
-        "PURCHASE"
-      ],
-      "supportedTenantCategories": [
-        "School",
-        "Retail"
-      ]
-    },
     {
       "hostCode": "express_pay",
       "isActive": true,
-      "ip": "196.6.103.18",
-      "port": 4018,
-      "kimonoKeys": {},
-      "kimonoFallbackParameters": {
-        "merchantId": "",
-        "uniqueId": "",
-        "institutionId": "",
-        "settlementAccount": "",
-        "keyLabel": ""
-      },
-      "baseUrl": " http://80.88.8.56:552/api/GetPlainMasterKey",
-      "authToken": "a222cbeadad0d46dd5ca76774034346f:e7d94f5b6a0402b200508d371c31f3295df4e5ebc14423555904b81cfc5d5922aa363c616b5fa6e8a48be129ddb0987e29b84c23ef6f5a55195d974bb37f37a0ce2d6507a254b51d4ae60672ee4c1b7c",
-      "hostName": "Express Pay",
-      "timeoutSeconds": 60,
-      "priority": 2,
-      "sslEnabled": true,
-      "supportedCardSchemes": [
-        "VISA",
-        "MASTERCARD",
-        "VERVE"
-      ],
-      "supportedTransactionTypes": [
-        "PURCHASE"
-      ],
-      "supportedTenantCategories": [
-        "School",
-        "Retail"
-      ],
-      "merchantCode": " 45FA0B59D2D5B0A7D06DD4B5C5C67D412B51330000000000000000000000000000000000000000000000000000000000",
-      "terminalGroup": " "
-    },
-    {
-      "hostCode": "medusa",
-      "isActive": false,
       "ip": "",
-      "port": 0
-    },
-    {
-      "hostCode": "kimono",
-      "isActive": false,
-      "ip": "",
-      "port": 0
+      "port": 0,
+      "authToken": "47473366cac8a043ef42d5006d5dc8ca:5a5726855ce5b16529946b168edecce77006cf9e8204a27dcdcb6656e2cd85eb28894d936563dd723548fe14d098cea88d8765e5272ba9d12ff39947919dfa3bcdfb333d9344942691f93dc086b34473"
     }
   ]
 }
