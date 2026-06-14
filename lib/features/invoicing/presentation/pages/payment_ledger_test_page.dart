@@ -74,7 +74,7 @@ class _PaymentLedgerTestPageState extends State<PaymentLedgerTestPage> {
     try {
       // Note: Use your actual server IP/URL if not running locally on emulator
       final response = await http.post(
-        Uri.parse('http://192.168.1.194:3000/api/test/mock-webhook'), 
+        Uri.parse('http://10.59.69.40:3000/api/test/mock-webhook'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'studentId': studentId,

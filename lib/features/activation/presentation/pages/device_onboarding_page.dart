@@ -133,7 +133,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       // Try local host ports (resilient fallbacks for Android/iOS emulators and localhost)
       final urls = [
         'http://localhost:3004/devices/onboard',
-        'http://192.168.1.194:3004/devices/onboard',
+        'http://10.59.69.40:3004/devices/onboard',
       ];
 
       for (var url in urls) {

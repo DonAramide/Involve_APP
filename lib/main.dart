@@ -288,7 +288,7 @@ class AppDependencies {
     // 2. License Service
     LicenseService.init(database);
     
-    final String baseUrl = 'http://192.168.1.194:3004';
+    final String baseUrl = 'http://10.59.69.40:3004';
 
     final financeRepoNew = FinanceRepository(
       FinanceApiClient(
@@ -507,7 +507,7 @@ class _InvolveAppState extends State<InvolveApp> {
 
     // Attempt to connect immediately with cached or updated details
     socketService.initializeSocket(
-      'http://192.168.1.194:3004',
+      'http://10.59.69.40:3004',
       tenantId: config?.tenantId,
       plan: config?.plan,
       type: config?.type,

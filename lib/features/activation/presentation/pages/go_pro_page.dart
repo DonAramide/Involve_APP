@@ -38,7 +38,7 @@ class _GoProPageState extends State<GoProPage> {
 
       // Try local host ports (resilient fallbacks for Android/iOS emulators and localhost)
       final urls = [
-        'http://192.168.1.194:3004/public/onboarding/provision',
+        'http://10.59.69.40:3004/public/onboarding/provision',
         'http://localhost:3004/public/onboarding/provision',
       ];
 
