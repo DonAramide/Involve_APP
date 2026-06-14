@@ -187,7 +187,7 @@ class ReceiptService {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text('EXPECTED AMOUNT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+                  pw.Text(invoice.amountPaid > 0 && invoice.amountPaid >= invoice.totalAmount ? 'PAID AMOUNT' : 'EXPECTED AMOUNT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                   pw.Text('${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', 
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
@@ -402,7 +402,7 @@ class ReceiptService {
                               _summaryRow('SALES TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%)', CurrencyFormatter.format(invoice.taxAmount)),
                             if (invoice.discountAmount > 0)
                               _summaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}'),
-                            _summaryRow('EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
+                            _summaryRow(invoice.amountPaid > 0 && invoice.amountPaid >= invoice.totalAmount ? 'PAID AMOUNT' : 'EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
                             if (invoice.balanceAmount > 0) ...[
                               _summaryRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid)),
                               _summaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), isBold: true),
@@ -1147,7 +1147,7 @@ class ReceiptService {
                     children: [
                       _academicCell(''),
                       _academicCell(''),
-                      _academicCell('EXPECTED AMOUNT', isBold: true, align: pw.Alignment.centerRight),
+                      _academicCell(invoice.amountPaid > 0 && invoice.amountPaid >= invoice.totalAmount ? 'PAID AMOUNT' : 'EXPECTED AMOUNT', isBold: true, align: pw.Alignment.centerRight),
                       _academicCell(CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount), isBold: true, align: pw.Alignment.centerRight),
                     ],
                   ),
