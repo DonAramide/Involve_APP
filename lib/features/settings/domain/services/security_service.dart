@@ -2,7 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:convert';
-import '../../../services/terminal_sync_service.dart';
+import '../../../../services/terminal_sync_service.dart';
 
 class SecurityService {
   final _storage = const FlutterSecureStorage();
