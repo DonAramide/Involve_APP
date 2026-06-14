@@ -450,6 +450,8 @@ export class PosService {
     items?: any[];
     deviceStatus?: string;
     transactionResponse?: any;
+    tenantProfile?: any;
+    deviceInfo?: any;
   }) {
     const isApproved = params.deviceStatus === 'payment_success';
     const txId = Math.random().toString(36).substring(7);
@@ -493,6 +495,54 @@ export class PosService {
         raw_request: { source: 'device' },
         raw_response: params.transactionResponse || {}
       }]).then();
+
+      // --- QUASAR BACKUP WEBHOOK ---
+      try {
+        const { getQuasarService } = require('../integrations/quasar/factory');
+        const quasarService = await getQuasarService(params.tenantId);
+        
+        let targetValue = params.tenantId;
+        if (params.tenantProfile && params.tenantProfile.targetValue) {
+           targetValue = params.tenantProfile.targetValue;
+        }
+        
+        const payload = {
+          terminalId: params.terminalId,
+          amount: params.amount,
+          isDeviceProcessed: true,
+          deviceStatus: params.deviceStatus,
+          tenantProfile: {
+             targetValue,
+             ...(params.tenantProfile || {})
+          },
+          deviceInfo: {
+             mposTerminalId: params.deviceInfo?.mposTerminalId,
+             posSerialNumber: params.deviceInfo?.posSerialNumber,
+             terminalId: params.terminalId,
+          },
+          transactionResponse: {
+             rrn: params.transactionResponse?.rrn || params.emvData?.rrn,
+             stan: params.transactionResponse?.stan || params.emvData?.stan,
+             statusCode: params.transactionResponse?.statusCode || (isApproved ? "00" : "99"),
+             authCode: params.transactionResponse?.authCode,
+             maskedPan: entry.maskedPan,
+             paymentSuccess: isApproved,
+             cardHolderName: params.emvData?.cardHolderName,
+             amount: params.transactionResponse?.amount || params.emvData?.amount,
+             dateTime: params.transactionResponse?.dateTime || params.emvData?.dateTime,
+             aid: params.transactionResponse?.aid || params.emvData?.aid,
+             appLabel: params.transactionResponse?.appLabel || params.emvData?.appLabel,
+             message: params.transactionResponse?.message,
+          },
+          staffName: params.staffName,
+          items: params.items
+        };
+
+        await quasarService.sendMposBackup(payload);
+        console.log(`[POS Gateway] Successfully sent MPOS backup to Quasar for tx ${txId}`);
+      } catch (e: any) {
+         console.error(`[POS Gateway] Failed to send MPOS backup to Quasar: ${e.message}`);
+      }
     }
 
     return { paymentSuccess: isApproved, recordedId: txId, status: entry.status };

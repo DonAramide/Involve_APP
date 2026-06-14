@@ -9,12 +9,36 @@ import { QuasarClient } from "@iips/quasar-sdk";
 export class QuasarService {
   private client: QuasarClient;
   private webhookSecret: string;
+  private apiKey: string;
 
   constructor(apiKey: string, webhookSecret: string = '') {
     // Initialize QuasarClient with tenant-specific API key
     this.client = new QuasarClient({ apiKey });
     this.webhookSecret = webhookSecret;
+    this.apiKey = apiKey;
   }
+
+  /**
+   * Sends MPOS transaction backup to Quasar for device-processed transactions.
+   */
+  async sendMposBackup(payload: any): Promise<{ id: string; reference: string; status: string; replayed: boolean }> {
+    const baseUrl = process.env.QUASAR_API_URL || 'https://api-quasar.iips.app';
+    const res = await fetch(`${baseUrl}/api/v1/pos/transactionFromMpos`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json();
+    if (!res.ok || body.responseCode !== "00") {
+      throw new Error(body.responseMessage ?? `HTTP ${res.status}`);
+    }
+    return body.data?.data || body.data;
+  }
+
 
 
   /**
