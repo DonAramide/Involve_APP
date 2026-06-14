@@ -49,8 +49,8 @@ export class LeadController {
           success: true,
           message: 'Lead converted successfully (Mock Mode)',
           data: {
-            tenant_id: `tenant-${Date.now()}`,
-            agent_tenant_id: `agent-tenant-${Date.now()}`
+            tenant_id: `tenant-${require('crypto').randomUUID()}`,
+            agent_tenant_id: `agent-tenant-${require('crypto').randomUUID()}`
           }
         });
       }

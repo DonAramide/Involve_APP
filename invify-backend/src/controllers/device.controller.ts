@@ -484,7 +484,7 @@ export class DeviceController {
           const tenants = JSON.parse(fs.readFileSync(tenantsDbPath, 'utf-8'));
           let found = tenants.find((t: any) => t.name.toLowerCase() === businessName.toLowerCase());
           if (!found) {
-            resolvedTenantId = `tenant-${Date.now()}`;
+            resolvedTenantId = `tenant-${require('crypto').randomUUID()}`;
             const newTenant = {
               id: resolvedTenantId,
               name: businessName,

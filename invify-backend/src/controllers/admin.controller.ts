@@ -327,7 +327,7 @@ export class AdminController {
         console.log('[AdminController] Creating tenant locally immediately (OFFLINE_MOCK_AUTH active).');
         const data = AdminController.getLocalData();
         const newTenant: any = {
-          id: `tenant-${Date.now()}`,
+          id: `tenant-${require('crypto').randomUUID()}`,
           name,
           type,
           plan: plan || 'standard',

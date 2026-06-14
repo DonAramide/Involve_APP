@@ -118,7 +118,7 @@ export class OnboardingController {
           ];
         }
 
-        const tenantId = `tenant-${Date.now()}`;
+        const tenantId = `tenant-${require('crypto').randomUUID()}`;
         const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
         const startingBalance = plan === 'enterprise' ? 100000 : 50000;
 
