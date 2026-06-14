@@ -40,6 +40,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   late TextEditingController _amountReceivedController;
   bool _isInitialized = false;
   TerminalConfig? _terminalConfig;
+  bool _isProcessingPos = false;
 
   @override
   void initState() {
@@ -309,7 +310,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   TextButton(onPressed: () => Navigator.pop(context), child: const Text('EDIT')),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                    onPressed: (invoiceState.isSaving || invoiceState.isGeneratingAccount || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
+                    onPressed: (invoiceState.isSaving || invoiceState.isGeneratingAccount || _isProcessingPos || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
                       try {
                         MposTransactionData? posTransactionData;
                         if (invoiceState.paymentMethod == 'POS') {
@@ -362,11 +363,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           if (confirm != true) return;
 
                           if (!mounted) return;
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (_) => const Center(child: CircularProgressIndicator()),
-                          );
+                          setState(() => _isProcessingPos = true);
                           
                           final routingRules = _terminalConfig?.routingRules ?? {};
                           final processOnDevice = routingRules['processOnDevice'] == true;
@@ -395,9 +392,6 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             }
                           }
                           if (!mounted) return;
-                          if (Navigator.canPop(context)) {
-                            Navigator.pop(context); // Close loading
-                          }
 
                           posTransactionData = result.transaction;
                           if (result.status == 'payment_success' || result.status == 'payment_failed') {
@@ -571,9 +565,6 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invoice saved!')));
                       } catch (e) {
                         if (!mounted) return;
-                        if (Navigator.canPop(context)) {
-                          Navigator.pop(context); // Close loading
-                        }
                         await showDialog(
                           context: context,
                           builder: (ctx) => AlertDialog(
@@ -582,9 +573,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
                           ),
                         );
+                      } finally {
+                        if (mounted) {
+                          setState(() => _isProcessingPos = false);
+                        }
                       }
                     },
-                    child: (invoiceState.isSaving || invoiceState.isGeneratingAccount)
+                    child: (invoiceState.isSaving || invoiceState.isGeneratingAccount || _isProcessingPos)
                       ? const Text('PROCESSING...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))
                       : Text(invoiceState.paymentMethod == 'POS' ? 'CHARGE POS & SAVE' : 'SAVE & PRINT'),
                   ),

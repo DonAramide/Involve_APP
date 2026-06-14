@@ -132,7 +132,7 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
 
                 // 3. Clear all modal overlays (Preview Dialog AND Cart Bottom Sheet)
                 // and return to the main menu (Dashboard)
-                nav.popUntil((route) => route.isFirst);
+                nav.popUntil((route) => route.isFirst || route.settings.name == '/dashboard' || route.settings.name == '/');
 
                 // 4. Show success feedback
                 messenger.showSnackBar(

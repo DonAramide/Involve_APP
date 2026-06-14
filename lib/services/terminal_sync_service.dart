@@ -192,7 +192,7 @@ class TerminalSyncService {
   // Base URL — reads from app config or defaults to localhost
   static String get _baseUrl {
     // Hardcoded URL for local network testing based on user's active session
-    return 'http://10.59.69.40:3004';
+    return 'http://192.168.1.194:3004';
   }
 
   /// Sync the terminal configuration for this device from the backend.

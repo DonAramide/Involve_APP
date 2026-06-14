@@ -4,7 +4,7 @@ import '../../../../services/terminal_sync_service.dart';
 import '../../../settings/domain/services/security_service.dart';
 
 class CloudMetricsService {
-  final String baseUrl = 'http://10.59.69.40:3004';
+  final String baseUrl = 'http://192.168.1.194:3004';
 
   Future<Map<String, String>> _getHeaders() async {
     // In a real scenario, fetch the JWT token from Supabase/Auth Service

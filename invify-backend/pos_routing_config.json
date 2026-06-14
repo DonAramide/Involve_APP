@@ -1,5 +1,5 @@
 {
-  "activeHost": "express_pay",
+  "activeHost": "nibss",
   "failoverOrder": [
     "express_pay",
     "kimono",
@@ -8,7 +8,22 @@
   ],
   "splitThresholdNaira": 50000,
   "thresholdRulesMatrix": [],
-  "tenantRoutingProfiles": [],
+  "tenantRoutingProfiles": [
+    {
+      "profileId": "prof_1781452052847",
+      "scopeType": "Tenant",
+      "targetValue": "tenant-8838236e-5664-4a28-86f7-233194437a64",
+      "category": "Retail",
+      "preferredHosts": [
+        "nibss"
+      ],
+      "fallbackHosts": [
+        "nibss"
+      ],
+      "processOnDevice": true,
+      "webhookUrl": "https://bertie-archegoniate-causelessly.ngrok-free.dev/api/pos/transactionFromMpos"
+    }
+  ],
   "hosts": [
     {
       "hostName": "Express Pay",
@@ -28,9 +43,9 @@
       "supportedTerminalTypes": [],
       "supportedTenantCategories": [],
       "supportedTransactionTypes": [],
-      "isActive": true,
+      "isActive": false,
       "baseUrl": "http://80.88.8.56:552/api/GetPlainMasterKey",
-      "authToken": "7a8369f57eed7555816a21d215af4b04:d001f3515a94f5696888e6b7b3444a857c2933ac84f5cd0f2a587fb42100af2d85d4f4fd1196650f7fe22b8dd56a725fdf457237136633802ab38487957d48b9147252b80251a5a1ad9122b7b77255a6"
+      "authToken": "40cd9f1e0e6b0850f3e6b57244eae7f0:349f36b00fcdc5b7436c8795f9687c06a95b4a9b326b06b243e73b108366bdf36758bc9680fcb8cdf0087f752ae225309cd53f9e1720f008c2c51f53b6c0493c5b0b90c4ebb93dd05d0a1c07bc5d7b7c"
     },
     {
       "hostName": "NIBSS",
@@ -50,7 +65,7 @@
       "supportedTerminalTypes": [],
       "supportedTenantCategories": [],
       "supportedTransactionTypes": [],
-      "isActive": false,
+      "isActive": true,
       "nibssConfig": {
         "institutionCode": "",
         "terminalId": "",

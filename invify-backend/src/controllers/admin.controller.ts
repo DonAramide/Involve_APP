@@ -317,17 +317,37 @@ export class AdminController {
    */
   static async createTenant(req: Request, res: Response) {
     try {
-      const { name, type, plan } = req.body;
+      const { name, type, plan, phone } = req.body;
 
       if (!name || !type) {
         return res.status(400).json({ error: "Name and Type are required" });
       }
+      if (!phone) {
+        return res.status(400).json({ error: "Phone number is required to generate Tenant ID" });
+      }
 
+      const numericPhone = phone.replace(/\D/g, '');
+      if (numericPhone.length < 10) {
+        return res.status(400).json({ error: "Phone number must have at least 10 digits" });
+      }
+      
+      const baseTenantId = numericPhone.slice(-10).split('').reverse().join('');
+      let finalTenantId = baseTenantId;
+      let attempt = 0;
+      const suffixes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+
+      // Uniqueness Collision Check
       if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        console.log('[AdminController] Creating tenant locally immediately (OFFLINE_MOCK_AUTH active).');
-        const data = AdminController.getLocalData();
+        const localData = AdminController.getLocalData();
+        while (localData.some((t: any) => t.id === finalTenantId)) {
+          if (attempt >= suffixes.length) throw new Error('Too many tenants with this phone number');
+          finalTenantId = `${baseTenantId}-${suffixes[attempt]}`;
+          attempt++;
+        }
+        
+        console.log(`[AdminController] Creating tenant locally immediately with ID ${finalTenantId}`);
         const newTenant: any = {
-          id: `tenant-${require('crypto').randomUUID()}`,
+          id: finalTenantId,
           name,
           type,
           plan: plan || 'standard',
@@ -360,14 +380,27 @@ export class AdminController {
           console.error('[AdminController] Mock VA generation failed via Quasar:', vaError.message);
         }
 
-        data.unshift(newTenant);
-        AdminController.saveLocalData(data);
+        localData.unshift(newTenant);
+        AdminController.saveLocalData(localData);
         return res.status(201).json(newTenant);
+      }
+
+      // Production / Supabase Uniqueness Check
+      while (true) {
+        const { data: existing } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('id', finalTenantId)
+          .maybeSingle();
+        if (!existing) break; // Available
+        if (attempt >= suffixes.length) throw new Error('Too many tenants with this phone number');
+        finalTenantId = `${baseTenantId}-${suffixes[attempt]}`;
+        attempt++;
       }
 
       const { data, error } = await supabase
         .from('tenants')
-        .insert({ name, type, plan: plan || 'free', status: 'active' })
+        .insert({ id: finalTenantId, name, type, plan: plan || 'free', status: 'active' })
         .select()
         .single();
 
@@ -983,15 +1016,18 @@ export class AdminController {
         error.message?.includes('timeout') ||
         error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT';
 
-      if (isConnectionTimeout || process.env.OFFLINE_MOCK_AUTH === 'true') {
-        console.warn('[AdminController] Supabase offline fallback triggered for getDashboardStats.');
-        return res.status(200).json({
-          total_revenue: 0,
-          active_students: 0,
-          pending_invoices: 0,
-          billing: { plan: 'Standard', status: 'active', quotaUsed: 0, maxQuota: 100 }
-        });
-      }
+        if (isConnectionTimeout || process.env.OFFLINE_MOCK_AUTH === 'true') {
+          console.warn('[AdminController] Supabase offline fallback triggered for getDashboardStats.');
+          return res.status(200).json({
+            total_revenue: 0,
+            active_students: 0,
+            pending_invoices: 0,
+            internal_wallet: 850000.0,
+            cash_on_hand: 250000.0,
+            pending_quasar: 120000.0,
+            billing: { plan: 'Standard', status: 'active', quotaUsed: 0, maxQuota: 100 }
+          });
+        }
       return res.status(500).json({ error: error.message });
     }
   }

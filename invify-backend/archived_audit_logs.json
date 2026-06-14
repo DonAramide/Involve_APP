@@ -1,5 +1,5 @@
 {
-  "archived_at": "2026-06-14T15:44:34.669Z",
+  "archived_at": "2026-06-14T20:21:49.246Z",
   "logs": [
     {
       "id": "audit-1780333603981-jovru",
@@ -1859,6 +1859,1518 @@
         "enrollmentKey": null
       },
       "created_at": "2026-06-11T15:40:31.190Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781193138432-ifqe6",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T15:52:18.432Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781192933462-vnznt",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T15:48:53.462Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781195449084-nbd9o",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T16:30:49.084Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781207353512-4umc4",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:49:13.542Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781206831358-xp4kj",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:40:31.358Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781206828213-qnwup",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:40:28.214Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781206702806-82em0",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:38:22.806Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781206220527-eqvx5",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:30:20.527Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781206205389-ukm2u",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:30:05.389Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781206190951-1ik6q",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:29:50.951Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781206183810-wl40g",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:29:43.810Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781206181334-3ytvc",
+      "action_type": "SYNC_SUCCESS",
+      "terminal_id": "2214OTGF",
+      "mpos_terminal_id": "mpos-1780133656325-0.3101378214529058",
+      "old_device_id": null,
+      "new_device_id": "R52M3012KRB",
+      "admin_id": "R52M3012KRB",
+      "reason": "Mobile device sync",
+      "ip_address": null,
+      "metadata": {
+        "serialNumber": "R52M3012KRB",
+        "androidId": "R52M3012KRB",
+        "enrollmentKey": null
+      },
+      "created_at": "2026-06-11T19:29:41.334Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781205268532-g9hq5",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T19:14:28.532Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781205240277-vtrns",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Modified host settings for XpressPay",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Modified host settings for XpressPay"
+      },
+      "created_at": "2026-06-11T19:14:00.278Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781205238440-siz9a",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Modified host settings for XpressPay",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Modified host settings for XpressPay"
+      },
+      "created_at": "2026-06-11T19:13:58.440Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781205204970-jhida",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Modified host settings for XpressPay",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Modified host settings for XpressPay"
+      },
+      "created_at": "2026-06-11T19:13:24.970Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781205027700-7zqw8",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T19:10:27.700Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781205024509-zw3oe",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T19:10:24.509Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781205009310-v1j2g",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated routing profile for tenant-1779640483822",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated routing profile for tenant-1779640483822"
+      },
+      "created_at": "2026-06-11T19:10:09.310Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781205007394-btu3r",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated routing profile for tenant-1779640483822",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated routing profile for tenant-1779640483822"
+      },
+      "created_at": "2026-06-11T19:10:07.394Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781204775142-4n29o",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T19:06:15.142Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781204769511-1vt59",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T19:06:09.511Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781203034957-h5o2m",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated tenant category profile for School",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated tenant category profile for School"
+      },
+      "created_at": "2026-06-11T18:37:14.957Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781203034946-oycjg",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated tenant category profile for School",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated tenant category profile for School"
+      },
+      "created_at": "2026-06-11T18:37:14.946Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781203034322-1y4mk",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated tenant category profile for School",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated tenant category profile for School"
+      },
+      "created_at": "2026-06-11T18:37:14.322Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781203032822-52lh2",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated tenant category profile for School",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated tenant category profile for School"
+      },
+      "created_at": "2026-06-11T18:37:12.822Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781203032815-hl7wy",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated tenant category profile for School",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated tenant category profile for School"
+      },
+      "created_at": "2026-06-11T18:37:12.815Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781203032809-jnttd",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated tenant category profile for School",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated tenant category profile for School"
+      },
+      "created_at": "2026-06-11T18:37:12.809Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781202335493-3bopn",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:25:35.493Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781202335187-0tfzc",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:25:35.187Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781202334693-kul7m",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:25:34.693Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781202287827-wxwa7",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:24:47.827Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781202282869-6zjg6",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:24:42.869Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781202281745-fhxb3",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:24:41.745Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201861189-5sstw",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:17:41.189Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201860725-lbjs9",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:17:40.725Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201860719-sgbx6",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:17:40.719Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201858054-uv453",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:17:38.054Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201852137-gyzhh",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:17:32.138Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201851528-ebugd",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:17:31.528Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201850082-xpco6",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:17:30.082Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201849862-ntfi7",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:17:29.862Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201786540-f0z5h",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:16:26.540Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201786479-ojkrs",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:16:26.479Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201782455-dlf82",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:16:22.455Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201718413-y0pm6",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:15:18.413Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201716631-sjbyh",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:15:16.631Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201653871-tqwz5",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:13.871Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201652693-xnmvh",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:12.693Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201652060-wz0uz",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:12.060Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201650446-39erv",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:10.446Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201646865-jkxcr",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:06.865Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201645847-nlnh6",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:05.847Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201644740-zxshi",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:04.740Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201643733-9chsz",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:03.733Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201643018-hjtin",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:03.018Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201641603-mgpko",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:01.603Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201640507-lwe61",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:14:00.507Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201638322-vflpj",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:13:58.322Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201522119-fibst",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:12:02.119Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201521678-z7ae1",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:12:01.678Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201509466-vp6kh",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:11:49.466Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201509089-23ujs",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:11:49.089Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201502728-2o1pb",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:11:42.728Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201399182-i90z4",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": "Updated tenant category profile for Retail",
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": "Updated tenant category profile for Retail"
+      },
+      "created_at": "2026-06-11T18:09:59.182Z",
+      "source_origin": "terminal_audit_log_local"
+    },
+    {
+      "id": "audit-1781201214961-7xmnb",
+      "action_type": "ROUTING_CONFIG_UPDATE",
+      "terminal_id": null,
+      "mpos_terminal_id": null,
+      "old_device_id": null,
+      "new_device_id": null,
+      "admin_id": "SuperAdmin",
+      "reason": true,
+      "ip_address": null,
+      "metadata": {
+        "changedFields": [
+          "activeHost",
+          "failoverOrder",
+          "splitThresholdNaira",
+          "thresholdRulesMatrix",
+          "tenantRoutingProfiles",
+          "hosts"
+        ],
+        "reason": true
+      },
+      "created_at": "2026-06-11T18:06:54.961Z",
       "source_origin": "terminal_audit_log_local"
     }
   ]
