@@ -5,7 +5,7 @@ import '../../settings/domain/services/security_service.dart';
 
 class SupportService {
   // Using global ngrok url for device testing
-  final String baseUrl = 'https://bertie-archegoniate-causelessly.ngrok-free.dev';
+  final String baseUrl = 'http://192.168.1.194:3004';
 
   Future<bool> submitComplaint({
     required String title,

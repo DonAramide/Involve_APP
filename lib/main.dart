@@ -288,7 +288,7 @@ class AppDependencies {
     // 2. License Service
     LicenseService.init(database);
     
-    final String baseUrl = 'https://bertie-archegoniate-causelessly.ngrok-free.dev';
+    final String baseUrl = 'http://192.168.1.194:3004';
 
     final financeRepoNew = FinanceRepository(
       FinanceApiClient(
@@ -507,7 +507,7 @@ class _InvolveAppState extends State<InvolveApp> {
 
     // Attempt to connect immediately with cached or updated details
     socketService.initializeSocket(
-      'https://bertie-archegoniate-causelessly.ngrok-free.dev',
+      'http://192.168.1.194:3004',
       tenantId: config?.tenantId,
       plan: config?.plan,
       type: config?.type,
