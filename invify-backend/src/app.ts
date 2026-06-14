@@ -340,6 +340,8 @@ app.get('/api/finance/audit/ledger', authenticate, AuditController.getTransactio
 
 // POS Operations (Medusa | Cpoint-Kimono | NIBSS)
 app.post('/api/pos/transaction', authenticate, PosController.processTransaction);
+app.post('/api/pos/transactionFromMpos', authenticate, PosController.processTransaction);
+app.post('/api/v1/pos/transactionFromMpos', authenticate, PosController.processTransaction);
 app.get('/api/pos/history', authenticate, PosController.getTransactionHistory);
 app.post('/api/pos/test-iso', authenticate, PosController.testIso);  // ISO8583 debug parser
 app.get('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.getRoutingConfig);
