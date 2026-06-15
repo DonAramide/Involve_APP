@@ -122,39 +122,8 @@ class _CreateInvoicePageState extends State<CreateInvoicePage> {
                 // 1. Reload stock (since items were sold)
                 context.read<StockBloc>().add(LoadItems());
 
-                // 2. Format name for success message
-                final name = state.customerName ?? 'Transaction';
-
-                // Grab states before popping context
-                final nav = Navigator.of(context);
-                final messenger = ScaffoldMessenger.of(context);
-                final invoiceBloc = context.read<InvoiceBloc>();
-
-                // 3. Clear all modal overlays (Preview Dialog AND Cart Bottom Sheet)
-                // and return to the main menu (Dashboard)
-                nav.popUntil((route) => route.isFirst || route.settings.name == '/dashboard' || route.settings.name == '/');
-
-                // 4. Show success feedback
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text('$name has been saved and printed successfully!'),
-                    backgroundColor: Colors.green,
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 5),
-                    action: SnackBarAction(
-                      label: 'VIEW HISTORY',
-                      textColor: Colors.white,
-                      onPressed: () {
-                        nav.push(
-                          MaterialPageRoute(builder: (_) => InvoiceHistoryPage()),
-                        );
-                      },
-                    ),
-                  ),
-                );
-
-                // 5. Reset flow for next transaction
-                invoiceBloc.add(ResetInvoice());
+                // 2. Reset flow for next transaction
+                context.read<InvoiceBloc>().add(ResetInvoice());
               }
             },
           ),

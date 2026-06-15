@@ -561,9 +561,12 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                           changeGiven: changeGiven,
                         );
 
-                        _printInvoice(context, invoice, settings!, posTx: posTransactionData, copyType: 'Customer Copy');
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invoice saved!')));
-                      } catch (e) {
+                          _printInvoice(context, invoice, settings!, posTx: posTransactionData, copyType: 'Customer Copy');
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invoice saved!')));
+                            Navigator.of(context).popUntil((route) => route.settings.name == '/dashboard' || route.isFirst);
+                          }
+                        } catch (e) {
                         if (!mounted) return;
                         await showDialog(
                           context: context,
@@ -792,9 +795,11 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         warrantyDuration: invoiceState.warrantyDuration,
                       );
 
-                      if (mounted) {
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));
-                      }
+                        if (mounted) {
+                          final nav = Navigator.of(context);
+                          nav.popUntil((route) => route.settings.name == '/dashboard' || route.isFirst);
+                          nav.push(MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));
+                        }
                       } catch (e) {
                         if (!mounted) return;
                         await showDialog(
@@ -1048,7 +1053,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         _printPosReceipt(result.transaction!, copyType: 'Customer Copy');
       }
 
-      showDialog(
+      await showDialog(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
