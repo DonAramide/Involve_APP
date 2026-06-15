@@ -182,6 +182,13 @@ class MainActivity: FlutterActivity() {
                         when (listener) {
                             is TransactionResultListener.OnCompleted -> {
                                 val txResult = listener.result
+                                
+                                // If we are processing on device, ignore the intermediate emv_data_ready event
+                                // so that we don't reply early and miss the final payment_success/failed event.
+                                if (processOnDevice && txResult.status == "emv_data_ready") {
+                                    return@initiatePayment
+                                }
+
                                 val responseMap = mutableMapOf<String, Any?>()
 
                                 responseMap["status"] = txResult.status
