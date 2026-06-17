@@ -26,7 +26,6 @@ import 'package:involve_app/core/offline/offline_webhook_service.dart';
 import 'package:involve_app/core/utils/iso_response_codes.dart';
 import 'package:dio/dio.dart';
 
-
 class InvoicePreviewDialog extends StatefulWidget {
   final InvoiceBloc invoiceBloc;
 
@@ -52,7 +51,10 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
   Future<void> _loadTerminalConfig() async {
     final config = await TerminalSyncService.loadCachedConfig();
-    if (mounted) setState(() { _terminalConfig = config; });
+    if (mounted)
+      setState(() {
+        _terminalConfig = config;
+      });
   }
 
   void _onAmountChanged() {
@@ -82,7 +84,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   if (invoiceState.paymentMethod == 'Deferred') {
                     _amountReceivedController.text = '0.00';
                   } else if (invoiceState.paymentMethod != null) {
-                    _amountReceivedController.text = CurrencyFormatter.format(invoiceState.total);
+                    _amountReceivedController.text =
+                        CurrencyFormatter.format(invoiceState.total);
                   }
                 });
                 _isInitialized = true;
@@ -99,19 +102,25 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         Center(
                           child: Text(
                             settings?.organizationName ?? 'BAR & HOTEL NAME',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 18),
                           ),
                         ),
-                        if (settings?.businessDescription != null && settings!.businessDescription!.isNotEmpty)
+                        if (settings?.businessDescription != null &&
+                            settings!.businessDescription!.isNotEmpty)
                           Center(
                             child: Text(
                               settings.businessDescription!,
-                              style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                              style: const TextStyle(
+                                  fontSize: 12, fontStyle: FontStyle.italic),
                               textAlign: TextAlign.center,
                             ),
                           ),
-                        Center(child: Text(settings?.address ?? 'Address Line 1, City')),
-                        Center(child: Text('Phone: ${settings?.phone ?? 'N/A'}')),
+                        Center(
+                            child: Text(
+                                settings?.address ?? 'Address Line 1, City')),
+                        Center(
+                            child: Text('Phone: ${settings?.phone ?? 'N/A'}')),
                         const Divider(),
                         Center(
                           child: Text(
@@ -129,7 +138,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                         ...invoiceState.items.map((item) => Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text('${item.quantity}x ${item.item.name}'),
                                   Text(
@@ -142,51 +152,76 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                               ),
                             )),
                         const Divider(),
-                        _row('Subtotal', invoiceState.subtotal, settings?.currency ?? '₦'),
-                        _row('Tax (${(invoiceState.taxRate * 100).toStringAsFixed(0)}%)', invoiceState.tax, settings?.currency ?? '₦'),
+                        _row('Subtotal', invoiceState.subtotal,
+                            settings?.currency ?? '₦'),
+                        _row(
+                            'Tax (${(invoiceState.taxRate * 100).toStringAsFixed(0)}%)',
+                            invoiceState.tax,
+                            settings?.currency ?? '₦'),
                         if (invoiceState.discount > 0) ...[
                           _row(
-                            invoiceState.discountType == DiscountType.percentage 
-                              ? 'Discount (${invoiceState.discount % 1 == 0 ? invoiceState.discount.toInt() : invoiceState.discount}%)' 
-                              : 'Discount', 
-                            -widget.invoiceBloc.calculationService.calculateDiscountAmount(
-                              invoiceState.subtotal, 
-                              invoiceState.tax, 
-                              invoiceState.discount, 
-                              invoiceState.discountType,
-                            ), 
-                            settings?.currency ?? '₦'
-                          ),
+                              invoiceState.discountType ==
+                                      DiscountType.percentage
+                                  ? 'Discount (${invoiceState.discount % 1 == 0 ? invoiceState.discount.toInt() : invoiceState.discount}%)'
+                                  : 'Discount',
+                              -widget.invoiceBloc.calculationService
+                                  .calculateDiscountAmount(
+                                invoiceState.subtotal,
+                                invoiceState.tax,
+                                invoiceState.discount,
+                                invoiceState.discountType,
+                              ),
+                              settings?.currency ?? '₦'),
                         ],
                         const Divider(),
-                        _row('Total', invoiceState.total, settings?.currency ?? '₦', isBold: true),
+                        _row('Total', invoiceState.total,
+                            settings?.currency ?? '₦',
+                            isBold: true),
                         if (invoiceState.warrantyDuration != null) ...[
                           const SizedBox(height: 4),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Warranty:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              Text(invoiceState.warrantyDuration!, style: const TextStyle(fontSize: 12)),
+                              const Text('Warranty:',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold)),
+                              Text(invoiceState.warrantyDuration!,
+                                  style: const TextStyle(fontSize: 12)),
                             ],
                           ),
                         ],
-                        
                         Builder(
                           builder: (context) {
-                            final amountReceived = double.tryParse(_amountReceivedController.text) ?? 0.0;
-                            final balanceAmount = (invoiceState.total - amountReceived).clamp(0.0, double.infinity);
+                            final amountReceived = double.tryParse(
+                                    _amountReceivedController.text) ??
+                                0.0;
+                            final balanceAmount =
+                                (invoiceState.total - amountReceived)
+                                    .clamp(0.0, double.infinity);
                             final isFullPayment = balanceAmount <= 0;
-                            final showAccount = (settings?.showAccountDetails == true || invoiceState.paymentMethod == 'Transfer' || invoiceState.paymentMethod == 'VirtualAccount') && !isFullPayment;
-                            
+                            final showAccount = (settings?.showAccountDetails ==
+                                        true ||
+                                    invoiceState.paymentMethod == 'Transfer' ||
+                                    invoiceState.paymentMethod ==
+                                        'VirtualAccount') &&
+                                !isFullPayment;
+
                             if (showAccount) {
-                              if (invoiceState.paymentMethod == 'VirtualAccount') {
-                                final staffList = context.watch<StaffBloc>().state.staffList;
+                              if (invoiceState.paymentMethod ==
+                                  'VirtualAccount') {
+                                final staffList =
+                                    context.watch<StaffBloc>().state.staffList;
                                 Staff? currentStaff;
                                 if (invoiceState.staffId != null) {
-                                  currentStaff = staffList.where((s) => s.id == invoiceState.staffId).firstOrNull;
+                                  currentStaff = staffList
+                                      .where(
+                                          (s) => s.id == invoiceState.staffId)
+                                      .firstOrNull;
                                 }
-                                
-                                if (currentStaff?.virtualBankName != null && currentStaff!.virtualBankName!.isNotEmpty) {
+
+                                if (currentStaff?.virtualBankName != null &&
+                                    currentStaff!.virtualBankName!.isNotEmpty) {
                                   return Column(
                                     children: [
                                       const SizedBox(height: 12),
@@ -194,13 +229,27 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                       const Center(
                                         child: Text(
                                           'PAYMENT DETAILS',
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 10),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Center(child: Text('Bank: ${currentStaff.virtualBankName}', style: const TextStyle(fontSize: 12))),
-                                      Center(child: Text('Account: ${currentStaff.virtualAccountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
-                                      Center(child: Text('Name: ${currentStaff.virtualAccountName ?? ""}', style: const TextStyle(fontSize: 12))),
+                                      Center(
+                                          child: Text(
+                                              'Bank: ${currentStaff.virtualBankName}',
+                                              style: const TextStyle(
+                                                  fontSize: 12))),
+                                      Center(
+                                          child: Text(
+                                              'Account: ${currentStaff.virtualAccountNumber ?? ""}',
+                                              style: const TextStyle(
+                                                  fontSize: 12))),
+                                      Center(
+                                          child: Text(
+                                              'Name: ${currentStaff.virtualAccountName ?? ""}',
+                                              style: const TextStyle(
+                                                  fontSize: 12))),
                                     ],
                                   );
                                 } else {
@@ -211,11 +260,18 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                       const Center(
                                         child: Text(
                                           'PAYMENT DETAILS',
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 10),
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      const Center(child: Text('Contact admin for account profiling', style: TextStyle(fontSize: 12, color: Colors.red))),
+                                      const Center(
+                                          child: Text(
+                                              'Contact admin for account profiling',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.red))),
                                     ],
                                   );
                                 }
@@ -227,13 +283,27 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                                     const Center(
                                       child: Text(
                                         'PAYMENT DETAILS',
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 10),
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    Center(child: Text('Bank: ${settings!.bankName}', style: const TextStyle(fontSize: 12))),
-                                    Center(child: Text('Account: ${settings.accountNumber ?? ""}', style: const TextStyle(fontSize: 12))),
-                                    Center(child: Text('Name: ${settings.accountName ?? ""}', style: const TextStyle(fontSize: 12))),
+                                    Center(
+                                        child: Text(
+                                            'Bank: ${settings!.bankName}',
+                                            style:
+                                                const TextStyle(fontSize: 12))),
+                                    Center(
+                                        child: Text(
+                                            'Account: ${settings.accountNumber ?? ""}',
+                                            style:
+                                                const TextStyle(fontSize: 12))),
+                                    Center(
+                                        child: Text(
+                                            'Name: ${settings.accountName ?? ""}',
+                                            style:
+                                                const TextStyle(fontSize: 12))),
                                   ],
                                 );
                               }
@@ -241,19 +311,24 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             return const SizedBox.shrink();
                           },
                         ),
-
                         if (settings?.paymentMethodsEnabled == true) ...[
                           const Divider(),
-                          const Text('Select Payment Method:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          const Text('Select Payment Method:',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 14)),
                           const SizedBox(height: 4),
                           _buildPaymentMethodSelector(context, invoiceState),
                           if (invoiceState.paymentMethod != null) ...[
                             const SizedBox(height: 12),
-                            const Text('Amount Received:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            const Text('Amount Received:',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 14)),
                             const SizedBox(height: 8),
                             TextField(
                               controller: _amountReceivedController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                      decimal: true),
                               decoration: InputDecoration(
                                 prefixText: '${settings?.currency ?? '₦'} ',
                                 border: const OutlineInputBorder(),
@@ -262,22 +337,39 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             ),
                             Builder(
                               builder: (context) {
-                                final amountReceivedText = double.tryParse(_amountReceivedController.text) ?? 0.0;
-                                final changeDue = (amountReceivedText - invoiceState.total).clamp(0.0, double.infinity);
-                                
+                                final amountReceivedText = double.tryParse(
+                                        _amountReceivedController.text) ??
+                                    0.0;
+                                final changeDue =
+                                    (amountReceivedText - invoiceState.total)
+                                        .clamp(0.0, double.infinity);
+
                                 if (changeDue > 0) {
                                   // Only show change due if it's cash OR if give change is allowed for electronic payments
-                                  final isElectronic = invoiceState.paymentMethod == 'POS' || invoiceState.paymentMethod == 'Transfer';
-                                  if (!isElectronic || settings?.allowGiveChange == true) {
+                                  final isElectronic =
+                                      invoiceState.paymentMethod == 'POS' ||
+                                          invoiceState.paymentMethod ==
+                                              'Transfer';
+                                  if (!isElectronic ||
+                                      settings?.allowGiveChange == true) {
                                     return Padding(
                                       padding: const EdgeInsets.only(top: 8.0),
                                       child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Text('Change Due:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green)),
+                                          const Text('Change Due:',
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.green)),
                                           Text(
-                                            CurrencyFormatter.formatWithSymbol(changeDue, symbol: settings?.currency ?? '₦'),
-                                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                                            CurrencyFormatter.formatWithSymbol(
+                                                changeDue,
+                                                symbol:
+                                                    settings?.currency ?? '₦'),
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.green),
                                           ),
                                         ],
                                       ),
@@ -289,10 +381,11 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             ),
                           ],
                         ],
-                        
                         if (settings?.showSignatureSpace == true) ...[
                           const SizedBox(height: 8),
-                          const Center(child: Text('Signature: ____________________', style: TextStyle(fontSize: 12))),
+                          const Center(
+                              child: Text('Signature: ____________________',
+                                  style: TextStyle(fontSize: 12))),
                         ],
                         const SizedBox(height: 12),
                         Center(
@@ -301,518 +394,57 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const Center(child: Text('Powered by Invify.iips.app', style: TextStyle(fontSize: 10, color: Colors.grey))),
+                        const Center(
+                            child: Text('Powered by Invify.iips.app',
+                                style: TextStyle(
+                                    fontSize: 10, color: Colors.grey))),
                       ],
                     ),
                   ),
                 ),
                 actions: [
-                  TextButton(onPressed: () => Navigator.pop(context), child: const Text('EDIT')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('EDIT')),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                    onPressed: (invoiceState.isSaving || invoiceState.isGeneratingAccount || _isProcessingPos || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
-                      try {
-                        MposTransactionData? posTransactionData;
-                        if (invoiceState.paymentMethod == 'POS') {
-                          if (!mounted) return;
-                          if (_terminalConfig == null || _terminalConfig!.posSerialNumber == null || _terminalConfig!.posSerialNumber!.isEmpty) {
-                            await showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('POS Not Configured'),
-                                content: const Text('This POS device is not authorized or provisioned in Invify Operations.'),
-                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                              ),
-                            );
-                            return;
-                          }
-                          final terminalId = _terminalConfig!.terminalId ?? _terminalConfig!.mposTerminalId ?? '2214OTGF';
-
-                          // Network Check
-                          final connectivityResult = await Connectivity().checkConnectivity();
-                          if (!mounted) return;
-                          if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
-                            await showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('No Internet'),
-                                content: const Text('POS requires an active network connection.'),
-                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                              ),
-                            );
-                            return;
-                          }
-
-                          final amountReceivedText = double.tryParse(_amountReceivedController.text) ?? 0.0;
-                          final amountToCharge = (settings?.allowGiveChange == true && amountReceivedText > invoiceState.total) 
-                              ? amountReceivedText 
-                              : invoiceState.total;
-                          
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Confirm POS Payment'),
-                              content: Text('Charge ${CurrencyFormatter.formatWithSymbol(amountToCharge, symbol: settings?.currency ?? '₦')} to POS terminal?'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
-                                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('CHARGE')),
-                              ],
-                            ),
-                          );
-                          
-                          if (confirm != true) return;
-
-                          if (!mounted) return;
-                          setState(() => _isProcessingPos = true);
-                          
-                          final routingRules = _terminalConfig?.routingRules ?? {};
-                          final processOnDevice = routingRules['processOnDevice'] == true;
-                          final webhookUrl = routingRules['webhookUrl'] as String?;
-
-                          final activeHost = _terminalConfig?.activeHost ?? 'MEDUSA';
-                          var result = await MposService().initiatePayment(
-                            amount: amountToCharge,
-                            terminalId: terminalId,
-                            activeHost: activeHost,
-                            processOnDevice: processOnDevice,
-                          );
-
-                          // Fallback to secondary host if transaction fails
-                          if (result.status != 'payment_success' && _terminalConfig?.secondaryHost != null) {
-                            final secondaryHostName = _terminalConfig!.secondaryHost!['hostName'] as String?;
-                            if (secondaryHostName != null && secondaryHostName != activeHost) {
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Primary host failed. Falling back to secondary host: $secondaryHostName...')));
-                              result = await MposService().initiatePayment(
-                                amount: amountToCharge,
-                                terminalId: terminalId,
-                                activeHost: secondaryHostName,
-                                processOnDevice: processOnDevice,
-                              );
-                            }
-                          }
-                          if (!mounted) return;
-
-                          posTransactionData = result.transaction;
-                          if (result.status == 'payment_success' || result.status == 'payment_failed') {
-                            final shouldPrint = !(settings?.mergePosReceipt ?? false);
-                            final proceed = await _processWebhookAndSuccess(context, webhookUrl ?? '', result, {
-                                'terminalId': terminalId,
-                                'amount': amountToCharge,
-                                'isDeviceProcessed': true,
-                                'deviceStatus': result.status,
-                                'tenantProfile': _terminalConfig?.tenantPolicy,
-                                'deviceInfo': {
-                                  'terminalId': _terminalConfig?.terminalId,
-                                  'mposTerminalId': _terminalConfig?.mposTerminalId,
-                                  'posSerialNumber': _terminalConfig?.posSerialNumber,
-                                },
-                                'emvData': result.emvData?.toJson(),
-                                'transactionResponse': result.transaction?.toJson(),
-                                'staffName': invoiceState.staffName,
-                                'items': invoiceState.items.map((i) => {
-                                  'name': i.item.name,
-                                  'quantity': i.quantity,
-                                  'price': i.item.price,
-                                }).toList(),
-                            }, shouldPrint: shouldPrint);
-                            
-                            if (result.status == 'payment_failed') {
-                              if (!proceed) return;
-                              // Force the amount to 0 so the invoice saves as Unpaid
-                              _amountReceivedController.text = '0';
-                            }
-                          } else if (result.status == 'emv_data_ready' && result.emvData != null) {
-                            final financeRepo = context.read<FinanceRepository>();
-                            final backendResponse = await financeRepo.apiClient.post(
-                              '/api/pos/transaction',
-                              data: {
-                                'terminalId': terminalId,
-                                'amount': amountToCharge,
-                                'emvData': result.emvData!.toJson(),
-                                'staffName': invoiceState.staffName,
-                                'items': invoiceState.items.map((i) => {
-                                  'name': i.item.name,
-                                  'quantity': i.quantity,
-                                  'price': i.item.price,
-                                }).toList(),
-                              },
-                            );
-                            if (!mounted) return;
-                            if (backendResponse.statusCode != 200 || backendResponse.data['paymentSuccess'] != true) {
-                              final code = backendResponse.data['statusCode'] ?? 'Unknown';
-                              await showDialog(
-                                context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: const Text('POS Declined'),
-                                  content: Text('Transaction declined by host (Code: $code).'),
-                                  actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                                ),
-                              );
-                              return;
-                            }
-                          } else if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
-                            String errorMessage = result.error?.message ?? result.transaction?.message ?? 'Unknown Error';
-                            if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
-                              final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);
-                              errorMessage = 'Code ${result.transaction!.statusCode}: $codeMsg';
-                            }
-                            if (!mounted) return;
-                            await showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('POS Payment Failed'),
-                                content: Text(errorMessage),
-                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                              ),
-                            );
-                            return;
-                          }
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('POS Payment Approved!'), backgroundColor: Colors.green),
-                          );
-                        }
-
-                        final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
-
-                        // Safety check for significant overpayment
-                        if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
-                          final proceed = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Confirm Overpayment'),
-                              content: const Text('The amount received is significantly higher than the total. Proceed?'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('NO, CORRECT IT')),
-                                ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('YES, PROCEED')),
-                              ],
-                            ),
-                          );
-                          if (proceed != true) return;
-                        }
-                        
-                        double changeGiven = 0.0;
-                        double finalAmountPaid = amountReceived;
-                        if (amountReceived > invoiceState.total) {
-                          if (settings?.allowGiveChange == true && (invoiceState.paymentMethod == 'POS' || invoiceState.paymentMethod == 'Transfer')) {
-                            changeGiven = amountReceived - invoiceState.total;
-                          } else {
-                            // For Cash, or if give change is disabled, we cap the recorded paid amount to total.
-                            finalAmountPaid = invoiceState.total;
-                          }
-                        }
-
-                        final invoiceNumber = widget.invoiceBloc.calculationService.generateInvoiceNumber();
-                        widget.invoiceBloc.add(SaveInvoice(
-                          invoiceNumber: invoiceNumber,
-                          amountPaid: finalAmountPaid,
-                          changeGiven: changeGiven,
-                        ));
-
-                        await Future.delayed(const Duration(milliseconds: 300));
-
-                        // Create invoice object for printing
-                        final status = amountReceived >= invoiceState.total
-                            ? 'Paid'
-                            : (amountReceived <= 0 ? 'Unpaid' : 'Partial');
-                        final invoice = Invoice(
-                          id: 0,
-                          invoiceNumber: invoiceNumber,
-                          dateCreated: DateTime.now(),
-                          items: List.from(invoiceState.items),
-                          subtotal: invoiceState.subtotal,
-                          taxAmount: invoiceState.tax,
-                          discountAmount: widget.invoiceBloc.calculationService.calculateDiscountAmount(
-                            invoiceState.subtotal,
-                            invoiceState.tax,
-                            invoiceState.discount,
-                            invoiceState.discountType,
-                          ),
-                          discountType: invoiceState.discountType,
-                          totalAmount: invoiceState.total,
-                          paymentStatus: status,
-                          amountPaid: finalAmountPaid,
-                          balanceAmount: (invoiceState.total - finalAmountPaid).clamp(0, double.infinity),
-                          customerName: invoiceState.customerName,
-                          customerPhone: invoiceState.customerPhone,
-                          customerAddress: invoiceState.customerAddress,
-                          paymentMethod: invoiceState.paymentMethod,
-                          staffId: invoiceState.staffId,
-                          staffName: invoiceState.staffName,
-                          totalPrintAmount: widget.invoiceBloc.calculationService.calculateTotalPrintAmount(
-                            invoiceState.items,
-                            invoiceState.taxRate,
-                            invoiceState.taxEnabled,
-                            invoiceState.discount,
-                            invoiceState.discountType,
-                          ),
-                          businessMode: invoiceState.businessMode,
-                          studentId: invoiceState.studentId,
-                          classId: invoiceState.classId,
-                          termId: invoiceState.termId,
-                          academicYearId: invoiceState.academicYearId,
-                          admissionNumber: invoiceState.admissionNumber,
-                          className: invoiceState.className,
-                          termName: invoiceState.termName,
-                          academicYearName: invoiceState.academicYearName,
-                          studentImage: invoiceState.studentImage,
-                          warrantyDuration: invoiceState.warrantyDuration,
-                          changeGiven: changeGiven,
-                        );
-
-                          _printInvoice(context, invoice, settings!, posTx: posTransactionData, copyType: 'Customer Copy');
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invoice saved!')));
-                            Navigator.of(context).popUntil((route) => route.settings.name == '/dashboard' || route.isFirst);
-                          }
-                        } catch (e) {
-                        if (!mounted) return;
-                        await showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Error'),
-                            content: Text(e.toString()),
-                            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                          ),
-                        );
-                      } finally {
-                        if (mounted) {
-                          setState(() => _isProcessingPos = false);
-                        }
-                      }
-                    },
-                    child: (invoiceState.isSaving || invoiceState.isGeneratingAccount || _isProcessingPos)
-                      ? const Text('PROCESSING...', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white))
-                      : Text(invoiceState.paymentMethod == 'POS' ? 'CHARGE POS & SAVE' : 'SAVE & PRINT'),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white),
+                    onPressed: (invoiceState.isSaving ||
+                            invoiceState.isGeneratingAccount ||
+                            _isProcessingPos ||
+                            (settings?.paymentMethodsEnabled == true &&
+                                invoiceState.paymentMethod == null))
+                        ? null
+                        : () {
+                            _handleCheckout(context, invoiceState, settings,
+                                printReceipt: true);
+                          },
+                    child: (invoiceState.isSaving ||
+                            invoiceState.isGeneratingAccount ||
+                            _isProcessingPos)
+                        ? const Text('PROCESSING...',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white))
+                        : Text(invoiceState.paymentMethod == 'POS'
+                            ? 'CHARGE POS & PRINT'
+                            : 'SAVE & PRINT'),
                   ),
                   ElevatedButton(
-                    onPressed: (invoiceState.isSaving || (settings?.paymentMethodsEnabled == true && invoiceState.paymentMethod == null)) ? null : () async {
-                      try {
-                      MposTransactionData? posTransactionData;
-                      final amountReceived = CurrencyFormatter.parse(_amountReceivedController.text);
-
-                      if (invoiceState.paymentMethod == 'POS') {
-                        if (!mounted) return;
-                        if (_terminalConfig == null || _terminalConfig!.posSerialNumber == null || _terminalConfig!.posSerialNumber!.isEmpty) {
-                          await showDialog(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('POS Not Configured'),
-                              content: const Text('This POS device is not authorized or provisioned in Invify Operations.'),
-                              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                            ),
-                          );
-                          return;
-                        }
-                        final terminalId = _terminalConfig!.terminalId ?? _terminalConfig!.mposTerminalId ?? '2214OTGF';
-
-                        final connectivityResult = await Connectivity().checkConnectivity();
-                        if (!mounted) return;
-                        if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
-                          await showDialog(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('No Internet'),
-                              content: const Text('POS requires an active network connection.'),
-                              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                            ),
-                          );
-                          return;
-                        }
-
-                        final amountToCharge = invoiceState.total;
-                        final confirm = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Confirm POS Payment'),
-                            content: Text('Charge ${CurrencyFormatter.formatWithSymbol(amountToCharge, symbol: settings?.currency ?? '₦')} to POS terminal?'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCEL')),
-                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('CHARGE')),
-                            ],
-                          ),
-                        );
-                        if (confirm != true) return;
-
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending to POS terminal…')));
-
-                        final routingRules = _terminalConfig?.routingRules ?? {};
-                        final processOnDevice = routingRules['processOnDevice'] == true;
-                        final webhookUrl = routingRules['webhookUrl'] as String?;
-
-                        final activeHost = _terminalConfig?.activeHost ?? 'MEDUSA';
-                        var result = await MposService().initiatePayment(
-                          amount: amountToCharge,
-                          terminalId: terminalId,
-                          activeHost: activeHost,
-                          processOnDevice: processOnDevice,
-                        );
-
-                        // Fallback to secondary host if transaction fails
-                        if (result.status != 'payment_success' && _terminalConfig?.secondaryHost != null) {
-                          final secondaryHostName = _terminalConfig!.secondaryHost!['hostName'] as String?;
-                          if (secondaryHostName != null && secondaryHostName != activeHost) {
-                            if (!mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Primary host failed. Falling back to secondary host: $secondaryHostName...')));
-                            result = await MposService().initiatePayment(
-                              amount: amountToCharge,
-                              terminalId: terminalId,
-                              activeHost: secondaryHostName,
-                              processOnDevice: processOnDevice,
-                            );
-                          }
-                        }
-                        if (!mounted) return;
-
-                        posTransactionData = result.transaction;
-                        if (result.status == 'payment_success' || result.status == 'payment_failed') {
-                          final shouldPrint = !(settings?.mergePosReceipt ?? false);
-                          await _processWebhookAndSuccess(context, webhookUrl ?? '', result, {
-                              'terminalId': terminalId,
-                              'amount': amountToCharge,
-                              'isDeviceProcessed': true,
-                              'deviceStatus': result.status,
-                              'tenantProfile': _terminalConfig?.tenantPolicy,
-                              'deviceInfo': {
-                                'terminalId': _terminalConfig?.terminalId,
-                                'mposTerminalId': _terminalConfig?.mposTerminalId,
-                                'posSerialNumber': _terminalConfig?.posSerialNumber,
-                              },
-                              'emvData': result.emvData?.toJson(),
-                              'transactionResponse': result.transaction?.toJson(),
-                          }, shouldPrint: shouldPrint);
-                        } else if (result.status == 'emv_data_ready' && result.emvData != null) {
-                          final financeRepo = context.read<FinanceRepository>();
-                          final backendResponse = await financeRepo.apiClient.post(
-                            '/api/pos/transaction',
-                            data: {'terminalId': terminalId, 'amount': amountToCharge, 'emvData': result.emvData!.toJson()},
-                          );
-                          if (!mounted) return;
-                          if (backendResponse.statusCode != 200 || backendResponse.data['paymentSuccess'] != true) {
-                            final code = backendResponse.data['statusCode'] ?? 'Unknown';
-                            await showDialog(
-                              context: context,
-                              builder: (ctx) => AlertDialog(
-                                title: const Text('POS Declined'),
-                                content: Text('Transaction declined (Code: $code).'),
-                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                              ),
-                            );
-                            return;
-                          }
-                        } else if (result.status == 'error' || result.transaction?.paymentSuccess != true) {
-                          String errorMessage = result.error?.message ?? result.transaction?.message ?? 'Unknown Error';
-                          if (result.transaction?.statusCode != null && result.transaction!.statusCode!.isNotEmpty) {
-                            final codeMsg = NibssResponseCodes.getMessage(result.transaction!.statusCode);
-                            errorMessage = 'Code ${result.transaction!.statusCode}: $codeMsg';
-                          }
-                          if (!mounted) return;
-                          await showDialog(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('POS Payment Failed'),
-                              content: Text(errorMessage),
-                              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                            ),
-                          );
-                          return;
-                        }
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('POS Payment Approved!'), backgroundColor: Colors.green),
-                        );
-                      }
-
-                      // Safety check for significant overpayment
-                      if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
-                        final proceed = await showDialog<bool>(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Confirm Overpayment'),
-                            content: Text('The amount received ($amountReceived) is significantly higher than the total (${invoiceState.total}). Are you sure you want to proceed?'),
-                            actions: [
-                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('NO, CORRECT IT')),
-                              ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('YES, PROCEED')),
-                            ],
-                          ),
-                        );
-                        if (proceed != true) return;
-                      }
-
-                      final invoiceNumber = widget.invoiceBloc.calculationService.generateInvoiceNumber();
-                      
-                      widget.invoiceBloc.add(SaveInvoice(
-                        invoiceNumber: invoiceNumber,
-                        amountPaid: amountReceived,
-                      ));
-                      
-                      await Future.delayed(const Duration(milliseconds: 500));
-                      
-                      final status = amountReceived >= invoiceState.total ? 'Paid' : (amountReceived <= 0 ? 'Unpaid' : 'Partial');
-                      final savedInvoice = Invoice(
-                        id: 0,
-                        invoiceNumber: invoiceNumber,
-                        dateCreated: DateTime.now(),
-                        items: List.from(invoiceState.items),
-                        subtotal: invoiceState.subtotal,
-                        taxAmount: invoiceState.tax,
-                        discountAmount: widget.invoiceBloc.calculationService.calculateDiscountAmount(
-                          invoiceState.subtotal, 
-                          invoiceState.tax, 
-                          invoiceState.discount, 
-                          invoiceState.discountType,
-                        ),
-                        discountType: invoiceState.discountType,
-                        totalAmount: invoiceState.total,
-                        paymentStatus: status,
-                        amountPaid: amountReceived,
-                        balanceAmount: (invoiceState.total - amountReceived).clamp(0, double.infinity),
-                        customerName: invoiceState.customerName,
-                        customerPhone: invoiceState.customerPhone,
-                        customerAddress: invoiceState.customerAddress,
-                        paymentMethod: invoiceState.paymentMethod,
-                        staffId: invoiceState.staffId,
-                        staffName: invoiceState.staffName,
-                        totalPrintAmount: widget.invoiceBloc.calculationService.calculateTotalPrintAmount(
-                          invoiceState.items, 
-                          invoiceState.taxRate, 
-                          invoiceState.taxEnabled, 
-                          invoiceState.discount,
-                          invoiceState.discountType,
-                        ),
-                        businessMode: invoiceState.businessMode,
-                        studentId: invoiceState.studentId,
-                        classId: invoiceState.classId,
-                        termId: invoiceState.termId,
-                        academicYearId: invoiceState.academicYearId,
-                        admissionNumber: invoiceState.admissionNumber,
-                        className: invoiceState.className,
-                        termName: invoiceState.termName,
-                        academicYearName: invoiceState.academicYearName,
-                        studentImage: invoiceState.studentImage,
-                        warrantyDuration: invoiceState.warrantyDuration,
-                      );
-
-                        if (mounted) {
-                          final nav = Navigator.of(context);
-                          nav.popUntil((route) => route.settings.name == '/dashboard' || route.isFirst);
-                          nav.push(MaterialPageRoute(builder: (_) => ReceiptPreviewPage(invoice: savedInvoice)));
-                        }
-                      } catch (e) {
-                        if (!mounted) return;
-                        await showDialog(
-                          context: context,
-                          builder: (ctx) => AlertDialog(
-                            title: const Text('Error'),
-                            content: Text(e.toString()),
-                            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-                          ),
-                        );
-                      }
-                    },
-                    child: invoiceState.isSaving ? const Text('SAVING...') : Text(invoiceState.paymentMethod == 'POS' ? 'CHARGE POS & PREVIEW' : 'SAVE & PREVIEW'),
+                    onPressed: (invoiceState.isSaving ||
+                            (settings?.paymentMethodsEnabled == true &&
+                                invoiceState.paymentMethod == null))
+                        ? null
+                        : () {
+                            _handleCheckout(context, invoiceState, settings,
+                                printReceipt: false);
+                          },
+                    child: invoiceState.isSaving
+                        ? const Text('SAVING...')
+                        : Text(invoiceState.paymentMethod == 'POS'
+                            ? 'CHARGE POS & PREVIEW'
+                            : 'SAVE & PREVIEW'),
                   ),
                 ],
               );
@@ -823,25 +455,404 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     );
   }
 
-  void _printInvoice(BuildContext context, Invoice invoice, AppSettings settings, {MposTransactionData? posTx, String? copyType}) {
+  Future<void> _handleCheckout(
+      BuildContext context, InvoiceState invoiceState, AppSettings? settings,
+      {required bool printReceipt}) async {
+    try {
+      MposTransactionData? posTransactionData;
+      final amountReceivedText =
+          double.tryParse(_amountReceivedController.text) ?? 0.0;
+      final amountToCharge = (settings?.allowGiveChange == true &&
+              amountReceivedText > invoiceState.total)
+          ? amountReceivedText
+          : invoiceState.total;
+
+      if (invoiceState.paymentMethod == 'POS') {
+        if (!mounted) return;
+        if (_terminalConfig == null ||
+            _terminalConfig!.posSerialNumber == null ||
+            _terminalConfig!.posSerialNumber!.isEmpty) {
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('POS Not Configured'),
+              content: const Text(
+                  'This POS device is not authorized or provisioned in Invify Operations.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'))
+              ],
+            ),
+          );
+          return;
+        }
+        final terminalId = _terminalConfig!.terminalId ??
+            _terminalConfig!.mposTerminalId ??
+            '2214OTGF';
+
+        final connectivityResult = await Connectivity().checkConnectivity();
+        if (!mounted) return;
+        if (connectivityResult.contains(ConnectivityResult.none) ||
+            connectivityResult.isEmpty) {
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('No Internet'),
+              content: const Text('POS requires an active network connection.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'))
+              ],
+            ),
+          );
+          return;
+        }
+
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Confirm POS Payment'),
+            content: Text('Charge \ to POS terminal?'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('CANCEL')),
+              ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('CHARGE')),
+            ],
+          ),
+        );
+        if (confirm != true) return;
+
+        if (!mounted) return;
+        setState(() => _isProcessingPos = true);
+
+        final routingRules = _terminalConfig?.routingRules ?? {};
+        final processOnDevice = routingRules['processOnDevice'] == true;
+        final webhookUrl = routingRules['webhookUrl'] as String?;
+
+        final activeHost = _terminalConfig?.activeHost ?? 'MEDUSA';
+        var result = await MposService().initiatePayment(
+          amount: amountToCharge,
+          terminalId: terminalId,
+          activeHost: activeHost,
+          processOnDevice: processOnDevice,
+        );
+
+        if (result.status != 'payment_success' &&
+            _terminalConfig?.secondaryHost != null) {
+          final secondaryHostName =
+              _terminalConfig!.secondaryHost!['hostName'] as String?;
+          if (secondaryHostName != null && secondaryHostName != activeHost) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(
+                    'Primary host failed. Falling back to secondary host: \...')));
+            result = await MposService().initiatePayment(
+              amount: amountToCharge,
+              terminalId: terminalId,
+              activeHost: secondaryHostName,
+              processOnDevice: processOnDevice,
+            );
+          }
+        }
+        if (!mounted) return;
+
+        posTransactionData = result.transaction;
+
+        if (result.status == 'payment_failed') {
+          final msg = result.transaction?.message ?? 'Unknown Error';
+          final formattedMsg = getIsoResponseMessage(msg);
+          bool proceed = false;
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('POS Declined'),
+              content: Text(
+                  'Transaction declined by MPOS (\).\n\nDo you want to proceed by generating the invoice anyway?'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('CANCEL')),
+                ElevatedButton(
+                  onPressed: () {
+                    proceed = true;
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('PROCEED'),
+                )
+              ],
+            ),
+          );
+          if (!proceed) {
+            setState(() => _isProcessingPos = false);
+            return;
+          }
+        } else if (result.status == 'error' ||
+            (result.transaction != null &&
+                result.transaction?.paymentSuccess != true &&
+                result.status != 'payment_success' &&
+                result.status != 'payment_failed')) {
+          String errorMessage = result.error?.message ??
+              result.transaction?.message ??
+              'Unknown Error';
+          if (result.transaction?.statusCode != null &&
+              result.transaction!.statusCode!.isNotEmpty) {
+            final codeMsg =
+                NibssResponseCodes.getMessage(result.transaction!.statusCode);
+            errorMessage = 'Code \: ';
+          }
+          if (!mounted) return;
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('POS Payment Failed'),
+              content: Text(errorMessage),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'))
+              ],
+            ),
+          );
+          setState(() => _isProcessingPos = false);
+          return;
+        }
+
+        // Notify user of success explicitly since we removed the success dialog
+        if (result.status == 'payment_success') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('POS Payment Approved!'),
+                backgroundColor: Colors.green),
+          );
+        }
+
+        // FIRE AND FORGET webhook/sync for success or failure
+        if (result.status == 'payment_success' ||
+            result.status == 'payment_failed') {
+          _processWebhookAndSuccess(
+                  context,
+                  webhookUrl ?? '',
+                  result,
+                  {
+                    'terminalId': terminalId,
+                    'amount': amountToCharge,
+                    'isDeviceProcessed': true,
+                    'deviceStatus': result.status,
+                    'tenantProfile': _terminalConfig?.tenantPolicy,
+                    'deviceInfo': {
+                      'terminalId': _terminalConfig?.terminalId,
+                      'mposTerminalId': _terminalConfig?.mposTerminalId,
+                      'posSerialNumber': _terminalConfig?.posSerialNumber,
+                    },
+                    'emvData': result.emvData?.toJson(),
+                    'transactionResponse': result.transaction?.toJson(),
+                  },
+                  shouldPrint: false)
+              .catchError((e) => debugPrint(e.toString()));
+        } else if (result.status == 'emv_data_ready' &&
+            result.emvData != null) {
+          final financeRepo = context.read<FinanceRepository>();
+          financeRepo.apiClient.post(
+            '/api/pos/transaction',
+            data: {
+              'terminalId': terminalId,
+              'amount': amountToCharge,
+              'emvData': result.emvData!.toJson()
+            },
+          ).catchError((e) => debugPrint(e.toString()));
+        }
+      }
+
+      final amountReceived =
+          CurrencyFormatter.parse(_amountReceivedController.text);
+      if (amountReceived > invoiceState.total * 2 && invoiceState.total > 0) {
+        final proceed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Confirm Overpayment'),
+            content: const Text(
+                'The amount received is significantly higher than the total. Proceed?'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('NO, CORRECT IT')),
+              ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('YES, PROCEED')),
+            ],
+          ),
+        );
+        if (proceed != true) {
+          if (mounted) setState(() => _isProcessingPos = false);
+          return;
+        }
+      }
+
+      double changeGiven = 0.0;
+      double finalAmountPaid = amountReceived;
+      if (amountReceived > invoiceState.total) {
+        if (settings?.allowGiveChange == true &&
+            (invoiceState.paymentMethod == 'POS' ||
+                invoiceState.paymentMethod == 'Transfer')) {
+          changeGiven = amountReceived - invoiceState.total;
+        } else {
+          finalAmountPaid = invoiceState.total;
+        }
+      }
+
+      final invoiceNumber =
+          widget.invoiceBloc.calculationService.generateInvoiceNumber();
+      final status = amountReceived >= invoiceState.total
+          ? 'Paid'
+          : (amountReceived <= 0 ? 'Unpaid' : 'Partial');
+
+      final invoice = Invoice(
+        id: 0,
+        invoiceNumber: invoiceNumber,
+        dateCreated: DateTime.now(),
+        items: List.from(invoiceState.items),
+        subtotal: invoiceState.subtotal,
+        taxAmount: invoiceState.tax,
+        discountAmount:
+            widget.invoiceBloc.calculationService.calculateDiscountAmount(
+          invoiceState.subtotal,
+          invoiceState.tax,
+          invoiceState.discount,
+          invoiceState.discountType,
+        ),
+        discountType: invoiceState.discountType,
+        totalAmount: invoiceState.total,
+        paymentStatus: status,
+        amountPaid: finalAmountPaid,
+        balanceAmount:
+            (invoiceState.total - finalAmountPaid).clamp(0, double.infinity),
+        customerName: invoiceState.customerName,
+        customerPhone: invoiceState.customerPhone,
+        customerAddress: invoiceState.customerAddress,
+        paymentMethod: invoiceState.paymentMethod,
+        staffId: invoiceState.staffId,
+        staffName: invoiceState.staffName,
+        totalPrintAmount:
+            widget.invoiceBloc.calculationService.calculateTotalPrintAmount(
+          invoiceState.items,
+          invoiceState.taxRate,
+          invoiceState.taxEnabled,
+          invoiceState.discount,
+          invoiceState.discountType,
+        ),
+        businessMode: invoiceState.businessMode,
+        studentId: invoiceState.studentId,
+        classId: invoiceState.classId,
+        termId: invoiceState.termId,
+        academicYearId: invoiceState.academicYearId,
+        admissionNumber: invoiceState.admissionNumber,
+        className: invoiceState.className,
+        termName: invoiceState.termName,
+        academicYearName: invoiceState.academicYearName,
+        studentImage: invoiceState.studentImage,
+        warrantyDuration: invoiceState.warrantyDuration,
+      );
+
+      // 1. Immediately print if requested
+      if (printReceipt && settings != null) {
+        _printInvoice(context, invoice, settings,
+            posTx: posTransactionData, copyType: 'Customer Copy');
+        // also print merchant copy if POS
+        if (posTransactionData != null) {
+          final enableTenantCopy = settings.enableTenantReceiptCopy ?? false;
+          if (enableTenantCopy) {
+            _printPosReceipt(posTransactionData, copyType: 'Merchant Copy');
+          }
+        }
+      } else if (!printReceipt &&
+          posTransactionData != null &&
+          posTransactionData.paymentSuccess == true) {
+        // Just print customer copy of POS receipt if not printing invoice
+        final shouldPrint = !(settings?.mergePosReceipt ?? false);
+        if (shouldPrint) {
+          _printPosReceipt(posTransactionData, copyType: 'Customer Copy');
+        }
+      }
+
+      // 2. Concurrently save to backend
+      if (mounted) {
+        // Let the invoiceBloc know we've processed it
+        widget.invoiceBloc.add(SaveInvoice(
+          invoiceNumber: invoiceNumber,
+          amountPaid: finalAmountPaid,
+          changeGiven: changeGiven,
+        ));
+      }
+
+      // 3. Immediately navigate
+      if (mounted) {
+        final nav = Navigator.of(context);
+        nav.popUntil(
+            (route) => route.settings.name == '/dashboard' || route.isFirst);
+        if (printReceipt) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Invoice saved!'), backgroundColor: Colors.green));
+        } else {
+          nav.push(MaterialPageRoute(
+              builder: (_) => ReceiptPreviewPage(invoice: invoice)));
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+          ],
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessingPos = false);
+      }
+    }
+  }
+
+  void _printInvoice(
+      BuildContext context, Invoice invoice, AppSettings settings,
+      {MposTransactionData? posTx, String? copyType}) {
     final templateName = settings.defaultInvoiceTemplate ?? 'compact';
     final InvoiceTemplate template;
-    if (templateName == 'detailed') template = DetailedInvoiceTemplate();
-    else if (templateName == 'minimalist') template = MinimalistInvoiceTemplate();
-    else if (templateName == 'professional') template = ProfessionalInvoiceTemplate();
-    else if (templateName == 'modern') template = ModernProfessionalTemplate();
-    else if (templateName == 'classic') template = ClassicBusinessTemplate();
-    else template = CompactInvoiceTemplate();
+    if (templateName == 'detailed')
+      template = DetailedInvoiceTemplate();
+    else if (templateName == 'minimalist')
+      template = MinimalistInvoiceTemplate();
+    else if (templateName == 'professional')
+      template = ProfessionalInvoiceTemplate();
+    else if (templateName == 'modern')
+      template = ModernProfessionalTemplate();
+    else if (templateName == 'classic')
+      template = ClassicBusinessTemplate();
+    else
+      template = CompactInvoiceTemplate();
 
-    final commands = template.generateCommands(invoice, settings, copyType: copyType);
+    final commands =
+        template.generateCommands(invoice, settings, copyType: copyType);
     if (posTx != null && settings.mergePosReceipt == true) {
-      commands.addAll(_getPosReceiptCommands(posTx, settings, copyType: copyType));
+      commands
+          .addAll(_getPosReceiptCommands(posTx, settings, copyType: copyType));
     }
     context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
   }
 
   Widget _buildPaymentMethodSelector(BuildContext context, InvoiceState state) {
-    final isPosEnabled = _terminalConfig != null && _terminalConfig!.posSerialNumber != null && _terminalConfig!.posSerialNumber!.isNotEmpty;
+    final isPosEnabled = _terminalConfig != null &&
+        _terminalConfig!.posSerialNumber != null &&
+        _terminalConfig!.posSerialNumber!.isNotEmpty;
 
     return Column(
       children: [
@@ -853,27 +864,31 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           contentPadding: EdgeInsets.zero,
           onChanged: (val) {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = CurrencyFormatter.format(state.total);
+            _amountReceivedController.text =
+                CurrencyFormatter.format(state.total);
           },
         ),
         RadioListTile<String>(
-          title: Row(
-            children: [
-              Text('POS', style: TextStyle(color: isPosEnabled ? null : Colors.grey)),
-              if (!isPosEnabled) ...[
-                const SizedBox(width: 8),
-                const Text('(Not Configured)', style: TextStyle(fontSize: 10, color: Colors.red)),
-              ]
+          title: Row(children: [
+            Text('POS',
+                style: TextStyle(color: isPosEnabled ? null : Colors.grey)),
+            if (!isPosEnabled) ...[
+              const SizedBox(width: 8),
+              const Text('(Not Configured)',
+                  style: TextStyle(fontSize: 10, color: Colors.red)),
             ]
-          ),
+          ]),
           value: 'POS',
           groupValue: state.paymentMethod,
           dense: true,
           contentPadding: EdgeInsets.zero,
-          onChanged: isPosEnabled ? (val) {
-            context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = CurrencyFormatter.format(state.total);
-          } : null,
+          onChanged: isPosEnabled
+              ? (val) {
+                  context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
+                  _amountReceivedController.text =
+                      CurrencyFormatter.format(state.total);
+                }
+              : null,
         ),
         RadioListTile<String>(
           title: const Text('Transfer'),
@@ -883,34 +898,48 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           contentPadding: EdgeInsets.zero,
           onChanged: (val) {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = CurrencyFormatter.format(state.total);
+            _amountReceivedController.text =
+                CurrencyFormatter.format(state.total);
           },
         ),
         RadioListTile<String>(
-          title: const Text('Pay with Transfer (Virtual Account)', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+          title: const Text('Pay with Transfer (Virtual Account)',
+              style:
+                  TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
           value: 'VirtualAccount',
           groupValue: state.paymentMethod,
           dense: true,
           contentPadding: EdgeInsets.zero,
           onChanged: (val) {
             context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = CurrencyFormatter.format(state.total);
+            _amountReceivedController.text =
+                CurrencyFormatter.format(state.total);
           },
         ),
         RadioListTile<String>(
-          title: const Text('Customer Wallet/Credit', style: TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
+          title: const Text('Customer Wallet/Credit',
+              style:
+                  TextStyle(color: Colors.purple, fontWeight: FontWeight.bold)),
           value: 'Wallet',
           groupValue: state.paymentMethod,
           dense: true,
           contentPadding: EdgeInsets.zero,
-          onChanged: state.customerId != null ? (val) {
-            context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text = CurrencyFormatter.format(state.total);
-          } : null,
-          subtitle: state.customerId == null ? const Text('Please select a customer first.', style: TextStyle(fontSize: 10, color: Colors.grey)) : null,
+          onChanged: state.customerId != null
+              ? (val) {
+                  context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
+                  _amountReceivedController.text =
+                      CurrencyFormatter.format(state.total);
+                }
+              : null,
+          subtitle: state.customerId == null
+              ? const Text('Please select a customer first.',
+                  style: TextStyle(fontSize: 10, color: Colors.grey))
+              : null,
         ),
         RadioListTile<String>(
-          title: const Text('Pay Later (deferred)/ part payment', style: TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold)),
+          title: const Text('Pay Later (deferred)/ part payment',
+              style: TextStyle(
+                  color: Colors.deepOrange, fontWeight: FontWeight.bold)),
           value: 'Deferred',
           groupValue: state.paymentMethod,
           dense: true,
@@ -923,22 +952,27 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         if (state.paymentMethod == null)
           const Padding(
             padding: EdgeInsets.only(left: 8.0),
-            child: Text('Please select a payment method', style: TextStyle(color: Colors.red, fontSize: 12)),
+            child: Text('Please select a payment method',
+                style: TextStyle(color: Colors.red, fontSize: 12)),
           ),
       ],
     );
   }
 
-  Widget _row(String label, double value, String currency, {bool isBold = false}) {
+  Widget _row(String label, double value, String currency,
+      {bool isBold = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Text(label,
+              style: TextStyle(
+                  fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
           Text(
             CurrencyFormatter.formatWithSymbol(value, symbol: currency),
-            style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+            style: TextStyle(
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
           ),
         ],
       ),
@@ -959,13 +993,15 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         children: [
           const Text(
             'TRANSFER TO THIS ACCOUNT',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.blue),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 10, color: Colors.blue),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
             account['account_number'] ?? account['accountNumber'] ?? 'N/A',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 2),
+            style: const TextStyle(
+                fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 2),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
@@ -985,7 +1021,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             children: [
               Icon(Icons.sync, size: 12, color: Colors.blue),
               SizedBox(width: 8),
-              Text('Waiting for payment confirmation...', style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
+              Text('Waiting for payment confirmation...',
+                  style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic)),
             ],
           ),
         ],
@@ -993,7 +1030,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     );
   }
 
-  Future<bool> _processWebhookAndSuccess(
+  Future<void> _processWebhookAndSuccess(
       BuildContext context,
       String webhookUrl,
       MposTransactionResponse result,
@@ -1001,146 +1038,26 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       {bool shouldPrint = true}) async {
     final financeRepo = context.read<FinanceRepository>();
     final trimmedWebhook = webhookUrl.trim();
-    final endpoint = trimmedWebhook.isNotEmpty ? trimmedWebhook : '/api/pos/transaction';
-    
+    final endpoint =
+        trimmedWebhook.isNotEmpty ? trimmedWebhook : '/api/pos/transaction';
+
     Response? backendResponse;
     final offlineService = OfflineWebhookService(financeRepo.apiClient.dio);
     try {
       await offlineService.syncQueue();
       backendResponse = await financeRepo.apiClient.post(endpoint, data: data);
     } catch (e) {
-      debugPrint('[Webhook] Failed to sync to server: $e');
-      // Enqueue for offline sync
+      debugPrint('[Webhook] Failed to sync to server: ');
       await offlineService.enqueuePayload(endpoint, data);
     }
-
-    if (!mounted) return false;
-
-    if (result.status == 'payment_failed') {
-      final msg = result.transaction?.message ?? 'Unknown Error';
-      final formattedMsg = getIsoResponseMessage(msg);
-      bool proceed = false;
-      await showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('POS Declined'),
-          content: Text('Transaction declined by MPOS ($formattedMsg).\n\nDo you want to proceed by printing the receipt anyway?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-            ElevatedButton(
-              onPressed: () {
-                proceed = true;
-                Navigator.pop(ctx);
-              },
-              child: const Text('PRINT RECEIPT'),
-            )
-          ],
-        ),
-      );
-      return proceed;
-    }
-
-    if (backendResponse != null && backendResponse.statusCode != 200 && backendResponse.statusCode != 201) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment approved but failed to sync to server (Queued).')));
-    }
-
-    // Success Screen & Print Receipt
-    if (result.status == 'payment_success' && result.transaction != null) {
-      final enableTenantCopy = context.read<SettingsBloc>().state.settings?.enableTenantReceiptCopy ?? false;
-      
-      // Auto-print customer copy if it is separated from the main invoice
-      if (shouldPrint) {
-        _printPosReceipt(result.transaction!, copyType: 'Customer Copy');
-      }
-
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Row(children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 8),
-            Text('Purchase Successful')
-          ]),
-          content: Builder(
-            builder: (ctx) {
-              final amtStr = result.transaction!.amount ?? '0';
-              final amtValue = (double.tryParse(amtStr) ?? 0) / 100;
-              final formattedAmount = CurrencyFormatter.formatWithSymbol(amtValue, symbol: context.read<SettingsBloc>().state.settings?.currency ?? '₦');
-
-              String maskPan(String pan) {
-                if (pan.length < 10) return pan;
-                return '${pan.substring(0, 4)}********${pan.substring(pan.length - 4)}';
-              }
-              final maskedPan = maskPan(result.transaction!.maskedPan ?? '');
-
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Amount: $formattedAmount', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  Text('RRN: ${result.transaction!.rrn}'),
-                  Text('STAN: ${result.transaction!.stan}'),
-                  Text('Card: $maskedPan'),
-                  const Text('Status: Approved', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                ],
-              );
-            }
-          ),
-          actions: [
-            if (enableTenantCopy)
-              TextButton(
-                onPressed: () {
-                  _printPosReceipt(result.transaction!, copyType: 'Tenant Copy');
-                  Navigator.pop(ctx);
-                },
-                child: const Text('PRINT TENANT COPY'),
-              ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-              },
-              child: const Text('CLOSE'),
-            )
-          ],
-        ),
-      );
-    }
-    
-    return true;
   }
 
-
-  String _maskPan(String? pan) {
-    if (pan == null || pan.length < 10) return pan ?? "";
-    return "${pan.substring(0, 4)}********${pan.substring(pan.length - 4)}";
-  }
-
-  String _formatPosAmount(String? rawAmount, String symbol) {
-    if (rawAmount == null || rawAmount.isEmpty) return "";
-    final doubleAmount = (double.tryParse(rawAmount) ?? 0) / 100;
-    return CurrencyFormatter.formatWithSymbol(doubleAmount, symbol: symbol);
-  }
-
-  String _formatPosDate(String? rawDate) {
-    if (rawDate == null || rawDate.length != 10) return rawDate ?? "";
-    try {
-      final now = DateTime.now();
-      final month = int.parse(rawDate.substring(0, 2));
-      final day = int.parse(rawDate.substring(2, 4));
-      final hour = int.parse(rawDate.substring(4, 6));
-      final minute = int.parse(rawDate.substring(6, 8));
-      final second = int.parse(rawDate.substring(8, 10));
-      final date = DateTime(now.year, month, day, hour, minute, second);
-      return DateFormat('dd MMM, HH:mm:ss').format(date);
-    } catch (e) {
-      return rawDate;
-    }
-  }
-
-  List<PrintCommand> _getPosReceiptCommands(MposTransactionData tx, AppSettings? settings, {String? copyType}) {
-    final String merchantName = _terminalConfig?.businessName ?? settings?.organizationName ?? 'MERCHANT';
+  List<PrintCommand> _getPosReceiptCommands(
+      MposTransactionData tx, AppSettings? settings,
+      {String? copyType}) {
+    final String merchantName = _terminalConfig?.businessName ??
+        settings?.organizationName ??
+        'MERCHANT';
     final String merchantId = _terminalConfig?.terminalId ?? 'N/A';
     final currency = settings?.currency ?? 'NGN';
     final bool isMerged = settings?.mergePosReceipt ?? false;
@@ -1148,19 +1065,20 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     return [
       TextCommand('================================', align: 'center'),
       TextCommand('POS PAYMENT RECEIPT', isBold: true, align: 'center'),
-      if (copyType != null) TextCommand('*** ${copyType.toUpperCase()} ***', align: 'center', isBold: true),
+      if (copyType != null)
+        TextCommand('***  ***', align: 'center', isBold: true),
       TextCommand('================================', align: 'center'),
       if (!isMerged) TextCommand(merchantName, align: 'center'),
-      TextCommand('Terminal ID: $merchantId', align: 'center'),
+      TextCommand('Terminal ID: ', align: 'center'),
       SizedBoxCommand(height: 1),
-      TextCommand('Card Holder: ${tx.cardHolderName ?? ""}'),
-      TextCommand('Card Type: ${tx.appLabel ?? ""}'),
-      TextCommand('PAN: ${_maskPan(tx.maskedPan)}'),
-      TextCommand('Amount: ${_formatPosAmount(tx.amount, currency)}', isBold: true),
-      TextCommand('Auth Code: ${tx.authCode ?? ""}'),
-      TextCommand('RRN: ${tx.rrn ?? ""}'),
-      TextCommand('STAN: ${tx.stan ?? ""}'),
-      TextCommand('Date: ${_formatPosDate(tx.dateTime)}'),
+      TextCommand('Card Holder: '),
+      TextCommand('Card Type: '),
+      TextCommand('PAN: '),
+      TextCommand('Amount: ', isBold: true),
+      TextCommand('Auth Code: '),
+      TextCommand('RRN: '),
+      TextCommand('STAN: '),
+      TextCommand('Date: '),
       TextCommand('================================', align: 'center'),
       TextCommand('APPROVED', isBold: true, align: 'center'),
       TextCommand('================================', align: 'center'),
@@ -1170,6 +1088,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   void _printPosReceipt(MposTransactionData tx, {String? copyType}) {
     final settings = context.read<SettingsBloc>().state.settings;
     final commands = _getPosReceiptCommands(tx, settings, copyType: copyType);
-    context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58)); // Assuming 58mm
+    context
+        .read<PrinterBloc>()
+        .add(PrintCommandsEvent(commands, 58)); // Assuming 58mm
   }
 }

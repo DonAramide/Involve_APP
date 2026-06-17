@@ -245,7 +245,13 @@ const mockSettings = ref({
   auditArchiveHours: 72,
   enforceDeviceControl: false,
   isMaintenanceLocked: false,
-  maintenanceMessage: 'System is currently under maintenance. Please try again later.'
+  maintenanceMessage: 'System is currently under maintenance. Please try again later.',
+  metaAccessToken: '',
+  whatsappPhoneNumberId: '',
+  whatsappBusinessAccountId: '',
+  quasarClientId: '',
+  quasarClientSecret: '',
+  lessonAiApiKey: ''
 });
 
 const currencyColumns = [
@@ -294,6 +300,14 @@ async function fetchSettings() {
       mockSettings.value.enforceDeviceControl = data.enforce_device_control !== undefined ? data.enforce_device_control : (data.enforceDeviceControl !== undefined ? data.enforceDeviceControl : false);
       mockSettings.value.isMaintenanceLocked = data.is_maintenance_locked !== undefined ? data.is_maintenance_locked : false;
       mockSettings.value.maintenanceMessage = data.maintenance_message || 'System is currently under maintenance. Please try again later.';
+      
+      // Integrations
+      mockSettings.value.metaAccessToken = data.meta_access_token || '';
+      mockSettings.value.whatsappPhoneNumberId = data.whatsapp_phone_number_id || '';
+      mockSettings.value.whatsappBusinessAccountId = data.whatsapp_business_account_id || '';
+      mockSettings.value.quasarClientId = data.quasar_client_id || '';
+      mockSettings.value.quasarClientSecret = data.quasar_client_secret || '';
+      mockSettings.value.lessonAiApiKey = data.lesson_ai_api_key || '';
     }
   } catch (err) {
     console.error('Failed to load global platform settings:', err);
@@ -315,7 +329,13 @@ async function saveAllSettings() {
       audit_retention_hours: Number(mockSettings.value.auditArchiveHours),
       enforce_device_control: mockSettings.value.enforceDeviceControl,
       is_maintenance_locked: mockSettings.value.isMaintenanceLocked,
-      maintenance_message: mockSettings.value.maintenanceMessage
+      maintenance_message: mockSettings.value.maintenanceMessage,
+      meta_access_token: mockSettings.value.metaAccessToken,
+      whatsapp_phone_number_id: mockSettings.value.whatsappPhoneNumberId,
+      whatsapp_business_account_id: mockSettings.value.whatsappBusinessAccountId,
+      quasar_client_id: mockSettings.value.quasarClientId,
+      quasar_client_secret: mockSettings.value.quasarClientSecret,
+      lesson_ai_api_key: mockSettings.value.lessonAiApiKey
     };
     await adminApi.updateGlobalSettings(payload);
     $q.notify({

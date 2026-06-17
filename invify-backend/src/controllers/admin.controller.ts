@@ -74,6 +74,14 @@ export class AdminController {
     if (data.audit_retention_hours === undefined) data.audit_retention_hours = 72;
     if (data.enforce_device_control === undefined) data.enforce_device_control = false;
     
+    // Integrations defaults
+    if (data.meta_access_token === undefined) data.meta_access_token = '';
+    if (data.whatsapp_phone_number_id === undefined) data.whatsapp_phone_number_id = '';
+    if (data.whatsapp_business_account_id === undefined) data.whatsapp_business_account_id = '';
+    if (data.quasar_client_id === undefined) data.quasar_client_id = '';
+    if (data.quasar_client_secret === undefined) data.quasar_client_secret = '';
+    if (data.lesson_ai_api_key === undefined) data.lesson_ai_api_key = '';
+    
     // Commission settings
     if (data.commissions === undefined) {
       data.commissions = {
@@ -127,8 +135,7 @@ export class AdminController {
       // Update each key-value pair in system_configurations
       for (const [key, value] of Object.entries(updates)) {
         const { error } = await supabase.from('system_configurations')
-          .update({ config_value: value, updated_by: operatorId })
-          .eq('config_key', key);
+          .upsert({ config_key: key, config_value: value, updated_by: operatorId });
           
         if (error) {
           throw new Error(`Failed to update ${key}: ${error.message}`);

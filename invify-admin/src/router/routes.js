@@ -18,6 +18,21 @@ const routes = [
     meta: { isGuest: true, title: 'Enterprise Portal Login' }
   },
   {
+    path: '/register',
+    component: () => import('pages/public/RegisterPage.vue'),
+    meta: { isGuest: true, title: 'Enterprise Onboarding' }
+  },
+  {
+    path: '/forgot-password',
+    component: () => import('pages/public/ForgotPasswordPage.vue'),
+    meta: { isGuest: true, title: 'Password Recovery' }
+  },
+  {
+    path: '/reset-password',
+    component: () => import('pages/public/ResetPasswordPage.vue'),
+    meta: { isGuest: true, title: 'Reset Password' }
+  },
+  {
     path: '/mfa/challenge',
     component: () => import('pages/governance/MFAChallengePage.vue'),
     meta: { requiresAuth: true, isMfaPendingAllowed: true, title: 'Multi-Factor Gateway' }
@@ -325,6 +340,8 @@ const routes = [
       { path: 'admin/users', component: () => import('pages/UsersPage.vue'), meta: { workspace: 'admin', title: 'Operators', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/settings', component: () => import('pages/admin/PlatformOverviewPage.vue'), meta: { workspace: 'admin', title: 'Platform Overview', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/config', component: () => import('pages/admin/PlatformConfigPage.vue'), meta: { workspace: 'admin', title: 'Platform Configuration', permission: 'admin_deploy', requiresAuth: true, keywords: ['maintenance', 'maintenance mode', 'maintenance mode controls', 'system lockout', 'lockout'] } },
+      { path: 'admin/vault', component: () => import('pages/admin/IntegrationVaultPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Integration Vault', permission: 'admin_deploy', requiresAuth: true, keywords: ['vault', 'integrations', 'secrets', 'api keys', 'certificates'] } },
+      { path: 'admin/settings/authentication', component: () => import('pages/admin/AuthenticationSettingsPage.vue'), meta: { workspace: 'admin', title: 'Authentication Settings', permission: 'admin_deploy', requiresAuth: true, keywords: ['settings', 'authentication', 'onboarding', 'verification'] } },
       { path: 'admin/contact', component: () => import('pages/governance/ContactMaintenancePage.vue'), meta: { workspace: 'admin', title: 'Contact Maintenance', permission: 'admin_deploy', requiresAuth: true } },
 
       { path: 'admin/billing', component: () => import('pages/admin/BillingGovernanceCenterPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Billing & Revenue', permission: 'admin_deploy', requiresAuth: true } },

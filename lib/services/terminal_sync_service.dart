@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'dart:io' show Platform;
 import 'package:http/http.dart' as http;
-import 'dart:developer' as developer;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Terminal configuration synced from the Invify backend.
 class TerminalConfig {
@@ -47,6 +47,11 @@ class TerminalConfig {
   final Map<String, dynamic>? kimonoKeys;
   final Map<String, dynamic>? kimonoFallbackParameters;
 
+  // P0-1 Fields
+  final String? deviceCategory;
+  final String? deviceRole;
+  final Map<String, dynamic>? features;
+
   const TerminalConfig({
     required this.assigned,
     this.terminalId,
@@ -85,18 +90,14 @@ class TerminalConfig {
     this.kimonoSSL = false,
     this.kimonoKeys,
     this.kimonoFallbackParameters,
+    this.deviceCategory,
+    this.deviceRole,
+    this.features,
   });
-
-  factory TerminalConfig.notAssigned() {
-    return const TerminalConfig(
-      assigned: false,
-      message: 'No terminal assigned to this device',
-    );
-  }
 
   factory TerminalConfig.fromJson(Map<String, dynamic> json) {
     return TerminalConfig(
-      assigned: json['assigned'] == true,
+      assigned: json['assigned'] == true || json['success'] == true,
       terminalId: json['terminalId']?.toString(),
       mposTerminalId: json['mposTerminalId']?.toString(),
       posSerialNumber: json['posSerialNumber']?.toString(),
@@ -133,6 +134,9 @@ class TerminalConfig {
       kimonoSSL: json['kimonoSSL'] == true,
       kimonoKeys: json['kimonoKeys'] != null ? Map<String, dynamic>.from(json['kimonoKeys'] as Map) : null,
       kimonoFallbackParameters: json['kimonoFallbackParameters'] != null ? Map<String, dynamic>.from(json['kimonoFallbackParameters'] as Map) : null,
+      deviceCategory: json['deviceCategory']?.toString(),
+      deviceRole: json['deviceRole']?.toString(),
+      features: json['features'] != null ? Map<String, dynamic>.from(json['features'] as Map) : null,
     );
   }
 
@@ -174,11 +178,17 @@ class TerminalConfig {
     'kimonoSSL': kimonoSSL,
     'kimonoKeys': kimonoKeys,
     'kimonoFallbackParameters': kimonoFallbackParameters,
+    'deviceCategory': deviceCategory,
+    'deviceRole': deviceRole,
+    'features': features,
   };
 
+  DeviceCapabilities get capabilities => DeviceCapabilities.fromJson(features);
+
   @override
-  String toString() => 'TerminalConfig(terminalId: $terminalId, assigned: $assigned)';
+  String toString() => 'TerminalConfig(terminalId: $terminalId, assigned: $assigned, deviceCategory: $deviceCategory)';
 }
+
 
 /// Handles syncing terminal configuration from the Invify backend.
 ///
@@ -192,10 +202,8 @@ class TerminalSyncService {
   // Base URL — reads from app config or defaults to localhost
   static String get _baseUrl {
     // Hardcoded URL for local network testing based on user's active session
-    return 'http://192.168.1.194:3004';
-  }
-
-  /// Sync the terminal configuration for this device from the backend.
+    return dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
+  }  /// Sync the terminal configuration for this device from the backend.
   ///
   /// [deviceId] — the device's unique identifier (activation/enrollment ID)
   /// [enrollmentKey] — optional enrollment key for verification
@@ -208,7 +216,6 @@ class TerminalSyncService {
     String? enrollmentKey,
     String? serialNumber,
     String? androidId,
-    String? businessName,
   }) async {
     try {
       final payload = {
@@ -216,17 +223,23 @@ class TerminalSyncService {
         'enrollmentKey': enrollmentKey,
         'serialNumber': serialNumber,
         'androidId': androidId,
-        'businessName': businessName,
       };
       
       debugPrint('[TerminalSync] Requesting sync with payload: ${jsonEncode(payload)}');
 
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+      final headers = {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
       final response = await http.post(
         Uri.parse('$_baseUrl/api/mobile/terminal/sync'),
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
+        headers: headers,
         body: jsonEncode(payload),
       ).timeout(const Duration(seconds: 15));
 
@@ -260,7 +273,7 @@ class TerminalSyncService {
                errorMessage = errData['error'];
              }
            } catch (_) {}
-        }
+         }
         throw Exception(errorMessage);
       }
     } catch (e) {
@@ -277,12 +290,19 @@ class TerminalSyncService {
     required String deviceId,
   }) async {
     try {
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+      final headers = {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
       final response = await http.get(
         Uri.parse('$_baseUrl/api/mobile/terminal/status?deviceId=${Uri.encodeComponent(deviceId)}'),
-        headers: {
-          'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
-        },
+        headers: headers,
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -290,8 +310,9 @@ class TerminalSyncService {
         return TerminalConfig.fromJson(data);
       }
     } catch (_) {}
-    return await _getCachedConfig() ?? TerminalConfig.notAssigned();
+    return await _getCachedConfig() ?? const TerminalConfig(assigned: false);
   }
+
 
   static Future<void> recordKeyExchangeSuccess(String deviceId) async {
     try {
@@ -362,3 +383,47 @@ class TerminalSyncService {
     await _secureStorage.delete(key: _lastSyncTimeKey);
   }
 }
+
+class DeviceCapabilities {
+  final bool invoicing;
+  final bool inventory;
+  final bool customerManagement;
+  final bool reporting;
+  final bool printing;
+  final bool emvPayments;
+  final bool cardSettlement;
+
+  const DeviceCapabilities({
+    this.invoicing = true,
+    this.inventory = true,
+    this.customerManagement = true,
+    this.reporting = true,
+    this.printing = false,
+    this.emvPayments = false,
+    this.cardSettlement = false,
+  });
+
+  factory DeviceCapabilities.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const DeviceCapabilities();
+    return DeviceCapabilities(
+      invoicing: json['invoicing'] != false,
+      inventory: json['inventory'] != false,
+      customerManagement: json['customerManagement'] != false,
+      reporting: json['reporting'] != false,
+      printing: json['printing'] == true,
+      emvPayments: json['emvPayments'] == true,
+      cardSettlement: json['cardSettlement'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'invoicing': invoicing,
+    'inventory': inventory,
+    'customerManagement': customerManagement,
+    'reporting': reporting,
+    'printing': printing,
+    'emvPayments': emvPayments,
+    'cardSettlement': cardSettlement,
+  };
+}
+

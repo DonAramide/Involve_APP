@@ -1,27 +1,15 @@
 [
   {
-    "id": "tenant-1779662125243",
-    "name": "myde",
-    "type": "retail",
-    "plan": "premium",
-    "status": "active",
-    "created_at": "2026-05-24T22:35:25.244Z"
-  },
-  {
-    "id": "tenant-1779041949485",
-    "name": "Wendy's gift Store",
-    "type": "retail",
-    "plan": "starter",
-    "status": "active",
-    "created_at": "2026-05-17T18:19:09.485Z"
-  },
-  {
     "id": "00000000-0000-0000-0000-000000000001",
     "name": "Lagos Academy School",
     "type": "school",
     "plan": "standard",
     "status": "active",
-    "created_at": "2026-05-17T09:46:44.414Z"
+    "owner_email": "seed@example.com",
+    "owner_name": "Seed Admin",
+    "phone": null,
+    "created_at": "2026-01-01T00:00:00.000Z",
+    "subscription_end_date": "2027-01-01T00:00:00.000Z"
   },
   {
     "id": "00000000-0000-0000-0000-000000000002",
@@ -29,7 +17,11 @@
     "type": "retail",
     "plan": "premium",
     "status": "active",
-    "created_at": "2026-05-17T09:46:44.414Z"
+    "owner_email": "seed2@example.com",
+    "owner_name": "Seed Owner",
+    "phone": null,
+    "created_at": "2026-01-01T00:00:00.000Z",
+    "subscription_end_date": "2027-01-01T00:00:00.000Z"
   },
   {
     "id": "00000000-0000-0000-0000-000000000003",
@@ -37,74 +29,10 @@
     "type": "healthcare",
     "plan": "enterprise",
     "status": "active",
-    "created_at": "2026-05-17T09:46:44.414Z"
-  },
-  {
-    "id": "tenant-invi001",
-    "name": "invi001",
-    "type": "retail",
-    "plan": "standard",
-    "status": "active",
-    "created_at": "2026-05-19T00:49:13.028Z"
-  },
-  {
-    "id": "tenant-1779155800041",
-    "name": "imvi001",
-    "type": "retail",
-    "plan": "standard",
-    "status": "active",
-    "created_at": "2026-05-19T01:56:40.041Z"
-  },
-  {
-    "id": "tenant-1779516835715",
-    "name": "invify001",
-    "type": "school",
-    "plan": "standard",
-    "status": "active",
-    "created_at": "2026-05-23T06:13:55.715Z",
-    "agent_code": "AAA001",
-    "location": "Lagos, Nigeria",
-    "device_id": "PPR1.180610.011"
-  },
-  {
-    "id": "tenant-1779640483822",
-    "name": "My Business",
-    "type": "retail",
-    "plan": "standard",
-    "status": "active",
-    "agent_code": "AAA000",
-    "location": "Lat: 6.6257, Lng: 3.4783",
-    "device_id": "PPR1.180610.011",
-    "created_at": "2026-05-24T16:34:43.822Z",
-    "support_phone": "",
-    "support_email": "",
-    "support_whatsapp": "",
-    "emergency_lock_code": "ZCSSTA",
-    "is_emergency_locked": true
-  },
-  {
-    "id": "tenant-1779711092175",
-    "name": "My01",
-    "type": "retail",
-    "plan": "standard",
-    "status": "active",
-    "agent_code": "AAA000",
-    "location": "Lat: 6.6257, Lng: 3.4782",
-    "device_id": "PPR1.180610.011",
-    "created_at": "2026-05-25T12:11:32.176Z",
-    "support_phone": "+234234811111111",
-    "support_email": "muyibitaliat12@gmail.com",
-    "support_whatsapp": "234234811111111"
-  },
-  {
-    "id": "tenant-8838236e-5664-4a28-86f7-233194437a64",
-    "name": "Business Centre",
-    "type": "retail",
-    "plan": "standard",
-    "status": "active",
-    "agent_code": "AAA000",
-    "location": "Lat: 6.6304, Lng: 3.4831",
-    "device_id": "R52M3011J7H",
-    "created_at": "2026-06-14T14:37:14.523Z"
+    "owner_email": "seed3@example.com",
+    "owner_name": "Clinic Admin",
+    "phone": null,
+    "created_at": "2026-01-01T00:00:00.000Z",
+    "subscription_end_date": "2027-01-01T00:00:00.000Z"
   }
 ]

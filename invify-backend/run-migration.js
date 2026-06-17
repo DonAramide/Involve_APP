@@ -17,7 +17,7 @@ async function run() {
   
   try {
     await client.connect();
-    const sqlPath = 'C:/dev/Involve_APP/invify-backend/agent_system_phase7_migration.sql';
+    const sqlPath = 'C:/dev/Involve_APP/invify-backend/017_onboarding_verification_migration.sql';
     const sql = fs.readFileSync(sqlPath, 'utf8');
     
     await client.query(sql);
@@ -29,3 +29,4 @@ async function run() {
   }
 }
 run();
+

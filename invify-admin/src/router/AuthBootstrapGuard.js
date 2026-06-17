@@ -95,7 +95,7 @@ export function registerAuthBootstrapGuard(router) {
     // 3. Guest route rules (e.g., /login)
     if (to.meta?.isGuest) {
       if (isVerifiedSession) {
-        return next(getHomePath(operatorRole))
+        console.warn(`[DEV OVERRIDE] Allowed authenticated user to view guest route: ${to.path}`);
       }
       return next()
     }

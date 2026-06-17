@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
@@ -11,6 +12,8 @@ import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/features/activation/presentation/pages/verify_email_page.dart';
+import '../utils/onboarding_navigator.dart';
 
 class DeviceOnboardingPage extends StatefulWidget {
   const DeviceOnboardingPage({super.key});
@@ -21,6 +24,15 @@ class DeviceOnboardingPage extends StatefulWidget {
 
 class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   final _formKey = GlobalKey<FormState>();
+  
+  // New Registration Fields
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  // Existing Fields
   final _businessNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _agentCodeController = TextEditingController();
@@ -29,6 +41,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   String _primaryColorHex = '#6366F1';
   bool _isLoading = false;
   int _currentStep = 0;
+  bool _obscurePassword = true;
 
   final List<Map<String, String>> _stepsInfo = [
     {
@@ -38,7 +51,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     },
     {
       'title': 'Identity & Operation Mode',
-      'desc': 'Enter your business details and select your core operational industry mode.',
+      'desc': 'Enter your personal details, business details, and select your core operational industry mode.',
       'icon': 'business',
     },
     {
@@ -51,7 +64,6 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   @override
   void initState() {
     super.initState();
-    // Default pre-population from existing settings if any
     final state = context.read<SettingsBloc>().state;
     if (state.settings != null) {
       _businessNameController.text = state.settings!.organizationName;
@@ -80,103 +92,64 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   }
 
   Future<void> _submitOnboarding({required bool isTrial}) async {
+    if (_isLoading) return;
+
     if (!_formKey.currentState!.validate()) {
-      setState(() => _currentStep = 1); // Switch to the form step
+      setState(() => _currentStep = 1);
       return;
     }
 
     setState(() => _isLoading = true);
 
-    final businessName = _businessNameController.text.trim();
-    final phone = _phoneController.text.trim();
-    final inputAgentCode = _agentCodeController.text.trim();
-    final finalAgentCode = inputAgentCode.isEmpty ? 'AAA000' : inputAgentCode;
-    
-    // Get full diagnostic device specs
-    final deviceInfo = await DeviceInfoService.getDeviceDetails();
-
-    // 1. Mark onboarding completed locally
-    await StorageService.setOnboardingCompleted(true);
-    
-    // Set settings state globally inside settings BLoC
-    final settingsBloc = context.read<SettingsBloc>();
-    final currentSettings = settingsBloc.state.settings;
-    if (currentSettings != null) {
-      final parsedColor = int.parse(_primaryColorHex.replaceFirst('#', '0xFF'));
-      
-      settingsBloc.add(UpdateAppSettings(
-        currentSettings.copyWith(
-          organizationName: businessName,
-          lastRoute: isTrial ? DashboardPage.routeName : ActivationPage.routeName,
-          businessMode: _selectedIndustry,
-          primaryColor: parsedColor,
-        )
-      ));
-    }
-
-    final actualLocation = await _getCurrentLocation();
-
-    // 2. Resiliently transmit the device details to the backend API
-    bool apiSuccess = false;
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5)));
-      final payload = {
-        'businessName': businessName,
-        'phone': phone,
-        'industry': _selectedIndustry,
-        'themeColor': _primaryColorHex,
-        'agentCode': finalAgentCode,
-        'location': actualLocation,
-        'deviceInfo': deviceInfo,
-      };
-
-      // Try local host ports (resilient fallbacks for Android/iOS emulators and localhost)
-      final urls = [
-        'http://localhost:3004/devices/onboard',
-        'http://192.168.1.194:3004/devices/onboard',
+      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+      
+      // Fetch Onboarding Settings
+      List<String> requiredChannels = ['EMAIL']; // Default fallback
+      final settingsUrls = [
+        'http://localhost:3004/settings/onboarding',
+        '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/settings/onboarding',
       ];
 
-      for (var url in urls) {
+      for (var url in settingsUrls) {
         try {
-          await dio.post(url, data: payload);
-          apiSuccess = true;
-          debugPrint('[DeviceOnboarding] Successfully transmitted diagnostics to $url');
-          break; // Stop once we successfully ping one of the active developer endpoints
+          final response = await dio.get(url);
+          if (response.data['requiredChannels'] != null) {
+            requiredChannels = List<String>.from(response.data['requiredChannels']);
+          }
+          break;
         } catch (_) {}
       }
-    } catch (e) {
-      debugPrint('[DeviceOnboarding] Error during telemetry delivery: $e');
-    }
 
-    if (!isTrial && !apiSuccess) {
+      setState(() => _isLoading = false);
+
+      // Collect all payload data to pass to the next screen
+      final payload = {
+        'firstName': _firstNameController.text.trim(),
+        'lastName': _lastNameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'password': _passwordController.text,
+        'phone': _phoneController.text.trim(),
+        'businessName': _businessNameController.text.trim(),
+        'industry': _selectedIndustry,
+        'themeColor': _primaryColorHex,
+        'agentCode': _agentCodeController.text.trim().isEmpty ? 'AAA000' : _agentCodeController.text.trim(),
+        'isTrial': isTrial,
+        'completedChannels': <String>[],
+      };
+
+      if (mounted) {
+        await OnboardingNavigator.proceed(context, payload, requiredChannels);
+      }
+    } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Server is currently unavailable. Please proceed with the Free 3-Day Trial.'),
-            backgroundColor: Color(0xFFF59E0B), // Warning Orange
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: const Color(0xFFEF4444),
             behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 4),
           ),
-        );
-      }
-      return;
-    }
-
-    if (isTrial) {
-      // Initialize 3-Day Trial
-      await StorageService.saveTrialStartDate(DateTime.now());
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const DashboardPage()),
-          (route) => false,
-        );
-      }
-    } else {
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const ActivationPage(isExpired: false)),
-          (route) => false,
         );
       }
     }
@@ -184,7 +157,6 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -196,15 +168,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
             gradient: RadialGradient(
               center: Alignment.topLeft,
               radius: 1.5,
-              colors: [
-                Color(0xFF0B1226),
-                Color(0xFF05070D),
-              ],
+              colors: [Color(0xFF0B1226), Color(0xFF05070D)],
             ),
           ),
           child: Stack(
             children: [
-              // Watermarked Background Logo
               Positioned.fill(
                 child: Center(
                   child: Opacity(
@@ -218,8 +186,6 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                   ),
                 ),
               ),
-
-              // Main Content Layout
               SafeArea(
                 child: Center(
                   child: SingleChildScrollView(
@@ -246,107 +212,59 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                                 width: 500,
                                 padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 40.0),
                                 child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Header Branding Row
-                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF6366F1).withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(
-                                        Icons.rocket_launch,
-                                        color: Color(0xFF818CF8),
-                                        size: 24,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                    Row(
                                       children: [
-                                        const Text(
-                                          'INVIFY',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                            letterSpacing: 1.5,
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF6366F1).withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(10),
                                           ),
+                                          child: const Icon(Icons.rocket_launch, color: Color(0xFF818CF8), size: 24),
                                         ),
-                                        Text(
-                                          'DEVICE TELEMETRY ONBOARDING',
-                                          style: TextStyle(
-                                            color: Color(0xFF818CF8),
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 9,
-                                            letterSpacing: 1.0,
-                                          ),
+                                        const SizedBox(width: 12),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: const [
+                                            Text('INVIFY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.5)),
+                                            Text('DEVICE TELEMETRY ONBOARDING', style: TextStyle(color: Color(0xFF818CF8), fontWeight: FontWeight.bold, fontSize: 9, letterSpacing: 1.0)),
+                                          ],
                                         ),
                                       ],
                                     ),
+                                    const SizedBox(height: 32),
+                                    Row(
+                                      children: List.generate(3, (index) {
+                                        final isActive = index <= _currentStep;
+                                        return Expanded(
+                                          child: Container(
+                                            height: 3,
+                                            margin: EdgeInsets.only(right: index == 2 ? 0 : 8),
+                                            decoration: BoxDecoration(
+                                              color: isActive ? const Color(0xFF6366F1) : Colors.white.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(2),
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    Text(_stepsInfo[_currentStep]['title']!, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 8),
+                                    Text(_stepsInfo[_currentStep]['desc']!, style: TextStyle(color: Colors.grey[400], fontSize: 13, height: 1.4)),
+                                    const SizedBox(height: 32),
+                                    _buildStepContent(size),
+                                    const SizedBox(height: 32),
+                                    if (_isLoading)
+                                      const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)))
+                                    else
+                                      _buildStepActions(),
                                   ],
                                 ),
-                                const SizedBox(height: 32),
-
-                                // Indicator Row
-                                Row(
-                                  children: List.generate(3, (index) {
-                                    final isActive = index <= _currentStep;
-                                    return Expanded(
-                                      child: Container(
-                                        height: 3,
-                                        margin: EdgeInsets.only(right: index == 2 ? 0 : 8),
-                                        decoration: BoxDecoration(
-                                          color: isActive
-                                              ? const Color(0xFF6366F1)
-                                              : Colors.white.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(2),
-                                        ),
-                                      ),
-                                    );
-                                  }),
-                                ),
-                                const SizedBox(height: 24),
-
-                                // Step Title & Description
-                                Text(
-                                  _stepsInfo[_currentStep]['title']!,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _stepsInfo[_currentStep]['desc']!,
-                                  style: TextStyle(
-                                    color: Colors.grey[400],
-                                    fontSize: 13,
-                                    height: 1.4,
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-
-                                // Step Contents Switcher
-                                _buildStepContent(size),
-
-                                const SizedBox(height: 32),
-
-                                // Actions
-                                if (_isLoading)
-                                  const Center(
-                                    child: CircularProgressIndicator(
-                                      color: Color(0xFF6366F1),
-                                    ),
-                                  )
-                                else
-                                  _buildStepActions(),
-                              ],
+                              ),
                             ),
                           ),
                         ),
@@ -355,14 +273,12 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 
   Widget _buildStepContent(Size size) {
     if (_currentStep == 0) {
@@ -392,75 +308,43 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     if (_currentStep == 1) {
       return Column(
         children: [
-          TextFormField(
-            controller: _businessNameController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Business / School Name',
-              labelStyle: const TextStyle(color: Color(0xFF818CF8)),
-              prefixIcon: const Icon(Icons.business, color: Color(0xFF818CF8)),
-              filled: true,
-              fillColor: const Color(0xFF101625),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(_firstNameController, 'First Name', Icons.person),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6366F1)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildTextField(_lastNameController, 'Last Name', Icons.person_outline),
               ),
-            ),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+            ],
           ),
           const SizedBox(height: 20),
-          TextFormField(
-            controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'WhatsApp Contact (Telemetry)',
-              labelStyle: const TextStyle(color: Color(0xFF818CF8)),
-              prefixIcon: const Icon(Icons.phone, color: Color(0xFF818CF8)),
-              filled: true,
-              fillColor: const Color(0xFF101625),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6366F1)),
-              ),
-            ),
-            validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+          _buildTextField(_emailController, 'Email Address', Icons.email, isEmail: true),
+          const SizedBox(height: 20),
+          _buildTextField(_passwordController, 'Portal Password', Icons.lock, isPassword: true),
+          const SizedBox(height: 20),
+          _buildTextField(
+            _confirmPasswordController, 
+            'Confirm Portal Password', 
+            Icons.lock_outline, 
+            isPassword: true,
+            customValidator: (value) {
+              if (value == null || value.isEmpty) return 'Required';
+              if (value != _passwordController.text) return 'Passwords do not match';
+              return null;
+            }
           ),
           const SizedBox(height: 20),
-          TextFormField(
-            controller: _agentCodeController,
-            style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(
-              labelText: 'Agent Code (Optional)',
-              labelStyle: const TextStyle(color: Color(0xFF818CF8)),
-              prefixIcon: const Icon(Icons.badge, color: Color(0xFF818CF8)),
-              filled: true,
-              fillColor: const Color(0xFF101625),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF6366F1)),
-              ),
-            ),
-          ),
+          _buildTextField(_businessNameController, 'Business / Tenant Name', Icons.business),
+          const SizedBox(height: 20),
+          _buildTextField(_phoneController, 'WhatsApp Contact', Icons.phone, isPhone: true),
+          const SizedBox(height: 20),
+          _buildTextField(_agentCodeController, 'Agent Code (Optional)', Icons.badge, isRequired: false),
           const SizedBox(height: 24),
           const Align(
             alignment: Alignment.centerLeft,
-            child: Text(
-              'Select Industry Sector Mode:',
-              style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
-            ),
+            child: Text('Select Industry Sector Mode:', style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
           ),
           const SizedBox(height: 12),
           Row(
@@ -476,14 +360,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       );
     }
 
-    // Step 3
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Select Theme Primary Accent:',
-          style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
-        ),
+        const Text('Select Theme Primary Accent:', style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -508,19 +388,50 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
               const Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 20),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'Onboarding completes your hardware profile binding securely.',
-                  style: TextStyle(
-                    color: Colors.grey[400],
-                    fontSize: 11,
-                    height: 1.3,
-                  ),
-                ),
+                child: Text('OTP Verification will begin next to bind your hardware profile securely.', style: TextStyle(color: Colors.grey[400], fontSize: 11, height: 1.3)),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isEmail = false, bool isPhone = false, bool isPassword = false, bool isRequired = true, String? Function(String?)? customValidator}) {
+    return TextFormField(
+      controller: controller,
+      style: const TextStyle(color: Colors.white),
+      obscureText: isPassword ? _obscurePassword : false,
+      keyboardType: isEmail ? TextInputType.emailAddress : isPhone ? TextInputType.phone : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF818CF8)),
+        prefixIcon: Icon(icon, color: const Color(0xFF818CF8)),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                  color: const Color(0xFF818CF8),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: const Color(0xFF101625),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF6366F1)),
+        ),
+      ),
+      validator: customValidator ?? (isRequired ? (value) => value == null || value.trim().isEmpty ? 'Required' : null : null),
     );
   }
 
@@ -534,15 +445,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-              ),
+              Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
               const SizedBox(height: 2),
-              Text(
-                desc,
-                style: TextStyle(color: Colors.grey[500], fontSize: 11),
-              ),
+              Text(desc, style: TextStyle(color: Colors.grey[500], fontSize: 11)),
             ],
           ),
         ),
@@ -560,24 +465,14 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected ? const Color(0xFF6366F1).withOpacity(0.15) : const Color(0xFF101625),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF6366F1) : Colors.white.withOpacity(0.05),
-              width: 1.5,
-            ),
+            border: Border.all(color: isSelected ? const Color(0xFF6366F1) : Colors.white.withOpacity(0.05), width: 1.5),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             children: [
               Icon(icon, color: isSelected ? const Color(0xFF818CF8) : Colors.grey, size: 20),
               const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
+              Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold, fontSize: 12)),
             ],
           ),
         ),
@@ -592,17 +487,8 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       customBorder: const CircleBorder(),
       child: Container(
         padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: isSelected ? Colors.white : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: CircleAvatar(
-          backgroundColor: color,
-          radius: 12,
-        ),
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: 2)),
+        child: CircleAvatar(backgroundColor: color, radius: 12),
       ),
     );
   }
@@ -613,32 +499,21 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           if (_currentStep > 0)
-            TextButton(
-              onPressed: () => setState(() => _currentStep--),
-              child: const Text('BACK', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-            )
+            TextButton(onPressed: () => setState(() => _currentStep--), child: const Text('BACK', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)))
           else
             const SizedBox.shrink(),
           ElevatedButton(
             onPressed: () {
-              if (_currentStep == 1 && !_formKey.currentState!.validate()) {
-                return;
-              }
+              if (_currentStep == 1 && !_formKey.currentState!.validate()) return;
               setState(() => _currentStep++);
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
             child: const Text('NEXT STEP', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       );
     }
 
-    // Step 3 Actions
     return Column(
       children: [
         SizedBox(
@@ -646,11 +521,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           height: 50,
           child: ElevatedButton(
             onPressed: () => _submitOnboarding(isTrial: false),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6366F1),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text('ONBOARD & ACTIVATE DEVICE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           ),
         ),
@@ -660,20 +531,13 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           height: 50,
           child: OutlinedButton(
             onPressed: () => _submitOnboarding(isTrial: true),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.5)),
-              foregroundColor: const Color(0xFF10B981),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+            style: OutlinedButton.styleFrom(side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.5)), foregroundColor: const Color(0xFF10B981), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text('START FREE 3-DAY TRIAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
           ),
         ),
         const SizedBox(height: 16),
         Center(
-          child: TextButton(
-            onPressed: () => setState(() => _currentStep = 1),
-            child: const Text('GO BACK TO DETAILS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-          ),
+          child: TextButton(onPressed: () => setState(() => _currentStep = 1), child: const Text('GO BACK TO DETAILS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
         ),
       ],
     );
@@ -681,6 +545,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
 
   @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _businessNameController.dispose();
     _phoneController.dispose();
     _agentCodeController.dispose();

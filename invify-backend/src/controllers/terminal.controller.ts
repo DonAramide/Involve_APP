@@ -250,11 +250,15 @@ export class TerminalController {
   // POST /api/mobile/terminal/sync
   static async mobileSync(req: Request, res: Response) {
     try {
-      const { deviceId, enrollmentKey, serialNumber, androidId, businessName } = req.body;
+      const { deviceId, enrollmentKey, serialNumber, androidId } = req.body;
       if (!deviceId) return res.status(400).json({ error: 'deviceId is required' });
-      const result = await TerminalSyncService.syncTerminalForDevice(deviceId, enrollmentKey, serialNumber, androidId, businessName);
+      const tenantId = (req as any).user?.tenantId || null;
+      const result = await TerminalSyncService.syncTerminalForDevice(deviceId, enrollmentKey, serialNumber, androidId, tenantId);
       return res.status(200).json(result);
     } catch (error: any) {
+      if (error.message === 'ACCESS_DENIED_OWNERSHIP_MISMATCH') {
+        return res.status(403).json({ error: 'Access denied. You do not own this device.' });
+      }
       return res.status(500).json({ error: error.message });
     }
   }

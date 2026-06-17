@@ -446,6 +446,7 @@ export class PosService {
     terminalId: string;
     amount: number;
     emvData: any;
+    isDeviceProcessed?: boolean;
     staffName?: string;
     items?: any[];
     deviceStatus?: string;

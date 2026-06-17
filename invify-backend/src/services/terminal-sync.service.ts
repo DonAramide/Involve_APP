@@ -1,3 +1,4 @@
+import { QuasarPlatformService } from './quasar-platform.service';
 // src/services/terminal-sync.service.ts
 import { TerminalInventoryService } from './terminal-inventory.service';
 import { TerminalAuditService } from './terminal-audit.service';
@@ -29,100 +30,121 @@ export class TerminalSyncService {
   /**
    * Called by mobile device on startup / periodic sync.
    * Returns terminal config provisioned for the given deviceId.
+   * Never returns { assigned: false } — all devices are valid.
    */
   static async syncTerminalForDevice(
     deviceId: string,
     enrollmentKey?: string,
     serialNumber?: string,
     androidId?: string,
-    businessName?: string
+    tenantId?: string
   ) {
-    // Look up the assigned terminal bundle for this device
-    const bundle = await TerminalInventoryService.getAssignmentByDeviceId(deviceId);
+    // Step 1: Look up device record from Supabase to get device_category and tenant_id
+    let deviceRecord: any = null;
+    try {
+      const { data } = await supabase
+        .from('devices')
+        .select('*, tenants(id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code)')
+        .eq('device_id', deviceId)
+        .maybeSingle();
+      deviceRecord = data;
+    } catch (err) {
+      console.warn(`[TerminalSync] Device lookup failed for ${deviceId}:`, err);
+    }
 
+    const resolvedTenantId = deviceRecord?.tenant_id || tenantId || null;
+
+    if (deviceRecord && tenantId && deviceRecord.tenant_id !== tenantId) {
+      console.warn(`[TerminalSync] Device ownership spoofing detected! Device ${deviceId} belongs to tenant ${deviceRecord.tenant_id}, but request user is from tenant ${tenantId}.`);
+      throw new Error('ACCESS_DENIED_OWNERSHIP_MISMATCH');
+    }
+
+    const deviceCategory = deviceRecord?.device_category || 'USER_DEVICE';
+    const deviceRole = deviceRecord?.device_role || 'PHONE';
+
+    // Step 2: Fetch global support config from system_configurations
     let supportPhone = '+234 800 INVIFY';
     let supportEmail = 'info.iips.ng@gmail.com';
     let supportWhatsapp = '+2348023552282';
     let broadcastMessage = '';
-    let tenantDetails: any = null;
 
     try {
-      try {
-        const { data, error } = await supabase.from('system_configurations')
-          .select('config_key, config_value')
-          .in('config_key', ['support_phone', 'support_email', 'support_whatsapp', 'broadcast_message']);
-        
-        if (!error && data && data.length > 0) {
-          for (const row of data) {
-            if (row.config_key === 'support_phone') supportPhone = row.config_value;
-            if (row.config_key === 'support_email') supportEmail = row.config_value;
-            if (row.config_key === 'support_whatsapp') supportWhatsapp = row.config_value;
-            if (row.config_key === 'broadcast_message') broadcastMessage = row.config_value;
-          }
-        } else {
-          throw error || new Error('No DB data');
-        }
-      } catch (dbErr) {
-        const fs = require('fs');
-        const path = require('path');
-        const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
-        if (fs.existsSync(GLOBAL_SETTINGS_PATH)) {
-          const globalSettings = JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
-          if (globalSettings.support_phone) supportPhone = globalSettings.support_phone;
-          if (globalSettings.support_email) supportEmail = globalSettings.support_email;
-          if (globalSettings.support_whatsapp) supportWhatsapp = globalSettings.support_whatsapp;
-          if (globalSettings.broadcast_message) broadcastMessage = globalSettings.broadcast_message;
+      const { data, error } = await supabase.from('system_configurations')
+        .select('config_key, config_value')
+        .in('config_key', ['support_phone', 'support_email', 'support_whatsapp', 'broadcast_message']);
+      
+      if (!error && data && data.length > 0) {
+        for (const row of data) {
+          if (row.config_key === 'support_phone') supportPhone = row.config_value;
+          if (row.config_key === 'support_email') supportEmail = row.config_value;
+          if (row.config_key === 'support_whatsapp') supportWhatsapp = row.config_value;
+          if (row.config_key === 'broadcast_message') broadcastMessage = row.config_value;
         }
       }
+    } catch (e) {
+      console.warn('[TerminalSync] system_configurations lookup failed (non-fatal)');
+    }
 
-      // Check if terminal is assigned to a Tenant or if we have a businessName from the app
-      const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
-      if (fs.existsSync(LOCAL_TENANTS_DB_PATH)) {
-        const tenants = JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'));
-        let tenant = null;
+    // Override support details with tenant-specific values if available
+    const tenantDetails = deviceRecord?.tenants || null;
+    if (tenantDetails) {
+      if (tenantDetails.support_phone) supportPhone = tenantDetails.support_phone;
+      if (tenantDetails.support_email) supportEmail = tenantDetails.support_email;
+      if (tenantDetails.support_whatsapp) supportWhatsapp = tenantDetails.support_whatsapp;
+    }
 
-        if (bundle && bundle.assignment && bundle.assignment.tenant_id) {
-          tenant = tenants.find((t: any) => t.id === bundle.assignment.tenant_id);
-        } else if (businessName) {
-          tenant = tenants.find((t: any) => t.name.toLowerCase() === businessName.toLowerCase());
-        }
+    // Step 3: USER_DEVICE branch — return capabilities without terminal config
+    if (deviceCategory !== 'COMPANY_DEVICE') {
+      console.log(`[TerminalSync] Device ${deviceId} → USER_DEVICE. Returning capability profile.`);
 
-        if (tenant) {
-          tenantDetails = tenant;
-          if (tenant.support_phone) supportPhone = tenant.support_phone;
-          if (tenant.support_email) supportEmail = tenant.support_email;
-          if (tenant.support_whatsapp) supportWhatsapp = tenant.support_whatsapp;
-        }
+      // Quasar provisioning for eligible tenants
+      if (tenantDetails && tenantDetails.plan !== 'free' && tenantDetails.plan !== 'basic') {
+        try {
+          QuasarPlatformService.provisionTenant(tenantDetails).catch(e => console.error(e));
+        } catch (_) {}
       }
-    } catch (e) {}
 
-    if (!bundle || !bundle.assignment) {
-      console.log(`[TerminalSync] Device ${deviceId} is UNASSIGNED. Fallback lookup via businessName ('${businessName}') resolved tenantId: ${tenantDetails?.id}`);
       return {
-        assigned: false,
-        message: 'No terminal assigned to this device',
+        deviceCategory: 'USER_DEVICE',
+        deviceRole,
+        tenantId: resolvedTenantId,
+        tenantName: tenantDetails?.name || null,
+        plan: tenantDetails?.plan || null,
+        type: tenantDetails?.type || null,
+        features: {
+          invoicing: true,
+          inventory: true,
+          customerManagement: true,
+          reporting: true,
+          printing: false,
+          emvPayments: false,
+          cardSettlement: false,
+        },
         supportPhone,
         supportEmail,
         supportWhatsapp,
         broadcastMessage,
-        tenantId: tenantDetails?.id || null,
-        plan: tenantDetails?.plan || null,
-        type: tenantDetails?.type || null,
+        syncedAt: new Date().toISOString(),
       };
     }
 
-    console.log(`[TerminalSync] Device ${deviceId} is ASSIGNED. Found tenantId: ${tenantDetails?.id}`);
+    // Step 4: COMPANY_DEVICE branch — full terminal config
+    console.log(`[TerminalSync] Device ${deviceId} → COMPANY_DEVICE. Fetching terminal bundle.`);
+
+    const bundle = await TerminalInventoryService.getAssignmentByDeviceId(deviceId);
 
     // Record sync event in audit log
-    await TerminalAuditService.log({
-      actionType: 'SYNC_SUCCESS',
-      terminalId: bundle.terminal_id?.tid,
-      mposTerminalId: bundle.mpos?.id,
-      newDeviceId: deviceId,
-      adminId: deviceId,
-      reason: 'Mobile device sync',
-      metadata: { serialNumber, androidId, enrollmentKey },
-    });
+    if (bundle) {
+      await TerminalAuditService.log({
+        actionType: 'SYNC_SUCCESS',
+        terminalId: bundle.terminal_id?.tid,
+        mposTerminalId: bundle.mpos?.id,
+        newDeviceId: deviceId,
+        adminId: deviceId,
+        reason: 'Mobile device sync',
+        metadata: { serialNumber, androidId, enrollmentKey },
+      });
+    }
 
     const routingConfig = await PosService.getRoutingConfig();
 
@@ -138,36 +160,25 @@ export class TerminalSyncService {
     const tertiaryHost = activeHosts[2] || null;
 
     const tenantCategory = tenantDetails?.type || 'retail';
-    const tenantId = tenantDetails?.id;
-    
-    // In the future, we can extract agentCode or terminalGroup from the bundle/tenant for full matching.
-    const agentCode = null; 
+    const agentCode = tenantDetails?.agent_code || null;
     const terminalGroup = null;
 
     let tenantPolicy = null;
     if (routingConfig.tenantRoutingProfiles) {
-      // 1. Tenant match (Highest Priority)
-      if (tenantId) {
-        tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => p.scopeType === 'Tenant' && p.targetValue === tenantId);
+      if (resolvedTenantId) {
+        tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => p.scopeType === 'Tenant' && p.targetValue === resolvedTenantId);
       }
-      
-      // 2. Agent match
       if (!tenantPolicy && agentCode) {
         tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => p.scopeType === 'Agent' && p.targetValue === agentCode);
       }
-      
-      // 3. Group match
       if (!tenantPolicy && terminalGroup) {
         tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => p.scopeType === 'Group' && p.targetValue === terminalGroup);
       }
-      
-      // 4. Category / Default match (Lowest Priority)
       if (!tenantPolicy) {
         tenantPolicy = routingConfig.tenantRoutingProfiles.find((p: any) => {
           if (p.scopeType === 'Category' && p.targetValue) {
             return p.targetValue.toLowerCase() === tenantCategory.toLowerCase();
           }
-          // Backward compatibility
           if (!p.scopeType && p.category) {
             return p.category.toLowerCase() === tenantCategory.toLowerCase();
           }
@@ -176,24 +187,38 @@ export class TerminalSyncService {
       }
     }
 
+    // Determine COMPANY_DEVICE features based on bundle contents
+    const hasMpos = !!(bundle?.mpos);
+    const hasPrinter = !!(bundle?.printer);
+
     return {
-      assigned: true,
-      terminalId: bundle.terminal_id?.tid,
-      mposTerminalId: bundle.mpos?.id,
-      posSerialNumber: bundle.mpos?.serial_number,
-      businessName: tenantDetails?.name || 'Business mapped via Tenant DB',
-      terminalType: bundle.mpos?.hardware_type,
+      deviceCategory: 'COMPANY_DEVICE',
+      deviceRole,
+      tenantId: resolvedTenantId,
+      tenantName: tenantDetails?.name || 'Business mapped via Tenant DB',
+      plan: tenantDetails?.plan || null,
+      type: tenantDetails?.type || null,
+      features: {
+        invoicing: true,
+        inventory: true,
+        customerManagement: true,
+        reporting: true,
+        printing: hasPrinter || deviceRole === 'TABLET',
+        emvPayments: hasMpos,
+        cardSettlement: hasMpos,
+      },
+      terminalId: bundle?.terminal_id?.tid || null,
+      mposTerminalId: bundle?.mpos?.id || null,
+      posSerialNumber: bundle?.mpos?.serial_number || null,
+      terminalType: bundle?.mpos?.hardware_type || null,
       configVersion: 1,
       syncedAt: new Date().toISOString(),
-      printerMac: bundle.printer?.mac_address,
-      printerModel: bundle.printer?.model,
+      printerMac: bundle?.printer?.mac_address || null,
+      printerModel: bundle?.printer?.model || null,
       supportPhone,
       supportEmail,
       supportWhatsapp,
       broadcastMessage,
-      tenantId: tenantDetails?.id,
-      plan: tenantDetails?.plan,
-      type: tenantDetails?.type,
       activeHost: routingConfig.activeHost.toUpperCase(),
       expressPayHost: expressPay?.ip || null,
       expressPayPort: expressPay?.port || null,
@@ -228,12 +253,37 @@ export class TerminalSyncService {
 
   /**
    * Lightweight status check — no audit log entry.
+   * Returns device_category and features for all devices.
    */
   static async getTerminalStatus(deviceId: string) {
-    const bundle = await TerminalInventoryService.getAssignmentByDeviceId(deviceId);
-    if (!bundle) {
-      return { assigned: false };
+    // Look up device record for category
+    let deviceCategory = 'USER_DEVICE';
+    let deviceRole = 'PHONE';
+    try {
+      const { data } = await supabase.from('devices')
+        .select('device_category, device_role')
+        .eq('device_id', deviceId)
+        .maybeSingle();
+      if (data) {
+        deviceCategory = data.device_category || 'USER_DEVICE';
+        deviceRole = data.device_role || 'PHONE';
+      }
+    } catch (_) {}
+
+    // USER_DEVICE — minimal response
+    if (deviceCategory !== 'COMPANY_DEVICE') {
+      return {
+        deviceCategory,
+        deviceRole,
+        features: {
+          invoicing: true, inventory: true, customerManagement: true, reporting: true,
+          printing: false, emvPayments: false, cardSettlement: false,
+        },
+      };
     }
+
+    // COMPANY_DEVICE — include terminal config
+    const bundle = await TerminalInventoryService.getAssignmentByDeviceId(deviceId);
     const routingConfig = await PosService.getRoutingConfig();
 
     const activeHosts = routingConfig.hosts
@@ -247,12 +297,22 @@ export class TerminalSyncService {
     const secondaryHost = activeHosts[1] || null;
     const tertiaryHost = activeHosts[2] || null;
 
+    const hasMpos = !!(bundle?.mpos);
+    const hasPrinter = !!(bundle?.printer);
+
     return {
-      assigned: true,
-      terminalId: bundle.terminal_id?.tid,
-      mposTerminalId: bundle.mpos?.id,
-      posSerialNumber: bundle.mpos?.serial_number,
-      terminalType: bundle.mpos?.hardware_type,
+      deviceCategory,
+      deviceRole,
+      features: {
+        invoicing: true, inventory: true, customerManagement: true, reporting: true,
+        printing: hasPrinter || deviceRole === 'TABLET',
+        emvPayments: hasMpos,
+        cardSettlement: hasMpos,
+      },
+      terminalId: bundle?.terminal_id?.tid,
+      mposTerminalId: bundle?.mpos?.id,
+      posSerialNumber: bundle?.mpos?.serial_number,
+      terminalType: bundle?.mpos?.hardware_type,
       configVersion: 1,
       activeHost: routingConfig.activeHost.toUpperCase(),
       expressPayHost: expressPay?.ip || null,

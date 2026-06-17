@@ -161,7 +161,14 @@ app.post('/api/agent/resolve-suspension', AgentController.resolveSuspension);
 app.get('/api/agent/dashboard', authenticate, AgentController.getDashboard);
 
 import activationRoutes from './routes/activation.routes';
+import { authRoutes } from './routes/auth.routes';
+import vaultRoutes from './routes/vault.routes';
+import settingsRoutes from './routes/settings.routes';
+
 app.use(activationRoutes);
+app.use('/auth', authRoutes);
+app.use('/vault', vaultRoutes);
+app.use('/settings', settingsRoutes);
 
 // Orchestration Endpoints
 app.get('/api/orchestration/context', authenticate, checkRole(['super_admin']), OrchestrationController.getContext);
@@ -233,6 +240,8 @@ app.get('/api/admin/user-devices', authenticate, checkRole(['super_admin']), Use
 app.post('/api/admin/user-devices/approve', authenticate, checkRole(['super_admin']), UserController.approveDevice);
 app.post('/api/admin/user-devices/block', authenticate, checkRole(['super_admin']), UserController.blockDevice);
 app.post('/api/admin/audit/archive', authenticate, checkRole(['super_admin']), UserController.triggerArchiving);
+app.post('/admin/devices/:deviceId/upgrade-to-company', authenticate, checkRole(['super_admin']), DeviceController.upgradeToCompany);
+
 
 
 // Device Activation Hub Endpoints
@@ -240,7 +249,7 @@ app.get('/devices', authenticate, DeviceController.getDevices);
 app.get('/devices/activations', authenticate, DeviceController.getActivations);
 app.post('/devices/activations', authenticate, DeviceController.createActivation);
 app.post('/devices/validate', authenticate, DeviceController.validateCode);
-app.post('/devices/onboard', DeviceController.onboardDevice);
+app.post('/devices/onboard', authenticate, DeviceController.onboardDevice);
 app.patch('/devices/:id', authenticate, DeviceController.updateDevice);
 
 // ─── DEVICE TELEMETRY & FLEET VISIBILITY ──────────────────────────────────────
@@ -249,7 +258,7 @@ app.get('/api/devices/:deviceId/telemetry', authenticate, DeviceController.getDe
 app.get('/api/devices/:deviceId/alerts', authenticate, DeviceController.getDeviceAlerts);
 
 // Terminal Sync (Public for mobile app)
-app.post('/api/mobile/terminal/sync', TerminalController.mobileSync);
+app.post('/api/mobile/terminal/sync', authenticate, TerminalController.mobileSync);
 app.post('/api/mobile/terminal/keyexchange-success', TerminalController.keyExchangeSuccess);
 app.get('/api/mobile/terminal/status', TerminalController.mobileStatus);
 

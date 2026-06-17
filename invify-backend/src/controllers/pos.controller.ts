@@ -13,6 +13,7 @@ export class PosController {
           terminalId,
           amount,
           emvData,
+          isDeviceProcessed: true,
           staffName,
           items,
           deviceStatus,

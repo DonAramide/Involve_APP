@@ -17,7 +17,19 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/login',
-    component: () => import('pages/MockDashboard.vue')
+    component: () => import('pages/MockDashboard.vue') // Placeholder
+  },
+  {
+    path: '/register',
+    component: () => import('pages/public/RegisterPage.vue')
+  },
+  {
+    path: '/forgot-password',
+    component: () => import('pages/public/ForgotPasswordPage.vue')
+  },
+  {
+    path: '/reset-password',
+    component: () => import('pages/public/ResetPasswordPage.vue')
   },
 
   // Always leave this as last one,

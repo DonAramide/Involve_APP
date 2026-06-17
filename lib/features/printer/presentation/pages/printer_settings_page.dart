@@ -87,7 +87,6 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
         deviceId: _deviceId,
         androidId: androidId,
         serialNumber: serialNum,
-        businessName: businessName,
         enrollmentKey: enrollmentKey,
       );
       _lastSyncTime = await TerminalSyncService.getLastSyncTime();
@@ -260,6 +259,31 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
             // PRINTER TAB
             BlocBuilder<PrinterBloc, PrinterState>(
               builder: (context, state) {
+                if (_terminalConfig != null && _terminalConfig?.capabilities.printing != true) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.print_disabled, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'Printing Features Disabled',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'This device is not authorized for printing. Please contact your administrator to upgrade this device.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
                 if (state.error != null) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -421,135 +445,162 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'POS Terminal Configuration',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Builder(
+                  builder: (context) {
+                    if (_terminalConfig != null && _terminalConfig?.capabilities.emvPayments != true) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 64.0, horizontal: 24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.point_of_sale, size: 64, color: Colors.grey),
+                              SizedBox(height: 16),
+                              Text(
+                                'POS & EMV Features Disabled',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'This device is not configured as a company terminal. EMV / Card payments are disabled.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
                         ),
-                        if (_isSyncing)
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        else
-                          IconButton(
-                            icon: const Icon(Icons.sync, color: Colors.teal, size: 20),
-                            onPressed: () => _syncTerminalConfig(showLoading: true),
-                            tooltip: 'Force Sync Config',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'POS Terminal Configuration',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            if (_isSyncing)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else
+                              IconButton(
+                                icon: const Icon(Icons.sync, color: Colors.teal, size: 20),
+                                onPressed: () => _syncTerminalConfig(showLoading: true),
+                                tooltip: 'Force Sync Config',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Provisioned by Invify Operations — read-only',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                        ),
+                        const SizedBox(height: 16),
+
+                        if (_syncError != null)
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Sync Failed: $_syncError\nCheck your network connection and try again.',
+                                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        _buildTerminalStatusCard(),
+
+                        const SizedBox(height: 24),
+                        
+                        // Hardware Interaction Buttons
+                        Builder(
+                          builder: (ctx) {
+                            bool hasMismatch = false;
+                            bool isMissingMapping = false;
+                            bool isInvalidDevice = _mposSerialNumber == null || _mposSerialNumber!.isEmpty;
+
+                            if (_terminalConfig != null) {
+                              if (!_terminalConfig!.assigned) {
+                                isMissingMapping = true;
+                              } else {
+                                final connectedPrinterMac = ctx.watch<PrinterBloc>().state.connectedDevice?.address;
+                                final isPrinterMismatch = _terminalConfig!.printerMac != null && connectedPrinterMac != null && _terminalConfig!.printerMac != connectedPrinterMac;
+                                final isMposMismatch = _terminalConfig!.posSerialNumber != null && !isInvalidDevice && !_isDeviceNameMatch(_terminalConfig!.posSerialNumber, _mposSerialNumber);
+                                hasMismatch = isPrinterMismatch || isMposMismatch;
+                                
+                                isMissingMapping = _terminalConfig!.terminalId == null || _terminalConfig!.terminalId!.isEmpty;
+                              }
+                            } else {
+                              isMissingMapping = true;
+                            }
+
+                            final disablePairing = isMissingMapping;
+                            final disableDownload = hasMismatch || isMissingMapping || isInvalidDevice;
+
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: disablePairing ? null : _pairDevice,
+                                    icon: const Icon(Icons.bluetooth_connected, size: 18),
+                                    label: const Text('Pair Device'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.indigo.shade600,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: (_isLoadingParams || disableDownload) ? null : _downloadParams,
+                                    icon: _isLoadingParams 
+                                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                      : const Icon(Icons.download, size: 18),
+                                    label: Text(_isLoadingParams ? 'Loading...' : 'Download Terminal Params', style: const TextStyle(fontSize: 12)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.teal.shade600,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                        ),
+                        const SizedBox(height: 12),
+                        if (_lastSyncTime != null)
+                          Center(
+                            child: Text(
+                              'Last synced: ${_formatSyncTime(_lastSyncTime!)}',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                            ),
                           ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Provisioned by Invify Operations — read-only',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                    ),
-                    const SizedBox(height: 16),
-
-                    if (_syncError != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Sync Failed: $_syncError\nCheck your network connection and try again.',
-                                style: const TextStyle(color: Colors.red, fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    _buildTerminalStatusCard(),
-
-                    const SizedBox(height: 24),
-                    
-                    // Hardware Interaction Buttons
-                    Builder(
-                      builder: (ctx) {
-                        bool hasMismatch = false;
-                        bool isMissingMapping = false;
-                        bool isInvalidDevice = _mposSerialNumber == null || _mposSerialNumber!.isEmpty;
-
-                        if (_terminalConfig != null) {
-                          if (!_terminalConfig!.assigned) {
-                            isMissingMapping = true;
-                          } else {
-                            final connectedPrinterMac = ctx.watch<PrinterBloc>().state.connectedDevice?.address;
-                            final isPrinterMismatch = _terminalConfig!.printerMac != null && connectedPrinterMac != null && _terminalConfig!.printerMac != connectedPrinterMac;
-                            final isMposMismatch = _terminalConfig!.posSerialNumber != null && !isInvalidDevice && !_isDeviceNameMatch(_terminalConfig!.posSerialNumber, _mposSerialNumber);
-                            hasMismatch = isPrinterMismatch || isMposMismatch;
-                            
-                            isMissingMapping = _terminalConfig!.terminalId == null || _terminalConfig!.terminalId!.isEmpty;
-                          }
-                        } else {
-                          isMissingMapping = true;
-                        }
-
-                        final disablePairing = isMissingMapping;
-                        final disableDownload = hasMismatch || isMissingMapping || isInvalidDevice;
-
-                        return Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: disablePairing ? null : _pairDevice,
-                                icon: const Icon(Icons.bluetooth_connected, size: 18),
-                                label: const Text('Pair Device'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.indigo.shade600,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: (_isLoadingParams || disableDownload) ? null : _downloadParams,
-                                icon: _isLoadingParams 
-                                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                  : const Icon(Icons.download, size: 18),
-                                label: Text(_isLoadingParams ? 'Loading...' : 'Download Terminal Params', style: const TextStyle(fontSize: 12)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.teal.shade600,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      }
-                    ),
-                    const SizedBox(height: 12),
-                    if (_lastSyncTime != null)
-                      Center(
-                        child: Text(
-                          'Last synced: ${_formatSyncTime(_lastSyncTime!)}',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+                    );
+                  }
             ),
           ],
         ),

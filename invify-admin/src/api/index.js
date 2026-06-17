@@ -219,5 +219,12 @@ export const commissionApi = {
   deleteTerminalRule: (id) => api.delete(`/admin/commissions/terminal-rules/${id}`),
 };
 
+export const vaultApi = {
+  listIntegrations: (scope, tenantId) => api.get('/vault/integrations', { params: { scope, tenantId } }),
+  registerIntegration: (data) => api.post('/vault/integrations', data),
+  addCredential: (vaultId, data) => api.post(`/vault/integrations/${vaultId}/credentials`, data),
+  testConnection: (vaultId, data) => api.post(`/vault/integrations/${vaultId}/test`, data),
+};
+
 export { api };
 export default api;

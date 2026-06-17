@@ -461,85 +461,114 @@ export class DeviceController {
 
   /**
    * POST /devices/onboard
-   * Register first time onboarding from mobile client with full device diagnostics
+   * Register device from mobile client. Uses JWT tenant_id for identity.
+   * Classifies device as USER_DEVICE or COMPANY_DEVICE based on terminal_inventory lookup.
    */
   static async onboardDevice(req: Request, res: Response) {
     try {
-      const { businessName, phone, industry, themeColor, agentCode, location, deviceInfo } = req.body;
-      console.log('[DeviceController] Received Device Onboarding Payload:', {
-        businessName,
-        phone,
-        industry,
-        themeColor,
-        agentCode,
-        location,
-        deviceInfo
-      });
+      const { deviceId, deviceInfo, themeColor } = req.body;
+      const tenantId = (req as any).user?.tenantId;
 
-      // Ensure the business exists in tenants_db.json
-      let resolvedTenantId = 'tenant-invi001';
-      try {
-        const tenantsDbPath = path.join(process.cwd(), 'tenants_db.json');
-        if (fs.existsSync(tenantsDbPath)) {
-          const tenants = JSON.parse(fs.readFileSync(tenantsDbPath, 'utf-8'));
-          let found = tenants.find((t: any) => t.name.toLowerCase() === businessName.toLowerCase());
-          if (!found) {
-            resolvedTenantId = `tenant-${require('crypto').randomUUID()}`;
-            const newTenant = {
-              id: resolvedTenantId,
-              name: businessName,
-              type: industry || 'retail',
-              plan: 'standard',
-              status: 'active',
-              agent_code: agentCode || 'AAA000',
-              location: location || 'Unknown',
-              device_id: deviceInfo?.deviceId || 'UNASSIGNED',
-              created_at: new Date().toISOString()
-            };
-            tenants.push(newTenant);
-            fs.writeFileSync(tenantsDbPath, JSON.stringify(tenants, null, 2));
-            console.log('[DeviceController] Dynamically registered onboarded tenant:', businessName);
-          } else {
-            resolvedTenantId = found.id;
-            found.agent_code = agentCode || found.agent_code || 'AAA000';
-            found.location = location || found.location || 'Unknown';
-            found.device_id = deviceInfo?.deviceId || found.device_id || 'UNASSIGNED';
-            fs.writeFileSync(tenantsDbPath, JSON.stringify(tenants, null, 2));
-          }
-        }
-      } catch (err) {
-        console.error('[DeviceController] Failed to sync tenant database during onboarding:', err);
+      if (!tenantId) {
+        return res.status(401).json({ error: 'Authentication required. tenant_id missing from JWT.' });
+      }
+      if (!deviceId && !deviceInfo?.deviceId) {
+        return res.status(400).json({ error: 'deviceId is required.' });
       }
 
-      // Save in offline mock database
-      const local = DeviceController.getLocalData();
-      const existingIdx = local.devices.findIndex((d: any) => d.device_id === (deviceInfo?.deviceId || 'unknown'));
-      
-      const onboardedRecord = {
-        id: existingIdx >= 0 ? local.devices[existingIdx].id : `dev-${Date.now()}`,
-        device_id: deviceInfo?.deviceId || 'unknown',
-        device_suffix: deviceInfo?.deviceSuffix || 'XXXXXX',
-        tenant_id: resolvedTenantId,
+      const resolvedDeviceId = deviceId || deviceInfo?.deviceId;
+      console.log('[DeviceController] Device Onboarding:', { resolvedDeviceId, tenantId, themeColor });
+
+      // Step 1: Check terminal_inventory to classify device
+      let deviceCategory = 'USER_DEVICE';
+      let deviceRole = 'PHONE';
+      let inventoryRecordId: string | null = null;
+
+      try {
+        const { data: inventoryRecord } = await supabase
+          .from('terminal_inventory')
+          .select('id, terminal_type, assignment_status')
+          .eq('assigned_device_id', resolvedDeviceId)
+          .maybeSingle();
+
+        if (inventoryRecord) {
+          deviceCategory = 'COMPANY_DEVICE';
+          inventoryRecordId = inventoryRecord.id;
+          // Map terminal_type to device_role
+          const typeMap: Record<string, string> = {
+            'tablet': 'TABLET', 'android': 'TABLET',
+            'mpos': 'MPOS', 'dspread': 'MPOS',
+            'printer': 'PRINTER', 'bluetooth': 'PRINTER'
+          };
+          const rawType = (inventoryRecord.terminal_type || '').toLowerCase();
+          deviceRole = typeMap[rawType] || 'TABLET';
+          console.log(`[DeviceController] Device found in terminal_inventory → COMPANY_DEVICE (role: ${deviceRole})`);
+        } else {
+          // Determine USER_DEVICE role from deviceInfo
+          const platform = (deviceInfo?.platform || deviceInfo?.manufacturer || '').toLowerCase();
+          deviceRole = platform.includes('tablet') ? 'BYOD' : 'PHONE';
+          console.log(`[DeviceController] Device NOT in terminal_inventory → USER_DEVICE (role: ${deviceRole})`);
+        }
+      } catch (invErr: any) {
+        console.warn('[DeviceController] terminal_inventory lookup failed (non-fatal):', invErr.message);
+        // Default to USER_DEVICE on lookup failure — never block onboarding
+      }
+
+      // Step 2: Upsert device record in Supabase
+      const deviceRecord = {
+        device_id: resolvedDeviceId,
+        tenant_id: tenantId,
+        device_category: deviceCategory,
+        device_role: deviceRole,
         status: 'active',
-        business_name: businessName,
-        phone: phone,
-        industry: industry,
-        theme_color: themeColor,
-        device_info: deviceInfo,
+        device_suffix: deviceInfo?.deviceSuffix || null,
+        device_info: deviceInfo || null,
+        theme_color: themeColor || null,
+        inventory_record_id: inventoryRecordId,
+        device_name: deviceInfo?.model || deviceInfo?.deviceName || resolvedDeviceId,
+        platform: deviceInfo?.platform || 'android',
+        is_active: true,
         last_seen: new Date().toISOString(),
-        created_at: existingIdx >= 0 ? local.devices[existingIdx].created_at : new Date().toISOString(),
-        tenants: { name: businessName, plan: 'standard' }
       };
 
-      if (existingIdx >= 0) {
-        local.devices[existingIdx] = onboardedRecord;
-      } else {
-        local.devices.unshift(onboardedRecord);
+      const { data: upsertedDevice, error: upsertError } = await supabase
+        .from('devices')
+        .upsert(deviceRecord, { onConflict: 'device_id' })
+        .select()
+        .single();
+
+      if (upsertError) {
+        console.error('[DeviceController] Supabase upsert failed:', upsertError.message);
+        return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
       }
 
-      DeviceController.saveLocalData(local);
-      return res.status(200).json({ success: true, message: 'Device onboarded and registered successfully', record: onboardedRecord });
+      // Step 3: Compute capability profile
+      const isCompany = deviceCategory === 'COMPANY_DEVICE';
+      const hasMpos = isCompany && inventoryRecordId !== null; // MPOS detection refined during terminal sync
+      const hasPrinter = isCompany && deviceRole === 'PRINTER';
+
+      const features = {
+        invoicing: true,
+        inventory: true,
+        customerManagement: true,
+        reporting: true,
+        printing: isCompany && (hasPrinter || deviceRole === 'TABLET'),
+        emvPayments: isCompany && (hasMpos || deviceRole === 'MPOS'),
+        cardSettlement: isCompany && (hasMpos || deviceRole === 'MPOS'),
+      };
+
+      console.log(`[DeviceController] Onboarding complete: ${resolvedDeviceId} → ${deviceCategory}/${deviceRole}`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Device onboarded successfully',
+        device: upsertedDevice,
+        deviceCategory,
+        deviceRole,
+        features,
+      });
     } catch (error: any) {
+      console.error('[DeviceController] onboardDevice error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }
@@ -585,4 +614,79 @@ export class DeviceController {
       return res.status(500).json({ error: error.message });
     }
   }
+
+  /**
+   * POST /admin/devices/:deviceId/upgrade-to-company
+   * Upgrades a USER_DEVICE to a COMPANY_DEVICE, linking it to a terminal inventory record.
+   */
+  static async upgradeToCompany(req: Request, res: Response) {
+    try {
+      const { deviceId } = req.params;
+      const { inventoryRecordId } = req.body;
+
+      if (!inventoryRecordId) {
+        return res.status(400).json({ error: 'inventoryRecordId is required' });
+      }
+
+      // 1. Fetch terminal inventory record
+      const { data: inventoryRecord, error: invError } = await supabase
+        .from('terminal_inventory')
+        .select('*')
+        .eq('id', inventoryRecordId)
+        .single();
+
+      if (invError || !inventoryRecord) {
+        return res.status(404).json({ error: 'Terminal inventory record not found' });
+      }
+
+      // Map terminal type to device role
+      const typeMap: Record<string, string> = {
+        'tablet': 'TABLET', 'mpos': 'MPOS', 'dspread': 'MPOS',
+        'printer': 'PRINTER', 'bluetooth': 'PRINTER'
+      };
+      const rawType = (inventoryRecord.terminal_type || '').toLowerCase();
+      const deviceRole = typeMap[rawType] || 'TABLET';
+
+      // 2. Update device in Supabase
+      const { data: updatedDevice, error: updateError } = await supabase
+        .from('devices')
+        .update({
+          device_category: 'COMPANY_DEVICE',
+          device_role: deviceRole,
+          inventory_record_id: inventoryRecordId
+        })
+        .eq('device_id', deviceId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('[DeviceController] Upgrade device failed:', updateError.message);
+        return res.status(500).json({ error: 'Failed to update device record' });
+      }
+
+      // 3. Link device in terminal_inventory as well
+      const { error: invUpdateError } = await supabase
+        .from('terminal_inventory')
+        .update({
+          assigned_device_id: deviceId,
+          assignment_status: 'assigned',
+          assigned_at: new Date().toISOString()
+        })
+        .eq('id', inventoryRecordId);
+
+      if (invUpdateError) {
+        console.warn('[DeviceController] Failed to update terminal_inventory assignment:', invUpdateError.message);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Device upgraded to company successfully',
+        device: updatedDevice
+      });
+    } catch (error: any) {
+      console.error('[DeviceController] upgradeToCompany error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
 }
+

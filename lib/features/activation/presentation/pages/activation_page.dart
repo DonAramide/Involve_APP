@@ -47,7 +47,10 @@ class _ActivationPageState extends State<ActivationPage> {
   Future<void> _loadGlobalConfig() async {
     try {
       final deviceId = await DeviceInfoService.getDeviceSuffix();
-      final config = await TerminalSyncService.syncTerminalConfig(deviceId: deviceId);
+      final businessName = _businessNameController.text.trim();
+      final config = await TerminalSyncService.syncTerminalConfig(
+        deviceId: deviceId,
+      );
       if (mounted) {
         setState(() {
           _globalConfig = config;

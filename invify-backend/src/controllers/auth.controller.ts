@@ -364,4 +364,75 @@ export class AuthController {
       return res.status(500).json({ error: error.message });
     }
   }
+
+  public static async sendWhatsappOtp(req: Request, res: Response): Promise<void> {
+    try {
+      const { phone } = req.body;
+      if (!phone || typeof phone !== 'string') {
+        res.status(400).json({ error: 'Valid phone number is required.' });
+        return;
+      }
+
+      const { otpService } = require('../services/otp.service');
+      await otpService.generateOTP(phone);
+      res.status(200).json({ message: 'OTP sent successfully via WhatsApp.' });
+    } catch (error: any) {
+      console.error('[AuthController] sendWhatsappOtp error:', error.message);
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  public static async verifyWhatsappOtp(req: Request, res: Response): Promise<void> {
+    try {
+      const { phone, otp } = req.body;
+      if (!phone || !otp) {
+        res.status(400).json({ error: 'Phone and OTP are required.' });
+        return;
+      }
+
+      const { otpService } = require('../services/otp.service');
+      const isValid = await otpService.verifyOTP(phone, otp);
+      if (isValid) {
+        try {
+          const { dbQuery } = require('../db/pg');
+          // Check if tenants table exists
+          const tableCheck = await dbQuery(
+            `SELECT EXISTS (
+              SELECT FROM information_schema.tables 
+              WHERE table_schema = 'public' 
+              AND table_name = 'tenants'
+            );`
+          );
+
+          if (tableCheck.rows[0]?.exists) {
+            // Update phone_verified = true
+            const safePhone = phone.replace(/\+/g, '');
+            const reversed = safePhone.split('').reverse().join('');
+            const expectedTenantId = `tenant-` + reversed;
+
+            await dbQuery(
+              `UPDATE tenants SET phone_verified = true WHERE id = $1 OR phone = $2`,
+              [expectedTenantId, phone]
+            );
+          }
+          
+          res.status(200).json({ 
+            message: 'OTP verified successfully.',
+            data: { phone_verified: true }
+          });
+        } catch (dbErr) {
+          console.error('Failed to update tenant status after OTP verification', dbErr);
+          res.status(200).json({ 
+            message: 'OTP verified successfully (Tenant sync failed).',
+            data: { phone_verified: true }
+          });
+        }
+      } else {
+        res.status(400).json({ error: 'Invalid or expired OTP.' });
+      }
+    } catch (error: any) {
+      console.error('[AuthController] verifyWhatsappOtp error:', error.message);
+      res.status(400).json({ error: error.message });
+    }
+  }
 }

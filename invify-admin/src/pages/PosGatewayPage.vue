@@ -22,7 +22,7 @@
 
     <!-- ── Overview KPI Cards ────────────────────────────────────── -->
     <div class="row q-col-gutter-md q-mb-lg">
-      <div class="col-12 col-sm-6 col-md-3" v-for="kpi in kpiCards" :key="kpi.label">
+      <div class="col-12 col-sm-6 col-md" v-for="kpi in kpiCards" :key="kpi.label">
         <q-card class="bg-panel border-main animate-hover" flat :dark="prefs.isDarkMode">
           <q-card-section class="q-pa-md">
             <div class="row items-center justify-between q-mb-xs">
@@ -574,7 +574,14 @@
               </q-chip>
             </q-td>
           </template>
-          <template v-slot:body-cell-status="props">
+          <template v-slot:body-cell-processedBy="props">
+              <q-td :props="props" class="text-center">
+                <q-chip dense square :color="props.row.isDeviceProcessed ? 'deep-purple-5' : 'blue-6'" text-color="white" class="text-caption font-mono text-weight-bold">
+                  {{ props.row.isDeviceProcessed ? 'MPOS (Device)' : 'Quasar (Switch)' }}
+                </q-chip>
+              </q-td>
+            </template>
+            <template v-slot:body-cell-status="props">
             <q-td :props="props">
               <q-badge :color="props.value === 'Approved' ? 'green-10' : 'red-10'"
                 :text-color="props.value === 'Approved' ? 'green-4' : 'red-4'" class="text-weight-bold font-mono">
@@ -1007,6 +1014,7 @@ const txColumns = [
   { name: 'tenantId',   label: 'Business Owner', field: 'tenantId',   align: 'left'   },
   { name: 'terminalId', label: 'Terminal ID',  field: 'terminalId',   align: 'left'   },
   { name: 'host',       label: 'Routed Host',  field: 'host',         align: 'center' },
+    { name: 'processedBy',label: 'Processed By', field: 'processedBy',  align: 'center' },
   { name: 'amount',     label: 'Amount',       field: 'amount',       align: 'right',  sortable: true },
   { name: 'maskedPan',  label: 'Card PAN',     field: 'maskedPan',    align: 'left'   },
   { name: 'statusCode', label: 'Code',         field: 'statusCode',   align: 'center' },
@@ -1122,16 +1130,27 @@ const filteredHistory = computed(() => {
 
 // ── KPI cards ──────────────────────────────────────────────────────
 const kpiCards = computed(() => {
-  const all      = history.value
+  const all      = filteredHistory.value
   const approved = all.filter(t => t.status === 'Approved')
   const declined = all.filter(t => t.status !== 'Approved')
   const total    = all.reduce((s, t) => s + (t.amount || 0), 0)
   const rate     = metrics.value.successRate || 100
+  
+  const hostCounts = all.reduce((acc, tx) => {
+    const h = tx.host || 'UNKNOWN'
+    acc[h] = (acc[h] || 0) + 1
+    return acc
+  }, {})
+  const hostBreakdown = Object.entries(hostCounts).map(([host, count]) => `${host}: ${count}`).join(' | ') || 'Switchboard log total'
+  
+  const totalDeclinedAmt = declined.reduce((s, t) => s + (t.amount || 0), 0)
+  
   return [
-    { label: 'Total Transactions', value: all.length,                           sub: 'Switchboard log total',     icon: 'receipt_long',   color: 'purple-4', valueColor: '#a78bfa' },
-    { label: 'Switchboard Volume', value: `${currentCurrency.symbol}${total.toLocaleString()}`,          sub: 'Routed naira volume',        icon: 'payments',       color: 'teal-4',   valueColor: '#2dd4bf' },
+    { label: 'Total Transactions', value: all.length,                           sub: hostBreakdown,     icon: 'receipt_long',   color: 'purple-4', valueColor: '#a78bfa' },
+    { label: 'Switchboard Volume', value: `${currentCurrency.value.symbol}${total.toLocaleString()}`,          sub: 'Routed volume',        icon: 'payments',       color: 'teal-4',   valueColor: '#2dd4bf' },
     { label: 'Live Switch SLA',    value: `${rate}%`,                            sub: 'Successful route completion', icon: 'check_circle', color: 'green-4',  valueColor: '#4ade80' },
-    { label: 'Failovers Triggered',value: metrics.value.totalTransactions ? Object.values(metrics.value.hostFailoverCount || {}).reduce((a,b)=>a+b,0) : 0, sub: 'Incidents handled dynamically', icon: 'warning', color: 'red-4', valueColor: '#f87171' }
+    { label: 'Failovers Triggered',value: metrics.value.totalTransactions ? Object.values(metrics.value.hostFailoverCount || {}).reduce((a,b)=>a+b,0) : 0, sub: 'Incidents handled dynamically', icon: 'warning', color: 'red-4', valueColor: '#f87171' },
+    { label: 'Failed Transactions',value: declined.length,                       sub: `${currentCurrency.value.symbol}${totalDeclinedAmt.toLocaleString()} failed volume`, icon: 'error_outline', color: 'red-6', valueColor: '#ef4444' }
   ]
 })
 
@@ -1540,5 +1559,6 @@ pre {
   border-color: rgba(167, 139, 250, 0.25) !important;
 }
 </style>
+
 
 

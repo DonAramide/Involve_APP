@@ -926,6 +926,8 @@ const activeNavigationTree = computed(() => {
       return [
         { label: 'Platform Overview', path: '/admin/settings', icon: 'dashboard', color: 'cyan-4' },
         { label: 'Platform Configuration', path: '/admin/config', icon: 'tune', color: 'cyan-4' },
+        { label: 'Authentication Settings', path: '/admin/settings/authentication', icon: 'security', color: 'indigo-4', badge: 'Onboarding', badgeBg: 'indigo-10', badgeColor: 'indigo-2' },
+        { label: 'Integration Vault', path: '/admin/vault', icon: 'lock', color: 'orange-4', badge: 'Secrets', badgeBg: 'orange-10', badgeColor: 'orange-2' },
         { label: 'Tenants Identity Matrix', path: '/admin/tenants', icon: 'corporate_fare', color: 'indigo-3' },
         { label: 'Operators Access Profiles', path: '/admin/users', icon: 'shield', color: 'cyan-4' },
         { label: 'Tenant Orchestration', path: '/admin/orchestration', icon: 'settings_input_component', color: 'accent', badge: 'Ecosystem', badgeBg: 'amber-10', badgeColor: 'amber-2' },
@@ -1006,6 +1008,7 @@ const getMenuDescription = (label) => {
     // Admin
     'Platform Overview': 'Single-pane-of-glass administrative command center aggregating ecosystem health, security, operations, and telemetry.',
     'Platform Configuration': 'Configure core platform parameters, localization & currency systems, session security policies, and whitelabel branding.',
+    'Authentication Settings': 'Manage onboarding verification channels, SMS integrations, and security rules for new tenants.',
     'Contact Maintenance': 'Update support contact numbers and dispatch real-time emergency notifications to active devices.',
     'Global Setup & RBAC': 'Configure core platform parameters, primary currency defaults, global variables, and roles & permissions.',
     'Tenants Identity Matrix': 'Manage tenant registrations, approve incoming business profiles, provision database schemas, and view indices.',

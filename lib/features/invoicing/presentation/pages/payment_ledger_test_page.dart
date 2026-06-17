@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
@@ -74,7 +75,7 @@ class _PaymentLedgerTestPageState extends State<PaymentLedgerTestPage> {
     try {
       // Note: Use your actual server IP/URL if not running locally on emulator
       final response = await http.post(
-        Uri.parse('http://192.168.1.194:3000/api/test/mock-webhook'), 
+        Uri.parse('${dotenv.env['BASE_URL']?.replaceAll(':3004', ':3000') ?? 'http://192.168.1.194:3000'}/api/test/mock-webhook'), 
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'studentId': studentId,

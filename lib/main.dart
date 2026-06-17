@@ -11,6 +11,7 @@ import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:get_it/get_it.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/notification_repository.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:involve_app/features/school/data/repositories/school_repository_impl.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
@@ -136,6 +137,8 @@ import 'package:involve_app/features/support/presentation/pages/complaint_page.d
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  await dotenv.load(fileName: ".env");
+
   // Initialize Supabase (User must replace these with real values)
   await Supabase.initialize(
     url: 'https://placeholder-project.supabase.co',
@@ -288,7 +291,7 @@ class AppDependencies {
     // 2. License Service
     LicenseService.init(database);
     
-    final String baseUrl = 'http://192.168.1.194:3004';
+    final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
 
     final financeRepoNew = FinanceRepository(
       FinanceApiClient(
@@ -493,9 +496,9 @@ class _InvolveAppState extends State<InvolveApp> {
     if (config == null || config.tenantId == null) {
       try {
         debugPrint('[Socket Initialization] Config is null or lacks tenantId. Triggering background sync...');
+        final settings = await widget.dependencies.settingsRepository.getSettings();
         config = await TerminalSyncService.syncTerminalConfig(
           deviceId: deviceId,
-          businessName: config?.businessName, // Pass businessName so the backend can fallback to mapping via tenants_db.json
         );
         debugPrint('[Socket Initialization] Background sync complete. New tenantId: ${config?.tenantId}, plan: ${config?.plan}, type: ${config?.type}');
       } catch (e) {
@@ -507,7 +510,7 @@ class _InvolveAppState extends State<InvolveApp> {
 
     // Attempt to connect immediately with cached or updated details
     socketService.initializeSocket(
-      'http://192.168.1.194:3004',
+      dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004',
       tenantId: config?.tenantId,
       plan: config?.plan,
       type: config?.type,

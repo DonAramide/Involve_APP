@@ -13,15 +13,13 @@
       "processOnDevice": true,
       "webhookUrl": "https://bertie-archegoniate-causelessly.ngrok-free.dev/api/v1/pos/transactionFromMpos",
       "scopeType": "Tenant",
-      "targetValue": "tenant-8838236e-5664-4a28-86f7-233194437a64",
+      "targetValue": "",
       "profileId": "prof_1781452052847",
       "category": "Retail",
       "preferredHosts": [
-        "nibss"
+        "express_pay"
       ],
-      "fallbackHosts": [
-        "nibss"
-      ]
+      "fallbackHosts": []
     }
   ],
   "hosts": [
@@ -45,7 +43,7 @@
       "supportedTransactionTypes": [],
       "isActive": false,
       "baseUrl": "http://80.88.8.56:552/api/GetPlainMasterKey",
-      "authToken": "fee22aee2af63400a2d680dd0d88b637:fd0e797aed951196bf6a89715a27cec1b8fa389689473f7a4f4629faef436d86d48803557305f4642ed3de4967e019a7ceb42ab9a2667297ad4b8ffc2ebfbb4660ed3029e3b70fdc2fb82b8c02717d23"
+      "authToken": "23152270dea19ada8fc8494e8fb8e70b:61a58568c36a0b3c494dd5ad8ba48df85711510a75ef22ce1e7f7a478835724190467234b9c49c6dc0af7d0422184facd231a70bbec7184f93b3a6ebc567c15417a189ad75da6169a91a927fff4fa0a5"
     },
     {
       "hostName": "NIBSS",
