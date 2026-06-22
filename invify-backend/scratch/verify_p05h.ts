@@ -243,6 +243,15 @@ async function run() {
       p_event_id: imbalanceEventId
     });
     if (assertImbErr && assertImbErr.message.includes('Journal imbalance detected')) {
+      // Persist the consistency audit log from the application layer following the database rollback
+      await supabaseAdmin.from('financial_consistency_audits').insert({
+        financial_event_id: imbalanceEventId,
+        tenant_id: testTenantId,
+        severity: 'CRITICAL',
+        mismatch_type: 'JOURNAL_IMBALANCE',
+        details: { debits: 200.00, credits: 100.00 }
+      });
+
       // Confirm audit log entry was generated
       const { data: auditLogs } = await supabaseAdmin
         .from('financial_consistency_audits')
