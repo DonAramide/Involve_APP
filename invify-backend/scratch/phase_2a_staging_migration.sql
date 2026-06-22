@@ -187,7 +187,7 @@ BEGIN
     FROM public.financial_events
     WHERE id = NEW.financial_event_id;
     
-    IF v_event_type NOT IN ('PAYOUT_WITHDRAWAL', 'BANK_TRANSFER', 'MERCHANT_PAYOUT') THEN
+    IF v_event_type::text NOT IN ('PAYOUT_WITHDRAWAL', 'BANK_TRANSFER', 'MERCHANT_PAYOUT') THEN
         RAISE EXCEPTION 'Transaction blocked. Referenced financial event type is invalid: %', v_event_type;
     END IF;
     
