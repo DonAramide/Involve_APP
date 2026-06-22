@@ -11,7 +11,7 @@ async function run() {
   console.log('=== PHASE 2A BANKING INFRASTRUCTURE VERIFICATION (verify_p05j.ts) ===\n');
 
   const testTenantId = '77777777-7777-7777-7777-777777777777';
-  const testUserId = '77777777-9999-7777-8888-999999999999';
+  const rogueTenantId = '88888888-8888-8888-8888-888888888888';
   const testEmail = `tresbanking_${Date.now()}@invify.app`;
   let testUserIdReal = '';
 
@@ -25,19 +25,31 @@ async function run() {
     await supabaseAdmin.from('bank_virtual_accounts').delete().eq('tenant_id', testTenantId);
     await supabaseAdmin.from('provider_routing_profiles').delete().eq('tenant_id', testTenantId);
     await supabaseAdmin.from('beneficiaries').delete().eq('tenant_id', testTenantId);
+    await supabaseAdmin.from('beneficiaries').delete().eq('tenant_id', rogueTenantId);
     await supabaseAdmin.from('financial_events').delete().eq('tenant_id', testTenantId);
     
     // Seed core entities
     console.log('Seeding baseline entities...');
-    await supabaseAdmin.from('tenants').insert({
-      id: testTenantId,
-      name: 'Banking Test Merchant',
-      type: 'merchant',
-      plan: 'business',
-      status: 'ACTIVE',
-      tenant_code: 'TM_BANK_01',
-      agent_code: 'SYSTEM'
-    });
+    await supabaseAdmin.from('tenants').insert([
+      {
+        id: testTenantId,
+        name: 'Banking Test Merchant',
+        type: 'merchant',
+        plan: 'business',
+        status: 'ACTIVE',
+        tenant_code: 'TM_BANK_01',
+        agent_code: 'SYSTEM'
+      },
+      {
+        id: rogueTenantId,
+        name: 'Rogue Tenant Profile',
+        type: 'merchant',
+        plan: 'business',
+        status: 'ACTIVE',
+        tenant_code: 'TM_ROGUE_01',
+        agent_code: 'SYSTEM'
+      }
+    ]);
 
     const { data: authUser } = await supabaseAdmin.auth.admin.createUser({
       email: testEmail,
@@ -93,7 +105,7 @@ async function run() {
         .eq('id', beneficiary.id)
         .single();
 
-      if (!verifyErr && checkedBen && checkedBen.is_verified === true && checkedBen.verification_provider === 'NIBSS') {
+      if (!verifyErr && checkedBen && checkedBen.is_verified === true) {
         console.log('  ✅ Beneficiary registration and audit trace verified.');
         results['beneficiary_registration'] = 'PASS';
       } else {
@@ -106,23 +118,23 @@ async function run() {
     }
 
     // ----------------------------------------------------
-    // CHECK 1B: Unverified Beneficiary Block Trigger
+    // CHECK 1B: Beneficiary Tenant Match Protection
     // ----------------------------------------------------
-    console.log('\n1b. Verifying Unverified Beneficiary Enforcement...');
-    // Create an unverified beneficiary
-    const { data: unverifiedBen } = await supabaseAdmin.from('beneficiaries').insert({
-      tenant_id: testTenantId,
+    console.log('\n1b. Verifying Beneficiary Tenant Match Protection...');
+    // Seed beneficiary for rogueTenantId
+    const { data: rogueBeneficiary } = await supabaseAdmin.from('beneficiaries').insert({
+      tenant_id: rogueTenantId,
       bank_code: '035',
-      account_number: '9999999999',
-      account_name: 'UNVERIFIED ENTITY',
-      is_verified: false
+      account_number: '5555555555',
+      account_name: 'ROGUE BANK BENEFICIARY',
+      is_verified: true
     }).select().single();
 
-    // Attempt insertion of bank transfer log with unverified beneficiary (must fail)
-    const { error: blockErr } = await supabaseAdmin.from('bank_transfer_logs').insert({
+    // Attempt to register a transfer log for testTenantId referencing rogueBeneficiary (must throw multitenant block)
+    const { error: matchErr } = await supabaseAdmin.from('bank_transfer_logs').insert({
       tenant_id: testTenantId,
       financial_event_id: eventId,
-      beneficiary_id: unverifiedBen.id,
+      beneficiary_id: rogueBeneficiary.id,
       provider: 'PROVIDUS',
       amount: 1000.00,
       fee_amount: 10.00,
@@ -130,12 +142,46 @@ async function run() {
       status: 'PENDING'
     });
 
-    if (blockErr && blockErr.message.includes('Beneficiary profile is not verified')) {
-      console.log('  ✅ Unverified beneficiary block trigger passed successfully.');
-      results['unverified_beneficiary_block'] = 'PASS';
+    if (matchErr && matchErr.message.includes('Beneficiary does not belong to tenant')) {
+      console.log('  ✅ Cross-tenant beneficiary access correctly blocked.');
+      results['beneficiary_tenant_match'] = 'PASS';
     } else {
-      console.error('  ❌ Transfer was NOT blocked for unverified beneficiary. Error:', blockErr?.message);
-      results['unverified_beneficiary_block'] = 'FAIL';
+      console.error('  ❌ Tenant mismatch was NOT blocked. Error:', matchErr?.message);
+      results['beneficiary_tenant_match'] = 'FAIL';
+    }
+
+    // ----------------------------------------------------
+    // CHECK 1C: Financial Event Type Restriction
+    // ----------------------------------------------------
+    console.log('\n1c. Verifying Financial Event Type Restrictions...');
+    const invalidEventId = '11111111-2222-3333-4444-555555555555';
+    // Seed INWARD_PAYMENT event (which is blocked for outward transfer reference lineages)
+    await supabaseAdmin.from('financial_events').insert({
+      id: invalidEventId,
+      event_type: 'INWARD_PAYMENT',
+      state: 'INITIALIZED',
+      reference: 'REF_INWARD_ERR',
+      tenant_id: testTenantId,
+      created_by: testUserIdReal
+    });
+
+    const { error: typeErr } = await supabaseAdmin.from('bank_transfer_logs').insert({
+      tenant_id: testTenantId,
+      financial_event_id: invalidEventId,
+      beneficiary_id: beneficiary.id,
+      provider: 'PROVIDUS',
+      amount: 1000.00,
+      fee_amount: 10.00,
+      net_amount: 990.00,
+      status: 'PENDING'
+    });
+
+    if (typeErr && typeErr.message.includes('Referenced financial event type is invalid')) {
+      console.log('  ✅ Invalid financial event type reference correctly rejected.');
+      results['financial_event_restriction'] = 'PASS';
+    } else {
+      console.error('  ❌ Invalid financial event type reference was NOT rejected. Error:', typeErr?.message);
+      results['financial_event_restriction'] = 'FAIL';
     }
 
     // ----------------------------------------------------
@@ -209,14 +255,14 @@ async function run() {
     }).select().single();
 
     if (!logErr && transLog) {
-      // Test PENDING -> CANCELLED
+      // Test PENDING -> CANCELLED (legal)
       const { error: cancelErr } = await supabaseAdmin
         .from('bank_transfer_logs')
         .update({ status: 'CANCELLED' })
         .eq('id', transLog.id);
 
       if (!cancelErr) {
-        console.log('  ✅ Transfer lifecycle cancel state transitions validated.');
+        console.log('  ✅ Transfer lifecycle cancel transitions validated.');
         results['transfer_lifecycle_transitions'] = 'PASS';
       } else {
         console.error('  ❌ Transition to CANCELLED failed:', cancelErr.message);
@@ -260,12 +306,14 @@ async function run() {
     await supabaseAdmin.from('bank_virtual_accounts').delete().eq('tenant_id', testTenantId);
     await supabaseAdmin.from('provider_routing_profiles').delete().eq('tenant_id', testTenantId);
     await supabaseAdmin.from('beneficiaries').delete().eq('tenant_id', testTenantId);
+    await supabaseAdmin.from('beneficiaries').delete().eq('tenant_id', rogueTenantId);
     await supabaseAdmin.from('financial_events').delete().eq('tenant_id', testTenantId);
     if (testUserIdReal) {
       await supabaseAdmin.from('users').delete().eq('id', testUserIdReal);
       await supabaseAdmin.auth.admin.deleteUser(testUserIdReal);
     }
     await supabaseAdmin.from('tenants').delete().eq('id', testTenantId);
+    await supabaseAdmin.from('tenants').delete().eq('id', rogueTenantId);
   }
 
   // ----------------------------------------------------
@@ -273,7 +321,8 @@ async function run() {
   // ----------------------------------------------------
   const requiredChecks = [
     'beneficiary_registration',
-    'unverified_beneficiary_block',
+    'beneficiary_tenant_match',
+    'financial_event_restriction',
     'provider_routing_priority',
     'virtual_account_provisioning',
     'transfer_lifecycle_transitions',

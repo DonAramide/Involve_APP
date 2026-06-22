@@ -1,11 +1,11 @@
 -- ============================================================================
--- Phase 2A Staging DDL Migration Package (Hardened Amendments)
+-- Phase 2A Staging DDL Migration Package (Hardened Gates V2)
 -- Banking Infrastructure Foundation
 -- ============================================================================
 
 BEGIN;
 
--- Drop existing tables to allow safe iteration loops
+-- Drop existing tables to allow safe execution loop
 DROP TABLE IF EXISTS public.bank_transfer_attempts CASCADE;
 DROP TABLE IF EXISTS public.bank_transfer_logs CASCADE;
 DROP TABLE IF EXISTS public.bank_virtual_accounts CASCADE;
@@ -15,11 +15,13 @@ DROP TABLE IF EXISTS public.beneficiaries CASCADE;
 DROP TYPE IF EXISTS public.virtual_account_type_enum CASCADE;
 DROP TYPE IF EXISTS public.banking_provider_enum CASCADE;
 DROP TYPE IF EXISTS public.transfer_status_enum CASCADE;
+DROP TYPE IF EXISTS public.transfer_attempt_status_enum CASCADE;
 
 -- 1. Create Enums
 CREATE TYPE public.virtual_account_type_enum AS ENUM ('STATIC', 'DYNAMIC');
 CREATE TYPE public.banking_provider_enum AS ENUM ('PAYSTACK', 'FLUTTERWAVE', 'PROVIDUS', 'WEMA');
 CREATE TYPE public.transfer_status_enum AS ENUM ('PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'INVESTIGATION', 'REVERSAL_PENDING', 'REVERSED', 'CANCELLED');
+CREATE TYPE public.transfer_attempt_status_enum AS ENUM ('ATTEMPT_PENDING', 'ATTEMPT_SENT', 'ATTEMPT_TIMEOUT', 'ATTEMPT_FAILED', 'ATTEMPT_SUCCESS');
 
 -- 2. Beneficiary Registry (with verification audit trails)
 CREATE TABLE public.beneficiaries (
@@ -95,14 +97,14 @@ CREATE TABLE public.bank_transfer_logs (
     CONSTRAINT chk_net_amount_snapshot CHECK (net_amount = amount - fee_amount)
 );
 
--- 6. Outward Transfer Retry/Failover Attempt Registry
+-- 6. Outward Transfer Retry/Failover Attempt Registry (with independent status values)
 CREATE TABLE public.bank_transfer_attempts (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     transfer_log_id         UUID NOT NULL REFERENCES public.bank_transfer_logs(id) ON DELETE CASCADE,
     attempt_number          INTEGER NOT NULL CHECK (attempt_number > 0),
     provider                public.banking_provider_enum NOT NULL,
     provider_reference      VARCHAR(255) NOT NULL,
-    status                  public.transfer_status_enum NOT NULL DEFAULT 'PENDING',
+    status                  public.transfer_attempt_status_enum NOT NULL DEFAULT 'ATTEMPT_PENDING',
     error_code              VARCHAR(100),
     error_message           TEXT,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -153,7 +155,51 @@ CREATE TRIGGER trg_validate_verified_beneficiary
     BEFORE INSERT ON public.bank_transfer_logs
     FOR EACH ROW EXECUTE FUNCTION public.validate_verified_beneficiary();
 
--- 9. Transfer Lifecycle Transition Validator
+-- 9. Beneficiary Tenant Match Trigger (Multi-Tenant Isolation Protection)
+CREATE OR REPLACE FUNCTION public.validate_beneficiary_tenant_match()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_beneficiary_tenant_id UUID;
+BEGIN
+    SELECT tenant_id INTO v_beneficiary_tenant_id
+    FROM public.beneficiaries
+    WHERE id = NEW.beneficiary_id;
+    
+    IF NEW.tenant_id IS DISTINCT FROM v_beneficiary_tenant_id THEN
+        RAISE EXCEPTION 'Transaction blocked. Beneficiary does not belong to tenant.';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validate_beneficiary_tenant_match
+    BEFORE INSERT ON public.bank_transfer_logs
+    FOR EACH ROW EXECUTE FUNCTION public.validate_beneficiary_tenant_match();
+
+-- 10. Financial Event Type Restriction Trigger
+CREATE OR REPLACE FUNCTION public.validate_transfer_financial_event()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_event_type public.financial_event_type_enum;
+BEGIN
+    SELECT event_type INTO v_event_type
+    FROM public.financial_events
+    WHERE id = NEW.financial_event_id;
+    
+    IF v_event_type NOT IN ('PAYOUT_WITHDRAWAL', 'BANK_TRANSFER', 'MERCHANT_PAYOUT') THEN
+        RAISE EXCEPTION 'Transaction blocked. Referenced financial event type is invalid: %', v_event_type;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validate_transfer_financial_event
+    BEFORE INSERT ON public.bank_transfer_logs
+    FOR EACH ROW EXECUTE FUNCTION public.validate_transfer_financial_event();
+
+-- 11. Transfer Lifecycle Transition Validator
 CREATE OR REPLACE FUNCTION public.validate_bank_transfer_transition()
 RETURNS TRIGGER AS $$
 BEGIN
