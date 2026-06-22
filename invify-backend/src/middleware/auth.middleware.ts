@@ -1,36 +1,59 @@
 // src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../db/supabase';
+import { isMockTokenAllowed, isMockAuthAllowed, SYSTEM_USER_UUID } from '../config/constants';
 
 /**
  * Middleware: Supabase JWT Verification
  * Extracts the token, verifies it with Supabase, and populates req.user.
- * Robust network isolation: Automatically falls back to a development mock admin
- * session if the Supabase server times out or is unreachable.
+ *
+ * Security model:
+ *  - All mock/bypass paths are gated by isMockTokenAllowed() or isMockAuthAllowed().
+ *  - Both guards return false unconditionally in STAGING and PROD.
+ *  - Connection timeouts return 503 — they do NOT grant bypass sessions in production.
  */
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
-    
-    // Support local bypass or developer mock headers
-    if (authHeader && authHeader.startsWith('Bearer mock-agent-token-')) {
-      const agentId = authHeader.replace('Bearer mock-agent-token-', '');
-      (req as any).user = {
-        id: agentId,
-        role: 'AGENT',
-        email: 'agent@invify.app',
-        tenantId: null
-      };
-      return next();
+
+    // -------------------------------------------------------------------------
+    // Mock-token bypass paths — LOCAL / test only.
+    // isMockTokenAllowed() returns false in STAGING and PROD unconditionally.
+    // -------------------------------------------------------------------------
+    if (isMockTokenAllowed()) {
+      // mock-agent-token-* bypass (previously had NO environment guard — now fixed)
+      if (authHeader && authHeader.startsWith('Bearer mock-agent-token-')) {
+        const agentId = authHeader.replace('Bearer mock-agent-token-', '');
+        console.warn('[AuthMiddleware] Developer mock-agent-token auth bypass triggered.');
+        (req as any).user = {
+          id: agentId,
+          role: 'AGENT',
+          email: 'agent@invify.app',
+          tenantId: null
+        };
+        return next();
+      }
+
+      // mock-super-admin bypass
+      if (authHeader && authHeader.startsWith('Bearer mock-super-admin')) {
+        console.warn('[AuthMiddleware] Developer mock-super-admin auth bypass triggered.');
+        (req as any).user = {
+          id: SYSTEM_USER_UUID,
+          email: 'superadmin@invify.app',
+          role: 'super_admin',
+          tenantId: req.headers['x-tenant-id'] || null
+        };
+        return next();
+      }
     }
 
-    const variantService = require('../config/build-variant').BuildVariantService.getInstance();
-    const isMockAllowed = variantService.isLocal() || process.env.BUILD_VARIANT === 'STAGING';
-
-    if (isMockAllowed && process.env.OFFLINE_MOCK_AUTH === 'true' && authHeader !== 'Bearer invalid.jwt.token') {
+    // -------------------------------------------------------------------------
+    // OFFLINE_MOCK_AUTH full bypass — LOCAL / test only.
+    // -------------------------------------------------------------------------
+    if (isMockAuthAllowed() && authHeader !== 'Bearer invalid.jwt.token') {
       console.warn('[AuthMiddleware] Developer offline auth bypass triggered.');
       (req as any).user = {
-        id: '00000000-0000-0000-0000-000000000000',
+        id: SYSTEM_USER_UUID,
         email: 'superadmin@invify.app',
         role: 'super_admin',
         tenantId: req.headers['x-tenant-id'] || null
@@ -61,8 +84,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
       if (profileError) {
         const errStatus = (profileError as any).status;
-        const isDbTimeout = 
-          profileError.message?.includes('fetch failed') || 
+        const isDbTimeout =
+          profileError.message?.includes('fetch failed') ||
           profileError.message?.includes('timeout') ||
           errStatus === 408 ||
           errStatus === 504 ||
@@ -70,14 +93,11 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
           profileError.message?.includes('network');
 
         if (isDbTimeout) {
-          console.error('[AuthMiddleware] Supabase users database query timed out. Falling back to local offline session bypass.');
-          (req as any).user = {
-            id: authUser.id || '00000000-0000-0000-0000-000000000000',
-            email: authUser.email || 'offline-operator@invify.app',
-            role: 'super_admin',
-            tenantId: null
-          };
-          return next();
+          console.error('[AuthMiddleware] Supabase users database query timed out.');
+          // Do NOT grant a bypass session — return 503 so the client can retry.
+          return res.status(503).json({
+            error: 'Authentication service temporarily unavailable. Please retry.'
+          });
         }
 
         // Check if it's just "No rows found" (PGRST116)
@@ -96,7 +116,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
           const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
           decodedTenantId = payload.tenantId || null;
           decodedRole = payload.role || 'super_admin';
-          // Supabase defaults the JWT role to "authenticated". 
+          // Supabase defaults the JWT role to "authenticated".
           // If we are in this fallback state (missing DB profile), assume super_admin for local dev
           if (decodedRole === 'authenticated') {
             decodedRole = 'super_admin';
@@ -129,34 +149,21 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       next();
     } catch (netError: any) {
       // Catch Supabase unreachable network connection errors (timeouts)
-      const isConnectionTimeout = 
-        netError.message?.includes('fetch failed') || 
+      const isConnectionTimeout =
+        netError.message?.includes('fetch failed') ||
         netError.code === 'UND_ERR_CONNECT_TIMEOUT' ||
         netError.message?.includes('timeout') ||
         netError.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
         netError.status === 408 ||
         netError.status === 504 ||
-        netError.message?.includes('403'); 
+        netError.message?.includes('403');
 
       if (isConnectionTimeout) {
-        console.error('[AuthMiddleware] Supabase connection timed out. Falling back to local offline session bypass.');
-        
-        // Decode token payload to extract tenantId if available
-        let decodedTenantId = null;
-        let decodedRole = 'super_admin';
-        try {
-          const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-          decodedTenantId = payload.tenantId || null;
-          decodedRole = payload.role || 'super_admin';
-        } catch (_) {}
-
-        (req as any).user = {
-          id: '00000000-0000-0000-0000-000000000000',
-          email: 'offline-operator@invify.app',
-          role: decodedRole,
-          tenantId: decodedTenantId
-        };
-        return next();
+        console.error('[AuthMiddleware] Supabase connection timed out.');
+        // Return 503 — do NOT silently grant a bypass session in any environment.
+        return res.status(503).json({
+          error: 'Authentication service temporarily unavailable. Please retry.'
+        });
       }
       throw netError;
     }

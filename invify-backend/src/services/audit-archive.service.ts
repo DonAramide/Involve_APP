@@ -1,53 +1,24 @@
 // src/services/audit-archive.service.ts
-import * as fs from 'fs';
-import * as path from 'path';
-import { supabase } from '../db/supabase';
-
-const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
-const ARCHIVE_FILE_PATH = path.join(process.cwd(), 'archived_audit_logs.json');
-const TERMINAL_DB_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
+import { supabaseAdmin } from '../db/supabase';
 
 async function getGlobalSettings() {
   try {
-    const { data, error } = await supabase.from('system_configurations')
+    const { data, error } = await supabaseAdmin.from('system_configurations')
       .select('config_value')
       .eq('config_key', 'audit_retention_hours')
       .single();
     if (!error && data) {
       return { audit_retention_hours: parseInt(data.config_value, 10) };
     }
-  } catch(dbErr) {}
+  } catch (dbErr) {}
 
-  // Fallback
-  try {
-    if (fs.existsSync(GLOBAL_SETTINGS_PATH)) {
-      return JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
-    }
-  } catch (_) {}
   return { audit_retention_hours: 72 };
-}
-
-function getArchiveDB() {
-  try {
-    if (!fs.existsSync(ARCHIVE_FILE_PATH)) {
-      const initial = { archived_at: new Date().toISOString(), logs: [] };
-      fs.writeFileSync(ARCHIVE_FILE_PATH, JSON.stringify(initial, null, 2));
-      return initial;
-    }
-    return JSON.parse(fs.readFileSync(ARCHIVE_FILE_PATH, 'utf-8'));
-  } catch (_) {
-    return { archived_at: new Date().toISOString(), logs: [] };
-  }
-}
-
-function saveArchiveDB(data: any) {
-  fs.writeFileSync(ARCHIVE_FILE_PATH, JSON.stringify(data, null, 2));
 }
 
 export class AuditArchiveService {
   /**
    * Run the archival process. Logs older than configured X hours are shifted
-   * to archived_audit_logs.json and pruned from active databases/local mock JSON files.
+   * to the database-backed audit_log_archive table and pruned from active databases.
    */
   static async runArchiving(): Promise<{ archivedCount: number }> {
     const settings = await getGlobalSettings();
@@ -56,95 +27,105 @@ export class AuditArchiveService {
     const cutoffIso = cutoffTime.toISOString();
 
     let archivedCount = 0;
-    const archiveDb = getArchiveDB();
 
     console.log(`[AuditArchive] Starting archival run. Cutoff time: ${cutoffIso} (Retention: ${retentionHours} hours)`);
 
-    // 1. Archive local mock terminal logs
+    // 1. Archive online Supabase terminal logs if available
     try {
-      if (fs.existsSync(TERMINAL_DB_PATH)) {
-        const terminalDb = JSON.parse(fs.readFileSync(TERMINAL_DB_PATH, 'utf-8'));
-        const activeLogs: any[] = [];
-        const logsToArchive: any[] = [];
-
-        if (terminalDb.audit_log && Array.isArray(terminalDb.audit_log)) {
-          terminalDb.audit_log.forEach((log: any) => {
-            const logTime = new Date(log.created_at || log.timestamp || Date.now());
-            if (logTime < cutoffTime) {
-              logsToArchive.push({ ...log, source_origin: 'terminal_audit_log_local' });
-            } else {
-              activeLogs.push(log);
-            }
-          });
-
-          if (logsToArchive.length > 0) {
-            terminalDb.audit_log = activeLogs;
-            fs.writeFileSync(TERMINAL_DB_PATH, JSON.stringify(terminalDb, null, 2));
-            archiveDb.logs.push(...logsToArchive);
-            archivedCount += logsToArchive.length;
-            console.log(`[AuditArchive] Archived ${logsToArchive.length} local terminal audit records.`);
-          }
-        }
-      }
-    } catch (err: any) {
-      console.error('[AuditArchive] Error archiving local terminal logs:', err.message);
-    }
-
-    // 2. Archive online Supabase terminal logs if available
-    try {
-      const { data: onlineTermLogs, error: fetchErr } = await supabase
+      const { data: onlineTermLogs, error: fetchErr } = await supabaseAdmin
         .from('terminal_audit_log')
         .select('*')
         .lt('created_at', cutoffIso);
 
       if (!fetchErr && onlineTermLogs && onlineTermLogs.length > 0) {
-        // Append to archive file
-        const mapped = onlineTermLogs.map(l => ({ ...l, source_origin: 'terminal_audit_log_online' }));
-        archiveDb.logs.push(...mapped);
+        // Map to archive format
+        const archiveRows = onlineTermLogs.map(l => ({
+          original_log_id: l.id,
+          timestamp: l.created_at,
+          module: 'TERMINAL',
+          action: l.action_type,
+          user_email: l.admin_id || 'system',
+          user_name: null,
+          ip_address: l.ip_address || null,
+          location: null,
+          target: l.terminal_id || null,
+          status: 'SUCCESS',
+          metadata: {
+            mpos_terminal_id: l.mpos_terminal_id,
+            old_device_id: l.old_device_id,
+            new_device_id: l.new_device_id,
+            reason: l.reason,
+            ...(l.metadata || {})
+          },
+          tenant_id: null,
+          tenant_code: null,
+          source_origin: 'TERMINAL_AUDIT'
+        }));
+
+        // Insert into archive table
+        const { error: insErr } = await supabaseAdmin.from('audit_log_archive').insert(archiveRows);
+        if (insErr) throw insErr;
 
         // Delete from active database
         const ids = onlineTermLogs.map(l => l.id);
-        const { error: delErr } = await supabase.from('terminal_audit_log').delete().in('id', ids);
+        const { error: delErr } = await supabaseAdmin.from('terminal_audit_log').delete().in('id', ids);
 
         if (!delErr) {
           archivedCount += onlineTermLogs.length;
           console.log(`[AuditArchive] Archived ${onlineTermLogs.length} online terminal audit records.`);
+        } else {
+          throw delErr;
         }
       }
     } catch (err: any) {
-      console.warn('[AuditArchive] Supabase terminal logs archival bypassed (connection/offline):', err.message);
+      console.error('[AuditArchive] Supabase terminal logs archival failed:', err.message);
     }
 
-    // 3. Archive online Supabase general audit logs if available
+    // 2. Archive online Supabase general audit logs if available
     try {
-      const { data: onlineGeneralLogs, error: fetchErr } = await supabase
+      const { data: onlineGeneralLogs, error: fetchErr } = await supabaseAdmin
         .from('audit_logs')
         .select('*')
         .lt('timestamp', cutoffIso);
 
       if (!fetchErr && onlineGeneralLogs && onlineGeneralLogs.length > 0) {
-        const mapped = onlineGeneralLogs.map(l => ({ ...l, source_origin: 'audit_logs_online' }));
-        archiveDb.logs.push(...mapped);
+        // Map to archive format
+        const archiveRows = onlineGeneralLogs.map(l => ({
+          original_log_id: l.id,
+          timestamp: l.timestamp,
+          module: l.module,
+          action: l.action,
+          user_email: l.user_email,
+          user_name: l.user_name || null,
+          ip_address: l.ip_address || null,
+          location: l.location || null,
+          target: l.target || null,
+          status: l.status,
+          metadata: l.metadata || {},
+          tenant_id: l.tenant_id || null,
+          tenant_code: l.tenant_code || null,
+          source_origin: 'AUDIT_LOG'
+        }));
+
+        // Insert into archive table
+        const { error: insErr } = await supabaseAdmin.from('audit_log_archive').insert(archiveRows);
+        if (insErr) throw insErr;
 
         const ids = onlineGeneralLogs.map(l => l.id);
-        const { error: delErr } = await supabase.from('audit_logs').delete().in('id', ids);
+        const { error: delErr } = await supabaseAdmin.from('audit_logs').delete().in('id', ids);
 
         if (!delErr) {
           archivedCount += onlineGeneralLogs.length;
           console.log(`[AuditArchive] Archived ${onlineGeneralLogs.length} online general audit records.`);
+        } else {
+          throw delErr;
         }
       }
     } catch (err: any) {
-      console.warn('[AuditArchive] Supabase general logs archival bypassed:', err.message);
+      console.error('[AuditArchive] Supabase general logs archival failed:', err.message);
     }
 
-    // Save modifications to archive file
-    if (archivedCount > 0) {
-      archiveDb.archived_at = new Date().toISOString();
-      saveArchiveDB(archiveDb);
-    }
-
-    console.log(`[AuditArchive] Archival run complete. Shifted ${archivedCount} total entries to file archived_audit_logs.json.`);
+    console.log(`[AuditArchive] Archival run complete. Shifted ${archivedCount} total entries to audit_log_archive table.`);
     return { archivedCount };
   }
 }

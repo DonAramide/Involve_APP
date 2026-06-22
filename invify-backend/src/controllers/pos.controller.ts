@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PosService } from '../services/pos.service';
+import { supabase } from '../db/supabase';
 
 export class PosController {
   static async processTransaction(req: Request, res: Response) {
@@ -158,41 +159,64 @@ export class PosController {
         return res.status(400).json({ error: 'scopeType and targetValue are required' });
       }
 
-      const fs = require('fs');
-      const path = require('path');
-      const LOCAL_DB_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
-      
       let affectedDevices: any[] = [];
 
-      if (fs.existsSync(LOCAL_DB_PATH)) {
-        const db = JSON.parse(fs.readFileSync(LOCAL_DB_PATH, 'utf-8'));
-        
-        let assignments: any[] = [];
-        if (scopeType === 'Tenant') {
-          assignments = db.assignments.filter((a: any) => a.tenant_id === targetValue && a.status === 'ACTIVE');
-        } else {
-          // Future expansion for Agent, Group, Category
-        }
+      if (scopeType === 'Tenant') {
+        const { data: assignments, error: err } = await supabase
+          .from('terminal_inventory')
+          .select('terminal_id, mpos_terminal_id, terminal_type, assigned_device_id')
+          .eq('assigned_tenant_id', targetValue)
+          .eq('assignment_status', 'assigned');
 
-        affectedDevices = assignments.map((a: any) => {
-          const tablet = db.tablets?.find((t: any) => t.id === a.tablet_id);
-          const mpos = db.mpos_devices?.find((m: any) => m.id === a.mpos_id);
-          const tid = db.terminal_ids?.find((t: any) => t.id === a.terminal_id_id);
-          return {
-            tabletModel: tablet?.model || tablet?.device_id || 'Unknown',
-            tabletSerial: tablet?.serial_number || 'Unknown',
-            mposModel: mpos?.device_model || mpos?.hardware_type || 'Unknown',
-            mposSerial: mpos?.serial_number || 'Unknown',
-            terminalId: tid?.tid || 'Unknown',
-          };
-        });
+        if (err) throw err;
+
+        if (assignments && assignments.length > 0) {
+          const deviceIds = assignments.map(a => a.assigned_device_id).filter(Boolean);
+          let devices: any[] = [];
+          if (deviceIds.length > 0) {
+            const { data, error: devErr } = await supabase
+              .from('devices')
+              .select('device_id, device_name, device_info')
+              .in('device_id', deviceIds);
+            if (devErr) throw devErr;
+            devices = data || [];
+          }
+
+          affectedDevices = assignments.map((a: any) => {
+            const device = devices.find(d => d.device_id === a.assigned_device_id);
+            return {
+              tabletModel: device?.device_info?.model || device?.device_name || 'Unknown',
+              tabletSerial: device?.device_id || 'Unknown',
+              mposModel: a.terminal_type || 'Unknown',
+              mposSerial: a.mpos_terminal_id || 'Unknown',
+              terminalId: a.terminal_id || 'Unknown',
+            };
+          });
+        }
       }
 
       res.status(200).json(affectedDevices);
     } catch (error: any) {
       console.error('[POS Controller] getAffectedDevices failed:', error);
+      if (PosController.isNetworkTimeout(error)) {
+        return res.status(503).json({
+          error: 'Database unavailable',
+          retryable: true,
+          retryAfterMs: 2000
+        });
+      }
       res.status(500).json({ error: error.message });
     }
+  }
+
+  private static isNetworkTimeout(error: any): boolean {
+    return (
+      error.message?.includes('fetch failed') ||
+      error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      error.message?.includes('timeout') ||
+      error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      process.env.OFFLINE_MOCK_AUTH === 'true'
+    );
   }
 }
 

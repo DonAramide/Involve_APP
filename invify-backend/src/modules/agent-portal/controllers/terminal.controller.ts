@@ -66,10 +66,10 @@ export class TerminalController {
       const { error: auditErr } = await supabase
         .from('terminal_audit_log')
         .insert({
-          terminal_id: terminal_id,
-          action: 'ASSIGNED',
-          performed_by: agent.id,
-          details: { assigned_to: agentTenant.tenant_id, assigned_device_id },
+          terminal_id: terminal.terminal_id,
+          action_type: 'ASSIGNED',
+          admin_id: agent.id,
+          metadata: { assigned_to: agentTenant.tenant_id, assigned_device_id },
           created_at: new Date().toISOString()
         });
 

@@ -1,14 +1,8 @@
 // src/services/gov-audit.service.ts
 // Unified Governance Audit Ledger Service
 // Aggregates audit logs from all sources: terminal, device, governance, financial
-import * as fs from 'fs';
-import * as path from 'path';
 import * as https from 'https';
-import { supabase } from '../db/supabase';
-
-const GOV_AUDIT_DB_PATH = path.join(process.cwd(), 'gov_audit_db.json');
-const TERMINAL_DB_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
-const USER_DEVICES_DB_PATH = path.join(process.cwd(), 'user_devices_db.json');
+import { supabase, supabaseAdmin } from '../db/supabase';
 
 // In-memory IP geolocation cache
 const ipGeoCache = new Map<string, string>();
@@ -64,23 +58,6 @@ async function resolveIpLocation(ip: string): Promise<string> {
   });
 }
 
-function getGovAuditDb() {
-  try {
-    if (!fs.existsSync(GOV_AUDIT_DB_PATH)) {
-      const initial = { logs: [] };
-      fs.writeFileSync(GOV_AUDIT_DB_PATH, JSON.stringify(initial, null, 2));
-      return initial;
-    }
-    return JSON.parse(fs.readFileSync(GOV_AUDIT_DB_PATH, 'utf-8'));
-  } catch {
-    return { logs: [] };
-  }
-}
-
-function saveGovAuditDb(data: any) {
-  fs.writeFileSync(GOV_AUDIT_DB_PATH, JSON.stringify(data, null, 2));
-}
-
 function normalizeTerminalLog(raw: any): AuditEntry {
   return {
     id: raw.id || `term-${Date.now()}`,
@@ -124,7 +101,7 @@ export class GovAuditService {
    */
   static async logRbacGrant(actorId: string, targetUserId: string, oldRole: string, newRole: string, reqIp?: string): Promise<void> {
     const entry: any = {
-      id: crypto.randomUUID(),
+      id: require('crypto').randomUUID(),
       timestamp: new Date().toISOString(),
       module: 'GOVERNANCE',
       action: 'RBAC_PERMISSION_GRANTED',
@@ -140,18 +117,18 @@ export class GovAuditService {
       location: 'Local Network'
     };
 
-    const db = getGovAuditDb();
-    db.logs.unshift(entry);
-    saveGovAuditDb(db);
-
     try {
-      await supabase.from('audit_logs').insert({
+      await supabaseAdmin.from('audit_logs').insert({
         id: entry.id,
         module: entry.module,
         action: entry.action,
         user_email: entry.user_email,
+        user_name: entry.user_name,
+        target: entry.target,
+        status: entry.status,
         metadata: entry.metadata,
         ip_address: entry.ip_address,
+        location: entry.location,
         timestamp: entry.timestamp
       });
     } catch (e) {
@@ -171,16 +148,9 @@ export class GovAuditService {
 
     const logEntry: AuditEntry = { ...entry, location };
 
-    // Write to local JSON
-    const db = getGovAuditDb();
-    db.logs.unshift(logEntry); // newest first
-    // Keep only last 5000 entries in local file
-    if (db.logs.length > 5000) db.logs = db.logs.slice(0, 5000);
-    saveGovAuditDb(db);
-
-    // Also write to Supabase if available
+    // Write to Supabase audit_logs
     try {
-      await supabase.from('audit_logs').insert({
+      await supabaseAdmin.from('audit_logs').insert({
         id: logEntry.id,
         module: logEntry.module,
         action: logEntry.action,
@@ -193,8 +163,8 @@ export class GovAuditService {
         metadata: logEntry.metadata || {},
         timestamp: logEntry.timestamp
       });
-    } catch {
-      // Silently ignore - local JSON is the fallback
+    } catch (e) {
+      console.error('[GovAuditService] Error pushing audit log:', e);
     }
   }
 
@@ -217,83 +187,78 @@ export class GovAuditService {
 
     let allLogs: AuditEntry[] = [];
 
-    // 1. Read governance/maker-checker logs (local JSON)
+    // 1. Read governance/maker-checker logs from Supabase audit_logs table
     try {
-      const govDb = getGovAuditDb();
-      if (Array.isArray(govDb.logs)) {
-        allLogs.push(...govDb.logs);
+      let query = supabaseAdmin.from('audit_logs').select('*');
+      
+      if (filters.module && filters.module !== 'ALL') {
+        query = query.eq('module', filters.module);
       }
-    } catch {}
-
-    // 2. Read terminal audit logs (local JSON)
-    try {
-      if (fs.existsSync(TERMINAL_DB_PATH)) {
-        const termDb = JSON.parse(fs.readFileSync(TERMINAL_DB_PATH, 'utf-8'));
-        if (Array.isArray(termDb.audit_log)) {
-          allLogs.push(...termDb.audit_log.map(normalizeTerminalLog));
-        }
+      if (filters.status && filters.status !== 'ALL') {
+        query = query.eq('status', filters.status);
       }
-    } catch {}
-
-    // 3. Read device registration logs (local JSON)
-    try {
-      if (fs.existsSync(USER_DEVICES_DB_PATH)) {
-        const devDb = JSON.parse(fs.readFileSync(USER_DEVICES_DB_PATH, 'utf-8'));
-        if (Array.isArray(devDb.devices)) {
-          allLogs.push(...devDb.devices.map(normalizeDeviceLog));
-        }
+      if (filters.action) {
+        query = query.ilike('action', `%${filters.action}%`);
       }
-    } catch {}
+      if (filters.dateFrom) {
+        query = query.gte('timestamp', filters.dateFrom);
+      }
+      if (filters.dateTo) {
+        const toDate = new Date(filters.dateTo);
+        toDate.setDate(toDate.getDate() + 1);
+        query = query.lte('timestamp', toDate.toISOString());
+      }
+      
+      const { data: onlineLogs, error: onlineErr } = await query.order('timestamp', { ascending: false }).limit(500);
+      if (onlineErr) throw onlineErr;
 
-    // 4. Try Supabase for online logs
-    try {
-      let query = supabase.from('audit_logs').select('*', { count: 'exact' });
-      const { data: onlineLogs } = await query.limit(200).order('timestamp', { ascending: false });
       if (onlineLogs && onlineLogs.length > 0) {
-        // Avoid duplicates: online logs that have same id as local won't be added twice
-        const localIds = new Set(allLogs.map(l => l.id));
-        const deduped = onlineLogs.filter(l => !localIds.has(l.id)).map(l => ({
-          ...l,
+        allLogs.push(...onlineLogs.map(l => ({
+          id: l.id,
+          timestamp: l.timestamp,
           module: l.module || 'SYSTEM',
+          action: l.action,
+          user_email: l.user_email,
           user_name: l.user_name || l.user_email?.split('@')[0]?.toUpperCase() || 'System',
           ip_address: l.ip_address || '127.0.0.1',
           location: l.location || 'Unknown Location',
+          target: l.target || '-',
           status: l.status || 'success',
-        } as AuditEntry));
-        allLogs.push(...deduped);
+          metadata: l.metadata || {}
+        } as AuditEntry)));
       }
-    } catch {
-      // Silently ignore Supabase errors
+    } catch (e) {
+      console.warn('[GovAuditService] Error reading audit_logs from DB:', e);
     }
 
-    // 5. Also read from terminal_audit_log Supabase table
+    // 2. Read device registration logs from Supabase user_devices table
     try {
-      const { data: termOnline } = await supabase
+      const { data: userDevices } = await supabaseAdmin
+        .from('user_devices')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (userDevices && userDevices.length > 0) {
+        allLogs.push(...userDevices.map(normalizeDeviceLog));
+      }
+    } catch {}
+
+    // 3. Read from terminal_audit_log Supabase table
+    try {
+      const { data: termOnline } = await supabaseAdmin
         .from('terminal_audit_log')
         .select('*')
         .limit(100)
         .order('created_at', { ascending: false });
       if (termOnline && termOnline.length > 0) {
-        const localIds = new Set(allLogs.map(l => l.id));
-        const deduped = termOnline.filter(l => !localIds.has(l.id)).map(normalizeTerminalLog);
-        allLogs.push(...deduped);
+        allLogs.push(...termOnline.map(normalizeTerminalLog));
       }
     } catch {}
 
     // Sort all by timestamp descending
     allLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-    // Apply filters
-    if (filters.module && filters.module !== 'ALL') {
-      allLogs = allLogs.filter(l => l.module === filters.module);
-    }
-    if (filters.status && filters.status !== 'ALL') {
-      allLogs = allLogs.filter(l => l.status === filters.status);
-    }
-    if (filters.action) {
-      const actionQ = filters.action.toLowerCase();
-      allLogs = allLogs.filter(l => l.action.toLowerCase().includes(actionQ));
-    }
+    // Apply in-memory search and general filters
     if (filters.search) {
       const q = filters.search.toLowerCase();
       allLogs = allLogs.filter(l =>
@@ -304,14 +269,6 @@ export class GovAuditService {
         l.ip_address?.toLowerCase().includes(q) ||
         l.location?.toLowerCase().includes(q)
       );
-    }
-    if (filters.dateFrom) {
-      const from = new Date(filters.dateFrom).getTime();
-      allLogs = allLogs.filter(l => new Date(l.timestamp).getTime() >= from);
-    }
-    if (filters.dateTo) {
-      const to = new Date(filters.dateTo).getTime() + 86400000; // include full day
-      allLogs = allLogs.filter(l => new Date(l.timestamp).getTime() <= to);
     }
 
     // Compute stats
@@ -330,119 +287,127 @@ export class GovAuditService {
   /**
    * Seed sample governance audit logs for demonstration purposes
    */
-  static seedSampleLogs(): void {
-    const db = getGovAuditDb();
-    if (db.logs && db.logs.length > 0) return; // Already seeded
+  static async seedSampleLogs(): Promise<void> {
+    try {
+      const { count, error: countErr } = await supabaseAdmin
+        .from('audit_logs')
+        .select('*', { count: 'exact', head: true });
+        
+      if (countErr) throw countErr;
+      if (count && count > 0) return; // Already seeded
 
-    const now = Date.now();
-    const sample: AuditEntry[] = [
-      {
-        id: 'gov-log-001',
-        timestamp: new Date(now - 15 * 60000).toISOString(),
-        module: 'MAKER_CHECKER',
-        action: 'APPROVAL_GRANTED',
-        user_email: 'superadmin@invify.app',
-        user_name: 'System Administrator',
-        ip_address: '192.168.1.14',
-        location: 'Local Network',
-        target: 'TERMINAL_ASSIGNMENT:2215850F',
-        status: 'approved',
-        metadata: { approvalId: 'APR-2024-001', riskScore: 72 }
-      },
-      {
-        id: 'gov-log-002',
-        timestamp: new Date(now - 45 * 60000).toISOString(),
-        module: 'AUTH',
-        action: 'LOGIN_SUCCESS',
-        user_email: 'ops@invify.app',
-        user_name: 'Operations Staff',
-        ip_address: '192.168.1.20',
-        location: 'Local Network',
-        target: 'Admin Portal',
-        status: 'success',
-        metadata: { role: 'INTERNAL_STAFF', device: 'Chrome/Windows' }
-      },
-      {
-        id: 'gov-log-003',
-        timestamp: new Date(now - 2 * 3600000).toISOString(),
-        module: 'DEVICE',
-        action: 'DEVICE_BLOCKED',
-        user_email: 'superadmin@invify.app',
-        user_name: 'System Administrator',
-        ip_address: '192.168.1.14',
-        location: 'Local Network',
-        target: 'dev-UNKN-003 (ops-staff@invify.app)',
-        status: 'blocked',
-        metadata: { reason: 'Unrecognized device flagged by security review' }
-      },
-      {
-        id: 'gov-log-004',
-        timestamp: new Date(now - 3 * 3600000).toISOString(),
-        module: 'MAKER_CHECKER',
-        action: 'APPROVAL_REJECTED',
-        user_email: 'security@invify.app',
-        user_name: 'Security Lead',
-        ip_address: '192.168.1.8',
-        location: 'Local Network',
-        target: 'BULK_PAYOUT_REQUEST:TXN-88811',
-        status: 'rejected',
-        metadata: { approvalId: 'APR-2024-002', reason: 'Exceeds daily limit threshold' }
-      },
-      {
-        id: 'gov-log-005',
-        timestamp: new Date(now - 5 * 3600000).toISOString(),
-        module: 'USER_MGMT',
-        action: 'USER_CREATED',
-        user_email: 'superadmin@invify.app',
-        user_name: 'System Administrator',
-        ip_address: '192.168.1.14',
-        location: 'Local Network',
-        target: 'new-ops-staff@invify.app',
-        status: 'success',
-        metadata: { role: 'INTERNAL_STAFF', department: 'Operations' }
-      },
-      {
-        id: 'gov-log-006',
-        timestamp: new Date(now - 8 * 3600000).toISOString(),
-        module: 'SYSTEM',
-        action: 'AUDIT_ARCHIVE_RUN',
-        user_email: 'system@invify.internal',
-        user_name: 'Invify System',
-        ip_address: '127.0.0.1',
-        location: 'Local Network',
-        target: 'archived_audit_logs.json',
-        status: 'success',
-        metadata: { archivedCount: 47, retentionHours: 72 }
-      },
-      {
-        id: 'gov-log-007',
-        timestamp: new Date(now - 24 * 3600000).toISOString(),
-        module: 'GOVERNANCE',
-        action: 'POLICY_UPDATED',
-        user_email: 'superadmin@invify.app',
-        user_name: 'System Administrator',
-        ip_address: '192.168.1.14',
-        location: 'Local Network',
-        target: 'AML_POLICY_V2',
-        status: 'success',
-        metadata: { version: '2.1.0', changes: 'Updated KYC threshold to ₦5,000,000' }
-      },
-      {
-        id: 'gov-log-008',
-        timestamp: new Date(now - 36 * 3600000).toISOString(),
-        module: 'AUTH',
-        action: 'FAILED_LOGIN',
-        user_email: 'unknown@external.com',
-        user_name: 'Unknown',
-        ip_address: '102.89.47.28',
-        location: 'Lagos, Lagos, Nigeria',
-        target: 'Admin Portal',
-        status: 'failed',
-        metadata: { attempts: 3, blocked: false }
-      }
-    ];
+      const now = Date.now();
+      const sample = [
+        {
+          id: 'gov-log-001',
+          timestamp: new Date(now - 15 * 60000).toISOString(),
+          module: 'MAKER_CHECKER',
+          action: 'APPROVAL_GRANTED',
+          user_email: 'superadmin@invify.app',
+          user_name: 'System Administrator',
+          ip_address: '192.168.1.14',
+          location: 'Local Network',
+          target: 'TERMINAL_ASSIGNMENT:2215850F',
+          status: 'approved',
+          metadata: { approvalId: 'APR-2024-001', riskScore: 72 }
+        },
+        {
+          id: 'gov-log-002',
+          timestamp: new Date(now - 45 * 60000).toISOString(),
+          module: 'AUTH',
+          action: 'LOGIN_SUCCESS',
+          user_email: 'ops@invify.app',
+          user_name: 'Operations Staff',
+          ip_address: '192.168.1.20',
+          location: 'Local Network',
+          target: 'Admin Portal',
+          status: 'success',
+          metadata: { role: 'INTERNAL_STAFF', device: 'Chrome/Windows' }
+        },
+        {
+          id: 'gov-log-003',
+          timestamp: new Date(now - 2 * 3600000).toISOString(),
+          module: 'DEVICE',
+          action: 'DEVICE_BLOCKED',
+          user_email: 'superadmin@invify.app',
+          user_name: 'System Administrator',
+          ip_address: '192.168.1.14',
+          location: 'Local Network',
+          target: 'dev-UNKN-003 (ops-staff@invify.app)',
+          status: 'blocked',
+          metadata: { reason: 'Unrecognized device flagged by security review' }
+        },
+        {
+          id: 'gov-log-004',
+          timestamp: new Date(now - 3 * 3600000).toISOString(),
+          module: 'MAKER_CHECKER',
+          action: 'APPROVAL_REJECTED',
+          user_email: 'security@invify.app',
+          user_name: 'Security Lead',
+          ip_address: '192.168.1.8',
+          location: 'Local Network',
+          target: 'BULK_PAYOUT_REQUEST:TXN-88811',
+          status: 'rejected',
+          metadata: { approvalId: 'APR-2024-002', reason: 'Exceeds daily limit threshold' }
+        },
+        {
+          id: 'gov-log-005',
+          timestamp: new Date(now - 5 * 3600000).toISOString(),
+          module: 'USER_MGMT',
+          action: 'USER_CREATED',
+          user_email: 'superadmin@invify.app',
+          user_name: 'System Administrator',
+          ip_address: '192.168.1.14',
+          location: 'Local Network',
+          target: 'new-ops-staff@invify.app',
+          status: 'success',
+          metadata: { role: 'INTERNAL_STAFF', department: 'Operations' }
+        },
+        {
+          id: 'gov-log-006',
+          timestamp: new Date(now - 8 * 3600000).toISOString(),
+          module: 'SYSTEM',
+          action: 'AUDIT_ARCHIVE_RUN',
+          user_email: 'system@invify.internal',
+          user_name: 'Invify System',
+          ip_address: '127.0.0.1',
+          location: 'Local Network',
+          target: 'archived_audit_logs.json',
+          status: 'success',
+          metadata: { archivedCount: 47, retentionHours: 72 }
+        },
+        {
+          id: 'gov-log-007',
+          timestamp: new Date(now - 24 * 3600000).toISOString(),
+          module: 'GOVERNANCE',
+          action: 'POLICY_UPDATED',
+          user_email: 'superadmin@invify.app',
+          user_name: 'System Administrator',
+          ip_address: '192.168.1.14',
+          location: 'Local Network',
+          target: 'AML_POLICY_V2',
+          status: 'success',
+          metadata: { version: '2.1.0', changes: 'Updated KYC threshold to ₦5,000,000' }
+        },
+        {
+          id: 'gov-log-008',
+          timestamp: new Date(now - 36 * 3600000).toISOString(),
+          module: 'AUTH',
+          action: 'FAILED_LOGIN',
+          user_email: 'unknown@external.com',
+          user_name: 'Unknown',
+          ip_address: '102.89.47.28',
+          location: 'Lagos, Lagos, Nigeria',
+          target: 'Admin Portal',
+          status: 'failed',
+          metadata: { attempts: 3, blocked: false }
+        }
+      ];
 
-    db.logs = sample;
-    saveGovAuditDb(db);
+      await supabaseAdmin.from('audit_logs').insert(sample);
+      console.log('[GovAuditService] Seeded sample audit logs successfully.');
+    } catch (e: any) {
+      console.warn('[GovAuditService] Failed to seed sample audit logs:', e.message);
+    }
   }
 }

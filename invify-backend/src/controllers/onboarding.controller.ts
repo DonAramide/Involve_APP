@@ -1,20 +1,7 @@
 // src/controllers/onboarding.controller.ts
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase';
-import * as fs from 'fs';
-import * as path from 'path';
+import { supabase, supabaseAdmin } from '../db/supabase';
 import { verificationService } from '../services/verification.service';
-
-const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
-
-function readTenantsDb(): any[] {
-  if (!fs.existsSync(LOCAL_TENANTS_DB_PATH)) return [];
-  try { return JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8')); } catch (_) { return []; }
-}
-
-function writeTenantsDb(tenants: any[]): void {
-  fs.writeFileSync(LOCAL_TENANTS_DB_PATH, JSON.stringify(tenants, null, 2));
-}
 
 function generateTenantCode(phone: string | undefined | null): string {
   const cleanPhone = (phone || '').replace(/\D/g, '');
@@ -39,7 +26,7 @@ export class OnboardingController {
         return res.status(400).json({ error: 'Missing required onboarding data' });
       }
 
-      const { data: tenant, error: tenantError } = await supabase
+      const { data: tenant, error: tenantError } = await supabaseAdmin
         .from('tenants')
         .insert({ name: schoolName, type: businessMode || 'school', plan: 'free', status: 'pending' })
         .select()
@@ -52,21 +39,21 @@ export class OnboardingController {
         await ReferralService.trackSignup(tenant.id, email, referralCode);
       }
 
-      const { error: userError } = await supabase.from('users').insert({
+      const { error: userError } = await supabaseAdmin.from('users').insert({
         id: userId, tenant_id: tenant.id,
         name: schoolName + ' Admin', email, role: 'owner', require_password_reset: true
       });
 
       if (userError) {
-        await supabase.from('tenants').delete().eq('id', tenant.id);
+        await supabaseAdmin.from('tenants').delete().eq('id', tenant.id);
         throw userError;
       }
 
-      await supabase.from('wallets').insert({ tenant_id: tenant.id, balance: 0 });
+      await supabaseAdmin.from('wallets').insert({ tenant_id: tenant.id, balance: 0 });
 
       const endDate = new Date();
       endDate.setFullYear(endDate.getFullYear() + 100);
-      await supabase.from('subscriptions').insert({
+      await supabaseAdmin.from('subscriptions').insert({
         tenant_id: tenant.id, plan: 'free', status: 'active',
         start_date: new Date().toISOString(), end_date: endDate.toISOString()
       });
@@ -92,25 +79,6 @@ export class OnboardingController {
 
       const tenantCode = generateTenantCode(phone);
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        console.log('[OnboardingController] Simulating atomic onboarding provisioning offline.');
-        const tenants = readTenantsDb();
-        const tenantId = `tenant-${require('crypto').randomUUID()}`;
-        const userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        const startingBalance = plan === 'enterprise' ? 100000 : 50000;
-
-        tenants.unshift({
-          id: tenantId, name: businessName, type: industry,
-          plan: plan || 'premium', status: 'active', tenant_code: tenantCode, phone: phone || null, created_at: new Date().toISOString()
-        });
-        writeTenantsDb(tenants);
-
-        return res.status(201).json({
-          message: 'Stripe-grade Enterprise Provisioning sequence completed successfully.',
-          tenantId, userId, role: 'owner',
-          walletBalance: startingBalance, subscriptionPlan: plan || 'premium', activeModules: modules || [industry]
-        });
-      }
 
       console.log(`[OnboardingController] Beginning atomic provisioning for: ${businessName} (${email})`);
 
@@ -129,7 +97,7 @@ export class OnboardingController {
       let tenantError: any = null;
       let currentTenantCode = tenantCode;
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
           .from('tenants')
           .insert({ name: businessName, type: industry, plan: plan || 'premium', status: 'pending', settings: mockSettings, phone: phone || null, tenant_code: currentTenantCode })
           .select().single();
@@ -166,7 +134,7 @@ export class OnboardingController {
           parentShareBps: 0, metadata: { type: 'tenant_operating_account' }
         });
         generatedVa = va;
-        await supabase.from('tenants').update({
+        await supabaseAdmin.from('tenants').update({
           virtual_account_number: va.accountNumber,
           virtual_account_bank: va.bankName,
           virtual_account_status: 'ACTIVE'
@@ -177,7 +145,7 @@ export class OnboardingController {
 
       let userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       try {
-        const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
           email, password: password || '123456', email_confirm: true,
           user_metadata: { role: 'owner', tenantId: tenant.id }
         });
@@ -190,21 +158,21 @@ export class OnboardingController {
         userId = email === 'olive@invify.com' ? 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382' : require('crypto').randomUUID();
       }
 
-      const { error: userError } = await supabase.from('users').insert({
+      const { error: userError } = await supabaseAdmin.from('users').insert({
         id: userId, tenant_id: tenant.id,
         name: `${businessName} Owner`, email, role: 'owner', require_password_reset: true
       });
       if (userError) {
-        await supabase.from('tenants').delete().eq('id', tenant.id);
+        await supabaseAdmin.from('tenants').delete().eq('id', tenant.id);
         throw userError;
       }
 
       const startingBalance = plan === 'enterprise' ? 100000 : 50000;
-      await supabase.from('wallets').insert({ tenant_id: tenant.id, balance: startingBalance });
+      await supabaseAdmin.from('wallets').insert({ tenant_id: tenant.id, balance: startingBalance });
 
       const endDate = new Date();
       endDate.setMonth(endDate.getMonth() + 1);
-      await supabase.from('subscriptions').insert({
+      await supabaseAdmin.from('subscriptions').insert({
         tenant_id: tenant.id, plan: plan || 'premium', status: 'active',
         start_date: new Date().toISOString(), end_date: endDate.toISOString()
       });
@@ -213,7 +181,10 @@ export class OnboardingController {
 
       return res.status(201).json({
         message: 'Stripe-grade Enterprise Provisioning sequence completed successfully.',
-        tenantId: tenant.id, userId, role: 'owner',
+        tenantId: tenant.id,
+        tenantCode: currentTenantCode,
+        userId,
+        role: 'owner',
         walletBalance: startingBalance, subscriptionPlan: plan, activeModules: modules || [industry],
         virtualAccount: generatedVa ? {
           accountName: generatedVa.accountName || businessName.toUpperCase(),
@@ -331,75 +302,43 @@ export class OnboardingController {
         return;
       }
 
-      const tenantId = `tenant-${require('crypto').randomUUID()}`;
+      const tenantId = require('crypto').randomUUID();
       const tenantName = businessName || `${firstName} ${lastName}'s Business`;
       const plan = isTrial ? 'trial' : 'standard';
       const tenantCode = generateTenantCode(phone);
 
       console.log(`[OnboardingController] Registering user ${firstName} ${lastName} (${email}) — Business: ${tenantName}`);
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        const tenants = readTenantsDb();
-
-        // Prevent duplicate registrations for the same email
-        const existing = tenants.find((t: any) => t.owner_email === email);
-        if (existing) {
-          console.warn(`[OnboardingController] Tenant for ${email} already exists. Skipping duplicate.`);
-          res.status(201).json({ success: true, message: 'Account already exists.', tenantId: existing.id });
-          return;
-        }
-
-        const newTenant = {
+      // Live mode — write to Supabase
+      let tenantError: any = null;
+      let currentTenantCode = tenantCode;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { error } = await supabaseAdmin.from('tenants').insert({
           id: tenantId,
           name: tenantName,
           type: industry || 'retail',
           plan,
           status: 'active',
-          owner_email: email,
-          owner_name: `${firstName} ${lastName}`,
           phone: phone || null,
-          tenant_code: tenantCode,
-          created_at: new Date().toISOString(),
-          subscription_end_date: isTrial
-            ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
-            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        };
-
-        tenants.push(newTenant);
-        writeTenantsDb(tenants);
-        console.log(`[OnboardingController] Tenant "${tenantName}" saved to tenants_db.json. Total: ${tenants.length}`);
-      } else {
-        // Live mode — write to Supabase
-        let tenantError: any = null;
-        let currentTenantCode = tenantCode;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          const { error } = await supabase.from('tenants').insert({
-            id: tenantId,
-            name: tenantName,
-            type: industry || 'retail',
-            plan,
-            status: 'active',
-            phone: phone || null,
-            tenant_code: currentTenantCode
-          });
-          tenantError = error;
-          if (!tenantError) {
-            break;
-          }
-          const isUniqueViolation = tenantError.code === '23505' || tenantError.message?.includes('unique') || tenantError.message?.includes('duplicate');
-          if (isUniqueViolation && attempt < 3) {
-            console.warn(`[OnboardingController] Unique constraint collision on tenant_code "${currentTenantCode}" in register (attempt ${attempt}/3). Regenerating code...`);
-            currentTenantCode = `${tenantCode.substring(0, 15)}${Math.floor(Math.random() * 100)}`;
-          } else {
-            break;
-          }
+          tenant_code: currentTenantCode
+        });
+        tenantError = error;
+        if (!tenantError) {
+          break;
         }
-
-        if (tenantError) {
-          console.error('[OnboardingController] Supabase tenant insert failed after retry exhaustion:', tenantError.message);
-          res.status(409).json({ success: false, error: 'Registration failed: Tenant code conflict could not be resolved. Please try again with a different phone number.' });
-          return;
+        const isUniqueViolation = tenantError.code === '23505' || tenantError.message?.includes('unique') || tenantError.message?.includes('duplicate');
+        if (isUniqueViolation && attempt < 3) {
+          console.warn(`[OnboardingController] Unique constraint collision on tenant_code "${currentTenantCode}" in register (attempt ${attempt}/3). Regenerating code...`);
+          currentTenantCode = `${tenantCode.substring(0, 15)}${Math.floor(Math.random() * 100)}`;
+        } else {
+          break;
         }
+      }
+
+      if (tenantError) {
+        console.error('[OnboardingController] Supabase tenant insert failed after retry exhaustion:', tenantError.message);
+        res.status(409).json({ success: false, error: 'Registration failed: Tenant code conflict could not be resolved. Please try again with a different phone number.' });
+        return;
       }
 
       try {
@@ -409,7 +348,7 @@ export class OnboardingController {
         console.warn('[OnboardingController] Welcome email failed (non-fatal):', emailErr.message);
       }
 
-      res.status(201).json({ success: true, message: 'Account created successfully.', tenantId });
+      res.status(201).json({ success: true, message: 'Account created successfully.', tenantId, tenantCode: currentTenantCode });
     } catch (error: any) {
       console.error('[OnboardingController] register error:', error.message);
       res.status(500).json({ success: false, error: 'Internal server error' });

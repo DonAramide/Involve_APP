@@ -39,13 +39,17 @@ describe('Commission Security & Hardening Audit (PRG-1A)', () => {
 
   describe('2. mock-admin-token cannot be used in staging or production builds', () => {
     let originalEnv: string | undefined;
+    let originalMockAuth: string | undefined;
 
     beforeAll(() => {
       originalEnv = process.env.BUILD_VARIANT;
+      originalMockAuth = process.env.OFFLINE_MOCK_AUTH;
+      process.env.OFFLINE_MOCK_AUTH = 'true';
     });
 
     afterAll(() => {
       process.env.BUILD_VARIANT = originalEnv;
+      process.env.OFFLINE_MOCK_AUTH = originalMockAuth;
       require('../src/config/build-variant').BuildVariantService.resetInstance();
     });
 

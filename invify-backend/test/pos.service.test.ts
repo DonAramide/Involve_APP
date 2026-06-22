@@ -90,6 +90,94 @@ function mockHttpGet(response: object) {
   });
 }
 
+function setupMockHosts() {
+  PosService.routingConfig.hosts = [
+    {
+      hostName: 'Express Pay',
+      hostCode: 'express_pay',
+      ip: '196.6.103.18',
+      port: 4018,
+      sslEnabled: false,
+      sslCertMetadata: null,
+      timeoutSeconds: 3600,
+      priority: 1,
+      failoverPriority: 1,
+      healthScore: 100,
+      status: 'ONLINE',
+      supportedCardSchemes: [],
+      supportedTerminalTypes: [],
+      supportedTenantCategories: [],
+      supportedTransactionTypes: [],
+      isActive: true,
+      thresholdMin: 0,
+      thresholdMax: 999999999
+    },
+    {
+      hostName: 'Kimono',
+      hostCode: 'kimono',
+      ip: '127.0.0.1',
+      port: 443,
+      sslEnabled: true,
+      sslCertMetadata: null,
+      timeoutSeconds: 3600,
+      priority: 2,
+      failoverPriority: 2,
+      healthScore: 100,
+      status: 'ONLINE',
+      supportedCardSchemes: [],
+      supportedTerminalTypes: [],
+      supportedTenantCategories: [],
+      supportedTransactionTypes: [],
+      isActive: true,
+      thresholdMin: 0,
+      thresholdMax: 999999999,
+      baseUrl: 'https://kimono-api.invify.app',
+      paramsPath: '/getkimonoparams',
+      transactionPath: '/postcashposwithdrawalkim'
+    },
+    {
+      hostName: 'Medusa',
+      hostCode: 'medusa',
+      ip: '127.0.0.1',
+      port: 8080,
+      sslEnabled: false,
+      sslCertMetadata: null,
+      timeoutSeconds: 3600,
+      priority: 3,
+      failoverPriority: 3,
+      healthScore: 100,
+      status: 'ONLINE',
+      supportedCardSchemes: [],
+      supportedTerminalTypes: [],
+      supportedTenantCategories: [],
+      supportedTransactionTypes: [],
+      isActive: true,
+      thresholdMin: 0,
+      thresholdMax: 999999999
+    },
+    {
+      hostName: 'NIBSS',
+      hostCode: 'nibss',
+      ip: '127.0.0.1',
+      port: 5000,
+      sslEnabled: true,
+      sslCertMetadata: null,
+      timeoutSeconds: 3600,
+      priority: 4,
+      failoverPriority: 4,
+      healthScore: 100,
+      status: 'ONLINE',
+      supportedCardSchemes: [],
+      supportedTerminalTypes: [],
+      supportedTenantCategories: [],
+      supportedTransactionTypes: [],
+      isActive: false,
+      thresholdMin: 0,
+      thresholdMax: 999999999
+    }
+  ];
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  1. ROUTING LOGIC
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -98,13 +186,16 @@ describe('PosService — Routing Logic', () => {
 
   beforeEach(() => {
     // Reset to default (Kimono as default host)
-    PosService.routingConfig = {
-      ...PosService.routingConfig,
-      activeHost: 'kimono',
-      kimono: { ...PosService.routingConfig.kimono, isActive: true },
-      medusa: { ...PosService.routingConfig.medusa, isActive: true },
-      nibss: { ...PosService.routingConfig.nibss, isActive: false },
-    };
+    setupMockHosts();
+    PosService.routingConfig.activeHost = 'kimono';
+    PosService.routingConfig.tenantRoutingProfiles = [
+      {
+        category: 'Retail',
+        preferredHosts: ['kimono'],
+        fallbackHosts: ['medusa', 'express_pay']
+      }
+    ];
+    PosService.routingConfig.thresholdRulesMatrix = [];
   });
 
   it('should route ALL amounts to Kimono when toggle is ON (activeHost=kimono)', () => {
@@ -114,32 +205,56 @@ describe('PosService — Routing Logic', () => {
 
   it('should route amounts < ₦50,000 to Medusa when toggle is OFF', () => {
     PosService.routingConfig.activeHost = 'medusa';
+    PosService.routingConfig.tenantRoutingProfiles = [];
+    PosService.routingConfig.thresholdRulesMatrix = [
+      { minAmount: 0, maxAmount: 49999, preferredHost: 'medusa' },
+      { minAmount: 50000, maxAmount: 999999999, preferredHost: 'kimono' }
+    ];
     const route = (PosService as any).determineRoute(30000); // ₦30,000
     expect(route.name).toBe('MEDUSA');
   });
 
   it('should route amounts ≥ ₦50,000 to Kimono even when toggle is OFF', () => {
     PosService.routingConfig.activeHost = 'medusa';
+    PosService.routingConfig.tenantRoutingProfiles = [];
+    PosService.routingConfig.thresholdRulesMatrix = [
+      { minAmount: 0, maxAmount: 49999, preferredHost: 'medusa' },
+      { minAmount: 50000, maxAmount: 999999999, preferredHost: 'kimono' }
+    ];
     const route = (PosService as any).determineRoute(50000); // exactly ₦50,000
     expect(route.name).toBe('KIMONO');
   });
 
   it('should route amounts > ₦50,000 to Kimono even when toggle is OFF', () => {
     PosService.routingConfig.activeHost = 'medusa';
+    PosService.routingConfig.tenantRoutingProfiles = [];
+    PosService.routingConfig.thresholdRulesMatrix = [
+      { minAmount: 0, maxAmount: 49999, preferredHost: 'medusa' },
+      { minAmount: 50000, maxAmount: 999999999, preferredHost: 'kimono' }
+    ];
     const route = (PosService as any).determineRoute(100000); // ₦100,000
     expect(route.name).toBe('KIMONO');
   });
 
   it('should failover to Medusa when preferred Kimono host is inactive', () => {
-    PosService.routingConfig.kimono = { ...PosService.routingConfig.kimono, isActive: false };
+    PosService.routingConfig.tenantRoutingProfiles = [
+      {
+        category: 'Retail',
+        preferredHosts: ['kimono', 'medusa'],
+        fallbackHosts: ['express_pay']
+      }
+    ];
+    PosService.routingConfig.thresholdRulesMatrix = [];
+    const kimonoHost = PosService.routingConfig.hosts.find(h => h.hostCode === 'kimono');
+    if (kimonoHost) kimonoHost.isActive = false;
     const route = (PosService as any).determineRoute(50000);
     expect(route.name).toBe('MEDUSA');
   });
 
   it('should throw when all hosts are inactive', () => {
-    PosService.routingConfig.kimono = { ...PosService.routingConfig.kimono, isActive: false };
-    PosService.routingConfig.medusa = { ...PosService.routingConfig.medusa, isActive: false };
-    PosService.routingConfig.nibss  = { ...PosService.routingConfig.nibss,  isActive: false };
+    for (const h of PosService.routingConfig.hosts) {
+      h.isActive = false;
+    }
     expect(() => (PosService as any).determineRoute(5000)).toThrow('All hosts are inactive');
   });
 });
@@ -182,8 +297,18 @@ describe('PosService — parseIsoMessage', () => {
 describe('PosService — Kimono HTTPS flow', () => {
 
   beforeEach(() => {
+    setupMockHosts();
     PosService.routingConfig.activeHost = 'kimono';
-    PosService.routingConfig.kimono = { ...PosService.routingConfig.kimono, isActive: true };
+    PosService.routingConfig.tenantRoutingProfiles = [
+      {
+        category: 'Retail',
+        preferredHosts: ['kimono'],
+        fallbackHosts: ['medusa', 'express_pay']
+      }
+    ];
+    PosService.routingConfig.thresholdRulesMatrix = [];
+    const kimonoHost = PosService.routingConfig.hosts.find(h => h.hostCode === 'kimono');
+    if (kimonoHost) kimonoHost.isActive = true;
     PosService.clearKimonoParamsCache();
     jest.restoreAllMocks();
   });
@@ -280,9 +405,22 @@ describe('PosService — Kimono HTTPS flow', () => {
 describe('PosService — Auto-failover (Kimono → Medusa)', () => {
 
   beforeEach(() => {
+    setupMockHosts();
     PosService.routingConfig.activeHost = 'kimono';
-    PosService.routingConfig.kimono = { ...PosService.routingConfig.kimono, isActive: true };
-    PosService.routingConfig.medusa = { ...PosService.routingConfig.medusa, isActive: true };
+    PosService.routingConfig.tenantRoutingProfiles = [
+      {
+        category: 'Retail',
+        preferredHosts: ['kimono', 'medusa'],
+        fallbackHosts: ['express_pay']
+      }
+    ];
+    PosService.routingConfig.thresholdRulesMatrix = [];
+    const kimonoHost = PosService.routingConfig.hosts.find(h => h.hostCode === 'kimono');
+    if (kimonoHost) kimonoHost.isActive = true;
+    const medusaHost = PosService.routingConfig.hosts.find(h => h.hostCode === 'medusa');
+    if (medusaHost) medusaHost.isActive = true;
+    const expressPayHost = PosService.routingConfig.hosts.find(h => h.hostCode === 'express_pay');
+    if (expressPayHost) expressPayHost.isActive = false;
     PosService.clearKimonoParamsCache();
     jest.restoreAllMocks();
   });
@@ -357,39 +495,39 @@ describe('PosService — buildKimonoPayload field mapping', () => {
   };
 
   it('should map PAN from emvData.pan', () => {
-    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams);
+    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams, EMV_FIXTURE.pan || '');
     expect(payload.pan).toBe('5366132277281612');
   });
 
   it('should map track2Data correctly', () => {
-    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams);
+    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams, EMV_FIXTURE.pan || '');
     expect(payload.track2Data).toBe('5366132277281612D2812221012908360F');
   });
 
   it('should split expiry into year and month', () => {
-    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams);
+    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams, EMV_FIXTURE.pan || '');
     expect(payload.expiryYear).toBe('28');
     expect(payload.expiryMonth).toBe('12');
   });
 
   it('should set minorAmount from amountAuthorisedNumeric stripped of leading zeros', () => {
-    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams);
+    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams, EMV_FIXTURE.pan || '');
     // "000000012000" → "12000"
     expect(payload.minorAmount).toBe('12000');
   });
 
   it('should set cryptogram (tag 9F26) from appCryptogram', () => {
-    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams);
+    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams, EMV_FIXTURE.pan || '');
     expect(payload.cryptogram).toBe('C9D04E12B7F3DAC8');
   });
 
   it('should set pinBlock from emvData.pinBlock', () => {
-    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams);
+    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams, EMV_FIXTURE.pan || '');
     expect(payload.pinBlock).toBe('D1A0E33AF8B5070E');
   });
 
   it('should set terminalId from ISW_TERMINAL_ID udf', () => {
-    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams);
+    const payload = (PosService as any).buildKimonoPayload(EMV_FIXTURE, dummyParams, EMV_FIXTURE.pan || '');
     expect(payload.terminalId).toBe('TID00001');
   });
 });

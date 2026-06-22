@@ -1,96 +1,31 @@
 // invify-backend/src/controllers/admin.controller.ts
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase';
+import { supabase, supabaseAdmin } from '../db/supabase';
 import { WalletService } from '../services/wallet.service';
 import { PDFService } from '../services/pdf.service';
 import { BillingService } from '../services/billing.service';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
-
-interface MockTenant {
-  id: string;
-  name: string;
-  type: string;
-  plan: string;
-  status: string;
-  created_at: string;
-  virtual_account_number?: string;
-  virtual_account_bank?: string;
-  virtual_account_status?: string;
-  wallet_balance?: number;
-  total_wallet_balance?: number;
-  available_wallet_balance?: number;
-  support_phone?: string;
-  support_email?: string;
-  support_whatsapp?: string;
-  emergency_lock_code?: string;
-  is_emergency_locked?: boolean;
-  agent_code?: string;
-  subscription_end_date?: string;
-}
 
 export class AdminController {
-  private static initLocalDB() {
-    if (!fs.existsSync(LOCAL_TENANTS_DB_PATH)) {
-      const initialData = [
-        { id: '00000000-0000-0000-0000-000000000001', name: 'Lagos Academy School', type: 'school', plan: 'standard', status: 'active', created_at: new Date().toISOString() },
-        { id: '00000000-0000-0000-0000-000000000002', name: 'Elite Retail Hub', type: 'retail', plan: 'premium', status: 'active', created_at: new Date().toISOString() },
-        { id: '00000000-0000-0000-0000-000000000003', name: 'City Hospital Clinic', type: 'healthcare', plan: 'enterprise', status: 'active', created_at: new Date().toISOString() }
-      ];
-      fs.writeFileSync(LOCAL_TENANTS_DB_PATH, JSON.stringify(initialData, null, 2));
-    }
-  }
-
-  private static getLocalData(): MockTenant[] {
-    AdminController.initLocalDB();
-    try {
-      return JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'));
-    } catch (_) {
-      return [];
-    }
-  }
-
-  private static saveLocalData(data: MockTenant[]) {
-    fs.writeFileSync(LOCAL_TENANTS_DB_PATH, JSON.stringify(data, null, 2));
-  }
 
   private static getGlobalSettingsData() {
-    const GLOBAL_SETTINGS_PATH = path.join(process.cwd(), 'global_settings.json');
-    if (!fs.existsSync(GLOBAL_SETTINGS_PATH)) {
-      fs.writeFileSync(GLOBAL_SETTINGS_PATH, JSON.stringify({ 
-        support_phone: '+234 800 INVIFY',
-        support_email: 'info.iips.ng@gmail.com',
-        support_whatsapp: '+2348023552282',
-        broadcast_message: ''
-      }, null, 2));
-    }
-    const data = JSON.parse(fs.readFileSync(GLOBAL_SETTINGS_PATH, 'utf-8'));
-    // Ensure new fields exist even for existing files
-    if (!data.support_email) data.support_email = 'info.iips.ng@gmail.com';
-    if (!data.support_whatsapp) data.support_whatsapp = '+2348023552282';
-    if (!data.broadcast_message) data.broadcast_message = '';
-    if (data.audit_retention_hours === undefined) data.audit_retention_hours = 72;
-    if (data.enforce_device_control === undefined) data.enforce_device_control = false;
-    
-    // Integrations defaults
-    if (data.meta_access_token === undefined) data.meta_access_token = '';
-    if (data.whatsapp_phone_number_id === undefined) data.whatsapp_phone_number_id = '';
-    if (data.whatsapp_business_account_id === undefined) data.whatsapp_business_account_id = '';
-    if (data.quasar_client_id === undefined) data.quasar_client_id = '';
-    if (data.quasar_client_secret === undefined) data.quasar_client_secret = '';
-    if (data.lesson_ai_api_key === undefined) data.lesson_ai_api_key = '';
-    
-    // Commission settings
-    if (data.commissions === undefined) {
-      data.commissions = {
+    return { 
+      support_phone: '+234 800 INVIFY',
+      support_email: 'info.iips.ng@gmail.com',
+      support_whatsapp: '+2348023552282',
+      broadcast_message: '',
+      audit_retention_hours: 72,
+      enforce_device_control: false,
+      meta_access_token: '',
+      whatsapp_phone_number_id: '',
+      whatsapp_business_account_id: '',
+      quasar_client_id: '',
+      quasar_client_secret: '',
+      lesson_ai_api_key: '',
+      commissions: {
         globalDefaultOnboardingFee: 10.0,
         globalDefaultRevSharePercentage: 5.0
-      };
-    }
-    
-    return data;
+      }
+    };
   }
 
   // Removed saveGlobalSettingsData to enforce single source of truth
@@ -101,10 +36,10 @@ export class AdminController {
         return res.status(200).json(AdminController.getGlobalSettingsData());
       }
       
-      const { data, error } = await supabase.from('system_configurations').select('config_key, config_value');
+      const { data, error } = await supabaseAdmin.from('system_configurations').select('config_key, config_value');
       
       if (error || !data || data.length === 0) {
-         console.warn('[AdminController] Failed to read system_configurations from DB. Falling back to read-only JSON.', error);
+         console.warn('[AdminController] Failed to read system_configurations from DB. Falling back to in-memory defaults.', error);
          return res.status(200).json(AdminController.getGlobalSettingsData());
       }
 
@@ -116,7 +51,7 @@ export class AdminController {
       
       return res.status(200).json(settingsObj);
     } catch (error: any) {
-      console.warn('[AdminController] Exception in getGlobalSettings. Falling back to read-only JSON.', error);
+      console.warn('[AdminController] Exception in getGlobalSettings. Falling back to in-memory defaults.', error);
       return res.status(200).json(AdminController.getGlobalSettingsData());
     }
   }
@@ -134,7 +69,7 @@ export class AdminController {
       
       // Update each key-value pair in system_configurations
       for (const [key, value] of Object.entries(updates)) {
-        const { error } = await supabase.from('system_configurations')
+        const { error } = await supabaseAdmin.from('system_configurations')
           .upsert({ config_key: key, config_value: value, updated_by: operatorId });
           
         if (error) {
@@ -156,7 +91,7 @@ export class AdminController {
 
       // Attempt to source values from the active plan configuration (if exists)
       try {
-        const { data: activeVersion, error } = await supabase
+        const { data: activeVersion, error } = await supabaseAdmin
           .from('commission_plan_versions')
           .select('*, commission_program_rules(*)')
           .eq('status', 'ACTIVE')
@@ -192,7 +127,7 @@ export class AdminController {
       const { globalDefaultOnboardingFee, globalDefaultRevSharePercentage } = req.body;
       const operatorId = (req as any).user?.id || null;
 
-      const { data: activeVersion, error: fetchErr } = await supabase
+      const { data: activeVersion, error: fetchErr } = await supabaseAdmin
         .from('commission_plan_versions')
         .select('*')
         .eq('status', 'ACTIVE')
@@ -205,7 +140,7 @@ export class AdminController {
          throw new Error('No ACTIVE commission plan version found. Cannot update global commissions.');
       }
 
-      const { error: updateErr } = await supabase
+      const { error: updateErr } = await supabaseAdmin
         .from('commission_program_rules')
         .update({
           tenant_onboarding_bonus: globalDefaultOnboardingFee,
@@ -216,7 +151,7 @@ export class AdminController {
       if (updateErr) throw updateErr;
 
       // Audit write action in commission_events
-      await supabase.from('commission_events').insert({
+      await supabaseAdmin.from('commission_events').insert({
         agent_id: null,
         event_type: 'VERSION_RULES_UPDATED',
         amount: 0,
@@ -245,32 +180,10 @@ export class AdminController {
    * Lists all tenants with optional filtering.
    */
   static async listTenants(req: Request, res: Response) {
-    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-      console.log('[AdminController] Serving local mock tenants immediately (OFFLINE_MOCK_AUTH active).');
-      let data = AdminController.getLocalData();
-      
-      const { type, status, name } = req.query;
-      if (type) {
-        data = data.filter(t => t.type === type);
-      }
-      if (status) {
-        data = data.filter(t => t.status === status);
-      }
-      if (name) {
-        const queryStr = String(name).toLowerCase();
-        data = data.filter(t => 
-          t.name.toLowerCase().includes(queryStr) || 
-          (t as any).agent_code?.toLowerCase().includes(queryStr)
-        );
-      }
-      
-      return res.status(200).json(data);
-    }
-
     try {
       const { type, status, name } = req.query;
 
-      let query = supabase.from('tenants').select('*');
+      let query = supabaseAdmin.from('tenants').select('*');
 
       if (type) query = query.eq('type', type);
       if (status) query = query.eq('status', status);
@@ -289,30 +202,8 @@ export class AdminController {
         error.message?.includes('timeout') ||
         error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT';
 
-      if (isConnectionTimeout || process.env.OFFLINE_MOCK_AUTH === 'true') {
-        console.warn('[AdminController] Supabase offline fallback triggered for listTenants.');
-        let fallbackData = [
-          { id: '00000000-0000-0000-0000-000000000001', name: 'Lagos Academy School', type: 'school', plan: 'standard', status: 'active', created_at: new Date().toISOString() },
-          { id: '00000000-0000-0000-0000-000000000002', name: 'Elite Retail Hub', type: 'retail', plan: 'premium', status: 'active', created_at: new Date().toISOString() },
-          { id: '00000000-0000-0000-0000-000000000003', name: 'City Hospital Clinic', type: 'healthcare', plan: 'enterprise', status: 'active', created_at: new Date().toISOString() }
-        ];
-        
-        const { type, status, name } = req.query;
-        if (type) {
-          fallbackData = fallbackData.filter(t => t.type === type);
-        }
-        if (status) {
-          fallbackData = fallbackData.filter(t => t.status === status);
-        }
-        if (name) {
-          const queryStr = String(name).toLowerCase();
-          fallbackData = fallbackData.filter(t => 
-            t.name.toLowerCase().includes(queryStr) || 
-            (t as any).agent_code?.toLowerCase().includes(queryStr)
-          );
-        }
-        
-        return res.status(200).json(fallbackData);
+      if (isConnectionTimeout) {
+        return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
       }
       return res.status(500).json({ error: error.message });
     }
@@ -343,58 +234,9 @@ export class AdminController {
       let attempt = 0;
       const suffixes = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
-      // Uniqueness Collision Check
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        const localData = AdminController.getLocalData();
-        while (localData.some((t: any) => t.id === finalTenantId)) {
-          if (attempt >= suffixes.length) throw new Error('Too many tenants with this phone number');
-          finalTenantId = `${baseTenantId}-${suffixes[attempt]}`;
-          attempt++;
-        }
-        
-        console.log(`[AdminController] Creating tenant locally immediately with ID ${finalTenantId}`);
-        const newTenant: any = {
-          id: finalTenantId,
-          name,
-          type,
-          plan: plan || 'standard',
-          status: 'active',
-          created_at: new Date().toISOString()
-        };
-
-        // Call Quasar SDK for Virtual Account generation even in mock mode
-        try {
-          const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
-          const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-          const quasar = new QuasarServiceModule(platformApiKey);
-          const platformId = 'platform-admin-owner-id';
-          
-          const va = await quasar.createVirtualAccount({
-            childId: newTenant.id,
-            parentId: platformId,
-            currency: 'NGN',
-            email: `billing@tenant-${newTenant.id.substring(0,8)}.invify.app`,
-            firstName: name.split(' ')[0],
-            lastName: name.split(' ').slice(1).join(' ') || 'Business',
-            parentShareBps: 0,
-            metadata: { type: 'tenant_operating_account' }
-          });
-          
-          newTenant.virtual_account_number = va.accountNumber;
-          newTenant.virtual_account_bank = va.bankName;
-          newTenant.virtual_account_status = 'ACTIVE';
-        } catch (vaError: any) {
-          console.error('[AdminController] Mock VA generation failed via Quasar:', vaError.message);
-        }
-
-        localData.unshift(newTenant);
-        AdminController.saveLocalData(localData);
-        return res.status(201).json(newTenant);
-      }
-
-      // Production / Supabase Uniqueness Check
+      // Supabase Uniqueness Check
       while (true) {
-        const { data: existing } = await supabase
+        const { data: existing } = await supabaseAdmin
           .from('tenants')
           .select('id')
           .eq('id', finalTenantId)
@@ -405,7 +247,7 @@ export class AdminController {
         attempt++;
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('tenants')
         .insert({ id: finalTenantId, name, type, plan: plan || 'free', status: 'active' })
         .select()
@@ -414,7 +256,7 @@ export class AdminController {
       if (error) throw error;
       
       // Senior Practice: Auto-create wallet for the new tenant
-      await supabase.from('wallets').insert({ tenant_id: data.id, balance: 0 });
+      await supabaseAdmin.from('wallets').insert({ tenant_id: data.id, balance: 0 });
 
       // Generate Virtual Account for Tenant using Quasar SDK
       try {
@@ -436,7 +278,7 @@ export class AdminController {
         });
         
         // Save VA details to the tenant record
-        await supabase
+        await supabaseAdmin
           .from('tenants')
           .update({
             virtual_account_number: va.accountNumber,
@@ -464,20 +306,11 @@ export class AdminController {
   static async updateTenant(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const updates = req.body;
+      const updates = { ...req.body };
+      delete updates.tenant_code;
+      delete updates.agent_code;
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        const data = AdminController.getLocalData();
-        const index = data.findIndex(t => t.id === id);
-        if (index !== -1) {
-          data[index] = { ...data[index], ...updates };
-          AdminController.saveLocalData(data);
-          return res.status(200).json(data[index]);
-        }
-        return res.status(404).json({ error: 'Tenant not found' });
-      }
-
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('tenants')
         .update(updates)
         .eq('id', id)
@@ -497,18 +330,7 @@ export class AdminController {
       const { id } = req.params;
       const { status } = req.body;
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        const data = AdminController.getLocalData();
-        const index = data.findIndex(t => t.id === id);
-        if (index !== -1) {
-          data[index].status = status;
-          AdminController.saveLocalData(data);
-          return res.status(200).json(data[index]);
-        }
-        return res.status(404).json({ error: 'Tenant not found' });
-      }
-
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('tenants')
         .update({ status })
         .eq('id', id)
@@ -528,28 +350,8 @@ export class AdminController {
       const { id } = req.params;
       const { passcode } = req.body;
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        const data = AdminController.getLocalData();
-        const index = data.findIndex(t => t.id === id);
-        if (index !== -1) {
-          data[index].is_emergency_locked = true;
-          data[index].emergency_lock_code = passcode;
-          AdminController.saveLocalData(data);
-          
-          // Emit socket event
-          try {
-            const { io } = require('../app');
-            if (io) {
-              io.to(`tenant:${id}`).emit('emergency_lock', { passcode });
-            }
-          } catch (e) { console.error('Socket emit failed', e); }
-
-          return res.status(200).json(data[index]);
-        }
-        return res.status(404).json({ error: 'Tenant not found' });
-      }
-
-      // Add actual supabase update if needed later
+      const { error } = await supabaseAdmin.from('tenants').update({ is_emergency_locked: true, emergency_lock_code: passcode }).eq('id', id);
+      if (error) throw error;
       return res.status(200).json({ success: true });
     } catch (error: any) {
       console.error('[AdminController] triggerEmergencyLock Error:', error.message);
@@ -581,24 +383,13 @@ export class AdminController {
       const { io } = require('../app');
       
       if (targetType === 'agent' && targetValue) {
-        // Read tenants to find all tenants under this agent
-        let tenants: any[] = [];
-        if (fs.existsSync(LOCAL_TENANTS_DB_PATH)) {
-          tenants = JSON.parse(fs.readFileSync(LOCAL_TENANTS_DB_PATH, 'utf-8'));
-        }
-        
-        const agentTenants = tenants.filter(t => t.agent_code === targetValue);
-        
-        console.log(`[AdminController] Emitting broadcast to ${agentTenants.length} tenants under agent: ${targetValue}`);
-        
-        agentTenants.forEach(tenant => {
-          io.to(`tenant:${tenant.id}`).emit('app_broadcast', {
-            message,
-            timestamp: new Date().toISOString()
-          });
+        const { data: agentTenants } = await supabaseAdmin.from('tenants').select('id').eq('agent_code', targetValue);
+        const tenantList = agentTenants || [];
+        console.log(`[AdminController] Emitting broadcast to ${tenantList.length} tenants under agent: ${targetValue}`);
+        tenantList.forEach((tenant: any) => {
+          io.to(`tenant:${tenant.id}`).emit('app_broadcast', { message, timestamp: new Date().toISOString() });
         });
-
-        return res.status(200).json({ success: true, message: `Broadcast sent to ${agentTenants.length} tenants under agent ${targetValue}` });
+        return res.status(200).json({ success: true, message: `Broadcast sent to ${tenantList.length} tenants under agent ${targetValue}` });
       }
 
       let room = 'all';
@@ -631,74 +422,16 @@ export class AdminController {
    * Fetches detailed data for the Tenant Detail Page.
    */
   static async getTenantDetails(req: Request, res: Response) {
-    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-      const { id } = req.params;
-      const data = AdminController.getLocalData();
-      const match = data.find(t => t.id === id);
-      
-      const tenantName = match ? match.name : 'Invify Retail Business';
-      const tenantType = match ? match.type : 'retail';
-      const tenantPlan = match ? match.plan : 'standard';
-      const tenantStatus = match ? match.status : 'active';
-      const tenantCreatedAt = match ? match.created_at : new Date().toISOString();
-
-      let tenantCertificates: any[] = [];
-      try {
-        const fs = require('fs');
-        const path = require('path');
-        const devicesDbPath = path.join(process.cwd(), 'devices_db.json');
-        if (fs.existsSync(devicesDbPath)) {
-          const deviceDb = JSON.parse(fs.readFileSync(devicesDbPath, 'utf-8'));
-          tenantCertificates = (deviceDb.activations || [])
-            .filter((a: any) => a.tenant_id === id)
-            .map((a: any) => ({
-              code: a.activation_code,
-              deviceId: a.device_id,
-              plan: a.plan_index === 3 ? 'ENTERPRISE' : (a.plan_index === 2 ? 'PREMIUM' : (a.plan_index === 1 ? 'STANDARD' : 'BASIC')),
-              duration: `${a.duration_days} Days`,
-              expiry: new Date(new Date(a.created_at).getTime() + a.duration_days * 24 * 60 * 60 * 1000).toLocaleDateString(),
-              status: a.status === 'used' ? 'USED' : 'ACTIVE'
-            }));
-        }
-      } catch (e) {}
-
-      return res.status(200).json({
-        tenant: { 
-          id, 
-          name: tenantName, 
-          type: tenantType, 
-          plan: tenantPlan, 
-          status: tenantStatus, 
-          created_at: tenantCreatedAt,
-          virtual_account_number: match?.virtual_account_number || null,
-          virtual_account_bank: match?.virtual_account_bank || null,
-          virtual_account_status: match?.virtual_account_status || null,
-          emergency_lock_code: match?.emergency_lock_code || null,
-          is_emergency_locked: match?.is_emergency_locked || false
-        },
-        users: [
-          { id: 'usr-1', name: 'Admin User', role: 'admin' }
-        ],
-        wallet: { 
-          balance: match?.wallet_balance || 0,
-          total_wallet_balance: match?.total_wallet_balance || 0,
-          available_wallet_balance: match?.available_wallet_balance || 0
-        },
-        recentUsage: [],
-        certificates: tenantCertificates
-      });
-    }
-
     try {
       const { id } = req.params;
 
       // Parallel fetch for deep insights
       const [tenantRes, usersRes, walletInfo, usageRes, certRes] = await Promise.all([
-        supabase.from('tenants').select('*').eq('id', id).single(),
-        supabase.from('users').select('*').eq('tenant_id', id),
+        supabaseAdmin.from('tenants').select('*').eq('id', id).single(),
+        supabaseAdmin.from('users').select('*').eq('tenant_id', id),
         WalletService.getBalance(id), // DERIVED: Sum of ledger entries
-        supabase.from('ai_usage').select('*').eq('tenant_id', id).limit(5),
-        supabase.from('device_activations').select('*').eq('tenant_id', id)
+        supabaseAdmin.from('ai_usage').select('*').eq('tenant_id', id).limit(5),
+        supabaseAdmin.from('device_activations').select('*').eq('tenant_id', id)
       ]);
 
       if (tenantRes.error) throw tenantRes.error;
@@ -733,43 +466,9 @@ export class AdminController {
     try {
       const { id } = req.params;
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        const data = AdminController.getLocalData();
-        const tenant = data.find(t => t.id === id);
-        
-        if (!tenant) return res.status(404).json({ error: 'Tenant not found locally' });
-
-        try {
-          const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
-          const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
-          const quasar = new QuasarServiceModule(platformApiKey);
-          const platformId = 'platform-admin-owner-id';
-          
-          const va = await quasar.createVirtualAccount({
-            childId: tenant.id,
-            parentId: platformId,
-            currency: 'NGN',
-            email: `billing@tenant-${tenant.id.substring(0,8)}.invify.app`,
-            firstName: tenant.name.split(' ')[0],
-            lastName: tenant.name.split(' ').slice(1).join(' ') || 'Business',
-            parentShareBps: 0,
-            metadata: { type: 'tenant_operating_account' }
-          });
-          
-          tenant.virtual_account_number = va.accountNumber;
-          tenant.virtual_account_bank = va.bankName;
-          tenant.virtual_account_status = 'ACTIVE';
-          AdminController.saveLocalData(data);
-          
-          return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
-        } catch (vaError: any) {
-          console.error('[AdminController] Mock VA generation failed via Quasar:', vaError.message);
-          return res.status(500).json({ error: 'Failed to provision VA: ' + vaError.message });
-        }
-      }
 
       // Supabase flow
-      const { data: tenant, error: fetchErr } = await supabase.from('tenants').select('*').eq('id', id).single();
+      const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
       const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
@@ -788,7 +487,7 @@ export class AdminController {
         metadata: { type: 'tenant_operating_account' }
       });
       
-      await supabase
+      await supabaseAdmin
         .from('tenants')
         .update({
           virtual_account_number: va.accountNumber,
@@ -838,7 +537,7 @@ export class AdminController {
       }
 
       // Supabase flow - verify tenant first
-      const { data: tenant, error: fetchErr } = await supabase.from('tenants').select('*').eq('id', id).single();
+      const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
       // In real scenario, verify student exists in backend DB too.
@@ -901,7 +600,7 @@ export class AdminController {
       }
 
       // Supabase flow - verify tenant first
-      const { data: tenant, error: fetchErr } = await supabase.from('tenants').select('*').eq('id', id).single();
+      const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
       const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
@@ -935,7 +634,7 @@ export class AdminController {
     try {
       const { tenantId, startDate, endDate, reference } = req.query;
 
-      let query = supabase
+      let query = supabaseAdmin
         .from('ledger_entries')
         .select(`
           *,
@@ -965,7 +664,7 @@ export class AdminController {
     try {
       const { tenantId, status, provider, reference, startDate, endDate } = req.query;
 
-      let query = supabase
+      let query = supabaseAdmin
         .from('payments')
         .select(`
           *,
@@ -1001,7 +700,7 @@ export class AdminController {
         : tenantId;
 
       // 1. Fetch Insight Aggregation from Scoped RPC
-      const { data: stats, error } = await supabase.rpc('get_tenant_dashboard_stats', { 
+      const { data: stats, error } = await supabaseAdmin.rpc('get_tenant_dashboard_stats', { 
         p_tenant_id: targetTenantId 
       });
 
@@ -1048,7 +747,7 @@ export class AdminController {
       const { tenantId, id: userId, role } = (req as any).user;
       const { scope } = req.query; // 'personal' or 'school' or 'global'
 
-      let query = supabase.from('lesson_notes').select(`
+      let query = supabaseAdmin.from('lesson_notes').select(`
         *,
         users (name)
       `);
@@ -1089,7 +788,7 @@ export class AdminController {
 
       // Ensure we don't accidentally overwrite a GLOBAL note
       // We always create a new record if it is 'edited'
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('lesson_notes')
         .insert({
           tenant_id: tenantId,
@@ -1124,7 +823,7 @@ export class AdminController {
       const { id } = req.params;
 
       // 1. Fetch Note with Tenant Name
-      const { data: note, error } = await supabase
+      const { data: note, error } = await supabaseAdmin
         .from('lesson_notes')
         .select('*, tenants(name)')
         .eq('id', id)
@@ -1160,7 +859,7 @@ export class AdminController {
       const { id: userId } = (req as any).user;
       const { last_login_at } = req.body;
 
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('users')
         .update({ 
           last_login_at: last_login_at || new Date().toISOString(),
@@ -1186,33 +885,105 @@ export class AdminController {
         return res.status(400).json({ success: false, message: 'Invalid daysToExtend parameter' });
       }
 
-      const tenants = AdminController.getLocalData();
-      let updatedCount = 0;
+      let query = supabaseAdmin.from('tenants').select('id, name');
+      if (tenantId) {
+        query = query.eq('id', tenantId);
+      } else if (agentCode) {
+        query = query.eq('agent_code', agentCode);
+      } else if (type) {
+        query = query.eq('type', type);
+      } else {
+        return res.status(400).json({ success: false, message: 'Must specify tenantId, agentCode, or type' });
+      }
 
-      for (const t of tenants) {
-        let match = false;
-        if (tenantId && t.id === tenantId) match = true;
-        if (agentCode && t.agent_code === agentCode) match = true;
-        if (type && t.type === type && !tenantId && !agentCode) match = true;
-        
-        if (match) {
-          // Default to current date if no expiry exists
-          const currentExpiry = t.subscription_end_date ? new Date(t.subscription_end_date) : new Date();
-          // Add days
-          currentExpiry.setDate(currentExpiry.getDate() + daysToExtend);
-          t.subscription_end_date = currentExpiry.toISOString();
-          updatedCount++;
+      const { data: matchedTenants, error: tenantErr } = await query;
+      if (tenantErr) throw tenantErr;
+
+      let matchedCount = 0;
+      if (matchedTenants && matchedTenants.length > 0) {
+        matchedCount = matchedTenants.length;
+        for (const tenant of matchedTenants) {
+          // Fetch current active subscription
+          const { data: activeSub, error: subFetchErr } = await supabaseAdmin
+            .from('subscriptions')
+            .select('*')
+            .eq('tenant_id', tenant.id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (subFetchErr) throw subFetchErr;
+
+          let subscriptionId: string;
+          let eventType: 'CREATED' | 'EXTENDED';
+
+          if (activeSub) {
+            const currentEndDate = new Date(activeSub.end_date);
+            const baseDate = currentEndDate.getTime() > Date.now() ? currentEndDate : new Date();
+            const newEndDate = new Date(baseDate);
+            newEndDate.setDate(newEndDate.getDate() + daysToExtend);
+
+            const { data: updatedSub, error: updateErr } = await supabaseAdmin
+              .from('subscriptions')
+              .update({
+                end_date: newEndDate.toISOString()
+              })
+              .eq('id', activeSub.id)
+              .select()
+              .single();
+
+            if (updateErr) throw updateErr;
+            subscriptionId = updatedSub.id;
+            eventType = 'EXTENDED';
+          } else {
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + daysToExtend);
+
+            const { data: newSub, error: insertErr } = await supabaseAdmin
+              .from('subscriptions')
+              .insert({
+                tenant_id: tenant.id,
+                plan: 'standard',
+                status: 'active',
+                start_date: startDate.toISOString(),
+                end_date: endDate.toISOString()
+              })
+              .select()
+              .single();
+
+            if (insertErr) throw insertErr;
+            subscriptionId = newSub.id;
+            eventType = 'CREATED';
+          }
+
+          // Write an audit record to subscription_events
+          const { error: eventErr } = await supabaseAdmin
+            .from('subscription_events')
+            .insert({
+              subscription_id: subscriptionId,
+              tenant_id: tenant.id,
+              event_type: eventType,
+              days_added: daysToExtend,
+              performed_by: (req as any).user?.email || 'superadmin@invify.app'
+            });
+
+          if (eventErr) throw eventErr;
         }
       }
 
-      AdminController.saveLocalData(tenants);
-
       return res.status(200).json({
         success: true,
-        message: `Successfully extended subscription for ${updatedCount} tenant(s) by ${daysToExtend} days.`,
-        updatedCount
+        matchedCount,
+        extendedDays: daysToExtend
       });
     } catch (error: any) {
+      if (AdminController.isNetworkTimeout(error)) {
+        return res.status(503).json({
+          error: 'Database unavailable',
+          retryable: true,
+          retryAfterMs: 2000
+        });
+      }
       return res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -1223,41 +994,78 @@ export class AdminController {
    */
   static async getSubscriptionStatus(req: Request, res: Response) {
     try {
-      // In a real flow, tenantId comes from req.user
-      // For mock, we can accept it in query or fallback
-      const tenantId = req.query.tenantId as string;
-      const tenants = AdminController.getLocalData();
-      
-      let targetTenant = null;
-      if (tenantId) {
-        targetTenant = tenants.find(t => t.id === tenantId);
+      const { role, tenantId: jwtTenantId } = (req as any).user;
+      let targetTenantId = jwtTenantId;
+
+      if (role === 'super_admin') {
+        if (req.query.tenantId) {
+          targetTenantId = req.query.tenantId as string;
+        } else {
+          // Default to first tenant if none provided (for compatibility/testing)
+          const { data: firstTenant, error: firstTenantErr } = await supabaseAdmin
+            .from('tenants')
+            .select('id')
+            .limit(1)
+            .maybeSingle();
+
+          if (firstTenantErr) throw firstTenantErr;
+          if (firstTenant) {
+            targetTenantId = firstTenant.id;
+          }
+        }
       } else {
-        // Fallback to first if none provided (for simple mobile testing)
-        targetTenant = tenants[0];
+        if (req.query.tenantId && req.query.tenantId !== jwtTenantId) {
+          return res.status(403).json({ success: false, error: 'Forbidden: Cross-tenant query parameter spoofing detected' });
+        }
+        targetTenantId = jwtTenantId;
       }
 
-      if (!targetTenant) {
+      if (!targetTenantId) {
         return res.status(404).json({ success: false, message: 'Tenant not found' });
       }
 
-      // Default to 6 days from now for testing the countdown
-      const defaultExpiry = new Date();
-      defaultExpiry.setDate(defaultExpiry.getDate() + 6);
-      
-      const expiryStr = targetTenant.subscription_end_date || defaultExpiry.toISOString();
-      const expiryDate = new Date(expiryStr);
-      
+      const { data: sub, error: subErr } = await supabaseAdmin
+        .from('subscriptions')
+        .select('*')
+        .eq('tenant_id', targetTenantId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (subErr) throw subErr;
+
+      if (!sub) {
+        return res.status(404).json({ success: false, message: 'No active subscription found' });
+      }
+
+      const expiryDate = new Date(sub.end_date);
       const diffTime = expiryDate.getTime() - new Date().getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       return res.status(200).json({
         success: true,
-        tenantId: targetTenant.id,
+        tenantId: targetTenantId,
         daysRemaining: diffDays,
         expiresAt: expiryDate.toISOString()
       });
     } catch (error: any) {
+      if (AdminController.isNetworkTimeout(error)) {
+        return res.status(503).json({
+          error: 'Database unavailable',
+          retryable: true,
+          retryAfterMs: 2000
+        });
+      }
       return res.status(500).json({ success: false, message: error.message });
     }
+  }
+
+  private static isNetworkTimeout(error: any): boolean {
+    return (
+      error.message?.includes('fetch failed') ||
+      error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      error.message?.includes('timeout') ||
+      error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      process.env.OFFLINE_MOCK_AUTH === 'true'
+    );
   }
 }

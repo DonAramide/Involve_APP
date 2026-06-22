@@ -232,7 +232,7 @@ app.delete('/admin/commissions/terminal-rules/:id', authenticate, checkRole(['su
 
 // Subscriptions
 app.post('/admin/subscriptions/extend', authenticate, checkRole(['super_admin']), AdminController.extendSubscription);
-app.get('/api/subscription/status', AdminController.getSubscriptionStatus);
+app.get('/api/subscription/status', authenticate, AdminController.getSubscriptionStatus);
 
 // API Endpoints for Admin (Invify Pro App / Operator App)
 // User Device Controls & Audit Archiving (Super Admin only)
@@ -447,38 +447,21 @@ app.get('/api/admin/complaints', authenticate, checkRole(['super_admin', 'intern
 app.patch('/api/admin/complaints/:id/status', authenticate, checkRole(['super_admin', 'internal_staff', 'admin_ops']), SupportController.updateComplaintStatus);
 
 // ─── EMERGENCY APPLOCK ─────────────────────────────────────────────
-app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'internal_staff']), (req: Request, res: Response) => {
+app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'internal_staff']), async (req: Request, res: Response) => {
   try {
     const { tenant_id, passcode } = req.body;
     if (!tenant_id || !passcode) {
       return res.status(400).json({ success: false, message: 'Missing tenant_id or passcode' });
     }
-    
-    // Save to local DB if in offline mode
-    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-      const fs = require('fs');
-      const path = require('path');
-      const dbPath = path.join(process.cwd(), 'tenants_db.json');
-      if (fs.existsSync(dbPath)) {
-        const data = JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-        const index = data.findIndex((t: any) => t.id === tenant_id);
-        if (index !== -1) {
-          data[index].emergency_lock_code = passcode;
-          data[index].is_emergency_locked = true;
-          fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-        }
-      }
-    } else {
-      // Supabase flow (fire and forget for now)
-      const { supabase } = require('./db/supabase');
-      supabase.from('tenants').update({ emergency_lock_code: passcode, is_emergency_locked: true }).eq('id', tenant_id).then();
-    }
 
-    // The `io` instance is created at the bottom of app.ts, so we can access it lazily
+    // Supabase update — sole persistence path (P0-5A: removed JSON fallback)
+    const { supabase: sb } = require('./db/supabase');
+    await sb.from('tenants').update({ emergency_lock_code: passcode, is_emergency_locked: true }).eq('id', tenant_id);
+
     process.nextTick(() => {
       io.to(`tenant:${tenant_id}`).emit('emergency_lock', { action: 'lock', passcode });
     });
-    
+
     return res.json({ success: true, message: 'Emergency lock signal broadcasted' });
   } catch (err: any) {
     return res.status(500).json({ success: false, message: err.message });

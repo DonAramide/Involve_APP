@@ -1,26 +1,3 @@
 {
-  "commission_events_columns": {
-    "message": "JWT failed verification"
-  },
-  "plan_id_attnotnull": {
-    "message": "JWT failed verification"
-  },
-  "triggers_on_approval_queue": {
-    "message": "JWT failed verification"
-  },
-  "all_public_triggers": {
-    "message": "JWT failed verification"
-  },
-  "fn_trg_audit_approval_queue_change": {
-    "message": "JWT failed verification"
-  },
-  "fn_process_commission_approval": {
-    "message": "JWT failed verification"
-  },
-  "fn_execute_commission_clawback": {
-    "message": "JWT failed verification"
-  },
-  "fns_referencing_commission_events": {
-    "message": "JWT failed verification"
-  }
+  "connection_status": "FAILED — no pooler endpoint reachable"
 }

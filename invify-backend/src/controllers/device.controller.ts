@@ -1,126 +1,25 @@
 // src/controllers/device.controller.ts
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
-import * as fs from 'fs';
-import * as path from 'path';
 import { LicenseGenerator } from '../utils/license.util';
 
-// Local offline DB path
-const LOCAL_DB_PATH = path.join(process.cwd(), 'devices_db.json');
-
-// Interface definition matching database rows
-interface MockDevice {
-  id: string;
-  device_id: string;
-  tenant_id: string;
-  status: string;
-  last_seen: string;
-  created_at: string;
-  tenants?: { name: string; plan: string };
-}
-
-interface MockActivation {
-  id: string;
-  activation_code: string;
-  tenant_id: string;
-  duration_days: number;
-  plan_index: number;
-  device_suffix: string;
-  device_id?: string;
-  status: string;
-  is_used: boolean;
-  created_at: string;
-  created_by?: string;
-  tenants?: { name: string; plan: string };
+function isNetworkTimeout(error: any): boolean {
+  return (
+    error.message?.includes('fetch failed') ||
+    error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    error.message?.includes('timeout') ||
+    error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT'
+  );
 }
 
 export class DeviceController {
-  
-  // Seed initial local fallback data safely if not exists
-  private static initLocalDB() {
-    if (!fs.existsSync(LOCAL_DB_PATH)) {
-      const initialData = {
-        devices: [
-          {
-            id: 'mock-device-1',
-            device_id: 'DSPREAD-POS-80MM-0091',
-            tenant_id: '00000000-0000-0000-0000-000000000001',
-            status: 'active',
-            last_seen: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            tenants: { name: 'Lagos Academy School', plan: 'standard' }
-          }
-        ],
-        activations: [
-          {
-            id: 'mock-activation-1',
-            activation_code: 'INV-7X9B-K4M2',
-            tenant_id: '00000000-0000-0000-0000-000000000001',
-            duration_days: 90,
-            plan_index: 1,
-            device_suffix: '0',
-            status: 'pending',
-            is_used: false,
-            created_at: new Date().toISOString(),
-            tenants: { name: 'Lagos Academy School', plan: 'standard' }
-          }
-        ]
-      };
-      fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(initialData, null, 2));
-    }
-  }
 
-  private static getLocalData() {
-    this.initLocalDB();
-    try {
-      return JSON.parse(fs.readFileSync(LOCAL_DB_PATH, 'utf-8'));
-    } catch (_) {
-      return { devices: [], activations: [] };
-    }
-  }
-
-  private static saveLocalData(data: any) {
-    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2));
-  }
-
-  private static isNetworkTimeout(error: any): boolean {
-    return (
-      error.message?.includes('fetch failed') ||
-      error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-      error.message?.includes('timeout') ||
-      error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-      process.env.OFFLINE_MOCK_AUTH === 'true'
-    );
-  }
-
-  private static getTenantName(tenantId: string): { name: string; plan: string } {
-    try {
-      const tenantsDbPath = path.join(process.cwd(), 'tenants_db.json');
-      if (fs.existsSync(tenantsDbPath)) {
-        const tenants = JSON.parse(fs.readFileSync(tenantsDbPath, 'utf-8'));
-        const found = tenants.find((t: any) => t.id === tenantId);
-        if (found) {
-          return { name: found.name, plan: found.plan || 'standard' };
-        }
-      }
-    } catch (_) {}
-    return { 
-      name: tenantId === '00000000-0000-0000-0000-000000000001' ? 'Lagos Academy School' : 'Invify Retail Business',
-      plan: 'standard'
-    };
-  }
 
   /**
    * GET /devices
    * Retrieves all hardware devices
    */
   static async getDevices(req: Request, res: Response) {
-    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-      console.log('[DeviceController] Serving local mock devices immediately (OFFLINE_MOCK_AUTH active).');
-      const local = DeviceController.getLocalData();
-      return res.status(200).json(local.devices);
-    }
-
     try {
       const { data, error } = await supabase
         .from('devices')
@@ -130,10 +29,8 @@ export class DeviceController {
       if (error) throw error;
       return res.status(200).json(data);
     } catch (error: any) {
-      if (DeviceController.isNetworkTimeout(error)) {
-        console.warn('[DeviceController] Supabase connection timed out. Serving local mock devices.');
-        const local = DeviceController.getLocalData();
-        return res.status(200).json(local.devices);
+      if (isNetworkTimeout(error)) {
+        return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
       }
       console.error('[DeviceController] getDevices Error:', error.message);
       return res.status(500).json({ error: error.message });
@@ -145,12 +42,6 @@ export class DeviceController {
    * Retrieves all generated activation codes
    */
   static async getActivations(req: Request, res: Response) {
-    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-      console.log('[DeviceController] Serving local mock activations immediately (OFFLINE_MOCK_AUTH active).');
-      const local = DeviceController.getLocalData();
-      return res.status(200).json(local.activations);
-    }
-
     try {
       const { data, error } = await supabase
         .from('device_activations')
@@ -160,10 +51,8 @@ export class DeviceController {
       if (error) throw error;
       return res.status(200).json(data);
     } catch (error: any) {
-      if (DeviceController.isNetworkTimeout(error)) {
-        console.warn('[DeviceController] Supabase connection timed out. Serving local mock activations.');
-        const local = DeviceController.getLocalData();
-        return res.status(200).json(local.activations);
+      if (isNetworkTimeout(error)) {
+        return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
       }
       console.error('[DeviceController] getActivations Error:', error.message);
       return res.status(500).json({ error: error.message });
@@ -176,22 +65,36 @@ export class DeviceController {
    */
   static async createActivation(req: Request, res: Response) {
     try {
-      const { tenantId, durationDays, planIndex, deviceSuffix } = req.body;
+      const user = (req as any).user;
+      let tenantId = user?.tenantId;
+
+      if (user?.role === 'super_admin') {
+        tenantId = req.body.tenantId || tenantId;
+      }
+
       if (!tenantId) {
         return res.status(400).json({ error: 'tenantId is required' });
       }
 
+      const { durationDays, planIndex, deviceSuffix } = req.body;
+
       // Fetch tenant name for cryptographic signature
       let businessName = 'Invify Retail Business';
       try {
-        if (process.env.OFFLINE_MOCK_AUTH !== 'true') {
-          const { data } = await supabase.from('tenants').select('name').eq('id', tenantId).single();
-          if (data && data.name) businessName = data.name;
-        } else {
-          businessName = DeviceController.getTenantName(tenantId).name;
+        const { data, error } = await supabase.from('tenants').select('name').eq('id', tenantId).single();
+        if (error) throw error;
+        if (data && data.name) {
+          businessName = data.name;
         }
-      } catch (err) {
-        businessName = DeviceController.getTenantName(tenantId).name;
+      } catch (err: any) {
+        if (isNetworkTimeout(err)) {
+          return res.status(503).json({
+            error: 'Database unavailable',
+            retryable: true,
+            retryAfterMs: 2000
+          });
+        }
+        console.warn('[DeviceController] Failed to fetch tenant name:', err.message);
       }
 
       // Generate a cryptographically valid Base32 HMAC-SHA256 signature code
@@ -201,55 +104,27 @@ export class DeviceController {
         Number(planIndex) || 0, 
         deviceSuffix || '0'
       );
-      
-      const generatedDeviceId = `DSPREAD-POS-${deviceSuffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        console.log('[DeviceController] Creating activation locally immediately (OFFLINE_MOCK_AUTH active).');
-        const local = DeviceController.getLocalData();
-        
-        // Try to lookup mock tenant name
-        const tenantInfo = DeviceController.getTenantName(tenantId);
-        const creatorEmail = (req as any).user?.email || 'superadmin@invify.app';
-        
-        const newAct: MockActivation = {
-          id: `act-${Date.now()}`,
-          activation_code: code,
-          tenant_id: tenantId,
-          duration_days: Number(durationDays) || 30,
-          plan_index: Number(planIndex) || 0,
-          device_suffix: deviceSuffix || '0',
-          device_id: generatedDeviceId,
-          status: 'pending',
-          is_used: false,
-          created_at: new Date().toISOString(),
-          created_by: creatorEmail,
-          tenants: tenantInfo
-        };
-
-        local.activations.unshift(newAct);
-        DeviceController.saveLocalData(local);
-
-        return res.status(201).json({ 
-          activation_code: code,
-          device_id: generatedDeviceId
-        });
-      }
+      const durationDaysNum = Number(durationDays) || 30;
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + durationDaysNum);
+      const expiresAtIso = expiresAt.toISOString();
+      const creatorEmail = user?.email || 'superadmin@invify.app';
 
       try {
-        const creatorEmail = (req as any).user?.email || 'superadmin@invify.app';
         const { data, error } = await supabase
           .from('device_activations')
           .insert({
             tenant_id: tenantId,
             activation_code: code,
-            duration_days: durationDays || 30,
+            duration_days: durationDaysNum,
             plan_index: planIndex || 0,
             device_suffix: deviceSuffix || '0',
-            device_id: generatedDeviceId,
+            device_id: null, // No generated device identifier at creation time
             is_used: false,
             status: 'pending',
-            created_by: creatorEmail
+            created_by: creatorEmail,
+            expires_at: expiresAtIso
           })
           .select()
           .single();
@@ -257,38 +132,14 @@ export class DeviceController {
         if (error) throw error;
         return res.status(201).json({ 
           activation_code: data.activation_code,
-          device_id: data.device_id
+          expires_at: data.expires_at
         });
       } catch (dbErr: any) {
-        if (DeviceController.isNetworkTimeout(dbErr)) {
-          console.warn('[DeviceController] Supabase timeout. Saving activation locally.');
-          const local = DeviceController.getLocalData();
-          
-          // Try to lookup mock tenant name
-          const tenantInfo = DeviceController.getTenantName(tenantId);
-          const creatorEmail = (req as any).user?.email || 'superadmin@invify.app';
-          
-          const newAct: MockActivation = {
-            id: `act-${Date.now()}`,
-            activation_code: code,
-            tenant_id: tenantId,
-            duration_days: Number(durationDays) || 30,
-            plan_index: Number(planIndex) || 0,
-            device_suffix: deviceSuffix || '0',
-            device_id: generatedDeviceId,
-            status: 'pending',
-            is_used: false,
-            created_at: new Date().toISOString(),
-            created_by: creatorEmail,
-            tenants: tenantInfo
-          };
-
-          local.activations.unshift(newAct);
-          DeviceController.saveLocalData(local);
-
-          return res.status(201).json({ 
-            activation_code: code,
-            device_id: generatedDeviceId
+        if (isNetworkTimeout(dbErr)) {
+          return res.status(503).json({ 
+            error: 'Database unavailable', 
+            retryable: true,
+            retryAfterMs: 2000 
           });
         }
         throw dbErr;
@@ -301,116 +152,181 @@ export class DeviceController {
 
   /**
    * POST /devices/validate
-   * Validates a device activation key
+   * Validates and redeems a device activation key
    */
   static async validateCode(req: Request, res: Response) {
     try {
-      const { code } = req.body;
+      const { code, deviceId, deviceInfo, themeColor } = req.body;
       if (!code) {
         return res.status(400).json({ error: 'code is required' });
       }
-
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
-        console.log('[DeviceController] Validating code locally immediately (OFFLINE_MOCK_AUTH active).');
-        const local = DeviceController.getLocalData();
-        const match = local.activations.find((a: any) => a.activation_code === code);
-
-        if (!match) {
-          return res.status(400).json({ error: 'Invalid activation code' });
-        }
-
-        if (match.is_used) {
-          return res.status(400).json({ error: 'Activation code has already been used' });
-        }
-
-        // Mark it used locally
-        match.is_used = true;
-        match.status = 'used';
-        
-        // Provision a mock device for this code
-        const newDev: MockDevice = {
-          id: `dev-${Date.now()}`,
-          device_id: match.device_id || `DSPREAD-POS-${match.device_suffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`,
-          tenant_id: match.tenant_id,
-          status: 'active',
-          last_seen: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-          tenants: match.tenants
-        };
-        local.devices.unshift(newDev);
-        
-        DeviceController.saveLocalData(local);
-
-        return res.status(200).json({
-          valid: true,
-          activation_code: match.activation_code,
-          duration_days: match.duration_days,
-          tenant_id: match.tenant_id,
-          device_id: newDev.device_id
-        });
+      if (!deviceId) {
+        return res.status(400).json({ error: 'deviceId is required' });
       }
 
+      // 1. Fetch activation first to check existence, usage, and expiration for helpful error responses
+      let activation: any = null;
       try {
         const { data, error } = await supabase
           .from('device_activations')
           .select('*')
           .eq('activation_code', code)
+          .maybeSingle();
+
+        if (error) throw error;
+        activation = data;
+      } catch (selectErr: any) {
+        if (isNetworkTimeout(selectErr)) {
+          return res.status(503).json({
+            error: 'Database unavailable',
+            retryable: true,
+            retryAfterMs: 2000
+          });
+        }
+        throw selectErr;
+      }
+
+      if (!activation) {
+        return res.status(400).json({ error: 'Invalid activation code' });
+      }
+
+      if (activation.is_used || activation.status === 'used') {
+        return res.status(400).json({ error: 'Activation code has already been used' });
+      }
+
+      if (new Date(activation.expires_at) <= new Date() || activation.status === 'expired') {
+        return res.status(400).json({ error: 'Activation code has expired' });
+      }
+
+      // Enforce ownership integrity: user must belong to the same tenant as the activation (except super_admin)
+      const user = (req as any).user;
+      if (user && user.role !== 'super_admin' && activation.tenant_id !== user.tenantId) {
+        return res.status(403).json({ error: 'Forbidden: Activation code belongs to a different tenant' });
+      }
+
+      // 2. Perform conditional atomic update (expires_at > NOW() verified in query)
+      let updatedActivation: any = null;
+      try {
+        const { data, error } = await supabase
+          .from('device_activations')
+          .update({
+            is_used: true,
+            status: 'used',
+            device_id: deviceId,
+            used_at: new Date().toISOString()
+          })
+          .eq('activation_code', code)
+          .eq('is_used', false)
+          .eq('status', 'pending')
+          .gt('expires_at', new Date().toISOString()) // Expiration verification inside the atomic lock operation
+          .select()
+          .maybeSingle();
+
+        if (error) throw error;
+        updatedActivation = data;
+      } catch (updateErr: any) {
+        if (isNetworkTimeout(updateErr)) {
+          return res.status(503).json({
+            error: 'Database unavailable',
+            retryable: true,
+            retryAfterMs: 2000
+          });
+        }
+        throw updateErr;
+      }
+
+      if (!updatedActivation) {
+        return res.status(400).json({ error: 'Activation code is invalid, expired, or has already been used' });
+      }
+
+      // 3. Resolve device role dynamically
+      let deviceRole = 'TABLET'; // Default fallback for company devices, never PHONE
+      let inventoryRecordId: string | null = null;
+
+      try {
+        const { data: inventoryRecord } = await supabase
+          .from('terminal_inventory')
+          .select('id, terminal_type')
+          .eq('assigned_device_id', deviceId)
+          .maybeSingle();
+
+        if (inventoryRecord) {
+          inventoryRecordId = inventoryRecord.id;
+          const typeMap: Record<string, string> = {
+            'tablet': 'TABLET', 'android': 'TABLET',
+            'mpos': 'MPOS', 'dspread': 'MPOS',
+            'printer': 'PRINTER', 'bluetooth': 'PRINTER'
+          };
+          const rawType = (inventoryRecord.terminal_type || '').toLowerCase();
+          deviceRole = typeMap[rawType] || 'TABLET';
+        } else {
+          // Parse suffix: '0' -> TABLET, '1' -> MPOS, '2' -> PRINTER
+          const suffix = updatedActivation.device_suffix || '0';
+          if (suffix === '0') deviceRole = 'TABLET';
+          else if (suffix === '1') deviceRole = 'MPOS';
+          else if (suffix === '2') deviceRole = 'PRINTER';
+        }
+      } catch (invErr: any) {
+        if (isNetworkTimeout(invErr)) {
+          return res.status(503).json({
+            error: 'Database unavailable',
+            retryable: true,
+            retryAfterMs: 2000
+          });
+        }
+        console.warn('[DeviceController] terminal_inventory lookup failed during validation:', invErr.message);
+        // Fallback to suffix metadata
+        const suffix = updatedActivation.device_suffix || '0';
+        if (suffix === '0') deviceRole = 'TABLET';
+        else if (suffix === '1') deviceRole = 'MPOS';
+        else if (suffix === '2') deviceRole = 'PRINTER';
+      }
+
+      // 4. Provision the device as COMPANY_DEVICE
+      const deviceRecord = {
+        device_id: deviceId,
+        tenant_id: updatedActivation.tenant_id,
+        device_category: 'COMPANY_DEVICE',
+        device_role: deviceRole,
+        status: 'active',
+        device_suffix: updatedActivation.device_suffix || null,
+        device_info: deviceInfo || null,
+        theme_color: themeColor || null,
+        inventory_record_id: inventoryRecordId,
+        device_name: deviceInfo?.model || deviceInfo?.deviceName || deviceId,
+        platform: deviceInfo?.platform || 'android',
+        is_active: true,
+        last_seen: new Date().toISOString(),
+      };
+
+      try {
+        const { data: upsertedDevice, error: upsertError } = await supabase
+          .from('devices')
+          .upsert(deviceRecord, { onConflict: 'device_id' })
+          .select()
           .single();
 
-        if (error || !data) {
-          return res.status(400).json({ error: 'Invalid activation code' });
-        }
-
-        if (data.is_used) {
-          return res.status(400).json({ error: 'Activation code has already been used' });
-        }
+        if (upsertError) throw upsertError;
 
         return res.status(200).json({
           valid: true,
-          activation_code: data.activation_code,
-          duration_days: data.duration_days,
-          tenant_id: data.tenant_id
+          activation_code: updatedActivation.activation_code,
+          duration_days: updatedActivation.duration_days,
+          tenant_id: updatedActivation.tenant_id,
+          device_id: deviceId,
+          device_role: deviceRole,
+          device_category: 'COMPANY_DEVICE',
+          device: upsertedDevice
         });
-      } catch (dbErr: any) {
-        if (DeviceController.isNetworkTimeout(dbErr)) {
-          console.warn('[DeviceController] Supabase timeout. Validating locally.');
-          const local = DeviceController.getLocalData();
-          const match = local.activations.find((a: any) => a.activation_code === code);
-
-          if (!match) {
-            return res.status(400).json({ error: 'Invalid activation code' });
-          }
-
-          if (match.is_used) {
-            return res.status(400).json({ error: 'Activation code has already been used' });
-          }
-
-          // Mark it used locally
-          match.is_used = true;
-          match.status = 'used';
-          
-          // Provision a mock device for this code
-          const newDev: MockDevice = {
-            id: `dev-${Date.now()}`,
-            device_id: match.device_id || `DSPREAD-POS-${match.device_suffix || '0'}8MM-${Math.floor(1000 + Math.random() * 9000)}`,
-            tenant_id: match.tenant_id,
-            status: 'active',
-            last_seen: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            tenants: match.tenants
-          };
-          local.devices.unshift(newDev);
-          
-          DeviceController.saveLocalData(local);
-
-          return res.status(200).json({
-            valid: true,
-            activation_code: match.activation_code,
-            duration_days: match.duration_days,
-            tenant_id: match.tenant_id
+      } catch (upsertErr: any) {
+        if (isNetworkTimeout(upsertErr)) {
+          return res.status(503).json({
+            error: 'Database unavailable',
+            retryable: true,
+            retryAfterMs: 2000
           });
         }
-        throw dbErr;
+        throw upsertErr;
       }
     } catch (error: any) {
       console.error('[DeviceController] validateCode Error:', error.message);
@@ -438,18 +354,8 @@ export class DeviceController {
         if (error) throw error;
         return res.status(200).json(data);
       } catch (dbErr: any) {
-        if (DeviceController.isNetworkTimeout(dbErr)) {
-          console.warn('[DeviceController] Supabase timeout. Updating device locally.');
-          const local = DeviceController.getLocalData();
-          const match = local.devices.find((d: any) => d.id === id);
-
-          if (!match) {
-            return res.status(404).json({ error: 'Device not found' });
-          }
-
-          Object.assign(match, updates);
-          DeviceController.saveLocalData(local);
-          return res.status(200).json(match);
+        if (isNetworkTimeout(dbErr)) {
+          return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
         }
         throw dbErr;
       }
@@ -483,6 +389,7 @@ export class DeviceController {
       let deviceCategory = 'USER_DEVICE';
       let deviceRole = 'PHONE';
       let inventoryRecordId: string | null = null;
+      let isCompanyDeviceHardware = false;
 
       try {
         const { data: inventoryRecord } = await supabase
@@ -492,6 +399,7 @@ export class DeviceController {
           .maybeSingle();
 
         if (inventoryRecord) {
+          isCompanyDeviceHardware = true;
           deviceCategory = 'COMPANY_DEVICE';
           inventoryRecordId = inventoryRecord.id;
           // Map terminal_type to device_role
@@ -510,8 +418,42 @@ export class DeviceController {
           console.log(`[DeviceController] Device NOT in terminal_inventory → USER_DEVICE (role: ${deviceRole})`);
         }
       } catch (invErr: any) {
+        if (isNetworkTimeout(invErr)) {
+          return res.status(503).json({
+            error: 'Database unavailable',
+            retryable: true,
+            retryAfterMs: 2000
+          });
+        }
         console.warn('[DeviceController] terminal_inventory lookup failed (non-fatal):', invErr.message);
-        // Default to USER_DEVICE on lookup failure — never block onboarding
+      }
+
+      // Step 1.5: If it is a COMPANY_DEVICE, check if it's already activated in the devices table
+      if (isCompanyDeviceHardware) {
+        try {
+          const { data: existingDevice } = await supabase
+            .from('devices')
+            .select('id, is_active')
+            .eq('device_id', resolvedDeviceId)
+            .maybeSingle();
+
+          if (!existingDevice) {
+            console.log(`[DeviceController] COMPANY_DEVICE ${resolvedDeviceId} is NOT activated yet. Rejecting onboarding.`);
+            return res.status(400).json({
+              error: 'Activation code required for company devices. Please redeem an activation code.'
+            });
+          }
+          console.log(`[DeviceController] COMPANY_DEVICE ${resolvedDeviceId} is already activated. Permitting re-onboarding.`);
+        } catch (dbErr: any) {
+          if (isNetworkTimeout(dbErr)) {
+            return res.status(503).json({
+              error: 'Database unavailable',
+              retryable: true,
+              retryAfterMs: 2000
+            });
+          }
+          throw dbErr;
+        }
       }
 
       // Step 2: Upsert device record in Supabase
@@ -539,12 +481,19 @@ export class DeviceController {
 
       if (upsertError) {
         console.error('[DeviceController] Supabase upsert failed:', upsertError.message);
-        return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
+        if (isNetworkTimeout(upsertError)) {
+          return res.status(503).json({
+            error: 'Database unavailable',
+            retryable: true,
+            retryAfterMs: 2000
+          });
+        }
+        return res.status(500).json({ error: upsertError.message });
       }
 
       // Step 3: Compute capability profile
       const isCompany = deviceCategory === 'COMPANY_DEVICE';
-      const hasMpos = isCompany && inventoryRecordId !== null; // MPOS detection refined during terminal sync
+      const hasMpos = isCompany && inventoryRecordId !== null;
       const hasPrinter = isCompany && deviceRole === 'PRINTER';
 
       const features = {

@@ -76,10 +76,11 @@ export class ApkController {
       };
 
       let result;
+      const operatorEmail = (req as any).user?.email || 'system_operator';
       if (targetSlotId && targetSlotId !== 'null' && targetSlotId !== 'undefined') {
-        result = await ApkVaultService.updateApkSlot(targetSlotId, apkData);
+        result = await ApkVaultService.updateApkSlot(targetSlotId, apkData, operatorEmail);
       } else {
-        result = await ApkVaultService.addApk(apkData);
+        result = await ApkVaultService.addApk(apkData, operatorEmail);
       }
 
       return res.status(200).json(result);
@@ -103,7 +104,8 @@ export class ApkController {
     try {
       const { id } = req.params;
       const { s3Url } = req.body;
-      const result = await ApkVaultService.updateApkUrl(id, s3Url);
+      const operatorEmail = (req as any).user?.email || 'system_operator';
+      const result = await ApkVaultService.updateApkUrl(id, s3Url, operatorEmail);
       return res.status(200).json(result);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
@@ -153,12 +155,15 @@ export class ApkController {
       }
 
       // Log deployment
+      const operatorEmail = (req as any).user?.email || 'system_operator';
       await ApkVaultService.logDeployment({
         action: 'INSTALL',
         apkName: `${apk.name} v${targetVersion}`,
         devices: targetDevices.length,
-        status: 'SUCCESS'
-      });
+        status: 'SUCCESS',
+        apkId: apk.id,
+        targetVersion
+      }, operatorEmail);
 
       return res.status(200).json({ success: true, message: 'Deployment triggered successfully' });
     } catch (error: any) {
@@ -181,12 +186,14 @@ export class ApkController {
       apk.uninstallCount += targetDevices.length;
 
       // Log deployment
+      const operatorEmail = (req as any).user?.email || 'system_operator';
       await ApkVaultService.logDeployment({
         action: 'UNINSTALL',
         apkName: apk.name,
         devices: targetDevices.length,
-        status: 'SUCCESS'
-      });
+        status: 'SUCCESS',
+        apkId: apk.id
+      }, operatorEmail);
 
       return res.status(200).json({ success: true, message: 'Uninstall triggered successfully' });
     } catch (error: any) {

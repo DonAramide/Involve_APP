@@ -18,8 +18,6 @@ import * as net from 'net';
 import https from 'https';
 import http from 'http';
 import { URL } from 'url';
-import * as fs from 'fs';
-import * as path from 'path';
 import * as crypto from 'crypto';
 import type {
   CardIccDataInfo,
@@ -29,7 +27,7 @@ import type {
   MposEmvData,
   PosHostConfig,
 } from '../types/pos.types';
-import { supabase } from '../db/supabase';
+import { supabaseAdmin as supabase } from '../db/supabase';
 import { TerminalAuditService } from './terminal-audit.service';
 
 // iso8583-js may not ship TS types; require() is safe here
@@ -40,8 +38,21 @@ const iso8583 = require('iso8583-js');
 const DEFAULT_SPLIT_THRESHOLD_NAIRA = 50_000;
 
 export class PosService {
-  private static CONFIG_FILE_PATH = path.join(process.cwd(), 'pos_routing_config.json');
-  private static ENCRYPTION_KEY = crypto.scryptSync(process.env.POS_ENCRYPTION_KEY || 'invify-pos-switch-key-seed', 'salt', 32);
+  // P0-5A: CONFIG_FILE_PATH removed — config persisted to Supabase pos_routing_configs table
+
+  /**
+   * AES-256-CBC encryption key derived from POS_ENCRYPTION_KEY env var.
+   * Throws at access time if env var is not set — fail fast.
+   */
+  private static get ENCRYPTION_KEY(): Buffer {
+    if (!process.env.POS_ENCRYPTION_KEY) {
+      throw new Error(
+        '[POS Service] POS_ENCRYPTION_KEY environment variable is required. ' +
+        'Set it before starting the server. No insecure fallback is permitted.'
+      );
+    }
+    return crypto.scryptSync(process.env.POS_ENCRYPTION_KEY, 'salt', 32);
+  }
   private static IV_LENGTH = 16;
 
   private static encryptSecret(text: string): string {
@@ -154,31 +165,93 @@ export class PosService {
     ]
   };
 
-  static loadConfig() {
+  /**
+   * Loads POS routing config from Supabase pos_routing_configs table.
+   * Async — must be awaited at server bootstrap.
+   * Defaults to in-memory config only in LOCAL development mode (NODE_ENV=development and POS_ENCRYPTION_KEY absent).
+   */
+  static async loadConfig(): Promise<void> {
     try {
-      if (fs.existsSync(this.CONFIG_FILE_PATH)) {
-        const raw = fs.readFileSync(this.CONFIG_FILE_PATH, 'utf-8');
-        const encrypted = JSON.parse(raw);
-        this.routingConfig = this.mapSecrets(encrypted, 'decrypt');
-        console.log('[POS Service] Config loaded and decrypted successfully');
-      } else {
-        // Fallback default setup if no file exists
-        this.saveConfig();
+      const { data, error } = await supabase
+        .from('pos_routing_configs')
+        .select('config_blob, key_version, config_version')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('[POS Service] Supabase error loading config:', error.message);
+        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+          console.warn('[POS Service] Development/Test mode — using in-memory default config.');
+          if (process.env.NODE_ENV === 'development') {
+            await PosService.saveConfig('system_bootstrap');
+          }
+        } else {
+          throw new Error(`[POS Service] Failed to load routing config from Supabase: ${error.message}`);
+        }
+        return;
       }
+
+      if (!data) {
+        console.warn('[POS Service] No config found in Supabase. Saving default config.');
+        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+          if (process.env.NODE_ENV === 'development') {
+            await PosService.saveConfig('system_bootstrap');
+          }
+        } else {
+          await PosService.saveConfig('system_bootstrap');
+        }
+        return;
+      }
+
+      this.routingConfig = this.mapSecrets(JSON.parse(data.config_blob), 'decrypt');
+      console.log(`[POS Service] Config loaded from Supabase (key_version=${data.key_version}, config_version=${data.config_version})`);
     } catch (e: any) {
       console.error('[POS Service] Failed to load config:', e.message);
+      if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+        throw e; // Fail fast in production
+      }
     }
   }
 
-  static saveConfig() {
+  /**
+   * Saves POS routing config to Supabase pos_routing_configs table as an encrypted blob.
+   * Inserts a new versioned row — never updates in place (full audit trail).
+   * key_version: tracks encryption key rotation.
+   * config_version: tracks routing configuration revisions.
+   */
+  static async saveConfig(updatedBy: string = 'system'): Promise<void> {
     try {
       const encrypted = this.mapSecrets(this.routingConfig, 'encrypt');
-      fs.writeFileSync(this.CONFIG_FILE_PATH, JSON.stringify(encrypted, null, 2), 'utf-8');
-      console.log('[POS Service] Config encrypted and saved to file');
+
+      // Determine next config_version
+      const { data: latest } = await supabase
+        .from('pos_routing_configs')
+        .select('config_version')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextConfigVersion = (latest?.config_version ?? 0) + 1;
+
+      const { error } = await supabase.from('pos_routing_configs').insert({
+        config_blob: JSON.stringify(encrypted),
+        key_version: 1,              // Increment when POS_ENCRYPTION_KEY is rotated
+        config_version: nextConfigVersion,  // Increments on every config update
+        updated_by: updatedBy,
+        updated_at: new Date().toISOString()
+      });
+      if (error) throw error;
+      console.log(`[POS Service] Config encrypted and saved to Supabase (config_version=${nextConfigVersion})`);
     } catch (e: any) {
       console.error('[POS Service] Failed to save config:', e.message);
+      throw e;
     }
   }
+
+  // ─── Tenant Category Cache ──────────────────────────────────────────────────
+  // Populated asynchronously via cacheTenantCategory(), used synchronously in hot path.
+  static tenantCategoryCache: Map<string, string> = new Map();
+  static cacheTenantCategory: (tenantId: string) => Promise<void> = async () => {};
 
   // ─── Terminal Parameters Cache ─────────────────────────────────────────────
   private static kimonoParamsCache: Map<string, { params: KimonoTerminalParams; fetchedAt: number }> = new Map();
@@ -246,7 +319,7 @@ export class PosService {
     }
 
     this.routingConfig = { ...this.routingConfig, ...newConfig };
-    this.saveConfig();
+    await this.saveConfig(adminId);
 
     // Log to audit service
     await TerminalAuditService.log({
@@ -998,18 +1071,13 @@ export class PosService {
     cardScheme: string,
     simulatedHealthOverrides?: Record<string, { status: 'ONLINE' | 'OFFLINE'; healthScore: number }>
   ): { name: string; config: any } {
-    let category = 'Retail';
-    try {
-      const tenantsPath = path.join(process.cwd(), 'tenants_db.json');
-      if (fs.existsSync(tenantsPath)) {
-        const tenants = JSON.parse(fs.readFileSync(tenantsPath, 'utf8'));
-        const tenant = tenants.find((t: any) => t.id === tenantId || t.name === tenantId);
-        if (tenant && tenant.type) {
-          category = tenant.type.charAt(0).toUpperCase() + tenant.type.slice(1);
-        }
-      }
-    } catch (e) {
-      console.warn('[POS Gateway] Failed to resolve tenant category, defaulting to Retail:', e);
+    // Tenant category is resolved from in-memory cache (populated asynchronously).
+    // Falls back to 'Retail' if not yet resolved — matches current fallback behaviour.
+    const cachedCategory = PosService.tenantCategoryCache.get(tenantId);
+    const category = cachedCategory ?? 'Retail';
+    if (!cachedCategory) {
+      // Trigger async cache population — does not block the hot path
+      PosService.cacheTenantCategory(tenantId);
     }
 
     const activeHosts = this.routingConfig.hosts.filter(h => h.isActive);
@@ -1289,4 +1357,27 @@ export class PosService {
   }
 }
 
-PosService.loadConfig();
+// ─── Tenant Category Cache (replaces tenants_db.json read in determineRoute) ──
+// Populated asynchronously on first access per tenant, used synchronously in hot path.
+PosService.tenantCategoryCache = new Map<string, string>();
+PosService.cacheTenantCategory = async (tenantId: string): Promise<void> => {
+  try {
+    const { data } = await supabase
+      .from('tenants')
+      .select('type')
+      .or(`id.eq.${tenantId},name.eq.${tenantId}`)
+      .maybeSingle();
+    if (data?.type) {
+      const category = data.type.charAt(0).toUpperCase() + data.type.slice(1);
+      PosService.tenantCategoryCache.set(tenantId, category);
+    }
+  } catch (e) {
+    // Non-fatal — category defaults to Retail
+  }
+};
+
+// Bootstrap: load config from Supabase (async, fail fast in production)
+PosService.loadConfig().catch((e) => {
+  console.error('[POS Service] FATAL: Could not load routing config at startup:', e.message);
+  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') process.exit(1);
+});

@@ -1,9 +1,5 @@
 // src/services/user-device.service.ts
 import { supabase } from '../db/supabase';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const LOCAL_DB_PATH = path.join(process.cwd(), 'user_devices_db.json');
 
 interface UserDeviceRecord {
   id: string;
@@ -20,49 +16,11 @@ interface UserDeviceRecord {
   approved_by?: string;
 }
 
-function getLocalDB() {
-  try {
-    if (!fs.existsSync(LOCAL_DB_PATH)) {
-      const initial = { devices: [] };
-      fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(initial, null, 2));
-      return initial;
-    }
-    return JSON.parse(fs.readFileSync(LOCAL_DB_PATH, 'utf-8'));
-  } catch (_) {
-    return { devices: [] };
-  }
-}
 
-function saveLocalDB(data: any) {
-  fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2));
-}
-
-function isOfflineMode(): boolean {
-  return process.env.OFFLINE_MOCK_AUTH === 'true';
-}
 
 export class UserDeviceService {
 
   static async getDevices(filters: { status?: string; search?: string; page?: string; limit?: string } = {}): Promise<{ data: UserDeviceRecord[]; total: number }> {
-    if (isOfflineMode()) {
-      let devices = getLocalDB().devices || [];
-      if (filters.status) {
-        devices = devices.filter((d: any) => d.status === filters.status);
-      }
-      if (filters.search) {
-        const q = filters.search.toLowerCase();
-        devices = devices.filter((d: any) => 
-          d.email.toLowerCase().includes(q) || 
-          d.device_id.toLowerCase().includes(q) ||
-          (d.device_name && d.device_name.toLowerCase().includes(q))
-        );
-      }
-      const page = parseInt(filters.page || '1');
-      const limit = parseInt(filters.limit || '50');
-      const start = (page - 1) * limit;
-      return { data: devices.slice(start, start + limit), total: devices.length };
-    }
-
     try {
       let query = supabase.from('user_devices').select('*', { count: 'exact' });
       if (filters.status) query = query.eq('status', filters.status);
@@ -77,8 +35,7 @@ export class UserDeviceService {
       if (error) throw error;
       return { data: data || [], total: count || 0 };
     } catch (err: any) {
-      console.warn('[UserDeviceService] Supabase getDevices fallback:', err.message);
-      return this.getDevices({ ...filters, _offline: true } as any);
+      throw err;
     }
   }
 
@@ -90,35 +47,20 @@ export class UserDeviceService {
     ipAddress?: string;
     userAgent?: string;
   }): Promise<UserDeviceRecord> {
-    const db = isOfflineMode() ? getLocalDB() : null;
-
     // Check if user already has devices
     let hasExisting = false;
     let isAlreadyRegistered = false;
     let existingRecord: any = null;
 
-    if (isOfflineMode()) {
-      const userRecords = db.devices.filter((d: any) => d.user_id === params.userId);
-      hasExisting = userRecords.length > 0;
-      existingRecord = db.devices.find((d: any) => d.user_id === params.userId && d.device_id === params.deviceId);
-      isAlreadyRegistered = !!existingRecord;
-    } else {
-      try {
-        const { data: userRecords } = await supabase.from('user_devices').select('id').eq('user_id', params.userId).limit(1);
-        hasExisting = !!(userRecords && userRecords.length > 0);
+    try {
+      const { data: userRecords } = await supabase.from('user_devices').select('id').eq('user_id', params.userId).limit(1);
+      hasExisting = !!(userRecords && userRecords.length > 0);
 
-        const { data: matched } = await supabase.from('user_devices').select('*').eq('user_id', params.userId).eq('device_id', params.deviceId).maybeSingle();
-        existingRecord = matched;
-        isAlreadyRegistered = !!existingRecord;
-      } catch (err: any) {
-        console.warn('[UserDeviceService] Supabase register check fallback:', err.message);
-        // Fallback to local DB check
-        const localDb = getLocalDB();
-        const userRecords = localDb.devices.filter((d: any) => d.user_id === params.userId);
-        hasExisting = userRecords.length > 0;
-        existingRecord = localDb.devices.find((d: any) => d.user_id === params.userId && d.device_id === params.deviceId);
-        isAlreadyRegistered = !!existingRecord;
-      }
+      const { data: matched } = await supabase.from('user_devices').select('*').eq('user_id', params.userId).eq('device_id', params.deviceId).maybeSingle();
+      existingRecord = matched;
+      isAlreadyRegistered = !!existingRecord;
+    } catch (err: any) {
+      throw err;
     }
 
     if (isAlreadyRegistered) {
@@ -145,12 +87,6 @@ export class UserDeviceService {
       approved_by: approvedBy || undefined
     };
 
-    if (isOfflineMode()) {
-      db.devices.push(newRecord);
-      saveLocalDB(db);
-      return newRecord;
-    }
-
     try {
       const { data, error } = await supabase.from('user_devices').insert({
         user_id: newRecord.user_id,
@@ -166,29 +102,19 @@ export class UserDeviceService {
       if (error) throw error;
       return data;
     } catch (err: any) {
-      console.warn('[UserDeviceService] Supabase insert failed, saving locally:', err.message);
-      const localDb = getLocalDB();
-      localDb.devices.push(newRecord);
-      saveLocalDB(localDb);
-      return newRecord;
+      throw err;
     }
   }
 
   static async verifyDevice(userId: string, deviceId: string, email: string, context: { ipAddress?: string, userAgent?: string } = {}): Promise<{ isApproved: boolean; record: UserDeviceRecord }> {
     let record: any = null;
 
-    if (isOfflineMode()) {
-      const db = getLocalDB();
-      record = db.devices.find((d: any) => d.user_id === userId && d.device_id === deviceId);
-    } else {
-      try {
-        const { data, error } = await supabase.from('user_devices').select('*').eq('user_id', userId).eq('device_id', deviceId).maybeSingle();
-        if (!error) record = data;
-      } catch (err) {
-        // Fallback
-        const db = getLocalDB();
-        record = db.devices.find((d: any) => d.user_id === userId && d.device_id === deviceId);
-      }
+    try {
+      const { data, error } = await supabase.from('user_devices').select('*').eq('user_id', userId).eq('device_id', deviceId).maybeSingle();
+      if (error) throw error;
+      record = data;
+    } catch (err) {
+      throw err;
     }
 
     if (!record) {
@@ -208,18 +134,6 @@ export class UserDeviceService {
   }
 
   static async approveDevice(id: string, approvedBy: string): Promise<boolean> {
-    if (isOfflineMode()) {
-      const db = getLocalDB();
-      const idx = db.devices.findIndex((d: any) => d.id === id || d.device_id === id);
-      if (idx === -1) return false;
-      db.devices[idx].status = 'approved';
-      db.devices[idx].approved_at = new Date().toISOString();
-      db.devices[idx].approved_by = approvedBy;
-      db.devices[idx].updated_at = new Date().toISOString();
-      saveLocalDB(db);
-      return true;
-    }
-
     try {
       const { error } = await supabase.from('user_devices').update({
         status: 'approved',
@@ -230,30 +144,11 @@ export class UserDeviceService {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.warn('[UserDeviceService] Supabase approve failed, running locally:', err.message);
-      const db = getLocalDB();
-      const idx = db.devices.findIndex((d: any) => d.id === id || d.device_id === id);
-      if (idx === -1) return false;
-      db.devices[idx].status = 'approved';
-      db.devices[idx].approved_at = new Date().toISOString();
-      db.devices[idx].approved_by = approvedBy;
-      db.devices[idx].updated_at = new Date().toISOString();
-      saveLocalDB(db);
-      return true;
+      throw err;
     }
   }
 
   static async blockDevice(id: string, blockedBy: string): Promise<boolean> {
-    if (isOfflineMode()) {
-      const db = getLocalDB();
-      const idx = db.devices.findIndex((d: any) => d.id === id || d.device_id === id);
-      if (idx === -1) return false;
-      db.devices[idx].status = 'blocked';
-      db.devices[idx].updated_at = new Date().toISOString();
-      saveLocalDB(db);
-      return true;
-    }
-
     try {
       const { error } = await supabase.from('user_devices').update({
         status: 'blocked',
@@ -262,14 +157,7 @@ export class UserDeviceService {
       if (error) throw error;
       return true;
     } catch (err: any) {
-      console.warn('[UserDeviceService] Supabase block failed, running locally:', err.message);
-      const db = getLocalDB();
-      const idx = db.devices.findIndex((d: any) => d.id === id || d.device_id === id);
-      if (idx === -1) return false;
-      db.devices[idx].status = 'blocked';
-      db.devices[idx].updated_at = new Date().toISOString();
-      saveLocalDB(db);
-      return true;
+      throw err;
     }
   }
 }

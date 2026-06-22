@@ -1,7 +1,5 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import path from 'path';
 import { io } from '../../app';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { supabase } from '../../db/supabase';
@@ -50,25 +48,7 @@ async function uploadBase64ToContabo(base64Data: string, prefix: string, fileNam
   }
 }
 
-const LOCAL_TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
-const LOCAL_DEVICES_PATH = path.join(process.cwd(), 'devices_db.json');
-const LOCAL_TERMINALS_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
 
-function getLocalDevices(): any[] {
-  if (!fs.existsSync(LOCAL_DEVICES_PATH)) return [];
-  try { return JSON.parse(fs.readFileSync(LOCAL_DEVICES_PATH, 'utf8')); } catch { return []; }
-}
-function saveLocalDevices(data: any[]) {
-  fs.writeFileSync(LOCAL_DEVICES_PATH, JSON.stringify(data, null, 2));
-}
-
-function getLocalTerminals(): any[] {
-  if (!fs.existsSync(LOCAL_TERMINALS_PATH)) return [];
-  try { return JSON.parse(fs.readFileSync(LOCAL_TERMINALS_PATH, 'utf8')); } catch { return []; }
-}
-function saveLocalTerminals(data: any[]) {
-  fs.writeFileSync(LOCAL_TERMINALS_PATH, JSON.stringify(data, null, 2));
-}
 
 
 export interface Agent {
@@ -244,16 +224,9 @@ export class AgentController {
                if (row.config_key === 'is_maintenance_locked') is_maintenance_locked = row.config_value === true || row.config_value === 'true';
                if (row.config_key === 'maintenance_message') maintenance_message = row.config_value;
             }
-         } else {
-            throw error || new Error('No data');
          }
       } catch(dbErr) {
-         const settingsPath = path.join(process.cwd(), 'global_settings.json');
-         if (fs.existsSync(settingsPath)) {
-           const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-           is_maintenance_locked = !!settings.is_maintenance_locked;
-           maintenance_message = settings.maintenance_message || maintenance_message;
-         }
+         is_maintenance_locked = false;
       }
 
       if (is_maintenance_locked) {
@@ -672,131 +645,78 @@ export class AgentController {
       const authUserId = (req as any).user?.id;
       if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
-      // Check offline mode
-      const isOffline = process.env.OFFLINE_MOCK_AUTH === 'true';
-
-      let agentId = '00000000-0000-0000-0000-000000000000';
-      if (!isOffline) {
-        const { data: agent } = await supabase.from('agents').select('id').eq('auth_user_id', authUserId).single();
-        if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
-        agentId = agent.id;
-      }
+      const { data: agent } = await supabase.from('agents').select('id').eq('auth_user_id', authUserId).single();
+      if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+      const agentId = agent.id;
 
       const { type, tenantId, serialNumber } = req.body;
       if (!tenantId || !serialNumber) {
         return res.status(400).json({ success: false, message: 'Tenant and Serial Number are required' });
       }
 
-      if (isOffline) {
-        if (type === 'DEVICE') {
-          const devices = getLocalDevices();
-          const idx = devices.findIndex(d => d.device_id === serialNumber);
-          if (idx >= 0) {
-            devices[idx].tenant_id = tenantId;
-            devices[idx].status = 'active';
-            devices[idx].updated_at = new Date().toISOString();
-          } else {
-            devices.push({
-              id: uuidv4(),
+      if (type === 'DEVICE') {
+        // Check if device already exists in devices
+        const { data: existingDevice } = await supabase
+          .from('devices')
+          .select('id')
+          .eq('device_id', serialNumber)
+          .maybeSingle();
+
+        if (existingDevice) {
+          const { error } = await supabase
+            .from('devices')
+            .update({
+              tenant_id: tenantId,
+              status: 'active',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingDevice.id);
+          if (error) throw new Error('Failed to update device assignment: ' + error.message);
+        } else {
+          const { error } = await supabase
+            .from('devices')
+            .insert({
               tenant_id: tenantId,
               device_id: serialNumber,
               device_name: 'Agent-Assigned Device',
-              status: 'active',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              status: 'active'
             });
-          }
-          saveLocalDevices(devices);
-        } else if (type === 'TERMINAL') {
-          const terminals = getLocalTerminals();
-          const idx = terminals.findIndex(t => t.pos_serial_number === serialNumber || t.terminal_id === serialNumber);
-          if (idx >= 0) {
-            terminals[idx].assigned_tenant_id = tenantId;
-            terminals[idx].assignment_status = 'assigned';
-            terminals[idx].assigned_at = new Date().toISOString();
-            terminals[idx].updated_at = new Date().toISOString();
-          } else {
-            terminals.push({
-              id: uuidv4(),
+          if (error) throw new Error('Failed to create device assignment: ' + error.message);
+        }
+      } else if (type === 'TERMINAL') {
+        // Check if terminal exists in terminal_inventory
+        const { data: existingTerminal } = await supabase
+          .from('terminal_inventory')
+          .select('id')
+          .or(`pos_serial_number.eq.${serialNumber},terminal_id.eq.${serialNumber}`)
+          .maybeSingle();
+
+        if (existingTerminal) {
+          const { error } = await supabase
+            .from('terminal_inventory')
+            .update({
+              assigned_tenant_id: tenantId,
+              assignment_status: 'assigned',
+              assigned_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingTerminal.id);
+          if (error) throw new Error('Failed to update terminal assignment: ' + error.message);
+        } else {
+          const { error } = await supabase
+            .from('terminal_inventory')
+            .insert({
               terminal_id: serialNumber,
               pos_serial_number: serialNumber,
               assigned_tenant_id: tenantId,
               assignment_status: 'assigned',
               assigned_at: new Date().toISOString(),
-              terminal_type: 'N3',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              terminal_type: 'N3'
             });
-          }
-          saveLocalTerminals(terminals);
-        } else {
-          return res.status(400).json({ success: false, message: 'Invalid hardware type' });
+          if (error) throw new Error('Failed to create terminal assignment: ' + error.message);
         }
       } else {
-        if (type === 'DEVICE') {
-          // Check if device already exists in devices
-          const { data: existingDevice } = await supabase
-            .from('devices')
-            .select('id')
-            .eq('device_id', serialNumber)
-            .maybeSingle();
-
-          if (existingDevice) {
-            const { error } = await supabase
-              .from('devices')
-              .update({
-                tenant_id: tenantId,
-                status: 'active',
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', existingDevice.id);
-            if (error) throw new Error('Failed to update device assignment: ' + error.message);
-          } else {
-            const { error } = await supabase
-              .from('devices')
-              .insert({
-                tenant_id: tenantId,
-                device_id: serialNumber,
-                device_name: 'Agent-Assigned Device',
-                status: 'active'
-              });
-            if (error) throw new Error('Failed to create device assignment: ' + error.message);
-          }
-        } else if (type === 'TERMINAL') {
-          // Check if terminal exists in terminal_inventory
-          const { data: existingTerminal } = await supabase
-            .from('terminal_inventory')
-            .select('id')
-            .or(`pos_serial_number.eq.${serialNumber},terminal_id.eq.${serialNumber}`)
-            .maybeSingle();
-
-          if (existingTerminal) {
-            const { error } = await supabase
-              .from('terminal_inventory')
-              .update({
-                assigned_tenant_id: tenantId,
-                assignment_status: 'assigned',
-                assigned_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', existingTerminal.id);
-            if (error) throw new Error('Failed to update terminal assignment: ' + error.message);
-          } else {
-            const { error } = await supabase
-              .from('terminal_inventory')
-              .insert({
-                terminal_id: serialNumber,
-                pos_serial_number: serialNumber,
-                assigned_tenant_id: tenantId,
-                assignment_status: 'assigned',
-                assigned_at: new Date().toISOString(),
-                terminal_type: 'N3'
-              });
-            if (error) throw new Error('Failed to create terminal assignment: ' + error.message);
-          }
-        } else {
-          return res.status(400).json({ success: false, message: 'Invalid hardware type' });
-        }
+        return res.status(400).json({ success: false, message: 'Invalid hardware type' });
       }
 
       return res.status(200).json({ success: true, message: 'Hardware assigned successfully' });

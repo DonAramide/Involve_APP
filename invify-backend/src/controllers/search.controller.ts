@@ -1,11 +1,6 @@
 // src/controllers/search.controller.ts
 import { Request, Response } from 'express';
-import * as fs from 'fs';
-import * as path from 'path';
 import { supabase } from '../db/supabase';
-
-const TERMINAL_DB_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
-const TENANTS_DB_PATH = path.join(process.cwd(), 'tenants_db.json');
 
 export class SearchController {
   
@@ -17,7 +12,6 @@ export class SearchController {
         return;
       }
 
-      const q = query.toUpperCase();
       const qLower = query.toLowerCase();
       let results: any[] = [];
 
@@ -62,49 +56,43 @@ export class SearchController {
         results.push({ type: 'AI COMMAND', title: 'Billing Center', subtitle: 'Manage Billing and Invoices', icon: 'receipt', color: 'green', route: '/finance/billing' });
       }
 
-      // 2. Exact Entity ID Lookups from Databases (Offline / Supabase Fallback)
-      // We will read the local DBs for simplicity if offline auth is true, else try supabase.
-      // For this implementation, we will query the local JSONs for fast responses as fallback.
-      
-      // Load Terminals
+      // 2. Exact Entity ID Lookups from Databases (Supabase)
       let terminals: any[] = [];
       try {
-        if (fs.existsSync(TERMINAL_DB_PATH)) {
-          const tData = JSON.parse(fs.readFileSync(TERMINAL_DB_PATH, 'utf-8'));
-          terminals = [
-            ...(tData.terminal_ids || []),
-            ...(tData.mpos_devices || []),
-            ...(tData.tablets || [])
-          ];
-        }
+        const { data: termData, error: termErr } = await supabase
+          .from('terminal_inventory')
+          .select('terminal_id, mpos_terminal_id, terminal_type, bank_name')
+          .or(`terminal_id.ilike.%${query}%,mpos_terminal_id.ilike.%${query}%,pos_serial_number.ilike.%${query}%`)
+          .limit(3);
+        
+        if (termErr) throw termErr;
+        terminals = termData || [];
       } catch (e) {
-        console.error('Error reading terminals DB', e);
+        console.error('Error fetching terminals from Supabase for search:', e);
+        throw e;
       }
 
-      // Load Tenants
       let tenants: any[] = [];
       try {
-        if (fs.existsSync(TENANTS_DB_PATH)) {
-          const tData = JSON.parse(fs.readFileSync(TENANTS_DB_PATH, 'utf-8'));
-          // tenants_db.json is an array at the root
-          tenants = Array.isArray(tData) ? tData : (tData.tenants || []);
-        }
+        const { data: tenantData, error: tenantErr } = await supabase
+          .from('tenants')
+          .select('id, name, type, status')
+          .or(`id.ilike.%${query}%,name.ilike.%${query}%`)
+          .limit(3);
+        
+        if (tenantErr) throw tenantErr;
+        tenants = tenantData || [];
       } catch (e) {
-        console.error('Error reading tenants DB', e);
+        console.error('Error fetching tenants from Supabase for search:', e);
+        throw e;
       }
 
       // Terminals matching
-      const matchingTerminals = terminals.filter((t: any) => 
-        (t.tid && t.tid.toUpperCase().includes(q)) || 
-        (t.serial_number && t.serial_number.toUpperCase().includes(q)) ||
-        (t.device_id && t.device_id.toUpperCase().includes(q))
-      );
-
-      matchingTerminals.slice(0, 3).forEach((t: any) => {
+      terminals.forEach((t: any) => {
         results.push({
           type: 'TERMINAL',
-          title: `TRM: ${t.tid || t.serial_number || t.device_id}`,
-          subtitle: `${t.device_model || t.model || t.bank_name || 'Terminal'} • Active`,
+          title: `TRM: ${t.terminal_id || t.mpos_terminal_id}`,
+          subtitle: `${t.terminal_type || t.bank_name || 'Terminal'} • Active`,
           icon: 'point_of_sale',
           color: 'green',
           route: '/governance/terminals'
@@ -112,12 +100,7 @@ export class SearchController {
       });
 
       // Tenants matching
-      const matchingTenants = tenants.filter((t: any) => 
-        (t.id && t.id.toUpperCase().includes(q)) || 
-        (t.name && t.name.toUpperCase().includes(q))
-      );
-
-      matchingTenants.slice(0, 3).forEach((t: any) => {
+      tenants.forEach((t: any) => {
         results.push({
           type: 'TENANT',
           title: `TENANT: ${t.name}`,
@@ -129,11 +112,12 @@ export class SearchController {
       });
 
       // 3. Fallbacks for other specific prefixes
-      if (q.includes('TXN') || q.includes('LED')) {
-        results.push({ type: 'LEDGER', title: q, subtitle: 'Search Ledger Transactions', icon: 'receipt_long', color: 'cyan', route: '/observability/audit' });
+      const qUpper = query.toUpperCase();
+      if (qUpper.includes('TXN') || qUpper.includes('LED')) {
+        results.push({ type: 'LEDGER', title: qUpper, subtitle: 'Search Ledger Transactions', icon: 'receipt_long', color: 'cyan', route: '/observability/audit' });
       }
-      if (q.includes('CMP')) {
-        results.push({ type: 'COMPLIANCE', title: q, subtitle: 'EDD Required Search', icon: 'policy', color: 'purple', route: '/governance/compliance' });
+      if (qUpper.includes('CMP')) {
+        results.push({ type: 'COMPLIANCE', title: qUpper, subtitle: 'EDD Required Search', icon: 'policy', color: 'purple', route: '/governance/compliance' });
       }
 
       // Default fallback
@@ -142,9 +126,23 @@ export class SearchController {
       }
 
       res.status(200).json({ results });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Global Search Error:', error);
+      if (SearchController.isNetworkTimeout(error)) {
+        res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000, results: [] });
+        return;
+      }
       res.status(500).json({ error: 'Failed to execute smart search', results: [] });
     }
+  }
+
+  private static isNetworkTimeout(error: any): boolean {
+    return (
+      error.message?.includes('fetch failed') ||
+      error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      error.message?.includes('timeout') ||
+      error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      process.env.OFFLINE_MOCK_AUTH === 'true'
+    );
   }
 }

@@ -2,8 +2,7 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
 import { UserDeviceService } from '../services/user-device.service';
-import * as fs from 'fs';
-import * as path from 'path';
+import { SYSTEM_TENANT_UUID } from '../config/constants';
 
 async function validateDeviceOrBlock(userId: string, email: string, req: Request): Promise<{ allowed: boolean; errorResponse?: any }> {
   try {
@@ -12,15 +11,9 @@ async function validateDeviceOrBlock(userId: string, email: string, req: Request
       const { data, error } = await supabase.from('system_configurations').select('config_value').eq('config_key', 'enforce_device_control').single();
       if (!error && data) {
          enforce = data.config_value === true || data.config_value === 'true';
-      } else {
-         throw error || new Error('No data');
       }
     } catch(dbErr) {
-      const p = path.join(process.cwd(), 'global_settings.json');
-      if (fs.existsSync(p)) {
-        const data = JSON.parse(fs.readFileSync(p, 'utf-8'));
-        enforce = !!data.enforce_device_control;
-      }
+      enforce = false;
     }
     if (!enforce) return { allowed: true };
 
@@ -86,16 +79,9 @@ export class AuthController {
                if (row.config_key === 'is_maintenance_locked') is_maintenance_locked = row.config_value === true || row.config_value === 'true';
                if (row.config_key === 'maintenance_message') maintenance_message = row.config_value;
             }
-         } else {
-            throw error || new Error('No data');
          }
       } catch(dbErr) {
-         const settingsPath = path.join(process.cwd(), 'global_settings.json');
-         if (fs.existsSync(settingsPath)) {
-           const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-           is_maintenance_locked = !!settings.is_maintenance_locked;
-           maintenance_message = settings.maintenance_message || maintenance_message;
-         }
+         is_maintenance_locked = false;
       }
 
       if (is_maintenance_locked) {
@@ -123,7 +109,7 @@ export class AuthController {
         
         if (email.toLowerCase().includes('admin') || email.toLowerCase().includes('iips')) {
           role = 'SUPER_ADMIN';
-          tenantId = 'global';
+          tenantId = SYSTEM_TENANT_UUID;
           userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
         }
         
@@ -167,7 +153,7 @@ export class AuthController {
           
           if (email === 'sysadmin@IIPS.app' || email === 'superadmin@iips.app') {
             role = 'SUPER_ADMIN';
-            tenantId = 'global';
+            tenantId = SYSTEM_TENANT_UUID;
             userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // Admin Valid UUID
           }
           
@@ -258,7 +244,7 @@ export class AuthController {
         
         if (email === 'sysadmin@IIPS.app') {
           role = 'SUPER_ADMIN';
-          tenantId = 'global';
+          tenantId = SYSTEM_TENANT_UUID;
           userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // Admin UUID
         } else if (email === 'olive@invify.com') {
           role = 'TENANT_OPERATOR';

@@ -4,26 +4,6 @@ import { TerminalInventoryService } from './terminal-inventory.service';
 import { TerminalAuditService } from './terminal-audit.service';
 import { supabase } from '../db/supabase';
 import { PosService } from './pos.service';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const LOCAL_DB_PATH = path.join(process.cwd(), 'terminal_inventory_db.json');
-
-function getLocalDB() {
-  try {
-    return JSON.parse(fs.readFileSync(LOCAL_DB_PATH, 'utf-8'));
-  } catch (_) {
-    return { terminals: [], audit_log: [], import_batches: [] };
-  }
-}
-
-function saveLocalDB(data: any) {
-  fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2));
-}
-
-function isOfflineMode(): boolean {
-  return process.env.OFFLINE_MOCK_AUTH === 'true';
-}
 
 export class TerminalSyncService {
 
@@ -42,14 +22,16 @@ export class TerminalSyncService {
     // Step 1: Look up device record from Supabase to get device_category and tenant_id
     let deviceRecord: any = null;
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('devices')
         .select('*, tenants(id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code)')
         .eq('device_id', deviceId)
         .maybeSingle();
+      if (error) throw error;
       deviceRecord = data;
     } catch (err) {
       console.warn(`[TerminalSync] Device lookup failed for ${deviceId}:`, err);
+      throw err;
     }
 
     const resolvedTenantId = deviceRecord?.tenant_id || tenantId || null;
@@ -260,15 +242,18 @@ export class TerminalSyncService {
     let deviceCategory = 'USER_DEVICE';
     let deviceRole = 'PHONE';
     try {
-      const { data } = await supabase.from('devices')
+      const { data, error } = await supabase.from('devices')
         .select('device_category, device_role')
         .eq('device_id', deviceId)
         .maybeSingle();
+      if (error) throw error;
       if (data) {
         deviceCategory = data.device_category || 'USER_DEVICE';
         deviceRole = data.device_role || 'PHONE';
       }
-    } catch (_) {}
+    } catch (e) {
+      throw e;
+    }
 
     // USER_DEVICE — minimal response
     if (deviceCategory !== 'COMPANY_DEVICE') {
@@ -330,22 +315,11 @@ export class TerminalSyncService {
   }
 
   static async recordKeyExchangeSuccess(deviceId: string) {
-    if (isOfflineMode()) {
-      const db = getLocalDB();
-      const index = db.tablets.findIndex((t: any) => t.device_id === deviceId);
-      if (index !== -1) {
-        db.tablets[index].last_key_exchange_at = new Date().toISOString();
-        saveLocalDB(db);
-        return { success: true };
-      }
-      return { success: false, message: 'Device not found' };
-    } else {
-      const { data, error } = await supabase.from('devices').update({
-        last_key_exchange_at: new Date().toISOString()
-      }).eq('device_id', deviceId);
+    const { error } = await supabase.from('devices').update({
+      last_key_exchange_at: new Date().toISOString()
+    }).eq('device_id', deviceId);
 
-      if (error) throw error;
-      return { success: true };
-    }
+    if (error) throw error;
+    return { success: true };
   }
 }

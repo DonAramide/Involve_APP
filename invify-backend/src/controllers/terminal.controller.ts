@@ -59,6 +59,23 @@ function normalizeColumnNames(rows: any[]): any[] {
   });
 }
 
+function handleError(res: Response, error: any) {
+  if (
+    error.message?.includes('fetch failed') ||
+    error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    error.message?.includes('timeout') ||
+    error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    process.env.OFFLINE_MOCK_AUTH === 'true'
+  ) {
+    return res.status(503).json({
+      error: 'Database unavailable',
+      retryable: true,
+      retryAfterMs: 2000
+    });
+  }
+  return res.status(500).json({ error: error.message });
+}
+
 export class TerminalController {
 
   // GET /api/admin/inventory/tablets
@@ -67,7 +84,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.getTablets();
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -77,7 +94,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.getMposDevices();
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -87,7 +104,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.getPrinters();
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -97,7 +114,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.getTerminalIds();
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -107,7 +124,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.getAssignments();
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -125,7 +142,7 @@ export class TerminalController {
 
       return res.status(200).json(assignment);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -143,7 +160,7 @@ export class TerminalController {
 
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -153,7 +170,7 @@ export class TerminalController {
       const stats = await TerminalInventoryService.getStats();
       return res.status(200).json(stats);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -199,53 +216,9 @@ export class TerminalController {
       return res.status(200).json({ batchId, ...combined });
     } catch (error: any) {
       console.error('[TerminalController] importTerminals error:', error);
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
-
-  /*
-  // POST /api/terminals/export
-  static async exportTerminals(req: Request, res: Response) {
-    // Deprecated for decoupled architecture
-    return res.status(501).json({ error: 'Not implemented in v2' });
-  }
-
-  // POST /api/terminals/assign
-  static async assignTerminal(req: Request, res: Response) {
-    // Deprecated
-  }
-
-  // POST /api/admin/inventory/assignments/:id/unassign
-  static async unassignHardware(req: Request, res: Response) {
-    try {
-      const assignmentId = req.params.id;
-      const result = await TerminalInventoryService.unassignHardware(assignmentId);
-      
-      const adminId = getAdminId(req);
-      await TerminalAuditService.log({
-        actionType: 'HARDWARE_UNASSIGNED',
-        adminId,
-        terminalId: result.terminal_id_id,
-        reason: 'Manual unassignment via Admin portal',
-        metadata: { assignmentId, tabletId: result.tablet_id }
-      });
-      
-      return res.status(200).json(result);
-    } catch (error: any) {
-      return res.status(500).json({ error: error.message });
-    }
-  }
-
-  // POST /api/terminals/transfer
-  static async transferTerminal(req: Request, res: Response) {
-    // Deprecated
-  }
-
-  // POST /api/terminals/suspend
-  static async suspendTerminal(req: Request, res: Response) {
-    // Deprecated
-  }
-  */
 
   // POST /api/mobile/terminal/sync
   static async mobileSync(req: Request, res: Response) {
@@ -259,7 +232,7 @@ export class TerminalController {
       if (error.message === 'ACCESS_DENIED_OWNERSHIP_MISMATCH') {
         return res.status(403).json({ error: 'Access denied. You do not own this device.' });
       }
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -271,7 +244,7 @@ export class TerminalController {
       const result = await TerminalSyncService.recordKeyExchangeSuccess(deviceId);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -283,7 +256,7 @@ export class TerminalController {
       const result = await TerminalSyncService.getTerminalStatus(deviceId);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -299,7 +272,7 @@ export class TerminalController {
       const result = await TerminalAuditService.getAuditLog(filters);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -308,7 +281,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.updateTablet(req.params.id, req.body);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -317,7 +290,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.updateMpos(req.params.id, req.body);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -326,7 +299,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.updatePrinter(req.params.id, req.body);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 
@@ -335,7 +308,7 @@ export class TerminalController {
       const result = await TerminalInventoryService.updateTid(req.params.id, req.body);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(500).json({ error: error.message });
+      return handleError(res, error);
     }
   }
 }

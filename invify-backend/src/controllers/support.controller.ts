@@ -1,30 +1,9 @@
-// invify-backend/src/controllers/support.controller.ts
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase';
-import * as fs from 'fs';
-import * as path from 'path';
-
-const LOCAL_DB_PATH = path.join(process.cwd(), '.complaints_db.json');
-
-function getLocalDB() {
-  try {
-    if (!fs.existsSync(LOCAL_DB_PATH)) {
-      const initial = { complaints: [] };
-      fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(initial, null, 2));
-      return initial;
-    }
-    return JSON.parse(fs.readFileSync(LOCAL_DB_PATH, 'utf-8'));
-  } catch (_) {
-    return { complaints: [] };
-  }
-}
-
-function saveLocalDB(data: any) {
-  fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2));
-}
+import { supabaseAdmin } from '../db/supabase';
+import { isMockAuthAllowed } from '../config/constants';
 
 function isOfflineMode(): boolean {
-  return process.env.OFFLINE_MOCK_AUTH === 'true';
+  return isMockAuthAllowed();
 }
 
 export class SupportController {
@@ -36,6 +15,28 @@ export class SupportController {
     try {
       const { title, description, category, urgency, tenant_id, tenant_name, device_id, incident_date, attachment_url } = req.body;
       const ticketId = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      let resolvedTenantId: string | null = null;
+      let resolvedTenantCode: string | null = null;
+
+      // tenant_code Consistency Rule:
+      // If tenant_id is present, resolve tenant_code from tenants table database record.
+      // Do not accept client-provided tenant_code values.
+      if (tenant_id && tenant_id !== 'unknown' && tenant_id.trim() !== '') {
+        const { data: tenantData } = await supabaseAdmin
+          .from('tenants')
+          .select('tenant_code')
+          .eq('id', tenant_id)
+          .maybeSingle();
+        
+        if (tenantData) {
+          resolvedTenantId = tenant_id;
+          resolvedTenantCode = tenantData.tenant_code;
+        }
+      }
+
+      const cleanDeviceId = (device_id && device_id !== 'unknown' && device_id.trim() !== '') ? device_id : null;
+
       const newComplaint = {
         id: ticketId,
         title,
@@ -43,33 +44,34 @@ export class SupportController {
         category: category || 'general',
         urgency: urgency || 'normal',
         status: 'pending',
-        tenant_id: tenant_id || 'unknown',
-        tenant_name: tenant_name || 'Unknown Tenant',
-        device_id: device_id || null,
+        tenant_id: resolvedTenantId,
+        tenant_code: resolvedTenantCode,
+        tenant_name: tenant_name || null,
+        device_id: cleanDeviceId,
         incident_date: incident_date || null,
         attachment_url: attachment_url || null,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
 
       if (isOfflineMode()) {
-        const db = getLocalDB();
-        db.complaints.unshift(newComplaint);
-        saveLocalDB(db);
         return res.status(201).json({ success: true, data: newComplaint });
       }
 
-      // Supabase
-      const { data, error } = await supabase.from('complaints').insert([newComplaint]).select().single();
+      // Insert directly into complaints database table
+      const { data, error } = await supabaseAdmin
+        .from('complaints')
+        .insert([newComplaint])
+        .select()
+        .single();
+      
       if (error) {
-        // fallback
-        const db = getLocalDB();
-        db.complaints.unshift(newComplaint);
-        saveLocalDB(db);
-        return res.status(201).json({ success: true, data: newComplaint });
+        throw error;
       }
 
       return res.status(201).json({ success: true, data });
     } catch (err: any) {
+      console.error('[createComplaint] error:', err.message);
       return res.status(500).json({ success: false, message: err.message });
     }
   }
@@ -80,16 +82,22 @@ export class SupportController {
    */
   static async listComplaints(req: Request, res: Response) {
     if (isOfflineMode()) {
-      return res.json({ success: true, data: getLocalDB().complaints });
+      return res.json({ success: true, data: [] });
     }
 
     try {
-      const localData = getLocalDB().complaints;
-      const { data: complaintsData, error: cError } = await supabase.from('complaints').select('*');
+      const { tenant_code } = req.query;
+
+      let query = supabaseAdmin.from('complaints').select('*');
+      if (tenant_code && typeof tenant_code === 'string') {
+        query = query.eq('tenant_code', tenant_code);
+      }
+      
+      const { data: complaintsData, error: cError } = await query;
       if (cError) throw cError;
 
       // Fetch Agent support tickets
-      const { data: supportTicketsData } = await supabase.from('support_tickets').select('*');
+      const { data: supportTicketsData } = await supabaseAdmin.from('support_tickets').select('*');
       
       // Adapt support_tickets to match complaints structure for merging:
       const adaptedSupportTickets = (supportTicketsData || []).map((t: any) => ({
@@ -107,14 +115,37 @@ export class SupportController {
         created_at: t.created_at
       }));
 
-      const merged = [...(complaintsData || []), ...adaptedSupportTickets, ...localData];
-      const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
+      const merged = [...(complaintsData || []), ...adaptedSupportTickets];
+
+      // In-memory filter for Agent tickets if search by tenant_code was requested
+      let filtered = merged;
+      if (tenant_code && typeof tenant_code === 'string') {
+        // Agent tickets do not store tenant_code yet, so if tenant_code is filtered, 
+        // we can only match complaintsData (already filtered in DB) plus any agent ticket 
+        // that belongs to the resolved tenant.
+        // We will resolve the tenant_id for the tenant_code first.
+        const { data: tenantData } = await supabaseAdmin
+          .from('tenants')
+          .select('id')
+          .eq('tenant_code', tenant_code)
+          .maybeSingle();
+        
+        const tenantId = tenantData?.id;
+        filtered = merged.filter(item => {
+          if (item.category === 'Agent Support') {
+            return tenantId && item.tenant_id === tenantId;
+          }
+          return true; // Already filtered in SQL query
+        });
+      }
+
+      const unique = Array.from(new Map(filtered.map(item => [item.id, item])).values());
       unique.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       return res.json({ success: true, data: unique });
     } catch (err: any) {
       console.error('[listComplaints] error:', err.message);
-      return res.json({ success: true, data: getLocalDB().complaints });
+      return res.status(500).json({ success: false, message: err.message });
     }
   }
 
@@ -125,14 +156,13 @@ export class SupportController {
   static async getMobileComplaints(req: Request, res: Response) {
     const tenantId = req.query.tenant_id as string;
     const deviceId = req.query.device_id as string;
+
     if (isOfflineMode()) {
-       const db = getLocalDB();
-       return res.json({ success: true, data: db.complaints.filter((c: any) => c.tenant_id === tenantId || c.device_id === deviceId) });
+       return res.json({ success: true, data: [] });
     }
+
     try {
-      const localData = getLocalDB().complaints.filter((c: any) => c.tenant_id === tenantId || c.device_id === deviceId);
-      
-      let query = supabase.from('complaints').select('*').order('created_at', { ascending: false });
+      let query = supabaseAdmin.from('complaints').select('*').order('created_at', { ascending: false });
       if (tenantId && deviceId) {
         query = query.or(`tenant_id.eq.${tenantId},device_id.eq.${deviceId}`);
       } else if (tenantId) {
@@ -140,16 +170,14 @@ export class SupportController {
       } else if (deviceId) {
         query = query.eq('device_id', deviceId);
       }
+      
       const { data, error } = await query;
       if (error) throw error;
       
-      const merged = [...data, ...localData];
-      const unique = Array.from(new Map(merged.map(item => [item.id, item])).values());
-      unique.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      
-      return res.json({ success: true, data: unique });
+      return res.json({ success: true, data });
     } catch(err: any) {
-       return res.json({ success: true, data: getLocalDB().complaints.filter((c: any) => c.tenant_id === tenantId || c.device_id === deviceId) });
+      console.error('[getMobileComplaints] error:', err.message);
+      return res.status(500).json({ success: false, message: err.message });
     }
   }
 
@@ -161,18 +189,14 @@ export class SupportController {
     const { status } = req.body;
 
     if (isOfflineMode()) {
-      const db = getLocalDB();
-      const comp = db.complaints.find((c: any) => c.id === id);
-      if (comp) comp.status = status;
-      saveLocalDB(db);
-      return res.json({ success: true, data: comp });
+      return res.json({ success: true, data: { id, status } });
     }
 
     try {
       // 1. Try updating complaints table
-      const { data: cData } = await supabase
+      const { data: cData } = await supabaseAdmin
         .from('complaints')
-        .update({ status })
+        .update({ status, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .maybeSingle();
@@ -183,9 +207,9 @@ export class SupportController {
 
       // 2. Try updating support_tickets table (Agent tickets)
       const mappedStatus = status.toUpperCase();
-      const { data: sData } = await supabase
+      const { data: sData } = await supabaseAdmin
         .from('support_tickets')
-        .update({ status: mappedStatus })
+        .update({ status: mappedStatus, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .maybeSingle();
@@ -211,11 +235,7 @@ export class SupportController {
       throw new Error('Complaint or Ticket not found');
     } catch (err: any) {
       console.error('[updateComplaintStatus] error:', err.message);
-      const db = getLocalDB();
-      const comp = db.complaints.find((c: any) => c.id === id);
-      if (comp) comp.status = status;
-      saveLocalDB(db);
-      return res.json({ success: true, data: comp });
+      return res.status(500).json({ success: false, message: err.message });
     }
   }
 }
