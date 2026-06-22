@@ -103,6 +103,27 @@ async function run() {
     }
 
     // ----------------------------------------------------
+    // CHECK 1B: Invalid Event State Transition Block
+    // ----------------------------------------------------
+    console.log('\n1b. Verifying Invalid Event State Transitions...');
+    // Attempt illegal transition: INITIALIZED -> COMPLETED (bypassing PENDING/PROCESSING)
+    const { error: badTransErr } = await supabaseAdmin
+      .from('financial_events')
+      .update({ state: 'COMPLETED' })
+      .eq('id', eventId);
+
+    if (badTransErr && badTransErr.message.includes('Illegal financial event state transition')) {
+      console.log('  ✅ Invalid state transition blocked successfully.');
+      results['invalid_state_transition'] = 'PASS';
+    } else {
+      console.error('  ❌ Illegal state jump was NOT blocked. Error:', badTransErr?.message);
+      results['invalid_state_transition'] = 'FAIL';
+    }
+
+    // Move to PENDING legally to preserve event context
+    await supabaseAdmin.from('financial_events').update({ state: 'PENDING' }).eq('id', eventId);
+
+    // ----------------------------------------------------
     // CHECK 2: Treasury Account Seeding & Ownership Integrity
     // ----------------------------------------------------
     console.log('\n2. Verifying Treasury Account Seeding & Ownership...');
@@ -176,16 +197,71 @@ async function run() {
     ]);
 
     // Assert journal balance symmetry verification function
-    const { data: symmetryBalanced, error: symErr } = await supabaseAdmin.rpc('verify_journal_balance', {
+    const { error: symErr } = await supabaseAdmin.rpc('assert_journal_balance', {
       p_event_id: eventId
     });
 
-    if (!movErr && !jErr1 && !symErr && symmetryBalanced === true) {
-      console.log('  ✅ Treasury movements and double-entry journal balance assertion passed.');
+    if (!movErr && !jErr1 && !symErr) {
+      console.log('  ✅ Treasury movements and double-entry journal checks passed.');
       results['treasury_movements_journals'] = 'PASS';
     } else {
-      console.error('  ❌ Treasury movement checks failed. movErr:', movErr?.message, 'jErr1:', jErr1?.message, 'symErr:', symErr?.message, 'Balanced:', symmetryBalanced);
+      console.error('  ❌ Treasury movement checks failed. movErr:', movErr?.message, 'jErr1:', jErr1?.message, 'symErr:', symErr?.message);
       results['treasury_movements_journals'] = 'FAIL';
+    }
+
+    // ----------------------------------------------------
+    // CHECK 3B: Journal Imbalance Rejection
+    // ----------------------------------------------------
+    console.log('\n3b. Verifying Journal Imbalance Rejections...');
+    const imbalanceEventId = '11111111-2222-3333-4444-555555555555';
+    await supabaseAdmin.from('financial_events').insert({
+      id: imbalanceEventId,
+      event_type: 'PAYOUT_WITHDRAWAL',
+      state: 'INITIALIZED',
+      reference: 'REF_TRES_IMB',
+      tenant_id: testTenantId,
+      created_by: testUserId
+    });
+
+    // Write unbalanced journals (debit 200, credit 100)
+    await supabaseAdmin.from('treasury_journal_entries').insert([
+      {
+        financial_event_id: imbalanceEventId,
+        treasury_account_id: merchantTreasuryId,
+        direction: 'debit',
+        amount: 200.00,
+        currency: 'NGN'
+      },
+      {
+        financial_event_id: imbalanceEventId,
+        treasury_account_id: platformTreasuryId,
+        direction: 'credit',
+        amount: 100.00,
+        currency: 'NGN'
+      }
+    ]);
+
+    const { error: assertImbErr } = await supabaseAdmin.rpc('assert_journal_balance', {
+      p_event_id: imbalanceEventId
+    });
+
+    if (assertImbErr && assertImbErr.message.includes('Journal imbalance detected')) {
+      // Confirm audit log entry was generated
+      const { data: auditLogs } = await supabaseAdmin
+        .from('financial_consistency_audits')
+        .select('*')
+        .eq('financial_event_id', imbalanceEventId);
+
+      if (auditLogs && auditLogs.length > 0) {
+        console.log('  ✅ Journal imbalance correctly rejected and logged to consistency audits.');
+        results['journal_imbalance_rejection'] = 'PASS';
+      } else {
+        console.error('  ❌ Journal imbalance rejected, but audit trail log was missing.');
+        results['journal_imbalance_rejection'] = 'FAIL';
+      }
+    } else {
+      console.error('  ❌ Unbalanced journal was NOT rejected by assertion engine. Error:', assertImbErr?.message);
+      results['journal_imbalance_rejection'] = 'FAIL';
     }
 
     // ----------------------------------------------------
@@ -231,19 +307,67 @@ async function run() {
       p_tenant_id: testTenantId
     });
 
-    // Since frozen, verify_financial_consistency must return false to block withdrawal execution
-    if (!freezeErr && !consErr && consistent === false) {
-      console.log('  ✅ Scoped freeze enforcement validated. Outbound payout blocks are active.');
+    if (!freezeErr && !consErr && consistent === true) {
+      console.log('  ✅ General consistency calculations remain active under scoped freezes.');
       results['financial_freezes_scopes'] = 'PASS';
     } else {
-      console.error('  ❌ Freeze tests failed. freezeErr:', freezeErr?.message, 'consErr:', consErr?.message, 'Consistency result:', consistent);
+      console.error('  ❌ Scoped freeze setup failed. freezeErr:', freezeErr?.message, 'Consistency result:', consistent);
       results['financial_freezes_scopes'] = 'FAIL';
     }
 
     // ----------------------------------------------------
-    // CHECK 6: Quasar Verification Registry Snapshots
+    // CHECK 5B: Scoped Freeze Enforcement Policy
     // ----------------------------------------------------
-    console.log('\n6. Verifying Quasar Verification registry entries...');
+    console.log('\n5b. Verifying Scoped Freeze Enforcement Policy...');
+    // Assert withdrawals are blocked
+    const { data: isWithdrawalAllowed, error: wFzErr } = await supabaseAdmin.rpc('validate_financial_freeze', {
+      p_tenant_id: testTenantId,
+      p_scope: 'WITHDRAWALS_ONLY'
+    });
+
+    // Assert payouts are NOT blocked under WITHDRAWALS_ONLY scope
+    const { data: isPayoutAllowed, error: pFzErr } = await supabaseAdmin.rpc('validate_financial_freeze', {
+      p_tenant_id: testTenantId,
+      p_scope: 'PAYOUTS_ONLY'
+    });
+
+    if (wFzErr && wFzErr.message.includes('Account under active financial freeze') && !pFzErr && isPayoutAllowed === true) {
+      console.log('  ✅ Freeze scope granularity successfully enforced.');
+      results['freeze_scope_enforcement'] = 'PASS';
+    } else {
+      console.error('  ❌ Scope enforcement mismatch. Withdrawal error:', wFzErr?.message, 'Payout result:', isPayoutAllowed);
+      results['freeze_scope_enforcement'] = 'FAIL';
+    }
+
+    // ----------------------------------------------------
+    // CHECK 5C: Provider Settlement Reconciliation
+    // ----------------------------------------------------
+    console.log('\n5c. Verifying Provider Settlement Reconciliation...');
+    const providerConfigId = '99999999-9999-9999-9999-999999999999';
+    const { error: setErr } = await supabaseAdmin.from('provider_settlements').insert({
+      financial_event_id: eventId,
+      tenant_id: testTenantId,
+      amount: 1000.00,
+      currency: 'NGN',
+      status: 'REPORTED',
+      provider_account_ref: 'REF_PAYSTACK_TERM_01',
+      provider_settlement_reference: `SET_BATCH_${Date.now()}`,
+      provider_type: 'PAYSTACK',
+      provider_account_id: providerConfigId
+    });
+
+    if (!setErr) {
+      console.log('  ✅ Provider settlement ownership attributes successfully validated.');
+      results['provider_settlement_reconciliation'] = 'PASS';
+    } else {
+      console.error('  ❌ Provider settlement registry creation failed. Error:', setErr.message);
+      results['provider_settlement_reconciliation'] = 'FAIL';
+    }
+
+    // ----------------------------------------------------
+    // CHECK 6: Quasar Verification Registry Payload Lineage
+    // ----------------------------------------------------
+    console.log('\n6. Verifying Quasar Verification registry entries and Lineages...');
     const withdrawalId = '66666666-6666-6666-6666-666666666666';
     const { error: vRegErr } = await supabaseAdmin.from('quasar_verification_records').insert({
       withdrawal_id: withdrawalId,
@@ -255,15 +379,23 @@ async function run() {
       quasar_available_balance: 1000.00,
       quasar_treasury_position: 1000.00,
       verification_status: 'SUCCESS',
-      verification_hash: 'abc123hash_value_here'
+      verification_hash: 'abc123hash_value_here',
+      request_hash: 'req_hash_123',
+      response_hash: 'res_hash_123',
+      verification_reference: 'VR_PAY_001',
+      quasar_transaction_reference: 'QTR_908123',
+      verification_payload: { amount: 1000.00, destination: '0123456789' },
+      verification_result_payload: { gateway_status: 'success' }
     });
 
     if (!vRegErr) {
-      console.log('  ✅ Verification record successfully saved.');
+      console.log('  ✅ Verification record payload lineage successfully saved.');
       results['quasar_verification_registry'] = 'PASS';
+      results['quasar_verification_lineage'] = 'PASS';
     } else {
       console.error('  ❌ Verification record insertion failed:', vRegErr.message);
       results['quasar_verification_registry'] = 'FAIL';
+      results['quasar_verification_lineage'] = 'FAIL';
     }
 
     // ----------------------------------------------------
@@ -321,11 +453,16 @@ async function run() {
   // ----------------------------------------------------
   const requiredChecks = [
     'financial_event_lifecycle',
+    'invalid_state_transition',
     'treasury_ownership_integrity',
     'treasury_movements_journals',
+    'journal_imbalance_rejection',
     'reserved_funds_expiration',
     'financial_freezes_scopes',
+    'freeze_scope_enforcement',
+    'provider_settlement_reconciliation',
     'quasar_verification_registry',
+    'quasar_verification_lineage',
     'distributed_execution_locks'
   ];
 
@@ -336,7 +473,7 @@ async function run() {
   for (const check of requiredChecks) {
     const status = results[check] ?? 'NOT RUN';
     const icon = status === 'PASS' ? '✅' : '❌';
-    console.log(`${icon} ${check.padEnd(30)}: ${status}`);
+    console.log(`${icon} ${check.padEnd(35)}: ${status}`);
     if (status !== 'PASS') overallPass = false;
   }
   console.log('======================================================');
