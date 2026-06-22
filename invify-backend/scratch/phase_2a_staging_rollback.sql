@@ -4,9 +4,11 @@
 
 BEGIN;
 
-DROP FUNCTION IF EXISTS public.verify_beneficiary_details(UUID, UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.verify_beneficiary_details(UUID, UUID, VARCHAR, VARCHAR) CASCADE;
 DROP FUNCTION IF EXISTS public.validate_bank_transfer_transition() CASCADE;
+DROP FUNCTION IF EXISTS public.validate_verified_beneficiary() CASCADE;
 
+DROP TABLE IF EXISTS public.bank_transfer_attempts CASCADE;
 DROP TABLE IF EXISTS public.bank_transfer_logs CASCADE;
 DROP TABLE IF EXISTS public.bank_virtual_accounts CASCADE;
 DROP TABLE IF EXISTS public.provider_routing_profiles CASCADE;
