@@ -12,7 +12,8 @@ async function run() {
 
   const testTenantId = '77777777-7777-7777-7777-777777777777';
   const testAgentId = '77777777-8888-7777-6666-555555555555';
-  const testUserId = '77777777-9999-7777-8888-999999999999';
+  const testEmail = `tresanalyst_${Date.now()}@invify.app`;
+  let testUserId = '';
 
   const results: Record<string, string> = {};
 
@@ -30,10 +31,7 @@ async function run() {
     await supabaseAdmin.from('financial_event_state_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('financial_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('financial_execution_locks').delete().neq('lock_key', '00000000-0000-0000-0000-000000000000');
-    await supabaseAdmin.from('users').delete().eq('id', testUserId);
-    await supabaseAdmin.from('agents').delete().eq('id', testAgentId);
-    await supabaseAdmin.from('tenants').delete().eq('id', testTenantId);
-
+    
     // Setup entities
     console.log('Seeding core entities...');
     await supabaseAdmin.from('tenants').insert({
@@ -55,11 +53,24 @@ async function run() {
       is_active: true
     });
 
+    // Create a physical auth identity in auth.users first
+    const { data: authUser, error: authUserErr } = await supabaseAdmin.auth.admin.createUser({
+      email: testEmail,
+      password: 'SecurePassword123!',
+      email_confirm: true
+    });
+    
+    if (authUserErr || !authUser.user) {
+      throw new Error(`Failed to seed auth user: ${authUserErr?.message}`);
+    }
+    
+    testUserId = authUser.user.id;
+
     await supabaseAdmin.from('users').insert({
       id: testUserId,
       tenant_id: testTenantId,
       name: 'Treasury Analyst User',
-      email: 'tresanalyst@invify.app',
+      email: testEmail,
       role: 'super_admin',
       is_active: true
     });
@@ -79,7 +90,6 @@ async function run() {
       tenant_id: testTenantId,
       created_by: testUserId
     });
-
     if (!evErr) {
       // Advance event state to verify trigger fires
       await supabaseAdmin.from('financial_events').update({ state: 'PENDING' }).eq('id', eventId);
@@ -88,7 +98,6 @@ async function run() {
         .from('financial_event_state_history')
         .select('*')
         .eq('financial_event_id', eventId);
-
       const statesMatch = hist && hist.some(h => h.new_state === 'INITIALIZED') && hist.some(h => h.new_state === 'PENDING');
       if (statesMatch) {
         console.log('  ✅ Event Lifecycle and Trigger History verified.');
@@ -111,7 +120,6 @@ async function run() {
       .from('financial_events')
       .update({ state: 'COMPLETED' })
       .eq('id', eventId);
-
     if (badTransErr && badTransErr.message.includes('Illegal financial event state transition')) {
       console.log('  ✅ Invalid state transition blocked successfully.');
       results['invalid_state_transition'] = 'PASS';
@@ -129,7 +137,6 @@ async function run() {
     console.log('\n2. Verifying Treasury Account Seeding & Ownership...');
     const merchantTreasuryId = '22222222-2222-2222-2222-222222222222';
     const platformTreasuryId = '33333333-3333-3333-3333-333333333333';
-
     // Seed merchant account (Attributed to tenant_id)
     const { error: tErr1 } = await supabaseAdmin.from('treasury_accounts').insert({
       id: merchantTreasuryId,
@@ -138,7 +145,6 @@ async function run() {
       tenant_id: testTenantId,
       currency: 'NGN'
     });
-
     // Seed platform account (System owned)
     const { error: tErr2 } = await supabaseAdmin.from('treasury_accounts').insert({
       id: platformTreasuryId,
@@ -146,16 +152,13 @@ async function run() {
       owner_type: 'SYSTEM',
       currency: 'NGN'
     });
-
     // Try to violate ownership CHECK constraint (System account with tenant_id populated)
     const { error: tErrViolate } = await supabaseAdmin.from('treasury_accounts').insert({
       account_type: 'PLATFORM_TREASURY',
       owner_type: 'SYSTEM',
       tenant_id: testTenantId
     });
-
     const isConstraintActive = tErrViolate && tErrViolate.message.includes('chk_ownership_integrity');
-
     if (!tErr1 && !tErr2 && isConstraintActive) {
       console.log('  ✅ Treasury Account Ownership and Integrity checks passed.');
       results['treasury_ownership_integrity'] = 'PASS';
@@ -177,7 +180,6 @@ async function run() {
       amount: 150.00,
       currency: 'NGN'
     });
-
     // Write balanced double-entry journal logs
     const { error: jErr1 } = await supabaseAdmin.from('treasury_journal_entries').insert([
       {
@@ -195,12 +197,10 @@ async function run() {
         currency: 'NGN'
       }
     ]);
-
     // Assert journal balance symmetry verification function
     const { error: symErr } = await supabaseAdmin.rpc('assert_journal_balance', {
       p_event_id: eventId
     });
-
     if (!movErr && !jErr1 && !symErr) {
       console.log('  ✅ Treasury movements and double-entry journal checks passed.');
       results['treasury_movements_journals'] = 'PASS';
@@ -222,7 +222,6 @@ async function run() {
       tenant_id: testTenantId,
       created_by: testUserId
     });
-
     // Write unbalanced journals (debit 200, credit 100)
     await supabaseAdmin.from('treasury_journal_entries').insert([
       {
@@ -240,18 +239,15 @@ async function run() {
         currency: 'NGN'
       }
     ]);
-
     const { error: assertImbErr } = await supabaseAdmin.rpc('assert_journal_balance', {
       p_event_id: imbalanceEventId
     });
-
     if (assertImbErr && assertImbErr.message.includes('Journal imbalance detected')) {
       // Confirm audit log entry was generated
       const { data: auditLogs } = await supabaseAdmin
         .from('financial_consistency_audits')
         .select('*')
         .eq('financial_event_id', imbalanceEventId);
-
       if (auditLogs && auditLogs.length > 0) {
         console.log('  ✅ Journal imbalance correctly rejected and logged to consistency audits.');
         results['journal_imbalance_rejection'] = 'PASS';
@@ -277,7 +273,6 @@ async function run() {
       status: 'active',
       expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
     });
-
     if (!reserveErr) {
       console.log('  ✅ Reserved funds hold successfully created.');
       results['reserved_funds_expiration'] = 'PASS';
@@ -301,12 +296,10 @@ async function run() {
       created_by: testUserId,
       approved_by: testUserId
     });
-
     // Check if the consistency engine reports the frozen state
     const { data: consistent, error: consErr } = await supabaseAdmin.rpc('verify_financial_consistency', {
       p_tenant_id: testTenantId
     });
-
     if (!freezeErr && !consErr && consistent === true) {
       console.log('  ✅ General consistency calculations remain active under scoped freezes.');
       results['financial_freezes_scopes'] = 'PASS';
@@ -324,13 +317,11 @@ async function run() {
       p_tenant_id: testTenantId,
       p_scope: 'WITHDRAWALS_ONLY'
     });
-
     // Assert payouts are NOT blocked under WITHDRAWALS_ONLY scope
     const { data: isPayoutAllowed, error: pFzErr } = await supabaseAdmin.rpc('validate_financial_freeze', {
       p_tenant_id: testTenantId,
       p_scope: 'PAYOUTS_ONLY'
     });
-
     if (wFzErr && wFzErr.message.includes('Account under active financial freeze') && !pFzErr && isPayoutAllowed === true) {
       console.log('  ✅ Freeze scope granularity successfully enforced.');
       results['freeze_scope_enforcement'] = 'PASS';
@@ -355,7 +346,6 @@ async function run() {
       provider_type: 'PAYSTACK',
       provider_account_id: providerConfigId
     });
-
     if (!setErr) {
       console.log('  ✅ Provider settlement ownership attributes successfully validated.');
       results['provider_settlement_reconciliation'] = 'PASS';
@@ -387,7 +377,6 @@ async function run() {
       verification_payload: { amount: 1000.00, destination: '0123456789' },
       verification_result_payload: { gateway_status: 'success' }
     });
-
     if (!vRegErr) {
       console.log('  ✅ Verification record payload lineage successfully saved.');
       results['quasar_verification_registry'] = 'PASS';
@@ -409,16 +398,13 @@ async function run() {
       owner_id: testUserId,
       expires_at: new Date(Date.now() + 5000).toISOString()
     });
-
     // Attempt second acquisition of same lock key (must fail with duplicate primary key constraint)
     const { error: lockErr2 } = await supabaseAdmin.from('financial_execution_locks').insert({
       lock_key: `lock:withdrawal:${testTenantId}`,
       owner_id: testUserId,
       expires_at: new Date(Date.now() + 5000).toISOString()
     });
-
     const isDoubleLockBlocked = lockErr2 && (lockErr2.message.includes('unique constraint') || lockErr2.message.includes('duplicate key'));
-
     if (!lockErr1 && isDoubleLockBlocked) {
       console.log('  ✅ Distributed execution mutex locks verified successfully.');
       results['distributed_execution_locks'] = 'PASS';
@@ -426,7 +412,6 @@ async function run() {
       console.error('  ❌ Lock acquisition failed. lockErr1:', lockErr1?.message, 'lockErr2:', lockErr2?.message);
       results['distributed_execution_locks'] = 'FAIL';
     }
-
   } catch (err: any) {
     console.error('❌ Validation script encountered a fatal error:', err.message || err);
   } finally {
@@ -443,11 +428,13 @@ async function run() {
     await supabaseAdmin.from('financial_event_state_history').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('financial_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('financial_execution_locks').delete().neq('lock_key', '00000000-0000-0000-0000-000000000000');
-    await supabaseAdmin.from('users').delete().eq('id', testUserId);
+    if (testUserId) {
+      await supabaseAdmin.from('users').delete().eq('id', testUserId);
+      await supabaseAdmin.auth.admin.deleteUser(testUserId);
+    }
     await supabaseAdmin.from('agents').delete().eq('id', testAgentId);
     await supabaseAdmin.from('tenants').delete().eq('id', testTenantId);
   }
-
   // ----------------------------------------------------
   // VERDICT SUMMARY
   // ----------------------------------------------------
@@ -465,7 +452,6 @@ async function run() {
     'quasar_verification_lineage',
     'distributed_execution_locks'
   ];
-
   console.log('\n======================================================');
   console.log('PHASE 1C TREASURY & REVENUE RUNTIME VERDICT');
   console.log('======================================================');
@@ -479,8 +465,6 @@ async function run() {
   console.log('======================================================');
   console.log(`OVERALL STATUS: ${overallPass ? 'PASS' : 'FAIL'}`);
   console.log('======================================================');
-
   process.exit(overallPass ? 0 : 1);
 }
-
 run().catch(console.error);
