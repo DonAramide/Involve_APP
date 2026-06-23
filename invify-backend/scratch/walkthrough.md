@@ -1,51 +1,48 @@
-# Phase 2A Walkthrough
-## Banking Infrastructure Foundation
+# Phase 2B Walkthrough
+## Banking Runtime & Provider Integration Layer
 
-This document details the updated DDL structures and validation parameters for Phase 2A.
+This document details the DDL structures and validation parameters for Phase 2B.
 
 ---
 
-## 1. Banking Architecture Design
+## 1. Webhook Verification Queue
 
-The foundation layer handles routing virtual accounts and transfer executions securely across providers:
+Webhook events are logged to the database queue before verification:
 
 ```
-                  [Invify Routing Engine]
-                            │
-            ┌───────────────┼───────────────┐
-            ▼               ▼               ▼
-        [Providus]        [Wema]        [Paystack]
+[Incoming Webhook]
+       │
+       ▼
+[incoming_webhook_logs (PENDING_VERIFICATION)]
+       │
+       ▼ (Asynchronous signature validation check)
+[incoming_webhook_logs (VERIFIED)]
+       │
+       ▼
+[Credit Merchant available_balance & record ledger entries]
 ```
-
-### Key Security Safeguards
-1.  **Transfer Transition Guards**: Triggers block illegal transfer log status jumps (e.g. `PENDING -> SUCCESS` directly, bypassing `PROCESSING`).
-2.  **Lineage Constraint**: Employs `NOT NULL` columns to prevent transfers from bypassing `financial_event_id` registry trails.
-3.  **Beneficiary Verification Trigger**: Inserts to `bank_transfer_logs` fail immediately if the target record in `beneficiaries` has `is_verified = false`.
-4.  **Beneficiary Tenant Match Trigger**: Inserts to `bank_transfer_logs` verify `NEW.tenant_id = beneficiaries.tenant_id` to block cross-tenant beneficiary leakage.
-5.  **Financial Event Type Restriction**: Rejects transfer logs references unless the target event type is `PAYOUT_WITHDRAWAL`, `BANK_TRANSFER`, or `MERCHANT_PAYOUT`.
-6.  **Transfer Attempt Logs**: Tracks execution retries, status, and error details inside `bank_transfer_attempts` using independent attempt status enums.
 
 ---
 
 ## 2. Deliverables Inventory
 
 ### SQL Packages
--   [phase_2a_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2a_staging_migration.sql): Complete DDL schema containing beneficiaries, routing profiles, virtual accounts, transfer logs, and retry attempts.
--   [phase_2a_staging_rollback.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2a_staging_rollback.sql): Reverts all created tables, enums, functions, and triggers.
+-   [phase_2b_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2b_staging_migration.sql): Complete DDL schema containing webhooks queues, health registries, and transition audit events.
+-   [phase_2b_staging_rollback.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2b_staging_rollback.sql): Reverts all created tables, enums, functions, and triggers.
 
 ### Test Suites
--   [verify_p05j.ts](file:///c:/dev/Involve_APP/invify-backend/scratch/verify_p05j.ts): Verification script asserting all 7 banking validation checks.
+-   [verify_p05k.ts](file:///c:/dev/Involve_APP/invify-backend/scratch/verify_p05k.ts): Verification script asserting all 3 banking runtime checks.
 
 ---
 
 ## 3. Staging Execution Instructions
 
 1.  Open the Supabase Dashboard SQL Editor for the Staging Database.
-2.  Copy and execute [phase_2a_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2a_staging_migration.sql).
+2.  Copy and execute [phase_2b_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2b_staging_migration.sql).
 3.  Run the validation suite:
     ```bash
-    npx ts-node invify-backend/scratch/verify_p05j.ts
+    npx ts-node invify-backend/scratch/verify_p05k.ts
     ```
-4.  Verify that all 7 checks return `PASS`.
-5.  Execute [phase_2a_staging_rollback.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2a_staging_rollback.sql) in the Supabase Dashboard to test rollback integrity.
+4.  Verify that all 3 checks return `PASS`.
+5.  Execute [phase_2b_staging_rollback.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2b_staging_rollback.sql) in the Supabase Dashboard to test rollback integrity.
 6.  Re-run migration and verify passing status.
