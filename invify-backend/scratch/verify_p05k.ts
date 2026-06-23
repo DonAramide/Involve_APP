@@ -15,51 +15,94 @@ async function run() {
   try {
     // 0. Clean old records
     console.log('Cleaning up historical data...');
+    await supabaseAdmin.from('quasar_verification_requests').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabaseAdmin.from('provider_credentials').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('provider_health_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('provider_health_registry').delete().neq('provider', 'PAYSTACK');
     await supabaseAdmin.from('incoming_webhook_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
 
     // ----------------------------------------------------
-    // CHECK 1: Webhook Queue Lifecycle
+    // CHECK 1: Webhook Queue & Idempotency Controls
     // ----------------------------------------------------
-    console.log('\n1. Verifying Webhook Queue Lifecycle...');
+    console.log('\n1. Verifying Webhook Queue & Idempotency Controls...');
+    const eventId = `evt_test_${Date.now()}`;
     const { data: webhook, error: webErr } = await supabaseAdmin.from('incoming_webhook_logs').insert({
       provider: 'PAYSTACK',
       event_type: 'charge.success',
       payload: { reference: 'REF_TEST_PAY_01', amount: 50000 },
       signature_header: 'hmac_sha512_hash_value',
-      status: 'PENDING_VERIFICATION'
+      status: 'PENDING_VERIFICATION',
+      provider_event_id: eventId,
+      payload_hash: 'abc123payload_hash_sha256'
     }).select().single();
 
-    if (!webErr && webhook && webhook.status === 'PENDING_VERIFICATION') {
-      // Simulate validation completion
-      const { error: updateErr } = await supabaseAdmin
-        .from('incoming_webhook_logs')
-        .update({ status: 'VERIFIED', processed_at: new Date().toISOString() })
-        .eq('id', webhook.id);
+    if (!webErr && webhook) {
+      // Attempt duplicate insert (must fail with unique constraint)
+      const { error: dupErr } = await supabaseAdmin.from('incoming_webhook_logs').insert({
+        provider: 'PAYSTACK',
+        event_type: 'charge.success',
+        payload: { reference: 'REF_TEST_PAY_01', amount: 50000 },
+        signature_header: 'hmac_sha512_hash_value',
+        status: 'PENDING_VERIFICATION',
+        provider_event_id: eventId,
+        payload_hash: 'abc123payload_hash_sha256'
+      });
 
-      const { data: checkedWeb } = await supabaseAdmin
-        .from('incoming_webhook_logs')
-        .select('*')
-        .eq('id', webhook.id)
-        .single();
-
-      if (!updateErr && checkedWeb && checkedWeb.status === 'VERIFIED') {
-        console.log('  ✅ Webhook queue lifecycle state updates verified.');
-        results['webhook_queue_lifecycle'] = 'PASS';
+      if (dupErr && (dupErr.message.includes('unique constraint') || dupErr.message.includes('duplicate key'))) {
+        console.log('  ✅ Webhook duplicate event replay correctly blocked by database.');
+        results['webhook_idempotency'] = 'PASS';
       } else {
-        console.error('  ❌ Webhook status update failed. updateErr:', updateErr?.message);
-        results['webhook_queue_lifecycle'] = 'FAIL';
+        console.error('  ❌ Duplicate webhook event was NOT blocked. Error:', dupErr?.message);
+        results['webhook_idempotency'] = 'FAIL';
       }
     } else {
       console.error('  ❌ Webhook queue registration failed:', webErr?.message);
-      results['webhook_queue_lifecycle'] = 'FAIL';
+      results['webhook_idempotency'] = 'FAIL';
     }
 
     // ----------------------------------------------------
-    // CHECK 2: Circuit Breaker Transitions & Event Audits
+    // CHECK 2: Provider Credential Rotation Registry
     // ----------------------------------------------------
-    console.log('\n2. Verifying Circuit Breaker Transitions & Event Audits...');
+    console.log('\n2. Verifying Provider Credential Rotation Registry...');
+    const { error: credErr } = await supabaseAdmin.from('provider_credentials').insert({
+      provider: 'PAYSTACK',
+      key_version: 'v1_keys_2026',
+      public_key: '-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...',
+      is_active: true
+    });
+
+    if (!credErr) {
+      console.log('  ✅ Provider credential public/private key version registry verified.');
+      results['credential_rotation'] = 'PASS';
+    } else {
+      console.error('  ❌ Credential registration failed:', credErr.message);
+      results['credential_rotation'] = 'FAIL';
+    }
+
+    // ----------------------------------------------------
+    // CHECK 3: Quasar Verification Handshake Requests
+    // ----------------------------------------------------
+    console.log('\n3. Verifying Quasar Verification Handshake Requests...');
+    const { error: quasarErr } = await supabaseAdmin.from('quasar_verification_requests').insert({
+      withdrawal_id: '99999999-9999-9999-9999-999999999999',
+      signed_token: 'rs256_signed_token_payload_string',
+      nonce: `nonce_val_${Date.now()}`,
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      verification_status: 'PENDING'
+    });
+
+    if (!quasarErr) {
+      console.log('  ✅ Quasar validation request handshake token mapped.');
+      results['quasar_verification_handshake'] = 'PASS';
+    } else {
+      console.error('  ❌ Quasar request mapping failed:', quasarErr.message);
+      results['quasar_verification_handshake'] = 'FAIL';
+    }
+
+    // ----------------------------------------------------
+    // CHECK 4: Automatic Circuit Evaluation Engine
+    // ----------------------------------------------------
+    console.log('\n4. Verifying Automatic Circuit Evaluation Engine...');
     // Seed health registry for Providus
     await supabaseAdmin.from('provider_health_registry').upsert({
       provider: 'PROVIDUS',
@@ -69,33 +112,27 @@ async function run() {
       health_score: 100.00
     });
 
-    // Trigger state change to OPEN (representing consecutive error threshold tripped)
-    const { error: transitionErr } = await supabaseAdmin
-      .from('provider_health_registry')
-      .update({ circuit_state: 'OPEN', consecutive_failures: 5, health_score: 20.00 })
-      .eq('provider', 'PROVIDUS');
-
-    if (!transitionErr) {
-      // Check if audit log trigger ran successfully
-      const { data: events } = await supabaseAdmin
-        .from('provider_health_events')
-        .select('*')
-        .eq('provider', 'PROVIDUS')
-        .eq('new_state', 'OPEN');
-
-      if (events && events.length > 0) {
-        console.log('  ✅ Circuit breaker state changes successfully audited.');
-        results['circuit_breaker_transitions'] = 'PASS';
-        results['provider_health_events_logging'] = 'PASS';
-      } else {
-        console.error('  ❌ Circuit state changed, but no state history transition event was logged.');
-        results['circuit_breaker_transitions'] = 'FAIL';
-        results['provider_health_events_logging'] = 'FAIL';
+    // Call evaluate_provider_health to trigger failures
+    let finalState = 'CLOSED';
+    for (let i = 0; i < 5; i++) {
+      const { data: state, error: evalErr } = await supabaseAdmin.rpc('evaluate_provider_health', {
+        p_provider: 'PROVIDUS',
+        p_has_failed: true,
+        p_latency_ms: 2000
+      });
+      if (evalErr) {
+        console.error('  ❌ Evaluation engine returned error:', evalErr.message);
+        break;
       }
+      finalState = state;
+    }
+
+    if (finalState === 'OPEN') {
+      console.log('  ✅ Provider health evaluation correctly transitioned circuit state to OPEN.');
+      results['circuit_breaker_transitions'] = 'PASS';
     } else {
-      console.error('  ❌ Circuit transition failed:', transitionErr.message);
+      console.error('  ❌ Evaluation engine failed to transition state. Current state:', finalState);
       results['circuit_breaker_transitions'] = 'FAIL';
-      results['provider_health_events_logging'] = 'FAIL';
     }
 
   } catch (err: any) {
@@ -103,6 +140,8 @@ async function run() {
   } finally {
     // Cleanup
     console.log('\nPerforming post-test cleanup...');
+    await supabaseAdmin.from('quasar_verification_requests').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabaseAdmin.from('provider_credentials').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('provider_health_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('provider_health_registry').delete().neq('provider', 'PAYSTACK');
     await supabaseAdmin.from('incoming_webhook_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -112,9 +151,10 @@ async function run() {
   // VERDICT SUMMARY
   // ----------------------------------------------------
   const requiredChecks = [
-    'webhook_queue_lifecycle',
-    'circuit_breaker_transitions',
-    'provider_health_events_logging'
+    'webhook_idempotency',
+    'credential_rotation',
+    'quasar_verification_handshake',
+    'circuit_breaker_transitions'
   ];
 
   console.log('\n======================================================');

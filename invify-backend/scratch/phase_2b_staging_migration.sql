@@ -1,11 +1,13 @@
 -- ============================================================================
--- Phase 2B Staging DDL Migration Package
+-- Phase 2B Staging DDL Migration Package (Hardened Gates)
 -- Banking Runtime & Provider Integration Layer
 -- ============================================================================
 
 BEGIN;
 
 -- Drop existing tables to allow safe execution loop
+DROP TABLE IF EXISTS public.quasar_verification_requests CASCADE;
+DROP TABLE IF EXISTS public.provider_credentials CASCADE;
 DROP TABLE IF EXISTS public.provider_health_events CASCADE;
 DROP TABLE IF EXISTS public.provider_health_registry CASCADE;
 DROP TABLE IF EXISTS public.incoming_webhook_logs CASCADE;
@@ -17,7 +19,7 @@ DROP TYPE IF EXISTS public.circuit_state_enum CASCADE;
 CREATE TYPE public.webhook_verification_status AS ENUM ('PENDING_VERIFICATION', 'VERIFIED', 'FAILED', 'REPLAY_REJECTED');
 CREATE TYPE public.circuit_state_enum AS ENUM ('CLOSED', 'OPEN', 'HALF_OPEN');
 
--- 2. Webhook Queue Ingestion Table
+-- 2. Hardened Webhook Queue Ingestion Table
 CREATE TABLE public.incoming_webhook_logs (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     provider                public.banking_provider_enum NOT NULL,
@@ -25,8 +27,18 @@ CREATE TABLE public.incoming_webhook_logs (
     payload                 JSONB NOT NULL,
     signature_header        TEXT NOT NULL,
     status                  public.webhook_verification_status NOT NULL DEFAULT 'PENDING_VERIFICATION',
+    
+    provider_event_id       VARCHAR(255) NOT NULL,
+    payload_hash            VARCHAR(64) NOT NULL,
+    
+    verification_algorithm  VARCHAR(50),
+    verification_result     TEXT,
+    verified_at             TIMESTAMPTZ,
+    
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
-    processed_at            TIMESTAMPTZ
+    processed_at            TIMESTAMPTZ,
+    
+    CONSTRAINT uq_provider_event UNIQUE (provider, provider_event_id)
 );
 
 -- 3. Provider Circuit Breaker Health Registry
@@ -56,7 +68,111 @@ CREATE TABLE public.provider_health_events (
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 5. Trigger to Log Circuit State Transitions
+-- 5. Provider Key Credential Rotation Registry
+CREATE TABLE public.provider_credentials (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provider                public.banking_provider_enum NOT NULL,
+    key_version             VARCHAR(50) NOT NULL,
+    public_key              TEXT,
+    encrypted_private_key   TEXT,
+    is_active               BOOLEAN NOT NULL DEFAULT true,
+    rotated_at              TIMESTAMPTZ,
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    
+    CONSTRAINT uq_provider_key_version UNIQUE (provider, key_version)
+);
+
+-- 6. Quasar Verification Handshake Requests
+CREATE TABLE public.quasar_verification_requests (
+    id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    withdrawal_id           UUID NOT NULL,
+    signed_token            TEXT NOT NULL,
+    nonce                   VARCHAR(100) NOT NULL UNIQUE,
+    expires_at              TIMESTAMPTZ NOT NULL,
+    verification_status     VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (verification_status IN ('PENDING', 'VERIFIED', 'EXPIRED', 'FAILED')),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 7. Automatic Circuit Evaluation Engine function
+CREATE OR REPLACE FUNCTION public.evaluate_provider_health(
+    p_provider public.banking_provider_enum,
+    p_has_failed BOOLEAN,
+    p_latency_ms INTEGER
+)
+RETURNS public.circuit_state_enum AS $$
+DECLARE
+    v_state public.circuit_state_enum;
+    v_failures INTEGER;
+BEGIN
+    -- Get current state
+    SELECT circuit_state, consecutive_failures INTO v_state, v_failures
+    FROM public.provider_health_registry
+    WHERE provider = p_provider;
+
+    IF p_has_failed THEN
+        v_failures := v_failures + 1;
+        
+        -- Trip circuit to OPEN on 5 consecutive failures
+        IF v_state = 'CLOSED' AND v_failures >= 5 THEN
+            v_state := 'OPEN';
+            
+            UPDATE public.provider_health_registry
+            SET circuit_state = 'OPEN',
+                consecutive_failures = v_failures,
+                last_failure_at = now(),
+                next_retry_at = now() + INTERVAL '5 minutes',
+                health_score = 0.00
+            WHERE provider = p_provider;
+        ELSE
+            -- Trial failed in HALF_OPEN, transition back to OPEN and restart cooldown
+            IF v_state = 'HALF_OPEN' THEN
+                v_state := 'OPEN';
+                UPDATE public.provider_health_registry
+                SET circuit_state = 'OPEN',
+                    consecutive_failures = v_failures,
+                    last_failure_at = now(),
+                    next_retry_at = now() + INTERVAL '5 minutes'
+                WHERE provider = p_provider;
+            ELSE
+                UPDATE public.provider_health_registry
+                SET consecutive_failures = v_failures,
+                    last_failure_at = now()
+                WHERE provider = p_provider;
+            END IF;
+        END IF;
+    ELSE
+        -- Success
+        IF v_state = 'HALF_OPEN' THEN
+            -- In HALF_OPEN, 5 consecutive successful trials transition back to CLOSED
+            IF v_failures > 0 THEN
+                v_failures := v_failures - 1;
+            END IF;
+            
+            IF v_failures = 0 THEN
+                v_state := 'CLOSED';
+                UPDATE public.provider_health_registry
+                SET circuit_state = 'CLOSED',
+                    consecutive_failures = 0,
+                    health_score = 100.00
+                WHERE provider = p_provider;
+            ELSE
+                UPDATE public.provider_health_registry
+                SET consecutive_failures = v_failures
+                WHERE provider = p_provider;
+            END IF;
+        ELSE
+            UPDATE public.provider_health_registry
+            SET consecutive_failures = 0,
+                health_score = 100.00
+            WHERE provider = p_provider;
+        END IF;
+    END IF;
+
+    RETURN v_state;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 8. Trigger to Log Circuit State Transitions
 CREATE OR REPLACE FUNCTION public.log_provider_health_transition()
 RETURNS TRIGGER AS $$
 BEGIN
