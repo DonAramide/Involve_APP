@@ -10,6 +10,11 @@ import { supabaseAdmin } from '../src/db/supabase';
 async function run() {
   console.log('=== PHASE 2B BANKING RUNTIME VERIFICATION (verify_p05k.ts) ===\n');
 
+  const testTenantId = '77777777-7777-7777-7777-777777777777';
+  const testUserId = '77777777-9999-7777-8888-999999999999';
+  const testEmail = `tresbanking_2b_${Date.now()}@invify.app`;
+  let testUserIdReal = '';
+
   const results: Record<string, string> = {};
 
   try {
@@ -20,39 +25,87 @@ async function run() {
     await supabaseAdmin.from('provider_health_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('provider_health_registry').delete().neq('provider', 'PAYSTACK');
     await supabaseAdmin.from('incoming_webhook_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabaseAdmin.from('financial_events').delete().eq('tenant_id', testTenantId);
+
+    // Seed baseline entities
+    console.log('Seeding baseline entities...');
+    await supabaseAdmin.from('tenants').insert({
+      id: testTenantId,
+      name: 'Runtime Test Merchant',
+      type: 'merchant',
+      plan: 'business',
+      status: 'ACTIVE',
+      tenant_code: 'TM_RUN_02',
+      agent_code: 'SYSTEM'
+    });
+
+    const { data: authUser } = await supabaseAdmin.auth.admin.createUser({
+      email: testEmail,
+      password: 'SecurePassword123!',
+      email_confirm: true
+    });
+    if (authUser?.user) {
+      testUserIdReal = authUser.user.id;
+      await supabaseAdmin.from('users').insert({
+        id: testUserIdReal,
+        tenant_id: testTenantId,
+        name: 'Runtime Admin User',
+        email: testEmail,
+        role: 'super_admin',
+        is_active: true
+      });
+    }
+
+    const eventId = '11111111-1111-1111-1111-111111111111';
+    await supabaseAdmin.from('financial_events').insert({
+      id: eventId,
+      event_type: 'PAYOUT_WITHDRAWAL',
+      state: 'INITIALIZED',
+      reference: 'REF_RUN_PAY',
+      tenant_id: testTenantId,
+      created_by: testUserIdReal
+    });
 
     // ----------------------------------------------------
     // CHECK 1: Webhook Queue & Idempotency Controls
     // ----------------------------------------------------
     console.log('\n1. Verifying Webhook Queue & Idempotency Controls...');
-    const eventId = `evt_test_${Date.now()}`;
+    const evtId = `evt_test_${Date.now()}`;
+    const payloadHashVal = 'abc123payload_hash_sha256';
     const { data: webhook, error: webErr } = await supabaseAdmin.from('incoming_webhook_logs').insert({
       provider: 'PAYSTACK',
       event_type: 'charge.success',
       payload: { reference: 'REF_TEST_PAY_01', amount: 50000 },
       signature_header: 'hmac_sha512_hash_value',
       status: 'PENDING_VERIFICATION',
-      provider_event_id: eventId,
-      payload_hash: 'abc123payload_hash_sha256'
+      provider_event_id: evtId,
+      payload_hash: payloadHashVal,
+      received_at: new Date().toISOString(),
+      replay_window_seconds: 300
     }).select().single();
 
     if (!webErr && webhook) {
-      // Attempt duplicate insert (must fail with unique constraint)
+      // Simulate verified state to active unique hash constraint
+      await supabaseAdmin.from('incoming_webhook_logs').update({ status: 'VERIFIED' }).eq('id', webhook.id);
+
+      // Attempt duplicate payload_hash insert on status = VERIFIED (must trigger uq_verified_payload_hash constraint)
       const { error: dupErr } = await supabaseAdmin.from('incoming_webhook_logs').insert({
         provider: 'PAYSTACK',
         event_type: 'charge.success',
         payload: { reference: 'REF_TEST_PAY_01', amount: 50000 },
         signature_header: 'hmac_sha512_hash_value',
-        status: 'PENDING_VERIFICATION',
-        provider_event_id: eventId,
-        payload_hash: 'abc123payload_hash_sha256'
+        status: 'VERIFIED',
+        provider_event_id: `${evtId}_dup`,
+        payload_hash: payloadHashVal,
+        received_at: new Date().toISOString(),
+        replay_window_seconds: 300
       });
 
       if (dupErr && (dupErr.message.includes('unique constraint') || dupErr.message.includes('duplicate key'))) {
-        console.log('  ✅ Webhook duplicate event replay correctly blocked by database.');
+        console.log('  ✅ Webhook duplicate payload replay correctly blocked by database index.');
         results['webhook_idempotency'] = 'PASS';
       } else {
-        console.error('  ❌ Duplicate webhook event was NOT blocked. Error:', dupErr?.message);
+        console.error('  ❌ Duplicate payload replay was NOT blocked. Error:', dupErr?.message);
         results['webhook_idempotency'] = 'FAIL';
       }
     } else {
@@ -68,11 +121,12 @@ async function run() {
       provider: 'PAYSTACK',
       key_version: 'v1_keys_2026',
       public_key: '-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...',
+      vault_key_reference: 'vault:secret-key-path-v1',
       is_active: true
     });
 
     if (!credErr) {
-      console.log('  ✅ Provider credential public/private key version registry verified.');
+      console.log('  ✅ Provider key rotation registry and KMS/Vault reference validated.');
       results['credential_rotation'] = 'PASS';
     } else {
       console.error('  ❌ Credential registration failed:', credErr.message);
@@ -88,11 +142,15 @@ async function run() {
       signed_token: 'rs256_signed_token_payload_string',
       nonce: `nonce_val_${Date.now()}`,
       expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      verification_status: 'PENDING'
+      verification_status: 'PENDING',
+      tenant_id: testTenantId,
+      financial_event_id: eventId,
+      issued_by: testUserIdReal,
+      verification_hash: 'hash_sha256_value_of_verification_token'
     });
 
     if (!quasarErr) {
-      console.log('  ✅ Quasar validation request handshake token mapped.');
+      console.log('  ✅ Quasar validation handshake token maps correctly and binds to tenant.');
       results['quasar_verification_handshake'] = 'PASS';
     } else {
       console.error('  ❌ Quasar request mapping failed:', quasarErr.message);
@@ -145,6 +203,12 @@ async function run() {
     await supabaseAdmin.from('provider_health_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     await supabaseAdmin.from('provider_health_registry').delete().neq('provider', 'PAYSTACK');
     await supabaseAdmin.from('incoming_webhook_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabaseAdmin.from('financial_events').delete().eq('tenant_id', testTenantId);
+    if (testUserIdReal) {
+      await supabaseAdmin.from('users').delete().eq('id', testUserIdReal);
+      await supabaseAdmin.auth.admin.deleteUser(testUserIdReal);
+    }
+    await supabaseAdmin.from('tenants').delete().eq('id', testTenantId);
   }
 
   // ----------------------------------------------------

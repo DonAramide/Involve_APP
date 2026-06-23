@@ -23,10 +23,10 @@ The runtime layer adds automatic circuit breakers and cryptographic handshake se
 ```
 
 ### Key Security Safeguards
-1.  **Webhook Idempotency Locks**: Constraints strictly reject double-processing of provider events by hashing request payloads and assigning unique keys to `provider_event_id`.
+1.  **Webhook Idempotency Locks**: Constraints strictly reject double-processing of provider events by hashing request payloads and assigning unique keys to `provider_event_id`. Furthermore, the unique index `uq_verified_payload_hash` ensures payload hashes cannot be duplicate-processed for `VERIFIED` webhooks.
 2.  **Circuit Evaluation Engine**: Function `evaluate_provider_health()` automatically trips provider status to `OPEN` on 5 consecutive failures, removing them from routing availability.
-3.  **Credential Key Rotations**: Registry `provider_credentials` segregates public keys and active key versions used for webhook verification.
-4.  **Quasar Request Handshakes**: Logs authorization requests and nonces inside `quasar_verification_requests` to prevent playback attack patterns.
+3.  **Credential Key Rotations**: Registry `provider_credentials` segregates public keys and stores a `vault_key_reference` string, keeping actual private keys inside key management vaults instead of the operational DB.
+4.  **Quasar Request Handshakes**: Logs authorization requests, nonces, and binding parameters (`tenant_id`, `financial_event_id`, `verification_hash`) inside `quasar_verification_requests` to prevent playback attack patterns.
 
 ---
 
