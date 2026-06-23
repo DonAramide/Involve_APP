@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 2B Staging DDL Migration Package (Hardened Gates)
+-- Phase 2B Staging DDL Migration Package (Hardened Gates V2)
 -- Banking Runtime & Provider Integration Layer
 -- ============================================================================
 
@@ -12,12 +12,19 @@ DROP TABLE IF EXISTS public.provider_health_events CASCADE;
 DROP TABLE IF EXISTS public.provider_health_registry CASCADE;
 DROP TABLE IF EXISTS public.incoming_webhook_logs CASCADE;
 
-DROP TYPE IF EXISTS public.webhook_verification_status CASCADE;
-DROP TYPE IF EXISTS public.circuit_state_enum CASCADE;
-
--- 1. Create Enums
-CREATE TYPE public.webhook_verification_status AS ENUM ('PENDING_VERIFICATION', 'VERIFIED', 'FAILED', 'REPLAY_REJECTED');
-CREATE TYPE public.circuit_state_enum AS ENUM ('CLOSED', 'OPEN', 'HALF_OPEN');
+-- 1. Create Enums Safely
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'banking_provider_enum') THEN
+        CREATE TYPE public.banking_provider_enum AS ENUM ('PAYSTACK', 'FLUTTERWAVE', 'PROVIDUS', 'WEMA');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'webhook_verification_status') THEN
+        CREATE TYPE public.webhook_verification_status AS ENUM ('PENDING_VERIFICATION', 'VERIFIED', 'FAILED', 'REPLAY_REJECTED');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'circuit_state_enum') THEN
+        CREATE TYPE public.circuit_state_enum AS ENUM ('CLOSED', 'OPEN', 'HALF_OPEN');
+    END IF;
+END$$;
 
 -- 2. Hardened Webhook Queue Ingestion Table
 CREATE TABLE public.incoming_webhook_logs (
@@ -35,11 +42,19 @@ CREATE TABLE public.incoming_webhook_logs (
     verification_result     TEXT,
     verified_at             TIMESTAMPTZ,
     
+    received_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
+    replay_window_seconds   INTEGER,
+    
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     processed_at            TIMESTAMPTZ,
     
     CONSTRAINT uq_provider_event UNIQUE (provider, provider_event_id)
 );
+
+-- Replay Protection: Prevent duplicate processing of identical payload hashes for verified events
+CREATE UNIQUE INDEX uq_verified_payload_hash 
+    ON public.incoming_webhook_logs(provider, payload_hash) 
+    WHERE status = 'VERIFIED';
 
 -- 3. Provider Circuit Breaker Health Registry
 CREATE TABLE public.provider_health_registry (
@@ -68,13 +83,13 @@ CREATE TABLE public.provider_health_events (
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 5. Provider Key Credential Rotation Registry
+-- 5. Provider Key Credential Rotation Registry (Vault references only, no raw key materials)
 CREATE TABLE public.provider_credentials (
     id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     provider                public.banking_provider_enum NOT NULL,
     key_version             VARCHAR(50) NOT NULL,
     public_key              TEXT,
-    encrypted_private_key   TEXT,
+    vault_key_reference     VARCHAR(255) NOT NULL,
     is_active               BOOLEAN NOT NULL DEFAULT true,
     rotated_at              TIMESTAMPTZ,
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -90,6 +105,12 @@ CREATE TABLE public.quasar_verification_requests (
     nonce                   VARCHAR(100) NOT NULL UNIQUE,
     expires_at              TIMESTAMPTZ NOT NULL,
     verification_status     VARCHAR(50) NOT NULL DEFAULT 'PENDING' CHECK (verification_status IN ('PENDING', 'VERIFIED', 'EXPIRED', 'FAILED')),
+    
+    tenant_id               UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    financial_event_id      UUID NOT NULL REFERENCES public.financial_events(id) ON DELETE CASCADE,
+    issued_by               UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    verification_hash       VARCHAR(64) NOT NULL,
+    
     created_at              TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

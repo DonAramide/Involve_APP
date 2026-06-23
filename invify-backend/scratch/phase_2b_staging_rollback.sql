@@ -14,7 +14,6 @@ DROP TABLE IF EXISTS public.provider_health_events CASCADE;
 DROP TABLE IF EXISTS public.provider_health_registry CASCADE;
 DROP TABLE IF EXISTS public.incoming_webhook_logs CASCADE;
 
-DROP TYPE IF EXISTS public.webhook_verification_status CASCADE;
-DROP TYPE IF EXISTS public.circuit_state_enum CASCADE;
+-- Note: We do not drop types created conditionally in migration to prevent breaking dependent modules.
 
 COMMIT;
