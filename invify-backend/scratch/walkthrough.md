@@ -26,6 +26,7 @@ The connectivity layer establishes environment-isolated registries, capability h
 2.  **Environment-Isolated Health Checks**: Gating decisions on `provider_capability_health` unique keys `(provider, environment, capability)`.
 3.  **Hashed Request Log Classifiers**: Includes API `request_type` constraints for detailed transactional analysis.
 4.  **Quasar Decision Tracks**: Maps decisions (`APPROVED`, `RISK_REJECTED`, etc.) directly on withdrawal chains.
+5.  **Active Bank Version Integrity**: Partial unique index on `banks` restricts active bank listings to a single active index entry.
 
 ---
 

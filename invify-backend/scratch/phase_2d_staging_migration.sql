@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 2D Staging DDL Migration Package (Hardened Connectivity V2)
+-- Phase 2D Staging DDL Migration Package (Hardened Connectivity V3)
 -- Real Banking Connectivity Layer
 -- ============================================================================
 
@@ -47,6 +47,11 @@ CREATE TABLE public.banks (
     
     CONSTRAINT uq_bank_code_version UNIQUE (nip_bank_code, version)
 );
+
+-- Enforce bank version integrity: Only one active bank version may exist where effective_to IS NULL
+CREATE UNIQUE INDEX uq_active_bank_version 
+    ON public.banks (nip_bank_code) 
+    WHERE (effective_to IS NULL);
 
 -- 4. Provider Specific Bank Mappings
 CREATE TABLE public.provider_bank_mappings (
