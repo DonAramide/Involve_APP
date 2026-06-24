@@ -44,10 +44,35 @@ export class RoutingEngineService {
     const balanceMap = new Map(balances?.map(b => [b.provider, b]));
     const limitMap = new Map(dailyLimits?.map(l => [l.provider, l]));
 
+    const capMap: Record<string, string> = {
+      'supports_virtual_accounts': 'VIRTUAL_ACCOUNT',
+      'supports_name_enquiry': 'NAME_ENQUIRY',
+      'supports_nip_transfer': 'TRANSFER',
+      'supports_bulk_transfer': 'TRANSFER'
+    };
+    const dbCapName = capMap[params.requiredCapability];
+    const environment = process.env.NODE_ENV === 'production' ? 'production' : 'staging';
+
+    const eligibilityResults = await Promise.all(
+      caps.map(async (c: any) => {
+        if (!dbCapName) return { provider: c.provider, eligible: true };
+        const { data: eligible } = await supabaseAdmin.rpc('is_provider_capability_eligible', {
+          p_provider: c.provider,
+          p_environment: environment,
+          p_capability: dbCapName
+        });
+        return { provider: c.provider, eligible: !!eligible };
+      })
+    );
+    const eligibleMap = new Map(eligibilityResults.map(r => [r.provider, r.eligible]));
+
     const scoredProviders = caps
       .filter((c: any) => {
         // Exclude list check
         if (params.excludeProviders && params.excludeProviders.includes(c.provider)) return false;
+
+        // DB capability certification & health eligibility check
+        if (!eligibleMap.get(c.provider)) return false;
 
         // Capability check
         if (!c[params.requiredCapability]) return false;
