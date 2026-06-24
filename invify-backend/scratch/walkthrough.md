@@ -28,6 +28,7 @@ The connectivity layer establishes environment-isolated registries, capability h
 4.  **Hashed Request Log Classifiers**: Includes API `request_type` constraints for detailed transactional analysis.
 5.  **Quasar Decision Tracks**: Maps decisions (`APPROVED`, `RISK_REJECTED`, etc.) directly on withdrawal chains.
 6.  **Active Bank Version Integrity**: Partial unique index on `banks` restricts active bank listings to a single active index entry.
+7.  **Quasar Verification Table Alignment**: Declares `quasar_verification_requests` columns (`tenant_id`, `financial_event_id`, `verification_hash`) explicitly to prevent layout errors.
 
 ---
 
