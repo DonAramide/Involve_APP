@@ -1,5 +1,5 @@
 # Phase 2D Walkthrough
-## Real Banking Connectivity Layer
+## Real Banking Connectivity Layer (Hardened Release)
 
 This document details the DDL structures and validation parameters for Phase 2D.
 
@@ -7,7 +7,7 @@ This document details the DDL structures and validation parameters for Phase 2D.
 
 ## 1. Banking Platform Architecture Design
 
-The connectivity layer establishes environment registries, capability health registries, versioned banks, and logs:
+The connectivity layer establishes environment-isolated registries, capability health keys, versioned banks, and logs:
 
 ```
                   [BankingGatewayService]
@@ -22,17 +22,17 @@ The connectivity layer establishes environment registries, capability health reg
 ```
 
 ### Key Security Safeguards
-1.  **Provider Environment Registry**: Credentials, certifications, and routing are strictly isolated per environment using the `provider_environments` table.
-2.  **Capability Health Registry**: Routing decisions enforce both certification checks (`certification_status = 'CERTIFIED'`) and health metrics checks (`status = 'HEALTHY'`) in `provider_capability_health`.
-3.  **Versioned Bank Registers**: Supports future NIBSS bank code overrides dynamically using version and timeline fields in `banks`.
-4.  **API Audit Hashing**: Request and response bodies are SHA256 hashed to prevent logging active bank accounts or secrets.
+1.  **Provider Environment Registry**: Isolation of credentials and URL routes per target space in `provider_environments`.
+2.  **Environment-Isolated Health Checks**: Gating decisions on `provider_capability_health` unique keys `(provider, environment, capability)`.
+3.  **Hashed Request Log Classifiers**: Includes API `request_type` constraints for detailed transactional analysis.
+4.  **Quasar Decision Tracks**: Maps decisions (`APPROVED`, `RISK_REJECTED`, etc.) directly on withdrawal chains.
 
 ---
 
 ## 2. Deliverables Inventory
 
 ### SQL Packages
--   [phase_2d_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2d_staging_migration.sql): Complete DDL schema containing environments, certifications, capability health, hashed API logs, and Quasar result registries.
+-   [phase_2d_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2d_staging_migration.sql): Hardened DDL schema package.
 -   [phase_2d_staging_rollback.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2d_staging_rollback.sql): Reverts all created tables.
 
 ### Test Suites

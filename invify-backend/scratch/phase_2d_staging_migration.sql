@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 2D Staging DDL Migration Package (Hardened Connectivity)
+-- Phase 2D Staging DDL Migration Package (Hardened Connectivity V2)
 -- Real Banking Connectivity Layer
 -- ============================================================================
 
@@ -74,19 +74,21 @@ CREATE TABLE public.provider_certifications (
     CONSTRAINT fk_provider_cert_env FOREIGN KEY (provider, environment) REFERENCES public.provider_environments(provider, environment) ON DELETE CASCADE
 );
 
--- 6. Provider Capability Health
+-- 6. Provider Capability Health (Environment Isolated)
 CREATE TABLE public.provider_capability_health (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     provider                    public.banking_provider_enum NOT NULL,
+    environment                 VARCHAR(50) NOT NULL DEFAULT 'staging',
     capability                  public.provider_capability_enum NOT NULL,
     status                      public.capability_status_enum NOT NULL DEFAULT 'HEALTHY',
     last_checked_at             TIMESTAMPTZ NOT NULL DEFAULT now(),
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
     
-    CONSTRAINT uq_provider_cap_health UNIQUE (provider, capability)
+    CONSTRAINT uq_provider_cap_health UNIQUE (provider, environment, capability),
+    CONSTRAINT fk_provider_cap_health_env FOREIGN KEY (provider, environment) REFERENCES public.provider_environments(provider, environment) ON DELETE CASCADE
 );
 
--- 7. Provider API Audit Logs (hashed/no sensitive credentials)
+-- 7. Provider API Audit Logs (hashed/no sensitive credentials, type classified)
 CREATE TABLE public.provider_api_audit_logs (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     provider                    public.banking_provider_enum NOT NULL,
@@ -96,6 +98,7 @@ CREATE TABLE public.provider_api_audit_logs (
     response_hash               VARCHAR(64) NOT NULL,
     status_code                 INTEGER NOT NULL,
     latency_ms                  INTEGER NOT NULL,
+    request_type                VARCHAR(50) NOT NULL CHECK (request_type IN ('NAME_ENQUIRY', 'TRANSFER', 'WEBHOOK', 'VA_CREATION', 'TRANSFER_STATUS', 'SETTLEMENT_IMPORT')),
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -106,10 +109,11 @@ CREATE TABLE public.quasar_verification_results (
     result_status               VARCHAR(50) NOT NULL CHECK (result_status IN ('VERIFIED', 'EXPIRED', 'FAILED')),
     reason_code                 VARCHAR(100) NOT NULL,
     response_payload_hash       VARCHAR(64) NOT NULL,
+    decision_type               VARCHAR(50) NOT NULL CHECK (decision_type IN ('APPROVED', 'TREASURY_REJECTED', 'LIQUIDITY_REJECTED', 'RISK_REJECTED', 'PROVIDER_REJECTED')),
     verified_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Seed default environments and baseline certified registry items
+-- Seed default environments and baseline certified registry items in PENDING state
 INSERT INTO public.provider_environments (provider, environment, base_url, is_active, supports_live_funds)
 VALUES
     ('PROVIDUS', 'staging', 'https://api-staging.providusbank.com', true, false),
@@ -121,36 +125,36 @@ SET base_url = EXCLUDED.base_url, is_active = EXCLUDED.is_active;
 
 INSERT INTO public.provider_certifications (provider, environment, capability, certification_status)
 VALUES
-    ('PROVIDUS', 'staging', 'VIRTUAL_ACCOUNT', 'CERTIFIED'),
-    ('PROVIDUS', 'staging', 'NAME_ENQUIRY', 'CERTIFIED'),
-    ('PROVIDUS', 'staging', 'TRANSFER', 'CERTIFIED'),
-    ('WEMA', 'staging', 'VIRTUAL_ACCOUNT', 'CERTIFIED'),
-    ('WEMA', 'staging', 'NAME_ENQUIRY', 'CERTIFIED'),
-    ('WEMA', 'staging', 'TRANSFER', 'CERTIFIED'),
-    ('PAYSTACK', 'staging', 'VIRTUAL_ACCOUNT', 'CERTIFIED'),
-    ('PAYSTACK', 'staging', 'NAME_ENQUIRY', 'CERTIFIED'),
-    ('PAYSTACK', 'staging', 'TRANSFER', 'CERTIFIED'),
-    ('FLUTTERWAVE', 'staging', 'VIRTUAL_ACCOUNT', 'CERTIFIED'),
-    ('FLUTTERWAVE', 'staging', 'NAME_ENQUIRY', 'CERTIFIED'),
-    ('FLUTTERWAVE', 'staging', 'TRANSFER', 'CERTIFIED')
+    ('PROVIDUS', 'staging', 'VIRTUAL_ACCOUNT', 'PENDING'),
+    ('PROVIDUS', 'staging', 'NAME_ENQUIRY', 'PENDING'),
+    ('PROVIDUS', 'staging', 'TRANSFER', 'PENDING'),
+    ('WEMA', 'staging', 'VIRTUAL_ACCOUNT', 'PENDING'),
+    ('WEMA', 'staging', 'NAME_ENQUIRY', 'PENDING'),
+    ('WEMA', 'staging', 'TRANSFER', 'PENDING'),
+    ('PAYSTACK', 'staging', 'VIRTUAL_ACCOUNT', 'PENDING'),
+    ('PAYSTACK', 'staging', 'NAME_ENQUIRY', 'PENDING'),
+    ('PAYSTACK', 'staging', 'TRANSFER', 'PENDING'),
+    ('FLUTTERWAVE', 'staging', 'VIRTUAL_ACCOUNT', 'PENDING'),
+    ('FLUTTERWAVE', 'staging', 'NAME_ENQUIRY', 'PENDING'),
+    ('FLUTTERWAVE', 'staging', 'TRANSFER', 'PENDING')
 ON CONFLICT (provider, environment, capability) DO UPDATE
 SET certification_status = EXCLUDED.certification_status;
 
-INSERT INTO public.provider_capability_health (provider, capability, status)
+INSERT INTO public.provider_capability_health (provider, environment, capability, status)
 VALUES
-    ('PROVIDUS', 'VIRTUAL_ACCOUNT', 'HEALTHY'),
-    ('PROVIDUS', 'NAME_ENQUIRY', 'HEALTHY'),
-    ('PROVIDUS', 'TRANSFER', 'HEALTHY'),
-    ('WEMA', 'VIRTUAL_ACCOUNT', 'HEALTHY'),
-    ('WEMA', 'NAME_ENQUIRY', 'HEALTHY'),
-    ('WEMA', 'TRANSFER', 'HEALTHY'),
-    ('PAYSTACK', 'VIRTUAL_ACCOUNT', 'HEALTHY'),
-    ('PAYSTACK', 'NAME_ENQUIRY', 'HEALTHY'),
-    ('PAYSTACK', 'TRANSFER', 'HEALTHY'),
-    ('FLUTTERWAVE', 'VIRTUAL_ACCOUNT', 'HEALTHY'),
-    ('FLUTTERWAVE', 'NAME_ENQUIRY', 'HEALTHY'),
-    ('FLUTTERWAVE', 'TRANSFER', 'HEALTHY')
-ON CONFLICT (provider, capability) DO UPDATE
+    ('PROVIDUS', 'staging', 'VIRTUAL_ACCOUNT', 'HEALTHY'),
+    ('PROVIDUS', 'staging', 'NAME_ENQUIRY', 'HEALTHY'),
+    ('PROVIDUS', 'staging', 'TRANSFER', 'HEALTHY'),
+    ('WEMA', 'staging', 'VIRTUAL_ACCOUNT', 'HEALTHY'),
+    ('WEMA', 'staging', 'NAME_ENQUIRY', 'HEALTHY'),
+    ('WEMA', 'staging', 'TRANSFER', 'HEALTHY'),
+    ('PAYSTACK', 'staging', 'VIRTUAL_ACCOUNT', 'HEALTHY'),
+    ('PAYSTACK', 'staging', 'NAME_ENQUIRY', 'HEALTHY'),
+    ('PAYSTACK', 'staging', 'TRANSFER', 'HEALTHY'),
+    ('FLUTTERWAVE', 'staging', 'VIRTUAL_ACCOUNT', 'HEALTHY'),
+    ('FLUTTERWAVE', 'staging', 'NAME_ENQUIRY', 'HEALTHY'),
+    ('FLUTTERWAVE', 'staging', 'TRANSFER', 'HEALTHY')
+ON CONFLICT (provider, environment, capability) DO UPDATE
 SET status = EXCLUDED.status;
 
 COMMIT;

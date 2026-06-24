@@ -70,25 +70,37 @@ async function run() {
     // CHECK 2 & 3: Certified Capability & Health Routing
     // ----------------------------------------------------
     console.log('\n2 & 3. Verifying Capability Certification & Health Registers...');
-    const { error: certErr } = await supabaseAdmin.from('provider_certifications').insert({
-      provider: 'PROVIDUS',
-      environment: 'production',
-      capability: 'TRANSFER',
+    
+    // Assert Providus certification is seeded as PENDING by default
+    const { data: seededCert } = await supabaseAdmin
+      .from('provider_certifications')
+      .select('*')
+      .eq('provider', 'PROVIDUS')
+      .eq('environment', 'staging')
+      .eq('capability', 'TRANSFER')
+      .single();
+
+    // Verify it is indeed 'PENDING'
+    const isPending = seededCert && seededCert.certification_status === 'PENDING';
+
+    // Update it to CERTIFIED for test flow
+    await supabaseAdmin.from('provider_certifications').update({
       certification_status: 'CERTIFIED'
-    });
+    }).eq('id', seededCert.id);
 
     const { error: healthErr } = await supabaseAdmin.from('provider_capability_health').insert({
       provider: 'PROVIDUS',
+      environment: 'production',
       capability: 'TRANSFER',
       status: 'HEALTHY'
     });
 
-    if (!certErr && !healthErr) {
-      console.log('  ✅ Capability certification and health states logged successfully.');
+    if (isPending && !healthErr) {
+      console.log('  ✅ Environment-isolated health logged; certification defaults verified.');
       results['certified_capability_validation'] = 'PASS';
       results['capability_health_routing'] = 'PASS';
     } else {
-      console.error('  ❌ Certification mapping failed. certErr:', certErr?.message, 'healthErr:', healthErr?.message);
+      console.error('  ❌ Certification defaults or isolated health checks failed.', { isPending, healthErr });
       results['certified_capability_validation'] = 'FAIL';
       results['capability_health_routing'] = 'FAIL';
     }
@@ -114,7 +126,7 @@ async function run() {
     // ----------------------------------------------------
     // CHECK 5: Audit Log Hashing
     // ----------------------------------------------------
-    console.log('\n5. Verifying Audit Log Hashing (No raw secrets)...');
+    console.log('\n5. Verifying Audit Log Hashing & Request Classification...');
     const { error: auditErr } = await supabaseAdmin.from('provider_api_audit_logs').insert({
       provider: 'PROVIDUS',
       capability: 'TRANSFER',
@@ -122,11 +134,12 @@ async function run() {
       request_hash: 'sha256_hash_value_of_request_body',
       response_hash: 'sha256_hash_value_of_response_body',
       status_code: 200,
-      latency_ms: 150
+      latency_ms: 150,
+      request_type: 'TRANSFER'
     });
 
     if (!auditErr) {
-      console.log('  ✅ API request and response hashes archived safely.');
+      console.log('  ✅ API request type classified and hashes archived safely.');
       results['audit_log_hashing'] = 'PASS';
     } else {
       console.error('  ❌ Audit log creation failed:', auditErr.message);
@@ -153,11 +166,12 @@ async function run() {
         verification_request_id: req.id,
         result_status: 'VERIFIED',
         reason_code: 'TOKEN_SIGNATURE_VALID',
-        response_payload_hash: 'sha256_hash_of_quasar_verification_response'
+        response_payload_hash: 'sha256_hash_of_quasar_verification_response',
+        decision_type: 'APPROVED'
       });
 
       if (!resErr) {
-        console.log('  ✅ Quasar verification result logged and linked to request chain.');
+        console.log('  ✅ Quasar decision type classified and linked to request chain.');
         results['quasar_verification_audit_chain'] = 'PASS';
       } else {
         console.error('  ❌ Result mapping failed:', resErr.message);
