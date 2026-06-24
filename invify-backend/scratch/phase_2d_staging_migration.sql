@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 2D Staging DDL Migration Package (Hardened Connectivity V3)
+-- Phase 2D Staging DDL Migration Package (Hardened Connectivity V4)
 -- Real Banking Connectivity Layer
 -- ============================================================================
 
@@ -107,6 +107,11 @@ CREATE TABLE public.provider_api_audit_logs (
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Operational indexes for provider_api_audit_logs
+CREATE INDEX idx_provider_api_audit_logs_event_id ON public.provider_api_audit_logs (financial_event_id);
+CREATE INDEX idx_provider_api_audit_logs_provider_cap ON public.provider_api_audit_logs (provider, capability);
+CREATE INDEX idx_provider_api_audit_logs_created_at ON public.provider_api_audit_logs (created_at DESC);
+
 -- 8. Quasar Verification Results Registry
 CREATE TABLE public.quasar_verification_results (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -115,8 +120,13 @@ CREATE TABLE public.quasar_verification_results (
     reason_code                 VARCHAR(100) NOT NULL,
     response_payload_hash       VARCHAR(64) NOT NULL,
     decision_type               VARCHAR(50) NOT NULL CHECK (decision_type IN ('APPROVED', 'TREASURY_REJECTED', 'LIQUIDITY_REJECTED', 'RISK_REJECTED', 'PROVIDER_REJECTED')),
-    verified_at                 TIMESTAMPTZ NOT NULL DEFAULT now()
+    verified_at                 TIMESTAMPTZ NOT NULL DEFAULT now(),
+    
+    CONSTRAINT uq_quasar_verification_request UNIQUE (verification_request_id)
 );
+
+-- Operational index for quasar_verification_results
+CREATE INDEX idx_quasar_verification_results_verified_at ON public.quasar_verification_results (verified_at DESC);
 
 -- Seed default environments and baseline certified registry items in PENDING state
 INSERT INTO public.provider_environments (provider, environment, base_url, is_active, supports_live_funds)
