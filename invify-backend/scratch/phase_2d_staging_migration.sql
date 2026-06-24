@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 2D Staging DDL Migration Package (Hardened Connectivity V8)
+-- Phase 2D Staging DDL Migration Package (Hardened Connectivity V9)
 -- Real Banking Connectivity Layer
 -- ============================================================================
 
@@ -176,6 +176,23 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_eligible BOOLEAN := FALSE;
+BEGIN
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.provider_environments pe
+        JOIN public.provider_certifications pc 
+            ON pe.provider = pc.provider AND pe.environment = pc.environment
+        JOIN public.provider_capability_health pch 
+            ON pe.provider = pch.provider AND pe.environment = pch.environment AND pc.capability = pch.capability
+        WHERE pe.provider = p_provider
+          AND pe.environment = p_environment
+          AND pc.capability = p_capability
+          AND pe.is_active = TRUE
+          AND pc.certification_status = 'CERTIFIED'
+          AND pch.status = 'HEALTHY'
+    ) INTO v_eligible;
+    
+    RETURN v_eligible;
 END;
 $$;
 
