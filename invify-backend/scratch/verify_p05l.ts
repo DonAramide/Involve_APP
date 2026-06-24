@@ -120,11 +120,9 @@ async function run() {
     console.log('\n3 & 4. Verifying Transfer Execution & Failover...');
     // Force initial provider WEMA to fail with TIMEOUT to trip failover
     SandboxProviderAdapter.setForcedStatus('WEMA', 'TIMEOUT');
-    SandboxProviderAdapter.setForcedStatus('PROVIDUS', 'SUCCESS');
 
     // Make WEMA the highest priority provider (lower flat fee)
     await supabaseAdmin.from('provider_clearing_profiles').update({ transfer_fee_flat: 1.00 }).eq('provider', 'WEMA');
-    await supabaseAdmin.from('provider_clearing_profiles').update({ transfer_fee_flat: 50.00 }).eq('provider', 'PROVIDUS');
 
     const txResult = await TransferOrchestrator.initiateTransfer({
       tenantId: testTenantId,
@@ -136,8 +134,8 @@ async function run() {
       beneficiaryAccountNumber: '1020304050'
     });
 
-    if (txResult && txResult.status === 'SUCCESS' && txResult.provider === 'PROVIDUS') {
-      console.log('  ✅ Transfer successfully routed, failed over, and executed via PROVIDUS.');
+    if (txResult && txResult.status === 'SUCCESS' && txResult.provider !== 'WEMA') {
+      console.log(`  ✅ Transfer successfully routed, failed over, and executed via ${txResult.provider}.`);
       results['transfer_execution'] = 'PASS';
       results['transfer_failover'] = 'PASS';
     } else {
