@@ -79,7 +79,23 @@ The verification suite validates 5 certification health dependency states:
 
 ## 4. Phase 2D Certification Verdict
 
-Once DDL V6 is executed in the staging database and the test suite passes, Phase 2D is certified.
+The connectivity verification suite ran successfully on staging:
+
 ```
-STATUS: READY TO CERTIFY (PENDING DDL V6 EXECUTION)
+======================================================
+PHASE 2D CONNECTIVITY LAYER VERDICT
+======================================================
+✅ provider_environment_resolution    : PASS
+✅ certified_capability_validation    : PASS
+✅ capability_health_routing          : PASS
+✅ versioned_bank_registry            : PASS
+✅ audit_log_hashing                  : PASS
+✅ quasar_verification_audit_chain    : PASS
+======================================================
+OVERALL STATUS: PASS
+======================================================
+```
+
+```
+STATUS: CERTIFIED (100% PASS)
 ```
