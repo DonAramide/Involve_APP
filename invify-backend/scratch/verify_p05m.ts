@@ -110,26 +110,63 @@ async function run() {
     }
 
     // ----------------------------------------------------
-    // CHECK 3: Certification & Health Routing Eligibilities
+    // CHECK 3: Certification & Health Routing Eligibilities (4 Cases)
     // ----------------------------------------------------
     console.log('\n3. Verifying Certification Health Routing Eligibility...');
     
-    // Attempt 1: PENDING + HEALTHY (must be rejected)
-    const canRoutePending = seededCert && seededCert.certification_status === 'CERTIFIED' && true; // Simulating logic check
-    
+    // Case 1: PENDING + HEALTHY (Expected -> FALSE)
+    const { data: isEligibleCase1 } = await supabaseAdmin.rpc('is_provider_capability_eligible', {
+      p_provider: 'PROVIDUS',
+      p_environment: 'staging',
+      p_capability: 'TRANSFER'
+    });
+
     // Update Providus cert to CERTIFIED for test flow
     await supabaseAdmin.from('provider_certifications').update({
       certification_status: 'CERTIFIED'
     }).eq('id', seededCert.id);
 
-    // Setup health register as HEALTHY
-    const canRouteCertified = seededCert && health && health.status === 'HEALTHY';
+    // Case 2: CERTIFIED + HEALTHY (Expected -> TRUE)
+    const { data: isEligibleCase2 } = await supabaseAdmin.rpc('is_provider_capability_eligible', {
+      p_provider: 'PROVIDUS',
+      p_environment: 'staging',
+      p_capability: 'TRANSFER'
+    });
 
-    if (!canRoutePending && canRouteCertified) {
-      console.log('  ✅ Certification eligibility checks passing: PENDING is blocked, CERTIFIED + HEALTHY is allowed.');
+    // Update health to DEGRADED
+    await supabaseAdmin.from('provider_capability_health').update({
+      status: 'DEGRADED'
+    }).eq('id', health.id);
+
+    // Case 3: CERTIFIED + DEGRADED (Expected -> FALSE)
+    const { data: isEligibleCase3 } = await supabaseAdmin.rpc('is_provider_capability_eligible', {
+      p_provider: 'PROVIDUS',
+      p_environment: 'staging',
+      p_capability: 'TRANSFER'
+    });
+
+    // Update health to UNAVAILABLE
+    await supabaseAdmin.from('provider_capability_health').update({
+      status: 'UNAVAILABLE'
+    }).eq('id', health.id);
+
+    // Case 4: CERTIFIED + UNAVAILABLE (Expected -> FALSE)
+    const { data: isEligibleCase4 } = await supabaseAdmin.rpc('is_provider_capability_eligible', {
+      p_provider: 'PROVIDUS',
+      p_environment: 'staging',
+      p_capability: 'TRANSFER'
+    });
+
+    const checksPass = (isEligibleCase1 === false) && 
+                       (isEligibleCase2 === true) && 
+                       (isEligibleCase3 === false) && 
+                       (isEligibleCase4 === false);
+
+    if (checksPass) {
+      console.log('  ✅ Eligibility routing function verified across all 4 state checks.');
       results['capability_health_routing'] = 'PASS';
     } else {
-      console.error('  ❌ Eligibility checks failed.', { canRoutePending, canRouteCertified });
+      console.error('  ❌ Eligibility state failures:', { isEligibleCase1, isEligibleCase2, isEligibleCase3, isEligibleCase4 });
       results['capability_health_routing'] = 'FAIL';
     }
 

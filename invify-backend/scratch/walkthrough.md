@@ -12,10 +12,10 @@ The connectivity layer establishes environment-isolated registries, capability h
 ```
                   [BankingGatewayService]
                             │
-               (Check Capability Certified)
+               (Check Eligibility via Function)
                             │
                             ▼
-               [Check Capability HEALTHY]
+               [is_provider_capability_eligible]
                             │
                             ▼
               [Log Hashed request/response]
@@ -24,9 +24,10 @@ The connectivity layer establishes environment-isolated registries, capability h
 ### Key Security Safeguards
 1.  **Provider Environment Registry**: Isolation of credentials and URL routes per target space in `provider_environments`.
 2.  **Environment-Isolated Health Checks**: Gating decisions on `provider_capability_health` unique keys `(provider, environment, capability)`.
-3.  **Hashed Request Log Classifiers**: Includes API `request_type` constraints for detailed transactional analysis.
-4.  **Quasar Decision Tracks**: Maps decisions (`APPROVED`, `RISK_REJECTED`, etc.) directly on withdrawal chains.
-5.  **Active Bank Version Integrity**: Partial unique index on `banks` restricts active bank listings to a single active index entry.
+3.  **Routing Eligibility Helper Function**: Consumes environment active checks, certification status, and capability health within a single atomic query `is_provider_capability_eligible()`.
+4.  **Hashed Request Log Classifiers**: Includes API `request_type` constraints for detailed transactional analysis.
+5.  **Quasar Decision Tracks**: Maps decisions (`APPROVED`, `RISK_REJECTED`, etc.) directly on withdrawal chains.
+6.  **Active Bank Version Integrity**: Partial unique index on `banks` restricts active bank listings to a single active index entry.
 
 ---
 
