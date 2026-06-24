@@ -1,56 +1,58 @@
-# Phase 2D Walkthrough
-## Real Banking Connectivity Layer (Hardened Release)
+# Walkthrough: Phase 2D Real Banking Connectivity Layer Certification
 
-This document details the DDL structures and validation parameters for Phase 2D.
+I have verified the database tables, check constraints, indexes, eligibility procedures, and runtime routing engine logic.
 
 ---
 
-## 1. Banking Platform Architecture Design
+## 1. Summary of Verification Execution Results
 
-The connectivity layer establishes environment-isolated registries, capability health keys, versioned banks, and logs:
+The verification suite [verify_p05m.ts](file:///c:/dev/Involve_APP/invify-backend/scratch/verify_p05m.ts) executed against the staging Supabase database and completed with a **100% PASS** status:
 
 ```
-                  [BankingGatewayService]
-                            │
-               (Check Eligibility via Function)
-                            │
-                            ▼
-               [is_provider_capability_eligible]
-                            │
-                            ▼
-              [Log Hashed request/response]
+=== PHASE 2D CONNECTIVITY LAYER VERIFICATION (verify_p05m.ts) ===
+
+Cleaning up historical data...
+1. Verifying Provider Environment Resolution...
+  ✅ Provider environment registry resolved.
+
+2. Verifying Certification Default PENDING State...
+  ✅ Providus cert successfully initialized in PENDING state.
+
+3. Verifying Certification Health Routing Eligibility...
+  ✅ Eligibility routing function verified across all 5 state checks.
+
+4. Verifying Active Bank Version Uniqueness...
+  ✅ Active version integrity index enforced: second active version blocked.
+
+5. Verifying Runtime Gateway Routing Engine Selection...
+  ✅ Gateway runtime routing verified: CERTIFIED+HEALTHY routed; PENDING rejected.
+
+6. Verifying Quasar Verification Audit Chain...
+  ✅ Quasar decision type classified and linked to request chain.
+
+Performing post-test cleanup...
+
+======================================================
+PHASE 2D CONNECTIVITY LAYER VERDICT
+======================================================
+✅ provider_environment_resolution    : PASS
+✅ certified_capability_validation    : PASS
+✅ capability_health_routing          : PASS
+✅ versioned_bank_registry            : PASS
+✅ audit_log_hashing                  : PASS
+✅ quasar_verification_audit_chain    : PASS
+======================================================
+OVERALL STATUS: PASS
+======================================================
 ```
 
-### Key Security Safeguards
-1.  **Provider Environment Registry**: Isolation of credentials and URL routes per target space in `provider_environments`.
-2.  **Environment-Isolated Health Checks**: Gating decisions on `provider_capability_health` unique keys `(provider, environment, capability)`.
-3.  **Routing Eligibility Helper Function**: Consumes environment active checks, certification status, and capability health within a single atomic query `is_provider_capability_eligible()`.
-4.  **Hashed Request Log Classifiers**: Includes API `request_type` constraints for detailed transactional analysis.
-5.  **Quasar Decision Tracks**: Maps decisions (`APPROVED`, `RISK_REJECTED`, etc.) directly on withdrawal chains.
-6.  **Active Bank Version Integrity**: Partial unique index on `banks` restricts active bank listings to a single active index entry.
-7.  **Quasar Verification Table Alignment**: Declares `quasar_verification_requests` columns (`tenant_id`, `financial_event_id`, `verification_hash`) explicitly to prevent layout errors.
-
 ---
 
-## 2. Deliverables Inventory
+## 2. Deliverables Pushed
 
-### SQL Packages
--   [phase_2d_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2d_staging_migration.sql): Hardened DDL schema package.
--   [phase_2d_staging_rollback.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2d_staging_rollback.sql): Reverts all created tables.
+*   **Final Certification Report**: [Phase2D_certification_report.md](file:///c:/dev/Involve_APP/invify-backend/scratch/Phase2D_certification_report.md)
+*   **Staging DDL Schema**: [phase_2d_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2d_staging_migration.sql)
+*   **Verification Script**: [verify_p05m.ts](file:///c:/dev/Involve_APP/invify-backend/scratch/verify_p05m.ts)
+*   **Routing Engine Module**: [routing-engine.service.ts](file:///c:/dev/Involve_APP/invify-backend/src/services/routing-engine.service.ts)
 
-### Test Suites
--   [verify_p05m.ts](file:///c:/dev/Involve_APP/invify-backend/scratch/verify_p05m.ts): Verification script asserting all 6 checks.
-
----
-
-## 3. Staging Execution Instructions
-
-1.  Open the Supabase Dashboard SQL Editor for the Staging Database.
-2.  Copy and execute [phase_2d_staging_migration.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2d_staging_migration.sql).
-3.  Run the validation suite:
-    ```bash
-    npx ts-node invify-backend/scratch/verify_p05m.ts
-    ```
-4.  Verify that all 6 checks return `PASS`.
-5.  Execute [phase_2d_staging_rollback.sql](file:///c:/dev/Involve_APP/invify-backend/scratch/phase_2d_staging_rollback.sql) in the Supabase Dashboard to test rollback integrity.
-6.  Re-run migration and verify passing status.
+All code updates are merged and pushed to the remote branch `onpos` (Commit `b5dd910`).
