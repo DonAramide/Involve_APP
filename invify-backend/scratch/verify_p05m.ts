@@ -236,7 +236,7 @@ async function run() {
     try {
       const provider = await RoutingEngineService.selectOptimalProvider({
         requiredCapability: 'supports_nip_transfer',
-        amount: 0
+        amount: 1000
       });
       if (provider === 'PROVIDUS') routeSuccess = true;
     } catch (err: any) {
@@ -252,7 +252,7 @@ async function run() {
     try {
       await RoutingEngineService.selectOptimalProvider({
         requiredCapability: 'supports_nip_transfer',
-        amount: 0
+        amount: 1000
       });
     } catch (err: any) {
       if (err.message.includes('No available banking provider')) {
