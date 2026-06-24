@@ -2,7 +2,7 @@ import { supabaseAdmin } from '../db/supabase';
 
 export class RoutingEngineService {
   /**
-   * Selects the optimal provider based on health, latency, cost, capabilities, and liquidity limits.
+   * Selects the optimal provider based on health, latency, cost, capabilities, maintenance state, and daily capacity limits.
    */
   static async selectOptimalProvider(params: {
     requiredCapability: string;
@@ -33,9 +33,15 @@ export class RoutingEngineService {
       .from('provider_balance_snapshots')
       .select('*');
 
+    // 5. Fetch daily capacity limits
+    const { data: dailyLimits } = await supabaseAdmin
+      .from('provider_daily_limits')
+      .select('*');
+
     const healthMap = new Map(healths?.map(h => [h.provider, h]));
     const costMap = new Map(costs?.map(c => [c.provider, c]));
     const balanceMap = new Map(balances?.map(b => [b.provider, b]));
+    const limitMap = new Map(dailyLimits?.map(l => [l.provider, l]));
 
     const scoredProviders = caps
       .filter((c: any) => {
@@ -43,9 +49,10 @@ export class RoutingEngineService {
         if (!c[params.requiredCapability]) return false;
 
         const health = healthMap.get(c.provider);
-        // Circuit breaker check (exclude OPEN)
+        // Circuit breaker and maintenance mode check
         if (health && health.circuit_state === 'OPEN') return false;
         if (health && !health.is_active) return false;
+        if (health && health.maintenance_mode) return false;
 
         const balance = balanceMap.get(c.provider);
         // Liquidity check
@@ -55,6 +62,10 @@ export class RoutingEngineService {
         // Limit checks
         if (cost && params.amount < Number(cost.min_transfer_limit)) return false;
         if (cost && params.amount > Number(cost.max_transfer_limit)) return false;
+
+        const limit = limitMap.get(c.provider);
+        // Daily limit check
+        if (limit && Number(limit.remaining_capacity) < params.amount) return false;
 
         return true;
       })

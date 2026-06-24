@@ -1,16 +1,21 @@
 -- ============================================================================
--- Phase 2C Staging DDL Migration Package
+-- Phase 2C Staging DDL Migration Package (Hardened Gates)
 -- Banking Execution Layer
 -- ============================================================================
 
 BEGIN;
 
 -- Drop existing tables to allow safe execution loop
+DROP TABLE IF EXISTS public.provider_daily_limits CASCADE;
 DROP TABLE IF EXISTS public.provider_balance_snapshots CASCADE;
 DROP TABLE IF EXISTS public.provider_clearing_profiles CASCADE;
 DROP TABLE IF EXISTS public.provider_capabilities CASCADE;
 
--- 1. Provider Capability Registry
+-- 1. Alter provider_health_registry to add maintenance_mode
+ALTER TABLE public.provider_health_registry 
+    ADD COLUMN IF NOT EXISTS maintenance_mode BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- 2. Provider Capability Registry
 CREATE TABLE public.provider_capabilities (
     provider                    public.banking_provider_enum PRIMARY KEY,
     supports_virtual_accounts   BOOLEAN NOT NULL DEFAULT false,
@@ -21,7 +26,7 @@ CREATE TABLE public.provider_capabilities (
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 2. Provider Clearing & Fee Profiles
+-- 3. Provider Clearing & Fee Profiles
 CREATE TABLE public.provider_clearing_profiles (
     provider                    public.banking_provider_enum PRIMARY KEY REFERENCES public.provider_capabilities(provider) ON DELETE CASCADE,
     transfer_fee_flat           NUMERIC(15,2) NOT NULL DEFAULT 0.00 CHECK (transfer_fee_flat >= 0),
@@ -31,7 +36,7 @@ CREATE TABLE public.provider_clearing_profiles (
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 3. Provider Dynamic Liquidity Balance snapshots
+-- 4. Provider Dynamic Liquidity Balance snapshots
 CREATE TABLE public.provider_balance_snapshots (
     provider                    public.banking_provider_enum PRIMARY KEY REFERENCES public.provider_capabilities(provider) ON DELETE CASCADE,
     available_balance           NUMERIC(15,2) NOT NULL DEFAULT 0.00 CHECK (available_balance >= 0),
@@ -39,7 +44,18 @@ CREATE TABLE public.provider_balance_snapshots (
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 4. Seed default capacities, pricing, and balances for all 4 gateways
+-- 5. Provider Daily Limits Registry
+CREATE TABLE public.provider_daily_limits (
+    provider                    public.banking_provider_enum PRIMARY KEY REFERENCES public.provider_capabilities(provider) ON DELETE CASCADE,
+    daily_limit                 NUMERIC(15,2) NOT NULL DEFAULT 0.00 CHECK (daily_limit >= 0),
+    consumed_today              NUMERIC(15,2) NOT NULL DEFAULT 0.00 CHECK (consumed_today >= 0),
+    remaining_capacity          NUMERIC(15,2) NOT NULL DEFAULT 0.00 CHECK (remaining_capacity >= 0),
+    reset_at                    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    
+    CONSTRAINT chk_remaining_capacity CHECK (remaining_capacity = daily_limit - consumed_today)
+);
+
+-- Seed capacities, profiles, snapshots, and daily limits for all 4 gateways
 INSERT INTO public.provider_capabilities (provider, supports_virtual_accounts, supports_name_enquiry, supports_nip_transfer, supports_bulk_transfer, supports_webhooks)
 VALUES 
     ('PROVIDUS', true, true, true, false, true),
@@ -72,5 +88,15 @@ VALUES
     ('FLUTTERWAVE', 2000000.00, 'NGN')
 ON CONFLICT (provider) DO UPDATE 
 SET available_balance = EXCLUDED.available_balance;
+
+INSERT INTO public.provider_daily_limits (provider, daily_limit, consumed_today, remaining_capacity)
+VALUES
+    ('PROVIDUS', 10000000.00, 0.00, 10000000.00),
+    ('WEMA', 10000000.00, 0.00, 10000000.00),
+    ('PAYSTACK', 5000000.00, 0.00, 5000000.00),
+    ('FLUTTERWAVE', 5000000.00, 0.00, 5000000.00)
+ON CONFLICT (provider) DO UPDATE 
+SET daily_limit = EXCLUDED.daily_limit,
+    remaining_capacity = EXCLUDED.remaining_capacity;
 
 COMMIT;
