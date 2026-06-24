@@ -47,6 +47,29 @@ async function run() {
       tenant_id: testTenantId
     });
 
+    // Re-seed staging configs for tests
+    await supabaseAdmin.from('provider_environments').insert({
+      provider: 'PROVIDUS',
+      environment: 'staging',
+      base_url: 'https://api-staging.providusbank.com',
+      is_active: true,
+      supports_live_funds: false
+    });
+
+    const { data: seededCert } = await supabaseAdmin.from('provider_certifications').insert({
+      provider: 'PROVIDUS',
+      environment: 'staging',
+      capability: 'TRANSFER',
+      certification_status: 'PENDING'
+    }).select().single();
+
+    const { data: health } = await supabaseAdmin.from('provider_capability_health').insert({
+      provider: 'PROVIDUS',
+      environment: 'staging',
+      capability: 'TRANSFER',
+      status: 'HEALTHY'
+    }).select().single();
+
     // ----------------------------------------------------
     // CHECK 1: Provider Environment Resolution
     // ----------------------------------------------------
@@ -70,14 +93,6 @@ async function run() {
     // CHECK 2: Capability Certification Defaults Validation
     // ----------------------------------------------------
     console.log('\n2. Verifying Certification Default PENDING State...');
-    const { data: seededCert } = await supabaseAdmin
-      .from('provider_certifications')
-      .select('*')
-      .eq('provider', 'PROVIDUS')
-      .eq('environment', 'staging')
-      .eq('capability', 'TRANSFER')
-      .single();
-
     if (seededCert && seededCert.certification_status === 'PENDING') {
       console.log('  ✅ Providus cert successfully initialized in PENDING state.');
       results['certified_capability_validation'] = 'PASS';
@@ -99,7 +114,6 @@ async function run() {
     }).eq('id', seededCert.id);
 
     // Setup health register as HEALTHY
-    const { data: health } = await supabaseAdmin.from('provider_capability_health').select('*').eq('provider', 'PROVIDUS').eq('environment', 'staging').eq('capability', 'TRANSFER').single();
     const canRouteCertified = seededCert && health && health.status === 'HEALTHY';
 
     if (!canRoutePending && canRouteCertified) {
