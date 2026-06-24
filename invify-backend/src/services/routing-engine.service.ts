@@ -54,18 +54,21 @@ export class RoutingEngineService {
         if (health && !health.is_active) return false;
         if (health && health.maintenance_mode) return false;
 
-        const balance = balanceMap.get(c.provider);
-        // Liquidity check
-        if (balance && Number(balance.available_balance) < params.amount) return false;
+        // Transaction limits only apply to active money movement routing (NIP / Bulk transfers)
+        if (params.requiredCapability === 'supports_nip_transfer' || params.requiredCapability === 'supports_bulk_transfer') {
+          const balance = balanceMap.get(c.provider);
+          // Liquidity check
+          if (balance && Number(balance.available_balance) < params.amount) return false;
 
-        const cost = costMap.get(c.provider);
-        // Limit checks
-        if (cost && params.amount < Number(cost.min_transfer_limit)) return false;
-        if (cost && params.amount > Number(cost.max_transfer_limit)) return false;
+          const cost = costMap.get(c.provider);
+          // Limit checks
+          if (cost && params.amount < Number(cost.min_transfer_limit)) return false;
+          if (cost && params.amount > Number(cost.max_transfer_limit)) return false;
 
-        const limit = limitMap.get(c.provider);
-        // Daily limit check
-        if (limit && Number(limit.remaining_capacity) < params.amount) return false;
+          const limit = limitMap.get(c.provider);
+          // Daily limit check
+          if (limit && Number(limit.remaining_capacity) < params.amount) return false;
+        }
 
         return true;
       })
