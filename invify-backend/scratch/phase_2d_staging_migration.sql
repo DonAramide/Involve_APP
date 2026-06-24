@@ -1,11 +1,12 @@
 -- ============================================================================
--- Phase 2D Staging DDL Migration Package (Hardened Connectivity V4)
+-- Phase 2D Staging DDL Migration Package (Hardened Connectivity V6)
 -- Real Banking Connectivity Layer
 -- ============================================================================
 
 BEGIN;
 
--- Drop existing tables to allow safe execution loop
+-- Drop existing functions/tables to allow safe execution loop
+DROP FUNCTION IF EXISTS public.is_provider_capability_eligible(public.banking_provider_enum, VARCHAR, public.provider_capability_enum) CASCADE;
 DROP TABLE IF EXISTS public.quasar_verification_results CASCADE;
 DROP TABLE IF EXISTS public.provider_api_audit_logs CASCADE;
 DROP TABLE IF EXISTS public.provider_capability_health CASCADE;
@@ -21,6 +22,26 @@ BEGIN
         CREATE TYPE public.capability_status_enum AS ENUM ('HEALTHY', 'DEGRADED', 'UNAVAILABLE');
     END IF;
 END$$;
+
+-- Ensure quasar_verification_requests table has required columns if it exists, or create baseline table
+CREATE TABLE IF NOT EXISTS public.quasar_verification_requests (
+    id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    withdrawal_id               UUID NOT NULL,
+    signed_token                TEXT NOT NULL,
+    nonce                       VARCHAR(100) NOT NULL,
+    expires_at                  TIMESTAMPTZ NOT NULL,
+    verification_status         VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+    tenant_id                   UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    financial_event_id          UUID REFERENCES public.financial_events(id) ON DELETE SET NULL,
+    verification_hash           VARCHAR(64),
+    created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Safely extend if already exists
+ALTER TABLE public.quasar_verification_requests 
+    ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
+    ADD COLUMN IF NOT EXISTS financial_event_id UUID REFERENCES public.financial_events(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS verification_hash VARCHAR(64);
 
 -- 2. Provider Environment Registry
 CREATE TABLE public.provider_environments (
@@ -127,6 +148,38 @@ CREATE TABLE public.quasar_verification_results (
 
 -- Operational index for quasar_verification_results
 CREATE INDEX idx_quasar_verification_results_verified_at ON public.quasar_verification_results (verified_at DESC);
+
+-- 9. Eligibility Helper Function
+CREATE OR REPLACE FUNCTION public.is_provider_capability_eligible(
+    p_provider public.banking_provider_enum,
+    p_environment VARCHAR(50),
+    p_capability public.provider_capability_enum
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_eligible BOOLEAN := FALSE;
+BEGIN
+    SELECT EXISTS (
+        SELECT 1
+        FROM public.provider_environments pe
+        JOIN public.provider_certifications pc 
+            ON pe.provider = pc.provider AND pe.environment = pc.environment
+        JOIN public.provider_capability_health pch 
+            ON pe.provider = pch.provider AND pe.environment = pch.environment AND pc.capability = pch.capability
+        WHERE pe.provider = p_provider
+          AND pe.environment = p_environment
+          AND pc.capability = p_capability
+          AND pe.is_active = TRUE
+          AND pc.certification_status = 'CERTIFIED'
+          AND pch.status = 'HEALTHY'
+    ) INTO v_eligible;
+    
+    RETURN v_eligible;
+END;
+$$;
 
 -- Seed default environments and baseline certified registry items in PENDING state
 INSERT INTO public.provider_environments (provider, environment, base_url, is_active, supports_live_funds)
