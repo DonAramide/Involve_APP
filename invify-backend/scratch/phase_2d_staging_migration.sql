@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 2D Staging DDL Migration Package (Hardened Connectivity V7)
+-- Phase 2D Staging DDL Migration Package (Hardened Connectivity V8)
 -- Real Banking Connectivity Layer
 -- ============================================================================
 
@@ -18,6 +18,15 @@ DROP TABLE IF EXISTS public.provider_environments CASCADE;
 -- 1. Create Enums Safely
 DO $$
 BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'banking_provider_enum') THEN
+        CREATE TYPE public.banking_provider_enum AS ENUM ('PROVIDUS', 'WEMA', 'PAYSTACK', 'FLUTTERWAVE');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'provider_capability_enum') THEN
+        CREATE TYPE public.provider_capability_enum AS ENUM ('VIRTUAL_ACCOUNT', 'NAME_ENQUIRY', 'TRANSFER');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'certification_status_enum') THEN
+        CREATE TYPE public.certification_status_enum AS ENUM ('PENDING', 'CERTIFIED', 'FAILED');
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'capability_status_enum') THEN
         CREATE TYPE public.capability_status_enum AS ENUM ('HEALTHY', 'DEGRADED', 'UNAVAILABLE');
     END IF;
@@ -42,6 +51,7 @@ ALTER TABLE public.quasar_verification_requests
     ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     ADD COLUMN IF NOT EXISTS financial_event_id UUID REFERENCES public.financial_events(id) ON DELETE SET NULL,
     ADD COLUMN IF NOT EXISTS verification_hash VARCHAR(64),
+    DROP CONSTRAINT IF EXISTS uq_quasar_verification_requests_nonce,
     ADD CONSTRAINT uq_quasar_verification_requests_nonce UNIQUE (nonce);
 
 -- 2. Provider Environment Registry
@@ -166,23 +176,6 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_eligible BOOLEAN := FALSE;
-BEGIN
-    SELECT EXISTS (
-        SELECT 1
-        FROM public.provider_environments pe
-        JOIN public.provider_certifications pc 
-            ON pe.provider = pc.provider AND pe.environment = pc.environment
-        JOIN public.provider_capability_health pch 
-            ON pe.provider = pch.provider AND pe.environment = pch.environment AND pc.capability = pch.capability
-        WHERE pe.provider = p_provider
-          AND pe.environment = p_environment
-          AND pc.capability = p_capability
-          AND pe.is_active = TRUE
-          AND pc.certification_status = 'CERTIFIED'
-          AND pch.status = 'HEALTHY'
-    ) INTO v_eligible;
-    
-    RETURN v_eligible;
 END;
 $$;
 
