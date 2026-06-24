@@ -8,6 +8,7 @@ export class RoutingEngineService {
     requiredCapability: string;
     amount: number;
     preferredProvider?: string;
+    excludeProviders?: string[];
   }): Promise<string> {
     // 1. Fetch capability list
     const { data: caps } = await supabaseAdmin
@@ -45,6 +46,9 @@ export class RoutingEngineService {
 
     const scoredProviders = caps
       .filter((c: any) => {
+        // Exclude list check
+        if (params.excludeProviders && params.excludeProviders.includes(c.provider)) return false;
+
         // Capability check
         if (!c[params.requiredCapability]) return false;
 

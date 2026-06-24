@@ -57,10 +57,13 @@ export class TransferOrchestrator {
     }
 
     try {
+      const excludeList: string[] = [];
+
       // 2. Select initial optimal provider
       let provider = await RoutingEngineService.selectOptimalProvider({
         requiredCapability: 'supports_nip_transfer',
-        amount: params.amount
+        amount: params.amount,
+        excludeProviders: excludeList
       });
 
       // 3. Register baseline financial event
@@ -145,6 +148,9 @@ export class TransferOrchestrator {
             .eq('transfer_log_id', log.id)
             .eq('attempt_number', attemptNumber);
 
+          // Add to exclusions to prevent loop trap
+          excludeList.push(currentProvider);
+
           // Trip health evaluations
           await supabaseAdmin.rpc('evaluate_provider_health', {
             p_provider: currentProvider,
@@ -158,7 +164,8 @@ export class TransferOrchestrator {
             try {
               currentProvider = await RoutingEngineService.selectOptimalProvider({
                 requiredCapability: 'supports_nip_transfer',
-                amount: params.amount
+                amount: params.amount,
+                excludeProviders: excludeList
               });
               
               // Switch provider on transfer log
