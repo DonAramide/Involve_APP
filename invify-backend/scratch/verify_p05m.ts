@@ -48,33 +48,42 @@ async function run() {
     });
 
     // Re-seed staging configs for tests
-    await supabaseAdmin.from('provider_environments').insert({
+    const { error: envErr } = await supabaseAdmin.from('provider_environments').insert({
       provider: 'PROVIDUS',
       environment: 'staging',
       base_url: 'https://api-staging.providusbank.com',
       is_active: true,
       supports_live_funds: false
     });
+    if (envErr) {
+      throw new Error(`Failed to seed provider_environments. Did you apply phase_2d_staging_migration.sql? Message: ${envErr.message}`);
+    }
 
-    const { data: seededCert } = await supabaseAdmin.from('provider_certifications').insert({
+    const { data: seededCert, error: certInsertErr } = await supabaseAdmin.from('provider_certifications').insert({
       provider: 'PROVIDUS',
       environment: 'staging',
       capability: 'TRANSFER',
       certification_status: 'PENDING'
     }).select().single();
+    if (certInsertErr || !seededCert) {
+      throw new Error(`Failed to seed provider_certifications: ${certInsertErr?.message}`);
+    }
 
-    const { data: health } = await supabaseAdmin.from('provider_capability_health').insert({
+    const { data: health, error: healthInsertErr } = await supabaseAdmin.from('provider_capability_health').insert({
       provider: 'PROVIDUS',
       environment: 'staging',
       capability: 'TRANSFER',
       status: 'HEALTHY'
     }).select().single();
+    if (healthInsertErr || !health) {
+      throw new Error(`Failed to seed provider_capability_health: ${healthInsertErr?.message}`);
+    }
 
     // ----------------------------------------------------
     // CHECK 1: Provider Environment Resolution
     // ----------------------------------------------------
     console.log('1. Verifying Provider Environment Resolution...');
-    const { data: env } = await supabaseAdmin.from('provider_environments').insert({
+    const { data: envRes, error: envResErr } = await supabaseAdmin.from('provider_environments').insert({
       provider: 'PROVIDUS',
       environment: 'production',
       base_url: 'https://api.providusbank.com',
@@ -82,7 +91,7 @@ async function run() {
       supports_live_funds: true
     }).select().single();
 
-    if (env && env.supports_live_funds === true) {
+    if (envRes && envRes.supports_live_funds === true && !envResErr) {
       console.log('  ✅ Provider environment registry resolved.');
       results['provider_environment_resolution'] = 'PASS';
     } else {
