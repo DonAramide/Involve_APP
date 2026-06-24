@@ -1,5 +1,5 @@
 -- ============================================================================
--- Phase 2D Staging DDL Migration Package (Hardened Connectivity V6)
+-- Phase 2D Staging DDL Migration Package (Hardened Connectivity V7)
 -- Real Banking Connectivity Layer
 -- ============================================================================
 
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS public.quasar_verification_requests (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     withdrawal_id               UUID NOT NULL,
     signed_token                TEXT NOT NULL,
-    nonce                       VARCHAR(100) NOT NULL,
+    nonce                       VARCHAR(100) NOT NULL UNIQUE,
     expires_at                  TIMESTAMPTZ NOT NULL,
     verification_status         VARCHAR(50) NOT NULL DEFAULT 'PENDING',
     tenant_id                   UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -41,13 +41,14 @@ CREATE TABLE IF NOT EXISTS public.quasar_verification_requests (
 ALTER TABLE public.quasar_verification_requests 
     ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
     ADD COLUMN IF NOT EXISTS financial_event_id UUID REFERENCES public.financial_events(id) ON DELETE SET NULL,
-    ADD COLUMN IF NOT EXISTS verification_hash VARCHAR(64);
+    ADD COLUMN IF NOT EXISTS verification_hash VARCHAR(64),
+    ADD CONSTRAINT uq_quasar_verification_requests_nonce UNIQUE (nonce);
 
 -- 2. Provider Environment Registry
 CREATE TABLE public.provider_environments (
     id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     provider                    public.banking_provider_enum NOT NULL,
-    environment                 VARCHAR(50) NOT NULL DEFAULT 'staging',
+    environment                 VARCHAR(50) NOT NULL DEFAULT 'staging' CHECK (environment IN ('staging', 'production', 'sandbox')),
     base_url                    VARCHAR(255) NOT NULL,
     is_active                   BOOLEAN NOT NULL DEFAULT true,
     supports_live_funds         BOOLEAN NOT NULL DEFAULT false,
@@ -66,7 +67,8 @@ CREATE TABLE public.banks (
     effective_to                TIMESTAMPTZ,
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
     
-    CONSTRAINT uq_bank_code_version UNIQUE (nip_bank_code, version)
+    CONSTRAINT uq_bank_code_version UNIQUE (nip_bank_code, version),
+    CONSTRAINT chk_banks_effective_dates CHECK (effective_to IS NULL OR effective_to > effective_from)
 );
 
 -- Enforce bank version integrity: Only one active bank version may exist where effective_to IS NULL
@@ -84,6 +86,9 @@ CREATE TABLE public.provider_bank_mappings (
     
     CONSTRAINT uq_provider_bank_map UNIQUE (bank_id, provider)
 );
+
+-- Operational index for provider_bank_mappings
+CREATE INDEX idx_provider_bank_code ON public.provider_bank_mappings (provider, provider_bank_code);
 
 -- 5. Provider Capability Certification Registry
 CREATE TABLE public.provider_certifications (
@@ -123,7 +128,7 @@ CREATE TABLE public.provider_api_audit_logs (
     request_hash                VARCHAR(64) NOT NULL,
     response_hash               VARCHAR(64) NOT NULL,
     status_code                 INTEGER NOT NULL,
-    latency_ms                  INTEGER NOT NULL,
+    latency_ms                  INTEGER NOT NULL CHECK (latency_ms >= 0),
     request_type                VARCHAR(50) NOT NULL CHECK (request_type IN ('NAME_ENQUIRY', 'TRANSFER', 'WEBHOOK', 'VA_CREATION', 'TRANSFER_STATUS', 'SETTLEMENT_IMPORT')),
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
