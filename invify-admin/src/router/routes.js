@@ -106,6 +106,11 @@ const routes = [
         meta: { title: 'Agent Governance', workspace: 'admin', permission: 'admin_agent_management', requiresAuth: true }
       },
       { 
+        path: 'admin/certifications', 
+        component: () => import('pages/admin/certifications/CertificationCenterPage.vue'),
+        meta: { title: 'Certification Center', workspace: 'admin', permission: 'admin_deploy', requiresAuth: true, keywords: ['ledger', 'verification', 'sentinel', 'fee', 'reconciliation', 'check', 'dual control'] }
+      },
+      { 
         path: 'fleet/overview', 
         component: () => import('pages/fleet/FleetOverviewPage.vue'),
         meta: { title: 'Fleet Overview', workspace: 'fleet', permission: 'read_fleet', requiresAuth: true }
@@ -327,8 +332,8 @@ const routes = [
       { path: 'finance/compliance', component: () => import('pages/finance/ComplianceCenterPage.vue'), meta: { workspace: 'finance', title: 'Compliance Center', permission: 'admin_deploy', requiresAuth: true } },
       
       // Executive Command Center
-      { path: 'executive', component: () => import('pages/executive/ExecutiveCommandCenterPage.vue'), meta: { workspace: 'executive', title: 'Executive Command Center', permission: 'admin_deploy', requiresAuth: true } },
-      { path: 'executive/ai-insights', component: () => import('pages/executive/AIInsightsCenterPage.vue'), meta: { workspace: 'executive', title: 'AI Insights Center', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'executive', component: () => import('pages/executive/ExecutiveCommandCenterPage.vue'), meta: { workspace: 'ai', title: 'Executive Command Center', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'executive/ai-insights', component: () => import('pages/executive/AIInsightsCenterPage.vue'), meta: { workspace: 'ai', title: 'AI Insights Center', permission: 'admin_deploy', requiresAuth: true } },
       
       { path: 'apps/installed', component: () => import('pages/applications/InstalledApplicationsPage.vue'), meta: { workspace: 'apps', title: 'Installed Applications', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'apps/apk-deployment', component: () => import('pages/applications/APKDeploymentPage.vue'), meta: { workspace: 'apps', title: 'APK Fleet Deployment', permission: 'admin_deploy', requiresAuth: true } },

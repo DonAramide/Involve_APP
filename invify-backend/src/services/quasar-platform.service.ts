@@ -1,91 +1,70 @@
-import axios from 'axios';
-import * as dotenv from 'dotenv';
+// src/services/quasar-platform.service.ts
+/**
+ * @deprecated Use QuasarProvisioningService from '../integrations/quasar' instead.
+ *
+ * Retained for backward compatibility. All new code should import directly from
+ * the quasar integration layer:
+ *
+ *   import { QuasarProvisioningService } from '../integrations/quasar';
+ *
+ * This shim delegates to the new implementation.
+ */
 
-dotenv.config();
-
-const QUASAR_BASE_URL = process.env.QUASAR_BASE_URL || 'http://localhost:4000/api/v1';
+import { QuasarProvisioningService } from '../integrations/quasar/quasar-provisioning.service';
+import { QuasarPlatformClient } from '../integrations/quasar/quasar-platform.client';
 
 export class QuasarPlatformService {
+
+  /** @deprecated Use QuasarPlatformClient.resolveVertical() */
   static getClientCredentials(vertical: string) {
-    switch (vertical) {
-      case 'invify_school':
-        return {
-          clientId: process.env.INVIFY_SCHOOL_CLIENT_ID,
-          clientSecret: process.env.INVIFY_SCHOOL_CLIENT_SECRET,
-        };
-      case 'invify_services':
-        return {
-          clientId: process.env.INVIFY_SERVICES_CLIENT_ID,
-          clientSecret: process.env.INVIFY_SERVICES_CLIENT_SECRET,
-        };
-      case 'invify_retail':
-      default:
-        return {
-          clientId: process.env.INVIFY_RETAIL_CLIENT_ID,
-          clientSecret: process.env.INVIFY_RETAIL_CLIENT_SECRET,
-        };
+    // Kept for interface compatibility — actual credential resolution is in QuasarPlatformClient
+    const v = vertical as any;
+    if (v === 'invify_school') {
+      return {
+        clientId: process.env.INVIFY_SCHOOL_CLIENT_ID,
+        clientSecret: process.env.INVIFY_SCHOOL_CLIENT_SECRET,
+      };
+    } else if (v === 'invify_services') {
+      return {
+        clientId: process.env.INVIFY_SERVICES_CLIENT_ID,
+        clientSecret: process.env.INVIFY_SERVICES_CLIENT_SECRET,
+      };
+    } else {
+      return {
+        clientId: process.env.INVIFY_RETAIL_CLIENT_ID,
+        clientSecret: process.env.INVIFY_RETAIL_CLIENT_SECRET,
+      };
     }
   }
 
-  static async provisionTenant(tenant: any): Promise<{ tenantId: string; tenantSlug: string; sk_secret: string } | null> {
+  /**
+   * @deprecated Use QuasarProvisioningService.provisionMerchant() instead.
+   * This shim exists only for legacy callers. Idempotent.
+   */
+  static async provisionTenant(
+    tenant: { id: string; name: string; type?: string; slug?: string },
+  ): Promise<{ tenantId: string; tenantSlug: string; sk_secret: string } | null> {
     try {
-      const vertical = tenant.type === 'school' ? 'invify_school' : (tenant.type === 'services' ? 'invify_services' : 'invify_retail');
-      const { clientId, clientSecret } = this.getClientCredentials(vertical);
-
-      if (!clientId || !clientSecret) {
-        throw new Error('Missing Quasar Platform Credentials for vertical: ' + vertical);
-      }
-
-      // 1. Create Tenant
-      const slug = tenant.slug || `tenant-${tenant.id.substring(0, 8)}`;
-      const tenantPayload = {
-        name: tenant.name,
-        slug: slug,
-        vertical: vertical,
-        defaultCurrency: "NGN"
-      };
-
-      const tenantResponse = await axios.post(`${QUASAR_BASE_URL}/integration/platform/tenants`, tenantPayload, {
-        headers: {
-          'X-Quasar-Client-Id': clientId,
-          'X-Quasar-Client-Secret': clientSecret,
-          'Content-Type': 'application/json'
-        }
+      const result = await QuasarProvisioningService.provisionMerchant({
+        invifyTenantId: tenant.id,
+        tenantName: tenant.name,
+        tenantType: tenant.type ?? 'retail',
       });
 
-      const quasarTenantId = tenantResponse.data?.data?.data?.id || tenantResponse.data?.data?.id;
+      // Retrieve the decrypted secret for legacy return contract
+      const { QuasarIntegrationStore } = await import('../integrations/quasar/quasar-integration.store');
+      const integration = await QuasarIntegrationStore.getByInvifyTenantId(tenant.id);
+      if (!integration) return null;
 
-      if (!quasarTenantId) {
-        throw new Error('Failed to extract Quasar Tenant ID from response');
-      }
-
-      // 2. Create API Key
-      const apiKeyPayload = {
-        name: `Invify MPOS - ${tenant.name}`,
-        environment: process.env.QUASAR_ENV || 'test'
-      };
-
-      const apiKeyResponse = await axios.post(`${QUASAR_BASE_URL}/integration/platform/tenants/${quasarTenantId}/api-keys`, apiKeyPayload, {
-        headers: {
-          'X-Quasar-Client-Id': clientId,
-          'X-Quasar-Client-Secret': clientSecret,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      const sk_secret = apiKeyResponse.data?.data?.secretKey;
-
-      if (!sk_secret) {
-        throw new Error('Failed to extract Quasar Secret Key from response');
-      }
+      const sk_secret = QuasarIntegrationStore.decryptSkSecret(integration);
 
       return {
-        tenantId: quasarTenantId,
-        tenantSlug: slug,
-        sk_secret: sk_secret
+        tenantId: result.quasarTenantId,
+        tenantSlug: result.quasarTenantSlug,
+        sk_secret,
       };
     } catch (error: any) {
-      console.error('[QuasarPlatformService] Provisioning failed:', error?.response?.data || error.message);
+      console.error('[QuasarPlatformService] provisionTenant (legacy shim) failed:', error.message);
       return null;
     }
   }

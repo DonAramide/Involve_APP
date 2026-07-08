@@ -1,191 +1,242 @@
 // src/services/reconciliation.service.ts
 import { supabase } from '../db/supabase';
+import { GovAuditService } from './gov-audit.service';
+import crypto from 'crypto';
 
-export interface ReconciliationResult {
-  matchedPayments: any[];
-  unmatchedPayments: any[];
-  failedPayments: any[];
-  discrepancies: any[];
-}
-
-/**
- * ReconciliationService ensures the operational integrity of the financial system.
- * It compares external intent logs with internal ledger entries.
- */
 export class ReconciliationService {
   
-  /**
-   * Generates a paginated reconciliation report with summary stats.
-   */
-  static async getReport(params: {
-    tenantId: string;
-    status?: 'matched' | 'unmatched' | 'issues';
-    page?: number;
-    limit?: number;
-  }) {
+  static async getReport(params: { tenantId: string; status?: string; page?: number; limit?: number; }) {
     const { tenantId, status, page = 1, limit = 50 } = params;
     const offset = (page - 1) * limit;
 
     try {
-      // 1. Fetch Logs and Ledgers for the tenant
-      const [{ data: logs }, { data: ledgers }] = await Promise.all([
-        supabase.from('transactions_log').select('*').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
-        supabase.from('ledgers').select('*').eq('tenant_id', tenantId)
-      ]);
+      // Fetch cases from DB (which will be populated by the migration/triggers eventually)
+      // Since we just ran a migration but there is no data in `reconciliation_cases` yet,
+      // we'll fetch from `reconciliation_cases`. If the table is empty, we return empty stats.
+      // We will also return a clean unified model.
+      const query = supabase
+        .from('reconciliation_cases')
+        .select('*', { count: 'exact' })
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false });
 
-      if (!logs || !ledgers) return { summary: { totalPayments: 0, matched: 0, unmatched: 0, issues: 0 }, data: [] };
-
-      // 2. Fetch Student Names for mapping
-      const studentIds = [...new Set(logs.map(l => l.wallet_id).filter(Boolean))];
-      const { data: students } = await supabase
-        .from('students')
-        .select('id, first_name, last_name')
-        .in('id', studentIds);
-      
-      const studentMap = new Map(students?.map(s => [s.id, `${s.first_name} ${s.last_name}`]) || []);
-
-      // 3. Process Reconciliation Logic
-      const ledgerMap = new Map(ledgers.map(l => [l.reference, l]));
-      const duplicateRefs = ledgers
-        .map(l => l.reference)
-        .filter((ref, i, arr) => arr.indexOf(ref) !== i);
-
-      let allResults: any[] = [];
-      let summary = { totalPayments: logs.length, matched: 0, unmatched: 0, issues: 0 };
-
-      for (const log of logs) {
-        const ledgerEntry = ledgerMap.get(log.reference);
-        const record = {
-          reference: log.reference,
-          amount: log.amount,
-          status: log.status,
-          studentId: log.wallet_id,
-          studentName: studentMap.get(log.wallet_id) || 'Unknown',
-          method: log.provider || 'quasar',
-          createdAt: log.created_at,
-          issueType: null as string | null
-        };
-
-        // Identification Logic
-        if (duplicateRefs.includes(log.reference)) {
-          record.issueType = 'duplicate_payment';
-        } else if (log.status === 'SUCCESS') {
-          if (ledgerEntry) {
-            if (Number(log.amount) !== Number((ledgerEntry as any).amount)) {
-              record.issueType = 'provider_mismatch';
-            } else {
-              summary.matched++;
-            }
-          } else {
-            record.issueType = 'unprocessed_webhook';
-          }
-        } else if (log.status === 'PENDING') {
-          const isOld = new Date().getTime() - new Date(log.created_at).getTime() > 24 * 60 * 60 * 1000;
-          if (isOld) record.issueType = 'stale_pending';
-        }
-
-        if (!log.wallet_id && log.status === 'SUCCESS' && !record.issueType) {
-           record.issueType = 'missing_student';
-        }
-
-        // Categorize for summary
-        if (record.issueType) {
-          if (['duplicate_payment', 'provider_mismatch'].includes(record.issueType)) {
-            summary.issues++;
-          } else {
-            summary.unmatched++;
-          }
-        }
-
-        allResults.push(record);
+      if (status && status !== 'all') {
+        query.eq('status', status.toUpperCase());
       }
 
-      // 4. Apply Status Filter
-      let filtered = allResults;
-      if (status === 'matched') filtered = allResults.filter(r => !r.issueType);
-      else if (status === 'unmatched') filtered = allResults.filter(r => r.issueType && !['duplicate_payment', 'provider_mismatch'].includes(r.issueType));
-      else if (status === 'issues') filtered = allResults.filter(r => ['duplicate_payment', 'provider_mismatch'].includes(r.issueType));
+      const { data, count, error } = await query.range(offset, offset + limit - 1);
 
-      // 5. Paginate
-      const paginatedData = filtered.slice(offset, offset + limit);
+      if (error && error.code !== '42P01') { // Ignore table not found if migration hasn't run
+        throw error;
+      }
+
+      const cases = data || [];
+
+      // Calculate summary stats dynamically
+      const { data: allStats, error: statsError } = await supabase
+        .from('reconciliation_cases')
+        .select('status, expected_amount, difference_amount')
+        .eq('tenant_id', tenantId);
+
+      let summary = {
+        totalPayments: 0,
+        matched: 0,
+        unmatched: 0,
+        issues: 0,
+        mismatchAmount: 0,
+        reconciliationRate: 100.0
+      };
+
+      if (!statsError && allStats) {
+        summary.totalPayments = allStats.length;
+        summary.matched = allStats.filter(c => c.status === 'MATCHED').length;
+        summary.unmatched = allStats.filter(c => c.status === 'PENDING').length;
+        summary.issues = allStats.filter(c => ['MISMATCH', 'FAILED', 'ESCALATED', 'INVESTIGATING'].includes(c.status)).length;
+        
+        allStats.filter(c => c.status === 'MISMATCH').forEach(c => {
+          summary.mismatchAmount += Math.abs(Number(c.difference_amount) || 0);
+        });
+
+        if (summary.totalPayments > 0) {
+          summary.reconciliationRate = Number(((summary.matched / summary.totalPayments) * 100).toFixed(1));
+        }
+      }
 
       return {
         summary,
-        data: paginatedData
+        data: cases.map(c => ({
+          id: c.case_number,
+          txnId: c.transaction_reference,
+          ledgerBatchId: c.ledger_batch_id,
+          expectedAmount: c.expected_amount,
+          actualAmount: c.actual_amount,
+          difference: c.difference_amount,
+          status: c.status,
+          riskScore: c.risk_score,
+          createdDate: c.created_at
+        })),
+        pagination: {
+          total: count || 0,
+          page,
+          limit
+        }
       };
-
-    } catch (error) {
-      console.error('[ReconciliationService] Report failed:', error);
+    } catch (error: any) {
+      console.error('[ReconciliationService] getReport error:', error);
       throw error;
     }
   }
 
-  /**
-   * Manually patches a transaction by assigning it to a student.
-   */
-  static async fixMissingStudent(reference: string, walletId: string) {
-    const { data, error } = await supabase
-      .from('transactions_log')
-      .update({ wallet_id: walletId })
-      .eq('reference', reference)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+  // ==== Detail Subtabs ====
+  
+  static async getDetails(caseNumber: string) {
+    const { data } = await supabase.from('reconciliation_cases').select('*').eq('case_number', caseNumber).single();
+    if (!data) throw new Error('Reconciliation case not found');
+    return {
+      overview: {
+        expectedAmount: data.expected_amount,
+        actualAmount: data.actual_amount,
+        difference: data.difference_amount,
+        priority: data.severity === 'CRITICAL' ? 'High' : 'Normal',
+        riskRating: data.risk_score > 80 ? 'Elevated' : 'Standard',
+        assignedTo: data.assigned_to || 'Unassigned',
+      },
+      flow: {
+        origin: data.wallet_id || data.card_id || 'Unknown Source',
+        provider: data.provider_reference ? 'Payment Gateway' : 'System',
+        target: data.ledger_batch_id ? 'Master Ledger' : 'Pending'
+      }
+    };
   }
 
-  /**
-   * Assigns a payment to a specific student and triggers immediate reconciliation.
-   */
-  static async assignPaymentToStudent(reference: string, studentId: string) {
-    // 1. Update the transaction log
-    const { data: tx, error: updateError } = await supabase
-      .from('transactions_log')
-      .update({ wallet_id: studentId })
-      .eq('reference', reference)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
-
-    // 2. If it was already successful, try to re-process it now that we have a student
-    if (tx.status === 'SUCCESS') {
-      await ReconciliationService.retryReconciliation(reference);
+  static async getLedger(caseNumber: string) {
+    const { data: recon } = await supabase.from('reconciliation_cases').select('transaction_reference').eq('case_number', caseNumber).single();
+    if (!recon) throw new Error('Case not found');
+    const { data: ledgers } = await supabase.from('ledgers').select('*').eq('reference', recon.transaction_reference);
+    if (!ledgers || ledgers.length === 0) {
+      return { status: 'NO_DATA', message: 'No associated ledger entries found.' };
     }
-
-    return tx;
+    return { status: 'OK', data: ledgers };
   }
 
-  /**
-   * Retries the reconciliation for a transaction.
-   * If status is SUCCESS but no ledger entry exists, it re-runs the credit logic.
-   */
-  static async retryReconciliation(reference: string) {
-    const { data: tx } = await supabase
-      .from('transactions_log')
+  static async getSettlement(caseNumber: string) {
+    const { data: recon } = await supabase.from('reconciliation_cases').select('settlement_batch_id').eq('case_number', caseNumber).single();
+    if (!recon?.settlement_batch_id) {
+      return { status: 'NOT_CONFIGURED', message: 'Settlement matching not yet configured for this flow.' };
+    }
+    return { status: 'OK', data: { batchId: recon.settlement_batch_id } };
+  }
+
+  static async getWallet(caseNumber: string) {
+    return { status: 'NOT_CONFIGURED', message: 'Wallet telemetry subtab not yet configured.' };
+  }
+
+  static async getCard(caseNumber: string) {
+    return { status: 'NOT_CONFIGURED', message: 'Card Network integration not yet configured.' };
+  }
+
+  static async getBank(caseNumber: string) {
+    return { status: 'NOT_CONFIGURED', message: 'Direct bank node integration not yet configured.' };
+  }
+
+  static async getAudit(caseNumber: string) {
+    const { data } = await supabase
+      .from('audit_logs')
       .select('*')
-      .eq('reference', reference)
-      .single();
+      .eq('target', caseNumber)
+      .order('timestamp', { ascending: false });
+    
+    return { status: 'OK', data: data || [] };
+  }
 
-    if (!tx || tx.status !== 'SUCCESS' || !tx.wallet_id) {
-      throw new Error('Transaction not eligible for auto-retry. Must be SUCCESS and have a Student ID.');
+  static async getTimeline(caseNumber: string) {
+    const { data: recon } = await supabase.from('reconciliation_cases').select('id').eq('case_number', caseNumber).single();
+    if (!recon) throw new Error('Case not found');
+    
+    const { data: timeline } = await supabase
+      .from('reconciliation_timeline')
+      .select('*')
+      .eq('case_id', recon.id)
+      .order('timestamp', { ascending: true });
+    
+    if (!timeline || timeline.length === 0) {
+      return { status: 'NO_DATA', message: 'No timeline events found.' };
+    }
+    return { status: 'OK', data: timeline };
+  }
+
+  // ==== Commands ====
+
+  static async executeCommand(caseNumber: string, command: string, payload: any, user: any) {
+    const { data: recon } = await supabase.from('reconciliation_cases').select('*').eq('case_number', caseNumber).single();
+    if (!recon) throw new Error('Reconciliation case not found');
+
+    const previousStatus = recon.status;
+    let newStatus = previousStatus;
+    let updateData: any = { updated_at: new Date().toISOString() };
+
+    switch (command) {
+      case 'ASSIGN':
+        updateData.assigned_to = payload.assigneeId;
+        updateData.status = 'INVESTIGATING';
+        newStatus = 'INVESTIGATING';
+        break;
+      case 'ESCALATE':
+        updateData.status = 'ESCALATED';
+        updateData.severity = 'CRITICAL';
+        newStatus = 'ESCALATED';
+        break;
+      case 'RESOLVE':
+      case 'FORCE_MATCH':
+        updateData.status = 'MATCHED';
+        updateData.resolved_by = user.id || null;
+        updateData.resolved_at = new Date().toISOString();
+        newStatus = 'MATCHED';
+        break;
+      case 'RETRY':
+        updateData.status = 'PENDING';
+        newStatus = 'PENDING';
+        // A real system would trigger an async job here
+        break;
+      case 'LOCK':
+        updateData.fraud_flags = [...(recon.fraud_flags || []), 'ADMIN_LOCKED'];
+        break;
+      case 'UNLOCK':
+        updateData.fraud_flags = (recon.fraud_flags || []).filter((f: string) => f !== 'ADMIN_LOCKED');
+        break;
+      default:
+        throw new Error('Unknown command');
     }
 
-    // Check if ledger already exists
-    const { data: existingLedger } = await supabase
-      .from('ledgers')
-      .select('id')
-      .eq('reference', reference)
-      .maybeSingle();
+    // Update DB
+    const { error } = await supabase.from('reconciliation_cases').update(updateData).eq('case_number', caseNumber);
+    if (error) throw error;
 
-    if (existingLedger) {
-      return { status: 'already_reconciled' };
-    }
+    // Log to Audit
+    const correlationId = crypto.randomUUID();
+    await GovAuditService.logAction({
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      module: 'FINANCIAL',
+      action: `RECONCILIATION_${command}`,
+      user_email: user.email || 'system@invify.app',
+      user_name: user.name || 'System',
+      ip_address: payload.ip || '0.0.0.0',
+      location: 'System',
+      target: caseNumber,
+      status: 'success',
+      metadata: {
+        correlationId,
+        previousStatus,
+        newStatus,
+        reason: payload.reason || 'Admin Command Execution',
+        permissionUsed: `reconciliation.${command.toLowerCase()}`
+      }
+    });
 
-    // Re-trigger the logic (Normally we'd call the WebhookController logic or a shared helper)
-    // For now, we emit a signal or perform the ledger write directly if safe.
-    // I'll use a direct approach for simplicity here, assuming ledger_service is robust.
-    return { status: 'retry_initiated', reference };
+    // We can broadcast WebSocket updates using the central controller if available, 
+    // or return the new state to the client which updates optimistically.
+
+    return { success: true, caseNumber, newStatus, correlationId };
   }
 }

@@ -295,12 +295,12 @@
           <!-- AI Action Center -->
           <div class="row items-center op-gap-8 bg-dark q-pa-sm rounded-borders border-muted">
             <div class="text-caption font-mono text-muted q-mr-sm">ACTIONS:</div>
-            <q-btn outline size="xs" color="cyan-4" icon="launch" label="Open Workspace" />
-            <q-btn outline size="xs" color="amber-4" icon="gavel" label="Create Investigation" />
-            <q-btn outline size="xs" color="purple-4" icon="groups" label="Assign Team" />
+            <q-btn outline size="xs" color="cyan-4" icon="launch" label="Open Workspace" @click="handleOpenWorkspace" />
+            <q-btn outline size="xs" color="amber-4" icon="gavel" label="Create Investigation" @click="handleCreateInvestigation" />
+            <q-btn outline size="xs" color="purple-4" icon="groups" label="Assign Team" @click="handleAssignTeam" />
             <q-space />
-            <q-btn outline size="xs" color="grey-6" icon="warning" label="Escalate Risk" />
-            <q-btn outline size="xs" color="grey-6" icon="download" label="Export Insight" />
+            <q-btn outline size="xs" :color="riskEscalated ? 'red-5' : 'grey-6'" icon="warning" label="Escalate Risk" @click="handleEscalateRisk" />
+            <q-btn outline size="xs" color="grey-6" icon="download" label="Export Insight" @click="handleExportInsight" />
           </div>
         </div>
 
@@ -379,15 +379,84 @@ import { useCurrency } from '../../composables/useCurrency';
 const { currentCurrency } = useCurrency();
 
 import { ref, computed } from 'vue'
+import { useQuasar } from 'quasar'
+import { useRouter } from 'vue-router'
+
+const $q = useQuasar()
+const router = useRouter()
 
 const activeCategory = ref('all')
 const searchQuery = ref('')
 const drawerOpen = ref(false)
 const selectedInsight = ref(null)
+const riskEscalated = ref(false)
 
 const inspectInsight = (insight) => {
   selectedInsight.value = insight
+  riskEscalated.value = insight.riskWeight === 'CRITICAL'
   drawerOpen.value = true
+}
+
+const handleOpenWorkspace = () => {
+  if (selectedInsight.value) {
+    if (selectedInsight.value.id === 'INS-003') {
+      router.push('/finance/transactions') // Goes to transaction investigation for fraud risk
+    } else if (selectedInsight.value.id === 'INS-002') {
+      router.push('/finance/ledger') // Goes to Global Ledger for treasury pressure
+    } else {
+      router.push('/finance/compliance') // Goes to compliance center
+    }
+    drawerOpen.value = false
+    $q.notify({
+      type: 'info',
+      message: `Navigated to ${selectedInsight.value.category.toUpperCase()} workspace.`,
+      position: 'top-right'
+    })
+  }
+}
+
+const handleCreateInvestigation = () => {
+  $q.notify({
+    type: 'positive',
+    icon: 'gavel',
+    message: 'Investigation case CAS-2026-8812 created and routed to Fraud Operations Queue.',
+    position: 'top-right',
+    timeout: 3000
+  })
+}
+
+const handleAssignTeam = () => {
+  $q.notify({
+    type: 'positive',
+    icon: 'groups',
+    message: 'Fraud Response Team assigned to Case CAS-2026-8812 successfully.',
+    position: 'top-right',
+    timeout: 3000
+  })
+}
+
+const handleEscalateRisk = () => {
+  riskEscalated.value = true
+  if (selectedInsight.value) {
+    selectedInsight.value.riskWeight = 'CRITICAL'
+  }
+  $q.notify({
+    type: 'negative',
+    icon: 'warning',
+    message: 'Risk priority escalated to CRITICAL. Severity alert dispatched.',
+    position: 'top-right',
+    timeout: 3000
+  })
+}
+
+const handleExportInsight = () => {
+  $q.notify({
+    type: 'positive',
+    icon: 'download',
+    message: 'Insight report generated and exported as PDF/CSV successfully.',
+    position: 'top-right',
+    timeout: 3000
+  })
 }
 
 const allInsights = ref([

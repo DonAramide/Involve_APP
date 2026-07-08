@@ -1,5 +1,4 @@
-// src/services/terminal-audit.service.ts
-import { supabase } from '../db/supabase';
+import { supabase, supabaseAdmin } from '../db/supabase';
 
 export class TerminalAuditService {
 
@@ -27,7 +26,7 @@ export class TerminalAuditService {
       created_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('terminal_audit_log')
       .insert(record)
       .select()

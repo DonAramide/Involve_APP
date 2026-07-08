@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan for consuming the full Quasar API in Invify backend. Covers the QuasarPlatformService expansion, Quasar webhook receiver, wallet/payment/POS service, and webhook registration per tenant.",
+  "updatedAt":  "2026-07-05T22:10:01.070460500Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

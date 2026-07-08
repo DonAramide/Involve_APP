@@ -10,6 +10,8 @@ const { url: supabaseUrl, key: supabaseKey, serviceRoleKey } = BuildVariantServi
 
 if (!supabaseUrl || !supabaseKey) {
   console.warn('[Supabase] Missing credentials for active build variant');
+} else {
+  console.log(`[Supabase] Active environment target URL: ${supabaseUrl}`);
 }
 
 export const supabase = createClient(supabaseUrl || '', supabaseKey || '');

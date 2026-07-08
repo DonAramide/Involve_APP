@@ -1,12 +1,13 @@
 // src/controllers/webhook.controller.ts
 import { Request, Response } from 'express';
-import { getQuasarService } from '../integrations/quasar/factory';
 import { supabase } from '../db/supabase';
 import { LedgerService } from '../services/ledger.service';
 import { NotificationService } from '../services/notification.service';
 import { FinancialEventService } from '../services/event.service';
 import { AuditService } from '../services/audit.service';
 import { PaymentGatewayConvergenceService } from '../services/gateway.service';
+import { QuasarWebhookService } from '../integrations/quasar/quasar-webhook.service';
+import { QuasarIntegrationStore } from '../integrations/quasar/quasar-integration.store';
 
 
 
@@ -19,67 +20,76 @@ export class WebhookController {
   
   static async handleQuasarWebhook(req: Request, res: Response) {
     const signature = req.headers['x-quasar-signature'] as string;
-    const tenantIdHeader = req.headers['x-tenant-id'] as string; // Used for factory lookup
+    const rawBody = (req as any).rawBody?.toString() || JSON.stringify(req.body);
 
-    if (!signature || !tenantIdHeader) {
-      return res.status(400).json({ error: 'Security headers missing' });
+    if (!signature || !rawBody) {
+      return res.status(400).json({ error: 'Security headers or body missing' });
     }
 
     try {
-      const quasar = await getQuasarService(tenantIdHeader);
-      const rawBody = (req as any).rawBody?.toString();
-      
-      // 1. VERIFY SIGNATURE (Security Requirement)
-      const isValid = await quasar.verifyWebhookSignature(rawBody, signature);
-      if (!isValid) {
-        console.error('[Security] Webhook signature mismatch');
-        return res.status(401).json({ error: 'Auth failure' });
+      const event = req.body;
+      const { reference, amount, status } = event?.data || {};
+
+      // 1. RESOLVE TRANSACTION & TENANT (Never trust tenantId from payload)
+      if (!reference) {
+        return res.status(400).json({ error: 'Missing reference in payload' });
       }
 
-      // 2. PARSE & EXTRACT
-      const event = req.body;
-      const { reference, amount, status } = event.data || {};
-
-      if (!reference) throw new Error('Missing reference in payload');
-
-      // 0. LOG WEBHOOK RECEIVE
-      await AuditService.log({
-        eventType: 'webhook.received',
-        reference,
-        tenantId: tenantIdHeader,
-        payload: event
-      });
-
-
-      // 3. RESOLVE TRANSACTION & TENANT (Do NOT trust payload for tenantId)
       const { data: transaction, error: txError } = await supabase
         .from('transactions_log')
         .select('tenant_id, wallet_id, status, type')
         .eq('reference', reference)
         .single();
 
-
       if (txError || !transaction) {
-        console.error(`[Security] Attempted update for non-existent tx: ${reference}`);
-        return res.status(404).json({ error: 'Transaction not found' });
+        console.warn(`[Webhook] No transaction found for reference: ${reference}. Acknowledging silently.`);
+        return res.status(200).json({ received: true, note: 'unknown_reference' });
       }
 
-      const tenantId = transaction.tenant_id;
+      const tenantId = (transaction as any).tenant_id as string;
 
-      // 4. IDEMPOTENCY CHECK
+      // 2. LOAD ENCRYPTED SIGNING SECRET FOR THIS TENANT
+      const integration = await QuasarIntegrationStore.getByInvifyTenantId(tenantId);
+      if (!integration?.quasar_webhook_signing_secret_enc) {
+        console.error(`[Security] No webhook signing secret for tenant ${tenantId}`);
+        return res.status(401).json({ error: 'Auth configuration missing' });
+      }
+
+      const signingSecret = QuasarIntegrationStore.decryptSigningSecret(integration);
+
+      // 3. VERIFY SIGNATURE (HMAC-SHA256, constant-time, timestamp replay protection)
+      const isValid = QuasarWebhookService.verifySignature(
+        rawBody,
+        signature,
+        signingSecret,
+        event?.timestamp,
+      );
+      if (!isValid) {
+        console.error('[Security] Webhook HMAC signature mismatch');
+        return res.status(401).json({ error: 'Auth failure' });
+      }
+
+      // 4. LOG WEBHOOK RECEIVE
+      await AuditService.log({
+        eventType: 'webhook.received',
+        reference,
+        tenantId,
+        payload: event
+      });
+
+      // 5. IDEMPOTENCY CHECK
       const idempotencyKey = `quasar:${reference}:credit`;
       if (await LedgerService.exists(idempotencyKey)) {
         console.log(`[Idempotency] Already processed ${reference}. Returning success.`);
         return res.status(200).json({ status: 'already_processed' });
       }
 
-      // 5. PROCESS STATE UPDATES
+      // 6. PROCESS STATE UPDATES
       if (status === 'success') {
-        await WebhookController._handleSuccess(tenantId, transaction.wallet_id, reference, amount, idempotencyKey, event, transaction.type);
+        await WebhookController._handleSuccess(tenantId, (transaction as any).wallet_id, reference, amount, idempotencyKey, event, (transaction as any).type);
       } else if (status === 'failed') {
-        await WebhookController._handleFailure(tenantId, transaction.wallet_id, reference, event, transaction.type);
+        await WebhookController._handleFailure(tenantId, (transaction as any).wallet_id, reference, event, (transaction as any).type);
       }
-
 
       return res.status(200).json({ received: true });
 

@@ -146,6 +146,10 @@ export const billingApi = {
   subscribe: (data) => api.post('/billing/subscribe', data),
 };
 
+export const financeApi = {
+  getPayoutStats: () => api.get('/finance/stats/payouts')
+};
+
 export const attendanceApi = {
   listStudents: (params) => api.get('/attendance/students', { params }),
   enroll: (data) => api.post('/attendance/enroll', data),
@@ -159,8 +163,26 @@ export const insightsApi = {
 };
 
 export const reconciliationApi = {
-  getReport: () => api.get('/reconciliation'),
-  fixIssue: (data) => api.post('/reconciliation/fix', data)
+  getReport: (params) => api.get('/api/reconciliation', { params }),
+  
+  // Detail Tabs
+  getDetails: (id) => api.get(`/api/reconciliation/${id}/details`),
+  getLedger: (id) => api.get(`/api/reconciliation/${id}/ledger`),
+  getSettlement: (id) => api.get(`/api/reconciliation/${id}/settlement`),
+  getWallet: (id) => api.get(`/api/reconciliation/${id}/wallet`),
+  getCard: (id) => api.get(`/api/reconciliation/${id}/card`),
+  getBank: (id) => api.get(`/api/reconciliation/${id}/bank`),
+  getAudit: (id) => api.get(`/api/reconciliation/${id}/audit`),
+  getTimeline: (id) => api.get(`/api/reconciliation/${id}/timeline`),
+
+  // Commands
+  assign: (id, data) => api.post(`/api/reconciliation/${id}/assign`, data),
+  escalate: (id, data) => api.post(`/api/reconciliation/${id}/escalate`, data),
+  resolve: (id, data) => api.post(`/api/reconciliation/${id}/resolve`, data),
+  forceMatch: (id, data) => api.post(`/api/reconciliation/${id}/force_match`, data),
+  retry: (id, data) => api.post(`/api/reconciliation/${id}/retry`, data),
+  lock: (id, data) => api.post(`/api/reconciliation/${id}/lock`, data),
+  unlock: (id, data) => api.post(`/api/reconciliation/${id}/unlock`, data),
 };
 
 export const posApi = {

@@ -14,6 +14,7 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_state.d
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:involve_app/features/activation/presentation/pages/verify_email_page.dart';
 import '../utils/onboarding_navigator.dart';
+import '../../data/nigeria_states_lgas.dart';
 
 class DeviceOnboardingPage extends StatefulWidget {
   const DeviceOnboardingPage({super.key});
@@ -37,6 +38,13 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   final _phoneController = TextEditingController();
   final _agentCodeController = TextEditingController();
   
+  // Address Fields
+  final _streetController = TextEditingController();
+  String? _selectedCountry = 'Nigeria';
+  String? _selectedState;
+  String? _selectedLga;
+  final _stateController = TextEditingController(); // For non-Nigeria states
+  
   String _selectedIndustry = 'retail';
   String _primaryColorHex = '#6366F1';
   bool _isLoading = false;
@@ -53,6 +61,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       'title': 'Identity & Operation Mode',
       'desc': 'Enter your personal details, business details, and select your core operational industry mode.',
       'icon': 'business',
+    },
+    {
+      'title': 'Business Address',
+      'desc': 'Enter the physical location of your business for compliance and geo-telemetry.',
+      'icon': 'location_on',
     },
     {
       'title': 'Branding & Telemetry Sync',
@@ -134,6 +147,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         'industry': _selectedIndustry,
         'themeColor': _primaryColorHex,
         'agentCode': _agentCodeController.text.trim().isEmpty ? 'AAA000' : _agentCodeController.text.trim(),
+        'country': _selectedCountry,
+        'state': _selectedCountry == 'Nigeria' ? _selectedState : _stateController.text.trim(),
+        'lga': _selectedCountry == 'Nigeria' ? _selectedLga : null,
+        'streetAddress': _streetController.text.trim(),
         'isTrial': isTrial,
         'completedChannels': <String>[],
       };
@@ -237,12 +254,12 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                                     ),
                                     const SizedBox(height: 32),
                                     Row(
-                                      children: List.generate(3, (index) {
+                                      children: List.generate(4, (index) {
                                         final isActive = index <= _currentStep;
                                         return Expanded(
                                           child: Container(
                                             height: 3,
-                                            margin: EdgeInsets.only(right: index == 2 ? 0 : 8),
+                                            margin: EdgeInsets.only(right: index == 3 ? 0 : 8),
                                             decoration: BoxDecoration(
                                               color: isActive ? const Color(0xFF6366F1) : Colors.white.withOpacity(0.1),
                                               borderRadius: BorderRadius.circular(2),
@@ -358,6 +375,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           ),
         ],
       );
+    }
+
+    if (_currentStep == 2) {
+      return _buildAddressStep();
     }
 
     return Column(
@@ -494,7 +515,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   }
 
   Widget _buildStepActions() {
-    if (_currentStep < 2) {
+    if (_currentStep < 3) {
       return Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -505,6 +526,31 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           ElevatedButton(
             onPressed: () {
               if (_currentStep == 1 && !_formKey.currentState!.validate()) return;
+              if (_currentStep == 2) {
+                 if (_streetController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Street Address is required')));
+                    return;
+                 }
+                 if (_selectedCountry == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Country is required')));
+                    return;
+                 }
+                 if (_selectedCountry == 'Nigeria') {
+                     if (_selectedState == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('State is required')));
+                        return;
+                     }
+                     if (_selectedLga == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('LGA is required')));
+                        return;
+                     }
+                 } else {
+                     if (_stateController.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('State/Region is required')));
+                        return;
+                     }
+                 }
+              }
               setState(() => _currentStep++);
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6366F1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12)),
@@ -537,7 +583,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         ),
         const SizedBox(height: 16),
         Center(
-          child: TextButton(onPressed: () => setState(() => _currentStep = 1), child: const Text('GO BACK TO DETAILS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+          child: TextButton(onPressed: () => setState(() => _currentStep = 2), child: const Text('GO BACK TO DETAILS', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
         ),
       ],
     );
@@ -553,6 +599,82 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     _businessNameController.dispose();
     _phoneController.dispose();
     _agentCodeController.dispose();
+    _streetController.dispose();
+    _stateController.dispose();
     super.dispose();
+  }
+
+  Widget _buildAddressStep() {
+    final stateList = nigeriaStatesAndLgas.map((s) => s['state'] as String).toList();
+    List<String> lgaList = [];
+    if (_selectedState != null) {
+      final stateData = nigeriaStatesAndLgas.firstWhere((s) => s['state'] == _selectedState, orElse: () => {});
+      if (stateData.containsKey('lgas')) {
+        lgaList = List<String>.from(stateData['lgas']);
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildTextField(_streetController, 'Street Address', Icons.location_on),
+        const SizedBox(height: 20),
+        SearchableDropdown(
+          label: 'Country',
+          value: _selectedCountry,
+          items: africaCountries,
+          hint: 'Select Country',
+          icon: Icons.public,
+          onChanged: (val) {
+            setState(() {
+              _selectedCountry = val;
+              if (val != 'Nigeria') {
+                _selectedState = null;
+                _selectedLga = null;
+              }
+            });
+          },
+        ),
+        const SizedBox(height: 20),
+        if (_selectedCountry == 'Nigeria') ...[
+          Row(
+            children: [
+              Expanded(
+                child: SearchableDropdown(
+                  label: 'State',
+                  value: _selectedState,
+                  items: stateList,
+                  hint: 'Select State',
+                  icon: Icons.map,
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedState = val;
+                      _selectedLga = null; // Reset LGA when state changes
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: SearchableDropdown(
+                  label: 'LGA',
+                  value: _selectedLga,
+                  items: lgaList,
+                  hint: 'Select LGA',
+                  icon: Icons.location_city,
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedLga = val;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+        ] else ...[
+          _buildTextField(_stateController, 'State / Region', Icons.map),
+        ],
+      ],
+    );
   }
 }

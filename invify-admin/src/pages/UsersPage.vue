@@ -4,7 +4,10 @@
     <!-- Header -->
     <div class="row items-center q-mb-lg">
       <div class="col">
-        <h1 class="text-h4 text-weight-bolder q-ma-none text-white letter-spacing-1">Staff Management</h1>
+        <h1 class="text-h4 text-weight-bolder q-ma-none text-white letter-spacing-1">
+          Staff Management
+          <q-badge color="indigo-5" align="middle" class="text-subtitle1 q-ml-sm">{{ filteredUsers.length }}</q-badge>
+        </h1>
         <div class="text-grey-6">Manage teachers, assign roles, and invite new colleagues.</div>
       </div>
       <div class="col-auto">
@@ -102,9 +105,8 @@
       <template v-slot:body-cell-is_active="props">
         <q-td :props="props" class="text-center">
           <q-chip 
-            :color="props.value ? 'green-10' : 'red-10'" 
-            text-color="white" 
-            size="sm" outline
+            :color="props.value ? 'green-4' : 'red-4'" 
+            size="sm" outline class="text-weight-bolder"
           >
             {{ props.value ? 'ACTIVE' : 'DISABLED' }}
           </q-chip>

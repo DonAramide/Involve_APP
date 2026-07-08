@@ -22,6 +22,7 @@ export const checkRole = (allowedRoles: string[]) => {
     if (!user) return res.status(401).json({ error: 'Unauthenticated' });
 
     const userRoles = parseRoles(user.role);
+    console.log(`[RBAC checkRole] Path: ${req.path}, User Roles: ${userRoles.join(',')}, Allowed Roles: ${allowedRoles.join(',')}`);
 
     // 1. Super Admin bypass
     if (userRoles.includes('super_admin')) {
@@ -141,7 +142,20 @@ export const checkTenantPermission = (requiredPermission: string) => {
       return next();
     }
 
-    // 3. Check explicit permissions array (assuming it exists on the JWT/User object)
+    // 3. Admin Finance Bypass (Map admin_finance to reconciliation permissions)
+    if (userRoles.includes('admin_finance') && requiredPermission.startsWith('reconciliation.')) {
+      return next();
+    }
+    
+    if (userRoles.includes('finance_staff') && requiredPermission.startsWith('reconciliation.')) {
+        // finance_staff gets view/basic permissions but maybe not override.
+        const basicReconPerms = ['reconciliation.view', 'reconciliation.assign', 'reconciliation.timeline.view', 'reconciliation.audit.view'];
+        if (basicReconPerms.includes(requiredPermission)) {
+            return next();
+        }
+    }
+
+    // 4. Check explicit permissions array (assuming it exists on the JWT/User object)
     const userPermissions: string[] = user.permissions || [];
     if (!userPermissions.includes(requiredPermission)) {
       return res.status(403).json({ error: `Forbidden: Missing required permission: ${requiredPermission}` });

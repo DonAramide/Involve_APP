@@ -24,21 +24,21 @@
     <div class="grid-metrics-strip border-main bg-subpanel q-pa-sm rounded-borders">
       
       <!-- 1. Online Devices -->
-      <div class="metric-cell column justify-center items-center text-center">
+      <div class="metric-cell column justify-center items-center text-center cursor-pointer hover-cell" @click="drilldownToExplorer('online')">
         <span class="text-metric-mono text-weight-bold text-green-4" style="font-size: 15px; line-height: 1.1;">{{ onlineCount }}</span>
-        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Online Edge</span>
+        <span class="text-secondary text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">Online Edge</span>
       </div>
 
       <!-- 2. Offline Devices -->
-      <div class="metric-cell column justify-center items-center text-center">
+      <div class="metric-cell column justify-center items-center text-center cursor-pointer hover-cell" @click="drilldownToExplorer('offline')">
         <span class="text-metric-mono text-weight-bold text-muted" style="font-size: 15px; line-height: 1.1;">{{ offlineCount }}</span>
-        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Offline Node</span>
+        <span class="text-secondary text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">Offline Node</span>
       </div>
 
       <!-- 3. Degraded Devices -->
-      <div class="metric-cell column justify-center items-center text-center">
+      <div class="metric-cell column justify-center items-center text-center cursor-pointer hover-cell" @click="drilldownToExplorer('degraded')">
         <span class="text-metric-mono text-weight-bold text-amber-5" style="font-size: 15px; line-height: 1.1;">{{ degradedCount }}</span>
-        <span class="text-muted text-uppercase" style="font-size: 9px; margin-top: 2px;">Degraded</span>
+        <span class="text-secondary text-uppercase border-bottom-dashed" style="font-size: 9px; margin-top: 2px;">Degraded</span>
       </div>
 
       <!-- 4. Quarantined Devices -->
@@ -330,6 +330,7 @@ import { useRolloutEventStore } from '../../stores/realtime/useRolloutEventStore
 import { useGovernanceEventStore } from '../../stores/realtime/useGovernanceEventStore'
 import { useObservabilityMetricStore } from '../../stores/realtime/useObservabilityMetricStore'
 import { operationalEventBusSingleton } from '../../services/realtime/OperationalEventBus'
+import { deviceApi } from '../../api'
 
 const router = useRouter()
 
@@ -340,50 +341,80 @@ const rolloutStore = useRolloutEventStore()
 const govStore = useGovernanceEventStore()
 const obsStore = useObservabilityMetricStore()
 
-// Master dynamic telemetry counts calculated directly from reactive array aggregations
-const baseOnline = ref(142)
-const baseOffline = ref(12)
-const baseDegraded = ref(4)
+// ── DB-loaded device registry ─────────────────────────────────────────────
+const dbDevices = ref([])   // raw rows from supabase devices table
+const devicesLoading = ref(true)
 
-const onlineCount = computed(() => baseOnline.value + Math.min(10, fleetStore.totalBufferedCount))
-const offlineCount = computed(() => baseOffline.value)
-const degradedCount = computed(() => baseDegraded.value)
-const quarantinedCount = computed(() => govStore.activeQuarantineCount + 2)
+// ── Telemetry metric counts – all derived from DB ────────────────────────
+const onlineCount = computed(() => {
+  const dbOnline = dbDevices.value.filter(d => d.status === 'ACTIVE').length
+  return dbOnline + Math.min(10, fleetStore.totalBufferedCount)
+})
+const offlineCount = computed(() => dbDevices.value.filter(d => d.status === 'INACTIVE').length)
+const degradedCount = computed(() => {
+  return dbDevices.value.filter(d => {
+    const info = d.device_info || {}
+    const score = info.trust_score !== undefined ? info.trust_score : 100
+    return d.status === 'ACTIVE' && score < 80
+  }).length
+})
+const quarantinedCount = computed(() => {
+  const dbQ = dbDevices.value.filter(d => (d.device_info || {}).integrity === 'CRITICAL').length
+  return dbQ + govStore.activeQuarantineCount
+})
 const activeIncidentsCount = computed(() => incidentStore.unacknowledgedCriticalsCount)
 const rolloutFailuresCount = computed(() => rolloutStore.activeRollbacksCount)
-const complianceRateRatio = computed(() => 99.4)
+const complianceRateRatio = computed(() => {
+  if (dbDevices.value.length === 0) return 100
+  const total = dbDevices.value.reduce((sum, d) => {
+    const info = d.device_info || {}
+    const pct = parseInt((info.compliance || '100%').replace('%', ''))
+    return sum + (isNaN(pct) ? 100 : pct)
+  }, 0)
+  return (total / dbDevices.value.length).toFixed(1)
+})
 
 /**
- * FINAL REFINEMENT #3: Presence State Aging Calculator Engine.
- * Evaluates connection timestamps dynamically to grade absolute status health
- * across ONLINE -> DEGRADED -> STALE -> OFFLINE bounds.
+ * Fleet Presence Stream – computed from DB device rows.
+ * Evaluates last_seen timestamp from device_info JSONB to grade aging state.
  */
-const mockDevicesList = ref([
-  { id: 'dev-node-alpha', tenant: 'tenant-alpha', agent: 'v2.4', lastSeenMs: 12, isOnline: true },
-  { id: 'dev-node-beta', tenant: 'global', agent: 'v2.4', lastSeenMs: 45, isOnline: true },
-  { id: 'dev-node-gamma', tenant: 'tenant-omega', agent: 'v2.1', lastSeenMs: 140, isOnline: true },
-  { id: 'dev-node-delta', tenant: 'tenant-alpha', agent: 'v2.3', lastSeenMs: 420, isOnline: false }
-])
+const presenceStreamFromDB = computed(() => {
+  return dbDevices.value.map(d => {
+    const info = d.device_info || {}
+    const lastSeenDate = info.last_seen ? new Date(info.last_seen) : (d.last_seen ? new Date(d.last_seen) : new Date())
+    const ageMs = Date.now() - lastSeenDate.getTime()
+    const ageSec = Math.floor(ageMs / 1000)
 
-const presenceStream = computed(() => {
-  return mockDevicesList.value.map(dev => {
-    // Grade aging parameters progressively
     let agingState = 'ONLINE'
-    if (!dev.isOnline || dev.lastSeenMs > 300) {
+    if (d.status !== 'ACTIVE' || ageSec > 300) {
       agingState = 'OFFLINE'
-    } else if (dev.lastSeenMs > 120) {
+    } else if (ageSec > 120) {
       agingState = 'STALE'
-    } else if (dev.lastSeenMs > 30) {
+    } else if (ageSec > 30) {
       agingState = 'DEGRADED'
     }
+    if (info.integrity === 'CRITICAL') agingState = 'OFFLINE'
+
+    let lastHeartbeatStr = 'just now'
+    if (ageSec >= 3600) lastHeartbeatStr = `${Math.floor(ageSec / 3600)}h ago`
+    else if (ageSec >= 60) lastHeartbeatStr = `${Math.floor(ageSec / 60)}m ago`
+    else if (ageSec > 0) lastHeartbeatStr = `${ageSec}s ago`
 
     return {
-      ...dev,
+      id: d.device_id || d.id,
+      tenant: info.tenant_name || d.tenant_id || 'Global',
+      agent: info.agent_code || 'ag-unknown',
       agingState,
-      lastHeartbeatStr: `${dev.lastSeenMs}s ago`
+      lastHeartbeatStr,
+      _lastSeenDate: lastSeenDate
     }
   })
 })
+
+const presenceStream = presenceStreamFromDB
+
+
+
 
 const getAgingStatusColor = (state) => {
   switch(state) {
@@ -413,21 +444,32 @@ const acknowledgeIncidentHandler = (id) => {
   incidentStore.acknowledgeIncident(id)
 }
 
-// Map parsed quarantine metadata
+// Map parsed quarantine metadata — sourced from DB (integrity === CRITICAL)
 const quarantinedNodesList = computed(() => {
-  // Combine native store occurrences alongside fallback visuals
-  const base = [
-    { id: 'edge-gw-08', timestampStr: '12m ago', violationReason: 'Secure Boot Signature Hash Drift' },
-    { id: 'term-pos-14', timestampStr: '1h ago', violationReason: 'Unauthorized Dotroid Kernel Injection' }
-  ]
-  
-  const dynamicNodes = govStore.policies.filter(p => p.eventType === 'QUARANTINE_AUDIT').map((p, idx) => ({
-    id: p.sourceAttribution || `dyn-node-${idx}`,
-    timestampStr: formatRelativeTime(p.timestamp),
-    violationReason: p.payload?.reason || 'Runtime Attestation Exception'
-  }))
+  // Pull quarantined devices from DB first
+  const dbQuarantined = dbDevices.value
+    .filter(d => (d.device_info || {}).integrity === 'CRITICAL')
+    .map(d => {
+      const info = d.device_info || {}
+      const lastSeenDate = info.last_seen ? new Date(info.last_seen) : null
+      return {
+        id: d.device_id || d.id,
+        timestampStr: lastSeenDate ? formatRelativeTime(lastSeenDate.toISOString()) : 'unknown',
+        violationReason: info.description || 'Attestation Matrix Failure'
+      }
+    })
 
-  return [...dynamicNodes, ...base]
+  // Overlay any real-time governance bus QUARANTINE_AUDIT events that haven't been DB-persisted yet
+  const rtNodes = govStore.policies
+    .filter(p => p.eventType === 'QUARANTINE_AUDIT')
+    .filter(p => !dbQuarantined.some(d => d.id === (p.sourceAttribution || '')))
+    .map((p, idx) => ({
+      id: p.sourceAttribution || `rt-node-${idx}`,
+      timestampStr: formatRelativeTime(p.timestamp),
+      violationReason: p.payload?.reason || 'Runtime Attestation Exception'
+    }))
+
+  return [...dbQuarantined, ...rtNodes]
 })
 
 /**
@@ -456,8 +498,7 @@ const formatRelativeTime = (isoString) => {
 
 // Action triggers simulating background socket spams
 const simulatePresenceSpike = () => {
-  baseOnline.value += Math.floor(Math.random() * 5) + 1
-  // Inject randomized heartbeat presence events
+  // Inject randomized heartbeat presence events into the event bus (onlineCount reflects db + buffer)
   operationalEventBusSingleton.dispatchIncomingRawPayload({
     meta_id: `evt_pres_${Date.now()}`,
     type_str: 'FLEET_HEARTBEAT',
@@ -477,14 +518,18 @@ const simulateIncidentSpike = () => {
   })
 }
 
-onMounted(() => {
-  // Simulate natural periodic aging parameter shifts
-  setInterval(() => {
-    if (mockDevicesList.value.length > 0) {
-      mockDevicesList.value[0].lastSeenMs += 5
-      mockDevicesList.value[1].lastSeenMs += 3
+onMounted(async () => {
+  // Load real device records from Supabase
+  try {
+    const { data } = await deviceApi.getDevices()
+    if (data && Array.isArray(data)) {
+      dbDevices.value = data
     }
-  }, 5000)
+  } catch (err) {
+    console.warn('[FleetOverview] Could not load device registry from DB:', err)
+  } finally {
+    devicesLoading.value = false
+  }
 })
 </script>
 

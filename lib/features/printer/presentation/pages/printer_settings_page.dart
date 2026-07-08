@@ -600,7 +600,9 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                           ),
                       ],
                     );
-                  }
+                  },
+                ),
+              ),
             ),
           ],
         ),

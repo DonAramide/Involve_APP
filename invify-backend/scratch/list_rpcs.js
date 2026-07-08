@@ -1,8 +1,8 @@
 const axios = require('axios');
 require('dotenv').config({ path: 'c:/dev/Involve_APP/invify-backend/.env' });
 
-const url = process.env.STAGING_SUPABASE_URL || 'https://rpcjelhacmkhzguljdgi.supabase.co';
-const key = process.env.STAGING_SUPABASE_SERVICE_KEY || process.env.STAGING_SUPABASE_KEY;
+const url = process.env.SUPABASE_URL || 'https://iyqmqcohoduofotfjutm.supabase.co';
+const key = process.env.SUPABASE_KEY;
 
 async function run() {
   try {

@@ -911,7 +911,9 @@ const activeNavigationTree = computed(() => {
     case 'ai':
       return [
         { label: 'AI Operational Copilot', path: '/ai/copilot', icon: 'psychology', color: 'cyan-3', badge: 'Ground Truth', badgeBg: 'cyan-10', badgeColor: 'cyan-2' },
-        { label: 'AI Lesson Planner', path: '/notes', icon: 'auto_awesome', color: 'indigo-3', badge: 'AI', badgeBg: 'indigo-10', badgeColor: 'indigo-2' }
+        { label: 'AI Lesson Planner', path: '/notes', icon: 'auto_awesome', color: 'indigo-3', badge: 'AI', badgeBg: 'indigo-10', badgeColor: 'indigo-2' },
+        { label: 'Executive Command Center', path: '/executive', icon: 'dashboard', color: 'cyan-4' },
+        { label: 'AI Insights Center', path: '/executive/ai-insights', icon: 'insights', color: 'cyan-3', badge: 'PREDICTIVE', badgeBg: 'cyan-10', badgeColor: 'cyan-2' }
       ]
     
     case 'communications':

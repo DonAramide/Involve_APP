@@ -21,13 +21,38 @@ export class DeviceController {
    */
   static async getDevices(req: Request, res: Response) {
     try {
-      const { data, error } = await supabase
+      // 1. Fetch devices raw data
+      const { data: devices, error: devError } = await supabase
         .from('devices')
-        .select('*, tenants(name, plan)')
+        .select('*')
         .order('last_seen', { ascending: false });
 
-      if (error) throw error;
-      return res.status(200).json(data);
+      if (devError) throw devError;
+
+      // 2. Fetch related tenants in-memory to bypass database foreign key relationship caching issues
+      const tenantIds = Array.from(new Set((devices || []).map(d => d.tenant_id).filter(Boolean)));
+      const tenantsMap = new Map<string, { name: string; plan: string }>();
+
+      if (tenantIds.length > 0) {
+        const { data: tenants, error: tenError } = await supabase
+          .from('tenants')
+          .select('id, name, plan')
+          .in('id', tenantIds);
+
+        if (!tenError && tenants) {
+          tenants.forEach(t => {
+            tenantsMap.set(t.id, { name: t.name, plan: t.plan });
+          });
+        }
+      }
+
+      // 3. Map tenant details back to devices matching the shape expected by the frontend
+      const enrichedDevices = (devices || []).map(device => ({
+        ...device,
+        tenants: tenantsMap.get(device.tenant_id) || null,
+      }));
+
+      return res.status(200).json(enrichedDevices);
     } catch (error: any) {
       if (isNetworkTimeout(error)) {
         return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
@@ -43,13 +68,38 @@ export class DeviceController {
    */
   static async getActivations(req: Request, res: Response) {
     try {
-      const { data, error } = await supabase
+      // 1. Fetch activations raw data
+      const { data: activations, error: actError } = await supabase
         .from('device_activations')
-        .select('*, tenants(name, plan)')
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return res.status(200).json(data);
+      if (actError) throw actError;
+
+      // 2. Fetch related tenants in-memory to bypass database foreign key relationship caching issues
+      const tenantIds = Array.from(new Set((activations || []).map(a => a.tenant_id).filter(Boolean)));
+      const tenantsMap = new Map<string, { name: string; plan: string }>();
+
+      if (tenantIds.length > 0) {
+        const { data: tenants, error: tenError } = await supabase
+          .from('tenants')
+          .select('id, name, plan')
+          .in('id', tenantIds);
+
+        if (!tenError && tenants) {
+          tenants.forEach(t => {
+            tenantsMap.set(t.id, { name: t.name, plan: t.plan });
+          });
+        }
+      }
+
+      // 3. Map tenant details back to activations matching the shape expected by the frontend
+      const enrichedActivations = (activations || []).map(activation => ({
+        ...activation,
+        tenants: tenantsMap.get(activation.tenant_id) || null,
+      }));
+
+      return res.status(200).json(enrichedActivations);
     } catch (error: any) {
       if (isNetworkTimeout(error)) {
         return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });

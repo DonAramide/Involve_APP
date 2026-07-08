@@ -13,7 +13,14 @@ DROP FUNCTION IF EXISTS public.sync_wallet_cache_on_ledger_insert() CASCADE;
 DROP FUNCTION IF EXISTS public.prevent_ledger_modification() CASCADE;
 DROP FUNCTION IF EXISTS public.prevent_fee_modification() CASCADE;
 DROP FUNCTION IF EXISTS public.log_tenant_fee_profile_history() CASCADE;
-DROP PROCEDURE IF EXISTS public.rebuild_wallet_balance(UUID) CASCADE;
+DO $$
+BEGIN
+    EXECUTE 'DROP PROCEDURE IF EXISTS public.rebuild_wallet_balance(UUID) CASCADE';
+EXCEPTION WHEN OTHERS THEN
+    NULL;
+END;
+$$;
+DROP FUNCTION IF EXISTS public.rebuild_wallet_balance(UUID) CASCADE;
 
 DROP TABLE IF EXISTS public.fee_transactions CASCADE;
 DROP TABLE IF EXISTS public.tenant_fee_profile_history CASCADE;
@@ -230,15 +237,28 @@ ALTER TABLE public.wallets ADD CONSTRAINT wallets_tenant_id_unique UNIQUE (tenan
 ALTER TABLE public.wallets DROP CONSTRAINT IF EXISTS wallets_balance_non_negative;
 ALTER TABLE public.wallets ADD CONSTRAINT wallets_balance_non_negative CHECK (balance >= 0);
 
+ALTER TABLE public.wallets ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "tenant_owner_reads_own_wallet" ON public.wallets;
+CREATE POLICY "tenant_owner_reads_own_wallet" ON public.wallets FOR SELECT
+    USING ((SELECT tenant_id::text FROM public.users WHERE id = auth.uid()) = tenant_id::text);
+
+DROP POLICY IF EXISTS "tenant_owner_updates_own_wallet" ON public.wallets;
+CREATE POLICY "tenant_owner_updates_own_wallet" ON public.wallets FOR UPDATE
+    USING ((SELECT tenant_id::text FROM public.users WHERE id = auth.uid()) = tenant_id::text);
+
+DROP POLICY IF EXISTS "super_admin_all_wallet" ON public.wallets;
+CREATE POLICY "super_admin_all_wallet" ON public.wallets USING (is_admin_or_service());
+
 -- Sync trigger updating wallets.balance cache (only updates, direct modifications blocked)
 CREATE OR REPLACE FUNCTION public.sync_wallet_cache_on_ledger_insert()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.status = 'completed' THEN
         INSERT INTO public.wallets (tenant_id, balance, currency, updated_at)
-        VALUES (NEW.tenant_id::text, NEW.amount, 'NGN', now())
+        VALUES (NEW.tenant_id::text, GREATEST(0.00, NEW.amount), 'NGN', now())
         ON CONFLICT (tenant_id) DO UPDATE
-        SET balance = public.wallets.balance + EXCLUDED.balance,
+        SET balance = public.wallets.balance + NEW.amount,
             updated_at = now();
     END IF;
     RETURN NEW;
@@ -367,8 +387,9 @@ CREATE TRIGGER trg_log_tenant_fee_profile_history
     AFTER INSERT OR UPDATE OR DELETE ON public.tenant_fee_profiles
     FOR EACH ROW EXECUTE FUNCTION public.log_tenant_fee_profile_history();
 
--- 10. RECONCILIATION & RECOVERY PROCEDURE FOR WALLET BALANCE CACHE
-CREATE OR REPLACE PROCEDURE public.rebuild_wallet_balance(p_tenant_id UUID)
+-- 10. RECONCILIATION & RECOVERY FUNCTION FOR WALLET BALANCE CACHE
+CREATE OR REPLACE FUNCTION public.rebuild_wallet_balance(p_tenant_id UUID)
+RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
@@ -396,6 +417,20 @@ BEGIN
     ON CONFLICT (tenant_id) DO UPDATE
     SET balance = v_total,
         updated_at = now();
+END;
+$$;
+
+-- 13. TEMPORARY DEBUGGING UTILITY FUNCTION
+CREATE OR REPLACE FUNCTION public.execute_sql(sql_query TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    result JSONB;
+BEGIN
+    EXECUTE 'SELECT json_agg(t) FROM (' || sql_query || ') t' INTO result;
+    RETURN result;
 END;
 $$;
 
@@ -625,5 +660,11 @@ BEGIN
     RETURN v_ledger_id;
 END;
 $$;
+
+-- Enable RLS and add policy for public.users so subqueries in wallet RLS policies can retrieve tenant_id
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "allow_select_own_user" ON public.users;
+CREATE POLICY "allow_select_own_user" ON public.users FOR SELECT
+    USING (id = auth.uid());
 
 COMMIT;

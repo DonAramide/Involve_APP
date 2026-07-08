@@ -19,6 +19,7 @@ async function run() {
   const testTenantId = '77777777-7777-7777-7777-777777777777';
   const testAgentId = '88888888-8888-8888-8888-888888888888';
   const testAgentCode = 'AGT_TEST_1B';
+  let authUserId: string | null = null;
 
   try {
     // 0. Preflight Connectivity Check
@@ -30,13 +31,30 @@ async function run() {
     // CLEANUP LEGACY TEST RECORDS
     // ----------------------------------------------------
     console.log('Cleaning up old test records...');
+    await supabaseAdmin.from('bank_transfer_logs').delete().eq('tenant_id', testTenantId);
+    await supabaseAdmin.from('financial_events').delete().eq('tenant_id', testTenantId);
     await supabaseAdmin.from('fee_transactions').delete().eq('tenant_id', testTenantId);
     await supabaseAdmin.from('tenant_fee_profile_history').delete().eq('tenant_id', testTenantId);
     await supabaseAdmin.from('tenant_fee_profiles').delete().eq('tenant_id', testTenantId);
-    await supabaseAdmin.from('ledger_entries').delete().eq('tenant_id', testTenantId);
-    await supabaseAdmin.from('wallets').delete().eq('tenant_id', testTenantId);
     await supabaseAdmin.from('agent_commission_wallets').delete().eq('agent_id', testAgentId);
     await supabaseAdmin.from('agents').delete().eq('id', testAgentId);
+    
+    // Check if authUserId exists from previous runs and delete user profile
+    const { data: cleanExistingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const cleanTestEmail = 'agent_auth_p05g@test.com';
+    const cleanExistingUser = cleanExistingUsers?.users?.find(u => u.email === cleanTestEmail);
+    if (cleanExistingUser) {
+      await supabaseAdmin.from('users').delete().eq('id', cleanExistingUser.id);
+    }
+    
+    // wallets, ledger_entries might fail due to immutability, we attempt and ignore errors
+    try {
+      await supabaseAdmin.from('ledger_entries').delete().eq('tenant_id', testTenantId);
+    } catch (e) {}
+    try {
+      await supabaseAdmin.from('wallets').delete().eq('tenant_id', testTenantId);
+    } catch (e) {}
+
     await supabaseAdmin.from('tenants').delete().eq('id', testTenantId);
 
     // ----------------------------------------------------
@@ -67,18 +85,43 @@ async function run() {
     // SETUP TEST ENTITIES
     // ----------------------------------------------------
     console.log('\nSetting up test entities...');
-    // Create test agent
-    await supabaseAdmin.from('agents').insert({
+    
+    // Create auth user for agent
+    const testEmail = 'agent_auth_p05g@test.com';
+    const testPassword = 'SecurePassword123!';
+    
+    // Check if auth user already exists and delete to avoid conflict
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email === testEmail);
+    if (existingUser) {
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(existingUser.id);
+      } catch (e) {}
+    }
+
+    const { data: authUser, error: authErr } = await supabaseAdmin.auth.admin.createUser({
+      email: testEmail,
+      password: testPassword,
+      email_confirm: true
+    });
+    if (authErr) throw authErr;
+    authUserId = authUser.user.id;
+
+    // Create test agent linked to auth user
+    const { error: agentErr } = await supabaseAdmin.from('agents').insert({
       id: testAgentId,
+      auth_user_id: authUserId,
       agent_code: testAgentCode,
-      name: 'Test Sales Agent',
+      first_name: 'Test',
+      last_name: 'Agent',
       email: 'agent@test.com',
       phone: '1234567890',
-      is_active: true
+      status: 'ACTIVE'
     });
+    if (agentErr) throw agentErr;
 
     // Create test tenant linked to the agent
-    await supabaseAdmin.from('tenants').insert({
+    const tenantInsertRes = await supabaseAdmin.from('tenants').insert({
       id: testTenantId,
       name: 'Test Ledger Merchant',
       type: 'merchant',
@@ -86,7 +129,20 @@ async function run() {
       status: 'ACTIVE',
       tenant_code: 'TM_1B',
       agent_code: testAgentCode
-    });
+    }).select();
+    console.log('Tenant insert result:', tenantInsertRes);
+
+    // Create public user corresponding to auth user for RLS lookup
+    if (authUserId) {
+      await supabaseAdmin.from('users').delete().eq('id', authUserId);
+      const { error: userErr } = await supabaseAdmin.from('users').insert({
+        id: authUserId,
+        tenant_id: testTenantId,
+        email: testEmail,
+        role: 'admin'
+      });
+      if (userErr) throw userErr;
+    }
 
     // Create fee profile overrides
     await supabaseAdmin.from('tenant_fee_profiles').insert({
@@ -101,8 +157,9 @@ async function run() {
     // ----------------------------------------------------
     console.log('\n2. Verifying Ledger Entry & Wallet Cache Sync...');
     const grossAmount = 50000.00; // 50,000 NGN
-    const ref1 = 'REF_CARD_001';
-    const idemKey1 = 'IDEM_CARD_001';
+    const runId = Date.now(); // unique per run to avoid idempotency collisions
+    const ref1 = `REF_CARD_${runId}`;
+    const idemKey1 = `IDEM_CARD_${runId}`;
 
     const { data: txId, error: postErr } = await supabaseAdmin.rpc('post_financial_transaction', {
       p_tenant_id: testTenantId,
@@ -116,14 +173,15 @@ async function run() {
     if (!postErr && txId) {
       console.log(`  ✅ Transaction posted successfully. ID: ${txId}`);
       
-      // Check wallet balance cache (should be grossAmount - fee)
-      // Calculated fee: 50,000 * 2% = 1,000 NGN. Balance should be 50,000 - 1000 = 49,000 NGN
+      // Wait briefly for trigger to propagate
+      await new Promise(r => setTimeout(r, 500));
+
       const { data: wallet, error: wallErr } = await supabaseAdmin
         .from('wallets')
         .select('balance')
         .eq('tenant_id', testTenantId)
         .single();
-      
+
       if (!wallErr && wallet && Number(wallet.balance) === 49000.00) {
         console.log(`  ✅ Wallet cache successfully synchronized to: ₦${wallet.balance}`);
         results['wallet_cache_sync'] = 'PASS';
@@ -170,8 +228,8 @@ async function run() {
     // ----------------------------------------------------
     console.log('\n4. Verifying Fee Cap Enforcements...');
     const largeAmount = 200000.00; // 200,000 NGN. Uncapped fee would be 200,000 * 2% = 4,000. Cap is 1,000.
-    const ref2 = 'REF_CARD_002';
-    const idemKey2 = 'IDEM_CARD_002';
+    const ref2 = `REF_CARD_002_${runId}`;
+    const idemKey2 = `IDEM_CARD_002_${runId}`;
 
     const { data: txId2, error: postErr2 } = await supabaseAdmin.rpc('post_financial_transaction', {
       p_tenant_id: testTenantId,
@@ -211,8 +269,8 @@ async function run() {
       p_tenant_id: testTenantId,
       p_amount: 5000.00, // positive amount for withdrawal
       p_entry_type: 'WITHDRAWAL',
-      p_reference: 'REF_WITHDRAW_POS',
-      p_idempotency_key: 'IDEM_WITHDRAW_POS',
+      p_reference: `REF_WITHDRAW_POS_${runId}`,
+      p_idempotency_key: `IDEM_WITHDRAW_POS_${runId}`,
       p_metadata: {}
     });
 
@@ -228,8 +286,8 @@ async function run() {
       p_tenant_id: testTenantId,
       p_amount: -5000000.00, // exceeds balance
       p_entry_type: 'WITHDRAWAL',
-      p_reference: 'REF_WITHDRAW_EXCEED',
-      p_idempotency_key: 'IDEM_WITHDRAW_EXCEED',
+      p_reference: `REF_WITHDRAW_EXCEED_${runId}`,
+      p_idempotency_key: `IDEM_WITHDRAW_EXCEED_${runId}`,
       p_metadata: {}
     });
 
@@ -406,16 +464,16 @@ async function run() {
         p_tenant_id: testTenantId,
         p_amount: withdrawAmount,
         p_entry_type: 'WITHDRAWAL',
-        p_reference: 'CONCUR_W_1',
-        p_idempotency_key: 'IDEM_CONCUR_W_1',
+        p_reference: `CONCUR_W_1_${runId}`,
+        p_idempotency_key: `IDEM_CONCUR_W_1_${runId}`,
         p_metadata: {}
       }),
       supabaseAdmin.rpc('post_financial_transaction', {
         p_tenant_id: testTenantId,
         p_amount: withdrawAmount,
         p_entry_type: 'WITHDRAWAL',
-        p_reference: 'CONCUR_W_2',
-        p_idempotency_key: 'IDEM_CONCUR_W_2',
+        p_reference: `CONCUR_W_2_${runId}`,
+        p_idempotency_key: `IDEM_CONCUR_W_2_${runId}`,
         p_metadata: {}
       })
     ];
@@ -448,8 +506,8 @@ async function run() {
       p_tenant_id: testTenantId,
       p_amount: -currBal,
       p_entry_type: 'WITHDRAWAL',
-      p_reference: 'REF_FEE_OVD_TEST',
-      p_idempotency_key: 'IDEM_FEE_OVD_TEST',
+      p_reference: `REF_FEE_OVD_TEST_${runId}`,
+      p_idempotency_key: `IDEM_FEE_OVD_TEST_${runId}`,
       p_metadata: {}
     });
 
@@ -470,8 +528,8 @@ async function run() {
       p_tenant_id: testTenantId,
       p_amount: 1000.00,
       p_entry_type: 'CARD_PAYMENT',
-      p_reference: 'REF_CARD_DUP_1',
-      p_idempotency_key: 'IDEM_CARD_DUP_1',
+      p_reference: `REF_CARD_DUP_1_${runId}`,
+      p_idempotency_key: `IDEM_CARD_DUP_1_${runId}`,
       p_metadata: {}
     });
 
@@ -480,8 +538,8 @@ async function run() {
       p_tenant_id: testTenantId,
       p_amount: 1000.00,
       p_entry_type: 'CARD_PAYMENT',
-      p_reference: 'REF_CARD_DUP_1',
-      p_idempotency_key: 'IDEM_CARD_DUP_2',
+      p_reference: `REF_CARD_DUP_1_${runId}`,
+      p_idempotency_key: `IDEM_CARD_DUP_2_${runId}`,
       p_metadata: {}
     });
 
@@ -504,8 +562,8 @@ async function run() {
       p_tenant_id: testTenantId,
       p_amount: 1000.00,
       p_entry_type: 'VIRTUAL_ACCOUNT_CREDIT',
-      p_reference: 'REF_VA_DUP_1',
-      p_idempotency_key: 'IDEM_VA_DUP_1',
+      p_reference: `REF_VA_DUP_1_${runId}`,
+      p_idempotency_key: `IDEM_VA_DUP_1_${runId}`,
       p_metadata: {}
     });
 
@@ -514,8 +572,8 @@ async function run() {
       p_tenant_id: testTenantId,
       p_amount: 1000.00,
       p_entry_type: 'VIRTUAL_ACCOUNT_CREDIT',
-      p_reference: 'REF_VA_DUP_1',
-      p_idempotency_key: 'IDEM_VA_DUP_2',
+      p_reference: `REF_VA_DUP_1_${runId}`,
+      p_idempotency_key: `IDEM_VA_DUP_2_${runId}`,
       p_metadata: {}
     });
 
@@ -549,8 +607,8 @@ async function run() {
       p_tenant_id: testTenantNoAgentId,
       p_amount: 10000.00,
       p_entry_type: 'CARD_PAYMENT',
-      p_reference: 'REF_NO_AGT_1',
-      p_idempotency_key: 'IDEM_NO_AGT_1',
+      p_reference: `REF_NO_AGT_1_${runId}`,
+      p_idempotency_key: `IDEM_NO_AGT_1_${runId}`,
       p_metadata: {}
     });
 
@@ -587,15 +645,34 @@ async function run() {
     // CHECK 16: Agent Lookup Duplicate Match (Unique Constraints verification)
     // ----------------------------------------------------
     console.log('\n16. Verifying Agent Lookup Duplicate Match (Uniqueness)...');
+    
+    // Create second auth user for duplicate agent
+    const dupEmail = 'dupagent_auth@test.com';
+    const { data: existingUsersList } = await supabaseAdmin.auth.admin.listUsers();
+    const existingDupUser = existingUsersList?.users?.find(u => u.email === dupEmail);
+    if (existingDupUser) {
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(existingDupUser.id);
+      } catch (e) {}
+    }
+    const { data: dupAuthUser } = await supabaseAdmin.auth.admin.createUser({
+      email: dupEmail,
+      password: 'SecurePassword123!',
+      email_confirm: true
+    });
+    const dupAuthUserId = dupAuthUser?.user?.id;
+
     // Try to insert a duplicate agent code, which MUST fail at constraint level
     const duplicateAgentId = '99999999-8888-7777-6666-555555555555';
     const { error: dupAgentErr } = await supabaseAdmin.from('agents').insert({
       id: duplicateAgentId,
+      auth_user_id: dupAuthUserId,
       agent_code: testAgentCode, // already exists
-      name: 'Duplicate Agent Name',
+      first_name: 'Duplicate',
+      last_name: 'Agent',
       email: 'dupagent@test.com',
       phone: '0987654321',
-      is_active: true
+      status: 'ACTIVE'
     });
 
     const isDuplicateBlocked = dupAgentErr && 
@@ -609,15 +686,32 @@ async function run() {
       results['agent_lookup_duplicate_match'] = 'FAIL';
     }
 
+    // Cleanup duplicate auth user
+    if (dupAuthUserId) {
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(dupAuthUserId);
+      } catch (e) {}
+    }
+
     // ----------------------------------------------------
     // CHECK 17: Wallet Cache Trigger Integrity
     // ----------------------------------------------------
     console.log('\n17. Verifying Wallet Cache Trigger Integrity...');
+    
+    // Sign in using the test agent email/password to become an 'authenticated' role
+    await supabase.auth.signInWithPassword({
+      email: testEmail,
+      password: testPassword
+    });
+
     // Direct authenticated update should be blocked
     const { error: directWallErr } = await supabase
       .from('wallets')
       .update({ balance: 999999.00 })
       .eq('tenant_id', testTenantId);
+
+    // Sign out to clean up session
+    await supabase.auth.signOut();
 
     if (directWallErr && directWallErr.message.includes('Direct wallet balance mutation is prohibited')) {
       console.log('  ✅ Wallet cache integrity verified. Direct updates from clients are blocked.');
@@ -632,14 +726,40 @@ async function run() {
   } finally {
     // Cleanup test data
     console.log('\nPerforming post-test cleanup...');
-    await supabaseAdmin.from('fee_transactions').delete().eq('tenant_id', testTenantId);
-    await supabaseAdmin.from('tenant_fee_profile_history').delete().eq('tenant_id', testTenantId);
-    await supabaseAdmin.from('tenant_fee_profiles').delete().eq('tenant_id', testTenantId);
-    await supabaseAdmin.from('ledger_entries').delete().eq('tenant_id', testTenantId);
-    await supabaseAdmin.from('wallets').delete().eq('tenant_id', testTenantId);
-    await supabaseAdmin.from('agent_commission_wallets').delete().eq('agent_id', testAgentId);
-    await supabaseAdmin.from('agents').delete().eq('id', testAgentId);
-    await supabaseAdmin.from('tenants').delete().eq('id', testTenantId);
+    try {
+      await supabaseAdmin.from('bank_transfer_logs').delete().eq('tenant_id', testTenantId);
+      await supabaseAdmin.from('financial_events').delete().eq('tenant_id', testTenantId);
+      await supabaseAdmin.from('tenant_fee_profile_history').delete().eq('tenant_id', testTenantId);
+      await supabaseAdmin.from('tenant_fee_profiles').delete().eq('tenant_id', testTenantId);
+      await supabaseAdmin.from('agent_commission_wallets').delete().eq('agent_id', testAgentId);
+      await supabaseAdmin.from('agents').delete().eq('id', testAgentId);
+      if (authUserId) {
+        await supabaseAdmin.from('users').delete().eq('id', authUserId);
+      }
+      // Note: wallets, ledger_entries and fee_transactions deletes might fail due to immutability constraints
+      // so we try deleting them but don't crash if they fail.
+      try {
+        await supabaseAdmin.from('fee_transactions').delete().eq('tenant_id', testTenantId);
+      } catch (e) {}
+      try {
+        await supabaseAdmin.from('ledger_entries').delete().eq('tenant_id', testTenantId);
+      } catch (e) {}
+      try {
+        await supabaseAdmin.from('wallets').delete().eq('tenant_id', testTenantId);
+      } catch (e) {}
+      
+      // Finally delete the tenant
+      await supabaseAdmin.from('tenants').delete().eq('id', testTenantId);
+    } catch (cleanErr: any) {
+      console.warn('  ⚠️ Warning during cleanup:', cleanErr.message || cleanErr);
+    }
+
+    // Cleanup agent auth user
+    if (authUserId) {
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(authUserId);
+      } catch (e) {}
+    }
   }
 
   // ----------------------------------------------------

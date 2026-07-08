@@ -429,8 +429,11 @@ const filteredDevices = computed(() => {
   // Handle external query route bindings matching Cross-Panel Correlations
   if (route.query.filter) {
     const f = String(route.query.filter).toLowerCase()
-    if (f === 'quarantined') res = res.filter(d => d.integrity === 'CRITICAL')
+    if (f === 'quarantined') res = res.filter(d => d.integrity === 'CRITICAL' || d.trustScore < 50)
     if (f === 'incident') res = res.filter(d => d.onlineState !== 'ONLINE')
+    if (f === 'online') res = res.filter(d => d.onlineState === 'ONLINE')
+    if (f === 'offline') res = res.filter(d => d.onlineState === 'OFFLINE')
+    if (f === 'degraded') res = res.filter(d => d.onlineState === 'DEGRADED')
   }
 
   return res
@@ -607,6 +610,17 @@ watch(() => route.query.target, (newTarget) => {
   }
 }, { immediate: true })
 
+watch(() => route.query.filter, (newFilter) => {
+  if (newFilter) {
+    const f = String(newFilter).toLowerCase()
+    if (['quarantined', 'incident', 'rollout_fail'].includes(f)) {
+      activePreset.value = f
+    } else {
+      activePreset.value = 'all'
+    }
+  }
+}, { immediate: true })
+
 let tickerInterval = null
 let realtimeChannel = null
 
@@ -639,36 +653,39 @@ onMounted(async () => {
   // Dynamically pull real backend registered physical client instances
   try {
     const { data } = await deviceApi.getDevices()
-    if (data && Array.isArray(data)) {
-      const realNodes = data.map(d => ({
-        deviceId: d.device_id || d.id,
-        deviceName: d.device_name || d.model || 'Registered Client Hub',
-        tenant: d.tenants?.name || 'Global Organization Scope',
-        agentCode: 'ag-production',
-        onlineState: d.status === 'ACTIVE' ? 'ONLINE' : 'DEGRADED',
-        compliance: '100%',
-        integrity: 'HEALTHY',
-        trustScore: 99,
-        rolloutVersion: 'v2.5.0',
-        otaStatus: 'STABLE',
-        lastSeen: 'Live Handshake',
-        battery: d.battery || 100,
-        networkState: d.network_type || 'SECURE_WIFI',
-        androidVersion: d.os_version || d.platform || '13.0',
-        dotroidVersion: '4.2.0',
-        description: `Persistent Attestation Hash Signature Mapped Natively.`,
-        apps: ['com.invify.invoice_app', 'io.flutter.app'],
-        _lastSeenDate: d.last_seen ? new Date(d.last_seen) : new Date()
-      }))
-      // Set live targets as the only devices
+    if (data && Array.isArray(data) && data.length > 0) {
+      const realNodes = data.map(d => {
+        const info = d.device_info || {}
+        return {
+          deviceId: d.device_id || d.id,
+          deviceName: info.model || d.device_name || 'Registered Client Hub',
+          tenant: d.tenants?.name || 'Global Organization Scope',
+          agentCode: info.agent_code || 'ag-production',
+          onlineState: info.online_state || (d.status === 'ACTIVE' ? 'ONLINE' : 'DEGRADED'),
+          compliance: info.compliance || '100%',
+          integrity: info.integrity || 'HEALTHY',
+          trustScore: info.trust_score !== undefined ? info.trust_score : 99,
+          rolloutVersion: info.rollout_version || 'v2.5.0',
+          otaStatus: info.ota_status || 'STABLE',
+          lastSeen: info.last_seen ? new Date(info.last_seen).toLocaleString() : 'Live Handshake',
+          battery: info.battery !== undefined ? info.battery : 100,
+          networkState: d.network_type || info.network_state || 'SECURE_WIFI',
+          androidVersion: d.os_version || info.os_version || '13.0',
+          dotroidVersion: info.dotroid_version || '4.2.0',
+          description: info.description || `Persistent Attestation Hash Signature Mapped Natively.`,
+          apps: info.apps || ['com.invify.invoice_app', 'io.flutter.app'],
+          _lastSeenDate: info.last_seen ? new Date(info.last_seen) : (d.last_seen ? new Date(d.last_seen) : new Date())
+        }
+      })
       baseDevicesArray.value = realNodes
     }
   } catch (err) {
     console.warn('Real-time backend client registry sweep pending cluster stability verification.')
   }
 
-  // Setup Supabase Realtime Subscription for the public devices table
-  realtimeChannel = supabase.channel('public:devices')
+  // Setup Supabase Realtime Subscription for the public devices table with a unique mount channel name
+  const channelName = `public:devices:${Math.random().toString(36).substring(7)}`;
+  realtimeChannel = supabase.channel(channelName)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, payload => {
       console.log('Realtime Device Telemetry Update:', payload)
       const eventType = payload.eventType

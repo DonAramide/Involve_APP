@@ -84,6 +84,10 @@ class OnboardingNavigator {
             'emailVerified': payload['completedChannels']?.contains('EMAIL') ?? false,
             'phoneVerified': payload['completedChannels']?.contains('WHATSAPP') ?? false,
             'isTrial': payload['isTrial'],
+            'country': payload['country'],
+            'state': payload['state'],
+            'lga': payload['lga'],
+            'streetAddress': payload['streetAddress'],
           });
           signupSuccess = true;
           break;

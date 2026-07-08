@@ -4,6 +4,11 @@
  * SOC-Grade Telemetry Safety Circuit Breaker
  * Ensures that guidance layers never block or degrade real-time metrics,
  * chart renders, or live websocket operations.
+ *
+ * THRESHOLDS (updated):
+ *   FPS trip:    < 22 fps  (was 40 — too aggressive for dev/low-end hardware)
+ *   FPS recover: > 30 fps  (hysteresis band prevents flip-flopping)
+ *   EPS trip:    > 2000 eps (was 500 — too low for normal activity)
  */
 class PerformanceGuard {
   constructor() {
@@ -14,8 +19,12 @@ class PerformanceGuard {
     
     this.frameCount = 0
     this.lastFpsCheck = performance.now()
-    this.breakerTripThresholdFps = 40
-    this.breakerTripThresholdEps = 500
+    
+    // Trip thresholds with hysteresis to prevent rapid oscillation
+    this.TRIP_FPS     = 22    // Trip  when FPS drops below this
+    this.RECOVER_FPS  = 30    // Clear when FPS recovers above this
+    this.TRIP_EPS     = 2000  // Trip  when event rate exceeds this
+    this.RECOVER_EPS  = 1500  // Clear when event rate drops below this
     
     // Start FPS tracking in browser environment
     if (typeof window !== 'undefined') {
@@ -63,16 +72,29 @@ class PerformanceGuard {
   }
 
   evaluateBreakerStatus() {
-    const shouldTrip = 
-      this.activeFps < this.breakerTripThresholdFps || 
-      this.messageRateEps > this.breakerTripThresholdEps
+    let shouldTrip
+
+    if (this.tripped) {
+      // Currently tripped: only clear when metrics recover past the RECOVERY threshold (hysteresis)
+      const fpsRecovered = this.activeFps >= this.RECOVER_FPS
+      const epsRecovered = this.messageRateEps <= this.RECOVER_EPS
+      shouldTrip = !(fpsRecovered && epsRecovered)
+    } else {
+      // Currently clear: only trip when metrics exceed the TRIP threshold
+      const fpsCritical  = this.activeFps < this.TRIP_FPS
+      const epsCritical  = this.messageRateEps > this.TRIP_EPS
+      shouldTrip = fpsCritical || epsCritical
+    }
 
     if (shouldTrip !== this.tripped) {
       this.tripped = shouldTrip
-      console.warn(
-        `Contextual Intelligence Performance Breaker state shifted to: ${this.tripped ? 'ACTIVE (TRIPPED)' : 'NOMINAL'}. ` +
-        `FPS: ${this.activeFps}, WS-Rate: ${this.messageRateEps} EPS`
-      )
+      // Use debug-level logging — this should not appear in normal console output
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug(
+          `[PerfGuard] Breaker → ${this.tripped ? 'TRIPPED' : 'NOMINAL'} ` +
+          `(FPS: ${this.activeFps}, EPS: ${this.messageRateEps})`
+        )
+      }
       this.notifyListeners()
     }
   }
@@ -96,3 +118,4 @@ class PerformanceGuard {
 }
 
 export const ContextualPerformanceGuard = new PerformanceGuard()
+

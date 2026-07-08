@@ -9,7 +9,10 @@
             <q-icon name="account_balance_wallet" size="200px" />
           </div>
           <div class="column items-center">
-            <div class="text-overline text-indigo-3 letter-spacing-1">TOTAL AVAILABLE BALANCE</div>
+            <div class="row items-center">
+              <div class="text-overline text-indigo-3 letter-spacing-1">TOTAL AVAILABLE BALANCE</div>
+              <enterprise-context-hint registry-key="virtual-account" class="q-ml-xs" />
+            </div>
             <div class="text-h1 text-weight-bolder text-cyan-4 q-my-md animate-pop">
               {{ currentCurrency.symbol }}{{ balance.toLocaleString() }}
             </div>
@@ -102,6 +105,7 @@
 <script setup>
 import { useCurrency } from '../composables/useCurrency';
 const { currentCurrency } = useCurrency();
+import EnterpriseContextHint from '../components/contextual/EnterpriseContextHint.vue';
 
 import { ref, onMounted, computed } from 'vue'
 import { adminApi } from '../api'

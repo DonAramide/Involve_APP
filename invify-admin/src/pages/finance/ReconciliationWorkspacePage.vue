@@ -50,37 +50,37 @@
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Reconciliation Rate</div>
-          <div class="text-h5 text-metric-mono text-green-4">99.8% <q-icon name="trending_up" size="xs"/></div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ summaryStats.reconciliationRate }}% <q-icon name="trending_up" size="xs"/></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Matched</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">1.2M</div>
+          <div class="text-h5 text-metric-mono text-cyan-4">{{ summaryStats.matched }}</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Pending Match</div>
-          <div class="text-h5 text-metric-mono text-amber-5">4,302</div>
+          <div class="text-h5 text-metric-mono text-amber-5">{{ summaryStats.unmatched }}</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
           <div class="text-operator-title text-muted">Mismatch Amount</div>
-          <div class="text-h5 text-metric-mono text-red-4">{{ currentCurrency.symbol }}142.5K</div>
+          <div class="text-h5 text-metric-mono text-red-4">{{ currentCurrency.symbol }}{{ summaryStats.mismatchAmount.toLocaleString() }}</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg" @click="activeWorkspaceTab = 'exceptions'">
-          <div class="text-operator-title text-muted">Exceptions / Duplicates</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">12 / 4</div>
+          <div class="text-operator-title text-muted">Exceptions / Issues</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">{{ summaryStats.issues }}</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-2">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg" @click="activeWorkspaceTab = 'missing'">
           <div class="text-operator-title text-muted">Missing Settlements</div>
-          <div class="text-h5 text-metric-mono text-purple-4">2</div>
+          <div class="text-h5 text-metric-mono text-purple-4">0</div>
         </div>
       </div>
     </div>
@@ -242,12 +242,12 @@
           <!-- Operational Action Center -->
           <div class="row items-center op-gap-8 bg-dark q-pa-sm rounded-borders border-muted">
             <div class="text-caption font-mono text-muted q-mr-sm">ACTIONS:</div>
-            <q-btn outline size="xs" color="cyan-4" icon="receipt_long" label="Open Ledger" />
-            <q-btn outline size="xs" color="indigo-4" icon="account_balance" label="Open Settlement" />
-            <q-btn outline size="xs" color="amber-4" icon="person_add" label="Assign" />
-            <q-btn outline size="xs" color="red-4" icon="gavel" label="Escalate" />
+            <q-btn outline size="xs" color="cyan-4" icon="receipt_long" label="Open Ledger" @click="drawerTab = 'ledger'" />
+            <q-btn outline size="xs" color="indigo-4" icon="account_balance" label="Open Settlement" @click="drawerTab = 'settlement'" />
+            <q-btn outline size="xs" color="amber-4" icon="person_add" label="Assign" @click="executeCommand('assign')" />
+            <q-btn outline size="xs" color="red-4" icon="gavel" label="Escalate" @click="executeCommand('escalate')" />
             <q-space />
-            <q-btn size="xs" color="green-4" text-color="dark" icon="check_circle" label="Force Match" v-if="selectedRecon.status !== 'MATCHED'" />
+            <q-btn size="xs" color="green-4" text-color="dark" icon="check_circle" label="Force Match" v-if="selectedRecon.status !== 'MATCHED'" @click="executeCommand('forceMatch')" />
           </div>
         </div>
 
@@ -351,14 +351,69 @@
             </q-tab-panel>
 
             <!-- PLACEHOLDERS FOR OTHERS -->
-            <q-tab-panel name="ledger" class="q-pa-md flex flex-center"><div class="text-muted font-mono">Ledger Entries Data View</div></q-tab-panel>
-            <q-tab-panel name="settlement" class="q-pa-md flex flex-center"><div class="text-muted font-mono">Settlement Records View</div></q-tab-panel>
-            <q-tab-panel name="wallet" class="q-pa-md flex flex-center"><div class="text-muted font-mono">Wallet Movement View</div></q-tab-panel>
-            <q-tab-panel name="card" class="q-pa-md flex flex-center"><div class="text-muted font-mono">Card Processor View</div></q-tab-panel>
-            <q-tab-panel name="bank" class="q-pa-md flex flex-center"><div class="text-muted font-mono">Bank Record View</div></q-tab-panel>
-            <q-tab-panel name="audit" class="q-pa-md flex flex-center"><div class="text-muted font-mono">Audit Trail View</div></q-tab-panel>
-            <q-tab-panel name="timeline" class="q-pa-md flex flex-center"><div class="text-muted font-mono">Chronological Timeline View</div></q-tab-panel>
-            <q-tab-panel name="resolution" class="q-pa-md flex flex-center"><div class="text-muted font-mono">Resolution History View</div></q-tab-panel>
+            <q-tab-panel name="ledger" class="q-pa-md column">
+              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
+                <q-icon name="receipt_long" color="grey-6" size="xl" class="q-mb-md" />
+                <div class="text-h6 text-muted">No Data Available</div>
+                <div class="text-caption text-grey-6 text-center">Ledger entries for this reconciliation case are either missing or have not been ingested.</div>
+              </div>
+            </q-tab-panel>
+            
+            <q-tab-panel name="settlement" class="q-pa-md column">
+              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
+                <q-icon name="account_balance" color="amber-6" size="xl" class="q-mb-md" />
+                <div class="text-h6 text-muted">Not Yet Configured</div>
+                <div class="text-caption text-grey-6 text-center">Settlement engine integration is pending implementation for this flow.</div>
+              </div>
+            </q-tab-panel>
+            
+            <q-tab-panel name="wallet" class="q-pa-md column">
+              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
+                <q-icon name="account_balance_wallet" color="cyan-6" size="xl" class="q-mb-md" />
+                <div class="text-h6 text-muted">Not Yet Configured</div>
+                <div class="text-caption text-grey-6 text-center">Wallet telemetry subtab not yet configured.</div>
+              </div>
+            </q-tab-panel>
+            
+            <q-tab-panel name="card" class="q-pa-md column">
+              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
+                <q-icon name="credit_card" color="indigo-6" size="xl" class="q-mb-md" />
+                <div class="text-h6 text-muted">Not Yet Configured</div>
+                <div class="text-caption text-grey-6 text-center">Card Network integration not yet configured.</div>
+              </div>
+            </q-tab-panel>
+            
+            <q-tab-panel name="bank" class="q-pa-md column">
+              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
+                <q-icon name="food_bank" color="green-6" size="xl" class="q-mb-md" />
+                <div class="text-h6 text-muted">Not Yet Configured</div>
+                <div class="text-caption text-grey-6 text-center">Direct bank node integration not yet configured.</div>
+              </div>
+            </q-tab-panel>
+            
+            <q-tab-panel name="audit" class="q-pa-md column">
+              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
+                <q-icon name="policy" color="grey-6" size="xl" class="q-mb-md" />
+                <div class="text-h6 text-muted">No Audit Data</div>
+                <div class="text-caption text-grey-6 text-center">No governance actions or system audits found for this specific case yet.</div>
+              </div>
+            </q-tab-panel>
+            
+            <q-tab-panel name="timeline" class="q-pa-md column">
+              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
+                <q-icon name="timeline" color="grey-6" size="xl" class="q-mb-md" />
+                <div class="text-h6 text-muted">Timeline Unavailable</div>
+                <div class="text-caption text-grey-6 text-center">The chronological timeline events for this flow are not yet generated.</div>
+              </div>
+            </q-tab-panel>
+            
+            <q-tab-panel name="resolution" class="q-pa-md column">
+              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
+                <q-icon name="history" color="grey-6" size="xl" class="q-mb-md" />
+                <div class="text-h6 text-muted">No Resolution History</div>
+                <div class="text-caption text-grey-6 text-center">No historical resolutions or overrides have been applied to this case.</div>
+              </div>
+            </q-tab-panel>
 
           </q-tab-panels>
         </q-scroll-area>
@@ -369,10 +424,13 @@
 </template>
 
 <script setup>
+import { ref, onMounted, computed } from 'vue'
 import { useCurrency } from '../../composables/useCurrency';
-const { currentCurrency } = useCurrency();
+import { reconciliationApi } from '../../api';
+import { useQuasar } from 'quasar';
 
-import { ref } from 'vue'
+const { currentCurrency } = useCurrency();
+const $q = useQuasar();
 
 const activeWorkspaceTab = ref('queues')
 const activeQueueTab = ref('mismatch')
@@ -413,69 +471,59 @@ const reconCols = [
   { name: 'createdDate', label: 'CREATED', field: 'createdDate', align: 'right' }
 ]
 
-const reconRecords = ref([
-  {
-    id: 'REC-2026-9901',
-    txnId: 'TXN-2026-100001',
-    ledgerBatchId: 'BATCH-20260531-001',
-    settlementBatchId: 'SET-2026-300001',
-    walletId: 'WAL-0005',
-    expectedAmount: 45000,
-    actualAmount: 45000,
-    difference: 0,
-    status: 'MATCHED',
-    riskScore: 12,
-    anomalyScore: 0.05,
-    fraudFlags: [],
-    createdDate: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'REC-2026-9902',
-    txnId: 'TXN-2026-100002',
-    ledgerBatchId: 'BATCH-20260531-001',
-    settlementBatchId: 'SET-2026-300002',
-    cardId: 'CARD-9941',
-    expectedAmount: 1250000,
-    actualAmount: 1200000,
-    difference: 50000,
-    status: 'MISMATCH',
-    riskScore: 85,
-    anomalyScore: 0.92,
-    fraudFlags: ['AMOUNT_MISMATCH', 'VELOCITY_BREACH'],
-    createdDate: new Date(Date.now() - 7200000).toISOString()
-  },
-  {
-    id: 'REC-2026-9903',
-    txnId: 'TXN-2026-100003',
-    ledgerBatchId: 'BATCH-20260531-002',
-    settlementBatchId: 'SET-2026-300003',
-    walletId: 'WAL-0009',
-    expectedAmount: 345000,
-    actualAmount: 0,
-    difference: 345000,
-    status: 'FAILED',
-    riskScore: 60,
-    anomalyScore: 0.75,
-    fraudFlags: ['BANK_TIMEOUT'],
-    createdDate: new Date(Date.now() - 14400000).toISOString()
-  }
-])
+const reconRecords = ref([])
+const exceptions = ref([])
 
-// EXCEPTION DATA
-const exceptions = ref([
-  {
-    id: 'EXC-2026-001',
-    type: 'Amount Mismatch',
-    description: 'Ledger recorded {{ currentCurrency.symbol }}1,250,000 but Bank confirmed {{ currentCurrency.symbol }}1,200,000 for Settlement SET-2026-300002.',
-    reconRecord: reconRecords.value[1]
-  },
-  {
-    id: 'EXC-2026-002',
-    type: 'Bank Failure',
-    description: 'Timeout received from NIBSS gateway during reconciliation query.',
-    reconRecord: reconRecords.value[2]
+const summaryStats = ref({
+  totalPayments: 0,
+  matched: 0,
+  unmatched: 0,
+  issues: 0,
+  mismatchAmount: 0,
+  reconciliationRate: 0
+});
+
+const loadData = async () => {
+  try {
+    const res = await reconciliationApi.getReport({ status: 'all' });
+    reconRecords.value = res.data.data || [];
+    summaryStats.value = res.data.summary || summaryStats.value;
+    
+    exceptions.value = reconRecords.value.filter(r => ['MISMATCH', 'FAILED', 'ESCALATED'].includes(r.status)).map(r => ({
+      id: `EXC-${r.id.split('-').pop()}`,
+      type: r.status === 'FAILED' ? 'Bank Failure' : 'Amount Mismatch',
+      description: `Discrepancy detected for transaction ${r.txnId}. Difference: ${r.difference}`,
+      reconRecord: r
+    }));
+  } catch (error) {
+    console.error('Failed to load reconciliation data', error);
+    $q.notify({ color: 'negative', message: 'Failed to load reconciliation data' });
   }
-])
+};
+
+const executeCommand = async (commandName) => {
+  if (!selectedRecon.value) return;
+  try {
+    $q.loading.show();
+    const res = await reconciliationApi[commandName](selectedRecon.value.id, { reason: 'Admin Action', ip: '127.0.0.1' });
+    $q.notify({ color: 'positive', message: `Command ${commandName} executed successfully` });
+    
+    // Optimistic Update
+    if (res.data.newStatus) {
+      selectedRecon.value.status = res.data.newStatus;
+      const idx = reconRecords.value.findIndex(r => r.id === selectedRecon.value.id);
+      if (idx !== -1) reconRecords.value[idx].status = res.data.newStatus;
+    }
+  } catch (error) {
+    $q.notify({ color: 'negative', message: error.response?.data?.error || `Command ${commandName} failed` });
+  } finally {
+    $q.loading.hide();
+  }
+};
+
+onMounted(() => {
+  loadData();
+});
 
 </script>
 

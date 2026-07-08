@@ -4,7 +4,10 @@
     <!-- Header -->
     <div class="row items-center q-mb-lg">
       <div class="col">
-        <h1 class="text-h4 text-weight-bold q-ma-none text-white">Ledger Explorer</h1>
+        <div class="row items-center">
+          <h1 class="text-h4 text-weight-bold q-ma-none text-white">Ledger Explorer</h1>
+          <enterprise-context-hint registry-key="treasury-ledger" class="q-ml-sm" />
+        </div>
         <div class="text-grey-6">Immutable source of truth for all platform financial movements.</div>
       </div>
       <div class="col-auto">
@@ -124,6 +127,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { adminApi } from '../api'
+import EnterpriseContextHint from '../components/contextual/EnterpriseContextHint.vue'
 
 const loading = ref(false)
 const rows = ref([])

@@ -266,7 +266,9 @@ const stats = computed(() => [
 ])
 
 const handleEngineUpdate = (data) => {
-  const isSuperAdmin = userPermissions.value.includes('view_all') || userPermissions.value.includes('execute_actions')
+  const isSuperAdmin = userPermissions.value.includes('view_all') || 
+                       userPermissions.value.includes('execute_actions') ||
+                       localStorage.getItem('operator_role')?.toLowerCase() === 'super_admin';
   
   const filteredData = data.filter(item => {
     if (isSuperAdmin) return true

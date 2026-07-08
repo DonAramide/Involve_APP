@@ -478,6 +478,32 @@
                 </q-card-section>
               </q-card>
             </div>
+            
+            <div class="col-12 q-mt-md">
+              <q-card flat bordered class="bg-blue-grey-9 border-teal">
+                <q-card-section>
+                  <div class="text-overline text-teal-3">Address Information</div>
+                  <q-list dark separator class="q-mt-sm">
+                    <q-item>
+                      <q-item-section>Street Address</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.streetAddress || tenant.street_address || 'Not Provided' }}</q-item-section>
+                    </q-item>
+                    <q-item v-if="tenant.kyc_data?.lga || tenant.lga">
+                      <q-item-section>LGA / District</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.lga || tenant.lga }}</q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>State / Region</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.state || tenant.state || 'Not Provided' }}</q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>Country</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.country || tenant.country || 'Not Provided' }}</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card-section>
+              </q-card>
+            </div>
           </div>
         </q-tab-panel>
 

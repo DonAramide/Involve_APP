@@ -51,9 +51,10 @@ import { AdminAgentController } from './modules/agent-portal/controllers/admin-a
 import { CloudMetricsController } from './controllers/cloud-metrics.controller';
 import { DashboardController } from './controllers/dashboard.controller';
 import { CommissionController } from './controllers/commission.controller';
+import { QuasarHealthController } from './controllers/quasar-health.controller';
 
 import { authenticate } from './middleware/auth.middleware';
-import { checkRole, checkTenantAccess } from './middleware/rbac.middleware';
+import { checkRole, checkTenantAccess, checkTenantPermission } from './middleware/rbac.middleware';
 
 const app = express();
 
@@ -148,7 +149,12 @@ app.post('/admin/agents/:id/message-tenants', authenticate, checkRole(['super_ad
 
 app.post('/admin/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
 
-// Tenant Endpoints
+// Quasar Connectivity & Integration Health
+app.get('/api/admin/quasar/health', authenticate, checkRole(['super_admin', 'admin']), QuasarHealthController.getHealthReport);
+app.get('/api/admin/quasar/health/live', authenticate, checkRole(['super_admin', 'admin']), QuasarHealthController.getLiveness);
+app.get('/api/admin/quasar/integrations', authenticate, checkRole(['super_admin', 'admin']), QuasarHealthController.listIntegrations);
+
+// Terminal Management Endpoints
 import { TenantKycController } from './controllers/tenant-kyc.controller';
 app.post('/api/tenant/kyc/upload', TenantKycController.uploadKyc); // Mobile onboarding often doesn't have JWT yet, custom auth in controller
 app.get('/api/tenant/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), TenantKycController.getKycDocuments);
@@ -164,11 +170,13 @@ import activationRoutes from './routes/activation.routes';
 import { authRoutes } from './routes/auth.routes';
 import vaultRoutes from './routes/vault.routes';
 import settingsRoutes from './routes/settings.routes';
+import financeRoutes from './routes/finance.routes';
 
 app.use(activationRoutes);
 app.use('/auth', authRoutes);
 app.use('/vault', vaultRoutes);
 app.use('/settings', settingsRoutes);
+app.use('/finance', financeRoutes);
 
 // Orchestration Endpoints
 app.get('/api/orchestration/context', authenticate, checkRole(['super_admin']), OrchestrationController.getContext);
@@ -332,11 +340,27 @@ app.post('/webhooks/paystack', WebhookController.handlePaystackWebhook);
 app.post('/webhooks/flutterwave', WebhookController.handleFlutterwaveWebhook);
 app.post('/webhooks/stripe', WebhookController.handleStripeWebhook);
 
-app.get('/api/reconciliation', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ReconciliationController.getReport);
-app.post('/api/reconciliation/assign', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ReconciliationController.assign);
-app.post('/api/reconciliation/retry', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ReconciliationController.retry);
+// Reconciliation Endpoints
+app.get('/api/reconciliation', authenticate, checkTenantPermission('reconciliation.view'), ReconciliationController.getReport);
 
+// Reconciliation detail tabs
+app.get('/api/reconciliation/:id/details', authenticate, checkTenantPermission('reconciliation.view'), ReconciliationController.getDetails);
+app.get('/api/reconciliation/:id/ledger', authenticate, checkTenantPermission('reconciliation.view'), ReconciliationController.getLedger);
+app.get('/api/reconciliation/:id/settlement', authenticate, checkTenantPermission('reconciliation.view'), ReconciliationController.getSettlement);
+app.get('/api/reconciliation/:id/wallet', authenticate, checkTenantPermission('reconciliation.view'), ReconciliationController.getWallet);
+app.get('/api/reconciliation/:id/card', authenticate, checkTenantPermission('reconciliation.view'), ReconciliationController.getCard);
+app.get('/api/reconciliation/:id/bank', authenticate, checkTenantPermission('reconciliation.view'), ReconciliationController.getBank);
+app.get('/api/reconciliation/:id/audit', authenticate, checkTenantPermission('reconciliation.audit.view'), ReconciliationController.getAudit);
+app.get('/api/reconciliation/:id/timeline', authenticate, checkTenantPermission('reconciliation.timeline.view'), ReconciliationController.getTimeline);
 
+// Reconciliation Commands
+app.post('/api/reconciliation/:id/assign', authenticate, checkTenantPermission('reconciliation.assign'), ReconciliationController.assign);
+app.post('/api/reconciliation/:id/escalate', authenticate, checkTenantPermission('reconciliation.escalate'), ReconciliationController.escalate);
+app.post('/api/reconciliation/:id/resolve', authenticate, checkTenantPermission('reconciliation.resolve'), ReconciliationController.resolve);
+app.post('/api/reconciliation/:id/force_match', authenticate, checkTenantPermission('reconciliation.force_match'), ReconciliationController.forceMatch);
+app.post('/api/reconciliation/:id/retry', authenticate, checkTenantPermission('reconciliation.retry'), ReconciliationController.retry);
+app.post('/api/reconciliation/:id/lock', authenticate, checkTenantPermission('reconciliation.lock'), ReconciliationController.lock);
+app.post('/api/reconciliation/:id/unlock', authenticate, checkTenantPermission('reconciliation.unlock'), ReconciliationController.unlock);
 // Payout Configuration
 app.get('/api/payout/settings', authenticate, PayoutController.getSettings);
 app.post('/api/payout/settings', authenticate, PayoutController.saveSettings);

@@ -181,8 +181,8 @@ export class PosService {
 
       if (error) {
         console.error('[POS Service] Supabase error loading config:', error.message);
-        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
-          console.warn('[POS Service] Development/Test mode — using in-memory default config.');
+        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'staging') {
+          console.warn('[POS Service] Development/Test/Staging mode — using in-memory default config.');
           if (process.env.NODE_ENV === 'development') {
             await PosService.saveConfig('system_bootstrap');
           }
@@ -194,7 +194,7 @@ export class PosService {
 
       if (!data) {
         console.warn('[POS Service] No config found in Supabase. Saving default config.');
-        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'staging') {
           if (process.env.NODE_ENV === 'development') {
             await PosService.saveConfig('system_bootstrap');
           }
@@ -208,7 +208,7 @@ export class PosService {
       console.log(`[POS Service] Config loaded from Supabase (key_version=${data.key_version}, config_version=${data.config_version})`);
     } catch (e: any) {
       console.error('[POS Service] Failed to load config:', e.message);
-      if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'staging') {
         throw e; // Fail fast in production
       }
     }
@@ -1379,5 +1379,5 @@ PosService.cacheTenantCategory = async (tenantId: string): Promise<void> => {
 // Bootstrap: load config from Supabase (async, fail fast in production)
 PosService.loadConfig().catch((e) => {
   console.error('[POS Service] FATAL: Could not load routing config at startup:', e.message);
-  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test') process.exit(1);
+  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'staging') process.exit(1);
 });

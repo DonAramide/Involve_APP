@@ -4,7 +4,10 @@
     <!-- Header -->
     <div class="row items-center q-mb-lg">
       <div class="col">
-        <h1 class="text-h4 text-weight-bolder q-ma-none text-white">Reconciliation Hub</h1>
+        <div class="row items-center">
+          <h1 class="text-h4 text-weight-bolder q-ma-none text-white">Reconciliation Hub</h1>
+          <enterprise-context-hint registry-key="compliance-drift" class="q-ml-xs" />
+        </div>
         <div class="text-grey-6">Sync check between payment provider intents and immutable ledger entries.</div>
       </div>
       <div class="col-auto">
@@ -202,6 +205,7 @@ const { currentCurrency } = useCurrency();
 import { ref, onMounted } from 'vue'
 import { reconciliationApi, attendanceApi } from '../api'
 import { useQuasar } from 'quasar'
+import EnterpriseContextHint from '../components/contextual/EnterpriseContextHint.vue'
 
 const $q = useQuasar()
 const loading = ref(false)

@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
 import { verificationService } from '../services/verification.service';
+import { QuasarProvisioningService } from '../integrations/quasar/quasar-provisioning.service';
 
 function generateTenantCode(phone: string | undefined | null): string {
   const cleanPhone = (phone || '').replace(/\D/g, '');
@@ -178,6 +179,17 @@ export class OnboardingController {
       });
 
       console.log(`[TELEMETRY] Tenant Provisioned. ID: ${tenant.id}. Industry: ${industry}. Plan: ${plan}.`);
+
+      // ── Quasar Platform Provisioning (async — non-blocking) ───────────────
+      // Runs after the local tenant is committed. Failures are logged but
+      // do NOT roll back the Invify tenant, keeping onboarding atomic.
+      QuasarProvisioningService.provisionMerchant({
+        invifyTenantId: tenant.id,
+        tenantName: businessName,
+        tenantType: industry,
+      }).catch((qErr: Error) =>
+        console.error(`[OnboardingController] Quasar provisioning failed for tenant ${tenant.id}: ${qErr.message}`),
+      );
 
       return res.status(201).json({
         message: 'Stripe-grade Enterprise Provisioning sequence completed successfully.',

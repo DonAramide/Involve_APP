@@ -89,4 +89,59 @@ export class ExecutiveFinanceController {
       return res.status(500).json({ error: 'Failed to generate executive summary' });
     }
   }
+
+  /**
+   * GET /api/finance/payouts/stats
+   * Returns global system aggregates for payouts/settlements
+   */
+  static async getPayoutStats(req: Request, res: Response) {
+    try {
+      // 1. Pending Settlement: SUM of agent_withdrawal_requests where status IN ('REQUESTED', 'UNDER_REVIEW', 'APPROVED')
+      const { data: pendingData, error: pendingErr } = await supabase
+        .from('agent_withdrawal_requests')
+        .select('amount')
+        .in('status', ['REQUESTED', 'UNDER_REVIEW', 'APPROVED']);
+
+      // 2. Cleared Today: SUM of agent_withdrawal_requests where status = 'PAID' and updated_at >= today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { data: clearedData, error: clearedErr } = await supabase
+        .from('agent_withdrawal_requests')
+        .select('amount')
+        .eq('status', 'PAID')
+        .gte('updated_at', today.toISOString());
+
+      // 3. Held Funds: SUM of agent_wallets pending_balance
+      const { data: heldData, error: heldErr } = await supabase
+        .from('agent_wallets')
+        .select('pending_balance');
+
+      // 4. Failed Transfers: COUNT of agent_withdrawal_requests where status = 'REJECTED' and updated_at >= today
+      const { data: failedData, error: failedErr } = await supabase
+        .from('agent_withdrawal_requests')
+        .select('id')
+        .eq('status', 'REJECTED')
+        .gte('updated_at', today.toISOString());
+
+      if (pendingErr) console.error('Error fetching pending settlement:', pendingErr);
+      if (clearedErr) console.error('Error fetching cleared today:', clearedErr);
+      if (heldErr) console.error('Error fetching held funds:', heldErr);
+      if (failedErr) console.error('Error fetching failed transfers:', failedErr);
+
+      const pendingSettlement = pendingData?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0;
+      const clearedToday = clearedData?.reduce((acc: number, curr: any) => acc + Number(curr.amount || 0), 0) || 0;
+      const heldFunds = heldData?.reduce((acc: number, curr: any) => acc + Number(curr.pending_balance || 0), 0) || 0;
+      const failedTransfers = failedData?.length || 0;
+
+      return res.status(200).json({
+        pendingSettlement,
+        clearedToday,
+        heldFunds,
+        failedTransfers
+      });
+    } catch (error: any) {
+      console.error('[ExecutiveFinanceController] getPayoutStats Error:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch payout stats' });
+    }
+  }
 }
