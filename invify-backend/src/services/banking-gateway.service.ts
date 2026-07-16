@@ -41,7 +41,8 @@ export class BankingGatewayService {
     });
     
     const adapter = this.getAdapter(provider as any);
-    return adapter.provisionVirtualAccount(params);
+    const result = await adapter.provisionVirtualAccount(params);
+    return { ...result, provider };
   }
 
   static async nameEnquiry(params: {

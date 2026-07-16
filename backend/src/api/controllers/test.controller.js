@@ -7,6 +7,13 @@ const axios = require('axios');
  * Simulates a provider (Monnify/Paystack) sending a payment notification.
  */
 async function triggerMockWebhook(req, res) {
+    if (
+        process.env.NODE_ENV === 'production' ||
+        process.env.APP_ENV === 'production' ||
+        process.env.BUILD_PROFILE === 'production'
+    ) {
+        return res.status(403).json({ error: 'Mock endpoints are disabled in production' });
+    }
     const { studentId, amount, schoolId, categoryId } = req.body;
 
     if (!studentId || !amount || !schoolId) {

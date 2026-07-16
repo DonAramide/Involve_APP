@@ -1,12 +1,25 @@
 // invify-backend/src/services/ledger.service.ts
 import { supabase } from "../db/supabase";
+import { PoolClient } from "pg";
 
 export type LedgerEntryType = "DEBIT" | "CREDIT";
 
+export type LedgerAccount = 
+  | "USER_WALLET"
+  | "QUASAR_CLEARING"
+  | "EXTERNAL_BANK"
+  | "REVENUE"
+  | "COMMISSIONS"
+  | "TAXES"
+  | "SETTLEMENTS"
+  | "REFUNDS"
+  | "CHARGEBACKS"
+  | "ADJUSTMENTS";
+
 export interface LedgerEntry {
-  account: string;
+  account: LedgerAccount;
   type: LedgerEntryType;
-  amount: number;
+  amount: number; // Enforced as integer (kobo)
 }
 
 export class LedgerService {
@@ -19,9 +32,22 @@ export class LedgerService {
     tenantId: string;
     reference: string;
     entries: LedgerEntry[];
+    actorId?: string;
+    correlationId?: string;
+    requestId?: string;
+    provider?: string;
+    auditId?: string;
     metadata?: any;
-  }) {
-    const { idempotencyKey, tenantId, reference, entries, metadata } = params;
+  }, options?: { pgClient?: PoolClient }) {
+    const { 
+      idempotencyKey, tenantId, reference, entries, 
+      actorId, correlationId, requestId, provider, auditId, metadata 
+    } = params;
+
+    const enrichedMetadata = {
+      ...metadata,
+      identity: { actorId, correlationId, requestId, provider, auditId }
+    };
 
     // 1. Check for existing entry (Idempotency)
     const { data: existing } = await supabase
@@ -37,13 +63,26 @@ export class LedgerService {
 
     // 2. Atomic Transaction: Write entries and the idempotency record
     // We use a database RPC / Function to ensure Atomicity.
-    const { data, error } = await supabase.rpc('process_ledger_double_entry', {
-      p_tenant_id: tenantId,
-      p_idempotency_key: idempotencyKey,
-      p_reference: reference,
-      p_entries: entries,
-      p_metadata: metadata
-    });
+    let data, error;
+    if (options?.pgClient) {
+      try {
+        const query = 'SELECT process_ledger_double_entry($1::uuid, $2::varchar, $3::varchar, $4::jsonb, $5::jsonb) as result';
+        const res = await options.pgClient.query(query, [tenantId, idempotencyKey, reference, JSON.stringify(entries), JSON.stringify(enrichedMetadata)]);
+        data = res.rows[0]?.result;
+      } catch (err: any) {
+        error = err;
+      }
+    } else {
+      const rpcRes = await supabase.rpc('process_ledger_double_entry', {
+        p_tenant_id: tenantId,
+        p_idempotency_key: idempotencyKey,
+        p_reference: reference,
+        p_entries: entries,
+        p_metadata: enrichedMetadata
+      });
+      data = rpcRes.data;
+      error = rpcRes.error;
+    }
 
     if (error) {
       console.error('[Ledger] Atomic Write Failed:', error.message);

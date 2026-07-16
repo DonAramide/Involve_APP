@@ -130,7 +130,7 @@
             style="height: 100%;"
           >
             <template v-slot:body-cell-id="props">
-              <q-td :props="props" class="font-mono text-amber-3 cursor-pointer">
+              <q-td :props="props" class="font-mono text-amber-3 cursor-pointer text-weight-bold" @click="inspectJournal(props.row)">
                 {{ props.value }}
               </q-td>
             </template>

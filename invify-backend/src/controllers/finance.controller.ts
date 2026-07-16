@@ -144,4 +144,52 @@ export class ExecutiveFinanceController {
       return res.status(500).json({ error: 'Failed to fetch payout stats' });
     }
   }
+
+  /**
+   * GET /api/v1/finance/settlement-phases
+   * Returns a chronological timeline of settlement events derived from actual ledger/settlement records.
+   */
+  static async getSettlementPhases(req: Request, res: Response) {
+    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
+
+    try {
+      // Fetch distinct settlement operations from the ledger for this tenant
+      const { data, error } = await supabase
+        .from('ledger_entries')
+        .select('id, entry_type, amount, status, created_at, metadata, reference')
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
+      const phasesMap = new Map<string, any>();
+      
+      data?.forEach(entry => {
+        // derive operational phase from metadata, reference prefix, or type
+        let phaseCode = 'SYSTEM';
+        if (entry.metadata && entry.metadata.source) phaseCode = entry.metadata.source;
+        else if (entry.reference && entry.reference.startsWith('QS-TX')) phaseCode = 'QUASAR_POS';
+        else if (entry.reference && entry.reference.startsWith('QS-PO')) phaseCode = 'TREASURY_PAYOUT';
+        else phaseCode = entry.entry_type || 'UNKNOWN';
+
+        if (!phasesMap.has(phaseCode)) {
+          phasesMap.set(phaseCode, {
+            title: phaseCode.toUpperCase().replace(/_/g, ' ') + ' BATCHING',
+            desc: `Aggregating ${phaseCode} events. Last amount: N${entry.amount}`,
+            active: entry.status === 'completed',
+            timestamp: entry.created_at
+          });
+        }
+      });
+
+      const phases = Array.from(phasesMap.values()).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      return res.status(200).json(phases);
+    } catch (error: any) {
+      console.error('[ExecutiveFinanceController] getSettlementPhases Error:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch settlement phases' });
+    }
+  }
 }

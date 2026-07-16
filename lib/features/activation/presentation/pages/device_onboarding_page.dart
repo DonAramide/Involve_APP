@@ -1,3 +1,5 @@
+
+
 import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -7,17 +9,18 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
-import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:involve_app/features/activation/presentation/pages/verify_email_page.dart';
 import '../utils/onboarding_navigator.dart';
 import '../../data/nigeria_states_lgas.dart';
+import 'package:involve_app/core/widgets/barcode_scanner_dialog.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
 
 class DeviceOnboardingPage extends StatefulWidget {
   const DeviceOnboardingPage({super.key});
+
 
   @override
   State<DeviceOnboardingPage> createState() => _DeviceOnboardingPageState();
@@ -79,7 +82,11 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
     super.initState();
     final state = context.read<SettingsBloc>().state;
     if (state.settings != null) {
-      _businessNameController.text = state.settings!.organizationName;
+      final savedName = state.settings!.organizationName;
+      // Only pre-fill if there's a real saved name (not a placeholder)
+      if (savedName.isNotEmpty && savedName != 'My Business' && savedName != 'My Business (Reset)') {
+        _businessNameController.text = savedName;
+      }
     }
   }
 
@@ -134,6 +141,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         } catch (_) {}
       }
 
+      // ── Collect Device ID and GPS Location before registration ──
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      final gpsLocation = await _getCurrentLocation();
+
       setState(() => _isLoading = false);
 
       // Collect all payload data to pass to the next screen
@@ -146,7 +157,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         'businessName': _businessNameController.text.trim(),
         'industry': _selectedIndustry,
         'themeColor': _primaryColorHex,
-        'agentCode': _agentCodeController.text.trim().isEmpty ? 'AAA000' : _agentCodeController.text.trim(),
+        'agentCode': _agentCodeController.text.trim().isEmpty ? 'AAA000' : _agentCodeController.text.trim().toUpperCase(),
+        'deviceId': deviceId,
+        'location': gpsLocation,
         'country': _selectedCountry,
         'state': _selectedCountry == 'Nigeria' ? _selectedState : _stateController.text.trim(),
         'lga': _selectedCountry == 'Nigeria' ? _selectedLga : null,
@@ -516,6 +529,43 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
 
   Widget _buildStepActions() {
     if (_currentStep < 3) {
+      if (_currentStep == 0) {
+        return Column(
+          children: [
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() => _currentStep++);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('NEXT STEP', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: () => _startLinkQrScan(context),
+                icon: const Icon(Icons.qr_code_scanner, size: 18),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF818CF8)),
+                  foregroundColor: const Color(0xFF818CF8),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                label: const Text('LINK DEVICE TO EXISTING PROFILE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+            ),
+          ],
+        );
+      }
+
       return Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -677,4 +727,111 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       ],
     );
   }
+
+  Future<void> _startLinkQrScan(BuildContext context) async {
+    final scannedCode = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const BarcodeScannerDialog(),
+    );
+
+    if (scannedCode == null || scannedCode.isEmpty) return;
+    if (!mounted) return;
+
+    // Capture context-dependent refs BEFORE any await
+    final settingsBloc = this.context.read<SettingsBloc>();
+
+    // Parse the QR payload
+    try {
+      final data = jsonDecode(scannedCode);
+      if (data['action'] == 'LINK_DEVICE') {
+        final token = data['token'] as String;
+        final tenantId = data['tenantId'] as String;
+
+        setState(() => _isLoading = true);
+
+        final deviceId = await DeviceInfoService.getDeviceSuffix();
+        final gpsLocation = await _getCurrentLocation();
+
+        final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+        final urls = [
+          'http://localhost:3004/auth/link-device',
+          '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/auth/link-device',
+        ];
+
+        bool linkSuccess = false;
+        String errorMessage = 'Failed to link device';
+
+        for (final url in urls) {
+          try {
+            final response = await dio.post(url, data: {
+              'token': token,
+              'deviceId': deviceId,
+              'agentCode': 'AAA000',
+              'location': gpsLocation,
+              'ownerEmail': 'linked-device@invify.app',
+              'ownerName': 'Linked Terminal User',
+            });
+            if (response.statusCode == 200 && response.data['success'] == true) {
+              linkSuccess = true;
+              break;
+            }
+          } catch (e) {
+            if (e is DioException && e.response != null) {
+              errorMessage = e.response?.data['error'] ?? e.toString();
+            } else {
+              errorMessage = e.toString();
+            }
+          }
+        }
+
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+
+        if (linkSuccess) {
+          final security = SecurityService();
+          await security.setTenantId(tenantId);
+          await StorageService.setOnboardingCompleted(true);
+          await StorageService.saveTrialStartDate(DateTime.now());
+          settingsBloc.add(LoadSettings());
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(this.context).showSnackBar(
+            const SnackBar(
+              content: Text('Device linked successfully! 3-day trial activated.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(this.context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const DashboardPage()),
+            (route) => false,
+          );
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(this.context).showSnackBar(
+            SnackBar(
+              content: Text('Linking failed: $errorMessage'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(this.context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid QR code format for device linking.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
+          content: Text('Error parsing QR code: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 }
+

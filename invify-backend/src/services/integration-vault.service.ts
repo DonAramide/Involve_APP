@@ -61,15 +61,16 @@ export class IntegrationVaultService {
         .update({ status: 'STANDBY', revoked_at: new Date().toISOString() })
         .eq('vault_id', vaultId)
         .eq('environment', payload.environment)
+        .eq('key_name', payload.key_name)
         .eq('status', 'ACTIVE');
     }
 
-    // 3. Insert new ACTIVE credential
+    // 3. Insert new credential (ACTIVE if rotating, STANDBY if not)
     const insertPayload = {
       vault_id: vaultId,
       credential_type: payload.credential_type,
       environment: payload.environment,
-      status: 'ACTIVE',
+      status: payload.rotate_existing ? 'ACTIVE' : 'STANDBY',
       key_name: payload.key_name,
       encrypted_value: encrypted.encryptedValue,
       iv: encrypted.iv,
@@ -113,6 +114,8 @@ export class IntegrationVaultService {
     if (keyName) {
       credQuery = credQuery.eq('key_name', keyName);
     }
+    
+    credQuery = credQuery.limit(1);
 
     const { data: cred, error: credErr } = await credQuery.single();
 
@@ -127,6 +130,50 @@ export class IntegrationVaultService {
     };
 
     return VaultEncryptionUtil.decrypt(payload);
+  }
+
+  /**
+   * Promotes a STANDBY credential to ACTIVE and demotes any existing ACTIVE credential for the same key_name and environment.
+   */
+  static async activateCredential(vaultId: string, credentialId: string) {
+    // 1. Fetch the target credential
+    const { data: targetCred, error: fetchErr } = await supabaseAdmin.from('integration_credentials')
+      .select('environment, key_name')
+      .eq('id', credentialId)
+      .eq('vault_id', vaultId)
+      .single();
+
+    if (fetchErr || !targetCred) throw new Error('Credential not found');
+
+    // 2. Demote current ACTIVE to STANDBY
+    await supabaseAdmin.from('integration_credentials')
+      .update({ status: 'STANDBY', revoked_at: new Date().toISOString() })
+      .eq('vault_id', vaultId)
+      .eq('environment', targetCred.environment)
+      .eq('key_name', targetCred.key_name)
+      .eq('status', 'ACTIVE');
+
+    // 3. Promote target to ACTIVE
+    const { data, error } = await supabaseAdmin.from('integration_credentials')
+      .update({ status: 'ACTIVE', revoked_at: null })
+      .eq('id', credentialId)
+      .select().single();
+
+    if (error) throw new Error(`Failed to activate credential: ${error.message}`);
+    return data;
+  }
+
+  /**
+   * Hard deletes a credential from the vault.
+   */
+  static async deleteCredential(vaultId: string, credentialId: string) {
+    const { error } = await supabaseAdmin.from('integration_credentials')
+      .delete()
+      .eq('id', credentialId)
+      .eq('vault_id', vaultId);
+
+    if (error) throw new Error(`Failed to delete credential: ${error.message}`);
+    return true;
   }
 
   /**

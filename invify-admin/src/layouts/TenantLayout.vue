@@ -56,13 +56,14 @@
           <q-btn-dropdown dense flat size="sm" color="grey-3" :content-style="isDarkMode ? 'background-color: #0f172a; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 6px;' : 'background-color: #FFFFFF; border: 1px solid #D1D5DB;'" class="q-px-xs">
             <template v-slot:label>
               <div class="row items-center op-gap-8 no-wrap text-left">
-                <q-avatar size="24px" class="bg-indigo-9 text-indigo-3 text-weight-bold" style="border: 1px solid rgba(255,255,255,0.1);">
-                  {{ operatorEmail.charAt(0).toUpperCase() }}
+                <q-avatar size="32px" color="indigo-10" text-color="indigo-3" class="text-weight-bold shadow-1 border-indigo">
+                  {{ (operatorName || operatorEmail).charAt(0).toUpperCase() }}
                 </q-avatar>
-                <div class="v-hide-xs">
-                  <div class="text-operator-title text-white" style="font-size: 9px; line-height: 1; letter-spacing: 0.5px;">{{ operatorRole }}</div>
-                  <div class="text-metric-sm text-indigo-3" style="font-size: 10px; margin-top: 1px;">{{ operatorEmail }}</div>
-                </div>
+              
+              <div class="q-ml-sm column justify-center gt-xs">
+                <div class="text-caption text-weight-bold text-white" style="line-height: 1.2;">{{ operatorRole }}</div>
+                <div class="text-metric-sm text-indigo-3" style="font-size: 10px; margin-top: 1px;">{{ operatorName || operatorEmail }}</div>
+              </div>
               </div>
             </template>
             <q-list :dark="isDarkMode" class="bg-panel text-caption q-py-xs" style="min-width: 200px;">
@@ -73,7 +74,7 @@
               </q-item>
               
               <!-- Quick access triggers -->
-              <q-item clickable v-close-popup to="/devices" class="hover-bg rounded-borders q-mx-xs">
+              <q-item v-if="['retail', 'hospitality', 'healthcare'].includes(activeIndustry.toLowerCase())" clickable v-close-popup to="/tenant/devices" class="hover-bg rounded-borders q-mx-xs">
                 <q-item-section avatar><q-icon name="vpn_key" size="xs" color="amber-4" /></q-item-section>
                 <q-item-section class="text-white text-weight-bold">Device Activation</q-item-section>
               </q-item>
@@ -196,6 +197,7 @@ const isDarkMode = ref(true)
 const sidebarCollapsed = ref(true)
 
 const operatorEmail = ref(localStorage.getItem('operator_email') || 'owner@business.com')
+const operatorName = ref('')
 const operatorRole = ref(localStorage.getItem('operator_role') || 'OWNER')
 const activeBusinessName = ref('My Business')
 
@@ -203,6 +205,11 @@ const activeBusinessName = ref('My Business')
 const activeIndustry = ref(localStorage.getItem('tenant_type') || 'school')
 
 const getTenantIdFromToken = () => {
+  // 1. Try explicit local storage first (set during login)
+  const explicitId = localStorage.getItem('tenant_id')
+  if (explicitId) return explicitId
+
+  // 2. Fallback to JWT payload extraction (for mocked auth/legacy)
   const token = localStorage.getItem('invify_token')
   if (!token) return null
   try {
@@ -222,10 +229,18 @@ const loadTenantDetails = async () => {
   if (tenantId) {
     try {
       const res = await adminApi.getTenantDetails(tenantId)
-      if (res.data) {
-        activeBusinessName.value = res.data.name
-        activeIndustry.value = res.data.type || 'school'
+      if (res.data && res.data.tenant) {
+        activeBusinessName.value = res.data.tenant.name || 'My Business'
+        activeIndustry.value = res.data.tenant.type || 'school'
         localStorage.setItem('tenant_type', activeIndustry.value)
+        
+        // Find operator name
+        if (res.data.users && res.data.users.length > 0) {
+          const user = res.data.users.find(u => u.email === operatorEmail.value)
+          if (user && user.full_name) {
+            operatorName.value = user.full_name
+          }
+        }
       }
     } catch (e) {
       console.error('Failed to load active business branding:', e)
@@ -258,9 +273,18 @@ const industryNavigationTree = computed(() => {
   const mode = activeIndustry.value.toLowerCase()
   if (mode === 'school') {
     return [
-      { label: 'Curriculum & Courses', path: '/tenant/curriculum', icon: 'school', color: 'indigo-4', mode: 'SCHOOL' },
-      { label: 'Daily Lesson Notes', path: '/tenant/notes', icon: 'menu_book', color: 'indigo-3', mode: 'SCHOOL' },
-      { label: 'Student Attendance Tracker', path: '/tenant/attendance', icon: 'how_to_reg', color: 'green-4', mode: 'SCHOOL' }
+      { label: 'Dashboard', path: '/tenant/analytics', icon: 'dashboard', color: 'indigo-4', mode: 'SCHOOL' },
+      { label: 'Admissions', path: '/tenant/users?pipeline=ADMISSION', icon: 'how_to_reg', color: 'indigo-3', mode: 'SCHOOL' },
+      { label: 'Students', path: '/tenant/users?type=STUDENT', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
+      { label: 'Guardians', path: '/tenant/users?type=GUARDIAN', icon: 'family_restroom', color: 'cyan-4', mode: 'SCHOOL' },
+      { label: 'Academics', path: '/tenant/curriculum', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },
+      { label: 'Finance', path: '/tenant/transactions', icon: 'receipt_long', color: 'amber-4', mode: 'SCHOOL' },
+      { label: 'Inventory', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'deep-orange-4', mode: 'SCHOOL' },
+      { label: 'Library', path: '/tenant/curriculum', icon: 'library_books', color: 'brown-4', mode: 'SCHOOL' },
+      { label: 'Transport', path: '/tenant/logistics/fleet', icon: 'directions_bus', color: 'blue-grey-4', mode: 'SCHOOL' },
+      { label: 'Staff', path: '/tenant/users?role=TEACHER', icon: 'people', color: 'grey-4', mode: 'SCHOOL' },
+      { label: 'Communication', path: '/tenant/settings', icon: 'campaign', color: 'blue-4', mode: 'SCHOOL' },
+      { label: 'Reports', path: '/tenant/analytics', icon: 'insert_chart', color: 'teal-4', mode: 'SCHOOL' }
     ]
   } else if (mode === 'retail') {
     return [

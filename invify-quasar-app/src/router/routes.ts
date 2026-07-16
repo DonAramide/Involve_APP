@@ -6,18 +6,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import('layouts/MainLayout.vue'),
     children: [
       { path: '', component: () => import('pages/IndexPage.vue') },
-      { path: 'finance/:catchAll(.*)*', component: () => import('pages/MockDashboard.vue') },
-      { path: 'treasury/:catchAll(.*)*', component: () => import('pages/MockDashboard.vue') },
-      { path: 'governance/:catchAll(.*)*', component: () => import('pages/MockDashboard.vue') },
-      { path: 'fraud/:catchAll(.*)*', component: () => import('pages/MockDashboard.vue') },
-      { path: 'automation/:catchAll(.*)*', component: () => import('pages/MockDashboard.vue') },
-      { path: 'ai/:catchAll(.*)*', component: () => import('pages/MockDashboard.vue') },
-      { path: 'executive/:catchAll(.*)*', component: () => import('pages/MockDashboard.vue') }
+      { path: 'finance/:catchAll(.*)*', component: () => import('pages/FinanceDashboard.vue') },
+      { path: 'treasury/:catchAll(.*)*', component: () => import('pages/TreasuryDashboard.vue') },
+      { path: 'governance/:catchAll(.*)*', component: () => import('pages/GovernanceDashboard.vue') },
+      { path: 'fraud/:catchAll(.*)*', component: () => import('pages/FraudDashboard.vue') },
+      { path: 'automation/:catchAll(.*)*', component: () => import('pages/GovernanceDashboard.vue') }, // Re-routing automation to governance temporarily
+      { path: 'ai/:catchAll(.*)*', component: () => import('pages/AiDashboard.vue') },
+      { path: 'executive/:catchAll(.*)*', component: () => import('pages/ExecutiveDashboard.vue') }
     ],
   },
   {
     path: '/login',
-    component: () => import('pages/MockDashboard.vue') // Placeholder
+    component: () => import('pages/LoginPage.vue')
   },
   {
     path: '/register',

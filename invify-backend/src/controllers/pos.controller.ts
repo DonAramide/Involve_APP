@@ -215,7 +215,7 @@ export class PosController {
       error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
       error.message?.includes('timeout') ||
       error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-      process.env.OFFLINE_MOCK_AUTH === 'true'
+      process.env.OFFLINE_LOCAL_AUTH === 'true'
     );
   }
 }

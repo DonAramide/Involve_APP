@@ -31,7 +31,7 @@ export class QueueMonitor {
    * Returns a unified snapshot across all registered queues.
    */
   static async getSnapshot(): Promise<QueueMonitorSnapshot> {
-    const messages = QueueRegistry.getMockMessages();
+    const messages = QueueRegistry.getInMemoryMessages();
     const queues: QueueSummary[] = [];
 
     for (const queueName of ALL_QUEUES) {

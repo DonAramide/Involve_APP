@@ -1,4 +1,4 @@
-import axios from 'axios';
+import { EnterpriseHttpClient } from '../utils/http-client';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -7,6 +7,11 @@ export class WhatsAppService {
   private readonly baseUrl = 'https://graph.facebook.com/v19.0';
   private readonly phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   private readonly accessToken = process.env.META_ACCESS_TOKEN;
+  private httpClient = new EnterpriseHttpClient({
+    providerName: 'WhatsApp',
+    timeout: parseInt(process.env.WHATSAPP_TIMEOUT_MS || '5000', 10),
+    maxRetries: 3
+  });
 
   public async sendOtpTemplate(to: string, otp: string): Promise<boolean> {
     if (!this.phoneNumberId || !this.accessToken) {
@@ -52,7 +57,7 @@ export class WhatsAppService {
       };
 
       const url = `${this.baseUrl}/${this.phoneNumberId}/messages`;
-      await axios.post(url, payload, {
+      await this.httpClient.post(url, payload, {
         headers: {
           'Authorization': `Bearer ${this.accessToken}`,
           'Content-Type': 'application/json'

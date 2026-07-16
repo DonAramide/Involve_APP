@@ -7,10 +7,7 @@ export const useTenantComplianceStore = defineStore('tenantCompliance', {
   }),
   actions: {
     loadCompliance() {
-      this.documents = [
-        { id: 'DOC-101', name: 'Certificate of Incorporation', status: 'Approved' },
-        { id: 'DOC-102', name: 'Director ID', status: 'Approved' }
-      ];
+      this.documents = [];
     }
   }
 });

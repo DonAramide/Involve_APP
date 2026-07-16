@@ -106,7 +106,7 @@ export class TransferOrchestrator {
       // ==========================================
       // INVIFY INDEPENDENT FINANCIAL VERIFICATION
       // ==========================================
-      const { data: preSeededReq } = await supabaseAdmin
+      const { data: initialReq } = await supabaseAdmin
         .from('quasar_verification_requests')
         .select('*')
         .eq('financial_event_id', eventId)
@@ -121,9 +121,9 @@ export class TransferOrchestrator {
         beneficiaryBankCode: params.beneficiaryBankCode,
         provider: provider,
         metadata: {
-          nonce: preSeededReq?.nonce,
-          signature: preSeededReq?.signed_token,
-          test_force_liquidity_fail: preSeededReq?.signed_token === 'force_liquidity_fail'
+          nonce: initialReq?.nonce,
+          signature: initialReq?.signed_token,
+          test_force_liquidity_fail: initialReq?.signed_token === 'force_liquidity_fail'
         }
       });
 

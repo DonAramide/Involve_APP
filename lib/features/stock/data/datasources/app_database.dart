@@ -17,6 +17,7 @@ import 'package:involve_app/features/school/data/models/school_tables.dart';
 import 'package:involve_app/features/printer/data/models/printer_table.dart';
 import 'package:involve_app/features/services/data/models/services_tables.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/core/sync/data/models/outbox_table.dart';
 
 part 'app_database.g.dart';
 
@@ -53,10 +54,12 @@ part 'app_database.g.dart';
   ServiceLaborPresets,
   ServiceExpenseCategories,
   CurriculumMap,
-  LessonNotes
+  LessonNotes,
+  OutboxTable
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(connection.connect());
+  AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
   int get schemaVersion => 82;

@@ -23,7 +23,7 @@ export class TerminalSyncService {
     let deviceRecord: any = null;
     try {
       const { data, error } = await supabase
-        .from('devices')
+        .from('device_registrations')
         .select('*, tenants(id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code)')
         .eq('device_id', deviceId)
         .maybeSingle();

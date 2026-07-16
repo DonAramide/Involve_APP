@@ -768,7 +768,7 @@ export class AgentController {
       }
 
       // Check if mock mode is active
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         return res.status(200).json({
           success: true,
           message: 'Suspension resolution successfully submitted (Mock Mode)'

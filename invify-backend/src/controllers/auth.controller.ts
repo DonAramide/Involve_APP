@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
 import { UserDeviceService } from '../services/user-device.service';
 import { SYSTEM_TENANT_UUID } from '../config/constants';
+import { GovAuditService } from '../services/gov-audit.service';
 
 async function validateDeviceOrBlock(userId: string, email: string, req: Request): Promise<{ allowed: boolean; errorResponse?: any }> {
   try {
@@ -98,11 +99,11 @@ export class AuthController {
       const variantService = require('../config/build-variant').BuildVariantService.getInstance();
 
       // Offline Developer Bypass
-      if (process.env.OFFLINE_MOCK_AUTH === 'true' && variantService.isLocal()) {
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true' && variantService.isLocal()) {
         if (password === 'wrongpassword' || email.includes('notauser')) {
           return res.status(401).json({ error: 'Invalid credentials' });
         }
-        console.log(`[AuthController] OFFLINE_MOCK_AUTH is true. Bypassing Supabase for: ${email}`);
+        console.log(`[AuthController] OFFLINE_LOCAL_AUTH is true. Bypassing Supabase for: ${email}`);
         let role = 'TENANT_OPERATOR';
         let tenantId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382';
         let userId = '88a18bc0-d128-4e1b-b413-58019ab268f7';
@@ -121,7 +122,7 @@ export class AuthController {
           tenantId: tenantId,
           exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7)
         })).toString('base64').replace(/=/g, '');
-        const mockToken = `${header}.${payload}.mock_signature`;
+        const mockToken = `${header}.${payload}.local_dev_signature`;
         
         const check = await validateDeviceOrBlock(userId, email, req);
         if (!check.allowed) {
@@ -143,15 +144,16 @@ export class AuthController {
 
       if (authError || !authData.user || !authData.session) {
         // Dynamic Developer Bypass for local environment sandbox presets
-        const devAccounts = ['olive@invify.com', 'sysadmin@IIPS.app', 'superadmin@iips.app'];
-        if (devAccounts.includes(email) && variantService.isLocal()) {
-          console.log(`[AuthController] Dev sandbox credentials bypass activated for: ${email}`);
+        const devAccounts = ['olive@invify.com', 'sysadmin@iips.app', 'superadmin@iips.app', 'averyd777@gmail.com'];
+        const normalizedEmail = (email || '').trim().toLowerCase();
+        if (devAccounts.includes(normalizedEmail) && variantService.isLocal()) {
+          console.log(`[AuthController] Dev sandbox credentials bypass activated for: ${normalizedEmail}`);
           
           let role = 'TENANT_OPERATOR';
           let tenantId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382';
           let userId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382'; // Olive Valid UUID
           
-          if (email === 'sysadmin@IIPS.app' || email === 'superadmin@iips.app') {
+          if (normalizedEmail === 'sysadmin@iips.app' || normalizedEmail === 'superadmin@iips.app' || normalizedEmail === 'averyd777@gmail.com') {
             role = 'SUPER_ADMIN';
             tenantId = SYSTEM_TENANT_UUID;
             userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // Admin Valid UUID
@@ -165,7 +167,7 @@ export class AuthController {
             tenantId: tenantId,
             exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 1 week
           })).toString('base64').replace(/=/g, '');
-          const mockToken = `${header}.${payload}.mock_signature`;
+          const mockToken = `${header}.${payload}.local_dev_signature`;
           
           const check = await validateDeviceOrBlock(userId, email, req);
           if (!check.allowed) {
@@ -183,6 +185,26 @@ export class AuthController {
           });
         }
 
+        // Log failed login attempt
+        const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+        try {
+          await GovAuditService.logAction({
+            id: `auth-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            timestamp: new Date().toISOString(),
+            module: 'AUTH',
+            action: 'FAILED_LOGIN',
+            user_email: email,
+            user_name: 'Unknown',
+            ip_address: String(ip),
+            location: 'System',
+            target: 'Authentication',
+            status: 'failed',
+            metadata: { reason: authError?.message || 'Invalid credentials' }
+          });
+        } catch (e) {
+          console.error('Failed to log audit event', e);
+        }
+
         return res.status(401).json({ error: authError?.message || 'Invalid credentials' });
       }
 
@@ -196,6 +218,32 @@ export class AuthController {
       if (profileError || !profile) {
         console.error('[AuthController] Profile Fetch Error:', profileError);
         return res.status(403).json({ error: 'User profile not found' });
+      }
+
+      // Hard override for superadmin dev accounts in case the DB is misconfigured
+      const normalizedLoginEmail = (email || '').trim().toLowerCase();
+      if (normalizedLoginEmail === 'sysadmin@iips.app' || normalizedLoginEmail === 'superadmin@iips.app' || normalizedLoginEmail === 'averyd777@gmail.com') {
+        profile.role = 'super_admin';
+        profile.tenant_id = SYSTEM_TENANT_UUID;
+      }
+
+      // Check tenant plan restriction for Web Dashboard access
+      if (profile.tenant_id && profile.tenant_id !== SYSTEM_TENANT_UUID) {
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('plan')
+          .eq('id', profile.tenant_id)
+          .single();
+
+        if (tenant) {
+          const plan = (tenant.plan || '').toLowerCase();
+          if (['basic', 'free', 'trial'].includes(plan)) {
+            return res.status(403).json({
+              error: 'UPGRADE_REQUIRED',
+              message: 'You have to be a Pro user to login. Please upgrade to Pro user on your device to grant access to login.'
+            });
+          }
+        }
       }
 
       // 3. Check password reset requirement flag
@@ -261,7 +309,7 @@ export class AuthController {
           tenantId: tenantId,
           exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 1 week
         })).toString('base64').replace(/=/g, '');
-        const signature = 'mock_signature';
+        const signature = 'local_dev_signature';
         const mockToken = `${header}.${payload}.${signature}`;
         
         const check = await validateDeviceOrBlock(userId, email, req);

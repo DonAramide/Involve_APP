@@ -21,7 +21,7 @@ export class WebhookMonitor {
     const webhookMetrics = await QueueMetricsCollector.getMetrics('WEBHOOK');
     const replayMetrics = await QueueMetricsCollector.getMetrics('REPLAY');
 
-    const dlqMessages = QueueRegistry.getMockMessages().filter(
+    const dlqMessages = QueueRegistry.getInMemoryMessages().filter(
       (m) => m.queue_name === 'DLQ'
     );
 

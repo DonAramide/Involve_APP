@@ -58,12 +58,19 @@ export class SearchController {
 
       // 2. Exact Entity ID Lookups from Databases (Supabase)
       let terminals: any[] = [];
+      const user = (req as any).user;
+      
       try {
-        const { data: termData, error: termErr } = await supabase
+        let q = supabase
           .from('terminal_inventory')
           .select('terminal_id, mpos_terminal_id, terminal_type, bank_name')
-          .or(`terminal_id.ilike.%${query}%,mpos_terminal_id.ilike.%${query}%,pos_serial_number.ilike.%${query}%`)
-          .limit(3);
+          .or(`terminal_id.ilike.%${query}%,mpos_terminal_id.ilike.%${query}%,pos_serial_number.ilike.%${query}%`);
+          
+        if (user?.role !== 'super_admin' && user?.tenantId) {
+          q = q.eq('tenant_id', user.tenantId);
+        }
+        
+        const { data: termData, error: termErr } = await q.limit(3);
         
         if (termErr) throw termErr;
         terminals = termData || [];
@@ -74,11 +81,16 @@ export class SearchController {
 
       let tenants: any[] = [];
       try {
-        const { data: tenantData, error: tenantErr } = await supabase
+        let q = supabase
           .from('tenants')
           .select('id, name, type, status')
-          .or(`id.ilike.%${query}%,name.ilike.%${query}%`)
-          .limit(3);
+          .or(`id.ilike.%${query}%,name.ilike.%${query}%`);
+          
+        if (user?.role !== 'super_admin' && user?.tenantId) {
+          q = q.eq('id', user.tenantId);
+        }
+
+        const { data: tenantData, error: tenantErr } = await q.limit(3);
         
         if (tenantErr) throw tenantErr;
         tenants = tenantData || [];
@@ -142,7 +154,7 @@ export class SearchController {
       error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
       error.message?.includes('timeout') ||
       error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-      process.env.OFFLINE_MOCK_AUTH === 'true'
+      process.env.OFFLINE_LOCAL_AUTH === 'true'
     );
   }
 }

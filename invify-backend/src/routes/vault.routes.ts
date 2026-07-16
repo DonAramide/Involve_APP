@@ -10,6 +10,8 @@ const router = Router();
 router.get('/integrations', VaultController.listIntegrations);
 router.post('/integrations', VaultController.registerIntegration);
 router.post('/integrations/:vaultId/credentials', VaultController.addCredential);
+router.patch('/integrations/:vaultId/credentials/:credentialId/activate', VaultController.activateCredential);
+router.delete('/integrations/:vaultId/credentials/:credentialId', VaultController.deleteCredential);
 router.post('/integrations/:vaultId/test', VaultController.testConnection);
 
 export default router;

@@ -35,22 +35,23 @@ export interface ProviderSecretRotationJob {
 
 export class SecretDatabaseService {
   // In-memory fallback storage
-  private static mockVersions: ProviderSecretVersion[] = [];
-  private static mockAudits: ProviderSecretAudit[] = [];
-  private static mockRotationJobs: ProviderSecretRotationJob[] = [];
+  private static inMemoryVersions: ProviderSecretVersion[] = [];
+  private static inMemoryAudits: ProviderSecretAudit[] = [];
+  private static inMemoryRotationJobs: ProviderSecretRotationJob[] = [];
 
-  private static useMock = true; // Always fallback/use local mock in test environment since staging DDL is blocked
+  // Bypass in-memory in production to enable horizontal scaling and durability.
+  private static useInMemory = process.env.NODE_ENV !== 'production';
 
-  static clearMockData() {
-    this.mockVersions = [];
-    this.mockAudits = [];
-    this.mockRotationJobs = [];
+  static clearInMemoryData() {
+    this.inMemoryVersions = [];
+    this.inMemoryAudits = [];
+    this.inMemoryRotationJobs = [];
   }
 
   // --- Versions ---
   static async getVersions(provider: string, env: string): Promise<ProviderSecretVersion[]> {
-    if (this.useMock) {
-      return this.mockVersions.filter(v => v.provider === provider && v.environment === env);
+    if (this.useInMemory) {
+      return this.inMemoryVersions.filter(v => v.provider === provider && v.environment === env);
     }
     try {
       const { data, error } = await supabaseAdmin
@@ -61,13 +62,13 @@ export class SecretDatabaseService {
       if (error) throw error;
       return data || [];
     } catch {
-      return this.mockVersions.filter(v => v.provider === provider && v.environment === env);
+      return this.inMemoryVersions.filter(v => v.provider === provider && v.environment === env);
     }
   }
 
   static async insertVersion(version: Partial<ProviderSecretVersion>): Promise<ProviderSecretVersion> {
     const record: ProviderSecretVersion = {
-      id: version.id || Math.random().toString(36).substring(2),
+      id: version.id || require("crypto").randomUUID().substring(2),
       provider: version.provider!,
       key_version: version.key_version!,
       vault_key_reference: version.vault_key_reference!,
@@ -77,8 +78,8 @@ export class SecretDatabaseService {
       expires_at: version.expires_at || null,
       created_at: version.created_at || new Date().toISOString(),
     };
-    if (this.useMock) {
-      this.mockVersions.push(record);
+    if (this.useInMemory) {
+      this.inMemoryVersions.push(record);
       return record;
     }
     try {
@@ -90,16 +91,16 @@ export class SecretDatabaseService {
       if (error) throw error;
       return data;
     } catch {
-      this.mockVersions.push(record);
+      this.inMemoryVersions.push(record);
       return record;
     }
   }
 
   static async updateVersion(id: string, updates: Partial<ProviderSecretVersion>): Promise<void> {
-    if (this.useMock) {
-      const idx = this.mockVersions.findIndex(v => v.id === id);
+    if (this.useInMemory) {
+      const idx = this.inMemoryVersions.findIndex(v => v.id === id);
       if (idx !== -1) {
-        this.mockVersions[idx] = { ...this.mockVersions[idx], ...updates };
+        this.inMemoryVersions[idx] = { ...this.inMemoryVersions[idx], ...updates };
       }
       return;
     }
@@ -110,9 +111,9 @@ export class SecretDatabaseService {
         .eq('id', id);
       if (error) throw error;
     } catch {
-      const idx = this.mockVersions.findIndex(v => v.id === id);
+      const idx = this.inMemoryVersions.findIndex(v => v.id === id);
       if (idx !== -1) {
-        this.mockVersions[idx] = { ...this.mockVersions[idx], ...updates };
+        this.inMemoryVersions[idx] = { ...this.inMemoryVersions[idx], ...updates };
       }
     }
   }
@@ -120,7 +121,7 @@ export class SecretDatabaseService {
   // --- Audits ---
   static async insertAudit(audit: Partial<ProviderSecretAudit>): Promise<ProviderSecretAudit> {
     const record: ProviderSecretAudit = {
-      id: audit.id || Math.random().toString(36).substring(2),
+      id: audit.id || require("crypto").randomUUID().substring(2),
       provider: audit.provider || null,
       key_version: audit.key_version || null,
       action: audit.action!,
@@ -129,8 +130,8 @@ export class SecretDatabaseService {
       details: audit.details || '',
       created_at: new Date().toISOString(),
     };
-    if (this.useMock) {
-      this.mockAudits.push(record);
+    if (this.useInMemory) {
+      this.inMemoryAudits.push(record);
       return record;
     }
     try {
@@ -142,14 +143,14 @@ export class SecretDatabaseService {
       if (error) throw error;
       return data;
     } catch {
-      this.mockAudits.push(record);
+      this.inMemoryAudits.push(record);
       return record;
     }
   }
 
   static async getAudits(): Promise<ProviderSecretAudit[]> {
-    if (this.useMock) {
-      return this.mockAudits;
+    if (this.useInMemory) {
+      return this.inMemoryAudits;
     }
     try {
       const { data, error } = await supabaseAdmin
@@ -158,14 +159,14 @@ export class SecretDatabaseService {
       if (error) throw error;
       return data || [];
     } catch {
-      return this.mockAudits;
+      return this.inMemoryAudits;
     }
   }
 
   // --- Rotation Jobs ---
   static async insertRotationJob(job: Partial<ProviderSecretRotationJob>): Promise<ProviderSecretRotationJob> {
     const record: ProviderSecretRotationJob = {
-      id: job.id || Math.random().toString(36).substring(2),
+      id: job.id || require("crypto").randomUUID().substring(2),
       provider: job.provider!,
       status: job.status || 'PENDING',
       scheduled_at: job.scheduled_at || new Date().toISOString(),
@@ -173,8 +174,8 @@ export class SecretDatabaseService {
       error_message: job.error_message || null,
       created_at: new Date().toISOString(),
     };
-    if (this.useMock) {
-      this.mockRotationJobs.push(record);
+    if (this.useInMemory) {
+      this.inMemoryRotationJobs.push(record);
       return record;
     }
     try {
@@ -186,16 +187,16 @@ export class SecretDatabaseService {
       if (error) throw error;
       return data;
     } catch {
-      this.mockRotationJobs.push(record);
+      this.inMemoryRotationJobs.push(record);
       return record;
     }
   }
 
   static async updateRotationJob(id: string, updates: Partial<ProviderSecretRotationJob>): Promise<void> {
-    if (this.useMock) {
-      const idx = this.mockRotationJobs.findIndex(j => j.id === id);
+    if (this.useInMemory) {
+      const idx = this.inMemoryRotationJobs.findIndex(j => j.id === id);
       if (idx !== -1) {
-        this.mockRotationJobs[idx] = { ...this.mockRotationJobs[idx], ...updates };
+        this.inMemoryRotationJobs[idx] = { ...this.inMemoryRotationJobs[idx], ...updates };
       }
       return;
     }
@@ -206,16 +207,16 @@ export class SecretDatabaseService {
         .eq('id', id);
       if (error) throw error;
     } catch {
-      const idx = this.mockRotationJobs.findIndex(j => j.id === id);
+      const idx = this.inMemoryRotationJobs.findIndex(j => j.id === id);
       if (idx !== -1) {
-        this.mockRotationJobs[idx] = { ...this.mockRotationJobs[idx], ...updates };
+        this.inMemoryRotationJobs[idx] = { ...this.inMemoryRotationJobs[idx], ...updates };
       }
     }
   }
 
   static async getRotationJobs(): Promise<ProviderSecretRotationJob[]> {
-    if (this.useMock) {
-      return this.mockRotationJobs;
+    if (this.useInMemory) {
+      return this.inMemoryRotationJobs;
     }
     try {
       const { data, error } = await supabaseAdmin
@@ -224,7 +225,7 @@ export class SecretDatabaseService {
       if (error) throw error;
       return data || [];
     } catch {
-      return this.mockRotationJobs;
+      return this.inMemoryRotationJobs;
     }
   }
 }

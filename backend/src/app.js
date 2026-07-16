@@ -90,6 +90,7 @@ app.post('/api/finance/transactions/manual', authenticate, FinanceController.rec
 app.post('/api/finance/verify-payment', authenticate, FinanceController.verifyPayment);
 app.get('/api/finance/student/:studentId/balance', authenticate, FinanceController.getStudentBalance);
 app.get('/api/finance/ledger/history', authenticate, FinanceController.getLedgerHistory);
+app.get('/api/finance/settlement-phases', authenticate, FinanceController.getSettlementPhases);
 
 // 3.1 Cash Drawer Management
 app.post('/api/finance/cash/open', authenticate, CashController.openSession);

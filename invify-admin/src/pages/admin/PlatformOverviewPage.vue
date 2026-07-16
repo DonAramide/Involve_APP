@@ -93,13 +93,22 @@
             <q-badge color="cyan-10" text-color="cyan-3" class="font-mono text-weight-bold">RADAR</q-badge>
           </div>
           <div class="col flex flex-center">
-            <VueApexCharts 
-              type="radar" 
-              height="300" 
-              :options="radarChartOptions" 
-              :series="radarChartSeries" 
-              class="full-width"
-            />
+            <template v-if="radarChartSeries && radarChartSeries.length > 0">
+              <VueApexCharts 
+                type="radar" 
+                height="300" 
+                :options="radarChartOptions" 
+                :series="radarChartSeries" 
+                class="full-width"
+              />
+            </template>
+            <template v-else>
+              <div class="text-center q-pa-md border-main rounded-borders border-dashed" style="background: rgba(255,255,255,0.02)">
+                <q-icon name="sensors_off" size="xl" color="grey-7" class="q-mb-sm" />
+                <div class="text-grey-5 font-mono text-caption">Telemetry Unavailable</div>
+                <div class="text-grey-7" style="font-size: 10px;">Prometheus provider not configured</div>
+              </div>
+            </template>
           </div>
         </q-card>
       </div>
@@ -144,14 +153,14 @@
               :style="{ left: node.x + '%', top: node.y + '%' }"
             >
               <div class="ping" :style="{ borderColor: node.color }"></div>
-              <div class="dot" :style="{ background: node.color, boxShadow: '0 0 10px ' + node.color }">
-                <q-tooltip class="bg-dark text-caption font-mono border-main q-pa-sm" style="opacity: 0.95;">
-                  <div class="text-weight-bold">{{ node.tenant }}</div>
-                  <div>Location: {{ node.location }}</div>
-                  <div>Status: <span :style="{ color: node.color }">{{ node.status.toUpperCase() }}</span></div>
-                  <div>Activity: {{ node.activity }} TX/s</div>
-                </q-tooltip>
-              </div>
+              <div class="dot" :style="{ background: node.color, boxShadow: '0 0 10px ' + node.color }"></div>
+              
+              <q-tooltip class="bg-dark text-caption font-mono border-main q-pa-sm" style="opacity: 0.95;">
+                <div class="text-weight-bold">{{ node.tenant }}</div>
+                <div>Location: {{ node.location }}</div>
+                <div>Status: <span :style="{ color: node.color }">{{ node.status.toUpperCase() }}</span></div>
+                <div>Activity: {{ node.activity }} TX/s</div>
+              </q-tooltip>
             </div>
           </div>
 
@@ -221,31 +230,41 @@
           </div>
 
           <!-- Circular Gauges Row -->
-          <div class="row q-col-gutter-sm justify-around q-mb-md text-center font-mono">
-            <div v-for="(res, key) in hardwareResources" :key="key" class="col-3 column items-center">
-              <q-circular-progress
-                show-value
-                class="text-white text-caption text-weight-bold font-mono"
-                :value="res.value"
-                size="60px"
-                :thickness="0.18"
-                :color="res.color"
-                track-color="blue-grey-10"
-              >
-                {{ res.value }}%
-              </q-circular-progress>
-              <div class="text-caption text-grey-5 q-mt-xs" style="font-size: 10px;">{{ res.label }}</div>
+          <template v-if="hardwareResources && Object.keys(hardwareResources).length > 0">
+            <div class="row q-col-gutter-sm justify-around q-mb-md text-center font-mono">
+              <div v-for="(res, key) in hardwareResources" :key="key" class="col-3 column items-center">
+                <q-circular-progress
+                  show-value
+                  class="text-white text-caption text-weight-bold font-mono"
+                  :value="res.value"
+                  size="60px"
+                  :thickness="0.18"
+                  :color="res.color"
+                  track-color="blue-grey-10"
+                >
+                  {{ res.value }}%
+                </q-circular-progress>
+                <div class="text-caption text-grey-5 q-mt-xs" style="font-size: 10px;">{{ res.label }}</div>
+              </div>
             </div>
-          </div>
+          </template>
+          <template v-else>
+            <div class="text-center q-pa-lg border-main rounded-borders border-dashed q-mb-md" style="background: rgba(255,255,255,0.02)">
+              <q-icon name="memory" size="lg" color="grey-7" class="q-mb-sm" />
+              <div class="text-grey-5 font-mono text-caption">Node Exporter Metrics Unavailable</div>
+            </div>
+          </template>
 
           <!-- Hardware Load History Area Chart -->
           <div class="col">
-            <VueApexCharts 
-              type="area" 
-              height="160" 
-              :options="infraChartOptions" 
-              :series="infraChartSeries" 
-            />
+            <template v-if="infraChartSeries && infraChartSeries.length > 0">
+              <VueApexCharts 
+                type="area" 
+                height="160" 
+                :options="infraChartOptions" 
+                :series="infraChartSeries" 
+              />
+            </template>
           </div>
         </q-card>
       </div>
@@ -447,7 +466,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import { io } from 'socket.io-client'
 import VueApexCharts from 'vue3-apexcharts'
 import { DashboardProviderFactory } from '../../services/dashboard/DashboardProviderFactory'
 import type { 
@@ -455,8 +473,19 @@ import type {
   HardwareResource, InfraChartSeries, ActiveModule, TenantMatrixRow
 } from '../../services/dashboard/DashboardDataProvider'
 
+import { useFinanceStore } from '../../stores/finance.store'
+import { useInventoryStore } from '../../stores/inventory.store'
+// Removed missing store import
+import { useRuntimeStore } from '../../stores/runtime.store'
+
 const router = useRouter()
 const $q = useQuasar()
+
+// Stores
+const financeStore = useFinanceStore()
+const inventoryStore = useInventoryStore()
+// const operationsStore = useOperationsStore()
+const runtimeStore = useRuntimeStore()
 
 // State controls
 const timeRange = ref('Last 24 Hours')
@@ -558,14 +587,19 @@ const initializeDashboard = async () => {
 
     // Hydrate state
     kpis.value = kpiData
-    radarChartOptions.value = healthData.options
-    radarChartSeries.value = healthData.series
+    if (healthData.status === 'UNAVAILABLE') {
+      radarChartOptions.value = {}
+      radarChartSeries.value = []
+    } else {
+      radarChartOptions.value = healthData.options
+      radarChartSeries.value = healthData.series
+    }
     mapNodes.value = tenantData
     alerts.value = alertsData
     governanceCards.value = govData
     aiRecommendations.value = recData
-    hardwareResources.value = hardwareData
-    infraChartSeries.value = infraData
+    hardwareResources.value = hardwareData.status === 'UNAVAILABLE' ? {} : hardwareData
+    infraChartSeries.value = infraData.status === 'UNAVAILABLE' ? [] : infraData
     activeModules.value = modulesData
     tenantMatrix.value = matrixData
     
@@ -588,55 +622,30 @@ const initializeDashboard = async () => {
 // Refresh wrapper
 const refreshDashboard = () => {
   initializeDashboard()
-
-  // Initialize Socket.io connection to backend
-  const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3004');
-  
-  socket.on('connect', () => {
-    console.log('[Socket] Connected to telemetry stream');
-    socket.emit('join_room', { type: 'admin' });
-  });
-
-  socket.on('system_telemetry', (data: any) => {
-    if (data && data.cpu) {
-      hardwareResources.value = data;
-    }
-  });
-
-  socket.on('agent_locations', (locations: any[]) => {
-    // Map geographical coordinates (lat/lng) to UI percentage map (x/y)
-    mapNodes.value = locations.map(loc => ({
-      tenant: loc.name,
-      location: 'Live',
-      x: ((loc.lng + 180) / 360) * 100,
-      y: ((90 - loc.lat) / 180) * 100,
-      status: 'medium',
-      color: '#00E676',
-      activity: 100
-    }));
-  });
-
-  socket.on('disconnect', () => {
-    console.log('[Socket] Disconnected from telemetry stream');
-  });
-
-  onUnmounted(() => {
-    socket.disconnect();
-  });
-
 }
 
-// Increment timer
-let syncInterval: any = null
-onMounted(() => {
-  initializeDashboard()
-  syncInterval = setInterval(() => {
-    syncTimer.value++
-  }, 1000)
+onMounted(async () => {
+  await initializeDashboard()
+  
+  // Hydrate stores (they manage their own subscriptions via the Realtime Kernel)
+  await Promise.all([
+    financeStore.hydrate(),
+    inventoryStore.hydrate(),
+    // operationsStore.hydrate(),
+    runtimeStore.hydrate()
+  ]);
+  
+  // The system_telemetry and agent_locations streams are now managed by
+  // the EnterpriseRealtimeKernel and dispatched to the RuntimeStore.
+  
+  // No legacy `setInterval` or `socket.io` connections are managed here.
 })
 
 onUnmounted(() => {
-  if (syncInterval) clearInterval(syncInterval)
+  financeStore.unsubscribe()
+  inventoryStore.unsubscribe()
+  // operationsStore.unsubscribe()
+  runtimeStore.unsubscribe()
 })
 
 </script>

@@ -12,6 +12,7 @@ class SecurityService {
   static const _isAuthorizedKey = 'device_lifetime_authorized';
   static const _deviceIdKey = 'persistent_device_id';
   static const _tenantIdKey = 'assigned_host_tenant_id';
+  static const _offlineTokenKey = 'offline_jwt_token';
 
   // No longer using fixed plaintext passwords. 
   // For emergency/default, we'll hash the expected default strings.
@@ -48,6 +49,14 @@ class SecurityService {
   Future<String?> getStoredPassword() async {
     // This now returns the HASH. Useful for internal comparisons but never display.
     return await _storage.read(key: _passwordKey) ?? _hash('admin123');
+  }
+
+  Future<void> setOfflineToken(String token) async {
+    await _storage.write(key: _offlineTokenKey, value: token);
+  }
+
+  Future<String?> getOfflineToken() async {
+    return await _storage.read(key: _offlineTokenKey);
   }
 
   // NEW: Super Admin Password methods for critical settings protection

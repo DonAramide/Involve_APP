@@ -12,7 +12,7 @@
  * This service is read-only and never mutates state.
  */
 
-import axios from 'axios';
+import { EnterpriseHttpClient } from '../../utils/http-client';
 import * as crypto from 'crypto';
 import { QuasarApiClient } from './quasar-api.client';
 import { QuasarIntegrationStore } from './quasar-integration.store';
@@ -151,7 +151,8 @@ export class QuasarConnectivityHealthService {
     const origin = QuasarConnectivityHealthService.BASE_URL.replace('/api/v1', '');
     const start = Date.now();
     try {
-      const res = await axios.get(`${origin}/health`, { timeout: 8_000 });
+      const httpClient = new EnterpriseHttpClient({ providerName: 'QuasarHealthCheck' });
+      const res = await httpClient.get(`${origin}/health`, { timeout: 8_000 });
       const latencyMs = Date.now() - start;
       const reachable = res.status === 200;
       return { reachable, latencyMs };

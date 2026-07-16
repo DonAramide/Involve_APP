@@ -34,7 +34,7 @@
     <q-card class="bg-panel q-mb-lg shadow-2 border-indigo no-shadow">
       <q-card-section class="row q-col-gutter-md items-center">
         <div class="col-12 col-md-4">
-          <q-input v-model="filter.name" label="Search by Name or Agent Code" :dark="prefs.isDarkMode" filled dense @update:model-value="fetchTenants">
+          <q-input v-model="filter.name" label="Search by Name, Email, or Agent Code" :dark="prefs.isDarkMode" filled dense @update:model-value="fetchTenants">
             <template v-slot:append>
               <q-icon name="search" />
             </template>
@@ -77,11 +77,43 @@
     >
       <template v-slot:body-cell-device_serial="props">
         <q-td :props="props">
-          <span class="text-muted text-weight-medium" style="font-family: monospace; font-size: 11px;">
-            {{ props.value }}
+          <span v-if="props.row.device_id" class="text-weight-medium" style="font-family: monospace; font-size: 11px; color: #a5b4fc;">
+            {{ props.row.device_id }}
           </span>
+          <q-badge v-else color="grey-8" label="UNASSIGNED" class="text-weight-bold" style="font-size: 10px; opacity: 0.6;" />
         </q-td>
       </template>
+
+      <template v-slot:body-cell-agent_code="props">
+        <q-td :props="props" class="text-center">
+          <span v-if="props.row.agent_code" class="text-weight-bold" style="font-family: monospace; font-size: 12px; color: #34d399;">
+            {{ props.row.agent_code }}
+          </span>
+          <span v-else class="text-grey-6" style="font-size: 11px;">N/A</span>
+        </q-td>
+      </template>
+
+      <template v-slot:body-cell-location="props">
+        <q-td :props="props">
+          <span v-if="props.row.location" style="font-size: 11px; max-width: 140px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+            :title="props.row.location">
+            📍 {{ props.row.location }}
+          </span>
+          <span v-else class="text-grey-6" style="font-size: 11px;">N/A</span>
+        </q-td>
+      </template>
+
+      <template v-slot:body-cell-device_count="props">
+        <q-td :props="props" class="text-center">
+          <q-badge
+            :color="props.value > 1 ? 'deep-purple-7' : 'grey-8'"
+            :label="props.value > 1 ? `${props.value} Devices` : '1 Device'"
+            class="text-weight-bold q-px-sm"
+            :style="props.value > 1 ? 'font-size: 11px;' : 'font-size: 11px; opacity: 0.7;'"
+          />
+        </q-td>
+      </template>
+
 
       <template v-slot:body-cell-plan_expires_at="props">
         <q-td :props="props">
@@ -164,12 +196,13 @@ const columns = [
   { name: 'name', label: 'NAME', field: 'name', align: 'left', sortable: true },
   { name: 'type', label: 'TYPE', field: 'type', align: 'left', sortable: true },
   { name: 'device_serial', label: 'DEVICE ID', field: row => row.device_id || 'UNASSIGNED', align: 'left', sortable: true },
+  { name: 'device_count', label: 'DEVICES', field: row => row.device_count || 1, align: 'center', sortable: true },
   { name: 'agent_code', label: 'AGENT CODE', field: row => row.agent_code || 'N/A', align: 'center', sortable: true },
   { name: 'location', label: 'LOCATION', field: row => row.location || 'N/A', align: 'left', sortable: true },
   { name: 'plan', label: 'PLAN', field: 'plan', align: 'left', sortable: true },
   { name: 'plan_expires_at', label: 'EXPIRY DATE', field: row => row.plan_expires_at || null, align: 'center', sortable: true },
   { name: 'status', label: 'STATUS', field: 'status', align: 'center', sortable: true },
-  { name: 'created_at', label: 'CREATED AT', field: 'created_at', align: 'left', format: val => new Date(val).toLocaleDateString(), sortable: true },
+  { name: 'created_at', label: 'CREATED AT', field: 'created_at', align: 'left', format: val => new Date(val).toLocaleString(), sortable: true },
   { name: 'actions', label: 'ACTIONS', align: 'center' }
 ]
 

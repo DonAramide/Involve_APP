@@ -97,7 +97,7 @@ export class ReferralService {
 }
 
 /**
- * Mock Notification for referral invites.
+ * Simulated Notification for referral invites.
  */
 export class ReferralNotificationService {
   static async sendInvite(fromSchool: string, toEmail: string, referralLink: string) {

@@ -61,6 +61,34 @@ export class VaultController {
   }
 
   /**
+   * Activates a STANDBY credential.
+   */
+  static async activateCredential(req: Request, res: Response) {
+    try {
+      const { vaultId, credentialId } = req.params;
+      const data = await IntegrationVaultService.activateCredential(vaultId, credentialId);
+      return res.status(200).json({ success: true, data });
+    } catch (error: any) {
+      console.error('[VaultController] Failed to activate credential:', error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * Deletes a credential.
+   */
+  static async deleteCredential(req: Request, res: Response) {
+    try {
+      const { vaultId, credentialId } = req.params;
+      await IntegrationVaultService.deleteCredential(vaultId, credentialId);
+      return res.status(200).json({ success: true });
+    } catch (error: any) {
+      console.error('[VaultController] Failed to delete credential:', error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
    * Tests connection health (dummy ping logic for now, later extended to actual services).
    */
   static async testConnection(req: Request, res: Response) {

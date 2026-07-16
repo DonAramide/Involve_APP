@@ -37,7 +37,7 @@ export class WebhookController {
 
       const { data: transaction, error: txError } = await supabase
         .from('transactions_log')
-        .select('tenant_id, wallet_id, status, type')
+        .select('tenant_id, wallet_id, status, type, amount, metadata')
         .eq('reference', reference)
         .single();
 
@@ -47,6 +47,14 @@ export class WebhookController {
       }
 
       const tenantId = (transaction as any).tenant_id as string;
+      const expectedAmount = Number((transaction as any).amount);
+      
+      if (Math.round(amount) !== expectedAmount) {
+        console.error(`[Webhook] Amount mismatch for reference ${reference}. Expected: ${expectedAmount}, Received: ${Math.round(amount)}`);
+        // We reject the webhook or store it for manual reconciliation.
+        // For strict double-entry, we must reject it.
+        return res.status(400).json({ error: 'Payment amount mismatch. Flagged for reconciliation.' });
+      }
 
       // 2. LOAD ENCRYPTED SIGNING SECRET FOR THIS TENANT
       const integration = await QuasarIntegrationStore.getByInvifyTenantId(tenantId);
@@ -95,6 +103,19 @@ export class WebhookController {
 
     } catch (error: any) {
       console.error('[Webhook Critical Error]', error.message);
+      
+      try {
+        await supabase.from('webhook_dead_letters').insert({
+          provider: 'quasar',
+          endpoint: '/api/v1/webhooks/quasar',
+          payload: req.body,
+          error_message: error.message || String(error)
+        });
+        console.log(`[Webhook DLQ] Event stored in Dead Letter Queue for Quasar.`);
+      } catch (dlqErr: any) {
+        console.error('[DLQ Critical Failure] Could not store Quasar webhook in DLQ:', dlqErr.message);
+      }
+
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -114,8 +135,23 @@ export class WebhookController {
       return res.status(401).json({ error: 'Signature mismatch' });
     }
 
-    const result = await PaymentGatewayConvergenceService.processSettlementWebhook("paystack", signature, req.body);
-    return res.status(200).json(result);
+    try {
+      const result = await PaymentGatewayConvergenceService.processSettlementWebhook("paystack", signature, req.body);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error('[Paystack Webhook Error]', error.message);
+      try {
+        await supabase.from('webhook_dead_letters').insert({
+          provider: 'paystack',
+          endpoint: '/api/v1/webhooks/paystack',
+          payload: req.body,
+          error_message: error.message || String(error)
+        });
+      } catch (dlqErr: any) {
+        console.error('[DLQ Critical Failure]', dlqErr.message);
+      }
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 
   /**
@@ -132,8 +168,23 @@ export class WebhookController {
       return res.status(401).json({ error: 'Signature mismatch' });
     }
 
-    const result = await PaymentGatewayConvergenceService.processSettlementWebhook("flutterwave", signature, req.body);
-    return res.status(200).json(result);
+    try {
+      const result = await PaymentGatewayConvergenceService.processSettlementWebhook("flutterwave", signature, req.body);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error('[Flutterwave Webhook Error]', error.message);
+      try {
+        await supabase.from('webhook_dead_letters').insert({
+          provider: 'flutterwave',
+          endpoint: '/api/v1/webhooks/flutterwave',
+          payload: req.body,
+          error_message: error.message || String(error)
+        });
+      } catch (dlqErr: any) {
+        console.error('[DLQ Critical Failure]', dlqErr.message);
+      }
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 
   /**
@@ -151,8 +202,23 @@ export class WebhookController {
       return res.status(401).json({ error: 'Signature mismatch' });
     }
 
-    const result = await PaymentGatewayConvergenceService.processSettlementWebhook("stripe", signature, req.body);
-    return res.status(200).json(result);
+    try {
+      const result = await PaymentGatewayConvergenceService.processSettlementWebhook("stripe", signature, req.body);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error('[Stripe Webhook Error]', error.message);
+      try {
+        await supabase.from('webhook_dead_letters').insert({
+          provider: 'stripe',
+          endpoint: '/api/v1/webhooks/stripe',
+          payload: req.body,
+          error_message: error.message || String(error)
+        });
+      } catch (dlqErr: any) {
+        console.error('[DLQ Critical Failure]', dlqErr.message);
+      }
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 
   /**
@@ -176,7 +242,9 @@ export class WebhookController {
       idempotencyKey,
       tenantId,
       reference,
-      entries,
+      entries: entries as any,
+      actorId: 'SYSTEM_WEBHOOK',
+      provider: 'quasar',
       metadata: { source: 'quasar_webhook', type }
     });
 

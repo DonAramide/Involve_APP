@@ -12,8 +12,9 @@
  *  - Structured logging with correlation context
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
+import { AxiosRequestConfig, AxiosError } from 'axios';
 import * as crypto from 'crypto';
+import { EnterpriseHttpClient } from '../../utils/http-client';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,7 +100,7 @@ async function sleep(ms: number): Promise<void> {
 // ─── Client ───────────────────────────────────────────────────────────────────
 
 export class QuasarApiClient {
-  private readonly http: AxiosInstance;
+  private readonly http: EnterpriseHttpClient;
   private readonly options: Required<Pick<QuasarApiClientOptions, 'timeoutMs' | 'maxRetries'>> &
     QuasarApiClientOptions;
 
@@ -110,9 +111,11 @@ export class QuasarApiClient {
       ...opts,
     };
 
-    this.http = axios.create({
+    this.http = new EnterpriseHttpClient({
       baseURL: opts.baseUrl,
       timeout: this.options.timeoutMs,
+      maxRetries: this.options.maxRetries,
+      providerName: 'Quasar',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',

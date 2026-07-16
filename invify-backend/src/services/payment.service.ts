@@ -39,7 +39,7 @@ export class PaymentService {
     try {
       const quasar = await getQuasarService(tenantId);
       intent = await quasar.createPaymentIntent({
-        amount,
+        amount: Math.round(amount),
         reference,
         description: `Fees Payment - Student: ${studentName}`,
         metadata: { ...metadata, reference, tenantId, studentName } 
@@ -57,7 +57,7 @@ export class PaymentService {
         reference,
         tenant_id: tenantId,
         wallet_id: walletId,
-        amount,
+        amount: Math.round(amount),
         provider: "quasar",
         status: "PENDING",
         metadata: {
@@ -78,7 +78,7 @@ export class PaymentService {
       eventType: 'payment.intent.created',
       reference,
       tenantId,
-      payload: { amount, studentName, metadata, intent_reference: intent.reference }
+      payload: { amount: Math.round(amount), studentName, metadata, intent_reference: intent.reference }
     });
 
     // 6. Return intent to frontend
@@ -105,30 +105,30 @@ export class PaymentService {
       throw new Error(`Payout failed: No bank details configured for tenant ${tenantId}`);
     }
 
-    // 1.1 Balance Check (Mandatory)
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (walletError || !wallet) {
-      throw new Error(`Payout failed: Could not verify wallet balance.`);
-    }
-
-    if (Number(wallet.balance) < amount) {
-      throw new Error(`Insufficient funds. Available balance: ${wallet.balance}`);
-    }
-
     // 2. Generate unique payout reference
     const reference = `POUT-${Date.now()}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+    const idempotencyKey = `payout:${reference}`;
 
-    // 3. Call Quasar SDK (via service)
+    // 3. Database Pessimistic Locking & Double Entry
+    // This atomic RPC checks balance and records the double entry
+    const { data: ledgerRes, error: ledgerError } = await supabase.rpc('request_payout_with_lock', {
+      p_tenant_id: tenantId,
+      p_idempotency_key: idempotencyKey,
+      p_reference: reference,
+      p_amount: Math.round(amount), // Enforce Integer Kobo
+      p_metadata: { type: 'payout_request' }
+    });
+
+    if (ledgerError) {
+      throw new Error(`Payout rejected: ${ledgerError.message}`);
+    }
+
+    // 4. Call Quasar SDK (via service)
     let transfer;
     try {
       const quasar = await getQuasarService(tenantId);
       transfer = await quasar.initiateTransfer({
-        amount,
+        amount: Math.round(amount),
         reference,
         destination: {
           account_number: bankDetails.account_number,
@@ -143,29 +143,31 @@ export class PaymentService {
       });
     } catch (error: any) {
       console.error('[PaymentService] Quasar Transfer Failure:', error.message);
+      // Initiate Reversal logic here if needed, but the webhook handles failed payouts
       throw new Error(`Failed to initiate transfer with Quasar: ${error.message}`);
     }
 
-    // 4. Store transaction record (PENDING)
+    // 5. Store transaction record (PENDING)
     const { data: transaction, error: txError } = await supabase
       .from('transactions_log')
       .insert({
         reference,
         tenant_id: tenantId,
-        amount,
+        wallet_id: (ledgerRes as any)?.ledger_id || null, // Storing ledger_id as reference point
+        amount: Math.round(amount),
         provider: "quasar",
-        status: "PENDING",
         type: "payout",
+        status: "PENDING",
         metadata: {
-          bank_details: bankDetails.account_number,
-          quasar_transfer_id: transfer.reference
+          quasar_transfer_id: transfer.reference,
+          destination: bankDetails.account_number
         }
       })
       .select()
       .single();
 
     if (txError) {
-      console.error('[PaymentService] Payout DB Write Failed:', txError.message);
+      console.error('[PaymentService] DB Audit Write Failed:', txError.message);
     }
 
     // 5. AUDIT LOG

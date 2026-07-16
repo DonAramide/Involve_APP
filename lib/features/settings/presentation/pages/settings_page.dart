@@ -249,13 +249,7 @@ class _SettingsPageState extends State<SettingsPage> {
           _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
         if (_matches('Show Sync Status'))
           _buildSwitchTile('Show Sync Status', settings.showSyncStatus, (val) => _update(context, settings.copyWith(showSyncStatus: val))),
-        if (_matches('Restore Backup'))
-          ListTile(
-            title: const Text('Restore Backup'),
-            subtitle: const Text('Import database from a file'),
-            trailing: state.isImporting ? const Text('Restoring...', style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold)) : const Icon(Icons.restore),
-            onTap: () => _handleRestore(context),
-          ),
+
         const Divider(),
       ],
 
@@ -520,115 +514,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _handleRestore(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.any, // .sqlite might not be in the default list
-      allowMultiple: false,
-    );
 
-    if (result != null && result.files.isNotEmpty) {
-      final filePath = result.files.first.path;
-      if (filePath == null) return;
-
-      // Show Choice Dialog
-      final restoreType = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Restore Backup'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('How would you like to restore "${result.files.first.name}"?'),
-              const SizedBox(height: 20),
-              
-              // Merge Option
-              _buildRestoreOption(
-                context,
-                title: 'Merge Data (Recommended)',
-                subtitle: 'Add new records and update existing ones. Current data will NOT be deleted.',
-                icon: Icons.merge_type,
-                color: Colors.blue,
-                onTap: () => Navigator.pop(ctx, 'merge'),
-              ),
-              
-              const Divider(height: 24),
-              
-              // Overwrite Option
-              _buildRestoreOption(
-                context,
-                title: 'Full Restore (Overwrite)',
-                subtitle: 'REPLACE everything. All current records will be lost forever!',
-                icon: Icons.warning_amber_rounded,
-                color: Colors.red,
-                onTap: () => Navigator.pop(ctx, 'overwrite'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('CANCEL'),
-            ),
-          ],
-        ),
-      );
-      
-      if (!mounted) return;
-
-      if (restoreType == 'merge') {
-        _showLoadingDialog(context, 'Merging Data...');
-        context.read<SettingsBloc>().add(RestoreFromPath(filePath));
-      } else if (restoreType == 'overwrite') {
-        _showLoadingDialog(context, 'Restoring & Overwriting...');
-        context.read<SettingsBloc>().add(ImportDatabaseFromFile(filePath));
-      }
-    }
-  }
-
-  Widget _buildRestoreOption(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _showRestoreDialog(BuildContext context) {
     // Kept for backward compatibility if needed, but replaced by _handleRestore in the UI

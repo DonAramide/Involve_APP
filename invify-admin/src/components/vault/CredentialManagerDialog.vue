@@ -55,7 +55,7 @@
               <q-td :props="props">
                 <div class="row items-center">
                   <span class="text-grey-4 q-mr-sm text-monospace" v-if="!props.row.revealed">••••••••••••••••</span>
-                  <span class="text-white q-mr-sm text-monospace" v-else>{{ props.row.mockPlaintext }}</span>
+                  <span class="text-white q-mr-sm text-monospace" v-else>{{ props.row.plaintext_value || '********' }}</span>
                   <q-btn flat round dense size="sm" color="grey-5" :icon="props.row.revealed ? 'visibility_off' : 'visibility'" @click="props.row.revealed = !props.row.revealed" />
                 </div>
               </q-td>
@@ -70,7 +70,10 @@
                       <q-item clickable v-close-popup v-if="props.row.status === 'ACTIVE'" @click="rotateSecret(props.row)">
                         <q-item-section class="text-warning">Rotate Secret</q-item-section>
                       </q-item>
-                      <q-item clickable v-close-popup v-if="props.row.status !== 'REVOKED'">
+                      <q-item clickable v-close-popup v-if="props.row.status === 'STANDBY'" @click="activateSecret(props.row)">
+                        <q-item-section class="text-positive">Promote to Active</q-item-section>
+                      </q-item>
+                      <q-item clickable v-close-popup v-if="props.row.status !== 'REVOKED'" @click="deleteSecret(props.row)">
                         <q-item-section class="text-red-4">Revoke Access</q-item-section>
                       </q-item>
                     </q-list>
@@ -124,8 +127,8 @@
         </q-card-section>
         <q-card-section class="q-pt-md column op-gap-16">
           <q-select outlined dense dark v-model="newCred.type" :options="['API_KEY', 'TOKEN', 'CLIENT_SECRET', 'CERTIFICATE', 'WEBHOOK_SECRET']" label="Credential Type" />
-          <q-input outlined dense dark v-model="newCred.key_name" label="Key Name (e.g. KEY-002)" />
-          <q-input outlined dense dark type="password" v-model="newCred.value" label="Secret Value" />
+          <q-input outlined dense dark v-model="newCred.key_name" label="Key Name (e.g. KEY-002)" autocomplete="off" data-lpignore="true" spellcheck="false" />
+          <q-input outlined dense dark type="password" v-model="newCred.value" label="Secret Value" autocomplete="new-password" data-lpignore="true" />
           <q-input outlined dense dark type="date" v-model="newCred.expires_at" label="Expiration Date" stack-label />
           <q-toggle v-model="newCred.rotate" color="warning" label="Rotate instantly (Demotes current ACTIVE key to STANDBY)" dark />
         </q-card-section>
@@ -169,7 +172,6 @@ const columns = [
   { name: 'actions', label: 'Actions', align: 'right' }
 ];
 
-const mockCredentials = ref([]);
 
 const credentialsForEnv = computed(() => {
   const creds = props.integration?.integration_credentials || [];
@@ -213,7 +215,47 @@ function rotateSecret() {
   newCred.value.rotate = true;
 }
 
+async function activateSecret(cred) {
+  try {
+    await vaultApi.activateCredential(props.integration.id, cred.id);
+    $q.notify({ type: 'positive', message: 'Credential promoted to active.' });
+    emit('refresh');
+  } catch (err) {
+    console.error(err);
+    $q.notify({ type: 'negative', message: 'Failed to promote credential.' });
+  }
+}
+
+function deleteSecret(cred) {
+  $q.dialog({
+    title: 'Confirm Revocation',
+    message: `Are you sure you want to permanently delete the credential '${cred.key_name}'?`,
+    cancel: true,
+    persistent: true,
+    ok: { color: 'negative', label: 'Revoke Access' }
+  }).onOk(async () => {
+    try {
+      await vaultApi.deleteCredential(props.integration.id, cred.id);
+      $q.notify({ type: 'positive', message: 'Credential deleted successfully.' });
+      emit('refresh');
+    } catch (err) {
+      console.error(err);
+      $q.notify({ type: 'negative', message: 'Failed to delete credential.' });
+    }
+  });
+}
+
 async function saveNewCredential() {
+  if (!newCred.value.rotate) {
+    const isDuplicate = props.integration?.credentials?.some(
+      (c) => c.key_name === newCred.value.key_name && c.credential_type === newCred.value.type && c.environment === activeEnvironment.value
+    );
+    if (isDuplicate) {
+      $q.notify({ type: 'negative', message: 'A credential with this Version Name and Type already exists. Please toggle "Rotate instantly" to rotate it, or use a different name.' });
+      return;
+    }
+  }
+
   try {
     await vaultApi.addCredential(props.integration.id, {
       credential_type: newCred.value.type,

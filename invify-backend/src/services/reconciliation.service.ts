@@ -2,12 +2,12 @@
 import { supabase } from '../db/supabase';
 import { GovAuditService } from './gov-audit.service';
 import crypto from 'crypto';
+import { EventDispatcher } from './observability/EventDispatcher';
 
 export class ReconciliationService {
   
-  static async getReport(params: { tenantId: string; status?: string; page?: number; limit?: number; }) {
-    const { tenantId, status, page = 1, limit = 50 } = params;
-    const offset = (page - 1) * limit;
+  static async getReport(params: { tenantId: string; status?: string; cursor?: string; limit?: number; }) {
+    const { tenantId, status, cursor, limit = 50 } = params;
 
     try {
       // Fetch cases from DB (which will be populated by the migration/triggers eventually)
@@ -17,14 +17,28 @@ export class ReconciliationService {
       const query = supabase
         .from('reconciliation_cases')
         .select('*', { count: 'exact' })
-        .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false });
+
+      if (tenantId && tenantId !== 'global') {
+        query.eq('tenant_id', tenantId);
+      }
 
       if (status && status !== 'all') {
         query.eq('status', status.toUpperCase());
       }
 
-      const { data, count, error } = await query.range(offset, offset + limit - 1);
+      // Cursor pagination
+      if (cursor) {
+        // Parse cursor (format: timestamp_id)
+        const [cursorTime, cursorId] = cursor.split('_');
+        if (cursorTime && cursorId) {
+          // Equivalent to: WHERE (created_at, id) < (cursorTime, cursorId)
+          // In Supabase/PostgREST: created_at.lt.time OR (created_at.eq.time AND id.lt.id)
+          query.or(`created_at.lt.${cursorTime},and(created_at.eq.${cursorTime},id.lt.${cursorId})`);
+        }
+      }
+
+      const { data, count, error } = await query.limit(limit);
 
       if (error && error.code !== '42P01') { // Ignore table not found if migration hasn't run
         throw error;
@@ -33,10 +47,15 @@ export class ReconciliationService {
       const cases = data || [];
 
       // Calculate summary stats dynamically
-      const { data: allStats, error: statsError } = await supabase
+      let statsQuery = supabase
         .from('reconciliation_cases')
-        .select('status, expected_amount, difference_amount')
-        .eq('tenant_id', tenantId);
+        .select('status, expected_amount, difference_amount');
+
+      if (tenantId && tenantId !== 'global') {
+        statsQuery = statsQuery.eq('tenant_id', tenantId);
+      }
+
+      const { data: allStats, error: statsError } = await statsQuery;
 
       let summary = {
         totalPayments: 0,
@@ -77,8 +96,8 @@ export class ReconciliationService {
         })),
         pagination: {
           total: count || 0,
-          page,
-          limit
+          limit,
+          nextCursor: cases.length === limit ? `${cases[cases.length - 1].created_at}_${cases[cases.length - 1].id}` : null
         }
       };
     } catch (error: any) {
@@ -89,68 +108,61 @@ export class ReconciliationService {
 
   // ==== Detail Subtabs ====
   
-  static async getDetails(caseNumber: string) {
-    const { data } = await supabase.from('reconciliation_cases').select('*').eq('case_number', caseNumber).single();
-    if (!data) throw new Error('Reconciliation case not found');
-    return {
-      overview: {
-        expectedAmount: data.expected_amount,
-        actualAmount: data.actual_amount,
-        difference: data.difference_amount,
-        priority: data.severity === 'CRITICAL' ? 'High' : 'Normal',
-        riskRating: data.risk_score > 80 ? 'Elevated' : 'Standard',
-        assignedTo: data.assigned_to || 'Unassigned',
-      },
-      flow: {
-        origin: data.wallet_id || data.card_id || 'Unknown Source',
-        provider: data.provider_reference ? 'Payment Gateway' : 'System',
-        target: data.ledger_batch_id ? 'Master Ledger' : 'Pending'
-      }
-    };
+  static async getDetails(caseNumber: string, tenantId: string) {
+    const { data, error } = await supabase
+      .from('reconciliation_cases')
+      .select('*')
+      .eq('case_number', caseNumber)
+      .eq('tenant_id', tenantId)
+      .single();
+    
+    if (error || !data) throw new Error('Reconciliation case not found');
+    return { status: 'OK', data };
   }
 
-  static async getLedger(caseNumber: string) {
-    const { data: recon } = await supabase.from('reconciliation_cases').select('transaction_reference').eq('case_number', caseNumber).single();
+  static async getLedger(caseNumber: string, tenantId: string) {
+    const { data: recon } = await supabase.from('reconciliation_cases').select('transaction_reference').eq('case_number', caseNumber).eq('tenant_id', tenantId).single();
     if (!recon) throw new Error('Case not found');
-    const { data: ledgers } = await supabase.from('ledgers').select('*').eq('reference', recon.transaction_reference);
+    const { data: ledgers } = await supabase.from('ledgers').select('*').eq('reference', recon.transaction_reference).eq('tenant_id', tenantId);
     if (!ledgers || ledgers.length === 0) {
       return { status: 'NO_DATA', message: 'No associated ledger entries found.' };
     }
     return { status: 'OK', data: ledgers };
   }
 
-  static async getSettlement(caseNumber: string) {
-    const { data: recon } = await supabase.from('reconciliation_cases').select('settlement_batch_id').eq('case_number', caseNumber).single();
+  static async getSettlement(caseNumber: string, tenantId: string) {
+    const { data: recon } = await supabase.from('reconciliation_cases').select('settlement_batch_id').eq('case_number', caseNumber).eq('tenant_id', tenantId).single();
     if (!recon?.settlement_batch_id) {
       return { status: 'NOT_CONFIGURED', message: 'Settlement matching not yet configured for this flow.' };
     }
     return { status: 'OK', data: { batchId: recon.settlement_batch_id } };
   }
 
-  static async getWallet(caseNumber: string) {
+  static async getWallet(caseNumber: string, tenantId: string) {
     return { status: 'NOT_CONFIGURED', message: 'Wallet telemetry subtab not yet configured.' };
   }
 
-  static async getCard(caseNumber: string) {
+  static async getCard(caseNumber: string, tenantId: string) {
     return { status: 'NOT_CONFIGURED', message: 'Card Network integration not yet configured.' };
   }
 
-  static async getBank(caseNumber: string) {
+  static async getBank(caseNumber: string, tenantId: string) {
     return { status: 'NOT_CONFIGURED', message: 'Direct bank node integration not yet configured.' };
   }
 
-  static async getAudit(caseNumber: string) {
+  static async getAudit(caseNumber: string, tenantId: string) {
     const { data } = await supabase
       .from('audit_logs')
       .select('*')
       .eq('target', caseNumber)
+      .eq('tenant_id', tenantId)
       .order('timestamp', { ascending: false });
     
     return { status: 'OK', data: data || [] };
   }
 
-  static async getTimeline(caseNumber: string) {
-    const { data: recon } = await supabase.from('reconciliation_cases').select('id').eq('case_number', caseNumber).single();
+  static async getTimeline(caseNumber: string, tenantId: string) {
+    const { data: recon } = await supabase.from('reconciliation_cases').select('id').eq('case_number', caseNumber).eq('tenant_id', tenantId).single();
     if (!recon) throw new Error('Case not found');
     
     const { data: timeline } = await supabase
@@ -167,13 +179,17 @@ export class ReconciliationService {
 
   // ==== Commands ====
 
-  static async executeCommand(caseNumber: string, command: string, payload: any, user: any) {
-    const { data: recon } = await supabase.from('reconciliation_cases').select('*').eq('case_number', caseNumber).single();
-    if (!recon) throw new Error('Reconciliation case not found');
+  static async executeCommand(caseNumber: string, command: string, payload: any, user: any, tenantId: string) {
+    const { data: recon } = await supabase.from('reconciliation_cases').select('*').eq('case_number', caseNumber).eq('tenant_id', tenantId).single();
+    if (!recon) throw new Error('Reconciliation case not found or unauthorized');
 
+    const expectedVersion = payload.version || recon.version || 1;
     const previousStatus = recon.status;
     let newStatus = previousStatus;
-    let updateData: any = { updated_at: new Date().toISOString() };
+    let updateData: any = { 
+      updated_at: new Date().toISOString(),
+      version: expectedVersion + 1 
+    };
 
     switch (command) {
       case 'ASSIGN':
@@ -196,7 +212,6 @@ export class ReconciliationService {
       case 'RETRY':
         updateData.status = 'PENDING';
         newStatus = 'PENDING';
-        // A real system would trigger an async job here
         break;
       case 'LOCK':
         updateData.fraud_flags = [...(recon.fraud_flags || []), 'ADMIN_LOCKED'];
@@ -208,12 +223,32 @@ export class ReconciliationService {
         throw new Error('Unknown command');
     }
 
-    // Update DB
-    const { error } = await supabase.from('reconciliation_cases').update(updateData).eq('case_number', caseNumber);
+    // Optimistic Concurrency DB Update
+    const { data: updatedRows, error } = await supabase
+      .from('reconciliation_cases')
+      .update(updateData)
+      .eq('case_number', caseNumber)
+      .eq('tenant_id', tenantId)
+      .eq('version', expectedVersion)
+      .select();
+      
     if (error) throw error;
+    if (!updatedRows || updatedRows.length === 0) {
+      throw new Error('Concurrency Error: The case was modified by another transaction. Please refresh and try again.');
+    }
+
+    const correlationId = crypto.randomUUID();
+
+    // Append to Timeline
+    await supabase.from('reconciliation_timeline').insert({
+      case_id: recon.id,
+      stage: newStatus,
+      description: `Command ${command} executed by operator.`,
+      source_system: 'QUASAR',
+      metadata: { correlationId, operator: user.email }
+    });
 
     // Log to Audit
-    const correlationId = crypto.randomUUID();
     await GovAuditService.logAction({
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),
@@ -234,8 +269,19 @@ export class ReconciliationService {
       }
     });
 
-    // We can broadcast WebSocket updates using the central controller if available, 
-    // or return the new state to the client which updates optimistically.
+    // Publish Domain Event (Transport-Agnostic)
+    EventDispatcher.publish('ReconciliationStatusChanged', {
+      tenantId,
+      caseNumber,
+      command,
+      previousStatus,
+      newStatus,
+      operator: user.email,
+      correlationId
+    });
+
+    // Emit Operational Metric
+    console.log(`[Metrics] count#reconciliation.commands=${command} tenant=${tenantId}`);
 
     return { success: true, caseNumber, newStatus, correlationId };
   }

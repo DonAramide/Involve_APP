@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../features/settings/domain/services/security_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -228,7 +229,13 @@ class TerminalSyncService {
       debugPrint('[TerminalSync] Requesting sync with payload: ${jsonEncode(payload)}');
 
       final session = Supabase.instance.client.auth.currentSession;
-      final token = session?.accessToken;
+      String? token = session?.accessToken;
+      
+      // Fallback to offline token if no active Supabase session
+      if (token == null || token.isEmpty) {
+        token = await SecurityService().getOfflineToken();
+      }
+
       final headers = {
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true',

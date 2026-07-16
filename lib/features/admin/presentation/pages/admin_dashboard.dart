@@ -1,6 +1,7 @@
-// lib/features/admin/presentation/pages/admin_dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:involve_app/features/admin/presentation/pages/api_key_management_page.dart';
 import '../bloc/admin_bloc.dart';
 import '../widgets/master_mode_switch.dart';
 import 'system_setup_page.dart';
@@ -13,9 +14,15 @@ import '../../../../core/utils/progress_dialog_utils.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/services/finance_api_client.dart';
 import 'package:get_it/get_it.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import '../../../../core/utils/device_info_service.dart';
+import '../../../settings/domain/services/security_service.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
+
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
@@ -37,8 +44,14 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Future<void> _fetchSubscriptionStatus() async {
     try {
-      final client = GetIt.I<FinanceApiClient>();
-      final response = await client.get('/api/subscription/status');
+      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+      final baseUrl = dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
+      final token = await SecurityService().getOfflineToken() ?? 'mock-super-admin';
+      final response = await dio.get('$baseUrl/api/subscription/status', options: Options(
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ));
       if (response.data != null && response.data['success'] == true) {
         if (mounted) {
           setState(() {
@@ -194,6 +207,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   icon: Icons.list_alt,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminFinanceDashboardPage())),
                 ),
+                _ActionTile(
+                  label: 'Link New Device',
+                  icon: Icons.qr_code_2,
+                  onTap: () => _showLinkQrDialog(context),
+                ),
               ],
             ),
           ],
@@ -201,6 +219,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       },
     );
   }
+
 
   Widget _buildRecentAuditLogs(BuildContext context, List<Map<String, dynamic>> logs) {
     return Column(
@@ -230,7 +249,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   void _gotoKeys(BuildContext context) {
-    // Navigator.push...
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ApiKeyManagementPage()));
   }
   void _gotoLogs(BuildContext context) {
      context.read<AdminBloc>().add(LoadAuditLogs());
@@ -573,6 +592,125 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         ),
       ),
     );
+  }
+
+  void _showLinkQrDialog(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return FutureBuilder<Map<String, dynamic>>(
+              future: _generateLinkQrData(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return AlertDialog(
+                    backgroundColor: const Color(0xFF0F172A),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        CircularProgressIndicator(color: Color(0xFF6366F1)),
+                        SizedBox(height: 16),
+                        Text('Generating secure link token...', style: TextStyle(color: Colors.white)),
+                      ],
+                    ),
+                  );
+                }
+                if (snapshot.hasError || snapshot.data == null) {
+                  return AlertDialog(
+                    backgroundColor: const Color(0xFF0F172A),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    title: const Text('Error', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    content: Text('Failed to generate link token: ${snapshot.error}', style: const TextStyle(color: Colors.grey)),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('CLOSE', style: TextStyle(color: Color(0xFF6366F1))),
+                      ),
+                    ],
+                  );
+                }
+
+                final qrPayload = snapshot.data!['qrPayload'] as String;
+                final businessName = snapshot.data!['tenant']['name'] as String;
+
+                return AlertDialog(
+                  backgroundColor: const Color(0xFF0F172A),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  title: Row(
+                    children: [
+                      const Icon(Icons.qr_code_2, color: Color(0xFF818CF8)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Link New Device to $businessName',
+                          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Scan this QR code from your new device to automatically link it to this profile.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: QrImageView(
+                          data: qrPayload,
+                          version: QrVersions.auto,
+                          size: 200.0,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'This QR code is valid for 3 minutes.',
+                        style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('DONE', style: TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> _generateLinkQrData() async {
+    final security = SecurityService();
+    final tenantId = await security.getTenantId();
+    final deviceId = await DeviceInfoService.getDeviceSuffix();
+    final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+    final baseUrl = dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
+    final response = await dio.post('$baseUrl/auth/generate-link-qr', data: {
+      'tenantId': tenantId,
+      'deviceId': deviceId,
+      'agentCode': 'AAA000',
+    });
+
+    if (response.data == null || response.data['success'] != true) {
+      throw Exception(response.data['error'] ?? 'API response error');
+    }
+
+    return Map<String, dynamic>.from(response.data);
   }
 }
 

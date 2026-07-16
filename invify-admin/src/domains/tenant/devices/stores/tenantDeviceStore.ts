@@ -6,10 +6,7 @@ export const useTenantDeviceStore = defineStore('tenantDevice', {
   }),
   actions: {
     loadDevices() {
-      this.devices = [
-        { id: 'DEV-001', name: 'Frontend POS Terminal', status: 'ACTIVE' },
-        { id: 'DEV-002', name: 'Warehouse Scanner', status: 'INACTIVE' }
-      ];
+      this.devices = [];
     }
   }
 });

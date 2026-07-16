@@ -1,17 +1,14 @@
-import { supabaseAdmin } from '../src/db/supabase';
+import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+const supabase = createClient(
+  process.env.STAGING_SUPABASE_URL || '',
+  process.env.STAGING_SUPABASE_SERVICE_KEY || ''
+);
 
 async function check() {
-  console.log('Fetching users from staging database...');
-  const { data: users, error } = await supabaseAdmin
-    .from('users')
-    .select('id, email, role');
-  
-  if (error) {
-    console.error('Error fetching users:', error.message);
-  } else {
-    console.log('Staging Users:');
-    console.table(users);
-  }
+  const { data, error } = await supabase.from('users').select('*').limit(1);
+  console.log("users:", data, error?.message);
 }
-
-check().catch(console.error);
+check();

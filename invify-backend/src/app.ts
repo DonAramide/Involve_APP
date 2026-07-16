@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import * as dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 
 // Load environment variables
 dotenv.config();
@@ -46,6 +47,7 @@ import { PosController } from './controllers/pos.controller';
 import { TerminalController, terminalUploadMiddleware } from './controllers/terminal.controller';
 import { SearchController } from './controllers/search.controller';
 import { OrchestrationController } from './controllers/orchestration.controller';
+import { RuntimeController } from './controllers/runtime.controller';
 import { AgentController } from './modules/agent-portal/agent.controller';
 import { AdminAgentController } from './modules/agent-portal/controllers/admin-agent.controller';
 import { CloudMetricsController } from './controllers/cloud-metrics.controller';
@@ -55,22 +57,74 @@ import { QuasarHealthController } from './controllers/quasar-health.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess, checkTenantPermission } from './middleware/rbac.middleware';
+import { correlationIdMiddleware } from './middleware/correlation.middleware';
 
 const app = express();
+
+app.use(correlationIdMiddleware);
 
 const PORT = process.env.PORT || 3004;
 
 // 1. GLOBAL MIDDLEWARE
+app.disable('x-powered-by'); // Prevent framework fingerprinting
 app.use(helmet()); 
-app.use(cors());   
-app.use(morgan('dev')); 
+
+// Dynamic CORS Configuration
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  : (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:5173']);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
+// Request Payload Limits
+const maxPayloadSize = process.env.MAX_REQUEST_SIZE || '2mb';
 app.use(express.json({
-  limit: '50mb',
+  limit: maxPayloadSize,
   verify: (req: any, res, buf) => {
     req.rawBody = buf; // Capture raw body for signature verification
   }
 })); 
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: maxPayloadSize }));
+
+// Rate Limiting Middlewares
+const globalLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_GLOBAL_WINDOW_MS || '900000', 10), // Default: 15 mins
+  max: parseInt(process.env.RATE_LIMIT_GLOBAL_MAX || '10000', 10),
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW_MS || '900000', 10), // Default: 15 mins
+  max: parseInt(process.env.RATE_LIMIT_AUTH_MAX || '10000', 10),
+  message: { error: 'Too many authentication attempts, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const verificationLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_VERIFICATION_WINDOW_MS || '3600000', 10), // Default: 1 hour
+  max: parseInt(process.env.RATE_LIMIT_VERIFICATION_MAX || '10', 10),
+  message: { error: 'Too many verification attempts, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use(morgan('dev')); 
+app.use(globalLimiter);
+
+import path from 'path';
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 
 // 2. ROUTES
@@ -91,14 +145,15 @@ app.post('/payments/initialize', PaymentController.initializeGatewayCheckout);
 // Public Onboarding & System Lookup Data
 app.get('/public/lookup', LookupController.getLookup);
 app.post('/admin/lookup', LookupController.saveLookup);
-app.post('/public/otp/send', OTPController.sendOTP);
-app.post('/public/otp/verify', OTPController.verifyOTP);
-app.post('/public/onboarding/signup', OnboardingController.signup);
-app.post('/public/onboarding/provision', OnboardingController.provision);
+app.post('/public/otp/send', verificationLimiter, OTPController.sendOTP);
+app.post('/public/otp/verify', verificationLimiter, OTPController.verifyOTP);
+app.post('/public/onboarding/signup', verificationLimiter, OnboardingController.signup);
+app.post('/public/onboarding/provision', verificationLimiter, OnboardingController.provision);
+app.post('/public/onboarding/report-issue', OnboardingController.reportIssue);
 
 // Platform User Authentication & MFA / Recovery
-app.post('/api/auth/login', AuthController.login);
-app.post('/api/auth/reset-password', AuthController.resetPassword);
+app.post('/api/auth/login', authLimiter, AuthController.login);
+app.post('/api/auth/reset-password', authLimiter, AuthController.resetPassword);
 
 // Teacher Invitations (Public)
 app.get('/public/invites/validate/:token', InviteController.validateInvite);
@@ -156,7 +211,10 @@ app.get('/api/admin/quasar/integrations', authenticate, checkRole(['super_admin'
 
 // Terminal Management Endpoints
 import { TenantKycController } from './controllers/tenant-kyc.controller';
-app.post('/api/tenant/kyc/upload', TenantKycController.uploadKyc); // Mobile onboarding often doesn't have JWT yet, custom auth in controller
+import multer from 'multer';
+const upload = multer({ storage: multer.memoryStorage() });
+
+app.post('/api/tenant/kyc/upload', authenticate, upload.single('file'), TenantKycController.uploadKyc);
 app.get('/api/tenant/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), TenantKycController.getKycDocuments);
 
 // Agent Portal Routes
@@ -171,21 +229,69 @@ import { authRoutes } from './routes/auth.routes';
 import vaultRoutes from './routes/vault.routes';
 import settingsRoutes from './routes/settings.routes';
 import financeRoutes from './routes/finance.routes';
+import syncRoutes from './routes/sync.routes';
+import crmRoutes from './routes/crm.routes';
+import inventoryRoutes from './routes/inventory.routes';
+import operationsRoutes from './routes/operations.routes';
 
 app.use(activationRoutes);
 app.use('/auth', authRoutes);
 app.use('/vault', vaultRoutes);
 app.use('/settings', settingsRoutes);
-app.use('/finance', financeRoutes);
+app.use('/api/v1/finance', authenticate, financeRoutes);
+app.use('/api/v1/sync', syncRoutes);
+app.use('/api/v1/crm', authenticate, crmRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/v1', authenticate, operationsRoutes);
 
 // Orchestration Endpoints
 app.get('/api/orchestration/context', authenticate, checkRole(['super_admin']), OrchestrationController.getContext);
 app.post('/api/orchestration/onboarding/provision', authenticate, checkRole(['super_admin']), OrchestrationController.provisionOnboarding);
 app.post('/api/orchestration/modules/enable', authenticate, checkRole(['super_admin']), OrchestrationController.enableModule);
 app.post('/api/orchestration/tiers/elevate', authenticate, checkRole(['super_admin']), OrchestrationController.elevateTier);
-app.get('/admin/dashboard-stats', authenticate, checkRole(['super_admin']), AdminController.getDashboardStats);
-app.get('/admin/audit-logs', authenticate, checkRole(['super_admin']), TerminalController.getAuditLog);
-app.patch('/admin/profile', authenticate, AdminController.updateProfile);
+
+// Runtime Engine
+app.get('/api/v1/runtime/config', authenticate, RuntimeController.getConfig);
+
+// Admin Operations
+app.post('/api/admin/master-mode/enter', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.enterMasterMode);
+app.get('/api/admin/dashboard-stats', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.getDashboardStats);
+app.get('/api/admin/audit-logs', authenticate, checkRole(['super_admin', 'admin', 'owner']), TerminalController.getAuditLog);
+app.patch('/api/admin/profile', authenticate, AdminController.updateProfile);
+
+import fs from 'fs';
+
+// Setup storage for local files
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    let destPath = 'uploads/other';
+    if (file.fieldname === 'cac_document') {
+      destPath = 'uploads/cac';
+    } else if (file.fieldname === 'backup_file') {
+      destPath = 'uploads/backups';
+    }
+    // Ensure dir exists
+    const fullPath = path.join(__dirname, '..', destPath);
+    if (!fs.existsSync(fullPath)) {
+      fs.mkdirSync(fullPath, { recursive: true });
+    }
+    cb(null, fullPath);
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + ext);
+  }
+});
+
+const localUpload = multer({ storage: storage });
+
+app.post('/api/admin/upload-cac', authenticate, checkRole(['super_admin', 'admin', 'owner']), localUpload.single('cac_document'), AdminController.uploadCacDocument);
+app.post('/api/admin/claude-backup', authenticate, checkRole(['super_admin', 'admin', 'owner']), localUpload.single('backup_file'), AdminController.uploadClaudeBackup);
+app.post('/api/admin/virtual-account/init', authenticate, checkRole(['super_admin', 'admin', 'owner']), AdminController.initVirtualAccountEngine);
+
+import { MfaController } from './controllers/mfa.controller';
+app.post('/api/mfa/generate', authenticate, MfaController.generate);
+app.post('/api/mfa/enable', authenticate, MfaController.enable);
 
 // Cloud Metrics API Endpoints
 const cloudMetricsController = new CloudMetricsController();
@@ -291,8 +397,8 @@ app.get('/admin/ledger', authenticate, checkTenantAccess, AdminController.listLe
 app.get('/admin/payments', authenticate, checkTenantAccess, AdminController.listPayments);
 
 // Wallet Endpoints (Internal Ledger)
-app.get('/wallet', authenticate, checkTenantAccess, WalletController.getBalance);
-app.get('/wallet/transactions', authenticate, checkTenantAccess, WalletController.getTransactions);
+app.get('/api/v1/wallet', authenticate, checkTenantAccess, WalletController.getBalance);
+app.get('/api/v1/wallet/transactions', authenticate, checkTenantAccess, WalletController.getTransactions);
 
 // Users Management
 app.get('/admin/users', authenticate, checkRole(['super_admin', 'tenant_admin']), UserController.listUsers);
@@ -499,9 +605,24 @@ app.use((req: Request, res: Response) => {
 
 // 4. GLOBAL ERROR HANDLER
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error('[Global Error]', err.stack);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal Server Error'
+  console.error(`[Global Error] [${(req as any).correlationId || 'NO-CORRELATION'}]`, err.stack);
+  
+  const status = err.status || 500;
+  
+  let code = err.code || 'ERR_INTERNAL_SERVER';
+  if (status === 400) code = 'ERR_BAD_REQUEST';
+  if (status === 401) code = 'ERR_UNAUTHORIZED';
+  if (status === 403) code = 'ERR_FORBIDDEN';
+  if (status === 404) code = 'ERR_NOT_FOUND';
+  if (status === 422) code = 'ERR_UNPROCESSABLE_ENTITY';
+  if (status === 429) code = 'ERR_TOO_MANY_REQUESTS';
+
+  res.status(status).json({
+    success: false,
+    code,
+    message: err.message || 'Internal Server Error',
+    correlationId: (req as any).correlationId,
+    details: err.details || {}
   });
 });
 
@@ -515,13 +636,61 @@ export const io = new SocketIOServer(server, {
   }
 });
 
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
+    
+    // OFFLINE MOCK AUTH BYPASS
+    if (process.env.OFFLINE_LOCAL_AUTH === 'true' && token && token.includes('local_dev_signature')) {
+      const b64Payload = token.split('.')[1];
+      if (b64Payload) {
+        const decoded = JSON.parse(Buffer.from(b64Payload, 'base64').toString('utf-8'));
+        socket.data.user = decoded;
+        socket.data.tenantId = decoded.tenantId;
+        return next();
+      }
+    }
+
+    if (!token) {
+      return next(new Error('Authentication error: Missing token'));
+    }
+
+    const { supabase, supabaseAdmin } = require('./db/supabase');
+    const { data, error } = await supabase.auth.getUser(token);
+    
+    if (error || !data.user) {
+      return next(new Error('Authentication error: Invalid token'));
+    }
+
+    const { data: profile, error: profileErr } = await supabaseAdmin
+        .from('users')
+        .select('tenant_id, role')
+        .eq('id', data.user.id)
+        .single();
+        
+    if (profileErr || !profile) {
+      return next(new Error('Authentication error: User profile not found'));
+    }
+
+    socket.data.user = { id: data.user.id, ...profile };
+    socket.data.tenantId = profile.tenant_id;
+    next();
+  } catch (err) {
+    next(new Error('Authentication error: Server error'));
+  }
+});
+
 io.on('connection', (socket: Socket) => {
-  console.log(`[Socket.io] Client connected: ${socket.id}`);
+  console.log(`[Socket.io] Client connected: ${socket.id} (Tenant: ${socket.data.tenantId})`);
   
   // Clients will emit 'join_room' passing their characteristics
   socket.on('join_room', (data: any) => {
     const joined = ['all'];
-    if (data.tenantId) { socket.join(`tenant:${data.tenantId}`); joined.push(`tenant:${data.tenantId}`); }
+    // IGNORE data.tenantId, force authenticated tenantId
+    if (socket.data.tenantId) { 
+      socket.join(`tenant:${socket.data.tenantId}`); 
+      joined.push(`tenant:${socket.data.tenantId}`); 
+    }
     if (data.plan) { socket.join(`plan:${String(data.plan).toLowerCase()}`); joined.push(`plan:${data.plan}`); }
     if (data.type) { socket.join(`type:${String(data.type).toLowerCase()}`); joined.push(`type:${data.type}`); }
     if (data.deviceId) { socket.join(`device:${data.deviceId}`); joined.push(`device:${data.deviceId}`); }
@@ -597,3 +766,5 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export default app;
+
+// touch2

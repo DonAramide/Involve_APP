@@ -336,7 +336,7 @@ export class PosService {
   }
 
   static async getTransactionHistory(_tenantId: string) {
-    if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+    if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
       return this.transactionHistory;
     }
 
@@ -465,7 +465,7 @@ export class PosService {
     if (this.transactionHistory.length > 500) this.transactionHistory.pop();
 
     // Async insert to supabase
-    if (process.env.OFFLINE_MOCK_AUTH !== 'true' && params.tenantId && params.tenantId !== 'default') {
+    if (process.env.OFFLINE_LOCAL_AUTH !== 'true' && params.tenantId && params.tenantId !== 'default') {
       supabase.from('pos_transaction_attempts').insert([{
         id: pendingId,
         tenant_id: params.tenantId,
@@ -551,7 +551,7 @@ export class PosService {
     this.transactionHistory.unshift(entry);
     if (this.transactionHistory.length > 500) this.transactionHistory.pop();
 
-    if (process.env.OFFLINE_MOCK_AUTH !== 'true' && params.tenantId && params.tenantId !== 'default' && params.tenantId !== 'Unknown') {
+    if (process.env.OFFLINE_LOCAL_AUTH !== 'true' && params.tenantId && params.tenantId !== 'default' && params.tenantId !== 'Unknown') {
       supabase.from('pos_transaction_attempts').insert([{
         id: txId,
         tenant_id: params.tenantId,
@@ -1340,7 +1340,7 @@ export class PosService {
     );
 
     // Update in Supabase if applicable
-    if (process.env.OFFLINE_MOCK_AUTH !== 'true' && entry.tenantId && entry.tenantId !== 'default' && entry.tenantId !== 'Unknown') {
+    if (process.env.OFFLINE_LOCAL_AUTH !== 'true' && entry.tenantId && entry.tenantId !== 'default' && entry.tenantId !== 'Unknown') {
       supabase.from('pos_transaction_attempts').update({
         status: entry.status,
         status_code: entry.statusCode,

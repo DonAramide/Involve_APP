@@ -5,7 +5,7 @@ export enum BuildVariant {
 }
 
 export function getBuildVariant(): BuildVariant {
-  const variant = import.meta.env.VITE_BUILD_VARIANT?.toUpperCase();
+  const variant = (import.meta.env.VITE_BUILD_VARIANT || import.meta.env.VITE_DASHBOARD_DATA_MODE)?.toUpperCase();
   if (variant === 'PROD') return BuildVariant.PROD;
   if (variant === 'STAGING') return BuildVariant.STAGING;
   return BuildVariant.LOCAL;

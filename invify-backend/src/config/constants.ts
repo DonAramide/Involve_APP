@@ -39,21 +39,29 @@ export const SYSTEM_USER_UUID = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
  *
  * Returns true ONLY when:
  *  - BUILD_VARIANT is LOCAL (default when no env var is set), AND
- *  - OFFLINE_MOCK_AUTH is 'true', OR we are in a test environment.
+ *  - OFFLINE_LOCAL_AUTH is 'true', OR we are in a test environment.
  *
  * This function is intentionally synchronous and has no side effects.
  *
  * IMPORTANT: Always check this before any 'Bearer mock-*' token bypass,
- * OFFLINE_MOCK_AUTH shortcut, or connection-timeout fallback grant.
+ * OFFLINE_LOCAL_AUTH shortcut, or connection-timeout fallback grant.
  */
 export function isMockAuthAllowed(): boolean {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    process.env.APP_ENV === 'production' ||
+    process.env.BUILD_PROFILE === 'production'
+  ) {
+    return false;
+  }
+
   const variantService = BuildVariantService.getInstance();
   // Explicitly reject staging and production — no exception.
   if (variantService.isStaging() || variantService.isProd()) {
     return false;
   }
-  // Local: require OFFLINE_MOCK_AUTH or NODE_ENV=test
-  return process.env.OFFLINE_MOCK_AUTH === 'true' || process.env.NODE_ENV === 'test';
+  // Local: require OFFLINE_LOCAL_AUTH or NODE_ENV=test
+  return process.env.OFFLINE_LOCAL_AUTH === 'true' || process.env.NODE_ENV === 'test';
 }
 
 /**
@@ -61,9 +69,17 @@ export function isMockAuthAllowed(): boolean {
  * (mock-super-admin, mock-agent-token-*, etc.)
  *
  * Slightly broader than isMockAuthAllowed: allows any local/test request
- * with a recognised mock token header regardless of OFFLINE_MOCK_AUTH.
+ * with a recognised mock token header regardless of OFFLINE_LOCAL_AUTH.
  */
 export function isMockTokenAllowed(): boolean {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    process.env.APP_ENV === 'production' ||
+    process.env.BUILD_PROFILE === 'production'
+  ) {
+    return false;
+  }
+
   const variantService = BuildVariantService.getInstance();
   if (variantService.isStaging() || variantService.isProd()) {
     return false;

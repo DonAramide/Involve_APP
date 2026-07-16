@@ -45,7 +45,7 @@ export class RetentionService {
     // 2. Log conversion signal/Nudge
     console.log(`[Retention] 🚀 Nudging ${user.name} (${user.role}) @ ${user.tenants.name} - Milestone: ${milestone}`);
     
-    // 3. Mock Email dispatch
+    // 3. Simulated Email dispatch
     await this.sendEmail(user, milestone);
 
     // 4. Record Checkpoint

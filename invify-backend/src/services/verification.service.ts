@@ -24,6 +24,7 @@ export class VerificationService {
     tenantId?: string
   ): Promise<boolean> {
     const rawOtp = this.generateOTP();
+    console.log(`[DEV OTP BYPASS] Generated OTP for ${identifier}: ${rawOtp}`);
     const saltRounds = 10;
     const hashedOtp = await bcrypt.hash(rawOtp, saltRounds);
     

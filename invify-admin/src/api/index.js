@@ -112,6 +112,8 @@ export const adminApi = {
   getAtRisk: () => api.get('/admin/retention/at-risk'),
 
   // Curriculum System
+  getCurriculum: (params) => api.get('/admin/curriculum', { params }),
+  createTopic: (data) => api.post('/admin/curriculum', data),
   updateTopic: (id, data) => api.patch(`/admin/curriculum/${id}`, data),
   deleteTopic: (id) => api.delete(`/admin/curriculum/${id}`),
 
@@ -147,7 +149,33 @@ export const billingApi = {
 };
 
 export const financeApi = {
-  getPayoutStats: () => api.get('/finance/stats/payouts')
+  getExecutiveSummary: () => api.get('/api/v1/finance/executive-summary'),
+  getWalletBalance: () => api.get('/api/v1/wallet'),
+  getWalletTransactions: () => api.get('/api/v1/wallet/transactions'),
+  getPayoutStats: () => api.get('/api/v1/finance/stats/payouts'),
+  getInvoices: () => api.get('/api/v1/finance/invoices'),
+  createInvoice: (data) => api.post('/api/v1/finance/invoices', data),
+};
+
+export const crmApi = {
+  getCustomers: (params) => api.get('/api/v1/crm/customers', { params }),
+  getCustomer: (id) => api.get(`/api/v1/crm/customers/${id}`),
+  createCustomer: (data) => api.post('/api/v1/crm/customers', data),
+  updateCustomer: (id, data) => api.put(`/api/v1/crm/customers/${id}`, data),
+};
+
+export const inventoryApi = {
+  searchProducts: (params) => api.get('/api/inventory/products', { params }),
+  getProduct: (id) => api.get(`/api/inventory/products/${id}`),
+  createProduct: (data) => api.post('/api/inventory/products', data),
+  updateProduct: (id, data) => api.put(`/api/inventory/products/${id}`, data),
+  archiveProduct: (id) => api.delete(`/api/inventory/products/${id}`),
+  getLowStock: () => api.get('/api/inventory/stock/low'),
+  getOutOfStock: () => api.get('/api/inventory/stock/out'),
+  getStockSummary: () => api.get('/api/inventory/stock/summary'),
+  getStockHistory: (id) => api.get(`/api/inventory/stock/${id}/history`),
+  getCategories: () => api.get('/api/inventory/categories'),
+  getSuppliers: () => api.get('/api/inventory/suppliers'),
 };
 
 export const attendanceApi = {
@@ -245,6 +273,8 @@ export const vaultApi = {
   listIntegrations: (scope, tenantId) => api.get('/vault/integrations', { params: { scope, tenantId } }),
   registerIntegration: (data) => api.post('/vault/integrations', data),
   addCredential: (vaultId, data) => api.post(`/vault/integrations/${vaultId}/credentials`, data),
+  activateCredential: (vaultId, credentialId) => api.patch(`/vault/integrations/${vaultId}/credentials/${credentialId}/activate`),
+  deleteCredential: (vaultId, credentialId) => api.delete(`/vault/integrations/${vaultId}/credentials/${credentialId}`),
   testConnection: (vaultId, data) => api.post(`/vault/integrations/${vaultId}/test`, data),
 };
 

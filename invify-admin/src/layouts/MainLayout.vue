@@ -864,6 +864,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Audit Trail Ledger', path: '/governance/audit-trail', icon: 'history_edu', color: 'blue-5' },
         { label: 'User Device Approvals', path: '/governance/user-devices', icon: 'phonelink_lock', color: 'red-4' },
         { label: 'Enterprise Support Desk', path: '/governance/support', icon: 'headset_mic', color: 'amber-4', badge: 'TICKETS', badgeBg: 'amber-10', badgeColor: 'amber-2' },
+        { label: 'Provisioning Issues', path: '/governance/provisioning-issues', icon: 'report_problem', color: 'red-4', badge: 'ERRORS', badgeBg: 'red-10', badgeColor: 'red-2' },
         { label: 'Policy Governance', path: '/governance/policy', icon: 'policy', color: 'indigo-3' },
         { label: 'Integrity Center', path: '/governance/integrity', icon: 'security', color: 'grey-4' },
         { label: 'Trust Scoring', path: '/governance/trust', icon: 'thumb_up', color: 'cyan-3' },

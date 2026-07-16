@@ -137,7 +137,7 @@ const filteredNotifications = computed(() => {
   }
 
   if (tab.value === 'assigned') {
-    result = result.filter(n => n.assignedTo === 'current_user@invify.app') // Mock
+    result = result.filter(n => n.assignedToMe === true) 
   } else if (tab.value === 'approvals') {
     result = result.filter(n => n.category === 'Approvals')
   } else if (tab.value === 'workflow') {

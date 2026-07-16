@@ -156,6 +156,14 @@ export function registerAuthBootstrapGuard(router) {
           ADMIN_EXECUTIVE: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'read_telemetry', 'read_audit', 'read_ai_intelligence', 'soc_communications', 'create_requests', 'view_finance_queue', 'view_operations_queue', 'approve_finance', 'approve_operations'],
           ADMIN_DEPLOY: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'admin_deploy', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_deployment_queue', 'approve_deployment'],
           STAFF: ['read_fleet', 'read_devices', 'read_tenant', 'read_governance', 'read_streams', 'read_metrics', 'write_fleet', 'read_telemetry', 'read_audit', 'soc_communications', 'create_requests', 'view_own_requests'],
+          OWNER: [
+            'tenant.dashboard.view', 'tenant.transaction.view', 'tenant.wallet.view',
+            'tenant.ledger.view', 'tenant.users.manage', 'tenant.roles.view',
+            'tenant.invitations.manage', 'tenant.activity.view', 'tenant.reports.view',
+            'tenant.settings.manage', 'tenant.settlement.view', 'tenant.payout.create',
+            'tenant.devices.view', 'tenant.terminals.view', 'tenant.compliance.view',
+            'tenant.audit.view', 'tenant.analytics.view'
+          ],
           TENANT_OPERATOR: ['read_fleet', 'read_devices', 'read_streams']
         }
 

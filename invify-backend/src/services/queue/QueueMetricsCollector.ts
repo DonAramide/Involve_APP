@@ -13,17 +13,17 @@ export class QueueMetricsCollector {
   private static completedCounts: Map<QueueName, number> = new Map();
   private static failedCounts: Map<QueueName, number> = new Map();
 
-  private static mockDepths: Map<QueueName, number> = new Map();
+  private static inMemoryDepths: Map<QueueName, number> = new Map();
 
   static clearMetrics() {
     this.latencyRecords.clear();
     this.completedCounts.clear();
     this.failedCounts.clear();
-    this.mockDepths.clear();
+    this.inMemoryDepths.clear();
   }
 
   static recordDepth(queueName: QueueName, depth: number) {
-    this.mockDepths.set(queueName, depth);
+    this.inMemoryDepths.set(queueName, depth);
   }
 
   static recordLatency(queueName: QueueName, latencyMs: number) {
@@ -45,8 +45,8 @@ export class QueueMetricsCollector {
   }
 
   static getQueueMetrics(queueName: QueueName) {
-    const depth = this.mockDepths.get(queueName) ?? 
-      QueueRegistry.getMockMessages().filter(m => m.queue_name === queueName && m.status === 'PENDING').length;
+    const depth = this.inMemoryDepths.get(queueName) ?? 
+      QueueRegistry.getInMemoryMessages().filter(m => m.queue_name === queueName && m.status === 'PENDING').length;
     return {
       depth,
       completed: this.completedCounts.get(queueName) || 0,
@@ -55,8 +55,8 @@ export class QueueMetricsCollector {
   }
 
   static async getMetrics(queueName: QueueName): Promise<QueueMetrics> {
-    const depth = this.mockDepths.get(queueName) ??
-      QueueRegistry.getMockMessages().filter(m => m.queue_name === queueName && m.status === 'PENDING').length;
+    const depth = this.inMemoryDepths.get(queueName) ??
+      QueueRegistry.getInMemoryMessages().filter(m => m.queue_name === queueName && m.status === 'PENDING').length;
 
     const latencies = this.latencyRecords.get(queueName) || [];
     const averageLatencyMs = latencies.length > 0

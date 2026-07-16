@@ -20,5 +20,13 @@ export default defineConfig({
       template: { transformAssetUrls }
     }),
     quasar()
-  ]
+  ],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3004',
+        changeOrigin: true
+      }
+    }
+  }
 })

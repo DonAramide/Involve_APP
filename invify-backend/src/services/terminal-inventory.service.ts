@@ -99,7 +99,7 @@ export class TerminalInventoryService {
     };
   }
 
-  static async bulkImportDecoupled(rows: any[], batchId: string, adminId: string, importType: string = 'tablets') {
+  static async bulkImportDecoupled(rows: any[], batchId: string, adminId: string, importType: string = 'tablets', tenantId?: string) {
     let successful = 0;
     let failed = 0;
     let duplicates = 0;
@@ -115,6 +115,7 @@ export class TerminalInventoryService {
             continue;
           }
           const { error } = await supabase.from('devices').insert({
+            tenant_id: tenantId || null,
             device_id: row.device_id,
             device_name: row.model || 'Imported Tablet',
             device_info: { model: row.model },
@@ -129,6 +130,7 @@ export class TerminalInventoryService {
             continue;
           }
           const { error } = await supabase.from('terminal_inventory').insert({
+            tenant_id: tenantId || null,
             terminal_id: row.serial_number,
             mpos_terminal_id: row.serial_number,
             pos_serial_number: row.serial_number,
@@ -144,6 +146,7 @@ export class TerminalInventoryService {
             continue;
           }
           const { error } = await supabase.from('terminal_inventory').insert({
+            tenant_id: tenantId || null,
             terminal_id: row.mac_address,
             printer_mac_address: row.mac_address,
             printer_model: row.model || 'XP-58',

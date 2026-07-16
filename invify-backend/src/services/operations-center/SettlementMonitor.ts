@@ -19,7 +19,7 @@ export class SettlementMonitor {
     const dlqMetrics = await QueueMetricsCollector.getMetrics('DLQ');
 
     // DLQ depth counts messages that have been routed there from settlement
-    const dlqMessages = QueueRegistry.getMockMessages().filter(
+    const dlqMessages = QueueRegistry.getInMemoryMessages().filter(
       (m) => m.queue_name === 'DLQ'
     );
 

@@ -290,6 +290,13 @@ class FinanceApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> syncOutboxBatch(List<Map<String, dynamic>> events) async {
+    final response = await post('/api/v1/sync/outbox', data: {
+      'events': events,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   /// Unwraps a DioException's inner [FinanceApiException], or re-throws a

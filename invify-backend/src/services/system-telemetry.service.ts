@@ -58,7 +58,7 @@ export class SystemTelemetryService {
     const usedMem = totalMem - freeMem;
     const memoryPercentage = Math.round((usedMem / totalMem) * 100);
     
-    // Disk & Network are mocked here natively since raw node 'os' doesn't provide disk IO stats natively.
+    // Disk & Network are simulated here natively since raw node 'os' doesn't provide disk IO stats natively.
     // For a real prod app, you'd use a package or read /proc/diskstats in linux.
     const variantService = require('../config/build-variant').BuildVariantService.getInstance();
     

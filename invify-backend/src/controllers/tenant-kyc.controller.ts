@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
+import { S3Service } from '../services/s3.service';
 
 export class TenantKycController {
   static async uploadKyc(req: Request, res: Response) {
     try {
-      const authUserId = (req as any).user?.id || req.body.tenant_id; // Support both JWT and raw requests for mobile onboarding
+      const authUserId = (req as any).user?.tenantId || (req as any).user?.id;
       if (!authUserId) {
         return res.status(401).json({ success: false, message: 'Unauthorized. Tenant ID required.' });
       }
@@ -14,17 +15,28 @@ export class TenantKycController {
         return res.status(400).json({ success: false, message: 'Document type is required' });
       }
 
-      // 1. Simulate file upload by creating a CDN URL
-      const simulatedUrl = `https://storage.invify.app/tenants/kyc/${authUserId}_${type}_${Date.now()}.png`;
+      // Check if file was uploaded via multer
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ success: false, message: 'No document file provided' });
+      }
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      // 1. Upload to Contabo S3
+      const documentUrl = await S3Service.uploadFile(
+        file.buffer, 
+        file.originalname, 
+        file.mimetype, 
+        `tenants/kyc/${authUserId}`
+      );
+
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         return res.status(200).json({
           success: true,
           message: 'KYC document uploaded successfully (Mock Mode)',
           data: {
             tenant_id: authUserId,
             document_type: type,
-            document_url: simulatedUrl,
+            document_url: documentUrl,
             status: 'PENDING'
           }
         });
@@ -34,7 +46,7 @@ export class TenantKycController {
       const { data: doc, error: insertError } = await supabase.from('tenant_kyc_documents').insert({
         tenant_id: authUserId,
         document_type: type,
-        document_url: simulatedUrl,
+        document_url: documentUrl,
         status: 'PENDING'
       }).select().single();
 
@@ -64,7 +76,7 @@ export class TenantKycController {
         return res.status(400).json({ success: false, message: 'Tenant ID is required' });
       }
 
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         return res.status(200).json({
           success: true,
           data: []

@@ -165,7 +165,6 @@
 import { ref, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../../api'
-import axios from 'axios'
 
 const $q = useQuasar()
 const API_BASE = import.meta.env.VITE_API_URL || ''
@@ -190,7 +189,7 @@ const broadcasting = ref(false)
 const loadData = async () => {
   try {
     // Load Global Settings
-    const resSettings = await axios.get(`${API_BASE}/admin/settings`)
+    const resSettings = await adminApi.getGlobalSettings()
     if (resSettings.data) {
       if (resSettings.data.support_phone) supportPhone.value = resSettings.data.support_phone
       if (resSettings.data.support_email) supportEmail.value = resSettings.data.support_email
@@ -234,7 +233,7 @@ const saveSettings = async () => {
   saving.value = true
   try {
     if (selectedTenant.value === 'global') {
-      await axios.patch(`${API_BASE}/admin/settings`, { 
+      await adminApi.updateGlobalSettings({ 
         support_phone: supportPhone.value,
         support_email: supportEmail.value,
         support_whatsapp: supportWhatsapp.value

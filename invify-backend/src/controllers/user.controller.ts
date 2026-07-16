@@ -15,10 +15,7 @@ export class UserController {
     try {
       const { role, tenantId } = (req as any).user;
       
-      let query = supabase.from('users').select(`
-        *,
-        tenants (name)
-      `);
+      let query = supabase.from('users').select(`*`);
 
       // 1. Isolation Rule
       if (role !== 'super_admin') {

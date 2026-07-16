@@ -6,7 +6,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import '../../../../core/utils/device_info_service.dart';
-import '../../../settings/domain/services/security_service.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../../core/services/service_locator.dart';
 import '../../../school_finance/domain/repositories/finance_repository_new.dart';
 import '../../../../core/utils/progress_dialog_utils.dart';
@@ -14,6 +15,10 @@ import '../../../activation/presentation/pages/activation_page.dart';
 import '../../../activation/presentation/pages/tenant_kyc_upload_page.dart';
 import '../../../../core/license/storage_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
 
 class AccountSetupPage extends StatefulWidget {
   const AccountSetupPage({super.key});
@@ -366,6 +371,30 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                     ),
                     const SizedBox(height: 20),
+                    
+                    // CAC Document Upload UI
+                    Text('CAC Document', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _uploadCacDocument(ImageSource.gallery),
+                            icon: const Icon(Icons.photo_library, size: 16),
+                            label: const Text('Gallery'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _uploadCacDocument(ImageSource.camera),
+                            icon: const Icon(Icons.camera_alt, size: 16),
+                            label: const Text('Camera'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
 
                     // Enrollment broadcast actions & Premium Status Renewal View
                     if (isProTier) ...[
@@ -693,6 +722,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                   onUpdateState: (updated) {
                     setState(() => _claudeBackupEnabled = updated);
                     _showToast(updated ? 'Claude backup engine armed.' : 'Claude backup paused.');
+                    if (updated) _triggerClaudeBackup();
                   },
                 ),
               ),
@@ -715,6 +745,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
                   onUpdateState: (updated) {
                     setState(() => _virtualAccountsEnabled = updated);
                     _showToast(updated ? 'Virtual Account dispatch initialized.' : 'Virtual accounts deactivated.');
+                    if (updated) _initVirtualAccountEngine();
                   },
                 ),
               ),
@@ -840,6 +871,17 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     );
   }
 
+  FinanceApiClient _safeClient() {
+    if (!sl.isRegistered<FinanceApiClient>()) {
+      sl.registerSingleton<FinanceApiClient>(FinanceApiClient(
+        baseUrl: dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004',
+        getToken: () async => await SecurityService().getOfflineToken() ?? 'mock-super-admin',
+        getTenantId: () async => await SecurityService().getTenantId(),
+      ));
+    }
+    return sl<FinanceApiClient>();
+  }
+
   void _handleEnterpriseToggle({
     required bool requestedValue,
     required bool isProTier,
@@ -854,6 +896,87 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
     }
     await _storage.write(key: storageKey, value: requestedValue ? 'true' : 'false');
     onUpdateState(requestedValue);
+  }
+
+  Future<void> _uploadCacDocument(ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
+    if (pickedFile == null) return;
+
+    if (!mounted) return;
+
+    try {
+      await ProgressDialogUtils.showDancingProgress(context, () async {
+        final client = _safeClient();
+        final formData = FormData.fromMap({
+          'cac_document': await MultipartFile.fromFile(pickedFile.path, filename: 'cac_document.jpg'),
+        });
+
+        final response = await client.post('/api/admin/upload-cac', data: formData);
+        if (mounted) {
+          if (response.statusCode == 200) {
+            _showToast('CAC Document uploaded successfully!');
+          } else {
+            _showToast('Upload failed: ${response.data}');
+          }
+        }
+      }, message: 'Uploading CAC Document...');
+    } catch (e) {
+      if (mounted) {
+        _showToast('Error uploading document: $e');
+      }
+    }
+  }
+
+  Future<void> _triggerClaudeBackup() async {
+    if (!mounted) return;
+    try {
+      await ProgressDialogUtils.showDancingProgress(context, () async {
+        final dbFolder = await getApplicationDocumentsDirectory();
+        final dbPath = '${dbFolder.path}/app_database.db';
+        final file = File(dbPath);
+        
+        if (!await file.exists()) {
+          if (mounted) _showToast('Local database not found.');
+          return;
+        }
+
+        final client = _safeClient();
+        final formData = FormData.fromMap({
+          'backup_file': await MultipartFile.fromFile(dbPath, filename: 'app_database_backup_${DateTime.now().millisecondsSinceEpoch}.db'),
+        });
+
+        await client.post('/api/admin/claude-backup', data: formData);
+        if (mounted) {
+          _showToast('Backup successfully synchronized to Claude Engine');
+        }
+      }, message: 'Syncing database to Claude Engine...');
+    } catch (e) {
+      if (mounted) {
+        _showToast('Claude Backup failed: $e');
+        setState(() => _claudeBackupEnabled = false);
+        _storage.write(key: 'toggle_claude_backup', value: 'false');
+      }
+    }
+  }
+
+  Future<void> _initVirtualAccountEngine() async {
+    if (!mounted) return;
+    try {
+      await ProgressDialogUtils.showDancingProgress(context, () async {
+        final client = _safeClient();
+        await client.post('/api/admin/virtual-account/init');
+        if (mounted) {
+          _showToast('Quasar virtual accounts successfully initialized.');
+        }
+      }, message: 'Configuring Quasar Virtual Accounts...');
+    } catch (e) {
+      if (mounted) {
+        _showToast('Failed to initialize Virtual Accounts: $e');
+        setState(() => _virtualAccountsEnabled = false);
+        _storage.write(key: 'toggle_virtual_account', value: 'false');
+      }
+    }
   }
 
   void _showFeatureUpgradePrompt(String featureName) {

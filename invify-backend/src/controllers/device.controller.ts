@@ -1,6 +1,6 @@
 // src/controllers/device.controller.ts
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase';
+import { supabase, supabaseAdmin } from '../db/supabase';
 import { LicenseGenerator } from '../utils/license.util';
 
 function isNetworkTimeout(error: any): boolean {
@@ -131,7 +131,7 @@ export class DeviceController {
       // Fetch tenant name for cryptographic signature
       let businessName = 'Invify Retail Business';
       try {
-        const { data, error } = await supabase.from('tenants').select('name').eq('id', tenantId).single();
+        const { data, error } = await supabaseAdmin.from('tenants').select('name').eq('id', tenantId).single();
         if (error) throw error;
         if (data && data.name) {
           businessName = data.name;
@@ -162,7 +162,7 @@ export class DeviceController {
       const creatorEmail = user?.email || 'superadmin@invify.app';
 
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
           .from('device_activations')
           .insert({
             tenant_id: tenantId,

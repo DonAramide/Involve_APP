@@ -36,10 +36,14 @@ class _ActivationPageState extends State<ActivationPage> {
   void initState() {
     super.initState();
     _checkOnboarding();
-    // Pre-populate business name if settings are already loaded
+    // Pre-populate business name only if a real name is already saved (not a generic placeholder)
     final settingsState = context.read<SettingsBloc>().state;
     if (settingsState.settings != null) {
-      _businessNameController.text = settingsState.settings!.organizationName;
+      final savedName = settingsState.settings!.organizationName;
+      // Don't show generic fallback names — leave blank so user must type their real business name
+      if (savedName.isNotEmpty && savedName != 'My Business' && savedName != 'My Business (Reset)') {
+        _businessNameController.text = savedName;
+      }
     }
     _loadGlobalConfig();
   }

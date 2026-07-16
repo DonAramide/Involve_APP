@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../pages/verify_email_page.dart';
 import '../pages/verify_whatsapp_page.dart';
 import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
 import '../pages/activation_page.dart';
 import 'package:involve_app/core/license/storage_service.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
 
 class OnboardingNavigator {
   static Future<void> proceed(BuildContext context, Map<String, dynamic> payload, List<String> requiredChannels, {bool isMounted = true}) async {
@@ -73,7 +77,7 @@ class OnboardingNavigator {
       
       for (var url in signupUrls) {
         try {
-          await dio.post(url, data: {
+          final response = await dio.post(url, data: {
             'firstName': payload['firstName'],
             'lastName': payload['lastName'],
             'email': payload['email'],
@@ -88,7 +92,16 @@ class OnboardingNavigator {
             'state': payload['state'],
             'lga': payload['lga'],
             'streetAddress': payload['streetAddress'],
+            // Device identity fields
+            'deviceId': payload['deviceId'],
+            'agentCode': payload['agentCode'] ?? 'AAA000',
+            'location': payload['location'],
           });
+          
+          if (response.data != null && response.data['offlineToken'] != null) {
+            await SecurityService().setOfflineToken(response.data['offlineToken']);
+          }
+          
           signupSuccess = true;
           break;
         } catch (e) {
@@ -113,6 +126,22 @@ class OnboardingNavigator {
       }
 
       if (isMounted) {
+        // Sync the business name globally
+        try {
+          final settingsBloc = context.read<SettingsBloc>();
+          final currentSettings = settingsBloc.state.settings;
+          if (currentSettings != null) {
+            settingsBloc.add(UpdateAppSettings(
+              currentSettings.copyWith(
+                organizationName: payload['businessName'] ?? currentSettings.organizationName,
+                phone: payload['phone'] ?? currentSettings.phone,
+              )
+            ));
+          }
+        } catch (e) {
+          debugPrint('Error syncing business name: $e');
+        }
+
         final isTrial = payload['isTrial'] == true;
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => isTrial ? const DashboardPage() : const ActivationPage(isExpired: false)),

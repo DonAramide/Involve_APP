@@ -16,5 +16,8 @@ router.post('/verify-email-otp', otpRateLimiter, OnboardingController.verifyEmai
 router.post('/send-whatsapp-otp', otpRateLimiter, OnboardingController.sendWhatsappOtp);
 router.post('/verify-whatsapp-otp', otpRateLimiter, OnboardingController.verifyWhatsappOtp);
 router.post('/register', OnboardingController.register);
+// Device linking via QR code
+router.post('/generate-link-qr', OnboardingController.generateDeviceLinkQr);
+router.post('/link-device', OnboardingController.linkDevice);
 
 export const authRoutes = router;

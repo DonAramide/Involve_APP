@@ -12,7 +12,7 @@ export class AuditController {
 
       // 1. Fetch successful Cash and Transfer invoices
       let invoicesData: any[] = [];
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
          // Mock response for invoices
          invoicesData = [];
       } else {
@@ -29,7 +29,7 @@ export class AuditController {
 
       // 2. Fetch POS attempts (Cards)
       let posData: any[] = [];
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
          posData = await PosService.getTransactionHistory(tenantId);
       } else {
          const { data, error } = await supabase

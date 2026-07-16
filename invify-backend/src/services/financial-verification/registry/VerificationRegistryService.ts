@@ -10,6 +10,7 @@ export class VerificationRegistryService implements FinancialVerificationModule 
   public readonly priority = 30;
   public readonly mandatory = true;
   public readonly version = '1.0.0';
+  public readonly capabilities = ['nonce_validation', 'registry_validation'];
 
   public async verify(context: VerificationContext): Promise<VerificationResult> {
     try {

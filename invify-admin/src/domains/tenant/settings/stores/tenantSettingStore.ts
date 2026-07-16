@@ -1,4 +1,7 @@
 import { defineStore } from 'pinia';
+import { OperationsAdapter } from '../../operations/operations.adapter';
+import { useEventBus } from '../../../../services/realtime';
+import { EnterpriseEventV1 } from '../../../core/events/enterprise.event';
 
 export const useTenantSettingStore = defineStore('tenantSetting', {
   state: () => ({
@@ -21,9 +24,41 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
       { name: 'Active POS Operators', desc: 'Total active staff nodes created.', usage: '3', limit: '10', val: 0.3 },
       { name: 'AI Copilot Query Allocations', desc: 'Aggregated analytics insights queries remaining.', usage: '840', limit: '1,000', val: 0.84 },
       { name: 'Telemetry Storage Data', desc: 'Immutable audit transaction logs stored.', usage: '2.4 GB', limit: '10 GB', val: 0.24 }
-    ]
+    ],
+    isLoading: false,
+    unsubscribeFn: null as (() => void) | null
   }),
   actions: {
+    hydrate() {
+      this.loadBrandingPrefs();
+      this.subscribe();
+    },
+
+    subscribe() {
+      if (this.unsubscribeFn) return;
+      const bus = useEventBus();
+      this.unsubscribeFn = bus.subscribe('runtime.settings.*', (event: EnterpriseEventV1) => {
+        this.refresh(event);
+      });
+    },
+
+    unsubscribe() {
+      if (this.unsubscribeFn) {
+        this.unsubscribeFn();
+        this.unsubscribeFn = null;
+      }
+    },
+
+    refresh(event: EnterpriseEventV1) {
+      this.invalidate(event.event);
+    },
+
+    invalidate(topic: string) {
+      console.log(`[SettingStore] Invalidating settings due to ${topic}`);
+      // In a real app we'd fetch the latest settings from the backend
+      // this.fetchSettings();
+    },
+
     loadBrandingPrefs() {
       const savedBranding = localStorage.getItem('tenant_branding_prefs');
       if (savedBranding) {
@@ -32,10 +67,22 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
         } catch (e) {}
       }
     },
-    savePreferences() {
-      localStorage.setItem('tenant_type', this.activeModule);
-      localStorage.setItem('tenant_branding_prefs', JSON.stringify(this.branding));
-      return `Preferences applied successfully. Workspace provisions shifted to [${this.activeModule.toUpperCase()}].`;
+    async savePreferences() {
+      this.isLoading = true;
+      try {
+        await OperationsAdapter.updateSettingsGroup('general', {
+          activeModule: this.activeModule,
+          branding: this.branding
+        });
+        localStorage.setItem('tenant_type', this.activeModule);
+        localStorage.setItem('tenant_branding_prefs', JSON.stringify(this.branding));
+        return `Preferences applied successfully. Workspace provisions shifted to [${this.activeModule.toUpperCase()}].`;
+      } catch (error: any) {
+        console.error('Failed to save settings:', error);
+        return `Error: ${error.message}`;
+      } finally {
+        this.isLoading = false;
+      }
     },
     regenerateKey() {
       this.apiKey = 'sk_live_invify_' + Math.floor(Math.random() * 100000) + '_quasar_key';

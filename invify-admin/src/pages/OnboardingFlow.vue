@@ -353,6 +353,17 @@
                 </div>
               </div>
             </div>
+
+            <q-banner v-if="provisioningError" class="bg-red-10 text-white q-mt-md rounded-borders">
+              <template v-slot:avatar>
+                <q-icon name="error" color="white" />
+              </template>
+              <div class="text-weight-bold">Provisioning Aborted</div>
+              <div>{{ provisioningError }}</div>
+              <template v-slot:action>
+                <q-btn flat color="white" label="Report to Admin" @click="reportIssueToAdmin" :loading="reportingIssue" />
+              </template>
+            </q-banner>
           </q-step>
 
           <!-- STEP 6: Launch Completed Console -->
@@ -478,6 +489,8 @@ const router = useRouter()
 const $q = useQuasar()
 const step = ref(1)
 const loading = ref(false)
+const provisioningError = ref(null)
+const reportingIssue = ref(false)
 const showPassword = ref(false)
 
 const form = ref({
@@ -498,7 +511,7 @@ const form = ref({
     footnote: 'Thank you for transacting with Invify Pro.',
     primaryColor: '#6366f1'
   },
-  paymentMethod: 'stripe'
+  paymentMethod: 'quasar'
 })
 
 const industries = ref([
@@ -521,9 +534,7 @@ const plans = ref([
 ])
 
 const gateways = ref([
-  { id: 'stripe', label: 'Stripe Global', icon: 'credit_card' },
-  { id: 'paystack', label: 'Paystack Africa', icon: 'account_balance' },
-  { id: 'flutterwave', label: 'Flutterwave Web', icon: 'payments' }
+  { id: 'quasar', label: 'Quasar', icon: 'account_balance_wallet' }
 ])
 
 const loadLookupData = async () => {
@@ -532,7 +543,7 @@ const loadLookupData = async () => {
     const res = await axios.get(`${API_BASE}/public/lookup`)
     if (res.data) {
       if (res.data.gateways && res.data.gateways.length > 0) {
-        gateways.value = res.data.gateways
+        // gateways.value = res.data.gateways // Hardcoded to Quasar
       }
       if (res.data.industries && res.data.industries.length > 0) {
         industries.value = res.data.industries
@@ -607,12 +618,39 @@ const handleProvisioningStart = async () => {
     }, 1500)
 
   } catch (err) {
-    console.error(err)
-    await addLog(`❌ PROVISIONING FAILED: ${err.response?.data?.error || err.message}`, 'text-red-4 text-weight-bold', 400)
+    provisioningError.value = err.response?.data?.error || err.message
+    await addLog(`❌ PROVISIONING FAILED: ${provisioningError.value}`, 'text-red-4 text-weight-bold', 400)
     $q.notify({
       type: 'negative',
-      message: `Provisioning aborted: ${err.response?.data?.error || err.message}`
+      message: `Provisioning aborted: ${provisioningError.value}`
     })
+  }
+}
+
+const reportIssueToAdmin = async () => {
+  reportingIssue.value = true
+  try {
+    const API_BASE = import.meta.env.VITE_API_URL || ''
+    await axios.post(`${API_BASE}/public/onboarding/report-issue`, {
+      tenantName: form.value.businessName,
+      email: form.value.email,
+      phone: form.value.phone,
+      errorMessage: provisioningError.value,
+      rawPayload: form.value
+    })
+    $q.notify({
+      type: 'positive',
+      message: 'Issue reported to Invify Engineering successfully.'
+    })
+    provisioningError.value = null // Hide banner after reporting
+  } catch (err) {
+    console.error('Failed to report issue', err)
+    $q.notify({
+      type: 'negative',
+      message: 'Failed to report issue. Please contact support manually.'
+    })
+  } finally {
+    reportingIssue.value = false
   }
 }
 

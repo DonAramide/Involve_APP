@@ -478,6 +478,19 @@ const rawItems = [
     keywords: ['financial', 'reconciliation', 'balancing', 'ledger', 'discrepancy']
   },
   {
+    id: 'cmd-17-1',
+    label: 'Ledger Explorer',
+    description: 'Explore the global financial transaction ledger.',
+    route: '/finance/ledger',
+    domain: 'finance',
+    icon: 'account_tree',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'read_tenant',
+    keywords: ['ledger', 'explorer', 'transaction', 'finance']
+  },
+  {
     id: 'cmd-18',
     label: 'Enterprise Payment Gateways',
     description: 'Configure and monitor external payment processor health.',

@@ -270,6 +270,15 @@ export class GovAuditService {
         l.location?.toLowerCase().includes(q)
       );
     }
+    
+    if (filters.module && filters.module !== 'ALL') {
+      allLogs = allLogs.filter(l => l.module === filters.module);
+    }
+    
+    if (filters.status && filters.status !== 'ALL') {
+      const statusFilter = filters.status.toLowerCase();
+      allLogs = allLogs.filter(l => (l.status || '').toLowerCase() === statusFilter);
+    }
 
     // Compute stats
     const stats = {
@@ -288,126 +297,7 @@ export class GovAuditService {
    * Seed sample governance audit logs for demonstration purposes
    */
   static async seedSampleLogs(): Promise<void> {
-    try {
-      const { count, error: countErr } = await supabaseAdmin
-        .from('audit_logs')
-        .select('*', { count: 'exact', head: true });
-        
-      if (countErr) throw countErr;
-      if (count && count > 0) return; // Already seeded
-
-      const now = Date.now();
-      const sample = [
-        {
-          id: 'gov-log-001',
-          timestamp: new Date(now - 15 * 60000).toISOString(),
-          module: 'MAKER_CHECKER',
-          action: 'APPROVAL_GRANTED',
-          user_email: 'superadmin@invify.app',
-          user_name: 'System Administrator',
-          ip_address: '192.168.1.14',
-          location: 'Local Network',
-          target: 'TERMINAL_ASSIGNMENT:2215850F',
-          status: 'approved',
-          metadata: { approvalId: 'APR-2024-001', riskScore: 72 }
-        },
-        {
-          id: 'gov-log-002',
-          timestamp: new Date(now - 45 * 60000).toISOString(),
-          module: 'AUTH',
-          action: 'LOGIN_SUCCESS',
-          user_email: 'ops@invify.app',
-          user_name: 'Operations Staff',
-          ip_address: '192.168.1.20',
-          location: 'Local Network',
-          target: 'Admin Portal',
-          status: 'success',
-          metadata: { role: 'INTERNAL_STAFF', device: 'Chrome/Windows' }
-        },
-        {
-          id: 'gov-log-003',
-          timestamp: new Date(now - 2 * 3600000).toISOString(),
-          module: 'DEVICE',
-          action: 'DEVICE_BLOCKED',
-          user_email: 'superadmin@invify.app',
-          user_name: 'System Administrator',
-          ip_address: '192.168.1.14',
-          location: 'Local Network',
-          target: 'dev-UNKN-003 (ops-staff@invify.app)',
-          status: 'blocked',
-          metadata: { reason: 'Unrecognized device flagged by security review' }
-        },
-        {
-          id: 'gov-log-004',
-          timestamp: new Date(now - 3 * 3600000).toISOString(),
-          module: 'MAKER_CHECKER',
-          action: 'APPROVAL_REJECTED',
-          user_email: 'security@invify.app',
-          user_name: 'Security Lead',
-          ip_address: '192.168.1.8',
-          location: 'Local Network',
-          target: 'BULK_PAYOUT_REQUEST:TXN-88811',
-          status: 'rejected',
-          metadata: { approvalId: 'APR-2024-002', reason: 'Exceeds daily limit threshold' }
-        },
-        {
-          id: 'gov-log-005',
-          timestamp: new Date(now - 5 * 3600000).toISOString(),
-          module: 'USER_MGMT',
-          action: 'USER_CREATED',
-          user_email: 'superadmin@invify.app',
-          user_name: 'System Administrator',
-          ip_address: '192.168.1.14',
-          location: 'Local Network',
-          target: 'new-ops-staff@invify.app',
-          status: 'success',
-          metadata: { role: 'INTERNAL_STAFF', department: 'Operations' }
-        },
-        {
-          id: 'gov-log-006',
-          timestamp: new Date(now - 8 * 3600000).toISOString(),
-          module: 'SYSTEM',
-          action: 'AUDIT_ARCHIVE_RUN',
-          user_email: 'system@invify.internal',
-          user_name: 'Invify System',
-          ip_address: '127.0.0.1',
-          location: 'Local Network',
-          target: 'archived_audit_logs.json',
-          status: 'success',
-          metadata: { archivedCount: 47, retentionHours: 72 }
-        },
-        {
-          id: 'gov-log-007',
-          timestamp: new Date(now - 24 * 3600000).toISOString(),
-          module: 'GOVERNANCE',
-          action: 'POLICY_UPDATED',
-          user_email: 'superadmin@invify.app',
-          user_name: 'System Administrator',
-          ip_address: '192.168.1.14',
-          location: 'Local Network',
-          target: 'AML_POLICY_V2',
-          status: 'success',
-          metadata: { version: '2.1.0', changes: 'Updated KYC threshold to ₦5,000,000' }
-        },
-        {
-          id: 'gov-log-008',
-          timestamp: new Date(now - 36 * 3600000).toISOString(),
-          module: 'AUTH',
-          action: 'FAILED_LOGIN',
-          user_email: 'unknown@external.com',
-          user_name: 'Unknown',
-          ip_address: '102.89.47.28',
-          location: 'Lagos, Lagos, Nigeria',
-          target: 'Admin Portal',
-          status: 'failed',
-          metadata: { attempts: 3, blocked: false }
-        }
-      ];
-
-      await supabaseAdmin.from('audit_logs').insert(sample);
-      console.log('[GovAuditService] Seeded sample audit logs successfully.');
-    } catch (e: any) {
-      console.warn('[GovAuditService] Failed to seed sample audit logs:', e.message);
-    }
+    // ELIMINATED: Production environments must not seed sample mock logs.
+    return Promise.resolve();
   }
 }

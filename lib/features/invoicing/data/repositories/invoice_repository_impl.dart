@@ -10,12 +10,15 @@ import 'package:involve_app/core/utils/device_info_service.dart';
 
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 
+import 'package:involve_app/core/sync/domain/services/outbox_publisher.dart';
+
 class InvoiceRepositoryImpl implements InvoiceRepository {
   final AppDatabase db;
   final FinanceRepository? financeRepository; // Optional injection for payment logic
+  final OutboxPublisher? outboxPublisher;
   final _uuid = const Uuid();
 
-  InvoiceRepositoryImpl(this.db, {this.financeRepository});
+  InvoiceRepositoryImpl(this.db, {this.financeRepository, this.outboxPublisher});
 
   @override
   Future<Map<String, dynamic>> initiateVirtualAccount({
@@ -130,11 +133,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
                 type: Value(item.type),
                 serviceMeta: Value(item.serviceMeta),
                 syncId: Value(item.syncId ?? _uuid.v4()),
-                updatedAt: Value(now),
-                createdAt: Value(now),
-                deviceId: Value(deviceId),
-                isDeleted: const Value(false),
                 printPrice: Value(item.printPrice),
+                returnedQuantity: Value(item.returnedQuantity),
+                isReplacement: Value(item.isReplacement),
               ),
             );
 
@@ -214,6 +215,36 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
             Variable.withString(finalCustomerId)
           ],
           updates: {db.customers},
+        );
+      }
+
+      if (outboxPublisher != null) {
+        await outboxPublisher!.publish<Invoice>(
+          db: db, // This passes the transaction context through
+          eventName: 'invoice.created',
+          aggregateType: 'invoice',
+          aggregateId: invoice.syncId ?? invoiceSyncId,
+          payload: invoice,
+          serializer: (inv) => {
+            'invoiceNumber': inv.invoiceNumber,
+            'dateCreated': inv.dateCreated.toIso8601String(),
+            'subtotal': inv.subtotal,
+            'taxAmount': inv.taxAmount,
+            'totalAmount': inv.totalAmount,
+            'paymentStatus': inv.paymentStatus,
+            'amountPaid': inv.amountPaid,
+            'balanceAmount': inv.balanceAmount,
+            'customerName': inv.customerName,
+            'customerId': finalCustomerId, // use final evaluated id
+            'syncId': inv.syncId ?? invoiceSyncId,
+            'items': inv.items.map((i) => {
+              'productSyncId': i.item.syncId,
+              'quantity': i.quantity,
+              'unitPrice': i.unitPrice,
+              'type': i.type,
+              'invoiceItemSyncId': i.syncId,
+            }).toList(),
+          },
         );
       }
     });

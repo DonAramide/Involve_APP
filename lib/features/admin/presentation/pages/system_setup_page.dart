@@ -1,5 +1,6 @@
 // lib/features/admin/presentation/pages/system_setup_page.dart
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,6 +19,8 @@ import '../../../settings/presentation/widgets/upgrade_dialog.dart';
 import '../../../settings/presentation/widgets/super_admin_password_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:signature/signature.dart';
+import 'two_factor_auth_page.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});
@@ -193,6 +196,21 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   title: const Text('Change System Password'),
                   trailing: const Icon(Icons.lock_outline),
                   onTap: () => _showChangePassword(context),
+                ),
+                ListTile(
+                  title: const Text('2FA Settings (Google Authenticator)'),
+                  trailing: const Icon(Icons.security),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TwoFactorAuthPage())),
+                ),
+                const Divider(),
+
+                // 9. Data Management
+                _buildSectionHeader(context, 'Data Management'),
+                ListTile(
+                  title: const Text('Restore Backup'),
+                  subtitle: const Text('Import database from a file'),
+                  trailing: state.isImporting ? const Text('Restoring...', style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.bold)) : const Icon(Icons.restore),
+                  onTap: () => _handleRestore(context),
                 ),
                 const SizedBox(height: 100),
               ],
@@ -393,15 +411,63 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
   }
 
   Future<void> _pickSignature(BuildContext context, AppSettings settings) async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1024, maxHeight: 1024);
-    if (image != null) {
-      final croppedFile = await ImageCropper().cropImage(sourcePath: image.path, aspectRatio: const CropAspectRatio(ratioX: 2, ratioY: 1));
-      if (croppedFile != null) {
-        final bytes = await croppedFile.readAsBytes();
-        _update(context, settings.copyWith(adminSignature: bytes));
-      }
-    }
+    final SignatureController signatureController = SignatureController(
+      penStrokeWidth: 3,
+      penColor: Colors.black,
+      exportBackgroundColor: Colors.white,
+    );
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Draw Signature'),
+          content: Container(
+            width: 400,
+            height: 250,
+            decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
+            child: Signature(
+              controller: signatureController,
+              backgroundColor: Colors.white,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                signatureController.clear();
+              },
+              child: const Text('Clear', style: TextStyle(color: Colors.red)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (signatureController.isNotEmpty) {
+                  final Uint8List? bytes = await signatureController.toPngBytes();
+                  if (bytes != null && context.mounted) {
+                    _update(context, settings.copyWith(adminSignature: bytes));
+                  }
+                }
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // Delay disposal slightly to ensure the dialog is fully unmounted
+    Future.delayed(const Duration(milliseconds: 300), () {
+      signatureController.dispose();
+    });
   }
 
   Widget _buildStaffManagementSection(BuildContext context, AppSettings settings) {
@@ -748,4 +814,115 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     Color pickerColor = Color(settings.primaryColor);
     showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Pick a color'), content: SingleChildScrollView(child: ColorPicker(pickerColor: pickerColor, onColorChanged: (color) => pickerColor = color)), actions: [ElevatedButton(child: const Text('SELECT'), onPressed: () { _update(context, settings.copyWith(primaryColor: pickerColor.value)); Navigator.of(ctx).pop(); })]));
   }
+
+  Future<void> _handleRestore(BuildContext context) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any, // .sqlite might not be in the default list
+      allowMultiple: false,
+    );
+
+    if (result != null && result.files.isNotEmpty) {
+      final filePath = result.files.first.path;
+      if (filePath == null) return;
+
+      // Show Choice Dialog
+      final restoreType = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Restore Backup'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('How would you like to restore "${result.files.first.name}"?'),
+              const SizedBox(height: 20),
+              
+              // Merge Option
+              _buildRestoreOption(
+                context,
+                title: 'Merge Data (Recommended)',
+                subtitle: 'Add new records and update existing ones. Current data will NOT be deleted.',
+                icon: Icons.merge_type,
+                color: Colors.blue,
+                onTap: () => Navigator.pop(ctx, 'merge'),
+              ),
+              
+              const Divider(height: 24),
+              
+              // Overwrite Option
+              _buildRestoreOption(
+                context,
+                title: 'Full Restore (Overwrite)',
+                subtitle: 'REPLACE everything. All current records will be lost forever!',
+                icon: Icons.warning_amber_rounded,
+                color: Colors.red,
+                onTap: () => Navigator.pop(ctx, 'overwrite'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('CANCEL'),
+            ),
+          ],
+        ),
+      );
+      
+      if (!mounted) return;
+
+      if (restoreType == 'merge') {
+        _showLoadingDialog(context, 'Merging Data...');
+        context.read<SettingsBloc>().add(RestoreFromPath(filePath));
+      } else if (restoreType == 'overwrite') {
+        _showLoadingDialog(context, 'Restoring & Overwriting...');
+        context.read<SettingsBloc>().add(ImportDatabaseFromFile(filePath));
+      }
+    }
+  }
+
+  Widget _buildRestoreOption(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 }

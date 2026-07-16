@@ -49,8 +49,8 @@ export class HSMDesignLayer {
     return `HSM-OP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   }
 
-  private static mockOutput(operation: HSMOperation): string {
-    // Simulated base64-like output for mock/software mode
+  private static simulatedOutput(operation: HSMOperation): string {
+    // Simulated base64-like output for local/software mode
     const raw = `${operation}:${Date.now()}:${Math.random().toString(36).substring(2)}`;
     return Buffer.from(raw).toString('base64');
   }
@@ -78,7 +78,7 @@ export class HSMDesignLayer {
       keyId,
       operation,
       backend: this.backend,
-      output: this.mockOutput(operation),
+      output: this.simulatedOutput(operation),
       error: null,
       executedAt: new Date().toISOString(),
     };

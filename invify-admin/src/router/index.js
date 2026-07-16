@@ -2,6 +2,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import routes from './routes'
 import { registerAuthBootstrapGuard } from './AuthBootstrapGuard'
+import { registerRuntimeGuards } from './RuntimeGuard'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -10,6 +11,9 @@ const router = createRouter({
 
 // FINAL REFINEMENT #2: Inject primary authentication bootstrap gates natively
 registerAuthBootstrapGuard(router)
+
+// RC2.1.2: Inject enterprise runtime guards
+registerRuntimeGuards(router)
 
 // Gracefully recover from dynamic import/chunk loading failures due to HMR/network drift or server port changes
 router.onError((error, to) => {

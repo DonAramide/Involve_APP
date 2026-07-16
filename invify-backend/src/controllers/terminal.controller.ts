@@ -65,7 +65,7 @@ function handleError(res: Response, error: any) {
     error.code === 'UND_ERR_CONNECT_TIMEOUT' ||
     error.message?.includes('timeout') ||
     error.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-    process.env.OFFLINE_MOCK_AUTH === 'true'
+    process.env.OFFLINE_LOCAL_AUTH === 'true'
   ) {
     return res.status(503).json({
       error: 'Database unavailable',
@@ -191,7 +191,8 @@ export class TerminalController {
         console.log('[DEBUG] normalizedRows:', JSON.stringify(normalizedRows));
         const importType = req.body.importType || 'tablets';
         console.log('[DEBUG] importType:', importType);
-        const result = await TerminalInventoryService.bulkImportDecoupled(normalizedRows, batchId, adminId, importType);
+        const tenantId = (req as any).effectiveTenantId || (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+        const result = await TerminalInventoryService.bulkImportDecoupled(normalizedRows, batchId, adminId, importType, tenantId);
         console.log('[DEBUG] result:', JSON.stringify(result));
         allResults.push({ filename: file.originalname, ...result });
       }

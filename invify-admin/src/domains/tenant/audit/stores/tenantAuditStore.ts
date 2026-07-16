@@ -1,15 +1,27 @@
 import { defineStore } from 'pinia';
+import { OperationsAdapter } from '../../operations/operations.adapter';
 
 export const useTenantAuditStore = defineStore('tenantAudit', {
   state: () => ({
-    auditLogs: []
+    logs: [] as any[],
+    isLoading: false,
+    meta: null as any
   }),
   actions: {
     loadAuditLogs() {
-      this.auditLogs = [
-        { id: 'LOG-001', action: 'User Created', user: 'admin@invify.com', date: '2026-05-18 10:00:00' },
-        { id: 'LOG-002', action: 'Policy Updated', user: 'system', date: '2026-05-18 11:30:00' }
-      ];
+      this.logs = [];
+    },
+    async fetchLogs(params?: any) {
+      this.isLoading = true;
+      try {
+        const { data, meta } = await OperationsAdapter.fetchAuditLogs(params);
+        this.logs = data;
+        this.meta = meta;
+      } catch (error) {
+        console.error('Failed to fetch audit logs', error);
+      } finally {
+        this.isLoading = false;
+      }
     }
   }
 });

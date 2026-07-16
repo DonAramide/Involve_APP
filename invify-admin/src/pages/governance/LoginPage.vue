@@ -789,10 +789,14 @@ const finalizeAuthenticatedSession = (tokenData) => {
   }
   
   // Set explicit attribution storage values
-  const cleanRole = (tokenData.user?.role || activeUserRole.value || 'SUPER_ADMIN').toUpperCase()
+  const cleanRole = (tokenData.user?.role || tokenData.role || activeUserRole.value || 'SUPER_ADMIN').toUpperCase()
   localStorage.setItem('operator_role', cleanRole)
   localStorage.setItem('operator_email', form.value.email || 'federated@IIPS.app')
   localStorage.setItem('mfa_status_verified', 'true')
+  
+  if (tokenData.tenantId) {
+    localStorage.setItem('tenant_id', tokenData.tenantId)
+  }
   
   successMessage.value = 'Identity verified successfully. Traversing authorized RBAC operational matrix...'
   

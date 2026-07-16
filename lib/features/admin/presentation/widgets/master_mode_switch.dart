@@ -73,7 +73,7 @@ class MasterModeSwitch extends StatelessWidget {
             TextField(
               controller: otpController,
               decoration: const InputDecoration(
-                labelText: '2FA Code (Optional)',
+                labelText: '2FA Code (If enabled)',
                 border: OutlineInputBorder(),
               ),
             ),

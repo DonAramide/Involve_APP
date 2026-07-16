@@ -44,7 +44,7 @@ export class LeadController {
       if (!authUserId) return res.status(401).json({ success: false, message: 'Unauthorized' });
 
       // Check if we are in mock/offline mode
-      if (process.env.OFFLINE_MOCK_AUTH === 'true') {
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         return res.status(200).json({
           success: true,
           message: 'Lead converted successfully (Mock Mode)',

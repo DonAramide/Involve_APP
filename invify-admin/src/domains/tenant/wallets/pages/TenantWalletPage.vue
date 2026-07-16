@@ -147,12 +147,17 @@ import { useCurrency } from '../../../../composables/useCurrency';
 import { useTenantWalletStore } from '../stores/tenantWalletStore';
 import { storeToRefs } from 'pinia';
 import { useQuasar } from 'quasar';
+import { onMounted } from 'vue';
 
 const { currentCurrency } = useCurrency();
 const $q = useQuasar();
 const store = useTenantWalletStore();
 
 const { withdrawalAmount, withdrawing, activeSchedule, schedules, availableBalance, ledgerLogs } = storeToRefs(store);
+
+onMounted(() => {
+  store.loadTreasuryData();
+});
 
 const dispatchPayout = () => {
   store.dispatchPayout()

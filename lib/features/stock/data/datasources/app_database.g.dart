@@ -19792,6 +19792,1045 @@ class LessonNotesCompanion extends UpdateCompanion<LessonNoteTable> {
   }
 }
 
+class $OutboxTableTable extends OutboxTable
+    with TableInfo<$OutboxTableTable, OutboxEvent> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $OutboxTableTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _tenantIdMeta =
+      const VerificationMeta('tenantId');
+  @override
+  late final GeneratedColumn<String> tenantId = GeneratedColumn<String>(
+      'tenant_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _deviceIdMeta =
+      const VerificationMeta('deviceId');
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+      'device_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _correlationIdMeta =
+      const VerificationMeta('correlationId');
+  @override
+  late final GeneratedColumn<String> correlationId = GeneratedColumn<String>(
+      'correlation_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _idempotencyKeyMeta =
+      const VerificationMeta('idempotencyKey');
+  @override
+  late final GeneratedColumn<String> idempotencyKey = GeneratedColumn<String>(
+      'idempotency_key', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _aggregateTypeMeta =
+      const VerificationMeta('aggregateType');
+  @override
+  late final GeneratedColumn<String> aggregateType = GeneratedColumn<String>(
+      'aggregate_type', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _aggregateIdMeta =
+      const VerificationMeta('aggregateId');
+  @override
+  late final GeneratedColumn<String> aggregateId = GeneratedColumn<String>(
+      'aggregate_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _eventNameMeta =
+      const VerificationMeta('eventName');
+  @override
+  late final GeneratedColumn<String> eventName = GeneratedColumn<String>(
+      'event_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _eventVersionMeta =
+      const VerificationMeta('eventVersion');
+  @override
+  late final GeneratedColumn<int> eventVersion = GeneratedColumn<int>(
+      'event_version', aliasedName, false,
+      type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _payloadMeta =
+      const VerificationMeta('payload');
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+      'payload', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+      'status', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('PENDING'));
+  static const VerificationMeta _retryCountMeta =
+      const VerificationMeta('retryCount');
+  @override
+  late final GeneratedColumn<int> retryCount = GeneratedColumn<int>(
+      'retry_count', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _nextRetryAtMeta =
+      const VerificationMeta('nextRetryAt');
+  @override
+  late final GeneratedColumn<DateTime> nextRetryAt = GeneratedColumn<DateTime>(
+      'next_retry_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _lastAttemptAtMeta =
+      const VerificationMeta('lastAttemptAt');
+  @override
+  late final GeneratedColumn<DateTime> lastAttemptAt =
+      GeneratedColumn<DateTime>('last_attempt_at', aliasedName, true,
+          type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _processedAtMeta =
+      const VerificationMeta('processedAt');
+  @override
+  late final GeneratedColumn<DateTime> processedAt = GeneratedColumn<DateTime>(
+      'processed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _lastErrorMeta =
+      const VerificationMeta('lastError');
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+      'last_error', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _failureReasonMeta =
+      const VerificationMeta('failureReason');
+  @override
+  late final GeneratedColumn<String> failureReason = GeneratedColumn<String>(
+      'failure_reason', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _httpStatusMeta =
+      const VerificationMeta('httpStatus');
+  @override
+  late final GeneratedColumn<int> httpStatus = GeneratedColumn<int>(
+      'http_status', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _responseBodyMeta =
+      const VerificationMeta('responseBody');
+  @override
+  late final GeneratedColumn<String> responseBody = GeneratedColumn<String>(
+      'response_body', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _stackTraceMeta =
+      const VerificationMeta('stackTrace');
+  @override
+  late final GeneratedColumn<String> stackTrace = GeneratedColumn<String>(
+      'stack_trace', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        tenantId,
+        deviceId,
+        correlationId,
+        idempotencyKey,
+        aggregateType,
+        aggregateId,
+        eventName,
+        eventVersion,
+        payload,
+        status,
+        retryCount,
+        nextRetryAt,
+        lastAttemptAt,
+        processedAt,
+        updatedAt,
+        createdAt,
+        lastError,
+        failureReason,
+        httpStatus,
+        responseBody,
+        stackTrace
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'outbox_table';
+  @override
+  VerificationContext validateIntegrity(Insertable<OutboxEvent> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('tenant_id')) {
+      context.handle(_tenantIdMeta,
+          tenantId.isAcceptableOrUnknown(data['tenant_id']!, _tenantIdMeta));
+    } else if (isInserting) {
+      context.missing(_tenantIdMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(_deviceIdMeta,
+          deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta));
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    if (data.containsKey('correlation_id')) {
+      context.handle(
+          _correlationIdMeta,
+          correlationId.isAcceptableOrUnknown(
+              data['correlation_id']!, _correlationIdMeta));
+    } else if (isInserting) {
+      context.missing(_correlationIdMeta);
+    }
+    if (data.containsKey('idempotency_key')) {
+      context.handle(
+          _idempotencyKeyMeta,
+          idempotencyKey.isAcceptableOrUnknown(
+              data['idempotency_key']!, _idempotencyKeyMeta));
+    } else if (isInserting) {
+      context.missing(_idempotencyKeyMeta);
+    }
+    if (data.containsKey('aggregate_type')) {
+      context.handle(
+          _aggregateTypeMeta,
+          aggregateType.isAcceptableOrUnknown(
+              data['aggregate_type']!, _aggregateTypeMeta));
+    } else if (isInserting) {
+      context.missing(_aggregateTypeMeta);
+    }
+    if (data.containsKey('aggregate_id')) {
+      context.handle(
+          _aggregateIdMeta,
+          aggregateId.isAcceptableOrUnknown(
+              data['aggregate_id']!, _aggregateIdMeta));
+    } else if (isInserting) {
+      context.missing(_aggregateIdMeta);
+    }
+    if (data.containsKey('event_name')) {
+      context.handle(_eventNameMeta,
+          eventName.isAcceptableOrUnknown(data['event_name']!, _eventNameMeta));
+    } else if (isInserting) {
+      context.missing(_eventNameMeta);
+    }
+    if (data.containsKey('event_version')) {
+      context.handle(
+          _eventVersionMeta,
+          eventVersion.isAcceptableOrUnknown(
+              data['event_version']!, _eventVersionMeta));
+    } else if (isInserting) {
+      context.missing(_eventVersionMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(_payloadMeta,
+          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(_statusMeta,
+          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
+    }
+    if (data.containsKey('retry_count')) {
+      context.handle(
+          _retryCountMeta,
+          retryCount.isAcceptableOrUnknown(
+              data['retry_count']!, _retryCountMeta));
+    }
+    if (data.containsKey('next_retry_at')) {
+      context.handle(
+          _nextRetryAtMeta,
+          nextRetryAt.isAcceptableOrUnknown(
+              data['next_retry_at']!, _nextRetryAtMeta));
+    }
+    if (data.containsKey('last_attempt_at')) {
+      context.handle(
+          _lastAttemptAtMeta,
+          lastAttemptAt.isAcceptableOrUnknown(
+              data['last_attempt_at']!, _lastAttemptAtMeta));
+    }
+    if (data.containsKey('processed_at')) {
+      context.handle(
+          _processedAtMeta,
+          processedAt.isAcceptableOrUnknown(
+              data['processed_at']!, _processedAtMeta));
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(_lastErrorMeta,
+          lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta));
+    }
+    if (data.containsKey('failure_reason')) {
+      context.handle(
+          _failureReasonMeta,
+          failureReason.isAcceptableOrUnknown(
+              data['failure_reason']!, _failureReasonMeta));
+    }
+    if (data.containsKey('http_status')) {
+      context.handle(
+          _httpStatusMeta,
+          httpStatus.isAcceptableOrUnknown(
+              data['http_status']!, _httpStatusMeta));
+    }
+    if (data.containsKey('response_body')) {
+      context.handle(
+          _responseBodyMeta,
+          responseBody.isAcceptableOrUnknown(
+              data['response_body']!, _responseBodyMeta));
+    }
+    if (data.containsKey('stack_trace')) {
+      context.handle(
+          _stackTraceMeta,
+          stackTrace.isAcceptableOrUnknown(
+              data['stack_trace']!, _stackTraceMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  OutboxEvent map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return OutboxEvent(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      tenantId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tenant_id'])!,
+      deviceId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_id'])!,
+      correlationId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}correlation_id'])!,
+      idempotencyKey: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}idempotency_key'])!,
+      aggregateType: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}aggregate_type'])!,
+      aggregateId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}aggregate_id'])!,
+      eventName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}event_name'])!,
+      eventVersion: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}event_version'])!,
+      payload: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
+      status: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
+      retryCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}retry_count'])!,
+      nextRetryAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}next_retry_at']),
+      lastAttemptAt: attachedDatabase.typeMapping.read(
+          DriftSqlType.dateTime, data['${effectivePrefix}last_attempt_at']),
+      processedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}processed_at']),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      lastError: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}last_error']),
+      failureReason: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}failure_reason']),
+      httpStatus: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}http_status']),
+      responseBody: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}response_body']),
+      stackTrace: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}stack_trace']),
+    );
+  }
+
+  @override
+  $OutboxTableTable createAlias(String alias) {
+    return $OutboxTableTable(attachedDatabase, alias);
+  }
+}
+
+class OutboxEvent extends DataClass implements Insertable<OutboxEvent> {
+  final String id;
+  final String tenantId;
+  final String deviceId;
+  final String correlationId;
+  final String idempotencyKey;
+  final String aggregateType;
+  final String aggregateId;
+  final String eventName;
+  final int eventVersion;
+
+  /// Stored as a serialized JSON string.
+  final String payload;
+
+  /// PENDING, PROCESSING, FAILED, DEAD_LETTER, COMPLETED
+  final String status;
+  final int retryCount;
+  final DateTime? nextRetryAt;
+  final DateTime? lastAttemptAt;
+  final DateTime? processedAt;
+  final DateTime updatedAt;
+  final DateTime createdAt;
+  final String? lastError;
+  final String? failureReason;
+  final int? httpStatus;
+  final String? responseBody;
+  final String? stackTrace;
+  const OutboxEvent(
+      {required this.id,
+      required this.tenantId,
+      required this.deviceId,
+      required this.correlationId,
+      required this.idempotencyKey,
+      required this.aggregateType,
+      required this.aggregateId,
+      required this.eventName,
+      required this.eventVersion,
+      required this.payload,
+      required this.status,
+      required this.retryCount,
+      this.nextRetryAt,
+      this.lastAttemptAt,
+      this.processedAt,
+      required this.updatedAt,
+      required this.createdAt,
+      this.lastError,
+      this.failureReason,
+      this.httpStatus,
+      this.responseBody,
+      this.stackTrace});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['tenant_id'] = Variable<String>(tenantId);
+    map['device_id'] = Variable<String>(deviceId);
+    map['correlation_id'] = Variable<String>(correlationId);
+    map['idempotency_key'] = Variable<String>(idempotencyKey);
+    map['aggregate_type'] = Variable<String>(aggregateType);
+    map['aggregate_id'] = Variable<String>(aggregateId);
+    map['event_name'] = Variable<String>(eventName);
+    map['event_version'] = Variable<int>(eventVersion);
+    map['payload'] = Variable<String>(payload);
+    map['status'] = Variable<String>(status);
+    map['retry_count'] = Variable<int>(retryCount);
+    if (!nullToAbsent || nextRetryAt != null) {
+      map['next_retry_at'] = Variable<DateTime>(nextRetryAt);
+    }
+    if (!nullToAbsent || lastAttemptAt != null) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt);
+    }
+    if (!nullToAbsent || processedAt != null) {
+      map['processed_at'] = Variable<DateTime>(processedAt);
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
+    if (!nullToAbsent || failureReason != null) {
+      map['failure_reason'] = Variable<String>(failureReason);
+    }
+    if (!nullToAbsent || httpStatus != null) {
+      map['http_status'] = Variable<int>(httpStatus);
+    }
+    if (!nullToAbsent || responseBody != null) {
+      map['response_body'] = Variable<String>(responseBody);
+    }
+    if (!nullToAbsent || stackTrace != null) {
+      map['stack_trace'] = Variable<String>(stackTrace);
+    }
+    return map;
+  }
+
+  OutboxTableCompanion toCompanion(bool nullToAbsent) {
+    return OutboxTableCompanion(
+      id: Value(id),
+      tenantId: Value(tenantId),
+      deviceId: Value(deviceId),
+      correlationId: Value(correlationId),
+      idempotencyKey: Value(idempotencyKey),
+      aggregateType: Value(aggregateType),
+      aggregateId: Value(aggregateId),
+      eventName: Value(eventName),
+      eventVersion: Value(eventVersion),
+      payload: Value(payload),
+      status: Value(status),
+      retryCount: Value(retryCount),
+      nextRetryAt: nextRetryAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nextRetryAt),
+      lastAttemptAt: lastAttemptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastAttemptAt),
+      processedAt: processedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(processedAt),
+      updatedAt: Value(updatedAt),
+      createdAt: Value(createdAt),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
+      failureReason: failureReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failureReason),
+      httpStatus: httpStatus == null && nullToAbsent
+          ? const Value.absent()
+          : Value(httpStatus),
+      responseBody: responseBody == null && nullToAbsent
+          ? const Value.absent()
+          : Value(responseBody),
+      stackTrace: stackTrace == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stackTrace),
+    );
+  }
+
+  factory OutboxEvent.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return OutboxEvent(
+      id: serializer.fromJson<String>(json['id']),
+      tenantId: serializer.fromJson<String>(json['tenantId']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+      correlationId: serializer.fromJson<String>(json['correlationId']),
+      idempotencyKey: serializer.fromJson<String>(json['idempotencyKey']),
+      aggregateType: serializer.fromJson<String>(json['aggregateType']),
+      aggregateId: serializer.fromJson<String>(json['aggregateId']),
+      eventName: serializer.fromJson<String>(json['eventName']),
+      eventVersion: serializer.fromJson<int>(json['eventVersion']),
+      payload: serializer.fromJson<String>(json['payload']),
+      status: serializer.fromJson<String>(json['status']),
+      retryCount: serializer.fromJson<int>(json['retryCount']),
+      nextRetryAt: serializer.fromJson<DateTime?>(json['nextRetryAt']),
+      lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
+      processedAt: serializer.fromJson<DateTime?>(json['processedAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
+      failureReason: serializer.fromJson<String?>(json['failureReason']),
+      httpStatus: serializer.fromJson<int?>(json['httpStatus']),
+      responseBody: serializer.fromJson<String?>(json['responseBody']),
+      stackTrace: serializer.fromJson<String?>(json['stackTrace']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'tenantId': serializer.toJson<String>(tenantId),
+      'deviceId': serializer.toJson<String>(deviceId),
+      'correlationId': serializer.toJson<String>(correlationId),
+      'idempotencyKey': serializer.toJson<String>(idempotencyKey),
+      'aggregateType': serializer.toJson<String>(aggregateType),
+      'aggregateId': serializer.toJson<String>(aggregateId),
+      'eventName': serializer.toJson<String>(eventName),
+      'eventVersion': serializer.toJson<int>(eventVersion),
+      'payload': serializer.toJson<String>(payload),
+      'status': serializer.toJson<String>(status),
+      'retryCount': serializer.toJson<int>(retryCount),
+      'nextRetryAt': serializer.toJson<DateTime?>(nextRetryAt),
+      'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
+      'processedAt': serializer.toJson<DateTime?>(processedAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'lastError': serializer.toJson<String?>(lastError),
+      'failureReason': serializer.toJson<String?>(failureReason),
+      'httpStatus': serializer.toJson<int?>(httpStatus),
+      'responseBody': serializer.toJson<String?>(responseBody),
+      'stackTrace': serializer.toJson<String?>(stackTrace),
+    };
+  }
+
+  OutboxEvent copyWith(
+          {String? id,
+          String? tenantId,
+          String? deviceId,
+          String? correlationId,
+          String? idempotencyKey,
+          String? aggregateType,
+          String? aggregateId,
+          String? eventName,
+          int? eventVersion,
+          String? payload,
+          String? status,
+          int? retryCount,
+          Value<DateTime?> nextRetryAt = const Value.absent(),
+          Value<DateTime?> lastAttemptAt = const Value.absent(),
+          Value<DateTime?> processedAt = const Value.absent(),
+          DateTime? updatedAt,
+          DateTime? createdAt,
+          Value<String?> lastError = const Value.absent(),
+          Value<String?> failureReason = const Value.absent(),
+          Value<int?> httpStatus = const Value.absent(),
+          Value<String?> responseBody = const Value.absent(),
+          Value<String?> stackTrace = const Value.absent()}) =>
+      OutboxEvent(
+        id: id ?? this.id,
+        tenantId: tenantId ?? this.tenantId,
+        deviceId: deviceId ?? this.deviceId,
+        correlationId: correlationId ?? this.correlationId,
+        idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+        aggregateType: aggregateType ?? this.aggregateType,
+        aggregateId: aggregateId ?? this.aggregateId,
+        eventName: eventName ?? this.eventName,
+        eventVersion: eventVersion ?? this.eventVersion,
+        payload: payload ?? this.payload,
+        status: status ?? this.status,
+        retryCount: retryCount ?? this.retryCount,
+        nextRetryAt: nextRetryAt.present ? nextRetryAt.value : this.nextRetryAt,
+        lastAttemptAt:
+            lastAttemptAt.present ? lastAttemptAt.value : this.lastAttemptAt,
+        processedAt: processedAt.present ? processedAt.value : this.processedAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        createdAt: createdAt ?? this.createdAt,
+        lastError: lastError.present ? lastError.value : this.lastError,
+        failureReason:
+            failureReason.present ? failureReason.value : this.failureReason,
+        httpStatus: httpStatus.present ? httpStatus.value : this.httpStatus,
+        responseBody:
+            responseBody.present ? responseBody.value : this.responseBody,
+        stackTrace: stackTrace.present ? stackTrace.value : this.stackTrace,
+      );
+  OutboxEvent copyWithCompanion(OutboxTableCompanion data) {
+    return OutboxEvent(
+      id: data.id.present ? data.id.value : this.id,
+      tenantId: data.tenantId.present ? data.tenantId.value : this.tenantId,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+      correlationId: data.correlationId.present
+          ? data.correlationId.value
+          : this.correlationId,
+      idempotencyKey: data.idempotencyKey.present
+          ? data.idempotencyKey.value
+          : this.idempotencyKey,
+      aggregateType: data.aggregateType.present
+          ? data.aggregateType.value
+          : this.aggregateType,
+      aggregateId:
+          data.aggregateId.present ? data.aggregateId.value : this.aggregateId,
+      eventName: data.eventName.present ? data.eventName.value : this.eventName,
+      eventVersion: data.eventVersion.present
+          ? data.eventVersion.value
+          : this.eventVersion,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      status: data.status.present ? data.status.value : this.status,
+      retryCount:
+          data.retryCount.present ? data.retryCount.value : this.retryCount,
+      nextRetryAt:
+          data.nextRetryAt.present ? data.nextRetryAt.value : this.nextRetryAt,
+      lastAttemptAt: data.lastAttemptAt.present
+          ? data.lastAttemptAt.value
+          : this.lastAttemptAt,
+      processedAt:
+          data.processedAt.present ? data.processedAt.value : this.processedAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
+      failureReason: data.failureReason.present
+          ? data.failureReason.value
+          : this.failureReason,
+      httpStatus:
+          data.httpStatus.present ? data.httpStatus.value : this.httpStatus,
+      responseBody: data.responseBody.present
+          ? data.responseBody.value
+          : this.responseBody,
+      stackTrace:
+          data.stackTrace.present ? data.stackTrace.value : this.stackTrace,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OutboxEvent(')
+          ..write('id: $id, ')
+          ..write('tenantId: $tenantId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('correlationId: $correlationId, ')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('aggregateType: $aggregateType, ')
+          ..write('aggregateId: $aggregateId, ')
+          ..write('eventName: $eventName, ')
+          ..write('eventVersion: $eventVersion, ')
+          ..write('payload: $payload, ')
+          ..write('status: $status, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('processedAt: $processedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastError: $lastError, ')
+          ..write('failureReason: $failureReason, ')
+          ..write('httpStatus: $httpStatus, ')
+          ..write('responseBody: $responseBody, ')
+          ..write('stackTrace: $stackTrace')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+        id,
+        tenantId,
+        deviceId,
+        correlationId,
+        idempotencyKey,
+        aggregateType,
+        aggregateId,
+        eventName,
+        eventVersion,
+        payload,
+        status,
+        retryCount,
+        nextRetryAt,
+        lastAttemptAt,
+        processedAt,
+        updatedAt,
+        createdAt,
+        lastError,
+        failureReason,
+        httpStatus,
+        responseBody,
+        stackTrace
+      ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is OutboxEvent &&
+          other.id == this.id &&
+          other.tenantId == this.tenantId &&
+          other.deviceId == this.deviceId &&
+          other.correlationId == this.correlationId &&
+          other.idempotencyKey == this.idempotencyKey &&
+          other.aggregateType == this.aggregateType &&
+          other.aggregateId == this.aggregateId &&
+          other.eventName == this.eventName &&
+          other.eventVersion == this.eventVersion &&
+          other.payload == this.payload &&
+          other.status == this.status &&
+          other.retryCount == this.retryCount &&
+          other.nextRetryAt == this.nextRetryAt &&
+          other.lastAttemptAt == this.lastAttemptAt &&
+          other.processedAt == this.processedAt &&
+          other.updatedAt == this.updatedAt &&
+          other.createdAt == this.createdAt &&
+          other.lastError == this.lastError &&
+          other.failureReason == this.failureReason &&
+          other.httpStatus == this.httpStatus &&
+          other.responseBody == this.responseBody &&
+          other.stackTrace == this.stackTrace);
+}
+
+class OutboxTableCompanion extends UpdateCompanion<OutboxEvent> {
+  final Value<String> id;
+  final Value<String> tenantId;
+  final Value<String> deviceId;
+  final Value<String> correlationId;
+  final Value<String> idempotencyKey;
+  final Value<String> aggregateType;
+  final Value<String> aggregateId;
+  final Value<String> eventName;
+  final Value<int> eventVersion;
+  final Value<String> payload;
+  final Value<String> status;
+  final Value<int> retryCount;
+  final Value<DateTime?> nextRetryAt;
+  final Value<DateTime?> lastAttemptAt;
+  final Value<DateTime?> processedAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime> createdAt;
+  final Value<String?> lastError;
+  final Value<String?> failureReason;
+  final Value<int?> httpStatus;
+  final Value<String?> responseBody;
+  final Value<String?> stackTrace;
+  final Value<int> rowid;
+  const OutboxTableCompanion({
+    this.id = const Value.absent(),
+    this.tenantId = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.correlationId = const Value.absent(),
+    this.idempotencyKey = const Value.absent(),
+    this.aggregateType = const Value.absent(),
+    this.aggregateId = const Value.absent(),
+    this.eventName = const Value.absent(),
+    this.eventVersion = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.status = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
+    this.processedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.failureReason = const Value.absent(),
+    this.httpStatus = const Value.absent(),
+    this.responseBody = const Value.absent(),
+    this.stackTrace = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  OutboxTableCompanion.insert({
+    required String id,
+    required String tenantId,
+    required String deviceId,
+    required String correlationId,
+    required String idempotencyKey,
+    required String aggregateType,
+    required String aggregateId,
+    required String eventName,
+    required int eventVersion,
+    required String payload,
+    this.status = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.nextRetryAt = const Value.absent(),
+    this.lastAttemptAt = const Value.absent(),
+    this.processedAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.lastError = const Value.absent(),
+    this.failureReason = const Value.absent(),
+    this.httpStatus = const Value.absent(),
+    this.responseBody = const Value.absent(),
+    this.stackTrace = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        tenantId = Value(tenantId),
+        deviceId = Value(deviceId),
+        correlationId = Value(correlationId),
+        idempotencyKey = Value(idempotencyKey),
+        aggregateType = Value(aggregateType),
+        aggregateId = Value(aggregateId),
+        eventName = Value(eventName),
+        eventVersion = Value(eventVersion),
+        payload = Value(payload);
+  static Insertable<OutboxEvent> custom({
+    Expression<String>? id,
+    Expression<String>? tenantId,
+    Expression<String>? deviceId,
+    Expression<String>? correlationId,
+    Expression<String>? idempotencyKey,
+    Expression<String>? aggregateType,
+    Expression<String>? aggregateId,
+    Expression<String>? eventName,
+    Expression<int>? eventVersion,
+    Expression<String>? payload,
+    Expression<String>? status,
+    Expression<int>? retryCount,
+    Expression<DateTime>? nextRetryAt,
+    Expression<DateTime>? lastAttemptAt,
+    Expression<DateTime>? processedAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? createdAt,
+    Expression<String>? lastError,
+    Expression<String>? failureReason,
+    Expression<int>? httpStatus,
+    Expression<String>? responseBody,
+    Expression<String>? stackTrace,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (tenantId != null) 'tenant_id': tenantId,
+      if (deviceId != null) 'device_id': deviceId,
+      if (correlationId != null) 'correlation_id': correlationId,
+      if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      if (aggregateType != null) 'aggregate_type': aggregateType,
+      if (aggregateId != null) 'aggregate_id': aggregateId,
+      if (eventName != null) 'event_name': eventName,
+      if (eventVersion != null) 'event_version': eventVersion,
+      if (payload != null) 'payload': payload,
+      if (status != null) 'status': status,
+      if (retryCount != null) 'retry_count': retryCount,
+      if (nextRetryAt != null) 'next_retry_at': nextRetryAt,
+      if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
+      if (processedAt != null) 'processed_at': processedAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (lastError != null) 'last_error': lastError,
+      if (failureReason != null) 'failure_reason': failureReason,
+      if (httpStatus != null) 'http_status': httpStatus,
+      if (responseBody != null) 'response_body': responseBody,
+      if (stackTrace != null) 'stack_trace': stackTrace,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  OutboxTableCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? tenantId,
+      Value<String>? deviceId,
+      Value<String>? correlationId,
+      Value<String>? idempotencyKey,
+      Value<String>? aggregateType,
+      Value<String>? aggregateId,
+      Value<String>? eventName,
+      Value<int>? eventVersion,
+      Value<String>? payload,
+      Value<String>? status,
+      Value<int>? retryCount,
+      Value<DateTime?>? nextRetryAt,
+      Value<DateTime?>? lastAttemptAt,
+      Value<DateTime?>? processedAt,
+      Value<DateTime>? updatedAt,
+      Value<DateTime>? createdAt,
+      Value<String?>? lastError,
+      Value<String?>? failureReason,
+      Value<int?>? httpStatus,
+      Value<String?>? responseBody,
+      Value<String?>? stackTrace,
+      Value<int>? rowid}) {
+    return OutboxTableCompanion(
+      id: id ?? this.id,
+      tenantId: tenantId ?? this.tenantId,
+      deviceId: deviceId ?? this.deviceId,
+      correlationId: correlationId ?? this.correlationId,
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      aggregateType: aggregateType ?? this.aggregateType,
+      aggregateId: aggregateId ?? this.aggregateId,
+      eventName: eventName ?? this.eventName,
+      eventVersion: eventVersion ?? this.eventVersion,
+      payload: payload ?? this.payload,
+      status: status ?? this.status,
+      retryCount: retryCount ?? this.retryCount,
+      nextRetryAt: nextRetryAt ?? this.nextRetryAt,
+      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
+      processedAt: processedAt ?? this.processedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      createdAt: createdAt ?? this.createdAt,
+      lastError: lastError ?? this.lastError,
+      failureReason: failureReason ?? this.failureReason,
+      httpStatus: httpStatus ?? this.httpStatus,
+      responseBody: responseBody ?? this.responseBody,
+      stackTrace: stackTrace ?? this.stackTrace,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (tenantId.present) {
+      map['tenant_id'] = Variable<String>(tenantId.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (correlationId.present) {
+      map['correlation_id'] = Variable<String>(correlationId.value);
+    }
+    if (idempotencyKey.present) {
+      map['idempotency_key'] = Variable<String>(idempotencyKey.value);
+    }
+    if (aggregateType.present) {
+      map['aggregate_type'] = Variable<String>(aggregateType.value);
+    }
+    if (aggregateId.present) {
+      map['aggregate_id'] = Variable<String>(aggregateId.value);
+    }
+    if (eventName.present) {
+      map['event_name'] = Variable<String>(eventName.value);
+    }
+    if (eventVersion.present) {
+      map['event_version'] = Variable<int>(eventVersion.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (retryCount.present) {
+      map['retry_count'] = Variable<int>(retryCount.value);
+    }
+    if (nextRetryAt.present) {
+      map['next_retry_at'] = Variable<DateTime>(nextRetryAt.value);
+    }
+    if (lastAttemptAt.present) {
+      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt.value);
+    }
+    if (processedAt.present) {
+      map['processed_at'] = Variable<DateTime>(processedAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
+    if (failureReason.present) {
+      map['failure_reason'] = Variable<String>(failureReason.value);
+    }
+    if (httpStatus.present) {
+      map['http_status'] = Variable<int>(httpStatus.value);
+    }
+    if (responseBody.present) {
+      map['response_body'] = Variable<String>(responseBody.value);
+    }
+    if (stackTrace.present) {
+      map['stack_trace'] = Variable<String>(stackTrace.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('OutboxTableCompanion(')
+          ..write('id: $id, ')
+          ..write('tenantId: $tenantId, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('correlationId: $correlationId, ')
+          ..write('idempotencyKey: $idempotencyKey, ')
+          ..write('aggregateType: $aggregateType, ')
+          ..write('aggregateId: $aggregateId, ')
+          ..write('eventName: $eventName, ')
+          ..write('eventVersion: $eventVersion, ')
+          ..write('payload: $payload, ')
+          ..write('status: $status, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('nextRetryAt: $nextRetryAt, ')
+          ..write('lastAttemptAt: $lastAttemptAt, ')
+          ..write('processedAt: $processedAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('lastError: $lastError, ')
+          ..write('failureReason: $failureReason, ')
+          ..write('httpStatus: $httpStatus, ')
+          ..write('responseBody: $responseBody, ')
+          ..write('stackTrace: $stackTrace, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -19837,6 +20876,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ServiceExpenseCategoriesTable(this);
   late final $CurriculumMapTable curriculumMap = $CurriculumMapTable(this);
   late final $LessonNotesTable lessonNotes = $LessonNotesTable(this);
+  late final $OutboxTableTable outboxTable = $OutboxTableTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -19874,7 +20914,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         serviceLaborPresets,
         serviceExpenseCategories,
         curriculumMap,
-        lessonNotes
+        lessonNotes,
+        outboxTable
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -33046,6 +34087,442 @@ typedef $$LessonNotesTableProcessedTableManager = ProcessedTableManager<
     (LessonNoteTable, $$LessonNotesTableReferences),
     LessonNoteTable,
     PrefetchHooks Function({bool curriculumId})>;
+typedef $$OutboxTableTableCreateCompanionBuilder = OutboxTableCompanion
+    Function({
+  required String id,
+  required String tenantId,
+  required String deviceId,
+  required String correlationId,
+  required String idempotencyKey,
+  required String aggregateType,
+  required String aggregateId,
+  required String eventName,
+  required int eventVersion,
+  required String payload,
+  Value<String> status,
+  Value<int> retryCount,
+  Value<DateTime?> nextRetryAt,
+  Value<DateTime?> lastAttemptAt,
+  Value<DateTime?> processedAt,
+  Value<DateTime> updatedAt,
+  Value<DateTime> createdAt,
+  Value<String?> lastError,
+  Value<String?> failureReason,
+  Value<int?> httpStatus,
+  Value<String?> responseBody,
+  Value<String?> stackTrace,
+  Value<int> rowid,
+});
+typedef $$OutboxTableTableUpdateCompanionBuilder = OutboxTableCompanion
+    Function({
+  Value<String> id,
+  Value<String> tenantId,
+  Value<String> deviceId,
+  Value<String> correlationId,
+  Value<String> idempotencyKey,
+  Value<String> aggregateType,
+  Value<String> aggregateId,
+  Value<String> eventName,
+  Value<int> eventVersion,
+  Value<String> payload,
+  Value<String> status,
+  Value<int> retryCount,
+  Value<DateTime?> nextRetryAt,
+  Value<DateTime?> lastAttemptAt,
+  Value<DateTime?> processedAt,
+  Value<DateTime> updatedAt,
+  Value<DateTime> createdAt,
+  Value<String?> lastError,
+  Value<String?> failureReason,
+  Value<int?> httpStatus,
+  Value<String?> responseBody,
+  Value<String?> stackTrace,
+  Value<int> rowid,
+});
+
+class $$OutboxTableTableFilterComposer
+    extends Composer<_$AppDatabase, $OutboxTableTable> {
+  $$OutboxTableTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tenantId => $composableBuilder(
+      column: $table.tenantId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get correlationId => $composableBuilder(
+      column: $table.correlationId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get aggregateType => $composableBuilder(
+      column: $table.aggregateType, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get aggregateId => $composableBuilder(
+      column: $table.aggregateId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get eventName => $composableBuilder(
+      column: $table.eventName, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get eventVersion => $composableBuilder(
+      column: $table.eventVersion, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get retryCount => $composableBuilder(
+      column: $table.retryCount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get nextRetryAt => $composableBuilder(
+      column: $table.nextRetryAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastAttemptAt => $composableBuilder(
+      column: $table.lastAttemptAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get processedAt => $composableBuilder(
+      column: $table.processedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+      column: $table.lastError, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get failureReason => $composableBuilder(
+      column: $table.failureReason, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get httpStatus => $composableBuilder(
+      column: $table.httpStatus, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get responseBody => $composableBuilder(
+      column: $table.responseBody, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get stackTrace => $composableBuilder(
+      column: $table.stackTrace, builder: (column) => ColumnFilters(column));
+}
+
+class $$OutboxTableTableOrderingComposer
+    extends Composer<_$AppDatabase, $OutboxTableTable> {
+  $$OutboxTableTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tenantId => $composableBuilder(
+      column: $table.tenantId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+      column: $table.deviceId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get correlationId => $composableBuilder(
+      column: $table.correlationId,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get aggregateType => $composableBuilder(
+      column: $table.aggregateType,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get aggregateId => $composableBuilder(
+      column: $table.aggregateId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get eventName => $composableBuilder(
+      column: $table.eventName, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get eventVersion => $composableBuilder(
+      column: $table.eventVersion,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+      column: $table.payload, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get status => $composableBuilder(
+      column: $table.status, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get retryCount => $composableBuilder(
+      column: $table.retryCount, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get nextRetryAt => $composableBuilder(
+      column: $table.nextRetryAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastAttemptAt => $composableBuilder(
+      column: $table.lastAttemptAt,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get processedAt => $composableBuilder(
+      column: $table.processedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+      column: $table.lastError, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get failureReason => $composableBuilder(
+      column: $table.failureReason,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get httpStatus => $composableBuilder(
+      column: $table.httpStatus, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get responseBody => $composableBuilder(
+      column: $table.responseBody,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get stackTrace => $composableBuilder(
+      column: $table.stackTrace, builder: (column) => ColumnOrderings(column));
+}
+
+class $$OutboxTableTableAnnotationComposer
+    extends Composer<_$AppDatabase, $OutboxTableTable> {
+  $$OutboxTableTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get tenantId =>
+      $composableBuilder(column: $table.tenantId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+
+  GeneratedColumn<String> get correlationId => $composableBuilder(
+      column: $table.correlationId, builder: (column) => column);
+
+  GeneratedColumn<String> get idempotencyKey => $composableBuilder(
+      column: $table.idempotencyKey, builder: (column) => column);
+
+  GeneratedColumn<String> get aggregateType => $composableBuilder(
+      column: $table.aggregateType, builder: (column) => column);
+
+  GeneratedColumn<String> get aggregateId => $composableBuilder(
+      column: $table.aggregateId, builder: (column) => column);
+
+  GeneratedColumn<String> get eventName =>
+      $composableBuilder(column: $table.eventName, builder: (column) => column);
+
+  GeneratedColumn<int> get eventVersion => $composableBuilder(
+      column: $table.eventVersion, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumn<int> get retryCount => $composableBuilder(
+      column: $table.retryCount, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get nextRetryAt => $composableBuilder(
+      column: $table.nextRetryAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastAttemptAt => $composableBuilder(
+      column: $table.lastAttemptAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get processedAt => $composableBuilder(
+      column: $table.processedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
+
+  GeneratedColumn<String> get failureReason => $composableBuilder(
+      column: $table.failureReason, builder: (column) => column);
+
+  GeneratedColumn<int> get httpStatus => $composableBuilder(
+      column: $table.httpStatus, builder: (column) => column);
+
+  GeneratedColumn<String> get responseBody => $composableBuilder(
+      column: $table.responseBody, builder: (column) => column);
+
+  GeneratedColumn<String> get stackTrace => $composableBuilder(
+      column: $table.stackTrace, builder: (column) => column);
+}
+
+class $$OutboxTableTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $OutboxTableTable,
+    OutboxEvent,
+    $$OutboxTableTableFilterComposer,
+    $$OutboxTableTableOrderingComposer,
+    $$OutboxTableTableAnnotationComposer,
+    $$OutboxTableTableCreateCompanionBuilder,
+    $$OutboxTableTableUpdateCompanionBuilder,
+    (
+      OutboxEvent,
+      BaseReferences<_$AppDatabase, $OutboxTableTable, OutboxEvent>
+    ),
+    OutboxEvent,
+    PrefetchHooks Function()> {
+  $$OutboxTableTableTableManager(_$AppDatabase db, $OutboxTableTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$OutboxTableTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$OutboxTableTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$OutboxTableTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> tenantId = const Value.absent(),
+            Value<String> deviceId = const Value.absent(),
+            Value<String> correlationId = const Value.absent(),
+            Value<String> idempotencyKey = const Value.absent(),
+            Value<String> aggregateType = const Value.absent(),
+            Value<String> aggregateId = const Value.absent(),
+            Value<String> eventName = const Value.absent(),
+            Value<int> eventVersion = const Value.absent(),
+            Value<String> payload = const Value.absent(),
+            Value<String> status = const Value.absent(),
+            Value<int> retryCount = const Value.absent(),
+            Value<DateTime?> nextRetryAt = const Value.absent(),
+            Value<DateTime?> lastAttemptAt = const Value.absent(),
+            Value<DateTime?> processedAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<String?> lastError = const Value.absent(),
+            Value<String?> failureReason = const Value.absent(),
+            Value<int?> httpStatus = const Value.absent(),
+            Value<String?> responseBody = const Value.absent(),
+            Value<String?> stackTrace = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              OutboxTableCompanion(
+            id: id,
+            tenantId: tenantId,
+            deviceId: deviceId,
+            correlationId: correlationId,
+            idempotencyKey: idempotencyKey,
+            aggregateType: aggregateType,
+            aggregateId: aggregateId,
+            eventName: eventName,
+            eventVersion: eventVersion,
+            payload: payload,
+            status: status,
+            retryCount: retryCount,
+            nextRetryAt: nextRetryAt,
+            lastAttemptAt: lastAttemptAt,
+            processedAt: processedAt,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            lastError: lastError,
+            failureReason: failureReason,
+            httpStatus: httpStatus,
+            responseBody: responseBody,
+            stackTrace: stackTrace,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String tenantId,
+            required String deviceId,
+            required String correlationId,
+            required String idempotencyKey,
+            required String aggregateType,
+            required String aggregateId,
+            required String eventName,
+            required int eventVersion,
+            required String payload,
+            Value<String> status = const Value.absent(),
+            Value<int> retryCount = const Value.absent(),
+            Value<DateTime?> nextRetryAt = const Value.absent(),
+            Value<DateTime?> lastAttemptAt = const Value.absent(),
+            Value<DateTime?> processedAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<String?> lastError = const Value.absent(),
+            Value<String?> failureReason = const Value.absent(),
+            Value<int?> httpStatus = const Value.absent(),
+            Value<String?> responseBody = const Value.absent(),
+            Value<String?> stackTrace = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              OutboxTableCompanion.insert(
+            id: id,
+            tenantId: tenantId,
+            deviceId: deviceId,
+            correlationId: correlationId,
+            idempotencyKey: idempotencyKey,
+            aggregateType: aggregateType,
+            aggregateId: aggregateId,
+            eventName: eventName,
+            eventVersion: eventVersion,
+            payload: payload,
+            status: status,
+            retryCount: retryCount,
+            nextRetryAt: nextRetryAt,
+            lastAttemptAt: lastAttemptAt,
+            processedAt: processedAt,
+            updatedAt: updatedAt,
+            createdAt: createdAt,
+            lastError: lastError,
+            failureReason: failureReason,
+            httpStatus: httpStatus,
+            responseBody: responseBody,
+            stackTrace: stackTrace,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$OutboxTableTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $OutboxTableTable,
+    OutboxEvent,
+    $$OutboxTableTableFilterComposer,
+    $$OutboxTableTableOrderingComposer,
+    $$OutboxTableTableAnnotationComposer,
+    $$OutboxTableTableCreateCompanionBuilder,
+    $$OutboxTableTableUpdateCompanionBuilder,
+    (
+      OutboxEvent,
+      BaseReferences<_$AppDatabase, $OutboxTableTable, OutboxEvent>
+    ),
+    OutboxEvent,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -33118,4 +34595,6 @@ class $AppDatabaseManager {
       $$CurriculumMapTableTableManager(_db, _db.curriculumMap);
   $$LessonNotesTableTableManager get lessonNotes =>
       $$LessonNotesTableTableManager(_db, _db.lessonNotes);
+  $$OutboxTableTableTableManager get outboxTable =>
+      $$OutboxTableTableTableManager(_db, _db.outboxTable);
 }

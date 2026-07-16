@@ -161,7 +161,7 @@
                   size="24px"
                   :color="props.value > 80 ? 'red-5' : (props.value > 40 ? 'amber-5' : 'green-5')"
                   track-color="dark"
-                  thickness="0.3"
+                  :thickness="0.3"
                 >
                   {{ props.value }}
                 </q-circular-progress>
@@ -336,7 +336,7 @@
             <q-tab-panel name="risk" class="q-pa-md column">
               <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                 <div class="row items-center op-gap-8 q-mb-md">
-                  <q-circular-progress show-value class="text-caption text-white" :value="selectedRecon.riskScore" size="50px" :color="selectedRecon.riskScore > 80 ? 'red-5' : 'green-5'" track-color="dark" thickness="0.3">{{ selectedRecon.riskScore }}</q-circular-progress>
+                  <q-circular-progress show-value class="text-caption text-white" :value="selectedRecon.riskScore" size="50px" :color="selectedRecon.riskScore > 80 ? 'red-5' : 'green-5'" track-color="dark" :thickness="0.3">{{ selectedRecon.riskScore }}</q-circular-progress>
                   <div>
                     <div class="text-weight-bold">Risk Assessment</div>
                     <div class="text-caption text-muted">AI Anomaly Score: {{ selectedRecon.anomalyScore }}</div>

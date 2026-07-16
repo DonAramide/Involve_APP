@@ -1,28 +1,28 @@
-<!-- invify-admin/src/pages/TenantDetailPage.vue -->
 <template>
-  <q-page class="q-pa-lg bg-dark text-white" v-if="tenant">
-    <!-- Breadcrumbs & Header -->
-    <div class="q-mb-md">
-      <q-breadcrumbs class="text-grey-6" gutter="sm">
-        <q-breadcrumbs-el label="Dashboards" icon="dashboard" to="/" />
-        <q-breadcrumbs-el label="Tenants" icon="business" to="/tenants" />
-        <q-breadcrumbs-el :label="tenant.name" />
-      </q-breadcrumbs>
-    </div>
-
-    <div class="row items-center q-mb-xl">
-      <q-avatar size="72px" font-size="36px" color="indigo-10" text-color="indigo-3" icon="business" class="q-mr-md shadow-2" />
-      <div class="col">
-        <div class="row items-center q-gutter-sm">
-          <h1 class="text-h4 text-weight-bold q-ma-none">{{ tenant.name }}</h1>
-          <q-chip :color="tenant.status === 'active' ? 'green-10' : 'red-10'" text-color="white" size="md">
-            {{ tenant.status?.toUpperCase() }}
-          </q-chip>
-        </div>
-        <div class="text-grey-5">{{ tenant.type?.toUpperCase() }} • Plan: {{ tenant.plan?.toUpperCase() }} • ID: {{ tenant.id }}</div>
+  <q-page class="q-pa-lg bg-dark text-white">
+    <div v-if="tenant">
+      <!-- Breadcrumbs & Header -->
+      <div class="q-mb-md">
+        <q-breadcrumbs class="text-grey-6" gutter="sm">
+          <q-breadcrumbs-el label="Dashboards" icon="dashboard" to="/" />
+          <q-breadcrumbs-el label="Tenants" icon="business" to="/tenants" />
+          <q-breadcrumbs-el :label="tenant.name" />
+        </q-breadcrumbs>
       </div>
-      <div class="col-auto">
-        <q-btn 
+
+      <div class="row items-center q-mb-xl">
+        <q-avatar size="72px" font-size="36px" color="indigo-10" text-color="indigo-3" icon="business" class="q-mr-md shadow-2" />
+        <div class="col">
+          <div class="row items-center q-gutter-sm">
+            <h1 class="text-h4 text-weight-bold q-ma-none">{{ tenant.name }}</h1>
+            <q-chip :color="tenant.status === 'active' ? 'green-10' : 'red-10'" text-color="white" size="md">
+              {{ tenant.status?.toUpperCase() }}
+            </q-chip>
+          </div>
+          <div class="text-grey-5">{{ tenant.type?.toUpperCase() }} • Plan: {{ tenant.plan?.toUpperCase() }} • ID: {{ tenant.id }}</div>
+        </div>
+        <div class="col-auto">
+          <q-btn 
           color="amber-8" 
           text-color="black"
           icon="vpn_key" 
@@ -79,7 +79,7 @@
 
       <q-separator dark />
 
-      <q-tab-panels v-model="tab" animated class="bg-blue-grey-10 text-white min-height-400">
+      <q-tab-panels v-model="tab" keep-alive class="bg-blue-grey-10 text-white min-height-400">
         <!-- Overview Panel -->
         <q-tab-panel name="overview">
           <div class="row q-col-gutter-lg">
@@ -114,6 +114,67 @@
                   </q-item-section>
                 </q-item>
               </q-list>
+
+              <!-- Registered Devices Section -->
+              <div class="q-mt-lg" v-if="registeredDevices.length > 0">
+                <div class="text-subtitle1 text-indigo-3 q-mb-sm row items-center">
+                  <q-icon name="devices" class="q-mr-sm" size="sm" />
+                  Registered Devices
+                  <q-badge :label="`${registeredDevices.length} Device${registeredDevices.length > 1 ? 's' : ''}`"
+                    :color="registeredDevices.length > 1 ? 'deep-purple-7' : 'grey-7'"
+                    class="q-ml-sm text-weight-bold" />
+                </div>
+                <div class="row q-col-gutter-sm">
+                  <div
+                    v-for="dev in registeredDevices"
+                    :key="dev.deviceId"
+                    class="col-12"
+                  >
+                    <q-card class="bg-blue-grey-9 q-pa-sm rounded-borders" flat bordered>
+                      <div class="row items-center no-wrap q-gutter-sm">
+                        <q-avatar size="36px" color="indigo-9" text-color="indigo-3" icon="phone_android" />
+                        <div class="col">
+                          <div class="row items-center q-gutter-x-md">
+                            <div>
+                              <div class="text-caption text-grey-5">Device ID</div>
+                              <div class="text-weight-bold text-white" style="font-family: monospace; font-size: 12px;">
+                                {{ dev.deviceId || 'UNASSIGNED' }}
+                              </div>
+                            </div>
+                            <div>
+                              <div class="text-caption text-grey-5">Agent Code</div>
+                              <q-chip dense size="sm" color="indigo-9" text-color="indigo-3" icon="badge" class="text-weight-bold">
+                                {{ dev.agentCode || 'AAA000' }}
+                              </q-chip>
+                            </div>
+                            <div v-if="dev.location">
+                              <div class="text-caption text-grey-5">Location</div>
+                              <div class="text-white text-caption">{{ dev.location }}</div>
+                            </div>
+                            <q-space />
+                            <div class="text-right">
+                              <div class="text-caption text-grey-5">Device #{{ dev.deviceNumber }}</div>
+                              <div class="text-caption text-grey-6">{{ dev.ownerName }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </q-card>
+                  </div>
+                </div>
+              </div>
+
+              <!-- No devices registered yet (fallback) -->
+              <div class="q-mt-lg" v-else>
+                <div class="text-subtitle1 text-indigo-3 q-mb-sm row items-center">
+                  <q-icon name="devices" class="q-mr-sm" size="sm" />
+                  Registered Devices
+                </div>
+                <div class="text-grey-6 text-caption q-pa-md bg-blue-grey-9 rounded-borders text-center">
+                  <q-icon name="device_unknown" size="sm" class="q-mr-xs" />
+                  No device registrations found. Devices are registered when the mobile app activates.
+                </div>
+              </div>
 
               <!-- Location Map -->
               <div class="q-mt-lg" v-if="parsedLocation">
@@ -533,7 +594,7 @@
             </template>
             <template v-slot:body-cell-action="props">
               <q-td :props="props">
-                <span :class="props.row.action.includes('CREATE') ? 'text-green-3' : (props.row.action.includes('SUSPEND') || props.row.action.includes('DELETE') ? 'text-red-3' : 'text-blue-3')">
+                <span :class="(props.row.action || '').includes('CREATE') ? 'text-green-3' : ((props.row.action || '').includes('SUSPEND') || (props.row.action || '').includes('DELETE') ? 'text-red-3' : 'text-blue-3')">
                   {{ props.row.action }}
                 </span>
               </q-td>
@@ -581,11 +642,15 @@
             label-color="indigo-3"
           />
 
-          <q-input
+          <q-select
             v-model="shortcutConfig.deviceSuffix"
-            label="Device Suffix (6 chars)"
-            placeholder="e.g. DSPREAD"
+            :options="deviceOptions"
+            label="Select Device ID / Suffix"
             dark filled
+            emit-value map-options
+            use-input
+            new-value-mode="add-unique"
+            hint="Select a registered device or type a new suffix manually"
             class="font-mono q-mb-md"
             label-color="indigo-3"
           />
@@ -698,9 +763,9 @@
       </q-card>
     </q-dialog>
 
+    </div>
+    <q-inner-loading :showing="loading" dark color="indigo-4" />
   </q-page>
-
-  <q-inner-loading :showing="loading" dark color="indigo-4" />
 </template>
 
 <script setup>
@@ -729,6 +794,7 @@ const wallet = ref({
 })
 const recentUsage = ref([])
 const certificates = ref([])
+const registeredDevices = ref([])
 const auditRecords = ref([])
 const kycDocuments = ref([])
 
@@ -770,6 +836,20 @@ const planOptions = [
   { label: 'PREMIUM', value: 2 },
   { label: 'ENTERPRISE', value: 3 }
 ]
+
+const deviceOptions = computed(() => {
+  return registeredDevices.value
+    .filter(dev => dev && dev.deviceId)
+    .map(dev => {
+      const last6 = dev.deviceId.length > 6 
+        ? dev.deviceId.slice(-6)
+        : dev.deviceId;
+      return {
+        label: last6,
+        value: last6
+      }
+    })
+})
 
 const reviewCertificate = (cert) => {
   if (!tenant.value) return
@@ -851,7 +931,11 @@ const generateShortcutCode = async () => {
       plan: planOptions.find(p => p.value === shortcutConfig.value.planIndex)?.label || 'STANDARD',
       duration: durationOptions.find(d => d.value === shortcutConfig.value.duration)?.label || '30 Days',
       expiry: expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-      deviceId: data.device_id || `DSPREAD-POS-${shortcutConfig.value.deviceSuffix}8MM-${Math.floor(1000 + Math.random() * 9000)}`
+      deviceId: (() => {
+        if (data.device_id) return data.device_id;
+        const matchedDevice = registeredDevices.value.find(d => d.deviceId && d.deviceId.endsWith(shortcutConfig.value.deviceSuffix));
+        return matchedDevice ? matchedDevice.deviceId : `TERM-${shortcutConfig.value.deviceSuffix}-${Math.floor(1000 + Math.random() * 9000)}`;
+      })()
     }
 
     lastGeneratedCode.value = data.activation_code
@@ -1026,6 +1110,10 @@ const toggleStatus = async () => {
   }
 };
 
+const openEditModal = () => {
+  $q.notify({ type: 'info', message: 'Edit tenant is not fully implemented yet.' });
+};
+
 const resetPassword = () => {
   // Generate random 10 char alphanumeric password
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#';
@@ -1062,6 +1150,7 @@ const fetchDetails = async () => {
     }
     recentUsage.value = data.recentUsage || []
     certificates.value = data.certificates || []
+    registeredDevices.value = data.registeredDevices || []
     
     // Fetch related audit logs for this tenant (mocked or real)
     try {

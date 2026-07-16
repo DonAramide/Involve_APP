@@ -17,20 +17,21 @@ export interface QueueMessage {
 }
 
 export class QueueRegistry {
-  private static mockMessages: QueueMessage[] = [];
-  private static useMock = true; // DB DDL is blocked on staging, always use mock in test/local execution
+  private static inMemoryMessages: QueueMessage[] = [];
+  // Bypass in-memory in production to enable horizontal scaling and durability.
+  private static useInMemory = process.env.NODE_ENV !== 'production';
 
-  static clearMockData() {
-    this.mockMessages = [];
+  static clearInMemoryData() {
+    this.inMemoryMessages = [];
   }
 
-  static getMockMessages(): QueueMessage[] {
-    return this.mockMessages;
+  static getInMemoryMessages(): QueueMessage[] {
+    return this.inMemoryMessages;
   }
 
   static async getMessageById(id: string): Promise<QueueMessage | null> {
-    if (this.useMock) {
-      return this.mockMessages.find(m => m.id === id) || null;
+    if (this.useInMemory) {
+      return this.inMemoryMessages.find(m => m.id === id) || null;
     }
     try {
       const { data, error } = await supabaseAdmin
@@ -41,14 +42,14 @@ export class QueueRegistry {
       if (error) throw error;
       return data;
     } catch {
-      return this.mockMessages.find(m => m.id === id) || null;
+      return this.inMemoryMessages.find(m => m.id === id) || null;
     }
   }
 
   static async getPendingMessages(queueName: QueueName): Promise<QueueMessage[]> {
-    if (this.useMock) {
+    if (this.useInMemory) {
       const now = new Date();
-      return this.mockMessages.filter(
+      return this.inMemoryMessages.filter(
         m => m.queue_name === queueName &&
              m.status === 'PENDING' &&
              now >= new Date(m.next_attempt_at)
@@ -65,7 +66,7 @@ export class QueueRegistry {
       return data || [];
     } catch {
       const now = new Date();
-      return this.mockMessages.filter(
+      return this.inMemoryMessages.filter(
         m => m.queue_name === queueName &&
              m.status === 'PENDING' &&
              now >= new Date(m.next_attempt_at)
@@ -86,8 +87,8 @@ export class QueueRegistry {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    if (this.useMock) {
-      this.mockMessages.push(item);
+    if (this.useInMemory) {
+      this.inMemoryMessages.push(item);
       return item;
     }
     try {
@@ -99,17 +100,17 @@ export class QueueRegistry {
       if (error) throw error;
       return data;
     } catch {
-      this.mockMessages.push(item);
+      this.inMemoryMessages.push(item);
       return item;
     }
   }
 
   static async updateMessage(id: string, updates: Partial<QueueMessage>): Promise<void> {
     const time = new Date().toISOString();
-    if (this.useMock) {
-      const idx = this.mockMessages.findIndex(m => m.id === id);
+    if (this.useInMemory) {
+      const idx = this.inMemoryMessages.findIndex(m => m.id === id);
       if (idx !== -1) {
-        this.mockMessages[idx] = { ...this.mockMessages[idx], ...updates, updated_at: time };
+        this.inMemoryMessages[idx] = { ...this.inMemoryMessages[idx], ...updates, updated_at: time };
       }
       return;
     }
@@ -120,16 +121,16 @@ export class QueueRegistry {
         .eq('id', id);
       if (error) throw error;
     } catch {
-      const idx = this.mockMessages.findIndex(m => m.id === id);
+      const idx = this.inMemoryMessages.findIndex(m => m.id === id);
       if (idx !== -1) {
-        this.mockMessages[idx] = { ...this.mockMessages[idx], ...updates, updated_at: time };
+        this.inMemoryMessages[idx] = { ...this.inMemoryMessages[idx], ...updates, updated_at: time };
       }
     }
   }
 
   static async deleteMessage(id: string): Promise<void> {
-    if (this.useMock) {
-      this.mockMessages = this.mockMessages.filter(m => m.id !== id);
+    if (this.useInMemory) {
+      this.inMemoryMessages = this.inMemoryMessages.filter(m => m.id !== id);
       return;
     }
     try {
@@ -139,7 +140,7 @@ export class QueueRegistry {
         .eq('id', id);
       if (error) throw error;
     } catch {
-      this.mockMessages = this.mockMessages.filter(m => m.id !== id);
+      this.inMemoryMessages = this.inMemoryMessages.filter(m => m.id !== id);
     }
   }
 }

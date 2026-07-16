@@ -34,6 +34,7 @@ import 'package:involve_app/features/invoicing/presentation/bloc/invoice_bloc.da
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/settings/data/repositories/settings_repository_impl.dart';
 import 'package:involve_app/features/settings/domain/repositories/settings_repository.dart';
+import 'package:involve_app/core/sync/domain/services/session_context.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
@@ -63,6 +64,10 @@ import 'package:involve_app/core/sync/domain/services/bluetooth_sync_server.dart
 import 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_stub.dart'
     if (dart.library.io) 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_native.dart'
     if (dart.library.html) 'package:involve_app/core/sync/domain/services/bluetooth_discovery_service_web.dart';
+import 'package:involve_app/core/sync/domain/services/outbox_dispatcher.dart';
+import 'package:involve_app/core/sync/domain/services/outbox_publisher.dart';
+import 'package:involve_app/core/sync/domain/services/outbox_worker.dart';
+import 'package:involve_app/core/sync/domain/services/finance_api_batch_handler.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/core/utils/route_observer.dart';
 import 'package:involve_app/core/license/license_service.dart';
@@ -215,6 +220,7 @@ class AppDependencies {
   final IAdminRepository adminRepository;
   final FinanceRepository financeRepositoryNew;
   final NotificationRepository notificationRepository;
+  final OutboxWorker outboxWorker;
 
 
   AppDependencies({
@@ -275,6 +281,7 @@ class AppDependencies {
     required this.adminRepository,
     required this.financeRepositoryNew,
     required this.notificationRepository,
+    required this.outboxWorker,
   });
 
 
@@ -304,7 +311,14 @@ class AppDependencies {
 
     // 3. Repositories
     final itemRepository = ItemRepositoryImpl(database);
-    final invoiceRepository = InvoiceRepositoryImpl(database, financeRepository: financeRepoNew);
+    
+    // Setup Outbox
+    final securityServiceForId = SecurityService();
+    final deviceId = await securityServiceForId.getPersistentDeviceId();
+    final sessionContext = SessionContextImpl(securityServiceForId);
+    final outboxPublisher = OutboxPublisher(sessionContext);
+    
+    final invoiceRepository = InvoiceRepositoryImpl(database, financeRepository: financeRepoNew, outboxPublisher: outboxPublisher);
     final settingsRepository = SettingsRepositoryImpl(database);
     final categoryRepository = CategoryRepositoryImpl(database);
     final staffRepository = StaffRepositoryImpl(database);
@@ -313,9 +327,6 @@ class AppDependencies {
     final lessonNoteRepo = LessonNoteRepositoryImpl(database);
     final printerRepository = PrinterRepositoryImpl(database);
     
-    // SecurityService must be initialized before deviceId
-    final securityServiceForId = SecurityService();
-    final deviceId = await securityServiceForId.getPersistentDeviceId();
     
     // 4. Services Module (100% Offline)
     final servicesRepo = ServicesRepositoryImpl(db: database);
@@ -351,6 +362,17 @@ class AppDependencies {
 
     final notificationRepo = NotificationRepository(Dio(BaseOptions(baseUrl: baseUrl)));
 
+    final financeApiClient = FinanceApiClient(
+      baseUrl: baseUrl,
+      getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken ?? await SecurityService().getOfflineToken() ?? 'mock-super-admin',
+      getTenantId: () async => await SecurityService().getTenantId(),
+    );
+
+    final outboxDispatcher = OutboxDispatcher();
+    outboxDispatcher.register('*', FinanceApiBatchHandler(financeApiClient));
+
+    final outboxWorker = OutboxWorker(database, outboxDispatcher);
+
     // Register in GetIt for legacy sl access
     final sl = GetIt.instance;
     if (!sl.isRegistered<FinanceRepository>()) {
@@ -358,6 +380,9 @@ class AppDependencies {
     }
     if (!sl.isRegistered<NotificationRepository>()) {
       sl.registerSingleton<NotificationRepository>(notificationRepo);
+    }
+    if (!sl.isRegistered<FinanceApiClient>()) {
+      sl.registerSingleton<FinanceApiClient>(financeApiClient);
     }
 
     return AppDependencies(
@@ -441,10 +466,11 @@ class AppDependencies {
       adminRepository: AdminRepositoryImpl(
         FinanceApiClient(
           baseUrl: baseUrl,
-          getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
+          getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken ?? await SecurityService().getOfflineToken() ?? 'mock-super-admin',
           getTenantId: () async => await SecurityService().getTenantId(),
         ),
       ),
+      outboxWorker: outboxWorker,
     );
   }
 }
