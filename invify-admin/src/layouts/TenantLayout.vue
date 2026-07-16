@@ -202,7 +202,7 @@ const operatorRole = ref(localStorage.getItem('operator_role') || 'OWNER')
 const activeBusinessName = ref('My Business')
 
 // Industry configuration: read from localStorage (tenant_type / school, retail, etc.)
-const activeIndustry = ref(localStorage.getItem('tenant_type') || 'school')
+const activeIndustry = ref(localStorage.getItem('tenant_type') || 'retail')
 
 const getTenantIdFromToken = () => {
   // 1. Try explicit local storage first (set during login)
@@ -231,7 +231,7 @@ const loadTenantDetails = async () => {
       const res = await adminApi.getTenantDetails(tenantId)
       if (res.data && res.data.tenant) {
         activeBusinessName.value = res.data.tenant.name || 'My Business'
-        activeIndustry.value = res.data.tenant.type || 'school'
+        activeIndustry.value = res.data.tenant.business_mode || res.data.tenant.type || 'retail'
         localStorage.setItem('tenant_type', activeIndustry.value)
         
         // Find operator name
