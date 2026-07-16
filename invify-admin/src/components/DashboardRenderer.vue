@@ -26,7 +26,7 @@ const store = useRuntimeStore();
 
 const resolvedWidgets = computed(() => {
   const mode = (store.businessMode || '').toLowerCase();
-  const dashboardConfig = DashboardRegistry[mode] || DashboardRegistry.school;
+  const dashboardConfig = DashboardRegistry[mode] || { grid: [] };
   
   if (!dashboardConfig.grid) return [];
 

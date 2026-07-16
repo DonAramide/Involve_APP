@@ -68,7 +68,7 @@ export class RuntimeConfigService {
       tenant: {
         id: tenant.id,
         name: tenant.name,
-        businessMode: tenant.business_mode || 'Retail', // Default if missing
+        businessMode: tenant.business_mode || '', 
         status: tenant.status || 'active',
         version: '1.0.0', // Could be fetched from global config
       },

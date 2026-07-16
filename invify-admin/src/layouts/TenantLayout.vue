@@ -312,11 +312,8 @@ const industryNavigationTree = computed(() => {
     ]
   }
   
-  // Default to Retail fallback if nothing matches
-  return [
-    { label: 'POS Terminal Sales', path: '/tenant/retail/pos', icon: 'point_of_sale', color: 'amber-4', mode: 'RETAIL' },
-    { label: 'Inventory Stock Matrix', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'cyan-4', mode: 'RETAIL' }
-  ]
+  // Default to empty if nothing matches
+  return []
 })
 
 onMounted(loadTenantDetails)
