@@ -50,7 +50,7 @@ export const useRuntimeStore = defineStore('runtime', {
   }),
   getters: {
     isReady: (state) => state.config !== null,
-    businessMode: (state) => state.config?.tenant.businessMode || 'Retail',
+    businessMode: (state) => state.config?.tenant?.businessMode || '',
     subscriptionTier: (state) => state.config?.subscription.tier || 'Free',
     capabilities: (state) => state.config?.capabilities || {},
     branding: (state) => state.config?.branding || {}

@@ -25,7 +25,7 @@ import { WidgetRegistry } from '../registries/WidgetRegistry';
 const store = useRuntimeStore();
 
 const resolvedWidgets = computed(() => {
-  const mode = (store.businessMode || 'school').toLowerCase();
+  const mode = (store.businessMode || '').toLowerCase();
   const dashboardConfig = DashboardRegistry[mode] || DashboardRegistry.school;
   
   if (!dashboardConfig.grid) return [];

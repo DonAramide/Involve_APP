@@ -420,7 +420,7 @@ const isPlatformAdmin = computed(() => {
   return ['SUPER_ADMIN', 'INTERNAL_STAFF'].includes(role)
 })
 
-const myTenantName = ref('My Business')
+const myTenantName = ref('')
 
 const tab = ref('active')
 const loading = ref(false)

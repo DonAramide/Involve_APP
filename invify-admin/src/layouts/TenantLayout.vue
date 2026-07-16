@@ -199,10 +199,10 @@ const sidebarCollapsed = ref(true)
 const operatorEmail = ref(localStorage.getItem('operator_email') || 'owner@business.com')
 const operatorName = ref('')
 const operatorRole = ref(localStorage.getItem('operator_role') || 'OWNER')
-const activeBusinessName = ref('My Business')
+const activeBusinessName = ref('')
 
 // Industry configuration: read from localStorage (tenant_type / school, retail, etc.)
-const activeIndustry = ref(localStorage.getItem('tenant_type') || 'retail')
+const activeIndustry = ref(localStorage.getItem('tenant_type') || '')
 
 const getTenantIdFromToken = () => {
   // 1. Try explicit local storage first (set during login)
@@ -230,8 +230,8 @@ const loadTenantDetails = async () => {
     try {
       const res = await adminApi.getTenantDetails(tenantId)
       if (res.data && res.data.tenant) {
-        activeBusinessName.value = res.data.tenant.name || 'My Business'
-        activeIndustry.value = res.data.tenant.business_mode || res.data.tenant.type || 'retail'
+        activeBusinessName.value = res.data.tenant.name || ''
+        activeIndustry.value = res.data.tenant.business_mode || res.data.tenant.type || ''
         localStorage.setItem('tenant_type', activeIndustry.value)
         
         // Find operator name

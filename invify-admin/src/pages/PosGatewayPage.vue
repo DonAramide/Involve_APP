@@ -1076,7 +1076,7 @@ const mockSyncPayload = computed(() => {
     terminalId: '20330002',
     mposTerminalId: 'mpos-1780133656325-0.3101378214529058',
     posSerialNumber: 'VM3041056610_Android',
-    businessName: 'My Business',
+    businessName: '',
     terminalType: 'Aisino MPOS',
     configVersion: 1,
     syncedAt: new Date().toISOString(),

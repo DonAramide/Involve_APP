@@ -11,7 +11,7 @@ import { WorkspaceRegistry } from '../registries/WorkspaceRegistry';
 const store = useRuntimeStore();
 
 const activeWorkspace = computed(() => {
-  const mode = (store.businessMode || 'school').toLowerCase();
+  const mode = (store.businessMode || '').toLowerCase();
   const layoutName = DashboardRegistry[mode]?.layout || 'FallbackWorkspace';
   return WorkspaceRegistry[layoutName];
 });
