@@ -1,0 +1,1 @@
+class s{constructor(){this.isProd=!0}debug(o,...r){this.isProd||console.debug(`[DEBUG] ${o}`,...r)}info(o,...r){this.isProd||console.info(`[INFO] ${o}`,...r)}warn(o,...r){this.isProd||console.warn(`[WARN] ${o}`,...r)}error(o,...r){console.error(`[ERROR] ${o}`,...r)}}const i=new s;export{i as l};

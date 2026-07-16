@@ -1,0 +1,1 @@
+import{_ as t}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{c as e,i as o}from"./index-DNtPrF7Z.js";const c={};function n(r,i){return e(),o("div",null,"Agent Notifications")}const f=t(c,[["render",n]]);export{f as default};

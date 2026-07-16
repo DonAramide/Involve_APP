@@ -1,0 +1,98 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    xmlns:tools="http://schemas.android.com/tools"
+4    package="com.demo.mpossdk" >
+5
+6    <uses-sdk android:minSdkVersion="21" />
+7
+8    <uses-permission android:name="android.permission.INTERNET" />
+8-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:5:5-67
+8-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:5:22-64
+9    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+9-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:6:5-79
+9-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:6:22-76
+10    <uses-permission android:name="android.permission.BLUETOOTH" />
+10-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:7:5-68
+10-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:7:22-65
+11    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+11-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:8:5-74
+11-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:8:22-71
+12    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+12-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:9:5-76
+12-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:9:22-73
+13    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+13-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:10:5-78
+13-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:10:22-75
+14    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+14-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:11:5-81
+14-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:11:22-78
+15    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+15-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:12:5-80
+15-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:12:22-77
+16
+17    <uses-feature
+17-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:14:5-16:36
+18        android:name="android.hardware.bluetooth"
+18-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:15:9-50
+19        android:required="false" />
+19-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:16:9-33
+20    <uses-feature
+20-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:17:5-19:36
+21        android:name="android.hardware.bluetooth_le"
+21-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:18:9-53
+22        android:required="false" />
+22-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:19:9-33
+23
+24    <uses-permission
+24-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:21:5-24:31
+25        android:name="android.permission.BLUETOOTH_SCAN"
+25-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:22:9-57
+26        android:usesPermissionFlags="neverForLocation"
+26-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:23:9-55
+27        tools:targetApi="s" />
+27-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:24:9-28
+28
+29    <application android:theme="@style/Theme.MposSdk" >
+29-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:26:5-47:19
+29-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:26:18-54
+30        <activity
+30-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:27:9-29:40
+31            android:name="com.demo.mpossdk.internal.ui.DownloadParameterActivity"
+31-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:28:13-66
+32            android:exported="false" />
+32-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:29:13-37
+33        <activity
+33-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:30:9-32:40
+34            android:name="com.demo.mpossdk.internal.ui.processing.ProcessingTransactionActivity"
+34-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:31:13-81
+35            android:exported="false" />
+35-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:32:13-37
+36        <activity
+36-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:33:9-35:40
+37            android:name="com.demo.mpossdk.internal.ui.TransactionStatusActivity"
+37-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:34:13-66
+38            android:exported="false" />
+38-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:35:13-37
+39        <activity
+39-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:36:9-46:20
+40            android:name="com.demo.mpossdk.internal.ui.ConnectingDeviceActivity"
+40-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:37:13-65
+41            android:exported="false" >
+41-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:38:13-37
+42            <intent-filter>
+42-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:39:13-41:29
+43                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
+43-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:40:17-90
+43-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:40:25-87
+44            </intent-filter>
+45
+46            <meta-data
+46-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:43:13-45:57
+47                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+47-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:44:17-79
+48                android:resource="@xml/device_filter" />
+48-->C:\dev\Aisino\Mpos_Aisino\mpossdk\src\main\AndroidManifest.xml:45:17-54
+49        </activity>
+50    </application>
+51
+52</manifest>

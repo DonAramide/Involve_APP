@@ -1,0 +1,301 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.GovAuditService = void 0;
+// src/services/gov-audit.service.ts
+// Unified Governance Audit Ledger Service
+// Aggregates audit logs from all sources: terminal, device, governance, financial
+const https = __importStar(require("https"));
+const supabase_1 = require("../db/supabase");
+// In-memory IP geolocation cache
+const ipGeoCache = new Map();
+function isPrivateIp(ip) {
+    if (!ip || ip === '::1' || ip === '127.0.0.1')
+        return true;
+    if (ip.startsWith('192.168.') || ip.startsWith('10.') || ip.startsWith('172.'))
+        return true;
+    return false;
+}
+async function resolveIpLocation(ip) {
+    if (isPrivateIp(ip))
+        return 'Local Network';
+    if (ipGeoCache.has(ip))
+        return ipGeoCache.get(ip);
+    return new Promise((resolve) => {
+        const timeout = setTimeout(() => resolve('Unknown Location'), 2000);
+        https.get(`https://ip-api.com/json/${ip}?fields=status,country,city,regionName`, (res) => {
+            let data = '';
+            res.on('data', chunk => { data += chunk; });
+            res.on('end', () => {
+                clearTimeout(timeout);
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed.status === 'success') {
+                        const location = `${parsed.city || '?'}, ${parsed.regionName || '?'}, ${parsed.country || '?'}`;
+                        ipGeoCache.set(ip, location);
+                        resolve(location);
+                    }
+                    else {
+                        resolve('Unknown Location');
+                    }
+                }
+                catch {
+                    resolve('Unknown Location');
+                }
+            });
+        }).on('error', () => {
+            clearTimeout(timeout);
+            resolve('Unknown Location');
+        });
+    });
+}
+function normalizeTerminalLog(raw) {
+    return {
+        id: raw.id || `term-${Date.now()}`,
+        timestamp: raw.created_at || raw.timestamp || new Date().toISOString(),
+        module: 'TERMINAL',
+        action: raw.action_type || raw.action || 'TERMINAL_OP',
+        user_email: raw.admin_id || raw.uploaded_by || 'system',
+        user_name: raw.admin_name || raw.admin_id?.split('@')[0]?.replace(/[-_.]/g, ' ').toUpperCase() || 'System',
+        ip_address: raw.ip_address || '127.0.0.1',
+        location: raw.location || (isPrivateIp(raw.ip_address) ? 'Local Network' : 'Resolving...'),
+        target: raw.terminal_id || raw.mpos_terminal_id || raw.target || '-',
+        status: raw.status || 'success',
+        metadata: raw.metadata || { old_device: raw.old_device_id, new_device: raw.new_device_id, reason: raw.reason }
+    };
+}
+function normalizeDeviceLog(raw) {
+    const action = raw.status === 'approved' ? 'DEVICE_APPROVED'
+        : raw.status === 'blocked' ? 'DEVICE_BLOCKED'
+            : raw.status === 'pending' ? 'DEVICE_REGISTERED'
+                : 'DEVICE_EVENT';
+    return {
+        id: `dev-${raw.id || Date.now()}`,
+        timestamp: raw.created_at || new Date().toISOString(),
+        module: 'DEVICE',
+        action,
+        user_email: raw.email || 'unknown',
+        user_name: raw.user_name || raw.email?.split('@')[0]?.replace(/[-_.]/g, ' ').toUpperCase() || 'Unknown',
+        ip_address: raw.ip_address || '127.0.0.1',
+        location: raw.location || (isPrivateIp(raw.ip_address) ? 'Local Network' : 'Resolving...'),
+        target: raw.device_id || raw.device_name || 'Browser Device',
+        status: raw.status === 'approved' ? 'approved' : raw.status === 'blocked' ? 'blocked' : 'pending',
+        metadata: { device_name: raw.device_name, user_agent: raw.user_agent, approved_by: raw.approved_by }
+    };
+}
+class GovAuditService {
+    /**
+     * Logs a high-risk RBAC permission grant to guarantee an immutable audit trail.
+     */
+    static async logRbacGrant(actorId, targetUserId, oldRole, newRole, reqIp) {
+        const entry = {
+            id: require('crypto').randomUUID(),
+            timestamp: new Date().toISOString(),
+            module: 'GOVERNANCE',
+            action: 'RBAC_PERMISSION_GRANTED',
+            user_email: actorId,
+            user_name: 'SYSTEM',
+            target: targetUserId,
+            status: 'approved',
+            metadata: {
+                old_role: oldRole,
+                new_role: newRole
+            },
+            ip_address: reqIp || '127.0.0.1',
+            location: 'Local Network'
+        };
+        try {
+            await supabase_1.supabaseAdmin.from('audit_logs').insert({
+                id: entry.id,
+                module: entry.module,
+                action: entry.action,
+                user_email: entry.user_email,
+                user_name: entry.user_name,
+                target: entry.target,
+                status: entry.status,
+                metadata: entry.metadata,
+                ip_address: entry.ip_address,
+                location: entry.location,
+                timestamp: entry.timestamp
+            });
+        }
+        catch (e) {
+            console.error('[GovAuditService] Error pushing RBAC log:', e);
+        }
+    }
+    /**
+     * Log a governance/maker-checker action with IP and location context.
+     */
+    static async logAction(entry) {
+        // Resolve location from IP if not provided
+        let location = entry.location;
+        if (!location) {
+            location = isPrivateIp(entry.ip_address) ? 'Local Network' : await resolveIpLocation(entry.ip_address);
+        }
+        const logEntry = { ...entry, location };
+        // Write to Supabase audit_logs
+        try {
+            await supabase_1.supabaseAdmin.from('audit_logs').insert({
+                id: logEntry.id,
+                module: logEntry.module,
+                action: logEntry.action,
+                user_email: logEntry.user_email,
+                user_name: logEntry.user_name,
+                ip_address: logEntry.ip_address,
+                location: logEntry.location,
+                target: logEntry.target,
+                status: logEntry.status,
+                metadata: logEntry.metadata || {},
+                timestamp: logEntry.timestamp
+            });
+        }
+        catch (e) {
+            console.error('[GovAuditService] Error pushing audit log:', e);
+        }
+    }
+    /**
+     * Get a unified, paginated, filtered audit ledger from all sources.
+     */
+    static async getLedger(filters = {}) {
+        const page = parseInt(String(filters.page || '1'));
+        const limit = parseInt(String(filters.limit || '50'));
+        const start = (page - 1) * limit;
+        let allLogs = [];
+        // 1. Read governance/maker-checker logs from Supabase audit_logs table
+        try {
+            let query = supabase_1.supabaseAdmin.from('audit_logs').select('*');
+            if (filters.module && filters.module !== 'ALL') {
+                query = query.eq('module', filters.module);
+            }
+            if (filters.status && filters.status !== 'ALL') {
+                query = query.eq('status', filters.status);
+            }
+            if (filters.action) {
+                query = query.ilike('action', `%${filters.action}%`);
+            }
+            if (filters.dateFrom) {
+                query = query.gte('timestamp', filters.dateFrom);
+            }
+            if (filters.dateTo) {
+                const toDate = new Date(filters.dateTo);
+                toDate.setDate(toDate.getDate() + 1);
+                query = query.lte('timestamp', toDate.toISOString());
+            }
+            const { data: onlineLogs, error: onlineErr } = await query.order('timestamp', { ascending: false }).limit(500);
+            if (onlineErr)
+                throw onlineErr;
+            if (onlineLogs && onlineLogs.length > 0) {
+                allLogs.push(...onlineLogs.map(l => ({
+                    id: l.id,
+                    timestamp: l.timestamp,
+                    module: l.module || 'SYSTEM',
+                    action: l.action,
+                    user_email: l.user_email,
+                    user_name: l.user_name || l.user_email?.split('@')[0]?.toUpperCase() || 'System',
+                    ip_address: l.ip_address || '127.0.0.1',
+                    location: l.location || 'Unknown Location',
+                    target: l.target || '-',
+                    status: l.status || 'success',
+                    metadata: l.metadata || {}
+                })));
+            }
+        }
+        catch (e) {
+            console.warn('[GovAuditService] Error reading audit_logs from DB:', e);
+        }
+        // 2. Read device registration logs from Supabase user_devices table
+        try {
+            const { data: userDevices } = await supabase_1.supabaseAdmin
+                .from('user_devices')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(200);
+            if (userDevices && userDevices.length > 0) {
+                allLogs.push(...userDevices.map(normalizeDeviceLog));
+            }
+        }
+        catch { }
+        // 3. Read from terminal_audit_log Supabase table
+        try {
+            const { data: termOnline } = await supabase_1.supabaseAdmin
+                .from('terminal_audit_log')
+                .select('*')
+                .limit(100)
+                .order('created_at', { ascending: false });
+            if (termOnline && termOnline.length > 0) {
+                allLogs.push(...termOnline.map(normalizeTerminalLog));
+            }
+        }
+        catch { }
+        // Sort all by timestamp descending
+        allLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        // Apply in-memory search and general filters
+        if (filters.search) {
+            const q = filters.search.toLowerCase();
+            allLogs = allLogs.filter(l => l.user_email?.toLowerCase().includes(q) ||
+                l.user_name?.toLowerCase().includes(q) ||
+                l.action?.toLowerCase().includes(q) ||
+                l.target?.toLowerCase().includes(q) ||
+                l.ip_address?.toLowerCase().includes(q) ||
+                l.location?.toLowerCase().includes(q));
+        }
+        if (filters.module && filters.module !== 'ALL') {
+            allLogs = allLogs.filter(l => l.module === filters.module);
+        }
+        if (filters.status && filters.status !== 'ALL') {
+            const statusFilter = filters.status.toLowerCase();
+            allLogs = allLogs.filter(l => (l.status || '').toLowerCase() === statusFilter);
+        }
+        // Compute stats
+        const stats = {
+            total: allLogs.length,
+            critical: allLogs.filter(l => ['DEVICE_BLOCKED', 'IMPERSONATION', 'REVOCATION', 'FAILED_LOGIN', 'SESSION_REVOCATION_SWEEP'].some(k => l.action?.includes(k))).length,
+            pending: allLogs.filter(l => l.status === 'pending').length,
+            makerChecker: allLogs.filter(l => l.module === 'MAKER_CHECKER').length,
+            uniqueIPs: new Set(allLogs.map(l => l.ip_address).filter(Boolean)).size
+        };
+        const paginated = allLogs.slice(start, start + limit);
+        return { data: paginated, total: allLogs.length, stats };
+    }
+    /**
+     * Seed sample governance audit logs for demonstration purposes
+     */
+    static async seedSampleLogs() {
+        // ELIMINATED: Production environments must not seed sample mock logs.
+        return Promise.resolve();
+    }
+}
+exports.GovAuditService = GovAuditService;
+//# sourceMappingURL=gov-audit.service.js.map

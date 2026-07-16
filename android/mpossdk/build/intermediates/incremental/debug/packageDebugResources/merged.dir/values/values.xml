@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#0D2543</color>
+    <color name="background">#FAFAFA</color>
+    <color name="black">#FF000000</color>
+    <color name="dark_gray">#767171</color>
+    <color name="dark_gray_light">#9C9898</color>
+    <color name="dark_gray_lighter">#DFDEDE</color>
+    <color name="info">#F6AA1C</color>
+    <color name="info_light">#F8C15B</color>
+    <color name="info_lighter">#FDEBCA</color>
+    <color name="light_gray">#F9F9F9</color>
+    <color name="number_border">#BDBDBD</color>
+    <color name="primary">#ED1C25</color>
+    <color name="primary_light">#F25B61</color>
+    <color name="primary_lighter">#FBCACC</color>
+    <color name="success">#13A500</color>
+    <color name="success_light">#54BE47</color>
+    <color name="success_lighter">#C8EAC4</color>
+    <color name="transparent">#00000000</color>
+    <color name="warning">#8E8358</color>
+    <color name="warning_light">#ADA586</color>
+    <color name="warning_lighter">#E5E2D8</color>
+    <color name="white">#FFFFFFFF</color>
+    <string name="an_error_occurred">An error occurred</string>
+    <string name="error_packing_message">Error packing message</string>
+    <string name="host_disconnect">Host disconnect</string>
+    <string name="lib_name">MposPay</string>
+    <string name="network_error_please_check_your_connection_and_try_again">Network error. Please check your connection and try again.</string>
+    <style name="Theme.MposSdk" parent="Theme.MaterialComponents.NoActionBar">
+        
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorPrimaryVariant">@color/primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        
+        <item name="colorSecondary">@color/primary</item>
+        <item name="colorSecondaryVariant">@color/primary</item>
+        <item name="colorOnSecondary">@color/black</item>
+        
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        
+    </style>
+</resources>
