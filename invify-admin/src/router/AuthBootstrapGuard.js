@@ -162,7 +162,7 @@ export function registerAuthBootstrapGuard(router) {
             'tenant.invitations.manage', 'tenant.activity.view', 'tenant.reports.view',
             'tenant.settings.manage', 'tenant.settlement.view', 'tenant.payout.create',
             'tenant.devices.view', 'tenant.terminals.view', 'tenant.compliance.view',
-            'tenant.audit.view', 'tenant.analytics.view'
+            'tenant.audit.view', 'tenant.analytics.view', 'tenant.inventory.view'
           ],
           TENANT_OPERATOR: ['read_fleet', 'read_devices', 'read_streams']
         }
