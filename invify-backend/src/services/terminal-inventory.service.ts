@@ -1,5 +1,5 @@
 // src/services/terminal-inventory.service.ts
-import { supabase } from '../db/supabase';
+import { supabase, supabaseAdmin } from '../db/supabase';
 
 export class TerminalInventoryService {
 
@@ -105,16 +105,19 @@ export class TerminalInventoryService {
     let duplicates = 0;
     const errors: string[] = [];
 
+    // Use supabaseAdmin to bypass RLS — bulk import is a SUPER_ADMIN operation
+    const db = supabaseAdmin;
+
     for (const row of rows) {
       try {
         if (importType === 'tablets') {
           if (!row.device_id) throw new Error('Missing device_id');
-          const { data: existing } = await supabase.from('devices').select('id').eq('device_id', row.device_id).maybeSingle();
+          const { data: existing } = await db.from('devices').select('id').eq('device_id', row.device_id).maybeSingle();
           if (existing) {
             duplicates++;
             continue;
           }
-          const { error } = await supabase.from('devices').insert({
+          const { error } = await db.from('devices').insert({
             tenant_id: tenantId || null,
             device_id: row.device_id,
             device_name: row.model || 'Imported Tablet',
@@ -124,12 +127,12 @@ export class TerminalInventoryService {
           if (error) throw error;
         } else if (importType === 'mpos') {
           if (!row.serial_number) throw new Error('Missing serial_number');
-          const { data: existing } = await supabase.from('terminal_inventory').select('id').eq('mpos_terminal_id', row.serial_number).maybeSingle();
+          const { data: existing } = await db.from('terminal_inventory').select('id').eq('mpos_terminal_id', row.serial_number).maybeSingle();
           if (existing) {
             duplicates++;
             continue;
           }
-          const { error } = await supabase.from('terminal_inventory').insert({
+          const { error } = await db.from('terminal_inventory').insert({
             tenant_id: tenantId || null,
             terminal_id: row.serial_number,
             mpos_terminal_id: row.serial_number,
@@ -140,12 +143,12 @@ export class TerminalInventoryService {
           if (error) throw error;
         } else if (importType === 'printers') {
           if (!row.mac_address) throw new Error('Missing mac_address');
-          const { data: existing } = await supabase.from('terminal_inventory').select('id').eq('printer_mac_address', row.mac_address).maybeSingle();
+          const { data: existing } = await db.from('terminal_inventory').select('id').eq('printer_mac_address', row.mac_address).maybeSingle();
           if (existing) {
             duplicates++;
             continue;
           }
-          const { error } = await supabase.from('terminal_inventory').insert({
+          const { error } = await db.from('terminal_inventory').insert({
             tenant_id: tenantId || null,
             terminal_id: row.mac_address,
             printer_mac_address: row.mac_address,
@@ -155,12 +158,12 @@ export class TerminalInventoryService {
           if (error) throw error;
         } else if (importType === 'tids') {
           if (!row.tid) throw new Error('Missing tid');
-          const { data: existing } = await supabase.from('terminal_inventory').select('id').eq('terminal_id', row.tid).maybeSingle();
+          const { data: existing } = await db.from('terminal_inventory').select('id').eq('terminal_id', row.tid).maybeSingle();
           if (existing) {
             duplicates++;
             continue;
           }
-          const { error } = await supabase.from('terminal_inventory').insert({
+          const { error } = await db.from('terminal_inventory').insert({
             terminal_id: row.tid,
             merchant_id: row.mid || null,
             bank_name: row.bank_name || null,
@@ -169,12 +172,12 @@ export class TerminalInventoryService {
           if (error) throw error;
         } else if (importType === 'bundles') {
           if (!row.tenant_id) throw new Error('Missing tenant_id');
-          const { data: existing } = await supabase.from('terminal_inventory').select('id').eq('terminal_id', row.tid).maybeSingle();
+          const { data: existing } = await db.from('terminal_inventory').select('id').eq('terminal_id', row.tid).maybeSingle();
           if (existing) {
             duplicates++;
             continue;
           }
-          const { error } = await supabase.from('terminal_inventory').insert({
+          const { error } = await db.from('terminal_inventory').insert({
             terminal_id: row.tid,
             merchant_id: row.mid || null,
             bank_name: row.bank || null,

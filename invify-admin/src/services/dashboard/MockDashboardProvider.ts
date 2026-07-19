@@ -48,11 +48,11 @@ export class MockDashboardProvider implements DashboardDataProvider {
 
   async getTenantIntelligence(): Promise<MapNode[]> {
     return [
-      { tenant: 'Lagos Hub Network', location: 'Nigeria', x: 48, y: 55, status: 'high', color: '#00E676', activity: 38.4 },
-      { tenant: 'Acme School Group', location: 'UK', x: 46, y: 22, status: 'medium', color: '#FFC107', activity: 12.8 },
-      { tenant: 'New York Retail Grid', location: 'USA', x: 23, y: 25, status: 'high', color: '#00E676', activity: 41.2 },
-      { tenant: 'Cairo Services Co', location: 'Egypt', x: 52, y: 40, status: 'low', color: '#00B8FF', activity: 4.1 },
-      { tenant: 'Beta Logistics', location: 'Germany', x: 49, y: 26, status: 'risk', color: '#FF5252', activity: 0 }
+      { id: 't1', tenant: 'Lagos Hub Network', location: 'Nigeria', x: 48, y: 55, status: 'high', color: '#00E676', activity: 38.4 },
+      { id: 't2', tenant: 'Acme School Group', location: 'UK', x: 46, y: 22, status: 'medium', color: '#FFC107', activity: 12.8 },
+      { id: 't3', tenant: 'New York Retail Grid', location: 'USA', x: 23, y: 25, status: 'high', color: '#00E676', activity: 41.2 },
+      { id: 't4', tenant: 'Cairo Services Co', location: 'Egypt', x: 52, y: 40, status: 'low', color: '#00B8FF', activity: 4.1 },
+      { id: 't5', tenant: 'Beta Logistics', location: 'Germany', x: 49, y: 26, status: 'risk', color: '#FF5252', activity: 0 }
     ];
   }
 

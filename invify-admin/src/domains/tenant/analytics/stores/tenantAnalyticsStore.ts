@@ -75,9 +75,9 @@ export const useTenantAnalyticsStore = defineStore('tenantAnalytics', {
           paidCount,
           owingCount,
           totalOwingValue,
-          revenue: financeSummary.totalCollected || 8450200, // Still mock revenue as backend fails
-          activeUsers: totalStudents + 12,
-          transactions: 145
+          revenue: financeSummary?.totalCollected || 0,
+          activeUsers: totalStudents,
+          transactions: 0
         };
 
         // Prepare Payment Status Pie Chart
@@ -108,13 +108,13 @@ export const useTenantAnalyticsStore = defineStore('tenantAnalytics', {
             phone: s.phone
           }));
 
-        // Prepare Revenue Trend Line Chart (Mocking past 6 months since no invoice data)
+        // Prepare Revenue Trend Line Chart
         this.charts.revenueTrend = {
           series: [{
             name: 'Revenue',
-            data: [1200000, 1500000, 1100000, 1800000, 1400000, 1900000]
+            data: []
           }],
-          categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']
+          categories: []
         };
 
       } catch (err: any) {

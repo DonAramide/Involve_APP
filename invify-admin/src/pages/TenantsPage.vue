@@ -175,7 +175,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../api'
@@ -206,8 +206,8 @@ const columns = [
   { name: 'actions', label: 'ACTIONS', align: 'center' }
 ]
 
-const fetchTenants = async () => {
-  loading.value = true
+const fetchTenants = async (silent = false) => {
+  if (!silent) loading.value = true
   try {
     const params = {
       name: filter.value.name,
@@ -254,7 +254,19 @@ const viewDetails = (id) => {
   $router.push(`/tenants/${id}`)
 }
 
-onMounted(fetchTenants)
+let syncInterval
+
+onMounted(() => {
+  fetchTenants()
+  // Auto reload data every 10 seconds
+  syncInterval = setInterval(() => {
+    fetchTenants(true)
+  }, 10000)
+})
+
+onUnmounted(() => {
+  if (syncInterval) clearInterval(syncInterval)
+})
 </script>
 
 <style scoped>

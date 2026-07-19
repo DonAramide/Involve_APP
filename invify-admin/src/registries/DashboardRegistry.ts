@@ -14,8 +14,9 @@ export const DashboardRegistry = {
     layout: 'RetailWorkspace',
     grid: [
       { id: 'RevenueWidget', col: 'col-12 col-md-4', order: 1 },
-      { id: 'TopProductsWidget', col: 'col-12 col-md-4', order: 2 },
-      { id: 'LedgerFeed', col: 'col-12 col-md-4', order: 3 }
+      { id: 'WalletWidget', col: 'col-12 col-md-4', order: 2 },
+      { id: 'LedgerFeed', col: 'col-12 col-md-4', order: 3 },
+      { id: 'QuasarTimeline', col: 'col-12', order: 4 }
     ]
   },
   healthcare: {

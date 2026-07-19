@@ -96,7 +96,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useInventoryStore } from '../../../stores/inventory.store'
+import { useInventoryStore } from '../../../../stores/inventory.store'
 
 const inventoryStore = useInventoryStore()
 const showAddDialog = ref(false)

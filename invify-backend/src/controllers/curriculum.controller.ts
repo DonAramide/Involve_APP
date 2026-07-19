@@ -19,8 +19,11 @@ export class CurriculumController {
 
       const { data, error } = await query.order('class_level').order('term').order('week');
 
-      if (error) throw error;
-      return res.status(200).json(data);
+      if (error) {
+        console.warn(`[CurriculumController] Warning (possibly missing table): ${error.message}`);
+        return res.status(200).json([]);
+      }
+      return res.status(200).json(data || []);
     } catch (error: any) {
       console.error('[CurriculumController] listCurriculum Error:', error.message);
       return res.status(500).json({ error: error.message });

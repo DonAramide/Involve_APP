@@ -401,6 +401,7 @@ const routes = [
       { path: 'transactions', component: () => import('src/domains/tenant/transactions/pages/TenantTransactionsPage.vue'), meta: { title: 'Transactions Ledger', requiresAuth: true, permission: 'tenant.transaction.view' } },
       { path: 'retail/inventory', component: () => import('src/domains/tenant/inventory/pages/TenantInventoryPage.vue'), meta: { title: 'Inventory Stock Matrix', requiresAuth: true, permission: 'tenant.inventory.view' } },
       { path: 'retail/invoices', component: () => import('src/domains/tenant/transactions/pages/TenantInvoicesPage.vue'), meta: { title: 'Billing Invoices', requiresAuth: true, permission: 'tenant.transaction.view' } },
+      { path: 'retail/pos', component: () => import('pages/PosGatewayPage.vue'), meta: { title: 'POS Terminal Sales', requiresAuth: true, permission: 'tenant.pos.view' } },
       { path: 'wallet', component: () => import('src/domains/tenant/wallets/pages/TenantWalletPage.vue'), meta: { title: 'Wallet & Treasury', requiresAuth: true, permission: 'tenant.wallet.view' } },
       { path: 'reconciliation', component: () => import('src/domains/tenant/ledger/pages/TenantReconciliationPage.vue'), meta: { title: 'Discrepancy Reconciliation', requiresAuth: true, permission: 'tenant.ledger.view' } },
       { path: 'users', component: () => import('src/domains/tenant/crm/pages/TenantCrmPage.vue'), meta: { title: 'Directory', requiresAuth: true } },
@@ -411,6 +412,7 @@ const routes = [
       { path: 'activity', component: () => import('src/domains/tenant/users/pages/TenantActivityPage.vue'), meta: { title: 'Activity Audit', requiresAuth: true, permission: 'tenant.activity.view' } },
       { path: 'reports', component: () => import('src/domains/tenant/reports/pages/TenantReportsPage.vue'), meta: { title: 'Business Reports', requiresAuth: true, permission: 'tenant.reports.view' } },
       { path: 'settings', component: () => import('src/domains/tenant/settings/pages/TenantSettingsPage.vue'), meta: { title: 'Portal Customization', requiresAuth: true, permission: 'tenant.settings.manage' } },
+      { path: 'profile', component: () => import('src/domains/tenant/settings/pages/TenantProfilePage.vue'), meta: { title: 'My Account & Security', requiresAuth: true, permission: 'tenant.settings.manage' } },
       
       // Inventory Domain
       { path: 'products', component: () => import('src/pages/inventory/ProductsPage.vue'), meta: { title: 'Products', requiresAuth: true, permission: 'tenant.inventory.view' } },
@@ -431,6 +433,9 @@ const routes = [
       { path: 'curriculum', component: () => import('pages/CurriculumPage.vue'), meta: { requiresAuth: true } },
       { path: 'notes', component: () => import('pages/LessonNotePage.vue'), meta: { workspace: 'ai', title: 'AI Lesson Planner', requiresAuth: true } },
       { path: 'attendance', component: () => import('pages/AttendancePage.vue'), meta: { requiresAuth: true } },
+      
+      // Logistics/Fleet Domain
+      { path: 'logistics/fleet', component: () => import('pages/fleet/FleetOverviewPage.vue'), meta: { title: 'Fleet Overview', workspace: 'fleet', permission: 'read_fleet', requiresAuth: true } },
       
       // Removed legacy dynamic industry routes
     ]

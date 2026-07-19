@@ -268,7 +268,8 @@ export class AuthController {
         user: {
           id: profile.id,
           email: profile.email,
-          role: profile.role || 'tenant_admin'
+          role: profile.role || 'tenant_admin',
+          tenantId: profile.tenant_id
         }
       });
 

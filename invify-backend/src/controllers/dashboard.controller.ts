@@ -46,6 +46,7 @@ export class DashboardController {
       
       // We map the same view to Map Nodes for the globe, with some mock coordinates since the DB doesn't have lat/long
       const mapNodes = tenantMatrix.map((t: any, i: number) => ({
+        id: t.id || t.tenant_id,
         tenant: t.name,
         location: 'Global',
         x: 48 + i * 2,

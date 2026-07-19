@@ -68,8 +68,12 @@
             </template>
             <q-list :dark="isDarkMode" class="bg-panel text-caption q-py-xs" style="min-width: 200px;">
               <q-item-label header class="text-operator-title text-grey-5 q-py-xs" style="font-size: 10px; letter-spacing: 1px;">PORTAL SECURE SESSION</q-item-label>
+              <q-item clickable v-close-popup to="/tenant/profile" class="hover-bg rounded-borders q-mx-xs">
+                <q-item-section avatar><q-icon name="manage_accounts" size="xs" color="green-4" /></q-item-section>
+                <q-item-section class="text-white">My Profile & Security</q-item-section>
+              </q-item>
               <q-item clickable v-close-popup to="/tenant/settings" class="hover-bg rounded-borders q-mx-xs">
-                <q-item-section avatar><q-icon name="manage_accounts" size="xs" color="indigo-4" /></q-item-section>
+                <q-item-section avatar><q-icon name="tune" size="xs" color="indigo-4" /></q-item-section>
                 <q-item-section class="text-white">Business Settings</q-item-section>
               </q-item>
               
@@ -218,7 +222,8 @@ const getTenantIdFromToken = () => {
     const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
       return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
     }).join(''))
-    return JSON.parse(jsonPayload).tenantId
+    const payload = JSON.parse(jsonPayload)
+    return payload.tenantId || payload.user_metadata?.tenant_id || payload.app_metadata?.tenant_id || null
   } catch (e) {
     return null
   }
@@ -265,7 +270,8 @@ const coreNavigationTree = [
   { label: 'Reconciliation Center', path: '/tenant/reconciliation', icon: 'account_tree', color: 'amber-4' },
   { label: 'Staff Management', path: '/tenant/staff', icon: 'people_outline', color: 'cyan-4' },
   { label: 'BI Reports & Exports', path: '/tenant/reports', icon: 'insert_chart_outlined', color: 'purple-3' },
-  { label: 'Portal Preferences', path: '/tenant/settings', icon: 'tune', color: 'grey-4' }
+  { label: 'Portal Preferences', path: '/tenant/settings', icon: 'tune', color: 'grey-4' },
+  { label: 'My Profile & Security', path: '/tenant/profile', icon: 'manage_accounts', color: 'green-4' }
 ]
 
 // Dynamic industry-specific options based on the active industry
@@ -290,7 +296,17 @@ const industryNavigationTree = computed(() => {
     return [
       { label: 'POS Terminal Sales', path: '/tenant/retail/pos', icon: 'point_of_sale', color: 'amber-4', mode: 'RETAIL' },
       { label: 'Inventory Stock Matrix', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'cyan-4', mode: 'RETAIL' },
-      { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'RETAIL' }
+      { label: 'Stock & Adjustments', path: '/tenant/stock', icon: 'inventory', color: 'orange-4', mode: 'RETAIL' },
+      { label: 'Customer Lookup', path: '/tenant/users', icon: 'person_search', color: 'blue-4', mode: 'RETAIL' },
+      { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'RETAIL' },
+      { label: 'Inventory Reports', path: '/tenant/reports', icon: 'assessment', color: 'indigo-4', mode: 'RETAIL' }
+    ]
+  } else if (mode === 'services' || mode === 'service') {
+    return [
+      { label: 'Service Jobs Ledger', path: '/tenant/transactions', icon: 'work_outline', color: 'green-4', mode: 'SERVICE' },
+      { label: 'Customer Directory', path: '/tenant/users', icon: 'people', color: 'blue-4', mode: 'SERVICE' },
+      { label: 'Billing Invoices', path: '/tenant/retail/invoices', icon: 'receipt', color: 'purple-3', mode: 'SERVICE' },
+      { label: 'Performance Analytics', path: '/tenant/reports', icon: 'insert_chart', color: 'indigo-4', mode: 'SERVICE' }
     ]
   } else if (mode === 'hospitality') {
     return [

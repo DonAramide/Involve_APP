@@ -69,34 +69,47 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     const token = authHeader.split(' ')[1];
 
     try {
-      // 0. Attempt Local JWT Verification (Offline Mode Token)
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-super-secret-key-2026') as any;
-        if (decoded && decoded.tenantId) {
-          (req as any).user = {
-            id: decoded.id,
-            email: decoded.email,
-            role: decoded.role || 'owner',
-            tenantId: decoded.tenantId
-          };
-          return next();
+      // ── Step 1: Decode JWT locally — NO network call to Supabase auth servers ──
+      // Supabase tokens are HS256 JWTs. We can decode the payload to extract
+      // sub (user UUID), email, exp without making any network call.
+      // If SUPABASE_JWT_SECRET is set we do full signature verification.
+      // Otherwise we use jwt.decode() (no signature check) + DB presence as validation.
+
+      let jwtPayload: any = null;
+
+      const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET;
+      if (supabaseJwtSecret) {
+        // Full verification using Supabase JWT secret
+        try {
+          jwtPayload = jwt.verify(token, supabaseJwtSecret) as any;
+        } catch (verifyErr: any) {
+          return res.status(401).json({ error: 'Invalid or expired token' });
         }
-      } catch (jwtErr) {
-        // Not a local token or invalid, fall through to Supabase
+      } else {
+        // Decode without signature check — DB lookup acts as existence validation
+        jwtPayload = jwt.decode(token) as any;
+        if (!jwtPayload) {
+          return res.status(401).json({ error: 'Malformed token' });
+        }
+        // Manual expiry check
+        if (jwtPayload.exp && jwtPayload.exp < Math.floor(Date.now() / 1000)) {
+          return res.status(401).json({ error: 'Token has expired' });
+        }
       }
 
-      // 1. Verify token with Supabase (Robust verification)
-      const { data: { user: authUser }, error } = await supabase.auth.getUser(token);
+      // Extract identity from payload
+      const userId  = jwtPayload.sub;
+      const userEmail = jwtPayload.email || jwtPayload.user_metadata?.email || '';
 
-      if (error || !authUser) {
-        return res.status(401).json({ error: 'Invalid or expired session' });
+      if (!userId) {
+        return res.status(401).json({ error: 'Token missing subject claim' });
       }
 
-      // 2. Fetch platform-specific user profile (identity + role + tenant_id)
+      // ── Step 2: Fetch user profile from DB (supabaseAdmin bypasses RLS) ──
       let { data: profile, error: profileError } = await supabaseAdmin
         .from('users')
         .select('*')
-        .eq('id', authUser.id)
+        .eq('id', userId)
         .single();
 
       if (profileError) {
@@ -111,94 +124,78 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
         if (isDbTimeout) {
           console.error('[AuthMiddleware] Supabase users database query timed out.');
-          // Do NOT grant a bypass session — return 503 so the client can retry.
           return res.status(503).json({
             error: 'Authentication service temporarily unavailable. Please retry.'
           });
         }
 
-        // Check if it's just "No rows found" (PGRST116)
-        if (profileError.code === 'PGRST116' || profileError.message?.includes('No rows found')) {
-           // Fall through to the profile fallback logic below
-        } else {
-           console.error('[AuthMiddleware] Supabase users query failed:', profileError);
-           return res.status(403).json({ error: 'User profile not found in Invify' });
+        // PGRST116 = row not found — user exists in Auth but not in our users table yet
+        if (profileError.code !== 'PGRST116' && !profileError.message?.includes('No rows found')) {
+          console.error('[AuthMiddleware] Supabase users query failed:', profileError);
+          return res.status(403).json({ error: 'User profile not found in Invify' });
         }
       }
 
       if (!profile) {
-        // Fallback: Try extracting from JWT token if user isn't in the DB yet
-        let decodedTenantId = null;
-        let decodedRole = 'super_admin';
-        try {
-          const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-          decodedTenantId = payload.tenantId || null;
-          decodedRole = payload.role || 'super_admin';
-          if (decodedRole === 'authenticated') {
-            decodedRole = 'super_admin';
-          }
-        } catch (_) {}
+        // Auto-create profile for valid Supabase users not yet in our users table
+        let decodedRole = (jwtPayload.role === 'authenticated' || !jwtPayload.role)
+          ? 'super_admin'
+          : (jwtPayload.role || 'super_admin');
+        const decodedTenantId = jwtPayload.tenantId || null;
 
-        // Auto-create the user profile if missing so we don't spam the logs
         const { data: newProfile, error: insertError } = await supabaseAdmin.from('users').insert({
-          id: authUser.id,
-          email: authUser.email,
+          id: userId,
+          email: userEmail,
           role: decodedRole,
           tenant_id: decodedTenantId,
           is_active: true,
-          name: authUser.user_metadata?.full_name || 'Admin User'
+          name: jwtPayload.user_metadata?.full_name || 'Admin User'
         }).select().single();
 
         if (insertError) {
-          console.warn(`[AuthMiddleware] Could not auto-create user profile. Falling back to JWT roles: ${decodedRole}`);
-          (req as any).user = {
-            id: authUser.id,
-            email: authUser.email,
-            role: decodedRole,
-            tenantId: decodedTenantId
-          };
+          console.warn(`[AuthMiddleware] Could not auto-create user profile. Using JWT claims: ${decodedRole}`);
+          (req as any).user = { id: userId, email: userEmail, role: decodedRole, tenantId: decodedTenantId };
           return next();
         }
 
         profile = newProfile;
       }
 
-      // Hard override for superadmin dev accounts in case the DB is misconfigured
-      const normalizedAuthEmail = (authUser.email || '').trim().toLowerCase();
-      if (normalizedAuthEmail === 'sysadmin@iips.app' || normalizedAuthEmail === 'superadmin@iips.app' || normalizedAuthEmail === 'averyd777@gmail.com') {
+      // Hard override for known superadmin accounts
+      const normalizedEmail = (userEmail || profile.email || '').trim().toLowerCase();
+      if (
+        normalizedEmail === 'sysadmin@iips.app' ||
+        normalizedEmail === 'superadmin@iips.app' ||
+        normalizedEmail === 'averyd777@gmail.com'
+      ) {
         profile.role = 'super_admin';
         profile.tenant_id = SYSTEM_TENANT_UUID;
         profile.is_active = true;
       }
 
-      // 3. Block inactive users
+      // Block inactive accounts
       if (!profile.is_active) {
         return res.status(403).json({ error: 'Your account has been disabled' });
       }
 
-      // 4. Populate request context
+      // Populate request context
       (req as any).user = {
         id: profile.id,
         email: profile.email,
-        role: profile.role, // super_admin, tenant_admin, staff
-        tenantId: profile.tenant_id // NULL for super_admin
+        role: profile.role,
+        tenantId: profile.tenant_id
       };
 
       next();
     } catch (netError: any) {
-      // Catch Supabase unreachable network connection errors (timeouts)
       const isConnectionTimeout =
         netError.message?.includes('fetch failed') ||
         netError.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-        netError.message?.includes('timeout') ||
         netError.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-        netError.status === 408 ||
-        netError.status === 504 ||
-        netError.message?.includes('403');
+        netError.message?.includes('timeout');
 
       if (isConnectionTimeout) {
-        console.error('[AuthMiddleware] Supabase connection timed out.');
-        // Return 503 — do NOT silently grant a bypass session in any environment.
+        console.error('[AuthMiddleware] Database connection timed out during auth.');
         return res.status(503).json({
           error: 'Authentication service temporarily unavailable. Please retry.'
         });

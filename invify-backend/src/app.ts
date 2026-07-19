@@ -209,6 +209,64 @@ app.get('/api/admin/quasar/health', authenticate, checkRole(['super_admin', 'adm
 app.get('/api/admin/quasar/health/live', authenticate, checkRole(['super_admin', 'admin']), QuasarHealthController.getLiveness);
 app.get('/api/admin/quasar/integrations', authenticate, checkRole(['super_admin', 'admin']), QuasarHealthController.listIntegrations);
 
+// ── QFS Financial Sandbox API (/api/v1/sandbox/*) ─────────────────────────────
+import { qfsApiKeyAuth } from './middleware/qfs-api-key.middleware';
+import { QfsSandboxController } from './controllers/qfs-sandbox.controller';
+import { QfsAdminController } from './controllers/qfs-admin.controller';
+
+const qfsRead  = qfsApiKeyAuth(['sandbox:read']);
+const qfsWrite = qfsApiKeyAuth(['sandbox:write']);
+
+// Session
+app.get('/api/v1/sandbox',                          qfsRead,  QfsSandboxController.getSession);
+// Bootstrap & Config
+app.post('/api/v1/sandbox/bootstrap',               qfsWrite, QfsSandboxController.bootstrap);
+app.get('/api/v1/sandbox/config',                   qfsRead,  QfsSandboxController.getConfig);
+app.put('/api/v1/sandbox/config',                   qfsWrite, QfsSandboxController.updateConfig);
+app.post('/api/v1/sandbox/config/generate-secret',  qfsWrite, QfsSandboxController.generateSecret);
+// Banks
+app.get('/api/v1/sandbox/banks',                    qfsRead,  QfsSandboxController.getBanks);
+app.get('/api/v1/sandbox/bank/lookup',              qfsRead,  QfsSandboxController.lookupBank);
+// Accounts (generate must come before :id routes)
+app.post('/api/v1/sandbox/accounts/generate',       qfsWrite, QfsSandboxController.generateAccount);
+app.get('/api/v1/sandbox/accounts',                 qfsRead,  QfsSandboxController.listAccounts);
+app.get('/api/v1/sandbox/accounts/:id',             qfsRead,  QfsSandboxController.getAccount);
+app.post('/api/v1/sandbox/accounts/:id/credit',     qfsWrite, QfsSandboxController.creditAccount);
+app.post('/api/v1/sandbox/accounts/:id/debit',      qfsWrite, QfsSandboxController.debitAccount);
+app.get('/api/v1/sandbox/accounts/:id/ledger',      qfsRead,  QfsSandboxController.getLedger);
+app.get('/api/v1/sandbox/accounts/:id/balance-snapshots', qfsRead, QfsSandboxController.getBalanceSnapshots);
+// Audit
+app.get('/api/v1/sandbox/audit-logs',               qfsRead,  QfsSandboxController.getAuditLogs);
+// Timeline
+app.get('/api/v1/sandbox/timeline',                 qfsRead,  QfsSandboxController.getTimeline);
+app.get('/api/v1/sandbox/timeline/:correlationId',  qfsRead,  QfsSandboxController.getTimelineByCorrelation);
+// Profiles
+app.get('/api/v1/sandbox/profiles',                 qfsRead,  QfsSandboxController.getProfiles);
+// Transfers (generate must come before :id routes)
+app.post('/api/v1/sandbox/transfers/generate',      qfsWrite, QfsSandboxController.generateTransfer);
+app.post('/api/v1/sandbox/transfers',               qfsWrite, QfsSandboxController.createTransfer);
+app.get('/api/v1/sandbox/transfers',                qfsRead,  QfsSandboxController.listTransfers);
+app.get('/api/v1/sandbox/transfers/:id',            qfsRead,  QfsSandboxController.getTransfer);
+app.post('/api/v1/sandbox/transfers/:id/approve',   qfsWrite, QfsSandboxController.approveTransfer);
+app.post('/api/v1/sandbox/transfers/:id/reject',    qfsWrite, QfsSandboxController.rejectTransfer);
+app.post('/api/v1/sandbox/transfers/:id/reverse',   qfsWrite, QfsSandboxController.reverseTransfer);
+// PSP Simulators
+app.get('/api/v1/sandbox/providers',                qfsRead,  QfsSandboxController.getProviders);
+app.get('/api/v1/sandbox/providers/:provider',      qfsRead,  QfsSandboxController.getProvider);
+app.post('/api/v1/sandbox/providers/:provider/simulate', qfsWrite, QfsSandboxController.simulateProvider);
+
+// ── QFS Admin Routes (admin JWT auth) ─────────────────────────────────────────
+// API Key management — provision sk_test_* keys for tenants
+app.post('/api/v1/admin/qfs/keys',                  authenticate, checkRole(['super_admin']), QfsAdminController.createApiKey);
+app.get('/api/v1/admin/qfs/keys',                   authenticate, checkRole(['super_admin']), QfsAdminController.listApiKeys);
+app.delete('/api/v1/admin/qfs/keys/:id',            authenticate, checkRole(['super_admin']), QfsAdminController.revokeApiKey);
+// Admin financial sandbox views
+app.get('/api/v1/admin/financial-sandbox/webhooks', authenticate, checkRole(['super_admin', 'admin']), QfsAdminController.listWebhooks);
+app.get('/api/v1/admin/financial-sandbox/webhooks/:id', authenticate, checkRole(['super_admin', 'admin']), QfsAdminController.getWebhook);
+app.post('/api/v1/admin/financial-sandbox/webhooks/:id/replay', authenticate, checkRole(['super_admin']), QfsAdminController.replayWebhook);
+app.get('/api/v1/admin/financial-sandbox/health',   authenticate, checkRole(['super_admin', 'admin']), QfsAdminController.getHealth);
+app.get('/api/v1/admin/financial-sandbox/analytics', authenticate, checkRole(['super_admin', 'admin']), QfsAdminController.getAnalytics);
+
 // Terminal Management Endpoints
 import { TenantKycController } from './controllers/tenant-kyc.controller';
 import multer from 'multer';

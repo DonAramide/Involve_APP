@@ -20,11 +20,15 @@ function getIpAddress(req: Request): string {
 function parseFileToRows(buffer: Buffer, mimetype: string, originalName: string): any[] {
   if (originalName.endsWith('.csv') || mimetype === 'text/csv' || mimetype === 'text/plain') {
     const text = buffer.toString('utf-8');
-    const lines = text.split('\n').filter(l => l.trim());
+    // Handle both Windows (\r\n) and Unix (\n) line endings
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length === 0) return [];
-    const headers = lines[0].split(',').map(h => h.replace(/^\uFEFF/, '').trim().replace(/"/g, ''));
+    // Strip BOM, carriage returns, and quotes from headers
+    const headers = lines[0].split(',').map(h =>
+      h.replace(/^\uFEFF/, '').trim().replace(/"/g, '').replace(/\r/g, '')
+    );
     return lines.slice(1).map(line => {
-      const vals = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const vals = line.split(',').map(v => v.trim().replace(/"/g, '').replace(/\r/g, ''));
       const row: any = {};
       headers.forEach((h, i) => { row[h] = vals[i] || ''; });
       return row;

@@ -3,6 +3,8 @@ import { OperationsAdapter } from '../../operations/operations.adapter';
 import { useEventBus } from '../../../../services/realtime';
 import { EnterpriseEventV1 } from '../../../core/events/enterprise.event';
 
+import { useRuntimeStore } from '../../../../stores/runtime.store';
+
 export const useTenantSettingStore = defineStore('tenantSetting', {
   state: () => ({
     activeModule: localStorage.getItem('tenant_type') || 'school',
@@ -20,14 +22,22 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
       { id: 'logistics', name: 'Logistics Fleet & Dispatch Track', desc: 'Provision vehicle GPS pipelines, delivery analytics matrices, driver logs, and fuel ledgers.', icon: 'local_shipping', color: 'green-4' },
       { id: 'healthcare', name: 'Healthcare Clinic Patient Hub', desc: 'Provision pharmacy dispensers, appointment queues, patient charts, and clinician checklists.', icon: 'healing', color: 'red-4' }
     ],
-    quotas: [
-      { name: 'Active POS Operators', desc: 'Total active staff nodes created.', usage: '3', limit: '10', val: 0.3 },
-      { name: 'AI Copilot Query Allocations', desc: 'Aggregated analytics insights queries remaining.', usage: '840', limit: '1,000', val: 0.84 },
-      { name: 'Telemetry Storage Data', desc: 'Immutable audit transaction logs stored.', usage: '2.4 GB', limit: '10 GB', val: 0.24 }
-    ],
     isLoading: false,
     unsubscribeFn: null as (() => void) | null
   }),
+  getters: {
+    quotas: (state) => {
+      const runtime = useRuntimeStore();
+      const q = runtime.config?.quotas;
+      if (!q) return [];
+      
+      return [
+        { name: 'Active POS Operators', desc: 'Total active staff nodes created.', usage: q.activeTerminals, limit: q.maxTerminals, val: q.activeTerminals / Math.max(q.maxTerminals, 1) },
+        { name: 'AI Copilot Query Allocations', desc: 'Aggregated analytics insights queries remaining.', usage: q.aiQueryUsage, limit: q.aiQueryLimit, val: q.aiQueryUsage / Math.max(q.aiQueryLimit, 1) },
+        { name: 'Telemetry Storage Data', desc: 'Immutable audit transaction logs stored.', usage: `${q.storageUsageGb} GB`, limit: `${q.storageLimitGb} GB`, val: q.storageUsageGb / Math.max(q.storageLimitGb, 1) }
+      ];
+    }
+  },
   actions: {
     hydrate() {
       this.loadBrandingPrefs();

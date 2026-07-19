@@ -25,5 +25,11 @@ export const WidgetRegistry = {
     component: defineAsyncComponent(() => import('../components/adapters/QuasarTimelineAdapter.vue')),
     permissions: [],
     cacheTTL: 120
+  },
+  WalletWidget: {
+    id: 'WalletWidget',
+    component: defineAsyncComponent(() => import('../components/adapters/WalletAdapter.vue')),
+    permissions: [],
+    cacheTTL: 60
   }
 };

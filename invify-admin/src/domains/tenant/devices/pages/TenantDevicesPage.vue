@@ -21,6 +21,20 @@
         flat
         class="bg-transparent"
       >
+        <template v-slot:body-cell-status="props">
+          <q-td :props="props">
+            <q-chip :color="props.value === 'active' ? 'green-9' : 'red-9'" text-color="white" size="xs" dense>
+              {{ props.value?.toUpperCase() }}
+            </q-chip>
+          </q-td>
+        </template>
+        <template v-slot:body-cell-plan="props">
+          <q-td :props="props">
+            <q-badge :color="props.value === 'TRIAL MODE' ? 'orange-9' : 'indigo-9'" text-color="white" class="text-weight-bold font-mono q-pa-xs">
+              {{ props.value }}
+            </q-badge>
+          </q-td>
+        </template>
       </q-table>
     </div>
   </q-page>
@@ -37,6 +51,8 @@ const { devices } = storeToRefs(store);
 const columns = [
   { name: 'id', label: 'Device ID', field: 'id', align: 'left' },
   { name: 'name', label: 'Device Name', field: 'name', align: 'left' },
+  { name: 'plan', label: 'Active Plan', field: 'plan', align: 'left' },
+  { name: 'expiry', label: 'Expiration Date', field: 'expiry', align: 'right' },
   { name: 'status', label: 'Status', field: 'status', align: 'center' }
 ];
 

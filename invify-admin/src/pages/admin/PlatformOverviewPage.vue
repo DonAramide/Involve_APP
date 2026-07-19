@@ -121,7 +121,7 @@
               <div class="text-subtitle2 text-weight-bold font-sans">Tenant Activity Map</div>
               <div class="text-caption text-grey-5">Live global tenant distribution and status</div>
             </div>
-            <q-badge color="purple-10" text-color="purple-3" class="font-mono text-weight-bold">MAP</q-badge>
+            <q-badge color="purple-10" text-color="purple-3" class="font-mono text-weight-bold">MAP ({{ mapNodes.length }})</q-badge>
           </div>
           
           <div class="col position-relative flex flex-center map-bg q-py-lg">
@@ -145,12 +145,12 @@
               <path d="M780 340 L850 340 L880 390 L820 400 Z" fill="#0D1B2A" stroke="#16324A" />
             </svg>
 
-            <!-- Pulsing Hologram Nodes -->
             <div 
               v-for="(node, idx) in mapNodes" 
               :key="idx" 
-              class="map-node absolute" 
+              class="map-node absolute cursor-pointer hover-glow-btn" 
               :style="{ left: node.x + '%', top: node.y + '%' }"
+              @click="navigateToTenant(node.id)"
             >
               <div class="ping" :style="{ borderColor: node.color }"></div>
               <div class="dot" :style="{ background: node.color, boxShadow: '0 0 10px ' + node.color }"></div>
@@ -541,6 +541,14 @@ const navigateRoute = (path: string) => {
   if (path) router.push(path)
 }
 
+const navigateToTenant = (id?: string) => {
+  if (id) {
+    router.push(`/tenants/${id}`) // TenantDetailPage
+  } else {
+    router.push('/admin/tenants')
+  }
+}
+
 const executeRecommendation = (rec: Recommendation) => {
   $q.notify({
     type: 'positive',
@@ -644,8 +652,7 @@ onMounted(async () => {
 onUnmounted(() => {
   financeStore.unsubscribe()
   inventoryStore.unsubscribe()
-  // operationsStore.unsubscribe()
-  runtimeStore.unsubscribe()
+  runtimeStore.unsubscribe() // no-op — runtimeStore uses REST, not event bus
 })
 
 </script>

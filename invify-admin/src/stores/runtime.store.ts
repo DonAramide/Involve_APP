@@ -24,6 +24,10 @@ export interface TenantRuntimeConfig {
   quotas: {
     maxTerminals: number;
     activeTerminals: number;
+    aiQueryLimit: number;
+    aiQueryUsage: number;
+    storageLimitGb: number;
+    storageUsageGb: number;
   };
   integrations: {
     whatsapp: boolean;
@@ -102,6 +106,11 @@ export const useRuntimeStore = defineStore('runtime', {
       this.lastHydrated = 0;
       this.error = null;
       this.isLoading = false;
+    },
+    // No-op: runtimeStore fetches via REST, not event bus subscriptions.
+    // Provided for API consistency with financeStore / inventoryStore.
+    unsubscribe() {
+      // intentional no-op
     }
   }
 });

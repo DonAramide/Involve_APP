@@ -84,7 +84,10 @@ export class CustomerRepository implements ICustomerRepository {
       .order(sortField, { ascending })
       .range(offset, offset + pageSize - 1);
 
-    if (error) throw new Error(`Customer search failed: ${error.message}`);
+    if (error) {
+      console.warn(`[CustomerRepository] Search warning (possibly missing table): ${error.message}`);
+      return { data: [], total: 0, page, pageSize };
+    }
 
     return {
       data: data || [],

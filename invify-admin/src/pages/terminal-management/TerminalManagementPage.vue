@@ -166,10 +166,24 @@ const handleImport = async () => {
   importing.value = true
   try {
     const response = await terminalApi.importTerminals(importFiles.value, importType.value)
-    $q.notify({
-      type: 'positive',
-      message: `Successfully imported ${response.data.successful} records.`
-    })
+    const d = response.data
+    const detail = [
+      `Total rows: ${d.total}`,
+      `Imported: ${d.successful}`,
+      d.duplicates ? `Duplicates skipped: ${d.duplicates}` : null,
+      d.failed ? `Failed: ${d.failed}` : null
+    ].filter(Boolean).join(' | ')
+
+    if (d.successful > 0) {
+      $q.notify({ type: 'positive', message: `Import complete. ${detail}`, timeout: 6000 })
+    } else if (d.duplicates > 0 && d.successful === 0) {
+      $q.notify({ type: 'warning', message: `All ${d.duplicates} row(s) already exist — no new records added.`, timeout: 8000 })
+    } else if (d.failed > 0) {
+      const errSample = (d.errors || []).slice(0, 3).join('\n')
+      $q.notify({ type: 'negative', message: `Import failed. ${detail}\n${errSample}`, timeout: 10000 })
+    } else {
+      $q.notify({ type: 'warning', message: `No records were imported. The file may be empty or have unrecognised columns. ${detail}`, timeout: 8000 })
+    }
     showImportDialog.value = false
     importFiles.value = []
   } catch (error) {

@@ -30,11 +30,17 @@ export const useTenantDeviceStore = defineStore('tenantDevice', {
         if (!tenantId) return;
         const res = await adminApi.getTenantDetails(tenantId);
         if (res.data && res.data.registeredDevices) {
-          this.devices = res.data.registeredDevices.map((d: any) => ({
-            id: d.deviceId,
-            name: d.location || 'Terminal',
-            status: d.status
-          }));
+          const certs = res.data.certificates || [];
+          this.devices = res.data.registeredDevices.map((d: any) => {
+            const cert = certs.find((c: any) => c.deviceId === d.deviceId);
+            return {
+              id: d.deviceId,
+              name: d.location || 'Terminal',
+              status: d.status,
+              plan: cert ? cert.plan : 'TRIAL MODE',
+              expiry: cert ? cert.expiry : 'N/A'
+            };
+          });
         } else {
           this.devices = [];
         }

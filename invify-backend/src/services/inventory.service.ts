@@ -52,7 +52,7 @@ export class InventoryService {
       q = q.ilike('name', `%${query}%`);
     }
     const { data, error } = await q;
-    if (error) throw error;
+    if (error) { console.warn(error.message); return { items: [] }; }
     return { items: data || [] };
   }
 
@@ -90,7 +90,7 @@ export class InventoryService {
       .eq('type', 'product')
       .gt('stock_qty', 0);
     
-    if (error) throw error;
+    if (error) { console.warn(error.message); return { items: [] }; }
     
     // Filter in-memory since supabase doesn't support col comparison directly without RPC
     const lowStock = (data || []).filter((item: any) => item.stock_qty <= item.min_stock_qty);
@@ -104,13 +104,13 @@ export class InventoryService {
       .eq('type', 'product')
       .lte('stock_qty', 0);
     
-    if (error) throw error;
+    if (error) { console.warn(error.message); return { items: [] }; }
     return { items: data || [] };
   }
 
   static async getStockSummary(tenantId: string): Promise<StockSummaryDTO> {
     const { data, error } = await supabase.from('items').select('stock_qty, min_stock_qty, price').eq('tenant_id', tenantId).eq('type', 'product');
-    if (error) throw error;
+    if (error) { console.warn(error.message); return { total_items: 0, low_stock_items: 0, out_of_stock_items: 0, total_value: 0 }; }
 
     let totalItems = 0;
     let lowStock = 0;
@@ -148,7 +148,7 @@ export class InventoryService {
   // ==========================================
   static async getCategories(tenantId: string): Promise<{ categories: CategoryDTO[] }> {
     const { data, error } = await supabase.from('categories').select('*').eq('tenant_id', tenantId);
-    if (error) throw error;
+    if (error) { console.warn(error.message); return { categories: [] }; }
     return { categories: data || [] };
   }
 
@@ -157,7 +157,7 @@ export class InventoryService {
   // ==========================================
   static async getSuppliers(tenantId: string): Promise<{ suppliers: SupplierDTO[] }> {
     const { data, error } = await supabase.from('suppliers').select('*').eq('tenant_id', tenantId);
-    if (error) throw error;
+    if (error) { console.warn(error.message); return { suppliers: [] }; }
     return { suppliers: data || [] };
   }
 }

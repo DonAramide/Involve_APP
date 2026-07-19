@@ -23,6 +23,10 @@ export interface TenantRuntimeConfig {
   quotas: {
     maxTerminals: number;
     activeTerminals: number;
+    aiQueryLimit: number;
+    aiQueryUsage: number;
+    storageLimitGb: number;
+    storageUsageGb: number;
   };
   integrations: {
     whatsapp: boolean;
@@ -62,13 +66,20 @@ export class RuntimeConfigService {
       .eq('tenant_id', tenantId)
       .single();
 
+    const { count: activeDevicesCount } = await supabaseAdmin
+      .from('devices')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true);
+
+
     const features = tenant.features || {};
 
     return {
       tenant: {
         id: tenant.id,
         name: tenant.name,
-        businessMode: tenant.business_mode || '', 
+        businessMode: tenant.business_mode || tenant.type || '',
         status: tenant.status || 'active',
         version: '1.0.0', // Could be fetched from global config
       },
@@ -85,8 +96,12 @@ export class RuntimeConfigService {
         apiAccess: features.api_keys || false,
       },
       quotas: {
-        maxTerminals: sub?.max_terminals || 1,
-        activeTerminals: 0, // Should be aggregated from devices table ideally
+        maxTerminals: sub?.max_terminals || 10,
+        activeTerminals: activeDevicesCount || 0,
+        aiQueryLimit: tenant.ai_query_limit || 1000,
+        aiQueryUsage: tenant.ai_query_usage || 0,
+        storageLimitGb: tenant.storage_limit_gb || 10.0,
+        storageUsageGb: tenant.storage_usage_gb || 0.0,
       },
       integrations: {
         whatsapp: features.whatsapp || false,

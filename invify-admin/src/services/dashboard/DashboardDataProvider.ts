@@ -23,6 +23,7 @@ export interface RadarChartData {
 }
 
 export interface MapNode {
+  id?: string;
   x: number;
   y: number;
   tenant: string;

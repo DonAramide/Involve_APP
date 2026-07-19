@@ -304,7 +304,7 @@
           <q-table
             :rows="users"
             :columns="[
-              { name: 'full_name', label: 'NAME', field: 'full_name', align: 'left', sortable: true },
+              { name: 'name', label: 'NAME', field: 'name', align: 'left', sortable: true },
               { name: 'email', label: 'EMAIL', field: 'email', align: 'left', sortable: true },
               { name: 'role', label: 'ROLE', field: 'role', align: 'center', format: val => val?.toUpperCase() },
               { name: 'status', label: 'STATUS', field: 'status', align: 'center' }
@@ -495,7 +495,7 @@
                   <q-list dark separator class="q-mt-sm">
                     <q-item>
                       <q-item-section>Registration Number</q-item-section>
-                      <q-item-section side class="text-white">{{ tenant.kyc_data?.rc_number || 'RC-1092834' }}</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.rc_number || tenant.settings?.cacNumber || 'Not Provided' }}</q-item-section>
                     </q-item>
                     <q-item>
                       <q-item-section>Tax ID (TIN)</q-item-section>
@@ -772,7 +772,7 @@
 import { useCurrency } from '../composables/useCurrency';
 const { currentCurrency } = useCurrency();
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar, copyToClipboard } from 'quasar'
 import { adminApi, deviceApi } from '../api'
@@ -1172,6 +1172,29 @@ const fetchDetails = async () => {
 }
 
 onMounted(fetchDetails)
+
+// ── Re-fetch when navigating between different tenant detail pages ──
+// Vue Router reuses the same component instance when only params change,
+// so onMounted alone will NOT fire again. This watcher guarantees data
+// always reloads for the correct tenant without requiring a manual refresh.
+watch(
+  () => $route.params.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      // Reset state before fetching new tenant
+      tenant.value = null
+      users.value = []
+      wallet.value = { balance: 0, subAccount: null, virtualAccounts: [], transactions: [], allWallets: [] }
+      recentUsage.value = []
+      certificates.value = []
+      registeredDevices.value = []
+      auditRecords.value = []
+      kycDocuments.value = []
+      tab.value = 'overview'
+      fetchDetails()
+    }
+  }
+)
 </script>
 
 <style scoped>

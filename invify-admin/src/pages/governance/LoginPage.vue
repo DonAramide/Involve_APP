@@ -794,8 +794,26 @@ const finalizeAuthenticatedSession = (tokenData) => {
   localStorage.setItem('operator_email', form.value.email || 'federated@IIPS.app')
   localStorage.setItem('mfa_status_verified', 'true')
   
-  if (tokenData.tenantId) {
-    localStorage.setItem('tenant_id', tokenData.tenantId)
+  // Seed operator name from backend response if provided
+  const fullName = tokenData.user?.name || tokenData.user?.full_name || ''
+  if (fullName) {
+    const parts = fullName.trim().split(' ')
+    localStorage.setItem('operator_first_name', parts[0] || '')
+    localStorage.setItem('operator_last_name', parts.slice(1).join(' ') || '')
+  } else if (!localStorage.getItem('operator_first_name')) {
+    // Fallback: derive from email prefix only if never set before
+    const emailPrefix = (form.value.email || '').split('@')[0]
+    localStorage.setItem('operator_first_name', emailPrefix)
+  }
+
+  // Record join/session timestamp for profile display
+  if (!localStorage.getItem('operator_joined')) {
+    localStorage.setItem('operator_joined', String(Date.now()))
+  }
+  
+  const tenantId = tokenData.user?.tenantId || tokenData.tenantId
+  if (tenantId) {
+    localStorage.setItem('tenant_id', tenantId)
   }
   
   successMessage.value = 'Identity verified successfully. Traversing authorized RBAC operational matrix...'
