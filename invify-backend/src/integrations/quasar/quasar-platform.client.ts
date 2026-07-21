@@ -43,6 +43,8 @@ export interface CreateTenantParams {
 export interface CreateApiKeyParams {
   name: string;
   environment: 'test' | 'live';
+  /** When set, overrides Quasar partner default scopes. Include sandbox:* for QFS. */
+  scopes?: string[];
 }
 
 // ─── Vertical → Credential Mapping ───────────────────────────────────────────
@@ -90,7 +92,7 @@ export class QuasarPlatformClient {
     const creds = getPartnerCredentials(vertical);
     return new QuasarApiClient({
       baseUrl: this.baseUrl,
-      partnerAuth: {
+      clientAuth: {
         clientId: creds.clientId,
         clientSecret: creds.clientSecret,
       },

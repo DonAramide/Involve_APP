@@ -35,7 +35,7 @@ function buildClientWithSpy(opts?: Partial<QuasarApiClientOptions>): {
 } {
   const client = new QuasarApiClient({
     baseUrl: 'https://test.quasar.local/api/v1',
-    tenantApiKey: 'sk_test_unit',
+    tenantAuth: { apiKey: 'sk_test_unit' },
     maxRetries: 3,
     ...opts,
   });
@@ -60,7 +60,7 @@ function axiosErr(status: number, responseCode = '01', message = 'Error') {
 describe('QuasarApiClient — auth header injection', () => {
 
   it('injects Authorization: Bearer for tenant API key', async () => {
-    const { client, spy } = buildClientWithSpy({ tenantApiKey: 'sk_test_abc' });
+    const { client, spy } = buildClientWithSpy({ tenantAuth: { apiKey: 'sk_test_abc' } });
     spy.mockResolvedValue(qfpSuccess({ wallets: [] }));
 
     await client.get('/wallets');
@@ -71,8 +71,8 @@ describe('QuasarApiClient — auth header injection', () => {
 
   it('injects X-Quasar-Client-Id/Secret for partner credentials', async () => {
     const { client, spy } = buildClientWithSpy({
-      tenantApiKey: undefined,
-      partnerAuth: { clientId: 'INVIFY_RETAIL', clientSecret: 'qpc_test' },
+      tenantAuth: undefined,
+      clientAuth: { clientId: 'INVIFY_RETAIL', clientSecret: 'qpc_test' },
     });
     spy.mockResolvedValue(qfpSuccess({}));
 
@@ -128,7 +128,40 @@ describe('QuasarApiClient — auth header injection', () => {
   });
 });
 
+describe('QuasarApiClient — Strict Identity Plane Isolation', () => {
+  it('throws an error if multiple authentication planes are active (Service + Tenant)', () => {
+    const client = new QuasarApiClient({
+      baseUrl: 'http://test',
+      serviceAuth: { serviceId: 'qps_test', serviceSecret: 'sec' },
+      tenantAuth: { apiKey: 'sk_test' },
+    });
+    
+    expect(() => client['buildAuthHeaders']()).toThrow(/Multiple authentication planes detected/);
+  });
+
+  it('throws an error if multiple authentication planes are active (Service + Client)', () => {
+    const client = new QuasarApiClient({
+      baseUrl: 'http://test',
+      serviceAuth: { serviceId: 'qps_test', serviceSecret: 'sec' },
+      clientAuth: { clientId: 'INVIFY', clientSecret: 'sec' },
+    });
+    
+    expect(() => client['buildAuthHeaders']()).toThrow(/Multiple authentication planes detected/);
+  });
+
+  it('throws an error if multiple authentication planes are active (Client + Tenant)', () => {
+    const client = new QuasarApiClient({
+      baseUrl: 'http://test',
+      clientAuth: { clientId: 'INVIFY', clientSecret: 'sec' },
+      tenantAuth: { apiKey: 'sk_test' },
+    });
+    
+    expect(() => client['buildAuthHeaders']()).toThrow(/Multiple authentication planes detected/);
+  });
+});
+
 // ─── QFP envelope ─────────────────────────────────────────────────────────────
+
 
 describe('QuasarApiClient — QFP envelope', () => {
 

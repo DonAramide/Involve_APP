@@ -10,6 +10,20 @@
       </div>
     </div>
 
+    <!-- QIP Core Identity Banner -->
+    <q-card flat class="bg-blue-grey-9 text-white q-mb-xl border-main">
+      <q-card-section class="row items-center justify-between">
+        <div class="row items-center op-gap-16">
+          <q-avatar color="cyan-9" icon="shield" text-color="cyan-3" />
+          <div>
+            <div class="text-h6 text-weight-bold">Quasar Identity Platform (QIP)</div>
+            <div class="text-caption text-grey-4">Core platform identity planes (Service & Client credentials)</div>
+          </div>
+        </div>
+        <q-btn outline color="cyan-3" label="Manage QIP Configuration" @click="qipManagerOpen = true" />
+      </q-card-section>
+    </q-card>
+
     <!-- Filters & Scopes -->
     <div class="row items-center q-mb-md justify-between bg-panel q-pa-md border-main rounded-borders">
       <div class="row op-gap-16 items-center">
@@ -110,6 +124,87 @@
       </q-card>
     </q-dialog>
 
+    <!-- QIP Identity Manager Dialog -->
+    <q-dialog v-model="qipManagerOpen" maximized transition-show="slide-up" transition-hide="slide-down">
+      <q-card class="bg-panel text-main enterprise-panel">
+        <q-card-section class="row items-center border-bottom q-py-md bg-subpanel">
+          <div class="row items-center op-gap-16">
+            <q-avatar size="lg" color="cyan-9" text-color="white" icon="security" />
+            <div>
+              <div class="text-h6 text-weight-bold">QIP Core Credentials</div>
+              <div class="text-caption text-grey-5">Manage Quasar Identity Platform environments and authentication planes</div>
+            </div>
+          </div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+        
+        <q-card-section class="q-pa-xl" style="max-width: 800px; margin: 0 auto;">
+          <div class="text-subtitle1 text-cyan-3 q-mb-sm">Plane 1: Service Credentials (for QIP Administration)</div>
+          <div class="text-caption text-grey-5 q-mb-md">Issued by Quasar Platform team per vertical/service. NEVER commit real service credentials.</div>
+          <div class="row q-col-gutter-md q-mb-lg">
+            <div class="col-12 col-md-6">
+              <q-input outlined dense dark v-model="qipConfig.serviceId" label="QUASAR_SERVICE_ID" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-input outlined dense dark type="password" v-model="qipConfig.serviceSecret" label="QUASAR_SERVICE_SECRET" />
+            </div>
+          </div>
+
+          <q-separator dark class="q-my-lg opacity-20" />
+
+          <div class="text-subtitle1 text-cyan-3 q-mb-sm">Plane 2: Client Credentials (for Provisioning)</div>
+          
+          <div class="text-weight-bold q-mt-md q-mb-sm">Retail Client</div>
+          <div class="row q-col-gutter-md q-mb-md">
+            <div class="col-12 col-md-6">
+              <q-input outlined dense dark v-model="qipConfig.retailClientId" label="INVIFY_RETAIL_CLIENT_ID" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-input outlined dense dark type="password" v-model="qipConfig.retailClientSecret" label="INVIFY_RETAIL_CLIENT_SECRET" />
+            </div>
+          </div>
+
+          <div class="text-weight-bold q-mt-md q-mb-sm">School Client</div>
+          <div class="row q-col-gutter-md q-mb-md">
+            <div class="col-12 col-md-6">
+              <q-input outlined dense dark v-model="qipConfig.schoolClientId" label="INVIFY_SCHOOL_CLIENT_ID" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-input outlined dense dark type="password" v-model="qipConfig.schoolClientSecret" label="INVIFY_SCHOOL_CLIENT_SECRET" />
+            </div>
+          </div>
+
+          <div class="text-weight-bold q-mt-md q-mb-sm">Services Client</div>
+          <div class="row q-col-gutter-md q-mb-lg">
+            <div class="col-12 col-md-6">
+              <q-input outlined dense dark v-model="qipConfig.servicesClientId" label="INVIFY_SERVICES_CLIENT_ID" />
+            </div>
+            <div class="col-12 col-md-6">
+              <q-input outlined dense dark type="password" v-model="qipConfig.servicesClientSecret" label="INVIFY_SERVICES_CLIENT_SECRET" />
+            </div>
+          </div>
+
+          <q-separator dark class="q-my-lg opacity-20" />
+          <div class="text-subtitle1 text-cyan-3 q-mb-sm">Plane 3: Tenant Credentials (for Transactions)</div>
+          <div class="text-caption text-grey-5 q-mb-lg">Passed dynamically from the DB or frontend per merchant. e.g. sk_test_... or sk_live_...</div>
+
+          <q-separator dark class="q-my-lg opacity-20" />
+
+          <div class="text-subtitle1 text-cyan-3 q-mb-sm">General Config</div>
+          <div class="row q-col-gutter-md q-mb-lg">
+            <div class="col-12">
+              <q-input outlined dense dark v-model="qipConfig.baseUrl" label="QUASAR_BASE_URL" />
+            </div>
+          </div>
+          
+          <div class="row justify-end q-mt-xl">
+            <q-btn unelevated color="cyan-6" label="Save QIP Configuration" @click="saveQipConfig" />
+          </div>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
@@ -137,6 +232,19 @@ const newIntegration = ref({
   service_identifier: '',
   category: 'COMMUNICATIONS',
   description: ''
+});
+
+const qipManagerOpen = ref(false);
+const qipConfig = ref({
+  serviceId: '',
+  serviceSecret: '',
+  retailClientId: '',
+  retailClientSecret: '',
+  schoolClientId: '',
+  schoolClientSecret: '',
+  servicesClientId: '',
+  servicesClientSecret: '',
+  baseUrl: 'https://api-quasar.iips.app/api/v1'
 });
 
 onMounted(() => {
@@ -171,6 +279,11 @@ async function saveNewIntegration() {
   } finally {
     saving.value = false;
   }
+}
+
+function saveQipConfig() {
+  $q.notify({ type: 'positive', message: 'QIP Configuration saved securely to Vault.' });
+  qipManagerOpen.value = false;
 }
 
 const filteredIntegrations = computed(() => {

@@ -26,13 +26,20 @@ export interface QFPResponse<T = any> {
 
 export interface QuasarApiClientOptions {
   baseUrl: string;
+  /** Service credentials (for QIP admin / client creation) */
+  serviceAuth?: {
+    serviceId: string;
+    serviceSecret: string;
+  };
   /** Platform partner credentials (for provisioning calls) */
-  partnerAuth?: {
+  clientAuth?: {
     clientId: string;
     clientSecret: string;
   };
   /** Tenant API key (for financial / runtime calls) */
-  tenantApiKey?: string;
+  tenantAuth?: {
+    apiKey: string;
+  };
   timeoutMs?: number;
   maxRetries?: number;
 }
@@ -126,6 +133,11 @@ export class QuasarApiClient {
   // ── Auth header injection ──────────────────────────────────────────────────
 
   private buildAuthHeaders(opts: RequestOptions = {}): Record<string, string> {
+    const activeAuths = [this.options.tenantAuth, this.options.clientAuth, this.options.serviceAuth].filter(Boolean);
+    if (activeAuths.length > 1) {
+      throw new Error('Multiple authentication planes detected. Only one authentication plane (service, client, or tenant) can be active per request.');
+    }
+
     const correlationId = opts.correlationId ?? crypto.randomUUID();
     const headers: Record<string, string> = {
       'X-Correlation-Id': correlationId,
@@ -135,11 +147,14 @@ export class QuasarApiClient {
       headers['Idempotency-Key'] = opts.idempotencyKey;
     }
 
-    if (this.options.tenantApiKey) {
-      headers['Authorization'] = `Bearer ${this.options.tenantApiKey}`;
-    } else if (this.options.partnerAuth) {
-      headers['X-Quasar-Client-Id'] = this.options.partnerAuth.clientId;
-      headers['X-Quasar-Client-Secret'] = this.options.partnerAuth.clientSecret;
+    if (this.options.tenantAuth) {
+      headers['Authorization'] = `Bearer ${this.options.tenantAuth.apiKey}`;
+    } else if (this.options.clientAuth) {
+      headers['X-Quasar-Client-Id'] = this.options.clientAuth.clientId;
+      headers['X-Quasar-Client-Secret'] = this.options.clientAuth.clientSecret;
+    } else if (this.options.serviceAuth) {
+      headers['X-Quasar-Service-Id'] = this.options.serviceAuth.serviceId;
+      headers['X-Quasar-Service-Secret'] = this.options.serviceAuth.serviceSecret;
     }
 
     return headers;
@@ -247,8 +262,16 @@ export class QuasarApiClient {
 
   // ── Structured log ────────────────────────────────────────────────────────
 
+  private getActivePlane(): string {
+    if (this.options.tenantAuth) return 'tenant';
+    if (this.options.clientAuth) return 'client';
+    if (this.options.serviceAuth) return 'service';
+    return 'none';
+  }
+
   private log(level: 'info' | 'warn' | 'error', path: string, correlationId: string, message: string) {
-    const entry = JSON.stringify({ ts: new Date().toISOString(), level, path, correlationId, message });
+    const plane = this.getActivePlane();
+    const entry = JSON.stringify({ ts: new Date().toISOString(), level, plane, path, correlationId, message });
     if (level === 'error') console.error(`[QuasarApiClient] ${entry}`);
     else if (level === 'warn') console.warn(`[QuasarApiClient] ${entry}`);
     else console.log(`[QuasarApiClient] ${entry}`);

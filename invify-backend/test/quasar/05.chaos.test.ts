@@ -50,7 +50,7 @@ describe('Chaos — complete outage', () => {
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
-      tenantApiKey: 'sk_test',
+      tenantAuth: { apiKey: 'sk_test' },
       maxRetries: 3,
     });
 
@@ -66,7 +66,7 @@ describe('Chaos — complete outage', () => {
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
-      tenantApiKey: 'sk_test',
+      tenantAuth: { apiKey: 'sk_test' },
       maxRetries: 1,
     });
 
@@ -96,7 +96,7 @@ describe('Chaos — intermittent failures', () => {
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
-      tenantApiKey: 'sk_test',
+      tenantAuth: { apiKey: 'sk_test' },
       maxRetries: 3,
     });
 
@@ -120,7 +120,7 @@ describe('Chaos — intermittent failures', () => {
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
-      tenantApiKey: 'sk_test',
+      tenantAuth: { apiKey: 'sk_test' },
       maxRetries: 3,
     });
 
@@ -138,7 +138,7 @@ describe('Chaos — corrupted response envelopes', () => {
     });
     mockedAxios.create.mockReturnValue({ request: requestFn } as any);
 
-    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantApiKey: 'sk_test' });
+    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
     // Non-"00" code (undefined !== "00") → should throw
     await expect(client.get('/wallets')).rejects.toThrow(QuasarApiError);
   });
@@ -149,7 +149,7 @@ describe('Chaos — corrupted response envelopes', () => {
     });
     mockedAxios.create.mockReturnValue({ request: requestFn } as any);
 
-    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantApiKey: 'sk_test' });
+    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 
     await expect(client.get('/test')).rejects.toMatchObject({
       message: 'Business validation failed',
@@ -166,7 +166,7 @@ describe('Chaos — timeout', () => {
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
-      tenantApiKey: 'sk_test',
+      tenantAuth: { apiKey: 'sk_test' },
       maxRetries: 2,
       timeoutMs: 1,
     });
@@ -187,7 +187,7 @@ describe('Chaos — concurrent requests', () => {
     }));
     mockedAxios.create.mockReturnValue({ request: requestFn } as any);
 
-    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantApiKey: 'sk_test' });
+    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 
     const results = await Promise.all(
       Array.from({ length: 20 }, (_, i) => client.get(`/wallets/${i}`)),
@@ -208,7 +208,7 @@ describe('Chaos — concurrent requests', () => {
     });
     mockedAxios.create.mockReturnValue({ request: requestFn } as any);
 
-    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantApiKey: 'sk_test' });
+    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 
     await Promise.all(Array.from({ length: 10 }, () => client.get('/wallets')));
 

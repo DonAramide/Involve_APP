@@ -103,11 +103,56 @@ export interface MposBackupParams {
   metadata?: Record<string, any>;
 }
 
-export interface SandboxAccount {
+/** Quasar Financial Sandbox virtual account (camelCase REST view). */
+export interface SandboxVirtualAccount {
   id: string;
+  tenantId: string;
+  serviceSlug: string | null;
   accountNumber: string;
+  accountName: string;
   bankName: string;
-  balance: number;
+  bankCode: string;
+  currency: string;
+  status: string;
+  availableBalance: string;
+  environment: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** @deprecated Prefer SandboxVirtualAccount — kept for older cert tests. */
+export type SandboxAccount = SandboxVirtualAccount;
+
+export interface SandboxAccountList {
+  items: SandboxVirtualAccount[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface GenerateSandboxAccountParams {
+  serviceSlug?: string;
+  accountName?: string;
+  count?: number;
+  bankCode?: string;
+  bankName?: string;
+}
+
+export interface SandboxFundingParams {
+  amount: number;
+  reason: string;
+  currency?: string;
+  allowOverdraft?: boolean;
+}
+
+export interface SandboxBankLookupItem {
+  code: string;
+  name: string;
+  slug: string;
+  country: string;
+  currency: string;
+  processors: string[];
+  active: boolean;
 }
 
 // ─── Client ───────────────────────────────────────────────────────────────────
@@ -123,7 +168,7 @@ export class QuasarPaymentsClient {
     const baseUrl = process.env.QUASAR_BASE_URL ?? 'https://api-quasar.iips.app/api/v1';
     this.client = new QuasarApiClient({
       baseUrl,
-      tenantApiKey: skSecret,
+      tenantAuth: { apiKey: skSecret },
       timeoutMs: 30_000,
       maxRetries: 3,
     });
@@ -292,48 +337,283 @@ export class QuasarPaymentsClient {
     return this.client.get<WebhookEndpoint[]>('/webhooks/endpoints', opts);
   }
 
-  // ── Sandbox (QFS certification) ───────────────────────────────────────────
+  // ── Sandbox (Quasar Financial Sandbox — live QFS) ─────────────────────────
 
-  /** GET /sandbox — Sandbox overview (test keys only) */
+  /** GET /sandbox — Session info (test keys only) */
   async getSandboxInfo(opts?: RequestOptions): Promise<any> {
     return this.client.get('/sandbox', opts);
   }
 
-  /** POST /sandbox/accounts/generate — Create a test virtual account */
-  async generateSandboxAccount(opts?: RequestOptions): Promise<SandboxAccount> {
-    return this.client.post<SandboxAccount>('/sandbox/accounts/generate', {}, opts);
-  }
-
-  /** GET /sandbox/accounts — List sandbox accounts */
-  async getSandboxAccounts(opts?: RequestOptions): Promise<SandboxAccount[]> {
-    return this.client.get<SandboxAccount[]>('/sandbox/accounts', opts);
-  }
-
-  /** POST /sandbox/accounts/{id}/credit — Fund a sandbox account */
-  async creditSandboxAccount(
-    accountId: string,
-    amount: number,
+  /** POST /sandbox/bootstrap */
+  async bootstrapSandbox(
+    body: { sandboxWebhookUrl: string; sandboxSocketChannel?: string },
     opts?: RequestOptions,
   ): Promise<any> {
-    return this.client.post(
-      `/sandbox/accounts/${accountId}/credit`,
-      { amount, currency: 'NGN' },
-      { ...opts, idempotencyKey: opts?.idempotencyKey ?? `sandbox-credit:${accountId}:${amount}:${Date.now()}` },
+    return this.client.post('/sandbox/bootstrap', body, {
+      ...opts,
+      idempotencyKey: opts?.idempotencyKey ?? `sandbox-bootstrap:${body.sandboxWebhookUrl}`,
+    });
+  }
+
+  /** GET /sandbox/config */
+  async getSandboxConfig(opts?: RequestOptions): Promise<any> {
+    return this.client.get('/sandbox/config', opts);
+  }
+
+  /** PUT /sandbox/config */
+  async updateSandboxConfig(body: Record<string, unknown>, opts?: RequestOptions): Promise<any> {
+    return this.client.put('/sandbox/config', body, opts);
+  }
+
+  /** POST /sandbox/config/generate-secret */
+  async generateSandboxSecret(opts?: RequestOptions): Promise<any> {
+    return this.client.post('/sandbox/config/generate-secret', {}, opts);
+  }
+
+  /** GET /sandbox/banks or /sandbox/bank/lookup */
+  async lookupSandboxBanks(
+    query?: { q?: string; code?: string },
+    opts?: RequestOptions,
+  ): Promise<{ items: SandboxBankLookupItem[]; total: number }> {
+    const params = new URLSearchParams();
+    if (query?.q) params.set('q', query.q);
+    if (query?.code) params.set('code', query.code);
+    const qs = params.toString();
+    return this.client.get(`/sandbox/bank/lookup${qs ? `?${qs}` : ''}`, opts);
+  }
+
+  /**
+   * GET /sandbox/bank-providers — providers with nested banks for VA pickers.
+   * Call this before POST /sandbox/accounts/generate.
+   */
+  async getSandboxBankProviders(
+    query?: { q?: string },
+    opts?: RequestOptions,
+  ): Promise<{
+    defaultBankCode: string;
+    defaultBankName: string;
+    providers: Array<{
+      id: string;
+      name: string;
+      bankCount: number;
+      banks: Array<{
+        code: string;
+        name: string;
+        slug: string;
+        country: string;
+        currency: string;
+        active: boolean;
+      }>;
+    }>;
+    banks: Array<{
+      code: string;
+      name: string;
+      slug: string;
+      country: string;
+      currency: string;
+      active: boolean;
+      providers: string[];
+    }>;
+    totalBanks: number;
+    totalProviders: number;
+  }> {
+    const params = new URLSearchParams();
+    if (query?.q) params.set('q', query.q);
+    const qs = params.toString();
+    return this.client.get(`/sandbox/bank-providers${qs ? `?${qs}` : ''}`, opts);
+  }
+
+  /** POST /sandbox/accounts/generate — returns account array */
+  async generateSandboxAccounts(
+    params: GenerateSandboxAccountParams = {},
+    opts?: RequestOptions,
+  ): Promise<SandboxVirtualAccount[]> {
+    return this.client.post<SandboxVirtualAccount[]>(
+      '/sandbox/accounts/generate',
+      {
+        serviceSlug: params.serviceSlug,
+        accountName: params.accountName,
+        count: params.count ?? 1,
+        bankCode: params.bankCode,
+        bankName: params.bankName,
+      },
+      {
+        ...opts,
+        idempotencyKey:
+          opts?.idempotencyKey ??
+          `sandbox-generate:${params.accountName ?? 'va'}:${params.bankCode ?? '999'}:${Date.now()}`,
+      },
     );
   }
 
-  /** POST /sandbox/transfers — Simulate a transfer */
+  /** @deprecated Use generateSandboxAccounts */
+  async generateSandboxAccount(opts?: RequestOptions): Promise<SandboxVirtualAccount[]> {
+    return this.generateSandboxAccounts({}, opts);
+  }
+
+  /** GET /sandbox/accounts — paginated list */
+  async getSandboxAccounts(
+    query?: { page?: number; limit?: number },
+    opts?: RequestOptions,
+  ): Promise<SandboxAccountList> {
+    const params = new URLSearchParams();
+    if (query?.page) params.set('page', String(query.page));
+    if (query?.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return this.client.get<SandboxAccountList>(`/sandbox/accounts${qs ? `?${qs}` : ''}`, opts);
+  }
+
+  /** GET /sandbox/accounts/{id} */
+  async getSandboxAccount(accountId: string, opts?: RequestOptions): Promise<SandboxVirtualAccount> {
+    return this.client.get<SandboxVirtualAccount>(`/sandbox/accounts/${accountId}`, opts);
+  }
+
+  /** POST /sandbox/accounts/{id}/credit — amount in kobo; reason required */
+  async creditSandboxAccount(
+    accountId: string,
+    params: SandboxFundingParams | number,
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const body: SandboxFundingParams =
+      typeof params === 'number'
+        ? { amount: params, reason: 'Manual Credit', currency: 'NGN' }
+        : { currency: 'NGN', ...params };
+    return this.client.post(
+      `/sandbox/accounts/${accountId}/credit`,
+      body,
+      {
+        ...opts,
+        idempotencyKey:
+          opts?.idempotencyKey ??
+          `sandbox-credit:${accountId}:${body.amount}:${Date.now()}`,
+      },
+    );
+  }
+
+  /** POST /sandbox/accounts/{id}/debit */
+  async debitSandboxAccount(
+    accountId: string,
+    params: SandboxFundingParams,
+    opts?: RequestOptions,
+  ): Promise<any> {
+    return this.client.post(
+      `/sandbox/accounts/${accountId}/debit`,
+      { currency: 'NGN', ...params },
+      {
+        ...opts,
+        idempotencyKey:
+          opts?.idempotencyKey ??
+          `sandbox-debit:${accountId}:${params.amount}:${Date.now()}`,
+      },
+    );
+  }
+
+  /** GET /sandbox/accounts/{id}/ledger */
+  async getSandboxLedger(
+    accountId: string,
+    query?: { page?: number; limit?: number },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const params = new URLSearchParams();
+    if (query?.page) params.set('page', String(query.page));
+    if (query?.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return this.client.get(`/sandbox/accounts/${accountId}/ledger${qs ? `?${qs}` : ''}`, opts);
+  }
+
+  /** GET /sandbox/accounts/{id}/balance-snapshots */
+  async getSandboxBalanceSnapshots(accountId: string, opts?: RequestOptions): Promise<any> {
+    return this.client.get(`/sandbox/accounts/${accountId}/balance-snapshots`, opts);
+  }
+
+  /** GET /sandbox/audit-logs */
+  async getSandboxAuditLogs(
+    query?: { page?: number; limit?: number },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const params = new URLSearchParams();
+    if (query?.page) params.set('page', String(query.page));
+    if (query?.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return this.client.get(`/sandbox/audit-logs${qs ? `?${qs}` : ''}`, opts);
+  }
+
+  /** GET /sandbox/timeline */
+  async getSandboxTimeline(
+    query?: { page?: number; limit?: number },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const params = new URLSearchParams();
+    if (query?.page) params.set('page', String(query.page));
+    if (query?.limit) params.set('limit', String(query.limit));
+    const qs = params.toString();
+    return this.client.get(`/sandbox/timeline${qs ? `?${qs}` : ''}`, opts);
+  }
+
+  /** GET /sandbox/timeline/{correlationId} */
+  async getSandboxTimelineByCorrelation(correlationId: string, opts?: RequestOptions): Promise<any> {
+    return this.client.get(`/sandbox/timeline/${correlationId}`, opts);
+  }
+
+  /** GET /sandbox/profiles */
+  async getSandboxProfiles(opts?: RequestOptions): Promise<any> {
+    return this.client.get('/sandbox/profiles', opts);
+  }
+
+  /** POST /sandbox/transfers */
   async createSandboxTransfer(params: any, opts?: RequestOptions): Promise<any> {
     return this.client.post('/sandbox/transfers', params, opts);
   }
 
-  /** GET /sandbox/timeline — Sandbox event timeline */
-  async getSandboxTimeline(opts?: RequestOptions): Promise<any[]> {
-    return this.client.get<any[]>('/sandbox/timeline', opts);
+  /** POST /sandbox/transfers/generate */
+  async generateSandboxTransfer(params: { profileId: string }, opts?: RequestOptions): Promise<any> {
+    return this.client.post('/sandbox/transfers/generate', params, opts);
   }
 
-  /** POST /sandbox/bootstrap — Full sandbox environment setup */
-  async bootstrapSandbox(opts?: RequestOptions): Promise<any> {
-    return this.client.post('/sandbox/bootstrap', {}, opts);
+  /** GET /sandbox/transfers */
+  async listSandboxTransfers(
+    query?: { page?: number; limit?: number; status?: string },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const params = new URLSearchParams();
+    if (query?.page) params.set('page', String(query.page));
+    if (query?.limit) params.set('limit', String(query.limit));
+    if (query?.status) params.set('status', query.status);
+    const qs = params.toString();
+    return this.client.get(`/sandbox/transfers${qs ? `?${qs}` : ''}`, opts);
+  }
+
+  /** GET /sandbox/transfers/{id} */
+  async getSandboxTransfer(transferId: string, opts?: RequestOptions): Promise<any> {
+    return this.client.get(`/sandbox/transfers/${transferId}`, opts);
+  }
+
+  /** POST /sandbox/transfers/{id}/approve|reject|reverse */
+  async transitionSandboxTransfer(
+    transferId: string,
+    action: 'approve' | 'reject' | 'reverse',
+    body: Record<string, unknown> = {},
+    opts?: RequestOptions,
+  ): Promise<any> {
+    return this.client.post(`/sandbox/transfers/${transferId}/${action}`, body, opts);
+  }
+
+  /** GET /sandbox/providers */
+  async getSandboxProviders(opts?: RequestOptions): Promise<any> {
+    return this.client.get('/sandbox/providers', opts);
+  }
+
+  /** GET /sandbox/providers/{provider} */
+  async getSandboxProvider(provider: string, opts?: RequestOptions): Promise<any> {
+    return this.client.get(`/sandbox/providers/${provider}`, opts);
+  }
+
+  /** POST /sandbox/providers/{provider}/simulate */
+  async simulateSandboxProvider(
+    provider: string,
+    body: Record<string, unknown>,
+    opts?: RequestOptions,
+  ): Promise<any> {
+    return this.client.post(`/sandbox/providers/${provider}/simulate`, body, opts);
   }
 }

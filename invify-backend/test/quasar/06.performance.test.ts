@@ -104,7 +104,7 @@ describe('Performance — QFP envelope unwrap (mocked HTTP)', () => {
   });
 
   it(`processes ${ITERATIONS} mocked responses in < 1000ms total`, async () => {
-    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantApiKey: 'sk_test' });
+    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 
     const start = performance.now();
     await Promise.all(Array.from({ length: ITERATIONS }, () => client.get('/wallets/1')));
@@ -142,7 +142,7 @@ describe('Performance — concurrent load (1000 calls)', () => {
     });
     mockedAxios.create.mockReturnValue({ request: requestFn } as any);
 
-    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantApiKey: 'sk_test' });
+    const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 
     const start = performance.now();
     await Promise.all(Array.from({ length: 1000 }, (_, i) => client.get(`/wallets/${i % 10}`)));

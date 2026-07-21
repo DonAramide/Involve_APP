@@ -203,7 +203,7 @@ export class QuasarConnectivityHealthService {
         const correlationId = crypto.randomUUID();
         const client = new QuasarApiClient({
           baseUrl: QuasarConnectivityHealthService.BASE_URL,
-          tenantApiKey: sk,
+          tenantAuth: { apiKey: sk },
           timeoutMs: 8_000,
           maxRetries: 1,
         });
