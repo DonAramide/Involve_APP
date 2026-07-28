@@ -4,6 +4,7 @@ import { useEventBus } from '../../../../services/realtime';
 import { EnterpriseEventV1 } from '../../../core/events/enterprise.event';
 
 import { useRuntimeStore } from '../../../../stores/runtime.store';
+import api from '../../../../api';
 
 export const useTenantSettingStore = defineStore('tenantSetting', {
   state: () => ({
@@ -69,12 +70,23 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
       // this.fetchSettings();
     },
 
-    loadBrandingPrefs() {
-      const savedBranding = localStorage.getItem('tenant_branding_prefs');
-      if (savedBranding) {
-        try {
+    async loadBrandingPrefs() {
+      this.isLoading = true;
+      try {
+        const response = await api.get('/settings/onboarding'); // Load existing configuration if available
+        if (response.data) {
+          this.webhookUrl = response.data.webhookUrl || this.webhookUrl;
+          this.apiKey = response.data.apiKey || this.apiKey;
+        }
+        
+        const savedBranding = localStorage.getItem('tenant_branding_prefs');
+        if (savedBranding) {
           this.branding = JSON.parse(savedBranding);
-        } catch (e) {}
+        }
+      } catch (e) {
+        console.warn('[SettingStore] Failed to fetch settings from backend:', e);
+      } finally {
+        this.isLoading = false;
       }
     },
     async savePreferences() {
@@ -82,7 +94,8 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
       try {
         await OperationsAdapter.updateSettingsGroup('general', {
           activeModule: this.activeModule,
-          branding: this.branding
+          branding: this.branding,
+          webhookUrl: this.webhookUrl
         });
         localStorage.setItem('tenant_type', this.activeModule);
         localStorage.setItem('tenant_branding_prefs', JSON.stringify(this.branding));
@@ -94,8 +107,62 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
         this.isLoading = false;
       }
     },
-    regenerateKey() {
-      this.apiKey = 'sk_live_invify_' + Math.floor(Math.random() * 100000) + '_quasar_key';
+    async regenerateKey() {
+      this.isLoading = true;
+      try {
+        // Tenant merchant keys are issued by Financial Platform activation/rotation,
+        // not by posting an empty payload to a placeholder vault id.
+        // Prefer the dedicated rotate endpoint when a tenant context is available.
+        let tenantId = localStorage.getItem('tenant_id') || '';
+        if (!tenantId) {
+          const token = localStorage.getItem('token');
+          if (token) {
+            try {
+              const jsonPayload = atob(token.split('.')[1]);
+              tenantId = JSON.parse(jsonPayload).tenantId || '';
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+
+        if (!tenantId) {
+          throw new Error(
+            'No active tenant. Open Financial Platform and Activate first.'
+          );
+        }
+
+        // Rotate only works after activation — give a clear path if still unprovisioned
+        try {
+          const health = await api.get(`/api/v1/tenants/${tenantId}/financial-platform/health`);
+          const status = String(health.data?.platformStatus || health.data?.status || '').toLowerCase();
+          if (status && status !== 'active') {
+            throw new Error(
+              'Financial Platform is not ACTIVE yet. Go to Financial Platform → Activate, then regenerate.'
+            );
+          }
+        } catch (probeErr: any) {
+          if (probeErr?.message?.includes('Financial Platform is not ACTIVE')) throw probeErr;
+          // health probe optional — rotate endpoint enforces ACTIVE anyway
+        }
+
+        const response = await api.post(
+          `/api/v1/tenants/${tenantId}/financial-platform/rotate`
+        );
+        const publicKey =
+          response.data?.publicKey ||
+          response.data?.data?.publicKey ||
+          response.data?.apiKeyPublic;
+        if (publicKey) {
+          this.apiKey = publicKey;
+        }
+        return true;
+      } catch (e: any) {
+        console.error('[SettingStore] Failed to rotate credential key:', e);
+        throw e;
+      } finally {
+        this.isLoading = false;
+      }
     }
   }
 });

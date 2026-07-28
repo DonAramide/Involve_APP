@@ -77,6 +77,13 @@ export const adminApi = {
   getTenantDetails: (id) => api.get(`/admin/tenants/${id}/details`),
   getTenantKyc: (id) => api.get(`/api/tenant/${id}/kyc`),
   provisionVirtualAccount: (id) => api.post(`/admin/tenants/${id}/provision-virtual-account`),
+  
+  // Financial Platform Tenant Operations
+  getFinancialPlatformHealth: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/health`),
+  getFinancialPlatformAudit: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/audit`),
+  activateFinancialPlatform: (tenantId) => api.post(`/api/v1/tenants/${tenantId}/financial-platform/activate`),
+  rotateFinancialPlatformCredentials: (tenantId) => api.post(`/api/v1/tenants/${tenantId}/financial-platform/rotate`),
+
   getLedger: (params) => api.get('/admin/ledger', { params }),
   getPayments: (params) => api.get('/admin/payments', { params }),
   getDashboardStats: () => api.get('/admin/dashboard-stats'),
@@ -276,6 +283,30 @@ export const vaultApi = {
   activateCredential: (vaultId, credentialId) => api.patch(`/vault/integrations/${vaultId}/credentials/${credentialId}/activate`),
   deleteCredential: (vaultId, credentialId) => api.delete(`/vault/integrations/${vaultId}/credentials/${credentialId}`),
   testConnection: (vaultId, data) => api.post(`/vault/integrations/${vaultId}/test`, data),
+  saveQipConfig: (environment, data) => api.put('/vault/qip-config', { environment, ...data }),
+};
+
+export const ecsApi = {
+  getProviders: () => api.get('/v1/ecs/providers'),
+  getDefinitions: (namespace) => api.get(`/v1/ecs/${namespace}/definitions`),
+  getConfiguration: (namespace, environment, tenantId) => api.get(`/v1/ecs/${namespace}`, { params: { environment, tenantId } }),
+  saveConfiguration: (namespace, payload) => api.put(`/v1/ecs/${namespace}`, payload),
+  testConnection: (namespace, environment) => api.post(`/v1/ecs/${namespace}/test?environment=${environment}`)
+};
+
+export const sandboxApi = {
+  // Admin endpoints (admin JWT)
+  createApiKey: (data) => api.post('/v1/admin/qfs/keys', data),
+  listApiKeys: (params) => api.get('/v1/admin/qfs/keys', { params }),
+  revokeApiKey: (id) => api.delete(`/v1/admin/qfs/keys/${id}`),
+  getHealth: () => api.get('/v1/admin/financial-sandbox/health'),
+  getAnalytics: () => api.get('/v1/admin/financial-sandbox/analytics'),
+  listWebhooks: (params) => api.get('/v1/admin/financial-sandbox/webhooks', { params }),
+  getWebhook: (id) => api.get(`/v1/admin/financial-sandbox/webhooks/${id}`),
+  replayWebhook: (id) => api.post(`/v1/admin/financial-sandbox/webhooks/${id}/replay`),
+  
+  // Developer Portal endpoints - These will run using the provided API Key instead of admin JWT
+  // But typically the admin frontend will use admin APIs unless we build a dedicated tenant portal.
 };
 
 export { api };

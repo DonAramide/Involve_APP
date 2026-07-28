@@ -80,6 +80,57 @@ export class QuasarIntegrationStore {
   }
 
   /**
+   * Insert or update integration row for a tenant (safe for activation retries).
+   */
+  static async upsert(params: CreateIntegrationParams & { status?: QuasarIntegrationRecord['status'] }): Promise<QuasarIntegrationRecord> {
+    const existing = await this.getByInvifyTenantId(params.invifyTenantId);
+    const encryptedSk = VaultEncryptionUtil.encrypt(params.secretKey);
+    const status = params.status ?? 'active';
+
+    if (existing) {
+      const { data, error } = await supabaseAdmin
+        .from('quasar_integrations')
+        .update({
+          quasar_tenant_id: params.quasarTenantId,
+          quasar_tenant_slug: params.quasarTenantSlug,
+          quasar_tenant_code: params.quasarTenantCode,
+          quasar_vertical: params.vertical,
+          quasar_public_key: params.publicKey,
+          quasar_sk_secret_enc: JSON.stringify(encryptedSk),
+          quasar_environment: params.environment,
+          status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('invify_tenant_id', params.invifyTenantId)
+        .select()
+        .single();
+
+      if (error) throw new Error(`[QuasarIntegrationStore] upsert update failed: ${error.message}`);
+      return data as QuasarIntegrationRecord;
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('quasar_integrations')
+      .insert({
+        invify_tenant_id: params.invifyTenantId,
+        quasar_tenant_id: params.quasarTenantId,
+        quasar_tenant_slug: params.quasarTenantSlug,
+        quasar_tenant_code: params.quasarTenantCode,
+        quasar_vertical: params.vertical,
+        quasar_public_key: params.publicKey,
+        quasar_sk_secret_enc: JSON.stringify(encryptedSk),
+        quasar_environment: params.environment,
+        status,
+        quasar_provisioned_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`[QuasarIntegrationStore] upsert insert failed: ${error.message}`);
+    return data as QuasarIntegrationRecord;
+  }
+
+  /**
    * Record a registered webhook endpoint + encrypted signing secret.
    */
   static async registerWebhook(params: RegisterWebhookParams): Promise<void> {

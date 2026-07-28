@@ -48,8 +48,34 @@ export class VaultController {
       const payload = req.body;
       const operatorId = (req as any).user?.id || null;
 
+      const plaintext =
+        payload.plaintext_value ??
+        payload.value ??
+        payload.secret ??
+        payload.clientSecret;
+
+      if (!plaintext || typeof plaintext !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'plaintext_value is required (string). Received undefined — check the request body.'
+        });
+      }
+      if (!payload.key_name) {
+        return res.status(400).json({
+          success: false,
+          error: 'key_name is required.'
+        });
+      }
+      if (!payload.credential_type) {
+        return res.status(400).json({
+          success: false,
+          error: 'credential_type is required.'
+        });
+      }
+
       const data = await IntegrationVaultService.addCredential(vaultId, {
         ...payload,
+        plaintext_value: plaintext,
         operator_id: operatorId
       });
 

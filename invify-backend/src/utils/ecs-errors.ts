@@ -1,0 +1,21 @@
+export enum EcsErrorCode {
+  CONFIG_NOT_FOUND = 'CONFIG_NOT_FOUND',
+  CONFIG_VALIDATION_FAILED = 'CONFIG_VALIDATION_FAILED',
+  CONFIG_PROVIDER_NOT_REGISTERED = 'CONFIG_PROVIDER_NOT_REGISTERED',
+  CONFIG_ENVIRONMENT_INVALID = 'CONFIG_ENVIRONMENT_INVALID',
+  CONFIG_SECRET_WRITE_FAILED = 'CONFIG_SECRET_WRITE_FAILED',
+  CONFIG_HEALTHCHECK_FAILED = 'CONFIG_HEALTHCHECK_FAILED',
+  CONFIG_CONFLICT = 'CONFIG_CONFLICT',
+  CONFIG_UNAUTHORIZED = 'CONFIG_UNAUTHORIZED',
+}
+
+export class EcsError extends Error {
+  constructor(
+    public code: EcsErrorCode,
+    public message: string,
+    public details: string[] = []
+  ) {
+    super(message);
+    this.name = 'EcsError';
+  }
+}

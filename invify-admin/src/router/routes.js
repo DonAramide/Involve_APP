@@ -356,8 +356,17 @@ const routes = [
       { path: 'admin/settings', component: () => import('pages/admin/PlatformOverviewPage.vue'), meta: { workspace: 'admin', title: 'Platform Overview', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/config', component: () => import('pages/admin/PlatformConfigPage.vue'), meta: { workspace: 'admin', title: 'Platform Configuration', permission: 'admin_deploy', requiresAuth: true, keywords: ['maintenance', 'maintenance mode', 'maintenance mode controls', 'system lockout', 'lockout'] } },
       { path: 'admin/vault', component: () => import('pages/admin/IntegrationVaultPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Integration Vault', permission: 'admin_deploy', requiresAuth: true, keywords: ['vault', 'integrations', 'secrets', 'api keys', 'certificates'] } },
+      { path: 'admin/ecs-workspace', component: () => import('pages/admin/EnterpriseConfigurationWorkspace.vue'), meta: { workspace: 'admin', title: 'Enterprise Configuration Workspace', permission: 'admin_deploy', requiresAuth: true, keywords: ['ecs', 'configuration', 'workspace', 'providers'] } },
       { path: 'admin/settings/authentication', component: () => import('pages/admin/AuthenticationSettingsPage.vue'), meta: { workspace: 'admin', title: 'Authentication Settings', permission: 'admin_deploy', requiresAuth: true, keywords: ['settings', 'authentication', 'onboarding', 'verification'] } },
       { path: 'admin/contact', component: () => import('pages/governance/ContactMaintenancePage.vue'), meta: { workspace: 'admin', title: 'Contact Maintenance', permission: 'admin_deploy', requiresAuth: true } },
+
+      // ==========================================
+      // QUASAR FINANCIAL SANDBOX (QFS)
+      // ==========================================
+      { path: 'sandbox', component: () => import('pages/sandbox/SandboxDashboardPage.vue'), meta: { workspace: 'sandbox', title: 'QFS Sandbox Dashboard', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'sandbox/developer-portal', component: () => import('pages/sandbox/DeveloperPortalPage.vue'), meta: { workspace: 'sandbox', title: 'Developer Portal', permission: 'admin_deploy', requiresAuth: true } },
+      { path: 'sandbox/keys', component: () => import('pages/sandbox/ApiKeyManagementPage.vue'), meta: { workspace: 'sandbox', title: 'API Keys', permission: 'admin_deploy', requiresAuth: true } },
+
 
       { path: 'admin/billing', component: () => import('pages/admin/BillingGovernanceCenterPage.vue'), meta: { workspace: 'admin', title: 'Enterprise Billing & Revenue', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'admin/agents/commissions', component: () => import('pages/admin/AgentCommissionsPage.vue'), meta: { workspace: 'admin', title: 'Agent Commissions & Billing', keywords: ['commission', 'bill', 'payout', 'agent fee'], permission: 'admin_deploy', requiresAuth: true } },
@@ -412,6 +421,7 @@ const routes = [
       { path: 'activity', component: () => import('src/domains/tenant/users/pages/TenantActivityPage.vue'), meta: { title: 'Activity Audit', requiresAuth: true, permission: 'tenant.activity.view' } },
       { path: 'reports', component: () => import('src/domains/tenant/reports/pages/TenantReportsPage.vue'), meta: { title: 'Business Reports', requiresAuth: true, permission: 'tenant.reports.view' } },
       { path: 'settings', component: () => import('src/domains/tenant/settings/pages/TenantSettingsPage.vue'), meta: { title: 'Portal Customization', requiresAuth: true, permission: 'tenant.settings.manage' } },
+      { path: 'settings/financial-platform', component: () => import('src/pages/financial-platform/FinancialPlatformPage.vue'), meta: { title: 'Financial Platform', requiresAuth: true, permission: 'tenant.settings.manage' } },
       { path: 'profile', component: () => import('src/domains/tenant/settings/pages/TenantProfilePage.vue'), meta: { title: 'My Account & Security', requiresAuth: true, permission: 'tenant.settings.manage' } },
       
       // Inventory Domain

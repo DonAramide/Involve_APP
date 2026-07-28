@@ -177,9 +177,16 @@ const regenKey = () => {
     message: 'Any existing inventory integrations mapping to the current client secret key will instantly drop and return 401 Unauthorized errors until updated. Confirm regeneration?',
     cancel: true,
     dark: true
-  }).onOk(() => {
-    store.regenerateKey();
-    $q.notify({ type: 'positive', message: 'New cryptographically strong client credentials minted.' });
+  }).onOk(async () => {
+    try {
+      await store.regenerateKey();
+      $q.notify({ type: 'positive', message: 'New cryptographically strong client credentials minted.' });
+    } catch (e) {
+      $q.notify({
+        type: 'negative',
+        message: e?.response?.data?.error || e?.message || 'Failed to regenerate credentials'
+      });
+    }
   })
 }
 
