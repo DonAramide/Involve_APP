@@ -76,7 +76,7 @@ export class ActivationSaga {
         environment: 'test'
       }, context, keyIdempotency);
 
-      const keyPayload = apiKeyResp.data?.data || apiKeyResp.data || apiKeyResp;
+      const keyPayload = this.unwrapQuasarEntity(apiKeyResp);
       const secretKey = keyPayload.secretKey;
       const publicKey = keyPayload.publicKey;
 
@@ -168,20 +168,7 @@ export class ActivationSaga {
         defaultCurrency: 'NGN'
       }, context, `provision-tenant:${tenantId}`);
 
-      const tenantPayload = quasarTenant.data?.data || quasarTenant.data || quasarTenant;
-      const id = tenantPayload?.id;
-      if (!id) {
-        throw new Error(`Quasar createTenant returned no id: ${JSON.stringify(quasarTenant)}`);
-      }
-
-      // Guard: never accept Invify UUID mistakenly returned as Quasar id
-      if (String(id).toLowerCase() === String(tenantId).toLowerCase()) {
-        throw Object.assign(new Error('Recovered id equals Invify tenant id — invalid'), {
-          response: { status: 409, data: { responseMessage: 'Invalid recovered Quasar tenant id' } }
-        });
-      }
-
-      return { ...tenantPayload, id };
+      return this.requireTenantPayload(quasarTenant, tenantId);
     } catch (createErr: any) {
       const isConflict =
         createErr?.response?.status === 409 ||
@@ -189,26 +176,69 @@ export class ActivationSaga {
 
       if (!isConflict) throw createErr;
 
-      const recoverySlug = `${slug}-r${Date.now().toString(36).slice(-5)}`;
+      // Stable recovery slug so retries don't mint endless Quasar orphans
+      const recoverySlug = `tenant-${String(tenantId).slice(0, 8)}-recovery`;
       console.warn(
         `[ActivationSaga] Slug "${slug}" already on Quasar without a usable tenant id. Creating recovery slug "${recoverySlug}".`
       );
 
-      const recovered = await this.quasarClient.createTenant({
-        name: tenantData.name,
-        slug: recoverySlug,
-        vertical: 'invify_retail',
-        defaultCurrency: 'NGN'
-      }, context, `provision-tenant-recovery:${tenantId}:${recoverySlug}`);
+      try {
+        const recovered = await this.quasarClient.createTenant({
+          name: tenantData.name,
+          slug: recoverySlug,
+          vertical: 'invify_retail',
+          defaultCurrency: 'NGN'
+        }, context, `provision-tenant-recovery:${tenantId}`);
 
-      const tenantPayload = recovered.data?.data || recovered.data || recovered;
-      const id = tenantPayload?.id;
-      if (!id) {
-        throw new Error(`Recovery createTenant returned no id: ${JSON.stringify(recovered)}`);
+        return { ...this.requireTenantPayload(recovered, tenantId), slug: recoverySlug };
+      } catch (recoveryErr: any) {
+        // Recovery slug may already exist from a prior partial success — verify via get if we have a known id pattern is impossible;
+        // rethrow with clear message so operator can paste Quasar tenant UUID.
+        if (recoveryErr?.response?.status === 409) {
+          throw new Error(
+            `Quasar already has slug "${recoverySlug}" from a prior attempt, but Invify has no quasar_tenant_id. ` +
+            `Open Quasar admin, copy that tenant's UUID, then we can link it — or delete the Quasar tenant and retry Activate.`
+          );
+        }
+        throw recoveryErr;
       }
-
-      return { ...tenantPayload, id, slug: recoverySlug };
     }
+  }
+
+  /**
+   * Quasar envelopes nest inconsistently: data / data.data / data.data.data
+   */
+  private unwrapQuasarEntity(payload: any): any {
+    let cur = payload;
+    for (let i = 0; i < 6; i++) {
+      if (!cur || typeof cur !== 'object') break;
+      if (typeof cur.id === 'string' && cur.id.length > 0) return cur;
+      if (cur.data !== undefined) {
+        cur = cur.data;
+        continue;
+      }
+      break;
+    }
+    return cur;
+  }
+
+  private requireTenantPayload(
+    raw: any,
+    invifyTenantId: string
+  ): { id: string; slug?: string; code?: string; vertical?: string } {
+    const tenantPayload = this.unwrapQuasarEntity(raw);
+    const id = tenantPayload?.id;
+    if (!id) {
+      throw new Error(`Quasar createTenant returned no id: ${JSON.stringify(raw)}`);
+    }
+
+    if (String(id).toLowerCase() === String(invifyTenantId).toLowerCase()) {
+      throw Object.assign(new Error('Recovered id equals Invify tenant id — invalid'), {
+        response: { status: 409, data: { responseMessage: 'Invalid recovered Quasar tenant id' } }
+      });
+    }
+
+    return { ...tenantPayload, id };
   }
 
   private async clearBogusCheckpoint(invifyTenantId: string) {
