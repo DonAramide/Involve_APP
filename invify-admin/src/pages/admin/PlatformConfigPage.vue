@@ -24,6 +24,7 @@
       <q-tab name="localization" icon="language" label="Localization & Currency" />
       <q-tab name="security" icon="security" label="Security Policies" />
       <q-tab name="branding" icon="palette" label="Branding & Whitelabel" />
+      <q-tab name="payout" icon="schedule" label="Payout Settings" />
     </q-tabs>
 
     <q-separator dark class="q-mb-md opacity-20" />
@@ -195,6 +196,105 @@
           </q-card-section>
         </q-card>
       </q-tab-panel>
+
+      <!-- PAYOUT SETTINGS TAB -->
+      <q-tab-panel name="payout" class="q-pa-none">
+        <q-card flat class="enterprise-panel bg-panel border-main">
+          <q-card-section>
+            <div class="row items-center op-gap-10 q-mb-md">
+              <q-icon name="schedule" color="green-4" size="sm" />
+              <div>
+                <div class="text-h6 text-main">Automated Daily Payout Time</div>
+                <div class="text-caption text-muted">Set the global time at which the platform will trigger automated daily payout sweeps for all tenants.</div>
+              </div>
+            </div>
+
+            <div class="row q-col-gutter-lg items-start">
+              <div class="col-12 col-md-5">
+                <q-banner rounded class="bg-subpanel border-main q-mb-md">
+                  <template v-slot:avatar><q-icon name="info" color="cyan-4" /></template>
+                  <span class="text-caption text-main">This time will appear on the tenant's Payout Orchestrator as the configured daily sweep time. Tenants cannot override this value.</span>
+                </q-banner>
+
+                <div class="enterprise-subpanel q-pa-md rounded-borders border-main q-mb-md">
+                  <div class="text-caption text-muted font-mono q-mb-sm">DAILY PAYOUT TRIGGER TIME (WAT)</div>
+                  <div class="row items-center op-gap-12">
+                    <q-input
+                      id="daily-payout-time-input"
+                      v-model="payoutStore.dailyPayoutTime"
+                      outlined dense dark
+                      type="time"
+                      label="Payout Time (HH:MM)"
+                      style="width: 180px;"
+                      class="font-mono text-weight-bold"
+                    />
+                    <div class="column">
+                      <div class="text-caption text-muted">Current setting</div>
+                      <div class="text-weight-bold text-green-4 font-mono text-subtitle1">{{ payoutStore.dailyPayoutTime || '23:59' }} WAT</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="enterprise-subpanel q-pa-md rounded-borders border-main">
+                  <div class="text-caption text-muted font-mono q-mb-sm">ON-DEMAND (MANUAL) DISPATCH FEE</div>
+                  <div class="text-caption text-grey-5 q-mb-sm">Fee charged to tenants who choose to manually dispatch a payout outside the automated schedule.</div>
+                  <div class="row items-center op-gap-12">
+                    <q-input
+                      id="manual-dispatch-fee-input"
+                      v-model.number="payoutStore.manualDispatchFee"
+                      outlined dense dark
+                      type="number"
+                      label="Fee Amount"
+                      style="width: 140px;"
+                      class="font-mono"
+                    />
+                    <q-select
+                      id="manual-dispatch-fee-type-select"
+                      v-model="payoutStore.manualDispatchFeeType"
+                      outlined dense dark
+                      :options="['Fixed Amount', 'Percentage (%)']" 
+                      label="Fee Type"
+                      style="width: 180px;"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-7">
+                <q-card flat class="bg-subpanel border-main q-pa-md">
+                  <div class="text-caption text-muted font-mono q-mb-md border-bottom q-pb-xs">PAYOUT SCHEDULE PREVIEW</div>
+                  <div class="column q-gutter-y-sm">
+                    <div class="row items-center op-gap-12 q-pa-sm rounded-borders" style="background: rgba(81,207,102,0.07); border: 1px solid rgba(81,207,102,0.2);">
+                      <q-icon name="today" color="green-4" size="sm" />
+                      <div class="col">
+                        <div class="text-caption text-weight-bold text-white">Automated Daily Sweep</div>
+                        <div class="text-caption text-grey-5 font-mono">Triggers every day at <span class="text-green-4">{{ payoutSettings.dailyPayoutTime || '23:59' }} WAT</span></div>
+                      </div>
+                      <q-badge color="green-10" text-color="green-3">ACTIVE</q-badge>
+                    </div>
+                    <div class="row items-center op-gap-12 q-pa-sm rounded-borders" style="background: rgba(99,102,241,0.07); border: 1px solid rgba(99,102,241,0.2);">
+                      <q-icon name="date_range" color="indigo-4" size="sm" />
+                      <div class="col">
+                        <div class="text-caption text-weight-bold text-white">Automated Weekly Sweep</div>
+                        <div class="text-caption text-grey-5 font-mono">Tenant selects preferred day & time — <span class="text-indigo-4">admin notified on setup</span></div>
+                      </div>
+                      <q-badge color="indigo-10" text-color="indigo-3">TENANT-CONFIGURED</q-badge>
+                    </div>
+                    <div class="row items-center op-gap-12 q-pa-sm rounded-borders" style="background: rgba(252,100,25,0.07); border: 1px solid rgba(252,100,25,0.2);">
+                      <q-icon name="touch_app" color="orange-4" size="sm" />
+                      <div class="col">
+                        <div class="text-caption text-weight-bold text-white">Manual On-Demand Dispatch</div>
+                        <div class="text-caption text-grey-5 font-mono">Extra fee applies: <span class="text-orange-4">{{ payoutSettings.manualDispatchFeeType === 'Percentage (%)' ? payoutSettings.manualDispatchFee + '%' : (currentCurrency.symbol + (payoutSettings.manualDispatchFee || 0).toLocaleString()) }}</span></div>
+                      </div>
+                      <q-badge color="orange-10" text-color="orange-3">FEE APPLIES</q-badge>
+                    </div>
+                  </div>
+                </q-card>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </q-tab-panel>
     </q-tab-panels>
 
     <!-- Add/Edit Currency Dialog -->
@@ -219,17 +319,24 @@
       </q-card>
     </q-dialog>
 
+    <!-- Debug section at the bottom -->
+    <div class="q-mt-xl q-pa-sm bg-dark text-grey-5 rounded-borders font-mono text-caption text-center border-main">
+      [LOCALSTORAGE DEBUG] Active Key: platform_payout_settings | Raw Value: {{ localStorageDebug }}
+    </div>
+
   </q-page>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useQuasar } from 'quasar';
 import { useCurrency } from '../../composables/useCurrency';
 import { adminApi } from '../../api';
+import { usePlatformPayoutSettingsStore } from '../../stores/platformPayoutSettings.store';
 
 const $q = useQuasar();
 const { currentCurrency, setCurrency } = useCurrency();
+const payoutStore = usePlatformPayoutSettingsStore();
 
 const activeTab = ref('general');
 const mockSettings = ref({
@@ -254,6 +361,15 @@ const mockSettings = ref({
   lessonAiApiKey: ''
 });
 
+// Payout settings — thin alias to the shared Pinia store.
+// The store auto-hydrates from localStorage and is reactive:
+// tenant page reacts instantly when admin saves.
+const payoutSettings = {
+  get dailyPayoutTime()      { return payoutStore.dailyPayoutTime },
+  get manualDispatchFee()    { return payoutStore.manualDispatchFee },
+  get manualDispatchFeeType(){ return payoutStore.manualDispatchFeeType },
+};
+
 const currencyColumns = [
   { name: 'name', label: 'Currency Name', align: 'left', field: 'name', sortable: true },
   { name: 'code', label: 'Code', align: 'left', field: 'code', sortable: true },
@@ -271,7 +387,15 @@ const defaultCurrencies = [
 
 const currencyList = ref([]);
 
+const localStorageDebug = ref('NOT_LOADED');
+
+function updateDebug() {
+  localStorageDebug.value = localStorage.getItem('platform_payout_settings') || 'NOT_FOUND';
+}
+
 onMounted(async () => {
+  updateDebug();
+  setInterval(updateDebug, 1000);
   await fetchSettings();
   const savedList = localStorage.getItem('platform_currencies_list');
   if (savedList) {
@@ -308,6 +432,11 @@ async function fetchSettings() {
       mockSettings.value.quasarClientId = data.quasar_client_id || '';
       mockSettings.value.quasarClientSecret = data.quasar_client_secret || '';
       mockSettings.value.lessonAiApiKey = data.lesson_ai_api_key || '';
+
+      // Populate Payout Settings Store
+      payoutStore.dailyPayoutTime = data.daily_payout_time || data.dailyPayoutTime || payoutStore.dailyPayoutTime;
+      payoutStore.manualDispatchFee = data.manual_dispatch_fee ?? data.manualDispatchFee ?? payoutStore.manualDispatchFee;
+      payoutStore.manualDispatchFeeType = data.manual_dispatch_fee_type || data.manualDispatchFeeType || payoutStore.manualDispatchFeeType;
     }
   } catch (err) {
     console.error('Failed to load global platform settings:', err);
@@ -315,6 +444,11 @@ async function fetchSettings() {
 }
 
 async function saveAllSettings() {
+  // Step 1: Always persist payout settings locally first (store → localStorage).
+  // These fields are not yet in the backend schema — saving them client-side is safe and instant.
+  payoutStore.persist();
+
+  // Step 2: Send only the known platform config fields to the backend.
   try {
     const payload = {
       platform_name: mockSettings.value.platformName,
@@ -335,17 +469,22 @@ async function saveAllSettings() {
       whatsapp_business_account_id: mockSettings.value.whatsappBusinessAccountId,
       quasar_client_id: mockSettings.value.quasarClientId,
       quasar_client_secret: mockSettings.value.quasarClientSecret,
-      lesson_ai_api_key: mockSettings.value.lessonAiApiKey
+      lesson_ai_api_key: mockSettings.value.lessonAiApiKey,
+      // Payout settings keys — written to global_settings.json on the server
+      daily_payout_time: payoutStore.dailyPayoutTime,
+      manual_dispatch_fee: payoutStore.manualDispatchFee,
+      manual_dispatch_fee_type: payoutStore.manualDispatchFeeType
     };
     await adminApi.updateGlobalSettings(payload);
     $q.notify({
       type: 'positive',
-      message: 'Global platform configuration saved successfully.'
+      message: 'Platform configuration saved successfully. Payout settings applied.'
     });
   } catch (err) {
     $q.notify({
-      type: 'negative',
-      message: 'Failed to save global platform configuration: ' + (err.response?.data?.error || err.message)
+      type: 'warning',
+      icon: 'cloud_off',
+      message: 'Payout settings applied locally! (Server settings failed to sync: ' + (err.response?.data?.error || err.message) + ')'
     });
   }
 }

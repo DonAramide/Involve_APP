@@ -158,6 +158,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountNumber: row.virtualAccountNumber,
       virtualAccountBank: row.virtualAccountBank,
       virtualAccountStatus: row.virtualAccountStatus,
+      department: row.department,
     )).toList();
   }
 
@@ -180,6 +181,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       database.students.virtualAccountNumber,
       database.students.virtualAccountBank,
       database.students.virtualAccountStatus,
+      database.students.department,
     ]);
     
     final rows = await query.get();
@@ -201,6 +203,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountNumber: row.read(database.students.virtualAccountNumber),
       virtualAccountBank: row.read(database.students.virtualAccountBank),
       virtualAccountStatus: row.read(database.students.virtualAccountStatus),
+      department: row.read(database.students.department),
     )).toList();
   }
 
@@ -223,6 +226,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountNumber: Value(student.virtualAccountNumber),
       virtualAccountBank: Value(student.virtualAccountBank),
       virtualAccountStatus: Value(student.virtualAccountStatus),
+      department: Value(student.department),
     ));
   }
 
@@ -246,6 +250,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountNumber: Value(student.virtualAccountNumber),
       virtualAccountBank: Value(student.virtualAccountBank),
       virtualAccountStatus: Value(student.virtualAccountStatus),
+      department: Value(student.department),
     ));
   }
 
@@ -487,36 +492,49 @@ class SchoolRepositoryImpl implements SchoolRepository {
       employmentDate: row.employmentDate,
       certificates: row.certificates,
       image: row.image,
+      classIds: row.classIds != null && row.classIds!.isNotEmpty
+          ? row.classIds!.split(',').where((s) => s.isNotEmpty).map(int.parse).toList()
+          : null,
     )).toList();
   }
 
   @override
   Future<void> addTeacher(Teacher teacher) async {
+    final firstClassId = teacher.classIds != null && teacher.classIds!.isNotEmpty
+        ? teacher.classIds!.first
+        : teacher.classId;
+
     await database.into(database.teachers).insert(db.TeachersCompanion.insert(
       fullName: teacher.fullName,
       phone: Value(teacher.phone),
       profession: Value(teacher.profession),
-      classId: Value(teacher.classId),
+      classId: Value(firstClassId),
       salary: Value(teacher.salary),
       employmentDate: Value(teacher.employmentDate),
       yearsInSchool: const Value(0),
       certificates: Value(teacher.certificates),
       image: Value(teacher.image),
+      classIds: Value(teacher.classIds?.join(',')),
     ));
   }
 
   @override
   Future<void> updateTeacher(Teacher teacher) async {
+    final firstClassId = teacher.classIds != null && teacher.classIds!.isNotEmpty
+        ? teacher.classIds!.first
+        : teacher.classId;
+
     await (database.update(database.teachers)..where((t) => t.id.equals(teacher.id!)))
         .write(db.TeachersCompanion(
       fullName: Value(teacher.fullName),
       phone: Value(teacher.phone),
       profession: Value(teacher.profession),
-      classId: Value(teacher.classId),
+      classId: Value(firstClassId),
       salary: Value(teacher.salary),
       employmentDate: Value(teacher.employmentDate),
       certificates: Value(teacher.certificates),
       image: Value(teacher.image),
+      classIds: Value(teacher.classIds?.join(',')),
     ));
   }
 

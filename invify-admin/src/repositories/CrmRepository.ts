@@ -25,7 +25,7 @@ export class CrmRepository {
       async () => {
         try {
           const { data } = await crmApi.getCustomers(params);
-          return data?.customers || data || [];
+          return data?.data || data?.customers || (Array.isArray(data) ? data : []);
         } catch (error) {
           console.warn('[CrmRepository] Error fetching customers:', error);
           return [];

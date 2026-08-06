@@ -12,6 +12,8 @@ class StorageService {
   static const _proExpiryKey = 'pro_plan_expiry';
   static const _deviceAccessKey = 'device_admin_access_granted';
   static const _onboardingCompleteKey = 'onboarding_complete';
+  static const _onlineSyncEnabledKey = 'online_sync_enabled';
+  static const _onlineInvoiceUpdateEnabledKey = 'online_invoice_update_enabled';
 
   static Future<void> saveLicense(String licenseData) async {
     await _secureStorage.write(key: _licenseKey, value: licenseData);
@@ -94,5 +96,23 @@ class StorageService {
   static Future<bool> isOnboardingCompleted() async {
     final val = await _secureStorage.read(key: _onboardingCompleteKey);
     return val == 'true';
+  }
+
+  static Future<void> setOnlineSyncEnabled(bool enabled) async {
+    await _secureStorage.write(key: _onlineSyncEnabledKey, value: enabled ? 'true' : 'false');
+  }
+
+  static Future<bool> isOnlineSyncEnabled() async {
+    final val = await _secureStorage.read(key: _onlineSyncEnabledKey);
+    return val != 'false'; // Default to true
+  }
+
+  static Future<void> setOnlineInvoiceUpdateEnabled(bool enabled) async {
+    await _secureStorage.write(key: _onlineInvoiceUpdateEnabledKey, value: enabled ? 'true' : 'false');
+  }
+
+  static Future<bool> isOnlineInvoiceUpdateEnabled() async {
+    final val = await _secureStorage.read(key: _onlineInvoiceUpdateEnabledKey);
+    return val != 'false'; // Default to true
   }
 }

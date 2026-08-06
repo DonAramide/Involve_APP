@@ -153,6 +153,13 @@ export class QuasarIntegrationStore {
    * Retrieve the integration record for a given Invify tenant.
    */
   static async getByInvifyTenantId(invifyTenantId: string): Promise<QuasarIntegrationRecord | null> {
+    if (!invifyTenantId || typeof invifyTenantId !== 'string') return null;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(invifyTenantId)) {
+      console.warn(`[QuasarIntegrationStore] getByInvifyTenantId: "${invifyTenantId}" is not a valid UUID. Returning null.`);
+      return null;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('quasar_integrations')
       .select('*')
@@ -217,11 +224,11 @@ export class QuasarIntegrationStore {
    * List all active integrations (for health checks, dashboards).
    */
   static async listAll(): Promise<Pick<QuasarIntegrationRecord,
-    'invify_tenant_id' | 'quasar_tenant_id' | 'quasar_vertical' | 'quasar_environment' | 'status' | 'quasar_provisioned_at'
+    'invify_tenant_id' | 'quasar_tenant_id' | 'quasar_vertical' | 'quasar_environment' | 'status' | 'quasar_provisioned_at' | 'quasar_webhook_signing_secret_enc' | 'quasar_webhook_endpoint_id'
   >[]> {
     const { data, error } = await supabaseAdmin
       .from('quasar_integrations')
-      .select('invify_tenant_id, quasar_tenant_id, quasar_vertical, quasar_environment, status, quasar_provisioned_at')
+      .select('invify_tenant_id, quasar_tenant_id, quasar_vertical, quasar_environment, status, quasar_provisioned_at, quasar_webhook_signing_secret_enc, quasar_webhook_endpoint_id')
       .order('quasar_provisioned_at', { ascending: false });
 
     if (error) throw new Error(`[QuasarIntegrationStore] listAll failed: ${error.message}`);

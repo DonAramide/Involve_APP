@@ -31,5 +31,17 @@ export const WidgetRegistry = {
     component: defineAsyncComponent(() => import('../components/adapters/WalletAdapter.vue')),
     permissions: [],
     cacheTTL: 60
+  },
+  TransactionHistoryWidget: {
+    id: 'TransactionHistoryWidget',
+    component: defineAsyncComponent(() => import('../components/adapters/TransactionHistoryAdapter.vue')),
+    permissions: ['finance.view'],
+    cacheTTL: 60
+  },
+  SalesSummaryWidget: {
+    id: 'SalesSummaryWidget',
+    component: defineAsyncComponent(() => import('../components/adapters/SalesSummaryWidgetAdapter.vue')),
+    permissions: ['finance.view'],
+    cacheTTL: 60
   }
 };

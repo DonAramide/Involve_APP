@@ -120,6 +120,7 @@ class Student extends Equatable {
   final String? virtualAccountNumber;
   final String? virtualAccountBank;
   final String? virtualAccountStatus;
+  final String? department;
 
   const Student({
     this.id,
@@ -139,6 +140,7 @@ class Student extends Equatable {
     this.virtualAccountNumber,
     this.virtualAccountBank,
     this.virtualAccountStatus,
+    this.department,
   });
 
   Student copyWith({
@@ -159,6 +161,7 @@ class Student extends Equatable {
     String? virtualAccountNumber,
     String? virtualAccountBank,
     String? virtualAccountStatus,
+    String? department,
   }) {
     return Student(
       id: id ?? this.id,
@@ -178,13 +181,33 @@ class Student extends Equatable {
       virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
       virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
       virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
+      department: department ?? this.department,
     );
   }
 
   String get fullName => '$firstName $lastName';
 
   @override
-  List<Object?> get props => [id, admissionNumber, firstName, lastName, classId, academicYearId, parentName, parentPhone, balance, creditBalance, image, dateOfBirth, gender, registrationDate, virtualAccountNumber, virtualAccountBank, virtualAccountStatus];
+  List<Object?> get props => [
+        id,
+        admissionNumber,
+        firstName,
+        lastName,
+        classId,
+        academicYearId,
+        parentName,
+        parentPhone,
+        balance,
+        creditBalance,
+        image,
+        dateOfBirth,
+        gender,
+        registrationDate,
+        virtualAccountNumber,
+        virtualAccountBank,
+        virtualAccountStatus,
+        department,
+      ];
 }
 
 class Subject extends Equatable {
@@ -287,6 +310,7 @@ class Teacher extends Equatable {
   final DateTime employmentDate;
   final String? certificates;
   final Uint8List? image;
+  final List<int>? classIds;
 
   const Teacher({
     this.id,
@@ -298,6 +322,7 @@ class Teacher extends Equatable {
     required this.employmentDate,
     this.certificates,
     this.image,
+    this.classIds,
   });
 
   int get yearsInSchool {
@@ -319,6 +344,7 @@ class Teacher extends Equatable {
     DateTime? employmentDate,
     String? certificates,
     Uint8List? image,
+    List<int>? classIds,
   }) {
     return Teacher(
       id: id ?? this.id,
@@ -330,6 +356,7 @@ class Teacher extends Equatable {
       employmentDate: employmentDate ?? this.employmentDate,
       certificates: certificates ?? this.certificates,
       image: image ?? this.image,
+      classIds: classIds ?? this.classIds,
     );
   }
 
@@ -344,5 +371,6 @@ class Teacher extends Equatable {
         employmentDate,
         certificates,
         image,
+        classIds,
       ];
 }

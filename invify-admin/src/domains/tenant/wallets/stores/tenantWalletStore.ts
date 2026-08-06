@@ -69,39 +69,32 @@ export const useTenantWalletStore = defineStore('tenantWallet', {
         this.ledgerLogs = [];
       }
     },
-    async dispatchPayout() {
-      return new Promise((resolve, reject) => {
-        if (!this.withdrawalAmount || this.withdrawalAmount <= 0) {
-          reject('Specify a valid transfer amount.');
-          return;
-        }
-        if (this.withdrawalAmount > this.availableBalance) {
-          reject('Requested amount exceeds cleared treasury balance.');
-          return;
-        }
+    async dispatchPayout(): Promise<string> {
+      if (!this.withdrawalAmount || this.withdrawalAmount <= 0) {
+        return Promise.reject('Specify a valid transfer amount.');
+      }
+      if (this.withdrawalAmount > this.availableBalance) {
+        return Promise.reject('Requested amount exceeds cleared treasury balance.');
+      }
 
-        this.withdrawing = true;
-        setTimeout(() => {
-          this.withdrawing = false;
-          
-          const localWithdrawals = localStorage.getItem('tenant_withdrawals');
-          const withdrawals = localWithdrawals ? JSON.parse(localWithdrawals) : [];
-          const randRef = `SW-${Math.floor(Math.random() * 100000) + 800000}-QS`;
-          
-          withdrawals.unshift({
-            ref: randRef,
-            amount: this.withdrawalAmount,
-            time: new Date().toLocaleString()
-          });
-          localStorage.setItem('tenant_withdrawals', JSON.stringify(withdrawals));
-          
-          const msg = `Withdrawal of ${this.withdrawalAmount?.toLocaleString()} successfully routed to corporate node.`;
-          this.availableBalance -= this.withdrawalAmount!;
-          this.withdrawalAmount = null;
-          this.loadTreasuryData(); // Refresh UI
-          resolve(msg);
-        }, 1500);
-      });
+      this.withdrawing = true;
+      try {
+        const { adminApi } = await import('../../../../api');
+        const res = await adminApi.initiatePayout({ amount: this.withdrawalAmount });
+        
+        const reference = res.data?.reference || 'SW-SYSTEM';
+        const msg = `Withdrawal of ${this.withdrawalAmount.toLocaleString()} successfully routed to corporate node. Reference: ${reference}`;
+        
+        this.availableBalance -= this.withdrawalAmount;
+        this.withdrawalAmount = null;
+        await this.loadTreasuryData(); // Refresh UI
+        return msg;
+      } catch (err: any) {
+        const errMsg = err.response?.data?.error || err.message || 'Failed to process withdrawal';
+        return Promise.reject(errMsg);
+      } finally {
+        this.withdrawing = false;
+      }
     }
   }
 });

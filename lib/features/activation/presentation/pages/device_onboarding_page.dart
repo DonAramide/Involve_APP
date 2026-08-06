@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 
 
 import 'dart:convert';
@@ -53,6 +54,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   bool _isLoading = false;
   int _currentStep = 0;
   bool _obscurePassword = true;
+  bool? _isServerReachable;
 
   final List<Map<String, String>> _stepsInfo = [
     {
@@ -80,6 +82,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
   @override
   void initState() {
     super.initState();
+    _pingServer();
     final state = context.read<SettingsBloc>().state;
     if (state.settings != null) {
       final savedName = state.settings!.organizationName;
@@ -87,6 +90,16 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       if (savedName.isNotEmpty && savedName != 'My Business' && savedName != 'My Business (Reset)') {
         _businessNameController.text = savedName;
       }
+    }
+  }
+
+  Future<void> _pingServer() async {
+    try {
+      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 3)));
+      await dio.get('${AppConfig.baseUrl}/settings/onboarding');
+      if (mounted) setState(() => _isServerReachable = true);
+    } catch (_) {
+      if (mounted) setState(() => _isServerReachable = false);
     }
   }
 
@@ -126,24 +139,36 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
       
       // Fetch Onboarding Settings
       List<String> requiredChannels = ['EMAIL']; // Default fallback
-      final settingsUrls = [
-        'http://localhost:3004/settings/onboarding',
-        '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/settings/onboarding',
-      ];
-
-      for (var url in settingsUrls) {
-        try {
-          final response = await dio.get(url);
-          if (response.data['requiredChannels'] != null) {
-            requiredChannels = List<String>.from(response.data['requiredChannels']);
-          }
-          break;
-        } catch (_) {}
+      try {
+        final response = await dio.get('${AppConfig.baseUrl}/settings/onboarding');
+        if (response.data['requiredChannels'] != null) {
+          requiredChannels = List<String>.from(response.data['requiredChannels']);
+        }
+      } catch (_) {
+        debugPrint('Failed to fetch onboarding settings, using default channels.');
       }
 
       // ── Collect Device ID and GPS Location before registration ──
       final deviceId = await DeviceInfoService.getDeviceSuffix();
-      final gpsLocation = await _getCurrentLocation();
+      
+      // Use getLastKnownPosition or timeout getCurrentPosition to avoid 5+ second GPS hangs indoors
+      String gpsLocation = 'Unknown Location';
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+            Position? position = await Geolocator.getLastKnownPosition();
+            position ??= await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.medium,
+            ).timeout(const Duration(seconds: 2));
+            
+            gpsLocation = 'Lat: ${position.latitude.toStringAsFixed(4)}, Lng: ${position.longitude.toStringAsFixed(4)}';
+          }
+        }
+      } catch (e) {
+        debugPrint('Geolocator timeout or error: $e');
+      }
 
       setState(() => _isLoading = false);
 
@@ -191,6 +216,24 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF05070D),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            if (_currentStep > 0) {
+              setState(() => _currentStep--);
+            } else {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                SystemNavigator.pop();
+              }
+            }
+          },
+        ),
+      ),
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
         child: Container(
@@ -256,13 +299,37 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                                           child: const Icon(Icons.rocket_launch, color: Color(0xFF818CF8), size: 24),
                                         ),
                                         const SizedBox(width: 12),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: const [
-                                            Text('INVIFY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.5)),
-                                            Text('DEVICE TELEMETRY ONBOARDING', style: TextStyle(color: Color(0xFF818CF8), fontWeight: FontWeight.bold, fontSize: 9, letterSpacing: 1.0)),
-                                          ],
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: const [
+                                              Text('INVIFY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 1.5)),
+                                              Text('DEVICE TELEMETRY ONBOARDING', style: TextStyle(color: Color(0xFF818CF8), fontWeight: FontWeight.bold, fontSize: 9, letterSpacing: 1.0)),
+                                            ],
+                                          ),
                                         ),
+                                        if (_isServerReachable != null)
+                                          IconButton(
+                                            icon: Icon(
+                                              _isServerReachable! ? Icons.cloud_done : Icons.cloud_off,
+                                              color: _isServerReachable! ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                              size: 24,
+                                            ),
+                                            onPressed: () {
+                                              setState(() => _isServerReachable = null);
+                                              _pingServer();
+                                            },
+                                            tooltip: _isServerReachable! ? 'Connected to Server' : 'Server Unreachable (Tap to retry)',
+                                          )
+                                        else
+                                          const Padding(
+                                            padding: EdgeInsets.all(12.0),
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)),
+                                            ),
+                                          ),
                                       ],
                                     ),
                                     const SizedBox(height: 32),
@@ -755,7 +822,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
         final urls = [
           'http://localhost:3004/auth/link-device',
-          '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/auth/link-device',
+          '${AppConfig.baseUrl}/auth/link-device',
         ];
 
         bool linkSuccess = false;

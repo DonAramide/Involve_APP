@@ -1,5 +1,5 @@
 import type { DashboardDataProvider } from './DashboardDataProvider';
-import { MockDashboardProvider } from './MockDashboardProvider';
+
 import { StagingDashboardProvider } from './StagingDashboardProvider';
 import { ProdDashboardProvider } from './ProdDashboardProvider';
 import { getBuildVariant, BuildVariant } from '../../config/buildVariant';
@@ -13,7 +13,7 @@ export class DashboardProviderFactory {
       
       switch (variant) {
         case BuildVariant.LOCAL:
-          this.instance = new MockDashboardProvider();
+          this.instance = new StagingDashboardProvider();
           break;
         case BuildVariant.STAGING:
           this.instance = new StagingDashboardProvider();

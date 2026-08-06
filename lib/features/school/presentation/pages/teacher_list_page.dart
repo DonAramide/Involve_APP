@@ -53,7 +53,18 @@ class _TeacherListPageState extends State<TeacherListPage> {
               padding: const EdgeInsets.all(8),
               itemBuilder: (context, index) {
                 final teacher = state.teachers[index];
-                final assignedClass = state.classes.where((c) => c.id == teacher.classId).firstOrNull?.name ?? 'No Class';
+                final List<String> classNames = state.classes
+                    .where((c) => teacher.classIds?.contains(c.id) == true || c.id == teacher.classId)
+                    .map((c) => c.name)
+                    .toList();
+                final assignedClass = classNames.isNotEmpty ? classNames.join(', ') : 'No Class';
+                final teacherSubjects = state.subjects
+                    .where((s) => s.teacherId == teacher.id)
+                    .map((s) => s.name)
+                    .toList();
+                final subjectsText = teacherSubjects.isNotEmpty
+                    ? '  •  Subject: ${teacherSubjects.join(", ")}'
+                    : '';
 
                 return Card(
                   elevation: 2,
@@ -63,7 +74,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
                       child: teacher.image == null ? const Icon(Icons.person) : null,
                     ),
                     title: Text(teacher.fullName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('${teacher.profession ?? 'Staff'}  •  Class: $assignedClass'),
+                    subtitle: Text('${teacher.profession ?? 'Staff'}  •  Class: $assignedClass$subjectsText'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.push(

@@ -60,11 +60,14 @@ class GlobalTransactionTile extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      studentName,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                    Flexible(
+                      child: Text(
+                        studentName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -77,6 +80,8 @@ class GlobalTransactionTile extends StatelessWidget {
                     fontSize: 12,
                     color: Colors.grey.shade500,
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ],
             ),

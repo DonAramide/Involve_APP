@@ -31,9 +31,9 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
   late TextEditingController salaryCtrl;
   late TextEditingController certCtrl;
   DateTime? selectedEmploymentDate;
-  int? selectedClassId;
+  List<int> selectedClassIds = [];
   Uint8List? imageBytes;
-
+ 
   @override
   void initState() {
     super.initState();
@@ -43,7 +43,9 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
     salaryCtrl = TextEditingController(text: widget.teacher?.salary.toString() ?? '0');
     certCtrl = TextEditingController(text: widget.teacher?.certificates);
     selectedEmploymentDate = widget.teacher?.employmentDate ?? DateTime.now();
-    selectedClassId = widget.teacher?.classId;
+    selectedClassIds = widget.teacher?.classIds != null
+        ? List<int>.from(widget.teacher!.classIds!)
+        : (widget.teacher?.classId != null ? [widget.teacher!.classId!] : []);
     imageBytes = widget.teacher?.image;
   }
 
@@ -135,15 +137,26 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                         enabled: !state.isLoading,
                         decoration: const InputDecoration(labelText: 'Profession/Role', border: OutlineInputBorder()),
                       ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<int>(
-                        value: selectedClassId,
-                        decoration: const InputDecoration(labelText: 'Assign to Class', border: OutlineInputBorder()),
-                        items: [
-                          const DropdownMenuItem<int>(value: null, child: Text('None')),
-                          ...state.classes.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
-                        ],
-                        onChanged: state.isLoading ? null : (v) => setState(() => selectedClassId = v),
+                      GestureDetector(
+                        onTap: state.isLoading ? null : () => _showMultiSelectClassesDialog(context, state.classes),
+                        child: AbsorbPointer(
+                          child: TextFormField(
+                            key: ValueKey(selectedClassIds.length),
+                            decoration: const InputDecoration(
+                              labelText: 'Assign to Classes',
+                              border: OutlineInputBorder(),
+                              suffixIcon: Icon(Icons.arrow_drop_down),
+                            ),
+                            controller: TextEditingController(
+                              text: selectedClassIds.isEmpty
+                                  ? 'None'
+                                  : state.classes
+                                      .where((c) => selectedClassIds.contains(c.id))
+                                      .map((c) => c.name)
+                                      .join(', '),
+                            ),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -201,7 +214,8 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
                             fullName: nameCtrl.text,
                             phone: phoneCtrl.text,
                             profession: professionCtrl.text,
-                            classId: selectedClassId,
+                            classId: selectedClassIds.isNotEmpty ? selectedClassIds.first : null,
+                            classIds: selectedClassIds,
                             salary: double.tryParse(salaryCtrl.text) ?? 0.0,
                             employmentDate: selectedEmploymentDate ?? DateTime.now(),
                             certificates: certCtrl.text,
@@ -223,6 +237,49 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
           );
         },
       ),
+    );
+  }
+
+  void _showMultiSelectClassesDialog(BuildContext context, List<SchoolClass> classes) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Select Classes'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: classes.map((c) {
+                    final isSelected = selectedClassIds.contains(c.id);
+                    return CheckboxListTile(
+                      title: Text(c.name),
+                      value: isSelected,
+                      onChanged: (checked) {
+                        setDialogState(() {
+                          if (checked == true) {
+                            selectedClassIds.add(c.id!);
+                          } else {
+                            selectedClassIds.remove(c.id);
+                          }
+                        });
+                        setState(() {});
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

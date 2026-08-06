@@ -9,6 +9,7 @@ import '../../../printer/presentation/bloc/printer_state.dart';
 import '../../domain/templates/invoice_template.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
 import '../pages/receipt_preview_page.dart';
+import '../pages/invoice_success_page.dart';
 import '../../domain/templates/concrete_templates.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import '../../../settings/domain/entities/settings.dart';
@@ -24,7 +25,9 @@ import 'package:involve_app/features/school_finance/domain/repositories/finance_
 import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/core/offline/offline_webhook_service.dart';
 import 'package:involve_app/core/utils/iso_response_codes.dart';
+import 'package:involve_app/core/mpos/mpos_device_type.dart';
 import 'package:dio/dio.dart';
+import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 
 class InvoicePreviewDialog extends StatefulWidget {
   final InvoiceBloc invoiceBloc;
@@ -40,6 +43,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   bool _isInitialized = false;
   TerminalConfig? _terminalConfig;
   bool _isProcessingPos = false;
+  double? _customerWalletCredit;
+  String? _loadedWalletCustomerId;
 
   @override
   void initState() {
@@ -55,6 +60,109 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       setState(() {
         _terminalConfig = config;
       });
+  }
+
+  /// Credit available for wallet pay = abs(negative balance). Owing (positive) = 0 credit.
+  double _creditFromBalance(double balance) =>
+      balance < 0 ? -balance : 0.0;
+
+  Future<void> _ensureCustomerWalletCredit(String? customerId) async {
+    if (customerId == null || customerId.isEmpty) {
+      if (_customerWalletCredit != null || _loadedWalletCustomerId != null) {
+        setState(() {
+          _customerWalletCredit = null;
+          _loadedWalletCustomerId = null;
+        });
+      }
+      return;
+    }
+    if (_loadedWalletCustomerId == customerId && _customerWalletCredit != null) {
+      return;
+    }
+    try {
+      final customer =
+          await context.read<IServicesRepository>().getCustomerById(customerId);
+      if (!mounted) return;
+      setState(() {
+        _loadedWalletCustomerId = customerId;
+        _customerWalletCredit =
+            customer == null ? 0.0 : _creditFromBalance(customer.balance);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadedWalletCustomerId = customerId;
+        _customerWalletCredit = 0.0;
+      });
+    }
+  }
+
+  Future<bool> _validateWalletBalance(
+      BuildContext context, InvoiceState invoiceState) async {
+    final customerId = invoiceState.customerId;
+    if (customerId == null || customerId.isEmpty) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Customer Required'),
+          content: const Text(
+              'Select a customer before paying with Customer Wallet/Credit.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+          ],
+        ),
+      );
+      return false;
+    }
+
+    final customer =
+        await context.read<IServicesRepository>().getCustomerById(customerId);
+    if (!mounted) return false;
+
+    if (customer == null) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Customer Not Found'),
+          content: const Text(
+              'Could not load this customer’s wallet balance. Please re-select the customer.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+          ],
+        ),
+      );
+      return false;
+    }
+
+    final availableCredit = _creditFromBalance(customer.balance);
+    setState(() {
+      _loadedWalletCustomerId = customerId;
+      _customerWalletCredit = availableCredit;
+    });
+
+    if (availableCredit + 1e-9 < invoiceState.total) {
+      final currency = '₦';
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Insufficient Wallet Credit'),
+          content: Text(
+            'This customer does not have enough wallet credit for this invoice.\n\n'
+            'Available credit: $currency${availableCredit.toStringAsFixed(2)}\n'
+            'Invoice total: $currency${invoiceState.total.toStringAsFixed(2)}\n\n'
+            'Choose another payment method or top up the customer wallet first.',
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('OK'))
+          ],
+        ),
+      );
+      return false;
+    }
+    return true;
   }
 
   void _onAmountChanged() {
@@ -77,6 +185,12 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           return BlocBuilder<SettingsBloc, SettingsState>(
             builder: (context, settingsState) {
               final settings = settingsState.settings;
+
+              if (invoiceState.customerId != null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _ensureCustomerWalletCredit(invoiceState.customerId);
+                });
+              }
 
               // Initialize amount received once total and method are available
               if (!_isInitialized && settings != null) {
@@ -459,6 +573,11 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       BuildContext context, InvoiceState invoiceState, AppSettings? settings,
       {required bool printReceipt}) async {
     try {
+      if (invoiceState.paymentMethod == 'Wallet') {
+        final ok = await _validateWalletBalance(context, invoiceState);
+        if (!ok) return;
+      }
+
       MposTransactionData? posTransactionData;
       final amountReceivedText =
           double.tryParse(_amountReceivedController.text) ?? 0.0;
@@ -535,11 +654,20 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         final webhookUrl = routingRules['webhookUrl'] as String?;
 
         final activeHost = _terminalConfig?.activeHost ?? 'MEDUSA';
+        final deviceType = MposDeviceType.channelValue(
+          MposDeviceType.resolve(_terminalConfig?.terminalType),
+        );
+        // MoreFun MP63 always processes on-device against NIBSS.
+        final effectiveProcessOnDevice =
+            MposDeviceType.isMoreFun(_terminalConfig?.terminalType)
+                ? true
+                : processOnDevice;
         var result = await MposService().initiatePayment(
           amount: amountToCharge,
           terminalId: terminalId,
           activeHost: activeHost,
-          processOnDevice: processOnDevice,
+          processOnDevice: effectiveProcessOnDevice,
+          deviceType: deviceType,
         );
 
         if (result.status != 'payment_success' &&
@@ -555,7 +683,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
               amount: amountToCharge,
               terminalId: terminalId,
               activeHost: secondaryHostName,
-              processOnDevice: processOnDevice,
+              processOnDevice: effectiveProcessOnDevice,
+              deviceType: deviceType,
             );
           }
         }
@@ -695,7 +824,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
       double changeGiven = 0.0;
       double finalAmountPaid = amountReceived;
-      if (amountReceived > invoiceState.total) {
+      if (invoiceState.paymentMethod == 'VirtualAccount') {
+        finalAmountPaid = 0.0;
+      } else if (amountReceived > invoiceState.total) {
         if (settings?.allowGiveChange == true &&
             (invoiceState.paymentMethod == 'POS' ||
                 invoiceState.paymentMethod == 'Transfer')) {
@@ -707,9 +838,12 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
       final invoiceNumber =
           widget.invoiceBloc.calculationService.generateInvoiceNumber();
-      final status = amountReceived >= invoiceState.total
-          ? 'Paid'
-          : (amountReceived <= 0 ? 'Unpaid' : 'Partial');
+      final status = (invoiceState.paymentMethod == 'Transfer' ||
+              invoiceState.paymentMethod == 'VirtualAccount')
+          ? 'Pending'
+          : (amountReceived >= invoiceState.total
+              ? 'Paid'
+              : (amountReceived <= 0 ? 'Unpaid' : 'Partial'));
 
       final invoice = Invoice(
         id: 0,
@@ -786,21 +920,18 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           invoiceNumber: invoiceNumber,
           amountPaid: finalAmountPaid,
           changeGiven: changeGiven,
+          paymentStatus: status,
         ));
       }
 
-      // 3. Immediately navigate
+      // 3. Immediately navigate to success page
       if (mounted) {
         final nav = Navigator.of(context);
         nav.popUntil(
             (route) => route.settings.name == '/dashboard' || route.isFirst);
-        if (printReceipt) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Invoice saved!'), backgroundColor: Colors.green));
-        } else {
-          nav.push(MaterialPageRoute(
-              builder: (_) => ReceiptPreviewPage(invoice: invoice)));
-        }
+        nav.push(MaterialPageRoute(
+            builder: (_) => InvoiceSuccessPage(invoice: invoice),
+            settings: const RouteSettings(name: '/invoice_success')));
       }
     } catch (e) {
       if (!mounted) return;
@@ -891,7 +1022,7 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
               : null,
         ),
         RadioListTile<String>(
-          title: const Text('Transfer'),
+          title: const Text('Transfer (Personal Company account)'),
           value: 'Transfer',
           groupValue: state.paymentMethod,
           dense: true,
@@ -924,7 +1055,9 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           groupValue: state.paymentMethod,
           dense: true,
           contentPadding: EdgeInsets.zero,
-          onChanged: state.customerId != null
+          onChanged: state.customerId != null &&
+                  (_customerWalletCredit == null ||
+                      _customerWalletCredit! + 1e-9 >= state.total)
               ? (val) {
                   context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
                   _amountReceivedController.text =
@@ -934,7 +1067,22 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           subtitle: state.customerId == null
               ? const Text('Please select a customer first.',
                   style: TextStyle(fontSize: 10, color: Colors.grey))
-              : null,
+              : (_customerWalletCredit == null ||
+                      _loadedWalletCustomerId != state.customerId)
+                  ? const Text('Checking wallet credit…',
+                      style: TextStyle(fontSize: 10, color: Colors.grey))
+                  : Text(
+                      _customerWalletCredit! + 1e-9 >= state.total
+                          ? 'Credit available: ₦${_customerWalletCredit!.toStringAsFixed(2)}'
+                          : 'Insufficient credit: ₦${_customerWalletCredit!.toStringAsFixed(2)} (need ₦${state.total.toStringAsFixed(2)})',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: _customerWalletCredit! + 1e-9 >= state.total
+                            ? Colors.green.shade700
+                            : Colors.red,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
         ),
         RadioListTile<String>(
           title: const Text('Pay Later (deferred)/ part payment',

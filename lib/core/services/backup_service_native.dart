@@ -16,11 +16,39 @@ class BackupService {
 
   Future<String> getDatabasePath() async {
     if (kIsWeb) return dbName;
+    
+    // 1. Try Sqflite Databases Path (most common on mobile)
+    try {
+      final dbFolder = await sqflite.getDatabasesPath();
+      final path = p.join(dbFolder, dbName);
+      if (await File(path).exists()) {
+        return path;
+      }
+    } catch (_) {}
+
+    // 2. Try Application Documents Path
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final path = p.join(docsDir.path, dbName);
+      if (await File(path).exists()) {
+        return path;
+      }
+    } catch (_) {}
+
+    // 3. Try Application Support Path (common on Desktop fallbacks)
+    try {
+      final supportDir = await getApplicationSupportDirectory();
+      final path = p.join(supportDir.path, dbName);
+      if (await File(path).exists()) {
+        return path;
+      }
+    } catch (_) {}
+
+    // Default fallback to Sqflite Databases Path
     try {
       final dbFolder = await sqflite.getDatabasesPath();
       return p.join(dbFolder, dbName);
     } catch (e) {
-      // Fallback to documents if sqflite fails
       final docsDir = await getApplicationDocumentsDirectory();
       return p.join(docsDir.path, dbName);
     }

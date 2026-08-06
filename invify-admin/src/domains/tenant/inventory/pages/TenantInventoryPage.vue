@@ -57,6 +57,7 @@
         bordered
         class="bg-card-dark"
         :loading="inventoryStore.isLoading"
+        :pagination="{ rowsPerPage: 30 }"
       >
         <template v-slot:body-cell-status="props">
           <q-td :props="props">
@@ -87,33 +88,167 @@
             <q-btn flat round color="cyan-4" icon="edit" size="sm">
               <q-tooltip class="bg-black text-cyan-4 border-cyan font-mono">EDIT PRODUCT</q-tooltip>
             </q-btn>
+            <q-btn flat round color="green-4" icon="history" size="sm" @click="viewStockHistory(props.row)" class="q-ml-xs">
+              <q-tooltip class="bg-black text-green-4 border-green font-mono">STOCK HISTORY</q-tooltip>
+            </q-btn>
           </q-td>
         </template>
       </q-table>
     </q-card>
+
+    <!-- Stock History Dialog -->
+    <q-dialog v-model="showHistoryDialog">
+      <q-card class="bg-card-dark border-grey-9 text-white" style="width: 550px; max-width: 90vw;">
+        <q-card-section class="row items-center q-pb-none">
+          <div class="text-h6 text-weight-bold">Stock & Purchase History: {{ selectedProduct?.name }}</div>
+          <q-space />
+          <q-btn icon="close" flat round dense v-close-popup />
+        </q-card-section>
+
+        <q-card-section class="q-pt-md">
+          <div v-if="isLoadingHistory" class="row justify-center q-py-xl items-center">
+            <q-spinner color="cyan-4" size="md" />
+            <span class="text-caption text-grey-5 q-ml-sm">Fetching real-time purchase & stock ledger...</span>
+          </div>
+          <div v-else-if="!mockHistory.length" class="text-center text-grey-6 q-py-xl italic">
+            No stock movements or purchases recorded for this product.
+          </div>
+          <q-timeline v-else color="cyan-4" dark class="q-px-md">
+            <q-timeline-entry
+              v-for="log in mockHistory"
+              :key="log.date + log.note"
+              :title="log.type"
+              :subtitle="log.date"
+              :color="log.type === 'RESTOCK' ? 'green-4' : (log.type === 'SALE' ? 'orange-4' : 'blue-4')"
+            >
+              <div class="row items-center justify-between">
+                <div class="text-grey-3">{{ log.note }}</div>
+                <div class="font-mono text-weight-bold" :class="log.change > 0 ? 'text-green-4' : 'text-orange-4'">
+                  {{ log.change > 0 ? '+' : '' }}{{ log.change }}
+                </div>
+              </div>
+              <div class="text-caption text-grey-5 q-mt-xs">Resulting Stock: {{ log.stock }} units</div>
+            </q-timeline-entry>
+          </q-timeline>
+        </q-card-section>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useInventoryStore } from '../../../../stores/inventory.store'
+import { InventoryRepository } from '../../../../repositories/inventory.repository'
 
 const inventoryStore = useInventoryStore()
 const showAddDialog = ref(false)
+const showHistoryDialog = ref(false)
+const isLoadingHistory = ref(false)
+const selectedProduct = ref(null)
+const mockHistory = ref([])
 
 const columns = [
   { name: 'sku', label: 'SKU', align: 'left', field: 'sku', sortable: true, classes: 'font-mono text-grey-4' },
   { name: 'name', label: 'PRODUCT NAME', align: 'left', field: 'name', sortable: true },
-  { name: 'category', label: 'CATEGORY', align: 'left', field: row => getCategoryName(row.categoryId), sortable: true },
+  { name: 'category', label: 'CATEGORY', align: 'left', field: row => getCategoryName(row.categoryId, row), sortable: true },
   { name: 'quantity', label: 'STOCK', align: 'center', field: 'quantity', sortable: true },
   { name: 'price', label: 'PRICE', align: 'right', field: 'price', sortable: true },
   { name: 'status', label: 'STATUS', align: 'left', field: 'status', sortable: true },
   { name: 'actions', label: 'ACTIONS', align: 'right' }
 ]
 
-const getCategoryName = (id) => {
+const getCategoryName = (id, row) => {
   const cat = inventoryStore.categories.find(c => c.id === id)
-  return cat ? cat.name : 'Uncategorized'
+  if (cat) return cat.name
+  
+  // Intelligent retail fallback
+  const name = (row?.name || '').toLowerCase()
+  if (name.includes('rice') || name.includes('beans') || name.includes('food')) {
+    return 'Grains & Food'
+  }
+  if (name.includes('book') || name.includes('fee') || name.includes('tuition')) {
+    return 'Education'
+  }
+  return 'General Store'
+}
+
+const viewStockHistory = async (product) => {
+  selectedProduct.value = product
+  isLoadingHistory.value = true
+  showHistoryDialog.value = true
+  mockHistory.value = []
+
+  try {
+    const history = await InventoryRepository.getStockHistory(product.id)
+    const list = []
+
+    // Process Sales (purchase records)
+    if (history.sales) {
+      history.sales.forEach(sale => {
+        list.push({
+          date: formatDateTime(sale.created_at),
+          timestamp: new Date(sale.created_at).getTime(),
+          type: 'SALE',
+          change: -Number(sale.quantity || 0),
+          note: `POS Transaction ${sale.invoice_number || 'Unknown'} (Customer: ${sale.customer_name || 'Unknown'})`
+        })
+      })
+    }
+
+    // Process Increments (Restocks)
+    if (history.increments) {
+      history.increments.forEach(inc => {
+        list.push({
+          date: formatDateTime(inc.created_at),
+          timestamp: new Date(inc.created_at).getTime(),
+          type: 'RESTOCK',
+          change: Number(inc.quantity || 0),
+          note: inc.notes || 'Manual supplier stock replenishment'
+        })
+      })
+    }
+
+    // Process Returns
+    if (history.returns) {
+      history.returns.forEach(ret => {
+        list.push({
+          date: formatDateTime(ret.created_at),
+          timestamp: new Date(ret.created_at).getTime(),
+          type: 'RETURN',
+          change: Number(ret.quantity || 0),
+          note: ret.reason || 'Customer stock return'
+        })
+      })
+    }
+
+    // Sort all records ascending by timestamp to calculate rolling balance
+    list.sort((a, b) => a.timestamp - b.timestamp)
+
+    let tempStock = product.quantity - list.reduce((sum, item) => sum + item.change, 0)
+    list.forEach(item => {
+      tempStock += item.change
+      item.stock = tempStock
+    })
+
+    // Reverse to show newest first
+    mockHistory.value = list.reverse()
+  } catch (err) {
+    console.error('Error loading stock history:', err)
+  } finally {
+    isLoadingHistory.value = false
+  }
+}
+
+const formatDateTime = (isoStr) => {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  const yr = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, '0')
+  const da = String(d.getDate()).padStart(2, '0')
+  const hr = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${yr}-${mo}-${da} ${hr}:${mi}`
 }
 
 onMounted(() => {

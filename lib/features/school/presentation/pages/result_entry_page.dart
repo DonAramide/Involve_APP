@@ -19,6 +19,9 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
   // Controllers keyed by studentId. These are NEVER cleared after a save —
   // only cleared when class/subject changes. Values are updated via .text= after reload.
   final Map<int, Map<String, TextEditingController>> _controllers = {};
+  // True while waiting for fresh DB results after a class/subject change.
+  // Prevents stale results from seeding new controllers.
+  bool _loadingNewSelection = false;
 
   @override
   void initState() {
@@ -41,10 +44,15 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
 
   /// Only initialises controllers for students not yet in the map.
   /// Does NOT overwrite controllers the user is actively editing.
+  /// When [_loadingNewSelection] is true, always defaults to 0.0 to avoid
+  /// seeding from stale results belonging to the previously selected subject.
   void _initControllers(List<Student> classStudents, List<AcademicResult> existingResults) {
     for (var student in classStudents) {
       if (!_controllers.containsKey(student.id)) {
-        final result = existingResults.where((r) => r.studentId == student.id).firstOrNull;
+        // Only seed from DB results when we are NOT in a pending-load state
+        final result = _loadingNewSelection
+            ? null
+            : existingResults.where((r) => r.studentId == student.id).firstOrNull;
         _controllers[student.id!] = {
           'ca': TextEditingController(text: result?.assessmentScore.toString() ?? '0.0'),
           'exam': TextEditingController(text: result?.examScore.toString() ?? '0.0'),
@@ -56,15 +64,19 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
 
   /// Updates .text on existing controllers from fresh DB results without
   /// replacing the controller instances (which would lose focus / widget links).
+  /// Also resets [_loadingNewSelection] so future builder calls can seed from results.
   void _refreshControllersFromResults(List<AcademicResult> results) {
     _controllers.forEach((studentId, controllerMap) {
       final result = results.where((r) => r.studentId == studentId).firstOrNull;
-      if (result != null) {
-        controllerMap['ca']?.text = result.assessmentScore.toString();
-        controllerMap['exam']?.text = result.examScore.toString();
-        controllerMap['remarks']?.text = result.remarks ?? '';
-      }
+      // Always set the value — use 0.0 when no saved result exists for this student
+      controllerMap['ca']?.text = result?.assessmentScore.toString() ?? '0.0';
+      controllerMap['exam']?.text = result?.examScore.toString() ?? '0.0';
+      controllerMap['remarks']?.text = result?.remarks ?? '';
     });
+    // Results are now fresh — allow future builder calls to read from state.results
+    if (_loadingNewSelection) {
+      setState(() => _loadingNewSelection = false);
+    }
   }
 
   void _disposeControllers() {
@@ -88,7 +100,8 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
       listenWhen: (prev, curr) =>
           prev.status != curr.status ||
           prev.error != curr.error ||
-          prev.results != curr.results,
+          prev.results != curr.results ||
+          (prev.isLoading && !curr.isLoading),
       listener: (context, state) {
         if (state.status == SchoolStatus.success) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -108,10 +121,12 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
           context.read<SchoolBloc>().add(ResetSchoolStatus());
         }
 
-        // Always update controllers when results change, not just on initial status
-        if (state.results.isNotEmpty) {
-          _refreshControllersFromResults(state.results);
-        }
+        // Always update controllers when results arrive (even empty means no scores saved yet).
+        // listenWhen already gates this to: results changed OR isLoading went true→false.
+        // Using a post-frame callback ensures controllers exist before we update them.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _refreshControllersFromResults(state.results);
+        });
       },
       buildWhen: (prev, curr) =>
           prev.isLoading != curr.isLoading ||
@@ -166,7 +181,7 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
   Widget _buildFilters(SchoolState state) {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Theme.of(context).primaryColor.withOpacity(0.05),
+      color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
       child: Column(
         children: [
           Row(
@@ -181,6 +196,7 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
                     _disposeControllers();
                     setState(() {
                       _selectedClassId = val;
+                      _loadingNewSelection = true;
                     });
                     _loadExistingResults();
                   },
@@ -197,6 +213,7 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
                     _disposeControllers();
                     setState(() {
                       _selectedSubjectId = val;
+                      _loadingNewSelection = true;
                     });
                     _loadExistingResults();
                   },

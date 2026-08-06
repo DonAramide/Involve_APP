@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
 class DeviceInfoService {
   static final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   static const MethodChannel _mposChannel = MethodChannel('com.invify.app/mpos');
@@ -55,7 +56,11 @@ class DeviceInfoService {
 
     // Clean and return the full hardware serial/device ID
     final cleanId = deviceId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
-    return cleanId.isEmpty ? 'UNKNOWN' : cleanId;
+    if (cleanId.isEmpty || cleanId == 'UNKNOWN') {
+      final persistentId = await SecurityService().getPersistentDeviceId();
+      return persistentId.replaceAll('-', '').toUpperCase();
+    }
+    return cleanId;
   }
 
   /// Returns the last 6 characters of the full device ID for activation purposes.

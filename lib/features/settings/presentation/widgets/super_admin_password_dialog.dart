@@ -15,6 +15,7 @@ class _SuperAdminPasswordDialogState extends State<SuperAdminPasswordDialog> {
   final _controller = TextEditingController();
   bool _passwordVisible = false;
   String? _errorMessage;
+  bool _hasPopped = false;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +32,8 @@ class _SuperAdminPasswordDialogState extends State<SuperAdminPasswordDialog> {
         }
         
         // Close dialog on successful authorization
-        if (state.isSuperAdminAuthorized) {
+        if (state.isSuperAdminAuthorized && !_hasPopped) {
+          _hasPopped = true;
           Navigator.of(context, rootNavigator: true).pop(true); // Return true to indicate success
         }
       },

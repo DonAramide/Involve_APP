@@ -62,7 +62,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 82;
+  int get schemaVersion => 85;
 
   @override
   MigrationStrategy get migration {
@@ -424,6 +424,18 @@ class AppDatabase extends _$AppDatabase {
         if (from < 82) {
           // Schema V82: Add mergePosReceipt setting
           await _safeAddColumn(m, settings, settings.mergePosReceipt);
+        }
+        if (from < 83) {
+          // Schema V83: Add classIds to Teachers table
+          await _safeAddColumn(m, teachers, teachers.classIds);
+        }
+        if (from < 84) {
+          // Schema V84: Add department field to Students table
+          await _safeAddColumn(m, students, students.department);
+        }
+        if (from < 85) {
+          // Schema V85: Add email field to Settings table
+          await _safeAddColumn(m, settings, settings.email);
         }
       },
       beforeOpen: (details) async {

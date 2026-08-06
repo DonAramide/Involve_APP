@@ -14,8 +14,8 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
       hex: '#6366f1',
       receiptFootnote: ''
     },
-    apiKey: 'sk_live_invify_9281x_quasar_8802a',
-    webhookUrl: 'https://mybusiness.com/api/v1/quasar-webhook',
+    apiKey: '',
+    webhookUrl: '',
     modules: [
       { id: 'school', name: 'School & Academy Management', desc: 'Provision curriculum tools, lesson report cards, student attendance logs, and academy tuition fee matrices.', icon: 'school', color: 'indigo-4' },
       { id: 'retail', name: 'Retail & POS Stock Operations', desc: 'Provision physical point-of-sale checkout speeds, inventory matrices, depletion alerts, and customer invoices.', icon: 'point_of_sale', color: 'amber-4' },
@@ -73,15 +73,39 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
     async loadBrandingPrefs() {
       this.isLoading = true;
       try {
-        const response = await api.get('/settings/onboarding'); // Load existing configuration if available
+        // 1. Load general branding prefs from onboarding settings
+        const response = await api.get('/settings/onboarding');
         if (response.data) {
-          this.webhookUrl = response.data.webhookUrl || this.webhookUrl;
-          this.apiKey = response.data.apiKey || this.apiKey;
+          if (response.data.webhookUrl) this.webhookUrl = response.data.webhookUrl;
+          if (response.data.apiKey) this.apiKey = response.data.apiKey;
         }
-        
+
         const savedBranding = localStorage.getItem('tenant_branding_prefs');
         if (savedBranding) {
           this.branding = JSON.parse(savedBranding);
+        }
+
+        // 2. Load provisioned Financial Platform credentials (public key only — secret never exposed)
+        try {
+          let tenantId = localStorage.getItem('tenant_id') || '';
+          if (!tenantId) {
+            const token = localStorage.getItem('token');
+            if (token) {
+              const payload = JSON.parse(atob(token.split('.')[1]));
+              tenantId = payload.tenantId || payload.tenant_id || payload.sub || '';
+            }
+          }
+          if (tenantId) {
+            const credResponse = await api.get(`/api/v1/tenants/${tenantId}/financial-platform/credentials`);
+            if (credResponse.data?.publicKey) {
+              this.apiKey = credResponse.data.publicKey;
+            }
+            // webhookEndpointId is not a URL — only overwrite if we have a real user-configured webhook URL
+            // (the endpoint ID is Quasar-internal; users configure their own webhook URL separately)
+          }
+        } catch (credErr) {
+          // Non-critical: credentials section just stays empty if not yet provisioned
+          console.info('[SettingStore] Financial platform not yet provisioned or credentials unavailable');
         }
       } catch (e) {
         console.warn('[SettingStore] Failed to fetch settings from backend:', e);
@@ -135,8 +159,9 @@ export const useTenantSettingStore = defineStore('tenantSetting', {
         // Rotate only works after activation — give a clear path if still unprovisioned
         try {
           const health = await api.get(`/api/v1/tenants/${tenantId}/financial-platform/health`);
-          const status = String(health.data?.platformStatus || health.data?.status || '').toLowerCase();
-          if (status && status !== 'active') {
+          const status = String(health.data?.platformStatus || health.data?.status || '').toUpperCase();
+          const ACTIVE_STATES = ['ACTIVE', 'PROVISIONED', 'HEALTHY', 'DEGRADED']; // all post-activation states
+          if (status && !ACTIVE_STATES.includes(status) && status !== '') {
             throw new Error(
               'Financial Platform is not ACTIVE yet. Go to Financial Platform → Activate, then regenerate.'
             );

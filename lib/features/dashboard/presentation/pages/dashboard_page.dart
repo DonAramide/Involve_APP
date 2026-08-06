@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/features/stock/presentation/pages/stock_management_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/create_invoice_page.dart';
 import 'package:involve_app/features/invoicing/presentation/history/pages/invoice_history_page.dart';
@@ -33,6 +34,7 @@ import 'package:involve_app/core/license/license_service.dart';
 import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
 import 'package:involve_app/features/activation/presentation/pages/go_pro_page.dart';
 import 'dart:async';
+import 'package:involve_app/services/socket_service.dart';
 import 'package:involve_app/core/sync/presentation/bloc/sync_bloc.dart';
 import '../../../../core/sync/presentation/widgets/sync_indicator.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
@@ -54,11 +56,15 @@ import 'package:involve_app/features/school/presentation/pages/app_user_guide_pa
 import 'package:involve_app/features/stock/presentation/pages/inventory_report_page.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/customer_lookup_page.dart';
 import 'package:involve_app/features/admin/presentation/pages/system_setup_page.dart';
+import 'package:involve_app/features/settings/domain/entities/staff.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_dialog.dart';
 
 import 'package:involve_app/services/terminal_sync_service.dart';
 import '../widgets/notification_bell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:involve_app/services/socket_service.dart' as import_socket_service;
+import 'package:http/http.dart' as http;
+import 'package:involve_app/core/utils/app_config.dart';
 
 class DashboardPage extends StatefulWidget {
   static const routeName = '/dashboard';
@@ -140,7 +146,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     children: [
                       Flexible(
                         child: Text(
-                          settings?.organizationName ?? 'Invify',
+                          _terminalConfig?.businessName ?? settings?.organizationName ?? 'Invify',
                           style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -206,6 +212,118 @@ class _DashboardPageState extends State<DashboardPage> {
                       isSyncing: isSyncing,
                       tooltip: tooltip,
                       onPressed: () => Navigator.pushNamed(context, '/device_sync'),
+                    );
+                  },
+                ),
+              const SizedBox(width: 4),
+              if (settings?.showNetworkIndicator == true)
+                FutureBuilder<bool>(
+                  future: StorageService.isOnlineSyncEnabled(),
+                  builder: (context, syncEnabledSnap) {
+                    final syncEnabled = syncEnabledSnap.data ?? true;
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: SocketService().isConnected,
+                      builder: (context, isConnected, child) {
+                        IconData icon;
+                        Color color;
+                        String tooltip;
+
+                        if (!syncEnabled) {
+                          icon = Icons.cloud_off;
+                          color = Colors.white.withOpacity(0.4);
+                          tooltip = 'Sync Disabled';
+                        } else {
+                          icon = isConnected ? Icons.cloud_done : Icons.cloud_off;
+                          color = isConnected ? Colors.greenAccent : Colors.redAccent;
+                          tooltip = isConnected ? 'Server Connected' : 'Server Offline';
+                        }
+
+                        return IconButton(
+                          icon: Icon(icon, size: 20, color: color),
+                          tooltip: tooltip,
+                          onPressed: () async {
+                            final isBasic = settingsState.userPlan == null || settingsState.userPlan!.isBasic;
+                            if (isBasic) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Cloud synchronization is a Pro/Standard Version feature.'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Show the gorgeous sync configuration dialog
+                            bool currentSync = await StorageService.isOnlineSyncEnabled();
+                            bool currentInvoice = await StorageService.isOnlineInvoiceUpdateEnabled();
+
+                            if (!context.mounted) return;
+
+                            showDialog(
+                              context: context,
+                              builder: (context) {
+                                return StatefulBuilder(
+                                  builder: (context, setDialogState) {
+                                    return AlertDialog(
+                                      title: const Row(
+                                        children: [
+                                          Icon(Icons.cloud_sync_rounded, color: Colors.blue),
+                                          SizedBox(width: 10),
+                                          Text('Sync Configuration'),
+                                        ],
+                                      ),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SwitchListTile(
+                                            title: const Text('Online Sync'),
+                                            subtitle: const Text('Synchronize data with the backend server in real-time'),
+                                            value: currentSync,
+                                            activeColor: Colors.blue,
+                                            onChanged: (val) async {
+                                              await StorageService.setOnlineSyncEnabled(val);
+                                              if (val) {
+                                                SocketService().reconnect();
+                                              } else {
+                                                SocketService().disconnect();
+                                              }
+                                              setDialogState(() {
+                                                currentSync = val;
+                                              });
+                                              // Trigger rebuild of the DashboardPage to update the AppBar icon immediately
+                                              setState(() {});
+                                            },
+                                          ),
+                                          const Divider(),
+                                          SwitchListTile(
+                                            title: const Text('Online Invoice Update'),
+                                            subtitle: const Text('Automatically upload created invoices to the cloud'),
+                                            value: currentInvoice,
+                                            activeColor: Colors.blue,
+                                            onChanged: (val) async {
+                                              await StorageService.setOnlineInvoiceUpdateEnabled(val);
+                                              setDialogState(() {
+                                                currentInvoice = val;
+                                              });
+                                              setState(() {});
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text('CLOSE'),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
                     );
                   },
                 ),
@@ -506,19 +624,22 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _verifyAndNavigateToFinance(BuildContext context, String routeName) {
-    final settingsBloc = context.read<SettingsBloc>();
-    
-    // Reset auth state to ensure listener catches new success
-    settingsBloc.add(ResetSystemAuth());
-    
-    // Show password dialog
-    showDialog<bool>(
+    showDialog<Staff>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) => PasswordDialog(bloc: settingsBloc),
-    ).then((authorized) {
-      if (authorized == true && context.mounted) {
-        Navigator.pushNamed(context, routeName);
+      builder: (dialogContext) => const StaffAuthDialog(),
+    ).then((staff) {
+      if (staff != null && context.mounted) {
+        if (staff.role == 'ADMIN' || staff.role == 'FINANCE' || staff.role == 'EXECUTIVE') {
+          Navigator.pushNamed(context, routeName);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Access Denied: Admin or Finance role required to view this section.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     });
   }

@@ -78,6 +78,9 @@ android {
                 "META-INF/DEPENDENCIES",
                 "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
             )
+            pickFirsts += listOf(
+                "META-INF/jdom-info.xml"
+            )
         }
     }
 }
@@ -88,4 +91,5 @@ flutter {
 
 dependencies {
     implementation(project(":mpossdk"))
+    implementation(project(":morefunsdk"))
 }

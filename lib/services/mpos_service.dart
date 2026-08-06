@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import '../core/mpos/mpos_device_type.dart';
 
 class MposService {
   static const MethodChannel _channel = MethodChannel('com.invify.app/mpos');
@@ -17,13 +18,20 @@ class MposService {
     });
   }
 
-  /// Initiates the pairing process with the Aisino POS device.
-  Future<MposResult> pairDevice({String? posSerialNumber}) async {
+  String _deviceTypeArg(String? deviceType) =>
+      deviceType ?? MposDeviceType.channelValue(MposDeviceFamily.aisino);
+
+  /// Initiates pairing with the assigned MPOS (Aisino VM30 or MoreFun MP63).
+  Future<MposResult> pairDevice({
+    String? posSerialNumber,
+    String? deviceType,
+  }) async {
     try {
       final result = await _channel.invokeMethod<Map<Object?, Object?>>(
         'pairDevice',
         {
           'posSerialNumber': posSerialNumber,
+          'deviceType': _deviceTypeArg(deviceType),
         },
       );
       return MposResult.fromMap(result);
@@ -42,7 +50,9 @@ class MposService {
     bool enableSsl = false,
     String? terminalId,
     String? key1,
+    String? key2,
     int? timeoutSeconds,
+    String? deviceType,
   }) async {
     try {
       final result = await _channel.invokeMethod<Map<Object?, Object?>>(
@@ -56,7 +66,9 @@ class MposService {
           'enableSsl': enableSsl,
           'terminalId': terminalId,
           'key1': key1,
+          'key2': key2,
           'timeoutSeconds': timeoutSeconds,
+          'deviceType': _deviceTypeArg(deviceType),
         },
       );
       return MposResult.fromMap(result);
@@ -74,6 +86,7 @@ class MposService {
     String? terminalId,
     String activeHost = 'MEDUSA',
     bool processOnDevice = false,
+    String? deviceType,
   }) async {
     try {
       final result = await _channel.invokeMethod<Map<Object?, Object?>>(
@@ -83,6 +96,7 @@ class MposService {
           'terminalId': terminalId,
           'activeHost': activeHost,
           'processOnDevice': processOnDevice,
+          'deviceType': _deviceTypeArg(deviceType),
         },
       );
       
@@ -94,10 +108,35 @@ class MposService {
       );
     }
   }
-  /// Gets the physical serial number of the paired MPOS device.
-  Future<String?> getMposSerialNumber() async {
+  /// Card balance inquiry (MoreFun/MP63). Uses ISO proc 310000.
+  Future<MposTransactionResponse> checkBalance({
+    String? terminalId,
+    String? deviceType,
+  }) async {
     try {
-      final result = await _channel.invokeMethod<String>('getMposSerialNumber');
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'checkBalance',
+        {
+          'terminalId': terminalId,
+          'deviceType': _deviceTypeArg(deviceType),
+        },
+      );
+      return MposTransactionResponse.fromMap(result);
+    } on PlatformException catch (e) {
+      return MposTransactionResponse(
+        status: 'error',
+        error: MposErrorData(message: e.message),
+      );
+    }
+  }
+
+  /// Gets the physical serial number of the paired MPOS device.
+  Future<String?> getMposSerialNumber({String? deviceType}) async {
+    try {
+      final result = await _channel.invokeMethod<String>(
+        'getMposSerialNumber',
+        {'deviceType': _deviceTypeArg(deviceType)},
+      );
       return result;
     } on PlatformException catch (e) {
       debugPrint('Failed to get MPOS serial number: ${e.message}');
@@ -106,9 +145,12 @@ class MposService {
   }
 
   /// Unpairs the MPOS device locally by clearing its address from the Android session manager.
-  Future<MposResult> unpairDevice() async {
+  Future<MposResult> unpairDevice({String? deviceType}) async {
     try {
-      final result = await _channel.invokeMethod<Map<Object?, Object?>>('unpairDevice');
+      final result = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'unpairDevice',
+        {'deviceType': _deviceTypeArg(deviceType)},
+      );
       return MposResult.fromMap(result);
     } on PlatformException catch (e) {
       print('PlatformException: ${e.message}'); return MposResult(status: 'failure', message: e.message ?? 'Unknown Platform Exception');
@@ -213,6 +255,8 @@ class MposTransactionData {
   final String? statusCode;
   final String? transactionType;
   final bool paymentSuccess;
+  final String? balance;
+  final String? currencyCode;
 
   MposTransactionData({
     this.aid,
@@ -230,6 +274,8 @@ class MposTransactionData {
     this.statusCode,
     this.transactionType,
     this.paymentSuccess = false,
+    this.balance,
+    this.currencyCode,
   });
 
   factory MposTransactionData.fromMap(Map<Object?, Object?> map) {
@@ -249,6 +295,8 @@ class MposTransactionData {
       statusCode: map['statusCode']?.toString(),
       transactionType: map['transactionType']?.toString(),
       paymentSuccess: map['paymentSuccess'] == true,
+      balance: map['balance']?.toString(),
+      currencyCode: map['currencyCode']?.toString(),
     );
   }
 
@@ -269,6 +317,8 @@ class MposTransactionData {
       'statusCode': statusCode,
       'transactionType': transactionType,
       'paymentSuccess': paymentSuccess,
+      'balance': balance,
+      'currencyCode': currencyCode,
     };
   }
 }

@@ -18,6 +18,7 @@ const loadStoredPrefs = () => {
     activeWorkspace: 'fleet',
     activeTenantScope: 'global', // Multi-tenant isolation boundary identifier ('global' | 'tenant-xyz')
     sidebarCollapsed: false,
+    sidebarWidth: 230,
     isDarkMode: true, // Default to dark mode as requested
     pinnedViews: ['/fleet/overview', '/governance/compliance', '/observability/streams'],
     recentHistory: [],
@@ -35,10 +36,12 @@ const loadStoredPrefs = () => {
     console.warn('Unable to load stored operator preferences, loading absolute defaults.')
   }
 
+  const rawWidth = Number(parsed.sidebarWidth)
   const merged = {
     ...defaults,
     ...parsed,
     activeTenantScope: parsed.activeTenantScope || 'global',
+    sidebarWidth: Number.isFinite(rawWidth) ? Math.min(420, Math.max(180, rawWidth)) : defaults.sidebarWidth,
     pinnedViews: Array.isArray(parsed.pinnedViews) ? parsed.pinnedViews : defaults.pinnedViews,
     recentHistory: Array.isArray(parsed.recentHistory) ? parsed.recentHistory : defaults.recentHistory,
     workspaceOrder: Array.isArray(parsed.workspaceOrder) ? parsed.workspaceOrder : defaults.workspaceOrder
@@ -128,6 +131,12 @@ export function useOperatorPreferences() {
     prefs.value.sidebarCollapsed = !prefs.value.sidebarCollapsed
   }
 
+  const setSidebarWidth = (width) => {
+    const next = Number(width)
+    if (!Number.isFinite(next)) return
+    prefs.value.sidebarWidth = Math.min(420, Math.max(180, Math.round(next)))
+  }
+
   const togglePinView = (path) => {
     const index = prefs.value.pinnedViews.indexOf(path)
     if (index === -1) {
@@ -188,6 +197,7 @@ export function useOperatorPreferences() {
     setActiveWorkspace,
     setTenantScope,
     toggleSidebarCollapse,
+    setSidebarWidth,
     toggleTheme: () => { prefs.value.isDarkMode = !prefs.value.isDarkMode },
     togglePinView,
     isViewPinned,

@@ -1,5 +1,5 @@
 // src/services/event.service.ts
-import { supabase } from '../db/supabase';
+import { supabaseAdmin } from '../db/supabase';
 
 export type FinancialEventType = 'payment.success' | 'payment.failed' | 'wallet.updated' | 'payout.success' | 'payout.failed';
 
@@ -7,7 +7,7 @@ export interface FinancialEventParams {
   type: FinancialEventType;
   reference: string;
   tenantId: string;
-  walletId: string;
+  walletId?: string | null;
   amount: number;
   idempotencyKey: string;
   metadata?: any;
@@ -25,13 +25,14 @@ export class FinancialEventService {
    */
   static async emit(params: FinancialEventParams) {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('financial_events')
         .insert({
+          event_type: params.type.startsWith('payout') ? 'PAYOUT_WITHDRAWAL' : 'INWARD_PAYMENT',
           type: params.type,
           reference: params.reference,
           tenant_id: params.tenantId,
-          wallet_id: params.walletId,
+          wallet_id: params.walletId || null,
           amount: params.amount,
           idempotency_key: params.idempotencyKey,
           metadata: params.metadata || {}

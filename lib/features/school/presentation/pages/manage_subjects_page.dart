@@ -6,6 +6,10 @@ import 'package:involve_app/features/school/domain/entities/school_entities.dart
 import 'package:collection/collection.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/presentation/widgets/super_admin_password_dialog.dart';
+
 class ManageSubjectsPage extends StatefulWidget {
   const ManageSubjectsPage({super.key});
 
@@ -165,23 +169,35 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
     );
   }
 
-  void _confirmDeleteSubject(BuildContext context, Subject subject) {
-    showDialog(
+  Future<void> _confirmDeleteSubject(BuildContext context, Subject subject) async {
+    final settingsBloc = context.read<SettingsBloc>();
+    settingsBloc.add(ResetSuperAdminAuth());
+
+    final authorized = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Subject?'),
-        content: Text('Are you sure you want to delete ${subject.name}? This might affect existing results.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          TextButton(
-            onPressed: () {
-              context.read<SchoolBloc>().add(DeleteSubjectEvent(subject.id!));
-              Navigator.pop(ctx);
-            },
-            child: const Text('DELETE', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (dialogContext) => SuperAdminPasswordDialog(bloc: settingsBloc),
     );
+
+    if (authorized == true) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Delete Subject?'),
+          content: Text('Are you sure you want to delete ${subject.name}? This might affect existing results.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+            TextButton(
+              onPressed: () {
+                context.read<SchoolBloc>().add(DeleteSubjectEvent(subject.id!));
+                Navigator.pop(ctx);
+              },
+              child: const Text('DELETE', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }

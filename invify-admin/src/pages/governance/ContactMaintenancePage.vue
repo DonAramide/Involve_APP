@@ -167,7 +167,6 @@ import { useQuasar } from 'quasar'
 import { adminApi } from '../../api'
 
 const $q = useQuasar()
-const API_BASE = import.meta.env.VITE_API_URL || ''
 
 // Contact form state
 const selectedTenant = ref('global')
@@ -262,6 +261,10 @@ const saveSettings = async () => {
 }
 
 const sendBroadcast = async () => {
+  if (!broadcastMessage.value.trim()) {
+    $q.notify({ color: 'warning', message: 'Please enter a broadcast message.' })
+    return
+  }
   broadcasting.value = true
   try {
     const payload = {
@@ -269,9 +272,7 @@ const sendBroadcast = async () => {
       targetType: broadcastTargetType.value,
       targetValue: broadcastTargetValue.value
     }
-    await axios.post(`${API_BASE}/admin/broadcast`, payload, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` }
-    })
+    await adminApi.sendBroadcast(payload)
     $q.notify({ color: 'positive', icon: 'campaign', message: 'Broadcast sent to active devices!' })
     broadcastMessage.value = ''
   } catch (error) {

@@ -54,6 +54,7 @@ export const useRuntimeStore = defineStore('runtime', {
   }),
   getters: {
     isReady: (state) => state.config !== null,
+    tenantId: (state) => state.config?.tenant?.id || '',
     businessMode: (state) => state.config?.tenant?.businessMode || '',
     subscriptionTier: (state) => state.config?.subscription.tier || 'Free',
     capabilities: (state) => state.config?.capabilities || {},

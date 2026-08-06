@@ -64,6 +64,7 @@ class Teachers extends Table {
   DateTimeColumn get employmentDate => dateTime().withDefault(currentDateAndTime)();
   TextColumn get certificates => text().nullable()();
   BlobColumn get image => blob().nullable()();
+  TextColumn get classIds => text().nullable()();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();
@@ -92,6 +93,7 @@ class Students extends Table {
   TextColumn get virtualAccountNumber => text().nullable()();
   TextColumn get virtualAccountBank => text().nullable()();
   TextColumn get virtualAccountStatus => text().nullable()();
+  TextColumn get department => text().nullable()();
 
   // Sync Columns
   TextColumn get syncId => text().nullable()();

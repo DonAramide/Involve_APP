@@ -101,7 +101,7 @@ export class IntegrationVaultService {
       vaultQuery = vaultQuery.eq('scope', 'GLOBAL');
     }
 
-    const { data: vault, error: vaultErr } = await vaultQuery.single();
+    const { data: vault, error: vaultErr } = await vaultQuery.maybeSingle();
     if (vaultErr || !vault) return null;
 
     // 2. Fetch ACTIVE credential
@@ -117,7 +117,7 @@ export class IntegrationVaultService {
     
     credQuery = credQuery.limit(1);
 
-    const { data: cred, error: credErr } = await credQuery.single();
+    const { data: cred, error: credErr } = await credQuery.maybeSingle();
 
     if (credErr || !cred) return null;
 
@@ -188,5 +188,66 @@ export class IntegrationVaultService {
       error_message: errorMessage || null
     });
     if (error) console.error('[Vault] Failed to log health:', error.message);
+  }
+
+  /**
+   * Ensures the global Quasar vault integration exists and stores/rotates the
+   * outbound webhook HMAC signing secret (from Quasar Outbound webhook defaults).
+   */
+  static async upsertQuasarWebhookSigningSecret(signingSecret: string, environment: string = 'PRODUCTION') {
+    const serviceIdentifier = 'quasar';
+    const keyName = 'QUASAR_WEBHOOK_SIGNING_SECRET';
+
+    let vaultId: string | null = null;
+    const { data: existing } = await supabaseAdmin
+      .from('integration_vault')
+      .select('id')
+      .eq('service_identifier', serviceIdentifier)
+      .eq('scope', 'GLOBAL')
+      .maybeSingle();
+
+    if (existing?.id) {
+      vaultId = existing.id;
+    } else {
+      const created = await this.registerIntegration({
+        service_identifier: serviceIdentifier,
+        name: 'Quasar Payments',
+        description: 'Quasar outbound webhook HMAC signing secret (x-quasar-signature) and payment credentials.',
+        category: 'PAYMENTS',
+        scope: 'GLOBAL',
+        tenant_id: null,
+      });
+      vaultId = created.id;
+    }
+
+    await this.addCredential(vaultId!, {
+      credential_type: 'WEBHOOK_SECRET',
+      environment,
+      plaintext_value: signingSecret,
+      key_name: keyName,
+      rotate_existing: true,
+    });
+
+    return { vaultId, keyName, environment };
+  }
+
+  /**
+   * Status-only check for Quasar webhook signing secret (never returns plaintext).
+   */
+  static async getQuasarWebhookSecretStatus(environment: string = 'PRODUCTION') {
+    const fromEnv = Boolean(process.env.QUASAR_WEBHOOK_SIGNING_SECRET && process.env.QUASAR_WEBHOOK_SIGNING_SECRET.length >= 10);
+    const fromVault = Boolean(
+      await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_WEBHOOK_SIGNING_SECRET'),
+    );
+
+    return {
+      configured: fromEnv || fromVault,
+      sources: {
+        runtimeEnv: fromEnv,
+        integrationVault: fromVault,
+      },
+      environment,
+      header: 'x-quasar-signature',
+    };
   }
 }

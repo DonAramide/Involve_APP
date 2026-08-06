@@ -11,6 +11,7 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'virtual_accounts_page.dart';
 
 class SchoolFinanceDashboardPage extends StatefulWidget {
   const SchoolFinanceDashboardPage({super.key});
@@ -45,6 +46,18 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
         centerTitle: false,
         actions: [
           TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const VirtualAccountsPage()),
+            ),
+            icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+            label: const Text('Virtual Accounts'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.indigo.shade700,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+          ),
+          TextButton.icon(
             onPressed: () => _showWithdrawalModal(),
             icon: const Icon(Icons.account_balance_rounded, size: 18),
             label: const Text('Withdraw'),
@@ -67,19 +80,41 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
           }
 
           if (state is FinanceError) {
+            final isNetwork = state.message.toLowerCase().contains('connection') || state.message.toLowerCase().contains('internet');
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                  const SizedBox(height: 16),
-                  Text(state.message),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => context.read<FinanceBloc>().add(LoadSchoolDashboard()),
-                    child: const Text('Retry'),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isNetwork ? Icons.cloud_off_rounded : Icons.error_outline_rounded,
+                      size: 64,
+                      color: Colors.blueGrey.shade400,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Connection Issue',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      state.message.replaceAll('Exception: ', '').replaceAll('FinanceApiException: ', ''),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.4),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => context.read<FinanceBloc>().add(LoadSchoolDashboard()),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           }

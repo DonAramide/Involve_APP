@@ -1,7 +1,7 @@
 // lib/features/school_finance/presentation/pages/notifications_page.dart
 
 import 'package:flutter/material.dart';
-import '../domain/repositories/notification_repository.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/notification_repository.dart';
 import '../../../../core/services/service_locator.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';

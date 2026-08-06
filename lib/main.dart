@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -11,6 +13,8 @@ import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:get_it/get_it.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/notification_repository.dart';
+import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
+import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:involve_app/features/school/data/repositories/school_repository_impl.dart';
@@ -91,7 +95,6 @@ import 'package:involve_app/features/school_billing/data/repositories/billing_re
 import 'package:involve_app/features/school_billing/presentation/bloc/billing_bloc.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
 import 'package:involve_app/features/services/data/repositories/services_repository_impl.dart';
-import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/services/data/services/services_backup_service.dart';
 import 'package:involve_app/features/services/domain/usecases/service_usecases.dart';
 import 'package:involve_app/features/services/presentation/bloc/services_bloc.dart';
@@ -144,10 +147,10 @@ void main() async {
   
   await dotenv.load(fileName: ".env");
 
-  // Initialize Supabase (User must replace these with real values)
+  // Initialize Supabase with staging credentials
   await Supabase.initialize(
-    url: 'https://placeholder-project.supabase.co',
-    anonKey: 'placeholder-anon-key',
+    url: 'https://rpcjelhacmkhzguljdgi.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwY2plbGhhY21raHpndWxqZGdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NjI1OTYsImV4cCI6MjA5NjIzODU5Nn0.9ncknpcqC-PLOufVr1IWJXweteuOEMm46qXzC25un2k',
   );
   
   // Set up global BLoC observer
@@ -298,15 +301,16 @@ class AppDependencies {
     // 2. License Service
     LicenseService.init(database);
     
-    final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
+    final String baseUrl = AppConfig.baseUrl;
 
     final financeRepoNew = FinanceRepository(
       FinanceApiClient(
         baseUrl: baseUrl,
-        getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
+        getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken ?? await SecurityService().getOfflineToken() ?? 'mock-super-admin',
         getTenantId: () async => await SecurityService().getTenantId(),
       ),
       FinanceRealtimeDataSourceImpl(Supabase.instance.client),
+      database,
     );
 
     // 3. Repositories
@@ -384,6 +388,10 @@ class AppDependencies {
     if (!sl.isRegistered<FinanceApiClient>()) {
       sl.registerSingleton<FinanceApiClient>(financeApiClient);
     }
+    if (!sl.isRegistered<IServicesRepository>()) {
+      sl.registerSingleton<IServicesRepository>(servicesRepo);
+    }
+    CustomerWalletCreditService.instance.bind(servicesRepo);
 
     return AppDependencies(
       database: database,
@@ -486,6 +494,7 @@ class InvolveApp extends StatefulWidget {
 class _InvolveAppState extends State<InvolveApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+  Timer? _outboxTimer;
 
   @override
   void initState() {
@@ -493,6 +502,16 @@ class _InvolveAppState extends State<InvolveApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkEmergencyLock();
       _initSocket();
+      _startOutboxSync();
+    });
+  }
+
+  void _startOutboxSync() {
+    // Initial trigger
+    widget.dependencies.outboxWorker.triggerSync();
+    // Run periodically every 30 seconds to auto-sync transactions/invoices/customers
+    _outboxTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      widget.dependencies.outboxWorker.triggerSync();
     });
   }
   
@@ -536,17 +555,19 @@ class _InvolveAppState extends State<InvolveApp> {
 
     // Attempt to connect immediately with cached or updated details
     socketService.initializeSocket(
-      dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004',
+      AppConfig.baseUrl,
       tenantId: config?.tenantId,
       plan: config?.plan,
       type: config?.type,
       deviceId: deviceId,
       businessName: config?.businessName,
+      token: Supabase.instance.client.auth.currentSession?.accessToken ?? await widget.dependencies.securityService.getOfflineToken() ?? 'mock-super-admin',
     );
   }
 
   @override
   void dispose() {
+    _outboxTimer?.cancel();
     import_socket_service.SocketService().dispose();
     super.dispose();
   }
@@ -645,6 +666,8 @@ class _InvolveAppState extends State<InvolveApp> {
           BlocProvider(
             create: (context) => FinanceBloc(
               repository: dependencies.financeRepository,
+              invoiceRepository: dependencies.invoiceRepository,
+              schoolRepository: dependencies.schoolRepository,
             ),
           ),
           BlocProvider(
@@ -689,10 +712,14 @@ class _InvolveAppState extends State<InvolveApp> {
         ],
 
         child: BlocBuilder<SettingsBloc, SettingsState>(
-        builder: (context, state) {
-          final themeMode = state.settings?.themeMode ?? 'system';
-          return GlobalPaymentNotificationListener(
-            navigatorKey: _navigatorKey,
+          buildWhen: (previous, current) {
+            return previous.settings?.themeMode != current.settings?.themeMode ||
+                   previous.settings?.primaryColor != current.settings?.primaryColor;
+          },
+          builder: (context, state) {
+            final themeMode = state.settings?.themeMode ?? 'system';
+            return GlobalPaymentNotificationListener(
+              navigatorKey: _navigatorKey,
             scaffoldMessengerKey: _scaffoldMessengerKey,
             child: MaterialApp(
               title: 'Invify',

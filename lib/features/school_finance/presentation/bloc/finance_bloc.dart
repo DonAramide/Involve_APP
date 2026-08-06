@@ -18,17 +18,27 @@ import '../../data/models/wallet_model.dart';
 import '../../domain/entities/student_financial_summary.dart';
 import '../../domain/entities/virtual_account.dart';
 
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+
 part 'finance_event.dart';
 part 'finance_state.dart';
 
 class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
   final IFinanceRepository repository;
+  final InvoiceRepository? invoiceRepository;
+  final SchoolRepository? schoolRepository;
   StreamSubscription? _realtimeSubscription;
   
   // Idempotency & Realtime Safety
   final Set<String> _processedTransactionRefs = {};
 
-  FinanceBloc({required this.repository}) : super(FinanceInitial()) {
+  FinanceBloc({
+    required this.repository,
+    this.invoiceRepository,
+    this.schoolRepository,
+  }) : super(FinanceInitial()) {
     on<LoadWallet>(_onLoadWallet);
     on<LoadTransactionHistory>(_onLoadTransactions);
     on<OnPaymentReceived>(_onPaymentReceived);
@@ -54,17 +64,57 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       final virtualAccount = results[1] as VirtualAccount?;
       final transactions = results[2] as List<FinancialTransaction>;
 
-      // Setup Real-time specifically for this student session if needed
-      // (Usually handled via a more persistent listener, but we ensure it's active)
-
       emit(FinanceProfileLoaded(
         summary: summary,
         virtualAccount: virtualAccount,
         transactions: transactions,
       ));
     } catch (e) {
-      debugPrint('❌ FinanceBloc Profile Error: $e');
-      emit(FinanceError('Failed to load student profile: $e'));
+      debugPrint('❌ FinanceBloc Profile Error: $e. Trying offline fallback...');
+      final studentIdInt = int.tryParse(event.studentId);
+      if (invoiceRepository != null && schoolRepository != null && studentIdInt != null) {
+        try {
+          final studentInvoices = await invoiceRepository!.getInvoicesByStudentId(studentIdInt);
+          
+          double totalPaid = studentInvoices.fold(0.0, (sum, i) => sum + i.amountPaid);
+          double outstandingBalance = studentInvoices.fold(0.0, (sum, i) => sum + i.balanceAmount);
+          double totalFees = totalPaid + outstandingBalance;
+
+          final summary = StudentFinancialSummary(
+            totalFees: totalFees,
+            totalPaid: totalPaid,
+            outstandingBalance: outstandingBalance,
+            currentBalance: 0.0,
+          );
+
+          final List<FinancialTransaction> offlineTx = [];
+          for (final inv in studentInvoices) {
+            offlineTx.add(FinancialTransaction(
+              id: inv.id.toString(),
+              walletId: event.studentId,
+              amount: inv.totalAmount,
+              type: TransactionType.credit,
+              reference: inv.invoiceNumber,
+              description: 'Fee Payment #${inv.invoiceNumber}',
+              balanceAfter: 0.0,
+              channel: inv.paymentMethod ?? 'Cash',
+              createdAt: inv.dateCreated,
+            ));
+          }
+          offlineTx.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+          emit(FinanceProfileLoaded(
+            summary: summary,
+            virtualAccount: null,
+            transactions: offlineTx,
+          ));
+        } catch (ex) {
+          debugPrint('❌ FinanceBloc Profile Offline Fallback Failed: $ex');
+          emit(FinanceError('Failed to load student profile: $e'));
+        }
+      } else {
+        emit(FinanceError('Failed to load student profile: $e'));
+      }
     }
   }
 
@@ -139,60 +189,65 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       }
       emit(currentState.copyWith(transactions: transactions));
     } catch (e) {
-      debugPrint('⚠️ FinanceBloc: Could not load transaction history: $e');
+      debugPrint('⚠️ FinanceBloc: Loading transactions failed: $e');
     }
   }
 
   Future<void> _onPaymentReceived(OnPaymentReceived event, Emitter<FinanceState> emit) async {
     if (state is! FinanceLoaded) return;
     final currentState = state as FinanceLoaded;
-    
-    final transaction = TransactionModel.fromJson(event.data);
-    
-    // 1. Idempotency Check
-    if (_processedTransactionRefs.contains(transaction.reference)) {
-      debugPrint('🛡️ FinanceBloc: Duplicate transaction ignored: ${transaction.reference}');
+
+    final tx = FinancialTransaction(
+      id: event.data['id']?.toString() ?? UniqueKey().toString(),
+      walletId: currentState.wallet.id,
+      amount: (event.data['amount'] as num).toDouble(),
+      type: event.data['type'] == 'credit' ? TransactionType.credit : TransactionType.debit,
+      reference: event.data['reference']?.toString() ?? '',
+      description: event.data['description']?.toString() ?? 'Virtual Account Payment Received',
+      balanceAfter: (event.data['balanceAfter'] as num?)?.toDouble() ?? currentState.wallet.balance,
+      channel: event.data['channel']?.toString() ?? 'Transfer',
+      createdAt: event.data['createdAt'] != null ? DateTime.parse(event.data['createdAt']) : DateTime.now(),
+    );
+
+    // Prevent duplicates
+    if (_processedTransactionRefs.contains(tx.reference)) {
+      debugPrint('⚠️ FinanceBloc: Duplicate realtime payment transaction ignored: ${tx.reference}');
       return;
     }
+    _processedTransactionRefs.add(tx.reference);
 
-    debugPrint('✅ FinanceBloc: Processing new transaction: ${transaction.reference}');
-    _processedTransactionRefs.add(transaction.reference);
+    final updatedTransactions = List<FinancialTransaction>.from(currentState.transactions)..insert(0, tx);
+    final double updatedBalance = (event.data['balanceAfter'] as num?)?.toDouble() ?? (currentState.wallet.balance + tx.amount);
 
-    // 2. Balance Integrity: Re-fetch balance from API instead of computing
-    try {
-      final newBalance = await repository.getWalletBalance(currentState.wallet.id);
-      debugPrint('📈 FinanceBloc: Reconciled Balance via API: $newBalance');
-      
-      final updatedWallet = currentState.wallet is WalletModel
-          ? (currentState.wallet as WalletModel).copyWith(balance: newBalance)
-          : currentState.wallet;
+    final updatedWallet = currentState.wallet is WalletModel
+        ? (currentState.wallet as WalletModel).copyWith(balance: updatedBalance)
+        : currentState.wallet;
 
-      final updatedList = [transaction, ...currentState.transactions];
-      emit(currentState.copyWith(
-        wallet: updatedWallet,
-        transactions: updatedList,
-      ));
-    } catch (e) {
-      debugPrint('⚠️ FinanceBloc: Balance reconciliation failed after payment: $e');
-    }
+    emit(currentState.copyWith(
+      wallet: updatedWallet,
+      transactions: updatedTransactions,
+    ));
   }
 
   Future<void> _onWalletUpdated(OnWalletUpdated event, Emitter<FinanceState> emit) async {
     if (state is! FinanceLoaded) return;
     final currentState = state as FinanceLoaded;
-    
+    final double freshBalance = (event.data['balance'] as num).toDouble();
+    final updatedWallet = currentState.wallet is WalletModel
+        ? (currentState.wallet as WalletModel).copyWith(balance: freshBalance)
+        : currentState.wallet;
+
     try {
-      // Always fetch fresh balance for integrity
-      final updatedWalletData = WalletModel.fromJson(event.data);
-      final freshBalance = await repository.getWalletBalance(updatedWalletData.id);
-      
-      debugPrint('🔄 FinanceBloc: Wallet updated event. Fresh Balance: $freshBalance');
+      final latestTransactions = await repository.getTransactions(currentState.wallet.id);
       
       emit(currentState.copyWith(
-        wallet: updatedWalletData.copyWith(balance: freshBalance),
+        wallet: updatedWallet,
+        transactions: latestTransactions,
       ));
     } catch (e) {
-      debugPrint('⚠️ FinanceBloc: Wallet update reconciliation failed: $e');
+      emit(currentState.copyWith(
+        wallet: updatedWallet,
+      ));
     }
   }
 
@@ -217,8 +272,83 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
         transactions: transactions,
       ));
     } catch (e) {
-      debugPrint('❌ FinanceBloc Dashboard Error: $e');
-      emit(FinanceError(e.toString()));
+      debugPrint('❌ FinanceBloc Dashboard Error: $e. Trying offline fallback...');
+      if (invoiceRepository != null && schoolRepository != null) {
+        try {
+          final invoices = await invoiceRepository!.getAllInvoices();
+          final students = await schoolRepository!.getStudents();
+          
+          double totalRevenue = invoices.fold(0.0, (sum, inv) => sum + inv.amountPaid);
+          double outstandingFees = invoices.fold(0.0, (sum, inv) => sum + inv.balanceAmount);
+          int paidCount = 0;
+          int owingCount = 0;
+          final studentInvoices = <int, List<Invoice>>{};
+          for (final inv in invoices) {
+            if (inv.studentId != null) {
+              studentInvoices.putIfAbsent(inv.studentId!, () => []).add(inv);
+            }
+          }
+          for (final entry in studentInvoices.entries) {
+            final totalBalance = entry.value.fold(0.0, (sum, i) => sum + i.balanceAmount);
+            if (totalBalance > 0) {
+              owingCount++;
+            } else {
+              paidCount++;
+            }
+          }
+          
+          final summary = SchoolFinancialSummary(
+            totalRevenue: totalRevenue,
+            outstandingFees: outstandingFees,
+            paidStudentsCount: paidCount,
+            owingStudentsCount: owingCount,
+            totalStudents: students.length,
+            lastUpdated: DateTime.now(),
+          );
+
+          final List<DailyRevenue> offlineChart = [];
+          final now = DateTime.now();
+          for (int i = 6; i >= 0; i--) {
+            final targetDate = now.subtract(Duration(days: i));
+            final dateStr = "${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}";
+            final dayRevenue = invoices.where((inv) {
+              final created = inv.dateCreated;
+              return created.year == targetDate.year &&
+                     created.month == targetDate.month &&
+                     created.day == targetDate.day;
+            }).fold(0.0, (sum, inv) => sum + inv.amountPaid);
+            offlineChart.add(DailyRevenue(date: dateStr, revenue: dayRevenue));
+          }
+
+          final List<FinancialTransaction> offlineTx = [];
+          for (final inv in invoices) {
+            offlineTx.add(FinancialTransaction(
+              id: inv.id.toString(),
+              walletId: 'local',
+              amount: inv.totalAmount,
+              type: TransactionType.credit,
+              reference: inv.invoiceNumber,
+              description: 'Fee Payment #${inv.invoiceNumber} for ${inv.customerName}',
+              balanceAfter: 0.0,
+              channel: inv.paymentMethod ?? 'Cash',
+              createdAt: inv.dateCreated,
+            ));
+          }
+          offlineTx.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final recentOfflineTx = offlineTx.take(50).toList();
+
+          emit(FinanceDashboardLoaded(
+            summary: summary,
+            chartData: offlineChart,
+            transactions: recentOfflineTx,
+          ));
+        } catch (ex) {
+          debugPrint('❌ FinanceBloc Dashboard Offline Fallback Failed: $ex');
+          emit(FinanceError(e.toString()));
+        }
+      } else {
+        emit(FinanceError(e.toString()));
+      }
     }
   }
 
@@ -235,7 +365,65 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
         transactions: transactions,
       ));
     } catch (e) {
-      debugPrint('⚠️ FinanceBloc: Dashboard refresh failed: $e');
+      debugPrint('⚠️ FinanceBloc: Dashboard refresh failed, trying offline fallback: $e');
+      if (invoiceRepository != null && schoolRepository != null) {
+        try {
+          final invoices = await invoiceRepository!.getAllInvoices();
+          final students = await schoolRepository!.getStudents();
+          
+          double totalRevenue = invoices.fold(0.0, (sum, inv) => sum + inv.amountPaid);
+          double outstandingFees = invoices.fold(0.0, (sum, inv) => sum + inv.balanceAmount);
+          int paidCount = 0;
+          int owingCount = 0;
+          final studentInvoices = <int, List<Invoice>>{};
+          for (final inv in invoices) {
+            if (inv.studentId != null) {
+              studentInvoices.putIfAbsent(inv.studentId!, () => []).add(inv);
+            }
+          }
+          for (final entry in studentInvoices.entries) {
+            final totalBalance = entry.value.fold(0.0, (sum, i) => sum + i.balanceAmount);
+            if (totalBalance > 0) {
+              owingCount++;
+            } else {
+              paidCount++;
+            }
+          }
+          
+          final summary = SchoolFinancialSummary(
+            totalRevenue: totalRevenue,
+            outstandingFees: outstandingFees,
+            paidStudentsCount: paidCount,
+            owingStudentsCount: owingCount,
+            totalStudents: students.length,
+            lastUpdated: DateTime.now(),
+          );
+
+          final List<FinancialTransaction> offlineTx = [];
+          for (final inv in invoices) {
+            offlineTx.add(FinancialTransaction(
+              id: inv.id.toString(),
+              walletId: 'local',
+              amount: inv.totalAmount,
+              type: TransactionType.credit,
+              reference: inv.invoiceNumber,
+              description: 'Fee Payment #${inv.invoiceNumber} for ${inv.customerName}',
+              balanceAfter: 0.0,
+              channel: inv.paymentMethod ?? 'Cash',
+              createdAt: inv.dateCreated,
+            ));
+          }
+          offlineTx.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final recentOfflineTx = offlineTx.take(50).toList();
+
+          emit(currentState.copyWith(
+            summary: summary,
+            transactions: recentOfflineTx,
+          ));
+        } catch (ex) {
+          debugPrint('⚠️ FinanceBloc: Offline refresh fallback failed: $ex');
+        }
+      }
     }
   }
 
@@ -248,7 +436,30 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       final chartData = await repository.getDailyRevenue(days: event.days);
       emit(currentState.copyWith(chartData: chartData, isRefreshing: false));
     } catch (e) {
-      emit(currentState.copyWith(isRefreshing: false));
+      debugPrint('⚠️ FinanceBloc: Load chart data failed, trying offline fallback: $e');
+      if (invoiceRepository != null) {
+        try {
+          final invoices = await invoiceRepository!.getAllInvoices();
+          final List<DailyRevenue> offlineChart = [];
+          final now = DateTime.now();
+          for (int i = event.days - 1; i >= 0; i--) {
+            final targetDate = now.subtract(Duration(days: i));
+            final dateStr = "${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}";
+            final dayRevenue = invoices.where((inv) {
+              final created = inv.dateCreated;
+              return created.year == targetDate.year &&
+                     created.month == targetDate.month &&
+                     created.day == targetDate.day;
+            }).fold(0.0, (sum, inv) => sum + inv.amountPaid);
+            offlineChart.add(DailyRevenue(date: dateStr, revenue: dayRevenue));
+          }
+          emit(currentState.copyWith(chartData: offlineChart, isRefreshing: false));
+        } catch (ex) {
+          emit(currentState.copyWith(isRefreshing: false));
+        }
+      } else {
+        emit(currentState.copyWith(isRefreshing: false));
+      }
     }
   }
 
@@ -259,4 +470,3 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
     return super.close();
   }
 }
-

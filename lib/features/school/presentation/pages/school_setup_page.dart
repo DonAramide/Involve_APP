@@ -6,6 +6,9 @@ import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
 import 'manage_grading_rules_page.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
+import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
+import 'package:involve_app/features/settings/presentation/widgets/password_dialog.dart';
 
 class SchoolSetupPage extends StatelessWidget {
   const SchoolSetupPage({super.key});
@@ -305,12 +308,55 @@ class _ClassesTab extends StatelessWidget {
             subtitle: sClass.description != null ? Text(sClass.description!) : null,
             trailing: IconButton(
               icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: () => context.read<SchoolBloc>().add(DeleteClassEvent(sClass.id!)),
+              onPressed: () => _confirmDelete(context, sClass),
             ),
           );
         },
       ),
     );
+  }
+
+  void _confirmDelete(BuildContext context, SchoolClass sClass) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Class?'),
+        content: Text('Are you sure you want to delete ${sClass.name}? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _verifyAndExecute(context, () {
+                context.read<SchoolBloc>().add(DeleteClassEvent(sClass.id!));
+              });
+            },
+            child: const Text('DELETE', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _verifyAndExecute(BuildContext context, VoidCallback onSuccess) {
+    final settingsBloc = context.read<SettingsBloc>();
+    
+    // Reset auth to ensure listener catches new success
+    settingsBloc.add(ResetSystemAuth());
+    
+    // Show password dialog
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => PasswordDialog(bloc: settingsBloc),
+    ).then((authorized) {
+      if (authorized == true && context.mounted) {
+        onSuccess();
+      }
+    });
   }
 
   void _showAddClassDialog(BuildContext context) {

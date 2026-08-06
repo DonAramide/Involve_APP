@@ -11,6 +11,7 @@ import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 
 import 'package:involve_app/core/sync/domain/services/outbox_publisher.dart';
+import 'package:involve_app/core/license/storage_service.dart';
 
 class InvoiceRepositoryImpl implements InvoiceRepository {
   final AppDatabase db;
@@ -46,6 +47,28 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
 
     await db.transaction(() async {
       String? finalCustomerId = invoice.customerId;
+
+      // Wallet/credit payments require sufficient customer credit before save.
+      // Convention: balance < 0 means credit available (= -balance).
+      if (invoice.paymentMethod == 'Wallet') {
+        if (finalCustomerId == null || finalCustomerId.isEmpty) {
+          throw Exception(
+              'Customer Wallet payment requires a selected customer.');
+        }
+        final customer = await (db.select(db.customers)
+              ..where((t) => t.id.equals(finalCustomerId!)))
+            .getSingleOrNull();
+        if (customer == null) {
+          throw Exception('Selected customer was not found.');
+        }
+        final availableCredit =
+            customer.balance < 0 ? -customer.balance : 0.0;
+        if (availableCredit + 1e-9 < invoice.totalAmount) {
+          throw Exception(
+              'Insufficient wallet credit. Available: ₦${availableCredit.toStringAsFixed(2)}, '
+              'Invoice: ₦${invoice.totalAmount.toStringAsFixed(2)}.');
+        }
+      }
 
       if (finalCustomerId == null && invoice.customerName != null && invoice.customerName!.trim().isNotEmpty) {
         finalCustomerId = _uuid.v4();
@@ -218,7 +241,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         );
       }
 
-      if (outboxPublisher != null) {
+      final isOnlineInvoiceEnabled = await StorageService.isOnlineInvoiceUpdateEnabled();
+      if (outboxPublisher != null && isOnlineInvoiceEnabled) {
         await outboxPublisher!.publish<Invoice>(
           db: db, // This passes the transaction context through
           eventName: 'invoice.created',
@@ -461,7 +485,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     final newBalance = (invoice.totalAmount - newAmountPaid).clamp(0.0, double.infinity);
     final String newStatus;
     
-    if (newBalance <= 0) {
+    if (method == 'Transfer') {
+      newStatus = 'Pending';
+    } else if (newBalance <= 0) {
       newStatus = 'Paid';
     } else if (newAmountPaid > 0) {
       newStatus = 'Partial';

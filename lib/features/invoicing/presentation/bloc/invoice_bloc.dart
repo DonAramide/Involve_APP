@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'dart:convert';
 import 'invoice_state.dart';
 import '../../domain/entities/invoice.dart';
 import '../../domain/services/invoice_calculation_service.dart';
@@ -46,21 +47,40 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   void _onAddItem(AddItemToInvoice event, Emitter<InvoiceState> emit) {
     final updatedItems = List<InvoiceItem>.from(state.items);
     
-    // Find existing item with same ID AND same service metadata
-    final existingIndex = updatedItems.indexWhere((i) => 
-      i.item.id == event.item.id && i.serviceMeta == event.serviceMeta
-    );
+    // Find existing item with same ID AND matching service booking dates
+    final existingIndex = updatedItems.indexWhere((i) {
+      if (i.item.id != event.item.id) return false;
+      if (i.serviceMeta == event.serviceMeta) return true;
+      if (i.serviceMeta == null || event.serviceMeta == null) return false;
+      try {
+        final Map<String, dynamic> map1 = jsonDecode(i.serviceMeta!);
+        final Map<String, dynamic> map2 = jsonDecode(event.serviceMeta!);
+        return map1['startDate'] == map2['startDate'] && 
+               map1['endDate'] == map2['endDate'];
+      } catch (_) {
+        return false;
+      }
+    });
 
     if (existingIndex >= 0) {
       final existingItem = updatedItems[existingIndex];
-      // For services, we might not want to just increase quantity if it's a booking logic
-      // But if the meta is identical, it's the same booking slot, so increasing quantity is valid 
-      // (e.g. 2 rooms for same dates).
       final newQuantity = existingItem.quantity + event.quantity;
       if (newQuantity <= 0) {
         updatedItems.removeAt(existingIndex);
       } else {
-        updatedItems[existingIndex] = existingItem.copyWith(quantity: newQuantity);
+        var newServiceMeta = existingItem.serviceMeta;
+        if (newServiceMeta != null) {
+          try {
+            final Map<String, dynamic> map = jsonDecode(newServiceMeta);
+            map['quantity'] = newQuantity;
+            map['total'] = newQuantity * existingItem.unitPrice;
+            newServiceMeta = jsonEncode(map);
+          } catch (_) {}
+        }
+        updatedItems[existingIndex] = existingItem.copyWith(
+          quantity: newQuantity,
+          serviceMeta: newServiceMeta,
+        );
       }
     } else if (event.quantity > 0) {
       updatedItems.add(InvoiceItem(
@@ -104,7 +124,9 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
       if (event.paymentStatus != null) {
         status = event.paymentStatus!;
       } else {
-        if (amountPaid <= 0) {
+        if (state.paymentMethod == 'Transfer' || state.paymentMethod == 'VirtualAccount') {
+          status = 'Pending';
+        } else if (amountPaid <= 0) {
           status = 'Unpaid';
         } else if (amountPaid < state.total) {
           status = 'Partial';

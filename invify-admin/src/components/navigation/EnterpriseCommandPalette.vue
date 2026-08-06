@@ -144,12 +144,107 @@ const currentUserPermissions = ref([
   'read_metrics',
   'soc_quarantine',
   'admin_deploy',
-  'write_fleet'
+  'write_fleet',
+  'tenant.settings.manage',
+  'tenant.transaction.view',
+  'tenant.wallet.view',
+  'tenant.ledger.view'
   // Note: 'operator_root' scope is explicitly omitted to test runtime hiding of unauthorized remote tools
 ])
 
 // Raw Actions repository
 const rawItems = [
+  {
+    id: 'cmd-fp-activate',
+    label: 'Activate Financial Platform',
+    description: 'Initiate provisioning of Quasar Financial Services connection context.',
+    route: '/tenant/settings/financial-platform',
+    domain: 'finance',
+    icon: 'power_settings_new',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'tenant.settings.manage',
+    keywords: ['activate', 'financial', 'platform', 'provision', 'qfs', 'quasar']
+  },
+  {
+    id: 'cmd-fp-rotate',
+    label: 'Rotate Credentials',
+    description: 'Force immediate cycle and rotation of secure API keys and webhook signing secrets.',
+    route: '/tenant/settings/financial-platform',
+    domain: 'finance',
+    icon: 'sync',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'tenant.settings.manage',
+    keywords: ['rotate', 'credentials', 'keys', 'secrets', 'api key', 'qfs']
+  },
+  {
+    id: 'cmd-fp-health',
+    label: 'Health Check',
+    description: 'Inspect live ping latency, circuit breaker status, and Vault credentials state.',
+    route: '/tenant/settings/financial-platform',
+    domain: 'finance',
+    icon: 'health_and_safety',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'tenant.settings.manage',
+    keywords: ['health', 'check', 'diagnostics', 'ping', 'latency', 'circuit breaker']
+  },
+  {
+    id: 'cmd-fp-audit',
+    label: 'Audit Connection Logs',
+    description: 'Review append-only operational history, saga rollbacks, and compensation logs.',
+    route: '/tenant/settings/financial-platform',
+    domain: 'finance',
+    icon: 'history',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'tenant.settings.manage',
+    keywords: ['audit', 'logs', 'history', 'rollbacks', 'connections']
+  },
+  {
+    id: 'cmd-fp-payments',
+    label: 'Payments & Transactions Ledger',
+    description: 'Inspect invoice statuses, direct merchant transfers, and payout events.',
+    route: '/tenant/transactions',
+    domain: 'finance',
+    icon: 'paid',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'tenant.transaction.view',
+    keywords: ['payments', 'transactions', 'invoices', 'ledger', 'history']
+  },
+  {
+    id: 'cmd-fp-wallets',
+    label: 'Wallets & Virtual Accounts',
+    description: 'Manage digital wallets, treasury balances, and client virtual accounts.',
+    route: '/tenant/wallet',
+    domain: 'finance',
+    icon: 'account_balance_wallet',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'tenant.wallet.view',
+    keywords: ['wallets', 'virtual accounts', 'treasury', 'balances']
+  },
+  {
+    id: 'cmd-fp-treasury',
+    label: 'Treasury & Reconciliation',
+    description: 'Run automatic night audits, check policy drift, and balance accounts.',
+    route: '/tenant/reconciliation',
+    domain: 'finance',
+    icon: 'account_balance',
+    avatarBg: 'cyan-9',
+    avatarColor: 'white',
+    isCommand: true,
+    permission: 'tenant.ledger.view',
+    keywords: ['treasury', 'reconciliation', 'drift', 'balancing', 'audit']
+  },
   {
     id: 'cmd-terminals',
     label: 'Hardware Terminal Management',

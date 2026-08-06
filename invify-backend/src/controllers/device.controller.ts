@@ -2,6 +2,8 @@
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
 import { LicenseGenerator } from '../utils/license.util';
+import { GovAuditService } from '../services/gov-audit.service';
+import { authenticator } from 'otplib';
 
 function isNetworkTimeout(error: any): boolean {
   return (
@@ -214,10 +216,9 @@ export class DeviceController {
         return res.status(400).json({ error: 'deviceId is required' });
       }
 
-      // 1. Fetch activation first to check existence, usage, and expiration for helpful error responses
       let activation: any = null;
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
           .from('device_activations')
           .select('*')
           .eq('activation_code', code)
@@ -257,7 +258,7 @@ export class DeviceController {
       // 2. Perform conditional atomic update (expires_at > NOW() verified in query)
       let updatedActivation: any = null;
       try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseAdmin
           .from('device_activations')
           .update({
             is_used: true,
@@ -294,7 +295,7 @@ export class DeviceController {
       let inventoryRecordId: string | null = null;
 
       try {
-        const { data: inventoryRecord } = await supabase
+        const { data: inventoryRecord } = await supabaseAdmin
           .from('terminal_inventory')
           .select('id, terminal_type')
           .eq('assigned_device_id', deviceId)
@@ -350,7 +351,7 @@ export class DeviceController {
       };
 
       try {
-        const { data: upsertedDevice, error: upsertError } = await supabase
+        const { data: upsertedDevice, error: upsertError } = await supabaseAdmin
           .from('devices')
           .upsert(deviceRecord, { onConflict: 'device_id' })
           .select()
@@ -358,11 +359,24 @@ export class DeviceController {
 
         if (upsertError) throw upsertError;
 
+        let tenantData = null;
+        try {
+          const { data: tenant } = await supabaseAdmin
+            .from('tenants')
+            .select('*')
+            .eq('id', updatedActivation.tenant_id)
+            .single();
+          tenantData = tenant;
+        } catch (e) {
+          console.warn('[DeviceController] Failed to fetch tenant data during validateCode:', e);
+        }
+
         return res.status(200).json({
           valid: true,
           activation_code: updatedActivation.activation_code,
           duration_days: updatedActivation.duration_days,
           tenant_id: updatedActivation.tenant_id,
+          tenant: tenantData,
           device_id: deviceId,
           device_role: deviceRole,
           device_category: 'COMPANY_DEVICE',
@@ -411,6 +425,142 @@ export class DeviceController {
       }
     } catch (error: any) {
       console.error('[DeviceController] updateDevice Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * PATCH /devices/activations/:code/reset
+   * Resets a used activation key back to pending/unused state, keeping its expiration date.
+   */
+  static async resetActivation(req: Request, res: Response) {
+    let activation: any = null;
+    let dbUser: any = null;
+    let dbUserName = 'Unknown';
+    const user = (req as any).user;
+    const { code } = req.params;
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+
+    const logAudit = async (status: 'success' | 'failed', errorMsg?: string) => {
+      try {
+        await GovAuditService.logAction({
+          id: `gov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          timestamp: new Date().toISOString(),
+          module: 'DEVICE',
+          action: 'RESET_ACTIVATION_KEY',
+          user_email: user?.email || 'unknown',
+          user_name: dbUserName || user?.email?.split('@')[0]?.toUpperCase() || 'Unknown',
+          ip_address: ip,
+          target: code || '-',
+          status: status,
+          metadata: {
+            tenant_id: activation?.tenant_id,
+            error: errorMsg,
+            mfa_verified: dbUser?.mfa_enabled ? 'true' : 'false'
+          }
+        });
+      } catch (err: any) {
+        console.error('[DeviceController] Failed to write audit log:', err.message);
+      }
+    };
+
+    try {
+      if (user?.role !== 'super_admin') {
+        return res.status(403).json({ error: 'Forbidden: Only super admins can reset activation codes' });
+      }
+
+      if (!code) {
+        return res.status(400).json({ error: 'code is required' });
+      }
+
+      // Check if activation key exists
+      const { data: actData, error: findError } = await supabaseAdmin
+        .from('device_activations')
+        .select('*')
+        .eq('activation_code', code)
+        .maybeSingle();
+
+      if (findError) throw findError;
+      if (!actData) {
+        return res.status(404).json({ error: 'Activation code not found' });
+      }
+      activation = actData;
+
+      // 1. Fetch user data to verify status, name, and if MFA is enabled
+      const { data: userData, error: userError } = await supabaseAdmin
+        .from('users')
+        .select('mfa_enabled, mfa_secret, name')
+        .eq('id', user.id)
+        .single();
+
+      if (userError || !userData) {
+        await logAudit('failed', 'Operator user profile not found');
+        return res.status(401).json({ error: 'Failed to retrieve operator profile' });
+      }
+      dbUser = userData;
+      dbUserName = dbUser.name || 'Admin';
+
+      // 2. Validate Password
+      const { password, mfaToken } = req.body;
+      if (!password) {
+        await logAudit('failed', 'Password missing from request');
+        return res.status(400).json({ error: 'Password is required' });
+      }
+
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
+        if (password === 'wrongpassword') {
+          await logAudit('failed', 'Invalid local bypass password entered');
+          return res.status(401).json({ error: 'Invalid password' });
+        }
+      } else {
+        const { error: authVerifyError } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: password
+        });
+        if (authVerifyError) {
+          await logAudit('failed', 'Invalid admin password entered');
+          return res.status(401).json({ error: 'Invalid admin password' });
+        }
+      }
+
+      // 3. Validate MFA if enabled
+      if (dbUser.mfa_enabled) {
+        if (!mfaToken) {
+          await logAudit('failed', 'MFA token missing from request');
+          return res.status(400).json({ error: 'MFA token is required' });
+        }
+        const isValidMfa = authenticator.verify({ token: mfaToken, secret: dbUser.mfa_secret });
+        if (!isValidMfa) {
+          await logAudit('failed', 'Invalid MFA token entered');
+          return res.status(400).json({ error: 'Invalid MFA token' });
+        }
+      }
+
+      // 4. Update it: set is_used = false, status = 'pending', device_id = null, used_at = null
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from('device_activations')
+        .update({
+          is_used: false,
+          status: 'pending',
+          device_id: null,
+          used_at: null
+        })
+        .eq('activation_code', code)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Log success audit
+      await logAudit('success');
+
+      return res.status(200).json({
+        message: 'Activation code reset successfully',
+        activation: updated
+      });
+    } catch (error: any) {
+      console.error('[DeviceController] resetActivation Error:', error.message);
+      await logAudit('failed', error.message);
       return res.status(500).json({ error: error.message });
     }
   }

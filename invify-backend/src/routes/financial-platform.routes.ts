@@ -67,14 +67,20 @@ const mockVaultClient = {
     }
     if (key.startsWith('quasarTenant/')) {
       const tenantId = key.split('/')[1];
+      const tenantServiceId = `quasarTenant:${tenantId}`;
+      // Try tenant-scoped identifier first (new format), fall back to generic (legacy)
       const apiKeySecret =
-        await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'PRODUCTION', tenantId, 'apiKeySecret')
+        await IntegrationVaultService.getDecryptedCredential(tenantServiceId, 'PRODUCTION', tenantId, 'apiKeySecret')
+        || await IntegrationVaultService.getDecryptedCredential(tenantServiceId, 'STAGING', tenantId, 'apiKeySecret')
+        || await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'PRODUCTION', tenantId, 'apiKeySecret')
         || await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'STAGING', tenantId, 'apiKeySecret');
       if (!apiKeySecret) {
         return null;
       }
       const quasarTenantId =
-        await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'PRODUCTION', tenantId, 'quasarTenantId')
+        await IntegrationVaultService.getDecryptedCredential(tenantServiceId, 'PRODUCTION', tenantId, 'quasarTenantId')
+        || await IntegrationVaultService.getDecryptedCredential(tenantServiceId, 'STAGING', tenantId, 'quasarTenantId')
+        || await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'PRODUCTION', tenantId, 'quasarTenantId')
         || await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'STAGING', tenantId, 'quasarTenantId');
       return { apiKeySecret, tenantId: quasarTenantId, environment: 'PRODUCTION' };
     }
@@ -112,10 +118,12 @@ const mockVaultClient = {
       }
     } else if (key.startsWith('quasarTenant/')) {
       const tenantId = key.split('/')[1];
-      let vault = (await IntegrationVaultService.listIntegrations('TENANT', tenantId)).find(i => i.service_identifier === 'quasarTenant');
+      // Use tenant-scoped service_identifier to avoid unique constraint collision across tenants
+      const tenantServiceId = `quasarTenant:${tenantId}`;
+      let vault = (await IntegrationVaultService.listIntegrations('TENANT', tenantId)).find(i => i.service_identifier === tenantServiceId || i.service_identifier === 'quasarTenant');
       if (!vault) {
         vault = await IntegrationVaultService.registerIntegration({
-          service_identifier: 'quasarTenant',
+          service_identifier: tenantServiceId,
           name: 'Quasar Merchant Gateway',
           category: 'PAYMENT_GATEWAY',
           scope: 'TENANT',
@@ -161,7 +169,8 @@ const mockVaultClient = {
       }
     } else if (key.startsWith('quasarTenant/')) {
       const tenantId = key.split('/')[1];
-      const vault = (await IntegrationVaultService.listIntegrations('TENANT', tenantId)).find(i => i.service_identifier === 'quasarTenant');
+      const tenantServiceId = `quasarTenant:${tenantId}`;
+      const vault = (await IntegrationVaultService.listIntegrations('TENANT', tenantId)).find(i => i.service_identifier === tenantServiceId || i.service_identifier === 'quasarTenant');
       if (vault) {
         const { supabaseAdmin } = require('../db/supabase');
         await supabaseAdmin.from('integration_credentials').delete().eq('vault_id', vault.id);
@@ -174,13 +183,19 @@ const mockAuditLogger = {
   async log(eventName: string, payload: any, context: any) {
     console.log(`[Audit] ${eventName}`, payload);
     try {
-      await supabase.from('audit_logs').insert({
-        tenant_id: context.tenantId,
-        event_type: eventName,
-        payload: payload,
-        actor_id: context.actorId,
-        created_at: new Date().toISOString()
+      const { error } = await supabase.from('audit_logs').insert({
+        tenant_id: context.tenantId || null,
+        module: 'FINANCIAL_PLATFORM',
+        action: eventName,
+        user_email: context.actorId || 'system',
+        user_name: context.actorId || 'system',
+        status: /FAIL|ERROR/i.test(eventName) ? 'FAILED' : 'SUCCESS',
+        metadata: payload || {},
+        target: payload?.quasarTenantId || payload?.tenantId || context.tenantId || null
       });
+      if (error) {
+        console.error('Failed to write audit log to database', error.message);
+      }
     } catch (err: any) {
       console.error('Failed to write audit log to database', err.message);
     }
@@ -260,5 +275,43 @@ router.post('/tenants/:id/financial-platform/rotate', authenticate, checkTenantA
 router.post('/tenants/:id/financial-platform/deactivate', authenticate, checkTenantAccess, (req, res) => deactivationController.deactivate(req, res));
 router.get('/tenants/:id/financial-platform/health', authenticate, checkTenantAccess, (req, res) => healthController.getHealth(req, res));
 router.get('/tenants/:id/financial-platform/audit', authenticate, checkTenantAccess, (req, res) => auditController.getAuditLog(req, res));
+
+/**
+ * GET /tenants/:id/financial-platform/credentials
+ * Returns the NON-SECRET public key and webhook URL for the tenant.
+ * The secret key is NEVER returned — only the public key (apiKeyPublic) is exposed.
+ */
+router.get('/tenants/:id/financial-platform/credentials', authenticate, checkTenantAccess, async (req, res) => {
+  const tenantId = req.params.id;
+  try {
+    const tenantServiceId = `quasarTenant:${tenantId}`;
+
+    // Read public key (safe to expose)
+    const publicKey =
+      await IntegrationVaultService.getDecryptedCredential(tenantServiceId, 'PRODUCTION', tenantId, 'apiKeyPublic')
+      || await IntegrationVaultService.getDecryptedCredential(tenantServiceId, 'STAGING', tenantId, 'apiKeyPublic')
+      || await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'PRODUCTION', tenantId, 'apiKeyPublic')
+      || await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'STAGING', tenantId, 'apiKeyPublic')
+      || null;
+
+    // Read webhook URL from quasar_integrations table directly
+    const { supabaseAdmin } = require('../db/supabase');
+    const { data: integration } = await supabaseAdmin
+      .from('quasar_integrations')
+      .select('quasar_webhook_endpoint_id, quasar_environment, quasar_tenant_id')
+      .eq('invify_tenant_id', tenantId)
+      .maybeSingle();
+
+    return res.json({
+      publicKey: publicKey || null,
+      webhookEndpointId: integration?.quasar_webhook_endpoint_id || null,
+      environment: integration?.quasar_environment || null,
+      provisioned: !!publicKey,
+    });
+  } catch (err: any) {
+    console.error('[FinancialPlatform] /credentials fetch failed:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch credentials' });
+  }
+});
 
 export default router;

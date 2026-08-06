@@ -18,6 +18,8 @@ class StorageService {
   static const _onboardingCompleteKey = 'onboarding_complete';
   static const _licenseFileName = 'license.dat';
   static const _mposTerminalIdKey = 'mpos_terminal_id';
+  static const _onlineSyncEnabledKey = 'online_sync_enabled';
+  static const _onlineInvoiceUpdateEnabledKey = 'online_invoice_update_enabled';
 
   static const _encryptionKey = 0xAF;
 
@@ -256,6 +258,52 @@ class StorageService {
       }
     }
     return value == 'true';
+  }
+
+  static Future<void> setOnlineSyncEnabled(bool enabled) async {
+    final value = enabled ? 'true' : 'false';
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _onlineSyncEnabledKey, value: value);
+    } else {
+      final file = await _getDesktopFile('online_sync.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<bool> isOnlineSyncEnabled() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _onlineSyncEnabledKey);
+    } else {
+      final file = await _getDesktopFile('online_sync.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    return value != 'false'; // Default to true
+  }
+
+  static Future<void> setOnlineInvoiceUpdateEnabled(bool enabled) async {
+    final value = enabled ? 'true' : 'false';
+    if (Platform.isAndroid || Platform.isIOS) {
+      await _secureStorage.write(key: _onlineInvoiceUpdateEnabledKey, value: value);
+    } else {
+      final file = await _getDesktopFile('online_invoice_update.dat');
+      await file.writeAsString(value);
+    }
+  }
+
+  static Future<bool> isOnlineInvoiceUpdateEnabled() async {
+    String? value;
+    if (Platform.isAndroid || Platform.isIOS) {
+      value = await _secureStorage.read(key: _onlineInvoiceUpdateEnabledKey);
+    } else {
+      final file = await _getDesktopFile('online_invoice_update.dat');
+      if (await file.exists()) {
+        value = await file.readAsString();
+      }
+    }
+    return value != 'false'; // Default to true
   }
 
   static Future<File> _getDesktopFile(String fileName) async {

@@ -125,7 +125,7 @@ export class OnboardingController {
 
       let generatedVa: any = null;
       try {
-        const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+        const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
         const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
         const quasar = new QuasarServiceModule(platformApiKey);
         const va = await quasar.createVirtualAccount({
@@ -528,6 +528,8 @@ export class OnboardingController {
           ? 'Account created successfully.'
           : `Device #${deviceNumber} linked to your existing business account.`,
         tenantId: finalTenantId,
+        businessName: tenantName,
+        phone: phone || null,
         deviceNumber,
         isAdditionalDevice: !isNewTenant,
         offlineToken,

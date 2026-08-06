@@ -90,7 +90,7 @@ export class BillingService {
       .eq('tenant_id', tenantId)
       .gte('created_at', sub?.start_date || new Date().toISOString());
 
-    const baseLimit = (sub as any).usage_limits?.monthly_ai_limit || 20;
+    const baseLimit = (sub as any)?.usage_limits?.monthly_ai_limit || 20;
     const bonusLimit = tenant?.bonus_quota || 0;
     const totalLimit = baseLimit + bonusLimit;
     const usage = count || 0;
@@ -102,7 +102,7 @@ export class BillingService {
       limit: totalLimit,
       usage: usage,
       percentage: Math.round((usage / totalLimit) * 100),
-      features: (sub as any).usage_limits?.features_enabled || {}
+      features: (sub as any)?.usage_limits?.features_enabled || {}
     };
   }
 }

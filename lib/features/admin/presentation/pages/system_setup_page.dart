@@ -21,6 +21,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import 'package:signature/signature.dart';
 import 'two_factor_auth_page.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});
@@ -624,14 +625,32 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   // Virtual Account Section
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      'STAFF VIRTUAL ACCOUNT (OPTIONAL)',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
-                        letterSpacing: 0.5,
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'STAFF VIRTUAL ACCOUNT (OPTIONAL)',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[700],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        if (staff != null)
+                          TextButton.icon(
+                            icon: const Icon(Icons.autorenew, size: 14),
+                            label: const Text('GENERATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                            onPressed: () => _generateStaffVirtualAccount(
+                              ctx,
+                              staff,
+                              virtualBankNameController,
+                              virtualAccountNumberController,
+                              virtualAccountNameController,
+                              dialogSetState,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -921,6 +940,136 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _generateStaffVirtualAccount(
+    BuildContext dialogContext,
+    Staff staff,
+    TextEditingController bankController,
+    TextEditingController numberController,
+    TextEditingController nameController,
+    StateSetter dialogSetState,
+  ) async {
+    final customNameController = TextEditingController(text: staff.name);
+    final phoneController = TextEditingController(text: staff.phone);
+    final emailController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog(
+      context: dialogContext,
+      builder: (context) => AlertDialog(
+        title: const Text('Generate Staff Virtual Account'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'The first name on the account will be the business name. Please specify the custom second name below.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: customNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Custom Second Name (Required)',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (val) => (val == null || val.trim().isEmpty) ? 'Required' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number (Optional)',
+                    border: OutlineInputBorder(),
+                    hintText: 'e.g. 08012345678',
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email Address (Optional)',
+                    border: OutlineInputBorder(),
+                    hintText: 'e.g. staff@example.com',
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                final secondName = customNameController.text.trim();
+                final phone = phoneController.text.trim().isEmpty ? null : phoneController.text.trim();
+                final email = emailController.text.trim().isEmpty ? null : emailController.text.trim();
+
+                Navigator.pop(context); // Close inputs dialog
+
+                // Show loading dialog
+                showDialog(
+                  context: dialogContext,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(
+                    child: InvifyLoadingIndicator(message: 'Provisioning Staff Virtual Account...'),
+                  ),
+                );
+
+                try {
+                  final financeRepo = dialogContext.read<FinanceRepository>();
+                  
+                  // Use syncId (which is UUID string) as staff userId
+                  final result = await financeRepo.initiateStaffVirtualAccount(
+                    userId: staff.syncId ?? staff.id.toString(),
+                    customLastName: secondName,
+                    phone: phone,
+                    email: email,
+                  );
+
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext); // Close loading dialog
+
+                    if (result['accountNumber'] != null) {
+                      dialogSetState(() {
+                        bankController.text = result['bankName'] ?? '';
+                        numberController.text = result['accountNumber'] ?? '';
+                        nameController.text = result['accountName'] ?? '';
+                      });
+
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(content: Text('Staff Virtual Account generated! Click SAVE to apply.')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(dialogContext).showSnackBar(
+                        const SnackBar(content: Text('Failed to generate virtual account.')),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext); // Close loading dialog
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Failed to generate virtual account: $e')),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('GENERATE'),
+          ),
+        ],
       ),
     );
   }

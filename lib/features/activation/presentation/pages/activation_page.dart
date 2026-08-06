@@ -14,6 +14,9 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:involve_app/core/utils/app_config.dart';
 
 class ActivationPage extends StatefulWidget {
   static const routeName = '/activation';
@@ -31,10 +34,12 @@ class _ActivationPageState extends State<ActivationPage> {
   bool _isLoading = false;
   String? _errorMessage;
   TerminalConfig? _globalConfig;
+  bool? _isServerReachable;
   
   @override
   void initState() {
     super.initState();
+    _pingServer();
     _checkOnboarding();
     // Pre-populate business name only if a real name is already saved (not a generic placeholder)
     final settingsState = context.read<SettingsBloc>().state;
@@ -65,6 +70,16 @@ class _ActivationPageState extends State<ActivationPage> {
     }
   }
 
+  Future<void> _pingServer() async {
+    try {
+      final response = await http.get(Uri.parse('${AppConfig.baseUrl}/settings/onboarding'))
+        .timeout(const Duration(seconds: 3));
+      if (mounted) setState(() => _isServerReachable = true);
+    } catch (_) {
+      if (mounted) setState(() => _isServerReachable = false);
+    }
+  }
+
   Future<void> _checkOnboarding() async {
     final completed = await StorageService.isOnboardingCompleted();
     if (!completed && mounted) {
@@ -88,26 +103,59 @@ class _ActivationPageState extends State<ActivationPage> {
       _errorMessage = null;
     });
 
-    final license = await LicenseService.activate(businessName, code);
+    try {
+      // 1. Mandate server connection
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/devices/validate'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'code': code,
+          'deviceId': deviceId,
+        }),
+      ).timeout(const Duration(seconds: 15));
 
-    if (license != null) {
-      if (mounted) {
-        // Sync the business name globally if activation was successful
-        final settingsBloc = context.read<SettingsBloc>();
-        final currentSettings = settingsBloc.state.settings;
-        if (currentSettings != null && currentSettings.organizationName != businessName) {
-           settingsBloc.add(UpdateAppSettings(currentSettings.copyWith(organizationName: businessName)));
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final tenant = data['tenant'];
+        
+        // Use server's business name if available, otherwise fallback to what they typed
+        final actualBusinessName = (tenant != null && tenant['name'] != null) 
+            ? tenant['name'] 
+            : businessName;
+
+        final license = await LicenseService.activate(actualBusinessName, code);
+
+        if (license != null) {
+          if (mounted) {
+            final settingsBloc = context.read<SettingsBloc>();
+            final currentSettings = settingsBloc.state.settings;
+            if (currentSettings != null) {
+               settingsBloc.add(UpdateAppSettings(currentSettings.copyWith(
+                 organizationName: actualBusinessName,
+                 phone: tenant != null ? tenant['phone'] ?? currentSettings.phone : currentSettings.phone,
+               )));
+            }
+            settingsBloc.add(LoadSettings());
+            _showSuccessDialog(license);
+          }
+        } else {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Invalid activation code or business name mismatch.';
+          });
         }
-        
-        // Refresh entire state to update trial banner and Pro features
-        settingsBloc.add(LoadSettings());
-        
-        _showSuccessDialog(license);
+      } else {
+        setState(() {
+          _isLoading = false;
+          final errorMsg = jsonDecode(response.body)['error'] ?? 'Server validation failed';
+          _errorMessage = 'Activation failed: $errorMsg';
+        });
       }
-    } else {
+    } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Invalid activation code or business name';
+        _errorMessage = 'Server connection is mandated for activation. Please check your internet connection.';
       });
     }
   }
@@ -238,6 +286,33 @@ class _ActivationPageState extends State<ActivationPage> {
                     fit: BoxFit.contain,
                   ),
                 ),
+              ),
+            ),
+
+            SafeArea(
+              child: Align(
+                alignment: Alignment.topRight,
+                child: _isServerReachable != null
+                  ? IconButton(
+                      icon: Icon(
+                        _isServerReachable! ? Icons.cloud_done : Icons.cloud_off,
+                        color: _isServerReachable! ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        size: 28,
+                      ),
+                      onPressed: () {
+                        setState(() => _isServerReachable = null);
+                        _pingServer();
+                      },
+                      tooltip: _isServerReachable! ? 'Connected to Server' : 'Server Unreachable (Tap to retry)',
+                    )
+                  : const Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF818CF8)),
+                      ),
+                    ),
               ),
             ),
 

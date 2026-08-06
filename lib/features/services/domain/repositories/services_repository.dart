@@ -30,6 +30,21 @@ abstract class IServicesRepository {
   
   // Customers
   Future<List<ServiceCustomer>> getCustomers({String? query});
+  Future<ServiceCustomer?> getCustomerById(String id);
+  Future<ServiceCustomer?> getCustomerByVirtualAccount(String accountNumber);
+  /// Credits wallet from a VA deposit. Auto-debits against owing first, then
+  /// any remainder becomes customer credit (negative balance).
+  /// Idempotent by [reference]. Returns updated customer or null if no match / duplicate.
+  Future<ServiceCustomer?> creditCustomerWalletFromDeposit({
+    required double amount,
+    required String reference,
+    String? customerId,
+    String? virtualAccountNumber,
+    String? senderName,
+    String? senderBank,
+    String? createdAt,
+  });
+  Future<List<Map<String, dynamic>>> getCustomerFundTransactions(String customerId);
   Future<ServiceCustomer> createCustomer({
     required String name,
     String? phone,
@@ -37,7 +52,14 @@ abstract class IServicesRepository {
     String? address,
     Uint8List? image,
   });
-  Future<void> updateCustomerVirtualAccount(String customerId, String accountNumber, String bankName);
+  Future<void> updateCustomerVirtualAccount(String customerId, String accountNumber, String bankName, {String? accountName});
+  Future<void> updateCustomerBasicInfo({
+    required String id,
+    String? name,
+    String? phone,
+    String? email,
+    String? address,
+  });
 
   Future<List<ServicePayment>> getJobPayments(String jobId);
   

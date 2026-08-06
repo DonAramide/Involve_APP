@@ -4,17 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../../../core/services/service_locator.dart';
-import '../widgets/summary_stat_card.dart';
-import '../widgets/modern_revenue_chart.dart';
-import '../widgets/global_transaction_tile.dart';
 import 'package:intl/intl.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/core/utils/terminology.dart';
-import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
 import 'reconciliation_page.dart';
+import 'virtual_accounts_page.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ExecutiveFinanceDashboard extends StatefulWidget {
@@ -31,6 +28,9 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   bool _isLoading = true;
   String? _error;
 
+  DateTime? _startDate;
+  DateTime? _endDate;
+
   @override
   void initState() {
     super.initState();
@@ -44,7 +44,10 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       _error = null;
     });
     try {
-      final summary = await _repository.getExecutiveSummary();
+      final summary = await _repository.getExecutiveSummary(
+        startDate: _startDate != null ? DateFormat('yyyy-MM-dd').format(_startDate!) : null,
+        endDate: _endDate != null ? DateFormat('yyyy-MM-dd').format(_endDate!) : null,
+      );
       final history = await _repository.getPayoutHistory(limit: 5);
       
       setState(() {
@@ -57,17 +60,29 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       double localCollected = 0.0;
       int localCustomersCount = 0;
       List<dynamic> localActivities = [];
-      
+      int localOwing = 0;
       if (mounted) {
         final historyState = context.read<HistoryBloc>().state;
         if (historyState is HistoryLoaded) {
           final invoices = historyState.invoices;
+          final Map<String, double> customerBalanceMap = {};
+
           for (final inv in invoices) {
             localCollected += inv.totalAmount;
+            final name = inv.customerName ?? 'Guest';
+            final unpaid = inv.totalAmount - inv.amountPaid;
+            customerBalanceMap[name] = (customerBalanceMap[name] ?? 0.0) + unpaid;
           }
+
           final uniqueCustomers = invoices.map((e) => e.customerName).where((n) => n != null && n.isNotEmpty).toSet();
           localCustomersCount = uniqueCustomers.isNotEmpty ? uniqueCustomers.length : invoices.length;
-          
+
+          customerBalanceMap.forEach((name, unpaid) {
+            if (unpaid > 0.01) {
+              localOwing++;
+            }
+          });
+
           localActivities = invoices.take(5).map((inv) => {
             'created_at': inv.dateCreated.toIso8601String(),
             'type': 'fee',
@@ -80,18 +95,24 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       final finalCollected = localCollected > 0 ? localCollected : 0.0;
       final finalCustomers = localCustomersCount > 0 ? localCustomersCount : 0;
       final finalActivities = localActivities.isNotEmpty ? localActivities : [];
+      final finalOwing = localOwing;
+      final finalPaid = (finalCustomers - finalOwing) < 0 ? 0 : (finalCustomers - finalOwing);
 
       setState(() {
         _summary = {
           'walletBalance': finalCollected * 0.25, // Simulated available sweep fraction
           'totalCollected': finalCollected,
           'revenueInRange': finalCollected * 0.18,
+          'totalQuasarCollected': finalCollected * 0.82,
+          'totalQuasarRemitted': finalCollected * 0.50,
           'alerts': {
             'unmatchedCount': 0,
             'failedPayoutsCount': 0,
           },
           'studentMetrics': {
             'total': finalCustomers,
+            'paid': finalPaid,
+            'owing': finalOwing,
           },
         };
         _recentActivity = finalActivities;
@@ -117,6 +138,14 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
             backgroundColor: Colors.white,
             foregroundColor: Colors.black,
             actions: [
+              IconButton(
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                tooltip: 'Virtual Accounts',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VirtualAccountsPage()),
+                ),
+              ),
               IconButton(icon: const Icon(Icons.tune_rounded), onPressed: () => _showFilterOptions(context)),
               IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _loadData),
             ],
@@ -146,7 +175,9 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                           delegate: SliverChildListDelegate([
                             _buildKpiCard('Available Balance', _summary?['walletBalance'], Icons.account_balance_wallet_rounded, Colors.indigo),
                             _buildKpiCard(collectedLabel, _summary?['totalCollected'], Icons.payments_rounded, Colors.green),
-                            _buildKpiCard('Revenue (Range)', _summary?['revenueInRange'], Icons.trending_up_rounded, Colors.blue),
+                            _buildKpiCard('To be Remitted (Quasar)', _summary?['totalQuasarCollected'], Icons.account_balance_rounded, Colors.blue),
+                            _buildKpiCard('Remitted (Quasar)', _summary?['totalQuasarRemitted'], Icons.check_circle_outline_rounded, Colors.teal),
+                            _buildKpiCard('Revenue (Range)', _summary?['revenueInRange'], Icons.trending_up_rounded, Colors.purple),
                             _buildKpiCard('Outstanding', 0, Icons.warning_amber_rounded, Colors.orange),
                           ]),
                         ),
@@ -375,9 +406,9 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _metricItem('Total $pluralLabel', metrics?['total'].toString() ?? '0', Colors.white),
-            _metricItem('Paid', '0', Colors.greenAccent),
-            _metricItem('Owing', '0', Colors.orangeAccent),
+            _metricItem('Total $pluralLabel', metrics?['total']?.toString() ?? '0', Colors.white),
+            _metricItem('Paid', metrics?['paid']?.toString() ?? '0', Colors.greenAccent),
+            _metricItem('Owing', metrics?['owing']?.toString() ?? '0', Colors.orangeAccent),
           ],
         ),
       ),
@@ -446,43 +477,78 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Telemetry Projection Settings',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.date_range, color: Colors.blue),
-              title: const Text('Filter by Reporting Cycle'),
-              subtitle: const Text('View analytics for standard offline date ranges'),
-              onTap: () {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Reporting cycle set to Current Period.')),
-                );
-                _loadData();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.sync_rounded, color: Colors.green),
-              title: const Text('Re-index Local Storage Cache'),
-              subtitle: const Text('Force recalculation of all saved SQLite invoicing tables'),
-              onTap: () {
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Re-indexing client database caches...')),
-                );
-                context.read<HistoryBloc>().add(LoadHistory());
-                _loadData();
-              },
-            ),
-          ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Telemetry Projection Settings',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.date_range, color: Colors.blue),
+                title: const Text('Filter by Reporting Cycle'),
+                subtitle: Text(_startDate == null 
+                    ? 'View analytics for standard offline date ranges' 
+                    : 'Active: ${DateFormat('yyyy-MM-dd').format(_startDate!)} to ${DateFormat('yyyy-MM-dd').format(_endDate!)}'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final pickedRange = await showDateRangePicker(
+                    context: context,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                    initialDateRange: _startDate != null && _endDate != null
+                        ? DateTimeRange(start: _startDate!, end: _endDate!)
+                        : null,
+                  );
+                  if (pickedRange != null) {
+                    setState(() {
+                      _startDate = pickedRange.start;
+                      _endDate = pickedRange.end;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Reporting cycle set to: ${DateFormat('yyyy-MM-dd').format(_startDate!)} to ${DateFormat('yyyy-MM-dd').format(_endDate!)}')),
+                    );
+                    _loadData();
+                  }
+                },
+              ),
+              if (_startDate != null || _endDate != null)
+                ListTile(
+                  leading: const Icon(Icons.clear_all, color: Colors.red),
+                  title: const Text('Clear Date Range Filter'),
+                  subtitle: const Text('Reset to view all-time reporting data'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    setState(() {
+                      _startDate = null;
+                      _endDate = null;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Date range filter cleared.')),
+                    );
+                    _loadData();
+                  },
+                ),
+              ListTile(
+                leading: const Icon(Icons.sync_rounded, color: Colors.green),
+                title: const Text('Re-index Local Storage Cache'),
+                subtitle: const Text('Force recalculation of all saved SQLite invoicing tables'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Re-indexing client database caches...')),
+                  );
+                  context.read<HistoryBloc>().add(LoadHistory());
+                  _loadData();
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

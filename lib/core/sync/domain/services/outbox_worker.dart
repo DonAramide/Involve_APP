@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:involve_app/core/sync/domain/services/outbox_dispatcher.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
 
 class OutboxWorker {
   final AppDatabase _db;
@@ -22,6 +23,9 @@ class OutboxWorker {
   }
 
   Future<void> _processQueue() async {
+    final isOnlinePlan = await PlanGatingInterceptor.checkIsOnlinePlan();
+    if (!isOnlinePlan) return;
+
     while (true) {
       final now = DateTime.now();
       

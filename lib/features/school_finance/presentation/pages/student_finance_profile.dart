@@ -67,19 +67,38 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
           }
 
           if (state is FinanceError) {
+            final isNetwork = state.message.toLowerCase().contains('connection') || state.message.toLowerCase().contains('internet');
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.all(32.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                    const SizedBox(height: 16),
-                    Text(state.message, textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
+                    Icon(
+                      isNetwork ? Icons.cloud_off_rounded : Icons.error_outline_rounded,
+                      size: 64,
+                      color: Colors.blueGrey.shade400,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Connection Issue',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      state.message.replaceAll('Exception: ', '').replaceAll('FinanceApiException: ', ''),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.4),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
                       onPressed: () => context.read<FinanceBloc>().add(LoadStudentProfile(widget.studentId)),
-                      child: const Text('Try Again'),
+                      icon: const Icon(Icons.refresh_rounded, size: 18),
+                      label: const Text('Try Again'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ],
                 ),

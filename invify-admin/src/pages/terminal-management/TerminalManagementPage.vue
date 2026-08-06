@@ -130,7 +130,7 @@ const downloadTemplate = () => {
       filename = 'Tablets_Template.csv';
       break;
     case 'mpos':
-      content = 'serial_number,hardware_type,device_model\nDSPREAD-001,MPOS,DSPREAD-X1\nDSPREAD-002,ANDROID_POS,DSPREAD-X2';
+      content = 'serial_number,hardware_type,device_model\nVM3041056610,AISINO_VM30,VM30\nMP63-001,MOREFUN_MP63,MP63';
       filename = 'MPOS_Devices_Template.csv';
       break;
     case 'printers':
@@ -142,7 +142,7 @@ const downloadTemplate = () => {
       filename = 'TIDs_Template.csv';
       break;
     case 'bundles':
-      content = 'tenant_id,tablet_device_id,tablet_model,mpos_serial,mpos_model,printer_mac,printer_model,tid,mid,bank,email,phone\ntenant-xyz,DEV-TEST-002,Tab-A7,DSPREAD-001,MPOS-X1,00:11:22:33:44:55,XP-58,20330001,M-9001,Access,merchant@test.com,08012345678';
+      content = 'tenant_id,tablet_device_id,tablet_model,mpos_serial,mpos_model,printer_mac,printer_model,tid,mid,bank,email,phone\ntenant-xyz,DEV-TEST-002,Tab-A7,VM3041056610,AISINO_VM30,00:11:22:33:44:55,XP-58,20330001,M-9001,Access,merchant@test.com,08012345678\ntenant-xyz,DEV-TEST-003,Tab-A8,MP63-001,MOREFUN_MP63,00:11:22:33:44:66,XP-58,20330002,M-9002,Access,merchant2@test.com,08012345679';
       filename = 'Unified_Bundles_Template.csv';
       break;
   }

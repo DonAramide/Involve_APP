@@ -20,6 +20,7 @@ class StudentAnalyticsPage extends StatefulWidget {
 class _StudentAnalyticsPageState extends State<StudentAnalyticsPage> {
   bool _isLoading = true;
   List<Invoice> _allInvoices = [];
+  String _financialFilter = 'All'; // 'All', 'Paid Up', 'Owing'
 
   @override
   void initState() {
@@ -55,15 +56,28 @@ class _StudentAnalyticsPageState extends State<StudentAnalyticsPage> {
         // Core Student Metrics
         int totalStudents = students.length;
         
-        // Paid vs Owing
-        final owingStudents = students.where((s) => (s.balance ?? 0) > 0).toList();
-        final paidStudents = students.where((s) => (s.balance ?? 0) <= 0).toList();
-        
-        int owingCount = owingStudents.length;
-        double totalOwingValue = owingStudents.fold(0.0, (sum, s) => sum + (s.balance ?? 0));
-        
-        int paidCount = paidStudents.length;
-        // Total collected from fully paid students (requires interpreting total expected vs balance, or just using amount paid from invoices)
+        // Calculate student financial status from invoices for consistency
+        final Map<int, double> studentBalances = {};
+        for (final inv in _allInvoices) {
+          if (inv.studentId != null) {
+            final due = inv.totalAmount - inv.amountPaid;
+            studentBalances[inv.studentId!] = (studentBalances[inv.studentId!] ?? 0.0) + (due > 0 ? due : 0.0);
+          }
+        }
+
+        int owingCount = 0;
+        int paidCount = 0;
+        double totalOwingValue = 0.0;
+
+        for (final student in students) {
+          final balance = studentBalances[student.id] ?? 0.0;
+          if (balance > 0) {
+            owingCount++;
+            totalOwingValue += balance;
+          } else {
+            paidCount++;
+          }
+        }
         
         return Scaffold(
           appBar: AppBar(
@@ -438,7 +452,6 @@ class _StudentAnalyticsPageState extends State<StudentAnalyticsPage> {
       ),
     );
   }
-
   Widget _buildFinancialAnalytics(List<SchoolClass> classes, List<AcademicYear> years, List<Invoice> allInvoices) {
     // Expected vs Recovered grouped by Year, then Class
     return Card(
@@ -448,36 +461,83 @@ class _StudentAnalyticsPageState extends State<StudentAnalyticsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Revenue: Expected vs Recovered', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Revenue: Expected vs Recovered', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                DropdownButton<String>(
+                  value: _financialFilter,
+                  underline: const SizedBox(),
+                  icon: const Icon(Icons.filter_list, size: 18),
+                  style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _financialFilter = val;
+                      });
+                    }
+                  },
+                  items: const [
+                    DropdownMenuItem(value: 'All', child: Text('All')),
+                    DropdownMenuItem(value: 'Paid Up', child: Text('Paid Up')),
+                    DropdownMenuItem(value: 'Owing', child: Text('Owing')),
+                  ],
+                ),
+              ],
+            ),
             const Divider(),
             ...years.map((y) {
               final yearInvoices = allInvoices.where((i) => i.academicYearId == y.id).toList();
-              if (yearInvoices.isEmpty) return const SizedBox.shrink();
+              
+              // Filter based on selected filter
+              final filteredYearInvoices = yearInvoices.where((i) {
+                if (_financialFilter == 'All') return true;
+                final isPaid = i.amountPaid >= i.totalAmount;
+                if (_financialFilter == 'Paid Up') return isPaid;
+                return !isPaid; // 'Owing'
+              }).toList();
+              
+              if (filteredYearInvoices.isEmpty) return const SizedBox.shrink();
 
-              // Calculate over all classes for this year
-              double yearExpected = yearInvoices.fold(0.0, (sum, i) => sum + i.totalAmount);
-              double yearRecovered = yearInvoices.fold(0.0, (sum, i) => sum + i.amountPaid);
+              double yearExpected = filteredYearInvoices.fold(0.0, (sum, i) => sum + i.totalAmount);
+              double yearRecovered = filteredYearInvoices.fold(0.0, (sum, i) => sum + i.amountPaid);
               
               return ExpansionTile(
                 title: Text(y.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text('Expected: ${CurrencyFormatter.format(yearExpected)} | Recovered: ${CurrencyFormatter.format(yearRecovered)}'),
                 children: classes.map((c) {
-                  final classInvoices = yearInvoices.where((i) => i.classId == c.id).toList();
+                  final classInvoices = filteredYearInvoices.where((i) => i.classId == c.id).toList();
                   if (classInvoices.isEmpty) return const SizedBox.shrink();
 
                   double classExpected = classInvoices.fold(0.0, (sum, i) => sum + i.totalAmount);
                   double classRecovered = classInvoices.fold(0.0, (sum, i) => sum + i.amountPaid);
 
-                  return ListTile(
+                  return ExpansionTile(
                     title: Text(c.name),
-                    trailing: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text('Exp: ${CurrencyFormatter.format(classExpected)}', style: const TextStyle(fontSize: 12)),
-                        Text('Rec: ${CurrencyFormatter.format(classRecovered)}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
-                      ],
-                    ),
+                    subtitle: Text('Exp: ${CurrencyFormatter.format(classExpected)} | Rec: ${CurrencyFormatter.format(classRecovered)}'),
+                    children: classInvoices.map((inv) {
+                      final bool isPaid = inv.amountPaid >= inv.totalAmount;
+                      return ListTile(
+                        dense: true,
+                        title: Text('${inv.customerName ?? "Unknown Student"} (${inv.invoiceNumber})'),
+                        subtitle: Text('Expected: ${CurrencyFormatter.format(inv.totalAmount)} | Recovered: ${CurrencyFormatter.format(inv.amountPaid)}'),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isPaid ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isPaid ? 'Paid Up' : 'Owing',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isPaid ? Colors.green : Colors.red,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   );
                 }).toList(),
               );

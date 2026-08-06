@@ -363,16 +363,23 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { CanonicalBroadcastTypes, DotroidLauncherModes, DeliveryPriorityLanes } from '../../contracts/broadcast'
 import { BroadcastEnvelopeModel, BroadcastFactory } from '../../broadcast-models'
 import { broadcastEngineSingleton } from '../../services/broadcast/BroadcastOrchestrationEngine'
+import { realtimeGatewaySingleton } from '../../services/broadcast/BroadcastRealtimeGateway'
+import { pushDispatcherSingleton } from '../../services/broadcast/PushNotificationDispatcher'
 import { deliveryTrackerSingleton, TrackingStates } from '../../services/broadcast/BroadcastDeliveryTracker'
 import { targetingEngineSingleton } from '../../services/broadcast/DeliveryTargetingEngine'
 import { auditGovernanceSingleton } from '../../services/broadcast/BroadcastAuditGovernance'
+import { adminApi } from '../../api'
+
+// Ensure transport gateways register with the orchestration engine
+void realtimeGatewaySingleton
+void pushDispatcherSingleton
 
 const { prefs } = useOperatorPreferences()
 const $q = useQuasar()
@@ -536,6 +543,7 @@ const executeOperationalBroadcast = async () => {
     deliveryChannels: [...composerForm.channels],
     launcherMode: composerForm.launcherMode,
     priorityLane: composerForm.priorityLane,
+    locationContext: null,  // not available in admin console (web browser context)
     targetScopes: {
       tenants: composerForm.tenantScope === "global" ? [] : [composerForm.tenantScope],
       quarantineState: composerForm.severity === "EMERGENCY" ? "QUARANTINED" : "ANY"
@@ -560,6 +568,34 @@ const executeOperationalBroadcast = async () => {
   const result = await broadcastEngineSingleton.enqueueBroadcast(envelope)
   
   if (result.success) {
+    // Hard guarantee: also push to Invify Socket.IO devices when websocket transport is selected.
+    // (Orchestration gateways can miss registration in some boot orders.)
+    if (composerForm.channels.includes('websocket')) {
+      try {
+        const deviceMessage = [composerForm.title, composerForm.message].filter(Boolean).join('\n')
+        const targetType = composerForm.tenantScope === 'global' ? 'all' : 'tenant'
+        const targetValue = composerForm.tenantScope === 'global' ? null : composerForm.tenantScope
+        await adminApi.sendBroadcast({
+          message: deviceMessage,
+          targetType,
+          targetValue,
+          title: composerForm.title,
+          severity: composerForm.severity,
+          launcherMode: composerForm.launcherMode,
+          broadcastId: envelope.broadcastId,
+        })
+      } catch (socketErr) {
+        console.error('[BroadcastCenter] Direct /admin/broadcast failed:', socketErr)
+        $q?.notify({
+          message: 'Audit saved, but device socket push failed',
+          caption: socketErr?.response?.data?.error || socketErr?.message || 'Check backend auth /admin/broadcast',
+          color: 'amber-10',
+          textColor: 'black',
+          icon: 'warning',
+        })
+      }
+    }
+
     // Stage absolute initial tracker lifecycles
     deliveryTrackerSingleton.updateTrackingState(envelope.broadcastId, TrackingStates.DELIVERED, envelope)
     // Append immutable transaction trail
@@ -629,17 +665,19 @@ const clearAuditRecords = () => {
 // Programmatic tab anchor scroll routing observer
 const handleTabNavigation = (targetTab) => {
   if (!targetTab) return
-  setTimeout(() => {
-    if (targetTab === 'preflight' && preflightSectionRef.value) {
-      preflightSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      preflightSectionRef.value.classList.add('nav-highlight-glow')
-      setTimeout(() => preflightSectionRef.value.classList.remove('nav-highlight-glow'), 1800)
-    } else if (targetTab === 'audits' && auditSectionRef.value) {
-      auditSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      auditSectionRef.value.classList.add('nav-highlight-glow')
-      setTimeout(() => auditSectionRef.value.classList.remove('nav-highlight-glow'), 1800)
-    }
-  }, 120)
+  nextTick(() => {
+    setTimeout(() => {
+      if (targetTab === 'preflight' && preflightSectionRef.value) {
+        preflightSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        preflightSectionRef.value.classList?.add('nav-highlight-glow')
+        setTimeout(() => preflightSectionRef.value?.classList?.remove('nav-highlight-glow'), 1800)
+      } else if (targetTab === 'audits' && auditSectionRef.value) {
+        auditSectionRef.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        auditSectionRef.value.classList?.add('nav-highlight-glow')
+        setTimeout(() => auditSectionRef.value?.classList?.remove('nav-highlight-glow'), 1800)
+      }
+    }, 300)
+  })
 }
 
 watch(() => route.query?.tab, (newTab) => {

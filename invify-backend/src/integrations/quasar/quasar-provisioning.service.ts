@@ -88,11 +88,30 @@ export class QuasarProvisioningService {
       },
     );
 
-    // ── Step 2: Issue API Key ─────────────────────────────────────────────────
+    // ── Step 2: Issue API Key (include sandbox scopes for QFS) ────────────────
     const apiKey = await quasarPlatformClient.createApiKey(
       quasarTenant.id,
       vertical,
-      { name: `Invify MPOS — ${tenantName}`, environment },
+      {
+        name: `Invify MPOS — ${tenantName}`,
+        environment,
+        scopes: [
+          'payments:create',
+          'payments:read',
+          'wallets:read',
+          'transfers:create',
+          'transfers:read',
+          'virtual_accounts:read',
+          'virtual_accounts:write',
+          'webhooks:endpoints:manage',
+          'webhooks:read',
+          'integration:read',
+          'pos:icc:write',
+          'pos:card:execute',
+          'sandbox:read',
+          'sandbox:write',
+        ],
+      },
       {
         correlationId,
         idempotencyKey: `provision-apikey:${invifyTenantId}:${environment}`,
@@ -153,15 +172,43 @@ export class QuasarProvisioningService {
   }
 
   /**
-   * Retrieve a QuasarPaymentsClient pre-loaded with the decrypted sk_secret
-   * for a given Invify tenant. Used by financial service calls.
+   * Retrieve a QuasarPaymentsClient for financial / sandbox calls.
+   *
+   * Resolution order:
+   *   1. Per-tenant sk from quasar_integrations (preferred for multi-merchant)
+   *   2. Global QUASAR_API_KEY (Invify general sk_test_* issued by Quasar)
    */
   static async getPaymentsClient(invifyTenantId: string): Promise<QuasarPaymentsClient> {
     const integration = await QuasarIntegrationStore.getByInvifyTenantId(invifyTenantId);
-    if (!integration) {
-      throw new Error(`[QuasarProvisioning] No Quasar integration found for tenant ${invifyTenantId}`);
+    if (integration) {
+      const sk = QuasarIntegrationStore.decryptSkSecret(integration);
+      return new QuasarPaymentsClient(sk);
     }
-    const sk = QuasarIntegrationStore.decryptSkSecret(integration);
-    return new QuasarPaymentsClient(sk);
+
+    const generalKey =
+      process.env.QUASAR_API_KEY?.trim() ||
+      process.env.QUASER_API_KEY?.trim();
+
+    if (generalKey && !generalKey.includes('your-quaser')) {
+      console.warn(
+        `[QuasarProvisioning] No per-tenant Quasar integration for ${invifyTenantId}. ` +
+          `Using general QUASAR_API_KEY.`,
+      );
+      return new QuasarPaymentsClient(generalKey);
+    }
+
+    throw new Error(
+      `[QuasarProvisioning] No Quasar integration for tenant ${invifyTenantId} ` +
+        `and QUASAR_API_KEY is missing/invalid. Provision the merchant or set QUASAR_API_KEY=sk_test_…`,
+    );
+  }
+
+  /** True when Invify has a usable general Quasar sk_test_* in env. */
+  static hasGeneralApiKey(): boolean {
+    const key =
+      process.env.QUASAR_API_KEY?.trim() ||
+      process.env.QUASER_API_KEY?.trim() ||
+      '';
+    return key.length > 0 && !key.includes('your-quaser');
   }
 }

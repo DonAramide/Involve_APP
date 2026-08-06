@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -69,7 +70,7 @@ class OnboardingNavigator {
       
       final signupUrls = [
         'http://localhost:3004/auth/register',
-        '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/auth/register',
+        '${AppConfig.baseUrl}/auth/register',
       ];
 
       bool signupSuccess = false;
@@ -164,7 +165,7 @@ class OnboardingNavigator {
   static Future<void> _sendOtp(Dio dio, String identifier, String type) async {
     final urls = [
       'http://localhost:3004/auth/send-$type-otp',
-      '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/auth/send-$type-otp',
+      '${AppConfig.baseUrl}/auth/send-$type-otp',
     ];
 
     bool otpSent = false;

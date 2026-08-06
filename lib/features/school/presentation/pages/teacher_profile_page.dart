@@ -24,9 +24,20 @@ class TeacherProfilePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<SchoolBloc, SchoolState>(
       builder: (context, state) {
-        // Find the fresh teacher model and their assigned class
+        // Find the fresh teacher model and their assigned classes
         final currentTeacher = state.teachers.where((t) => t.id == teacher.id).firstOrNull ?? teacher;
-        final assignedClass = state.classes.where((c) => c.id == currentTeacher.classId).firstOrNull;
+        final assignedClasses = state.classes
+            .where((c) => currentTeacher.classIds?.contains(c.id) == true || c.id == currentTeacher.classId)
+            .toList();
+        final assignedClassesText = assignedClasses.isNotEmpty
+            ? assignedClasses.map((c) => c.name).join(', ')
+            : 'None';
+        final assignedSubjects = state.subjects
+            .where((s) => s.teacherId == currentTeacher.id)
+            .toList();
+        final assignedSubjectsText = assignedSubjects.isNotEmpty
+            ? assignedSubjects.map((s) => s.name).join(', ')
+            : 'None';
 
         return Scaffold(
           appBar: AppBar(
@@ -98,15 +109,55 @@ class TeacherProfilePage extends StatelessWidget {
                       ),
                     ElevatedButton.icon(
                       onPressed: () {
-                        if (currentTeacher.classId != null) {
+                        if (assignedClasses.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No class assigned to this teacher.')));
+                        } else if (assignedClasses.length == 1) {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => StudentListPage(initialClassFilter: currentTeacher.classId),
+                              builder: (_) => StudentListPage(initialClassFilter: assignedClasses.first.id),
                             ),
                           );
                         } else {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No class assigned to this teacher.')));
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('Select Class'),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: assignedClasses.map((c) {
+                                  final studentCount = state.students.where((s) => s.classId == c.id).length;
+                                  return ListTile(
+                                    title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                    trailing: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.shade50,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Text(
+                                        '$studentCount ${studentCount == 1 ? "student" : "students"}',
+                                        style: TextStyle(
+                                          color: Colors.blue.shade800,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(ctx);
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => StudentListPage(initialClassFilter: c.id),
+                                        ),
+                                      );
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          );
                         }
                       },
                       icon: const Icon(Icons.people),
@@ -127,7 +178,8 @@ class TeacherProfilePage extends StatelessWidget {
                       children: [
                         const Text('Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const Divider(),
-                        _buildDetailRow('Assigned Class:', assignedClass?.name ?? 'None'),
+                        _buildDetailRow('Assigned Classes:', assignedClassesText),
+                        _buildDetailRow('Assigned Subjects:', assignedSubjectsText),
                         _buildDetailRow('Phone:', currentTeacher.phone ?? 'N/A'),
                         _buildDetailRow('Salary:', CurrencyFormatter.format(currentTeacher.salary)),
                         _buildDetailRow('Date Joined:', DateFormat('MMMM dd, yyyy').format(currentTeacher.employmentDate)),

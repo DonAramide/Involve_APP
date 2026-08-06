@@ -616,4 +616,40 @@ export class QuasarPaymentsClient {
   ): Promise<any> {
     return this.client.post(`/sandbox/providers/${provider}/simulate`, body, opts);
   }
+
+  /**
+   * POST /school/students/{childId}/virtual-account — Provision virtual account
+   */
+  async createVirtualAccount(
+    params: {
+      childId: string;
+      parentId: string;
+      currency: string;
+      email: string;
+      firstName?: string;
+      lastName?: string;
+      parentShareBps?: number;
+      preferredBankCode?: string;
+      bvn?: string;
+      metadata?: Record<string, any>;
+    },
+    opts?: RequestOptions,
+  ): Promise<any> {
+    const idempotencyKey = opts?.idempotencyKey ?? `virtual-account:${params.childId}`;
+    return this.client.post(
+      `/school/students/${encodeURIComponent(params.childId)}/virtual-account`,
+      {
+        merchantWalletOwnerId: params.parentId,
+        currency: params.currency,
+        email: params.email,
+        firstName: params.firstName || 'User',
+        lastName: params.lastName || 'Account',
+        counterpartyShareBps: params.parentShareBps ?? 0,
+        preferredBankCode: params.preferredBankCode,
+        bvn: params.bvn,
+        metadata: params.metadata,
+      },
+      { ...opts, idempotencyKey },
+    );
+  }
 }

@@ -13,10 +13,12 @@ export const DashboardRegistry = {
   retail: {
     layout: 'RetailWorkspace',
     grid: [
-      { id: 'RevenueWidget', col: 'col-12 col-md-4', order: 1 },
-      { id: 'WalletWidget', col: 'col-12 col-md-4', order: 2 },
-      { id: 'LedgerFeed', col: 'col-12 col-md-4', order: 3 },
-      { id: 'QuasarTimeline', col: 'col-12', order: 4 }
+      { id: 'SalesSummaryWidget', col: 'col-12', order: 1 },
+      { id: 'RevenueWidget', col: 'col-12 col-md-4', order: 2 },
+      { id: 'WalletWidget', col: 'col-12 col-md-4', order: 3 },
+      { id: 'LedgerFeed', col: 'col-12 col-md-4', order: 4 },
+      { id: 'TransactionHistoryWidget', col: 'col-12 col-md-8', order: 5 },
+      { id: 'QuasarTimeline', col: 'col-12 col-md-4', order: 6 }
     ]
   },
   healthcare: {

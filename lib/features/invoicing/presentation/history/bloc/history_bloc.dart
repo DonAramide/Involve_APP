@@ -83,6 +83,8 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
           invoices = invoices.where((inv) => inv.paymentStatus == 'Unpaid').toList();
         } else if (status == 'Outstanding') {
           invoices = invoices.where((inv) => inv.balanceAmount > 0).toList();
+        } else if (status == 'Pending') {
+          invoices = invoices.where((inv) => inv.paymentStatus == 'Pending').toList();
         }
       }
 

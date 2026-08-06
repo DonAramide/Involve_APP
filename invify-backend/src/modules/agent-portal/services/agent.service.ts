@@ -109,6 +109,118 @@ export class AgentService {
 
     return updatedAgent;
   }
+
+  /**
+   * Update KYC status of agent
+   */
+  async updateKycStatus(
+    id: string,
+    kycStatus: string,
+    actorId: string,
+    ipAddress?: string,
+    userAgent?: string
+  ) {
+    const existingAgent = await agentRepository.findById(id);
+    if (!existingAgent) throw new Error('Agent not found');
+
+    const updatedProfile = await agentRepository.updateAgentProfile(id, { kyc_status: kycStatus });
+
+    // Log Audit
+    await agentRepository.logAudit(
+      actorId,
+      'AGENT_KYC',
+      id,
+      'UPDATE_KYC',
+      { kyc_status: existingAgent.agent_profiles?.kyc_status || 'PENDING' },
+      { kyc_status: kycStatus },
+      ipAddress,
+      userAgent
+    );
+
+    return updatedProfile;
+  }
+
+  /**
+   * Get commissions config for agent
+   */
+  async getCommissions(id: string) {
+    const agent = await agentRepository.findById(id);
+    if (!agent) throw new Error('Agent not found');
+    return {
+      commission_plan_id: agent.commission_plan_id,
+      tier: (agent as any).current_tier || 'TIER_1'
+    };
+  }
+
+  /**
+   * Update commissions config for agent
+   */
+  async updateCommissions(
+    id: string,
+    data: { commission_plan_id?: string; tier?: string },
+    actorId: string,
+    ipAddress?: string,
+    userAgent?: string
+  ) {
+    const existingAgent = await agentRepository.findById(id);
+    if (!existingAgent) throw new Error('Agent not found');
+
+    const updates: any = {};
+    if (data.commission_plan_id) updates.commission_plan_id = data.commission_plan_id;
+    if (data.tier) updates.current_tier = data.tier;
+
+    const updatedAgent = await agentRepository.updateAgent(id, updates);
+
+    // Log Audit
+    await agentRepository.logAudit(
+      actorId,
+      'AGENT_COMMISSIONS',
+      id,
+      'UPDATE_COMMISSIONS',
+      { commission_plan_id: existingAgent.commission_plan_id },
+      updates,
+      ipAddress,
+      userAgent
+    );
+
+    return updatedAgent;
+  }
+
+  /**
+   * Message agent
+   */
+  async messageAgent(id: string, message: string, actorId: string) {
+    const agent = await agentRepository.findById(id);
+    if (!agent) throw new Error('Agent not found');
+
+    // Simulate system message insertion/log
+    await agentRepository.logAudit(
+      actorId,
+      'AGENT_MESSAGE',
+      id,
+      'SEND_MESSAGE',
+      null,
+      { message }
+    );
+  }
+
+  /**
+   * Message all tenants managed by agent
+   */
+  async messageTenants(id: string, message: string, actorId: string) {
+    const agent = await agentRepository.findById(id);
+    if (!agent) throw new Error('Agent not found');
+
+    // Simulate system broadcast
+    await agentRepository.logAudit(
+      actorId,
+      'AGENT_MESSAGE',
+      id,
+      'BROADCAST_TENANTS',
+      null,
+      { message }
+    );
+  }
 }
 
 export const agentService = new AgentService();

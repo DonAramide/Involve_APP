@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -203,7 +204,7 @@ class TerminalSyncService {
   // Base URL — reads from app config or defaults to localhost
   static String get _baseUrl {
     // Hardcoded URL for local network testing based on user's active session
-    return dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
+    return AppConfig.baseUrl;
   }  /// Sync the terminal configuration for this device from the backend.
   ///
   /// [deviceId] — the device's unique identifier (activation/enrollment ID)

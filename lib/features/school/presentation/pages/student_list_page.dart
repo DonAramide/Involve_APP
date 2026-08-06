@@ -10,6 +10,7 @@ import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import './student_profile_page.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class StudentListPage extends StatefulWidget {
@@ -27,6 +28,7 @@ class _StudentListPageState extends State<StudentListPage> {
   int? _selectedClassFilter;
   String _selectedOwingFilter = 'All'; // 'All', 'Owing', 'Not Owing'
   int? _selectedYearFilter;
+  String _selectedDepartmentFilter = 'All'; // 'All', 'Science', 'Art', 'Commerce', 'None'
   String _searchQuery = '';
 
   @override
@@ -68,6 +70,7 @@ class _StudentListPageState extends State<StudentListPage> {
       },
       child: BlocBuilder<SchoolBloc, SchoolState>(
         builder: (context, state) {
+          final filteredStudents = _getFilteredStudents(state.students, state.studentInvoices);
           return Scaffold(
           appBar: AppBar(
             title: Text(_isSelectionMode ? '${_selectedStudentIds.length} Selected' : 'Students'),
@@ -97,10 +100,52 @@ class _StudentListPageState extends State<StudentListPage> {
             : Column(
                 children: [
                   _buildFilterBar(state),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    color: Colors.blueGrey.shade50.withOpacity(0.5),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Showing ${filteredStudents.length} ${filteredStudents.length == 1 ? "student" : "students"}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blueGrey.shade700,
+                          ),
+                        ),
+                        if (_selectedClassFilter != null) ...[
+                          (() {
+                            final selectedClass = state.classes.firstWhere(
+                              (c) => c.id == _selectedClassFilter,
+                              orElse: () => const SchoolClass(id: 0, name: '')
+                            );
+                            if (selectedClass.name.isEmpty) return const SizedBox.shrink();
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.blue.shade100),
+                              ),
+                              child: Text(
+                                selectedClass.name,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            );
+                          })(),
+                        ],
+                      ],
+                    ),
+                  ),
                   Expanded(
                     child: state.students.isEmpty 
                       ? const Center(child: Text('No students found.'))
-                      : _buildStudentList(state),
+                      : _buildStudentList(state, filteredStudents),
                   ),
                 ],
               ),
@@ -145,6 +190,23 @@ class _StudentListPageState extends State<StudentListPage> {
                 ),
                 const SizedBox(width: 16),
                 
+                // Department Filter
+                DropdownButton<String>(
+                  value: _selectedDepartmentFilter,
+                  items: ['All', 'Science', 'Art', 'Commerce', 'None']
+                      .map((d) => DropdownMenuItem(
+                            value: d,
+                            child: Text(d == 'All'
+                                ? 'All Depts'
+                                : d == 'None'
+                                    ? 'No Dept'
+                                    : d),
+                          ))
+                      .toList(),
+                  onChanged: (val) => setState(() => _selectedDepartmentFilter = val ?? 'All'),
+                ),
+                const SizedBox(width: 16),
+                
                 // Owing Status Filter
                 DropdownButton<String>(
                   value: _selectedOwingFilter,
@@ -173,8 +235,8 @@ class _StudentListPageState extends State<StudentListPage> {
     );
   }
 
-  Widget _buildStudentList(SchoolState state) {
-    final filteredStudents = state.students.where((s) {
+  List<Student> _getFilteredStudents(List<Student> students, List<Invoice> invoices) {
+    final filtered = students.where((s) {
       if (_searchQuery.isNotEmpty) {
         final nameMatch = s.fullName.toLowerCase().contains(_searchQuery);
         final idMatch = (s.admissionNumber ?? '').toLowerCase().contains(_searchQuery);
@@ -185,16 +247,26 @@ class _StudentListPageState extends State<StudentListPage> {
       
       if (_selectedYearFilter != null && s.academicYearId != _selectedYearFilter) return false;
 
-      final isOwing = (s.balance ?? 0) > 0;
+      if (_selectedDepartmentFilter != 'All') {
+        if (_selectedDepartmentFilter == 'None' && s.department != null) return false;
+        if (_selectedDepartmentFilter != 'None' && s.department != _selectedDepartmentFilter) return false;
+      }
+
+      final dynamicBalance = invoices
+          .where((inv) => inv.studentId == s.id)
+          .fold(0.0, (sum, inv) => sum + (inv.totalAmount - inv.amountPaid));
+      final isOwing = dynamicBalance > 0;
       if (_selectedOwingFilter == 'Owing' && !isOwing) return false;
       if (_selectedOwingFilter == 'Not Owing' && isOwing) return false;
 
       return true;
     }).toList();
 
-    // Alphabetical Sorting by full name
-    filteredStudents.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+    filtered.sort((a, b) => a.fullName.toLowerCase().compareTo(b.fullName.toLowerCase()));
+    return filtered;
+  }
 
+  Widget _buildStudentList(SchoolState state, List<Student> filteredStudents) {
     if (filteredStudents.isEmpty) {
       return const Center(child: Text('No students match the selected filters.'));
     }
@@ -229,12 +301,19 @@ class _StudentListPageState extends State<StudentListPage> {
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Class: ${sClass.name} | ID: ${student.admissionNumber ?? 'N/A'}'),
-                if ((student.balance ?? 0) > 0)
-                  Text(
-                    'Balance: ${CurrencyFormatter.format(student.balance!)}',
-                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
-                  ),
+                Text('Class: ${sClass.name}${student.department != null ? ' • ${student.department}' : ''} | ID: ${student.admissionNumber ?? 'N/A'}'),
+                (() {
+                  final dynamicBalance = state.studentInvoices
+                      .where((inv) => inv.studentId == student.id)
+                      .fold(0.0, (sum, inv) => sum + (inv.totalAmount - inv.amountPaid));
+                  if (dynamicBalance > 0) {
+                    return Text(
+                      'Balance: ${CurrencyFormatter.format(dynamicBalance)}',
+                      style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                })(),
               ],
             ),
             trailing: _isSelectionMode 
@@ -333,6 +412,7 @@ class _StudentListPageState extends State<StudentListPage> {
     final parentNameController = TextEditingController(text: student?.parentName);
     final parentPhoneController = TextEditingController(text: student?.parentPhone);
     int? selectedClassId = student?.classId;
+    String? selectedDepartment = student?.department;
     String? selectedGender = student?.gender;
     Uint8List? selectedImage = student?.image;
     DateTime? selectedDob = student?.dateOfBirth;
@@ -440,15 +520,31 @@ class _StudentListPageState extends State<StudentListPage> {
                     const SizedBox(height: 16),
                     BlocBuilder<SchoolBloc, SchoolState>(
                       builder: (context, state) {
-                        return DropdownButtonFormField<int>(
-                          value: selectedClassId,
-                          decoration: const InputDecoration(labelText: 'Class *'),
-                          items: state.classes.map((c) => DropdownMenuItem(value: c.id!, child: Text(c.name))).toList(),
-                          onChanged: (val) => setDialogState(() => selectedClassId = val),
-                          validator: (val) => val == null ? 'Please select a class' : null,
+                        return Column(
+                          children: [
+                            DropdownButtonFormField<int>(
+                              value: selectedClassId,
+                              decoration: const InputDecoration(labelText: 'Class *'),
+                              items: state.classes.map((c) => DropdownMenuItem(value: c.id!, child: Text(c.name))).toList(),
+                              onChanged: (val) => setDialogState(() => selectedClassId = val),
+                              validator: (val) => val == null ? 'Please select a class' : null,
+                            ),
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<String>(
+                              value: selectedDepartment,
+                              decoration: const InputDecoration(labelText: 'Department (Science/Art/Commerce)'),
+                              items: [
+                                const DropdownMenuItem<String>(value: null, child: Text('None')),
+                                ...['Science', 'Art', 'Commerce']
+                                    .map((d) => DropdownMenuItem(value: d, child: Text(d))),
+                              ],
+                              onChanged: (val) => setDialogState(() => selectedDepartment = val),
+                            ),
+                          ],
                         );
                       },
                     ),
+                    const SizedBox(height: 16),
                     TextFormField(
                       controller: parentNameController, 
                       decoration: const InputDecoration(labelText: 'Parent/Guardian Name *'),
@@ -487,6 +583,7 @@ class _StudentListPageState extends State<StudentListPage> {
                           image: selectedImage,
                           dateOfBirth: selectedDob,
                           gender: selectedGender,
+                          department: selectedDepartment,
                         ) ??
                         Student(
                           firstName: firstNameController.text,
@@ -499,6 +596,7 @@ class _StudentListPageState extends State<StudentListPage> {
                           dateOfBirth: selectedDob,
                           gender: selectedGender,
                           registrationDate: DateTime.now(),
+                          department: selectedDepartment,
                         );
 
                     if (student == null) {

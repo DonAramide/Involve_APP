@@ -3,9 +3,12 @@
  * QuasarHealthController — Admin-facing Quasar connectivity & credential health.
  *
  * Routes (all require authentication + Admin/SuperAdmin role):
- *   GET  /api/admin/quasar/health         — Full connectivity report
- *   GET  /api/admin/quasar/health/live    — Simple liveness probe (200/503)
- *   GET  /api/admin/quasar/integrations   — List all tenant integrations (no secrets)
+ *   GET  /api/admin/quasar/health                              — Full connectivity report
+ *   GET  /api/admin/quasar/health/live                         — Simple liveness probe (200/503)
+ *   GET  /api/admin/quasar/integrations                        — List all tenant integrations (no secrets)
+ *   PUT  /api/admin/quasar/integrations/:tenantId/webhook-secret — Update webhook signing secret for a tenant
+ *   PUT  /api/admin/quasar/webhook-secret/global               — Update the global/service-level fallback signing secret
+ *   GET  /api/admin/quasar/webhook-secret/status               — Status-only check (never returns plaintext)
  */
 
 import { Request, Response } from 'express';
@@ -71,6 +74,117 @@ export class QuasarHealthController {
       });
     } catch (err: any) {
       console.error('[QuasarHealthController] listIntegrations failed:', err.message);
+      return res.status(500).json({ responseCode: '99', responseMessage: err.message });
+    }
+  }
+  /**
+   * PUT /api/admin/quasar/integrations/:tenantId/webhook-secret
+   * Store/update the Quasar webhook signing secret for a specific tenant.
+   * Body: { signingSecret: string, webhookEndpointId?: string }
+   */
+  static async updateWebhookSigningSecret(req: Request, res: Response) {
+    try {
+      const { tenantId } = req.params;
+      const { signingSecret, webhookEndpointId } = req.body;
+
+      if (!tenantId || !signingSecret) {
+        return res.status(400).json({ responseCode: '02', responseMessage: 'tenantId and signingSecret are required' });
+      }
+
+      const integration = await QuasarIntegrationStore.getByInvifyTenantId(tenantId);
+      if (!integration) {
+        return res.status(404).json({ responseCode: '02', responseMessage: `No Quasar integration found for tenant ${tenantId}` });
+      }
+
+      await QuasarIntegrationStore.registerWebhook({
+        invifyTenantId: tenantId,
+        webhookEndpointId: webhookEndpointId || integration.quasar_webhook_endpoint_id || 'manual',
+        signingSecret,
+      });
+
+      console.log(`[QuasarHealthController] Webhook signing secret updated for tenant ${tenantId}`);
+      return res.status(200).json({
+        responseCode: '00',
+        responseMessage: 'Webhook signing secret saved and encrypted successfully',
+      });
+    } catch (err: any) {
+      console.error('[QuasarHealthController] updateWebhookSigningSecret failed:', err.message);
+      return res.status(500).json({ responseCode: '99', responseMessage: err.message });
+    }
+  }
+
+  /**
+   * PUT /api/admin/quasar/webhook-secret/global
+   * Store the Quasar service-level (global) webhook signing secret.
+   * This is shown once in the Quasar outbound webhooks dashboard under "Signing secret".
+   * Body: { signingSecret: string }
+   * Saves to ALL active tenant integrations that don't yet have a signing secret, and
+   * also persists to the QUASAR_WEBHOOK_SIGNING_SECRET runtime env var as a fallback.
+   */
+  static async updateGlobalWebhookSigningSecret(req: Request, res: Response) {
+    try {
+      const { signingSecret, environment } = req.body;
+      if (!signingSecret || typeof signingSecret !== 'string' || signingSecret.length < 10) {
+        return res.status(400).json({ responseCode: '02', responseMessage: 'A valid signingSecret is required' });
+      }
+
+      // Persist as runtime fallback (applies immediately without restart)
+      process.env.QUASAR_WEBHOOK_SIGNING_SECRET = signingSecret;
+
+      // Persist in Enterprise Integration Vault (survives restarts)
+      const { IntegrationVaultService } = await import('../services/integration-vault.service');
+      const vaultResult = await IntegrationVaultService.upsertQuasarWebhookSigningSecret(
+        signingSecret,
+        environment === 'SANDBOX' ? 'SANDBOX' : 'PRODUCTION',
+      );
+
+      // Also store on all integrations that are missing a webhook signing secret
+      const integrations = await QuasarIntegrationStore.listAll();
+      let updated = 0;
+      for (const intg of integrations) {
+        if (!intg.quasar_webhook_signing_secret_enc) {
+          await QuasarIntegrationStore.registerWebhook({
+            invifyTenantId: intg.invify_tenant_id,
+            webhookEndpointId: intg.quasar_webhook_endpoint_id || 'service-default',
+            signingSecret,
+          });
+          updated++;
+        }
+      }
+
+      console.log(`[QuasarHealthController] Global webhook signing secret updated. Vault=${vaultResult.vaultId}. Applied to ${updated} integrations.`);
+      return res.status(200).json({
+        responseCode: '00',
+        responseMessage: `Global signing secret saved to Integration Vault. Applied to ${updated} integration(s). Active for incoming webhooks immediately.`,
+        data: {
+          vaultId: vaultResult.vaultId,
+          keyName: vaultResult.keyName,
+          environment: vaultResult.environment,
+          tenantsUpdated: updated,
+        },
+      });
+    } catch (err: any) {
+      console.error('[QuasarHealthController] updateGlobalWebhookSigningSecret failed:', err.message);
+      return res.status(500).json({ responseCode: '99', responseMessage: err.message });
+    }
+  }
+
+  /**
+   * GET /api/admin/quasar/webhook-secret/status
+   * Returns whether a global Quasar webhook signing secret is configured (never returns the secret).
+   */
+  static async getWebhookSecretStatus(req: Request, res: Response) {
+    try {
+      const environment = (req.query.environment as string) === 'SANDBOX' ? 'SANDBOX' : 'PRODUCTION';
+      const { IntegrationVaultService } = await import('../services/integration-vault.service');
+      const status = await IntegrationVaultService.getQuasarWebhookSecretStatus(environment);
+      return res.status(200).json({
+        responseCode: '00',
+        responseMessage: status.configured ? 'Webhook signing secret is configured' : 'Webhook signing secret is not configured',
+        data: status,
+      });
+    } catch (err: any) {
+      console.error('[QuasarHealthController] getWebhookSecretStatus failed:', err.message);
       return res.status(500).json({ responseCode: '99', responseMessage: err.message });
     }
   }

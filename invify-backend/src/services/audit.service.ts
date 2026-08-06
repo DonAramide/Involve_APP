@@ -1,5 +1,5 @@
 // src/services/audit.service.ts
-import { supabase } from '../db/supabase';
+import { supabaseAdmin } from '../db/supabase';
 
 export type FinancialAuditEvents = 
   | 'payment.intent.created' 
@@ -26,7 +26,7 @@ export class AuditService {
     payload: any;
   }) {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('financial_audit_logs')
         .insert({
           event_type: params.eventType,

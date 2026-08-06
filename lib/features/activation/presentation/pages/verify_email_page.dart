@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -35,22 +36,10 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
       final email = widget.payload['email'];
       
-      final verifyUrls = [
-        'http://localhost:3004/auth/verify-email-otp',
-        '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/auth/verify-email-otp',
-      ];
-
-      bool otpVerified = false;
-      for (var url in verifyUrls) {
-        try {
-          await dio.post(url, data: {'email': email, 'code': _currentPin});
-          otpVerified = true;
-          break;
-        } catch (_) {}
-      }
-
-      if (!otpVerified) {
-        throw Exception('Invalid OTP or server unreachable.');
+      try {
+        await dio.post('${AppConfig.baseUrl}/auth/verify-email-otp', data: {'email': email, 'code': _currentPin});
+      } catch (e) {
+        throw Exception('Invalid OTP or server unreachable: $e');
       }
 
       setState(() => _isLoading = false);
@@ -79,25 +68,13 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     try {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
       final email = widget.payload['email'];
-      final urls = [
-        'http://localhost:3004/auth/send-email-otp',
-        '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/auth/send-email-otp',
-      ];
-
-      bool otpSent = false;
-      for (var url in urls) {
-        try {
-          await dio.post(url, data: {'email': email});
-          otpSent = true;
-          break;
-        } catch (_) {}
+      try {
+        await dio.post('${AppConfig.baseUrl}/auth/send-email-otp', data: {'email': email});
+      } catch (e) {
+        throw Exception('Failed to resend email OTP: $e');
       }
 
       setState(() => _isLoading = false);
-
-      if (!otpSent) {
-        throw Exception('Failed to resend email OTP. Server unreachable.');
-      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -121,6 +98,10 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(

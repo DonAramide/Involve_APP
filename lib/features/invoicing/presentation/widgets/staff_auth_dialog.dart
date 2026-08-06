@@ -95,75 +95,77 @@ class _StaffAuthDialogState extends State<StaffAuthDialog> {
 
             return AlertDialog(
               title: Text(isLocked ? '🔒 System Locked' : 'Staff Authentication'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isLocked) ...[
-                    const Text(
-                      'Too many failed attempts!',
-                      style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Enter unlock code to continue:',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12),
-                    ),
-                    const SizedBox(height: 16),
-                  ] else ...[
-                    if (failedAttempts > 0) ...[
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.warning, color: Colors.orange, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Attempts: $failedAttempts/6',
-                                style: const TextStyle(
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.bold,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isLocked) ...[
+                      const Text(
+                        'Too many failed attempts!',
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Enter unlock code to continue:',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+                    ] else ...[
+                      if (failedAttempts > 0) ...[
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning, color: Colors.orange, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Attempts: $failedAttempts/6',
+                                  style: const TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ),
+                      ],
+                      DropdownButtonFormField<Staff>(
+                        value: _selectedStaff,
+                        decoration: const InputDecoration(labelText: 'Select Staff'),
+                        items: state.staffList.map((s) => DropdownMenuItem(
+                          value: s,
+                          child: Text(s.name),
+                        )).toList(),
+                        onChanged: (val) => setState(() => _selectedStaff = val),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    TextField(
+                      controller: _codeController,
+                      decoration: InputDecoration(
+                        labelText: isLocked ? 'Unlock Code' : 'Enter 4-digit Key',
+                        errorText: _error ?? (settingsState.error != null && isLocked ? settingsState.error : null),
+                        suffixIcon: (!_isBiometricAvailable || isLocked) ? null : IconButton(
+                          icon: const Icon(Icons.fingerprint, color: Colors.blue, size: 28),
+                          onPressed: () => _handleBiometricAuth(state.staffList),
+                          tooltip: 'Login with Biometrics',
                         ),
                       ),
-                    ],
-                    DropdownButtonFormField<Staff>(
-                      value: _selectedStaff,
-                      decoration: const InputDecoration(labelText: 'Select Staff'),
-                      items: state.staffList.map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Text(s.name),
-                      )).toList(),
-                      onChanged: (val) => setState(() => _selectedStaff = val),
+                      obscureText: !isLocked,
+                      keyboardType: isLocked ? TextInputType.text : TextInputType.number,
+                      maxLength: isLocked ? null : 4,
                     ),
-                    const SizedBox(height: 16),
                   ],
-                  TextField(
-                    controller: _codeController,
-                    decoration: InputDecoration(
-                      labelText: isLocked ? 'Unlock Code' : 'Enter 4-digit Key',
-                      errorText: _error ?? (settingsState.error != null && isLocked ? settingsState.error : null),
-                      suffixIcon: (!_isBiometricAvailable || isLocked) ? null : IconButton(
-                        icon: const Icon(Icons.fingerprint, color: Colors.blue, size: 28),
-                        onPressed: () => _handleBiometricAuth(state.staffList),
-                        tooltip: 'Login with Biometrics',
-                      ),
-                    ),
-                    obscureText: !isLocked,
-                    keyboardType: isLocked ? TextInputType.text : TextInputType.number,
-                    maxLength: isLocked ? null : 4,
-                  ),
-                ],
+                ),
               ),
               actions: [
                 TextButton(

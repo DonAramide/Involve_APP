@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import '../../domain/entities/service_job.dart';
@@ -159,6 +162,131 @@ class ServicesRepositoryImpl implements IServicesRepository {
   }
 
   @override
+  Future<ServiceCustomer?> getCustomerById(String id) async {
+    final row = await (db.select(db.customers)..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    return _mapCustomer(row);
+  }
+
+  @override
+  Future<ServiceCustomer?> getCustomerByVirtualAccount(String accountNumber) async {
+    final va = accountNumber.trim();
+    if (va.isEmpty) return null;
+    final row = await (db.select(db.customers)
+          ..where((t) => t.virtualAccountNumber.equals(va)))
+        .getSingleOrNull();
+    if (row == null) return null;
+    return _mapCustomer(row);
+  }
+
+  static const String _fundLedgerPrefsKey = 'customer_fund_ledger';
+
+  Future<List<Map<String, dynamic>>> _loadFundLedger() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_fundLedgerPrefsKey) ?? '[]';
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _saveFundLedger(List<Map<String, dynamic>> items) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _fundLedgerPrefsKey,
+      jsonEncode(items.take(500).toList()),
+    );
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getCustomerFundTransactions(
+      String customerId) async {
+    final all = await _loadFundLedger();
+    return all
+        .where((e) => e['customerId']?.toString() == customerId)
+        .toList();
+  }
+
+  @override
+  Future<ServiceCustomer?> creditCustomerWalletFromDeposit({
+    required double amount,
+    required String reference,
+    String? customerId,
+    String? virtualAccountNumber,
+    String? senderName,
+    String? senderBank,
+    String? createdAt,
+  }) async {
+    if (amount <= 0 || reference.trim().isEmpty) return null;
+
+    final ledger = await _loadFundLedger();
+    if (ledger.any((e) => e['reference']?.toString() == reference)) {
+      debugPrint('[ServicesRepo] Duplicate VA credit ignored: $reference');
+      return null;
+    }
+
+    ServiceCustomer? customer;
+    if (customerId != null && customerId.isNotEmpty) {
+      customer = await getCustomerById(customerId);
+    }
+    if (customer == null &&
+        virtualAccountNumber != null &&
+        virtualAccountNumber.trim().isNotEmpty) {
+      customer = await getCustomerByVirtualAccount(virtualAccountNumber.trim());
+    }
+    if (customer == null) return null;
+
+    final balanceBefore = customer.balance;
+    // Auto-debit: reduce owing first; remainder becomes wallet credit.
+    final owingBefore = balanceBefore > 0 ? balanceBefore : 0.0;
+    final appliedToDebt =
+        owingBefore > 0 ? (amount < owingBefore ? amount : owingBefore) : 0.0;
+    final remainingAsCredit = amount - appliedToDebt;
+    final balanceAfter = balanceBefore - amount;
+
+    await db.customUpdate(
+      'UPDATE customers SET balance = balance - ?, sync_status = ? WHERE id = ?',
+      variables: [
+        Variable.withReal(amount),
+        Variable.withString('pending'),
+        Variable.withString(customer.id),
+      ],
+      updates: {db.customers},
+    );
+
+    final entry = {
+      'id': const Uuid().v4(),
+      'customerId': customer.id,
+      'customerName': customer.name,
+      'amount': amount,
+      'type': 'CREDIT',
+      'reference': reference,
+      'virtualAccountNumber':
+          virtualAccountNumber ?? customer.virtualAccountNumber,
+      'senderName': senderName ?? 'Unknown Sender',
+      'senderBank': senderBank ?? '',
+      'status': 'SUCCESS',
+      'createdAt': createdAt ?? DateTime.now().toIso8601String(),
+      'source': 'va_deposit',
+      'balanceBefore': balanceBefore,
+      'balanceAfter': balanceAfter,
+      'appliedToDebt': appliedToDebt,
+      'remainingAsCredit': remainingAsCredit,
+      'autoDebit': appliedToDebt > 0,
+    };
+    ledger.insert(0, entry);
+    await _saveFundLedger(ledger);
+
+    return getCustomerById(customer.id);
+  }
+
+  @override
   Future<ServiceCustomer> createCustomer({
     required String name,
     String? phone,
@@ -182,11 +310,32 @@ class ServicesRepositoryImpl implements IServicesRepository {
   }
 
   @override
-  Future<void> updateCustomerVirtualAccount(String customerId, String accountNumber, String bankName) async {
+  Future<void> updateCustomerVirtualAccount(String customerId, String accountNumber, String bankName, {String? accountName}) async {
     await (db.update(db.customers)..where((t) => t.id.equals(customerId))).write(
       CustomersCompanion(
         virtualAccountNumber: Value(accountNumber),
         virtualAccountBank: Value(bankName),
+        virtualAccountName: accountName != null ? Value(accountName) : const Value.absent(),
+        syncStatus: const Value('pending'),
+      ),
+    );
+  }
+
+  @override
+  Future<void> updateCustomerBasicInfo({
+    required String id,
+    String? name,
+    String? phone,
+    String? email,
+    String? address,
+  }) async {
+    await (db.update(db.customers)..where((t) => t.id.equals(id))).write(
+      CustomersCompanion(
+        name: name != null ? Value(name) : const Value.absent(),
+        phone: phone != null ? Value(phone) : const Value.absent(),
+        email: email != null ? Value(email) : const Value.absent(),
+        address: address != null ? Value(address) : const Value.absent(),
+        syncStatus: const Value('pending'),
       ),
     );
   }

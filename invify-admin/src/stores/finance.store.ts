@@ -20,6 +20,15 @@ export interface FinanceSummaryViewModel {
   revenueTrend: string;
   pendingSettlementFormatted: string;
   heldFundsFormatted: string;
+  salesSummary?: {
+    totalInvoiced: number;
+    totalCollected: number;
+    card: number;
+    transfer: number;
+    cash: number;
+    wallet: number;
+    invoiceCount: number;
+  };
   studentMetrics: {
     total: number;
     paid: number;
@@ -102,6 +111,7 @@ export const useFinanceStore = defineStore('finance', {
           revenueTrend: execSummary.revenueInRange > 0 ? `+₦${execSummary.revenueInRange.toLocaleString()}` : 'No recent revenue',
           pendingSettlementFormatted: formatCurrency(payoutStats.pendingSettlement),
           heldFundsFormatted: formatCurrency(payoutStats.heldFunds),
+          salesSummary: execSummary.salesSummary,
           studentMetrics: execSummary.studentMetrics,
           alerts: {
             unmatchedCount: execSummary.alerts.unmatchedCount,
@@ -129,10 +139,11 @@ export const useFinanceStore = defineStore('finance', {
         // Map to ViewModel
         this.transactions = data.transactions.map(tx => ({
           id: tx.id,
-          amountFormatted: `₦${tx.amount.toLocaleString()}`,
+          amountFormatted: `₦${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
           type: tx.entry_type.toLowerCase() as 'credit' | 'debit',
           description: tx.desc || tx.reference || 'Ledger Transaction',
-          date: new Date(tx.created_at).toLocaleString()
+          date: new Date(tx.created_at).toLocaleString(),
+          reference: tx.reference
         }));
       } catch (err: any) {
         this.error = err.message || 'Failed to fetch transactions';

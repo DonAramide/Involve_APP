@@ -130,7 +130,11 @@ class _ContactPageState extends State<ContactPage> {
         final filteredList = state.teachers.where((teacher) {
           final query = _searchQuery;
           // APPLY CLASS FILTER
-          if (_selectedClassId != null && teacher.classId != _selectedClassId) return false;
+          if (_selectedClassId != null && 
+              teacher.classId != _selectedClassId && 
+              !(teacher.classIds?.contains(_selectedClassId) ?? false)) {
+            return false;
+          }
 
           return teacher.fullName.toLowerCase().contains(query) || 
                  (teacher.phone?.contains(query) ?? false);

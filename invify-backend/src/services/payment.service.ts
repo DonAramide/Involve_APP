@@ -1,7 +1,11 @@
 import crypto from "crypto";
 import { getQuasarService } from "../integrations/quasar/factory";
+import { QuasarProvisioningService } from "../integrations/quasar/quasar-provisioning.service";
 import { supabase } from "../db/supabase";
 import { AuditService } from "./audit.service";
+import { LedgerService } from "./ledger.service";
+import * as fs from 'fs';
+import * as path from 'path';
 
 
 /**
@@ -95,13 +99,33 @@ export class PaymentService {
    */
   static async createPayout(tenantId: string, amount: number) {
     // 1. Fetch School Bank Details
-    const { data: bankDetails, error: bankError } = await supabase
-      .from('payout_settings')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .single();
+    let bankDetails: any = null;
+    try {
+      const { data, error } = await supabase
+        .from('payout_settings')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .single();
+      
+      if (!error && data) {
+        bankDetails = data;
+      }
+    } catch (err) {}
 
-    if (bankError || !bankDetails) {
+    if (!bankDetails) {
+      // Fallback to local cache tenant_payout_settings.json
+      try {
+        const filePath = path.join(process.cwd(), 'tenant_payout_settings.json');
+        if (fs.existsSync(filePath)) {
+          const allSettings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          bankDetails = allSettings[tenantId] || null;
+        }
+      } catch (err) {
+        console.error('[PaymentService] Failed to read local tenant payout settings fallback:', err);
+      }
+    }
+
+    if (!bankDetails) {
       throw new Error(`Payout failed: No bank details configured for tenant ${tenantId}`);
     }
 
@@ -183,6 +207,158 @@ export class PaymentService {
       status: "PENDING",
       transfer
     };
+  }
+
+  static async getIntent(reference: string) {
+    const { data: transaction, error } = await supabase
+      .from('transactions_log')
+      .select('*')
+      .or(`reference.eq.${reference},id.eq.${reference}`)
+      .single();
+
+    if (error || !transaction) {
+      throw new Error(`Transaction not found: ${reference}`);
+    }
+
+    try {
+      const paymentsClient = await QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
+      const liveIntent = await paymentsClient.getPaymentIntent(transaction.reference);
+      return {
+        ...transaction,
+        status: liveIntent.status || transaction.status,
+        liveIntent
+      };
+    } catch (err: any) {
+      console.warn(`[PaymentService] Failed to fetch live intent from Quasar:`, err.message);
+      return transaction;
+    }
+  }
+
+  static async cancelIntent(reference: string) {
+    const { data: transaction, error } = await supabase
+      .from('transactions_log')
+      .select('*')
+      .or(`reference.eq.${reference},id.eq.${reference}`)
+      .single();
+
+    if (error || !transaction) {
+      throw new Error(`Transaction not found: ${reference}`);
+    }
+
+    // Try to cancel on Quasar
+    try {
+      const paymentsClient = await QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
+      await (paymentsClient as any).client.post(`/payments/intents/${transaction.reference}/cancel`, {});
+    } catch (err: any) {
+      console.warn(`[PaymentService] Quasar cancellation endpoint failed, proceeding locally:`, err.message);
+    }
+
+    // Update locally
+    const { data: updatedTx, error: updateError } = await supabase
+      .from('transactions_log')
+      .update({ status: 'FAILED', processed_at: new Date().toISOString() })
+      .eq('id', transaction.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new Error(`Failed to update transaction locally: ${updateError.message}`);
+    }
+
+    // Audit log
+    await AuditService.log({
+      eventType: 'payment.intent.cancelled' as any,
+      reference: transaction.reference,
+      tenantId: transaction.tenant_id,
+      payload: { reason: 'User request' }
+    });
+
+    return updatedTx;
+  }
+
+  static async getHistory(tenantId: string) {
+    const { data, error } = await supabase
+      .from('transactions_log')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch history: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  static async refundIntent(reference: string, amount: number, reason?: string) {
+    const { data: transaction, error } = await supabase
+      .from('transactions_log')
+      .select('*')
+      .or(`reference.eq.${reference},id.eq.${reference}`)
+      .single();
+
+    if (error || !transaction) {
+      throw new Error(`Transaction not found: ${reference}`);
+    }
+
+    if (amount <= 0 || amount > transaction.amount) {
+      throw new Error(`Invalid refund amount: ${amount}. Must be greater than 0 and less than or equal to original amount ${transaction.amount}.`);
+    }
+
+    // Try to trigger refund on Quasar
+    try {
+      const paymentsClient = await QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
+      await (paymentsClient as any).client.post(`/payments/intents/${transaction.reference}/refunds`, { amount });
+    } catch (err: any) {
+      console.warn(`[PaymentService] Quasar refund endpoint failed, proceeding locally:`, err.message);
+    }
+
+    // Record the refund in transactions_log
+    const refundRef = `REF-${transaction.reference}-${Date.now()}`;
+    const { data: refundTx, error: refundTxErr } = await supabase
+      .from('transactions_log')
+      .insert({
+        reference: refundRef,
+        tenant_id: transaction.tenant_id,
+        wallet_id: transaction.wallet_id,
+        amount: Math.round(amount),
+        provider: "quasar",
+        type: "refund",
+        status: "SUCCESS",
+        metadata: {
+          original_reference: transaction.reference,
+          reason
+        }
+      })
+      .select()
+      .single();
+
+    if (refundTxErr) {
+      throw new Error(`Failed to create refund transaction record: ${refundTxErr.message}`);
+    }
+
+    // Execute double-entry bookkeeping: Debit merchant wallet, Credit refunds
+    const idempotencyKey = `ledger:refund:${refundRef}`;
+    await LedgerService.createDoubleEntry({
+      idempotencyKey,
+      tenantId: transaction.tenant_id,
+      reference: refundRef,
+      entries: [
+        { account: 'USER_WALLET', type: 'DEBIT', amount: Math.round(amount) },
+        { account: 'REFUNDS', type: 'CREDIT', amount: Math.round(amount) }
+      ],
+      metadata: { originalReference: transaction.reference, reason }
+    });
+
+    // Audit log
+    await AuditService.log({
+      eventType: 'payment.refund.created' as any,
+      reference: refundRef,
+      tenantId: transaction.tenant_id,
+      payload: { amount, original_reference: transaction.reference, reason }
+    });
+
+    return refundTx;
   }
 }
 

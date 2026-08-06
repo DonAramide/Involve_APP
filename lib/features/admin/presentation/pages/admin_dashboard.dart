@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -5,6 +6,7 @@ import 'package:involve_app/features/admin/presentation/pages/api_key_management
 import '../bloc/admin_bloc.dart';
 import '../widgets/master_mode_switch.dart';
 import 'system_setup_page.dart';
+import 'audit_logs_page.dart';
 import 'package:intl/intl.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
@@ -45,7 +47,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Future<void> _fetchSubscriptionStatus() async {
     try {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
-      final baseUrl = dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
+      final baseUrl = AppConfig.baseUrl;
       final token = await SecurityService().getOfflineToken() ?? 'mock-super-admin';
       final response = await dio.get('$baseUrl/api/subscription/status', options: Options(
         headers: {
@@ -129,13 +131,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildMetricSection(BuildContext context, Map<String, dynamic> metrics) {
     final formatter = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     
-    // Fallback to defaults if metrics are empty (e.g. backend offline)
-    final walletValue = metrics['internal_wallet'] != null 
-        ? formatter.format(metrics['internal_wallet']) 
-        : '₦0.00';
-    final revenueValue = metrics['monthly_revenue'] != null 
-        ? formatter.format(metrics['monthly_revenue']) 
-        : '₦0.00';
+    // Safely parse values since backend Supabase RPC may return strings for numeric types
+    double parseSafe(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+    
+    final walletValue = formatter.format(parseSafe(metrics['internal_wallet']));
+    final revenueValue = formatter.format(parseSafe(metrics['monthly_revenue']));
 
     return Row(
       children: [
@@ -163,8 +168,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget _buildQuickActions(BuildContext context, bool isMaster) {
     return BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, settingsState) {
-        // Display Account Set up if the user is on a plan that is not free or basic
         final isProUser = settingsState.userPlan?.isPro == true || settingsState.userPlan?.isLifetime == true || settingsState.userPlan?.planType == 'enterprise' || settingsState.userPlan?.planType == 'premium';
+        final isBasicOrFree = settingsState.userPlan?.isBasic == true || settingsState.userPlan?.planType == 'free_trial' || settingsState.userPlan?.isValid != true;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,34 +183,37 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 _ActionTile(
                   label: 'Quaser Keys',
                   icon: Icons.vpn_key,
-                  onTap: isMaster ? () => _gotoKeys(context) : null,
-                  isGated: !isMaster,
+                  onTap: (isMaster && !isBasicOrFree) ? () => _gotoKeys(context) : null,
+                  isGated: !isMaster || isBasicOrFree,
                 ),
                 _ActionTile(
                   label: 'System Setup',
                   icon: Icons.settings_applications,
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SystemSetupPage())),
                 ),
-                // Visible to all non-free tiers, enabling demo inspection even when simulation flags report basic plan limits
                 _ActionTile(
                   label: 'Account Set up',
                   icon: Icons.cloud_sync_rounded,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage())),
+                  onTap: isBasicOrFree ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AccountSetupPage())),
+                  isGated: isBasicOrFree,
                 ),
                 _ActionTile(
                   label: 'Online Login',
                   icon: Icons.security_rounded,
-                  onTap: () => _handleOnlineLoginClick(context, isProUser, settingsState.settings?.organizationName),
+                  onTap: isBasicOrFree ? null : () => _handleOnlineLoginClick(context, isProUser, settingsState.settings?.organizationName),
+                  isGated: isBasicOrFree,
                 ),
                 _ActionTile(
                   label: 'Audit Logs',
                   icon: Icons.history,
-                  onTap: () => _gotoLogs(context),
+                  onTap: isBasicOrFree ? null : () => _gotoLogs(context),
+                  isGated: isBasicOrFree,
                 ),
                 _ActionTile(
                   label: 'Ledger History',
                   icon: Icons.list_alt,
-                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminFinanceDashboardPage())),
+                  onTap: isBasicOrFree ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminFinanceDashboardPage())),
+                  isGated: isBasicOrFree,
                 ),
                 _ActionTile(
                   label: 'Link New Device',
@@ -252,7 +260,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const ApiKeyManagementPage()));
   }
   void _gotoLogs(BuildContext context) {
-     context.read<AdminBloc>().add(LoadAuditLogs());
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const AuditLogsPage()));
   }
 
   static const _storage = FlutterSecureStorage();
@@ -651,33 +659,36 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                     ],
                   ),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        'Scan this QR code from your new device to automatically link it to this profile.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
+                  content: SizedBox(
+                    width: 280,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Scan this QR code from your new device to automatically link it to this profile.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
                         ),
-                        child: QrImageView(
-                          data: qrPayload,
-                          version: QrVersions.auto,
-                          size: 200.0,
+                        const SizedBox(height: 20),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: QrImageView(
+                            data: qrPayload,
+                            version: QrVersions.auto,
+                            size: 200.0,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'This QR code is valid for 3 minutes.',
-                        style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ],
+                        const SizedBox(height: 20),
+                        const Text(
+                          'This QR code is valid for 3 minutes.',
+                          style: TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
                   ),
                   actions: [
                     TextButton(
@@ -699,18 +710,39 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final tenantId = await security.getTenantId();
     final deviceId = await DeviceInfoService.getDeviceSuffix();
     final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
-    final baseUrl = dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
-    final response = await dio.post('$baseUrl/auth/generate-link-qr', data: {
-      'tenantId': tenantId,
-      'deviceId': deviceId,
-      'agentCode': 'AAA000',
-    });
+    final baseUrl = AppConfig.baseUrl;
+    
+    try {
+      final response = await dio.post(
+        '$baseUrl/auth/generate-link-qr', 
+        data: {
+          'tenantId': tenantId,
+          'deviceId': deviceId,
+          'agentCode': 'AAA000',
+        },
+        options: Options(
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
 
-    if (response.data == null || response.data['success'] != true) {
-      throw Exception(response.data['error'] ?? 'API response error');
+      if (response.statusCode != 200) {
+        final errorMsg = response.data != null && response.data is Map 
+            ? response.data['error'] ?? response.data['message'] ?? 'API error (${response.statusCode})'
+            : 'API error (${response.statusCode})';
+        throw Exception(errorMsg);
+      }
+
+      if (response.data == null || response.data['success'] != true) {
+        throw Exception(response.data['error'] ?? 'API response error');
+      }
+
+      return Map<String, dynamic>.from(response.data);
+    } on DioException catch (e) {
+      if (e.response?.data != null && e.response?.data is Map) {
+         throw Exception(e.response!.data['error'] ?? e.response!.data['message'] ?? 'Network error');
+      }
+      throw Exception('Network error: ${e.message}');
     }
-
-    return Map<String, dynamic>.from(response.data);
   }
 }
 

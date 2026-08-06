@@ -84,6 +84,7 @@ dependencies:
   socket_io_client: ^3.1.4
   flutter_dotenv: ^6.0.1
   signature: ^6.3.0
+  audioplayers: ^6.4.0
 
 dev_dependencies:
   flutter_test:
@@ -113,6 +114,7 @@ flutter:
   assets:
     - assets/images/
     - assets/docs/
+    - assets/sounds/
     - .env
 
   # An image asset can refer to one or more resolution-specific "variants", see

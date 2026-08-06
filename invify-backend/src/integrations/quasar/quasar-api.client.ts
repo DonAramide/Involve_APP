@@ -51,54 +51,10 @@ export interface RequestOptions {
   noRetry?: boolean;
 }
 
-// ─── Circuit Breaker ──────────────────────────────────────────────────────────
+import { SimpleCircuitBreaker, ExponentialBackoffRetryPolicy } from '../../modules/financial-platform/infrastructure/ResiliencePolicies';
 
-interface CircuitBreakerState {
-  failures: number;
-  openedAt: number | null;
-  isOpen: boolean;
-}
-
-const CIRCUIT_FAILURE_THRESHOLD = 5;
-const CIRCUIT_PROBE_INTERVAL_MS = 30_000;
-
-const circuitState: CircuitBreakerState = {
-  failures: 0,
-  openedAt: null,
-  isOpen: false,
-};
-
-function recordSuccess() {
-  circuitState.failures = 0;
-  circuitState.isOpen = false;
-  circuitState.openedAt = null;
-}
-
-function recordFailure() {
-  circuitState.failures += 1;
-  if (circuitState.failures >= CIRCUIT_FAILURE_THRESHOLD && !circuitState.isOpen) {
-    circuitState.isOpen = true;
-    circuitState.openedAt = Date.now();
-    console.error(`[QuasarApiClient] Circuit OPEN after ${circuitState.failures} consecutive failures.`);
-  }
-}
-
-function isCircuitOpen(): boolean {
-  if (!circuitState.isOpen) return false;
-  const elapsed = Date.now() - (circuitState.openedAt ?? 0);
-  if (elapsed >= CIRCUIT_PROBE_INTERVAL_MS) {
-    // Half-open: allow one probe
-    console.warn('[QuasarApiClient] Circuit HALF-OPEN — probing Quasar.');
-    return false;
-  }
-  return true;
-}
-
-// ─── Retry ────────────────────────────────────────────────────────────────────
-
-function isRetryable(status: number): boolean {
-  return status === 429 || status >= 500;
-}
+const circuitBreaker = new SimpleCircuitBreaker();
+const retryPolicy = new ExponentialBackoffRetryPolicy(3);
 
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -182,64 +138,38 @@ export class QuasarApiClient {
     const { maxRetries, noRetry } = { noRetry: reqOpts.noRetry ?? false, maxRetries: this.options.maxRetries };
     const headers = this.buildAuthHeaders(reqOpts);
     const path = `${config.method?.toUpperCase()} ${config.url}`;
+    const correlationId = headers['X-Correlation-Id'];
 
-    if (isCircuitOpen()) {
-      throw new QuasarApiError(
-        'Quasar circuit breaker is open — requests suspended. Will retry automatically.',
-        'CIRCUIT_OPEN',
-        path,
-      );
+    const context = {
+      correlationId,
+      requestId: correlationId,
+      traceId: correlationId,
+      auditId: correlationId,
+      actorId: 'system',
+      tenantId: 'quasar'
+    };
+
+    const currentRetryPolicy = noRetry ? new ExponentialBackoffRetryPolicy(1) : retryPolicy;
+
+    try {
+      return await circuitBreaker.execute(async () => {
+        return await currentRetryPolicy.execute(async () => {
+          this.log('info', path, correlationId, `Sending request (noRetry: ${noRetry})...`);
+          const response = await this.http.request<QFPResponse<T>>({
+            ...config,
+            headers: { ...config.headers, ...headers },
+          });
+
+          return this.unwrap<T>(response.data, path);
+        }, context);
+      }, context);
+    } catch (err: any) {
+      const status = err?.response?.status ?? 0;
+      const axiosData = err?.response?.data as QFPResponse | undefined;
+      const message = axiosData?.responseMessage || err.message;
+      this.log('error', path, correlationId, `Request failed: ${message}`);
+      throw new QuasarApiError(message, axiosData?.responseCode ?? String(status), path);
     }
-
-    let lastError: Error | null = null;
-    const attempts = noRetry ? 1 : maxRetries;
-
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        const response = await this.http.request<QFPResponse<T>>({
-          ...config,
-          headers: { ...config.headers, ...headers },
-        });
-
-        recordSuccess();
-
-        const unwrapped = this.unwrap<T>(response.data, path);
-        this.log('info', path, headers['X-Correlation-Id'], `Success (attempt ${attempt})`);
-        return unwrapped;
-
-      } catch (err: any) {
-        const status = (err as AxiosError)?.response?.status ?? 0;
-        const axiosData = (err as AxiosError)?.response?.data as QFPResponse | undefined;
-        const message = axiosData?.responseMessage || err.message;
-
-        this.log('error', path, headers['X-Correlation-Id'], `Error (attempt ${attempt}/${attempts}): ${message}`);
-
-        if (status && isRetryable(status)) {
-          recordFailure();
-          lastError = new QuasarApiError(message, axiosData?.responseCode ?? String(status), path);
-          if (attempt < attempts) {
-            const delayMs = Math.pow(2, attempt) * 500; // 1s, 2s, 4s
-            this.log('warn', path, headers['X-Correlation-Id'], `Retrying in ${delayMs}ms...`);
-            await sleep(delayMs);
-            continue;
-          }
-        } else if (status >= 400 && status < 500) {
-          // Client error — don't retry, don't record as Quasar failure
-          throw new QuasarApiError(message, axiosData?.responseCode ?? String(status), path);
-        } else {
-          // Network / timeout
-          recordFailure();
-          lastError = err;
-          if (attempt < attempts) {
-            await sleep(Math.pow(2, attempt) * 500);
-            continue;
-          }
-        }
-        throw lastError ?? err;
-      }
-    }
-
-    throw lastError ?? new Error(`Quasar request failed: ${path}`);
   }
 
   // ── Convenience methods ───────────────────────────────────────────────────
@@ -278,8 +208,13 @@ export class QuasarApiClient {
   }
 
   /** Expose the circuit breaker state for health monitoring */
-  static getCircuitState(): Readonly<CircuitBreakerState> {
-    return { ...circuitState };
+  static getCircuitState(): any {
+    const status = circuitBreaker.getStatus();
+    return {
+      failures: status.failureCount,
+      openedAt: status.lastFailureTime ? status.lastFailureTime.getTime() : null,
+      isOpen: status.state === 'OPEN',
+    };
   }
 
   /**
@@ -287,9 +222,9 @@ export class QuasarApiClient {
    * Use in test teardown only — never call in production code.
    */
   static resetCircuit(): void {
-    circuitState.failures = 0;
-    circuitState.isOpen = false;
-    circuitState.openedAt = null;
+    (circuitBreaker as any).failureCount = 0;
+    (circuitBreaker as any).state = 'CLOSED';
+    (circuitBreaker as any).lastFailureTime = null;
   }
 }
 

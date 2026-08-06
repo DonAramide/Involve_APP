@@ -271,6 +271,7 @@ const coreNavigationTree = [
   { label: 'Staff Management', path: '/tenant/staff', icon: 'people_outline', color: 'cyan-4' },
   { label: 'BI Reports & Exports', path: '/tenant/reports', icon: 'insert_chart_outlined', color: 'purple-3' },
   { label: 'Portal Preferences', path: '/tenant/settings', icon: 'tune', color: 'grey-4' },
+  { label: 'Financial Platform', path: '/tenant/settings/financial-platform', icon: 'account_balance', color: 'amber-4' },
   { label: 'My Profile & Security', path: '/tenant/profile', icon: 'manage_accounts', color: 'green-4' }
 ]
 
@@ -294,7 +295,6 @@ const industryNavigationTree = computed(() => {
     ]
   } else if (mode === 'retail') {
     return [
-      { label: 'POS Terminal Sales', path: '/tenant/retail/pos', icon: 'point_of_sale', color: 'amber-4', mode: 'RETAIL' },
       { label: 'Inventory Stock Matrix', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'cyan-4', mode: 'RETAIL' },
       { label: 'Stock & Adjustments', path: '/tenant/stock', icon: 'inventory', color: 'orange-4', mode: 'RETAIL' },
       { label: 'Customer Lookup', path: '/tenant/users', icon: 'person_search', color: 'blue-4', mode: 'RETAIL' },

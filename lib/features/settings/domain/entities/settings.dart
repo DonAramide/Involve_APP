@@ -6,6 +6,7 @@ class AppSettings extends Equatable {
   final String organizationName;
   final String address;
   final String phone;
+  final String? email;
   final String? businessDescription;
   final String? taxId;
   final String? logoPath;
@@ -70,6 +71,7 @@ class AppSettings extends Equatable {
   final bool showAdminSignature;
   final bool warrantyEnabled;
   final bool allowGiveChange;
+  final bool showNetworkIndicator;
 
 
   const AppSettings({
@@ -77,6 +79,7 @@ class AppSettings extends Equatable {
     required this.organizationName,
     required this.address,
     required this.phone,
+    this.email,
     this.businessDescription,
     this.taxId,
     this.logoPath,
@@ -132,7 +135,7 @@ class AppSettings extends Equatable {
     this.showAdminSignature = false,
     this.warrantyEnabled = false,
     this.allowGiveChange = false,
-
+    this.showNetworkIndicator = true,
   });
 
   AppSettings copyWith({
@@ -140,6 +143,7 @@ class AppSettings extends Equatable {
     String? organizationName,
     String? address,
     String? phone,
+    String? email,
     String? businessDescription,
     bool? mergePosReceipt,
     String? taxId,
@@ -195,13 +199,14 @@ class AppSettings extends Equatable {
     bool? showAdminSignature,
     bool? warrantyEnabled,
     bool? allowGiveChange,
-
+    bool? showNetworkIndicator,
   }) {
     return AppSettings(
       id: id ?? this.id,
       organizationName: organizationName ?? this.organizationName,
       address: address ?? this.address,
       phone: phone ?? this.phone,
+      email: email ?? this.email,
       businessDescription: businessDescription ?? this.businessDescription,
       mergePosReceipt: mergePosReceipt ?? this.mergePosReceipt,
       taxId: taxId ?? this.taxId,
@@ -257,7 +262,7 @@ class AppSettings extends Equatable {
       showAdminSignature: showAdminSignature ?? this.showAdminSignature,
       warrantyEnabled: warrantyEnabled ?? this.warrantyEnabled,
       allowGiveChange: allowGiveChange ?? this.allowGiveChange,
-
+      showNetworkIndicator: showNetworkIndicator ?? this.showNetworkIndicator,
     );
   }
 
@@ -267,6 +272,7 @@ class AppSettings extends Equatable {
         organizationName,
         address,
         phone,
+        email,
         businessDescription,
         taxId,
         logoPath,
@@ -320,6 +326,6 @@ class AppSettings extends Equatable {
         showAdminSignature,
         warrantyEnabled,
         allowGiveChange,
-
+        showNetworkIndicator,
       ];
 }

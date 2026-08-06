@@ -94,14 +94,27 @@ export const adminApi = {
   createUser: (data) => api.post('/admin/users', data),
   updateUser: (id, data) => api.patch(`/admin/users/${id}`, data),
   sendInvite: (data) => api.post('/admin/invites', data),
+  getProfile: () => api.get('/admin/profile'),
   updateProfile: (data) => api.patch('/admin/profile', data),
   getGlobalSettings: () => api.get('/admin/settings'),
   updateGlobalSettings: (data) => api.patch('/admin/settings', data),
+  getPlatformPayoutSettings: () => api.get('/api/payout/platform-settings'),
+  getTenantPayoutSettings: () => api.get('/api/payout/settings'),
+  saveTenantPayoutSettings: (data) => api.post('/api/payout/settings', data),
+  getPayoutBanks: (params) => api.get('/api/payout/banks', { params }),
+  resolvePayoutAccount: (data) => api.post('/api/payout/resolve-account', data),
+  initiatePayout: (data) => api.post('/api/payout/withdraw', data),
   getUserDevices: (params) => api.get('/api/admin/user-devices', { params }),
   approveUserDevice: (id) => api.post('/api/admin/user-devices/approve', { id }),
   blockUserDevice: (id) => api.post('/api/admin/user-devices/block', { id }),
   triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
   emergencyLock: (data) => api.post('/api/admin/emergency-lock', data),
+
+  // Virtual Accounts Management
+  getVirtualAccounts: () => api.get('/api/finance/virtual-accounts'),
+  getVirtualAccountTransactions: (accountNumber) => api.get(`/api/finance/virtual-accounts/${accountNumber}/transactions`),
+  sweepVirtualAccount: (accountNumber, data) => api.post(`/api/finance/virtual-accounts/${accountNumber}/sweep`, data),
+  getQuasarTransactions: (params) => api.get('/api/finance/quasar-transactions', { params }),
 
   // Commissions
   listAgents: (params) => api.get('/admin/agents', { params }),
@@ -113,6 +126,9 @@ export const adminApi = {
   // Support & Complaints
   getComplaints: () => api.get('/api/admin/complaints'),
   updateComplaintStatus: (id, status) => api.patch(`/api/admin/complaints/${id}/status`, { status }),
+
+  // Live Broadcasts
+  sendBroadcast: (data) => api.post('/admin/broadcast', data),
 
   // Retention & Insights
   getRetentionSuggestion: () => api.get('/admin/retention/suggestion'),
@@ -143,6 +159,7 @@ export const deviceApi = {
   createActivation: (data) => api.post('/devices/activations', data),
   validateCode: (data) => api.post('/devices/validate', data),
   updateDevice: (id, data) => api.patch(`/devices/${id}`, data),
+  resetActivation: (code, data) => api.patch(`/devices/activations/${code}/reset`, data),
 
   // Telemetry & Fleet Visibility
   getDeviceStatus: (deviceId) => api.get(`/api/devices/${deviceId}/status`),
@@ -159,8 +176,9 @@ export const financeApi = {
   getExecutiveSummary: () => api.get('/api/v1/finance/executive-summary'),
   getWalletBalance: () => api.get('/api/v1/wallet'),
   getWalletTransactions: () => api.get('/api/v1/wallet/transactions'),
-  getPayoutStats: () => api.get('/api/v1/finance/stats/payouts'),
+  getPayoutStats: (headers) => api.get('/api/v1/finance/stats/payouts', { headers }),
   getInvoices: () => api.get('/api/v1/finance/invoices'),
+  getInvoice: (id) => api.get(`/api/v1/finance/invoices/${id}`),
   createInvoice: (data) => api.post('/api/v1/finance/invoices', data),
 };
 
@@ -284,6 +302,10 @@ export const vaultApi = {
   deleteCredential: (vaultId, credentialId) => api.delete(`/vault/integrations/${vaultId}/credentials/${credentialId}`),
   testConnection: (vaultId, data) => api.post(`/vault/integrations/${vaultId}/test`, data),
   saveQipConfig: (environment, data) => api.put('/vault/qip-config', { environment, ...data }),
+  getQuasarWebhookSecretStatus: (environment = 'PRODUCTION') =>
+    api.get('/api/admin/quasar/webhook-secret/status', { params: { environment } }),
+  saveQuasarWebhookSigningSecret: (data) =>
+    api.put('/api/admin/quasar/webhook-secret/global', data),
 };
 
 export const ecsApi = {

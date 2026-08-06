@@ -45,7 +45,13 @@
         bordered
         class="bg-card-dark"
         :loading="crmStore.loading"
+        :pagination="{ rowsPerPage: 30 }"
       >
+        <template v-slot:body-cell-balance="props">
+          <q-td :props="props" :class="props.row.balance > 0 ? 'text-red-4 text-weight-bold font-mono' : (props.row.balance < 0 ? 'text-green-4 text-weight-bold font-mono' : 'text-grey-5 font-mono')">
+            {{ formatBalance(props.row.balance) }}
+          </q-td>
+        </template>
         <template v-slot:body-cell-status="props">
           <q-td :props="props">
             <q-chip 
@@ -102,10 +108,19 @@ const entitySingularLabel = computed(() => {
   return 'Customer'
 })
 
+const formatBalance = (val) => {
+  const num = Number(val || 0)
+  if (num < 0) {
+    return `-₦${Math.abs(num).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+  return `₦${num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 const columns = [
-  { name: 'name', label: 'NAME', align: 'left', field: row => `${row.first_name} ${row.last_name}`, sortable: true },
+  { name: 'name', label: 'NAME', align: 'left', field: row => row.name || (row.first_name ? `${row.first_name} ${row.last_name}` : 'Unknown'), sortable: true },
   { name: 'email', label: 'EMAIL', align: 'left', field: 'email', sortable: true },
   { name: 'phone', label: 'PHONE', align: 'left', field: 'phone', sortable: true },
+  { name: 'balance', label: 'WALLET BALANCE', align: 'left', field: 'balance', sortable: true },
   { name: 'status', label: 'STATUS', align: 'left', field: 'status', sortable: true },
   { name: 'actions', label: 'ACTIONS', align: 'right' }
 ]

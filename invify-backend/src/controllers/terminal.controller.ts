@@ -56,7 +56,8 @@ function normalizeColumnNames(rows: any[]): any[] {
   return rows.map(row => {
     const normalized: any = {};
     for (const [key, value] of Object.entries(row)) {
-      const mappedKey = columnMap[key] || columnMap[key.trim()] || key;
+      const trimmedKey = key.trim();
+      const mappedKey = columnMap[key] || columnMap[trimmedKey] || trimmedKey;
       normalized[mappedKey] = value;
     }
     return normalized;

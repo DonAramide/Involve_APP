@@ -1,3 +1,5 @@
+import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/core/utils/terminology.dart';
 // lib/features/admin/presentation/pages/account_setup_page.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -733,7 +735,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
               _buildSetupCard(
                 theme: theme,
                 title: 'Virtual Account Engine',
-                subtitle: 'Dynamically generate dedicated local checking references for transparent student invoicing.',
+                subtitle: 'Dynamically generate dedicated local checking references for transparent ${state.settings?.customerLabel.toLowerCase() ?? 'customer'} invoicing.',
                 icon: Icons.account_balance_rounded,
                 iconColor: Colors.teal,
                 value: _virtualAccountsEnabled,
@@ -874,7 +876,7 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
   FinanceApiClient _safeClient() {
     if (!sl.isRegistered<FinanceApiClient>()) {
       sl.registerSingleton<FinanceApiClient>(FinanceApiClient(
-        baseUrl: dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004',
+        baseUrl: AppConfig.baseUrl,
         getToken: () async => await SecurityService().getOfflineToken() ?? 'mock-super-admin',
         getTenantId: () async => await SecurityService().getTenantId(),
       ));
@@ -962,13 +964,12 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
 
   Future<void> _initVirtualAccountEngine() async {
     if (!mounted) return;
+    bool success = false;
     try {
       await ProgressDialogUtils.showDancingProgress(context, () async {
         final client = _safeClient();
         await client.post('/api/admin/virtual-account/init');
-        if (mounted) {
-          _showToast('Quasar virtual accounts successfully initialized.');
-        }
+        success = true;
       }, message: 'Configuring Quasar Virtual Accounts...');
     } catch (e) {
       if (mounted) {
@@ -977,6 +978,175 @@ class _AccountSetupPageState extends State<AccountSetupPage> {
         _storage.write(key: 'toggle_virtual_account', value: 'false');
       }
     }
+
+    if (success && mounted) {
+      _showVirtualAccountWelcomeDialog();
+    }
+  }
+
+  void _showVirtualAccountWelcomeDialog() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: theme.cardColor,
+          elevation: 12,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.teal.shade50,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Positioned(
+                        right: 4,
+                        top: 4,
+                        child: Icon(Icons.auto_awesome, color: Colors.amber.shade600, size: 16),
+                      ),
+                      Positioned(
+                        left: 8,
+                        bottom: 8,
+                        child: Icon(Icons.auto_awesome, color: Colors.amber.shade500, size: 12),
+                      ),
+                      Icon(
+                        Icons.workspace_premium_rounded,
+                        color: Colors.teal.shade700,
+                        size: 44,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Congratulations!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Virtual Account Engine Active',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface.withOpacity(0.8),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.teal.shade50.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.teal.shade100.withOpacity(0.5)),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Your dedicated virtual payment routing infrastructure is now fully initialized.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.5,
+                            color: colorScheme.onSurface.withOpacity(0.9),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.check_circle_rounded, color: Colors.teal.shade600, size: 18),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Unique bank accounts for each customer',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.check_circle_rounded, color: Colors.teal.shade600, size: 18),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Direct real-time ledger balance updates',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.check_circle_rounded, color: Colors.teal.shade600, size: 18),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Instant webhook push notifications',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.teal.shade700,
+                        foregroundColor: Colors.white,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text(
+                        'Get Started',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showFeatureUpgradePrompt(String featureName) {

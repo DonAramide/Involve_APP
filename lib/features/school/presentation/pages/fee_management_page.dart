@@ -24,6 +24,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
   int? _selectedClassId;
   final List<Item> _selectedFees = [];
   bool _isGenerating = false;
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -85,65 +86,140 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
                       DropdownButtonFormField<int>(
                         decoration: const InputDecoration(labelText: 'Target Class', border: OutlineInputBorder()),
                         value: _selectedClassId,
-                        items: schoolState.classes.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList(),
+                        items: schoolState.classes.map((c) {
+                          final count = schoolState.students.where((s) => s.classId == c.id).length;
+                          return DropdownMenuItem(value: c.id, child: Text('${c.name} ($count students)'));
+                        }).toList(),
                         onChanged: (val) => setState(() => _selectedClassId = val),
                       ),
+                      if (_selectedClassId != null) ...[
+                        const SizedBox(height: 12),
+                        Card(
+                          elevation: 1,
+                          color: Theme.of(context).primaryColor.withValues(alpha: 0.05),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: Theme.of(context).primaryColor.withValues(alpha: 0.2)),
+                          ),
+                          child: ListTile(
+                            dense: true,
+                            leading: Icon(Icons.people_outline, color: Theme.of(context).primaryColor),
+                            title: Text(
+                              'Students in ${schoolState.classes.firstWhere((c) => c.id == _selectedClassId, orElse: () => schoolState.classes.first).name}',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            trailing: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '${schoolState.students.where((s) => s.classId == _selectedClassId).length}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
 
                       // Fee Item Selector
-                      const Text('Select Fee Items (from Products/Services)', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Select Fee Items (from Products/Services)', style: TextStyle(fontWeight: FontWeight.bold)),
+                          if (stockState.items.isNotEmpty)
+                            Text(
+                              'Selected: ${_selectedFees.length}',
+                              style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                        ],
+                      ),
                       const SizedBox(height: 8),
+
+                      // Search / Filter
+                      if (stockState.items.isNotEmpty) ...[
+                        TextField(
+                          decoration: const InputDecoration(
+                            hintText: 'Search fee items...',
+                            prefixIcon: Icon(Icons.search, size: 20),
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              _searchQuery = val;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+
                       Expanded(
                         child: stockState.items.isEmpty 
                           ? const Center(child: Text('No items found. Add Fees in Fee Structure first.'))
-                          : ListView.builder(
-                              itemCount: stockState.items.length,
-                              itemBuilder: (context, index) {
-                                final item = stockState.items[index];
-                                final isSelected = _selectedFees.any((f) => f.id == item.id);
-                                return CheckboxListTile(
-                                  title: Row(
-                                    children: [
-                                      Text(item.name),
-                                      if (item.isDefault) ...[
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.amber.withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(color: Colors.amber[700]!, width: 0.5),
+                          : () {
+                              final filteredItems = stockState.items.where((item) {
+                                return item.name.toLowerCase().contains(_searchQuery.toLowerCase());
+                              }).toList();
+                              
+                              if (filteredItems.isEmpty) {
+                                return const Center(child: Text('No matching items found.'));
+                              }
+                              
+                              return ListView.builder(
+                                itemCount: filteredItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = filteredItems[index];
+                                  final isSelected = _selectedFees.any((f) => f.id == item.id);
+                                  return CheckboxListTile(
+                                    title: Row(
+                                      children: [
+                                        Text(item.name),
+                                        if (item.isDefault) ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: Colors.amber.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(color: Colors.amber[700]!, width: 0.5),
+                                            ),
+                                            child: Text(
+                                              'DEFAULT',
+                                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber[900]),
+                                            ),
                                           ),
-                                          child: Text(
-                                            'DEFAULT',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber[900]),
-                                          ),
-                                        ),
+                                        ],
                                       ],
-                                    ],
-                                  ),
-                                  subtitle: Text(CurrencyFormatter.formatWithSymbol(item.price, symbol: '₦')),
-                                  secondary: IconButton(
-                                    icon: Icon(
-                                      item.isDefault ? Icons.star : Icons.star_border,
-                                      color: item.isDefault ? Colors.amber[700] : Colors.grey,
-                                      size: 20,
                                     ),
-                                    onPressed: () {
-                                      context.read<StockBloc>().add(ToggleItemDefaultEvent(item));
+                                    subtitle: Text(CurrencyFormatter.formatWithSymbol(item.price, symbol: '₦')),
+                                    secondary: IconButton(
+                                      icon: Icon(
+                                        item.isDefault ? Icons.star : Icons.star_border,
+                                        color: item.isDefault ? Colors.amber[700] : Colors.grey,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        context.read<StockBloc>().add(ToggleItemDefaultEvent(item));
+                                      },
+                                      tooltip: 'Toggle Default Status',
+                                    ),
+                                    value: isSelected,
+                                    onChanged: (val) {
+                                      setState(() {
+                                        if (val == true) _selectedFees.add(item);
+                                        else _selectedFees.removeWhere((f) => f.id == item.id);
+                                      });
                                     },
-                                    tooltip: 'Toggle Default Status',
-                                  ),
-                                  value: isSelected,
-                                  onChanged: (val) {
-                                    setState(() {
-                                      if (val == true) _selectedFees.add(item);
-                                      else _selectedFees.removeWhere((f) => f.id == item.id);
-                                    });
-                                  },
-                                );
-                              },
-                            ),
+                                  );
+                                },
+                              );
+                            }(),
                       ),
 
                       const SizedBox(height: 16),

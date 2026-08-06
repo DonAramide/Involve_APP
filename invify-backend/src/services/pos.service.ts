@@ -617,6 +617,62 @@ export class PosService {
       } catch (e: any) {
          console.error(`[POS Gateway] Failed to send MPOS backup to Quasar: ${e.message}`);
       }
+      // Trigger automatic inventory deduction if transaction is approved
+      if (isApproved && params.items && params.items.length > 0) {
+        const saleItems = params.items;
+        (async () => {
+          try {
+            console.log(`[POS Inventory] Initiating device transaction deduction for transaction ${txId}`);
+            for (const item of saleItems) {
+              const { data: dbItem, error: fetchErr } = await supabase
+                .from('items')
+                .select('*')
+                .eq('tenant_id', params.tenantId)
+                .eq('id', item.id)
+                .single();
+
+              if (fetchErr || !dbItem) {
+                console.error(`[POS Inventory] Item not found: ${item.id}`);
+                continue;
+              }
+
+              // Deduct stock qty (Quantity validation)
+              const newQty = (dbItem.stock_qty || 0) - (item.quantity || 1);
+              const { error: updateErr } = await supabase
+                .from('items')
+                .update({ stock_qty: newQty })
+                .eq('tenant_id', params.tenantId)
+                .eq('id', item.id);
+
+              if (updateErr) {
+                console.error(`[POS Inventory] Failed to deduct stock for item ${item.id}: ${updateErr.message}`);
+                continue;
+              }
+
+              // Write Audit Record
+              await supabase.from('audit_logs').insert({
+                tenant_id: params.tenantId,
+                event_type: 'INVENTORY_DEDUCTED',
+                payload: {
+                  transactionId: txId,
+                  itemId: item.id,
+                  previousQuantity: dbItem.stock_qty,
+                  newQuantity: newQty,
+                  deductedQuantity: item.quantity || 1,
+                  terminalId: params.terminalId
+                },
+                actor_id: params.staffName || 'system',
+                created_at: new Date().toISOString()
+              });
+
+              // Publish Inventory Event
+              console.log(`[POS Inventory Event] Published InventoryDeducted: ${item.id} -> ${newQty}`);
+            }
+          } catch (e: any) {
+            console.error('[POS Inventory] Stock deduction error:', e.message);
+          }
+        })();
+      }
     }
 
     return { paymentSuccess: isApproved, recordedId: txId, status: entry.status };
@@ -1351,6 +1407,62 @@ export class PosService {
         auth_code: entry.authCode,
         raw_response: response.kimonoResponse || response.isoFields || { statusCode: response.statusCode, message: response.message }
       }).eq('id', entry.id).then();
+
+      // Trigger automatic inventory deduction if transaction is approved
+      if (response.paymentSuccess && params.items && params.items.length > 0) {
+        (async () => {
+          try {
+            console.log(`[POS Inventory] Initiating deduction for transaction ${entry.id}`);
+            for (const item of params.items) {
+              const { data: dbItem, error: fetchErr } = await supabase
+                .from('items')
+                .select('*')
+                .eq('tenant_id', entry.tenantId)
+                .eq('id', item.id)
+                .single();
+
+              if (fetchErr || !dbItem) {
+                console.error(`[POS Inventory] Item not found: ${item.id}`);
+                continue;
+              }
+
+              // Deduct stock qty (Quantity validation)
+              const newQty = (dbItem.stock_qty || 0) - (item.quantity || 1);
+              const { error: updateErr } = await supabase
+                .from('items')
+                .update({ stock_qty: newQty })
+                .eq('tenant_id', entry.tenantId)
+                .eq('id', item.id);
+
+              if (updateErr) {
+                console.error(`[POS Inventory] Failed to deduct stock for item ${item.id}: ${updateErr.message}`);
+                continue;
+              }
+
+              // Write Audit Record
+              await supabase.from('audit_logs').insert({
+                tenant_id: entry.tenantId,
+                event_type: 'INVENTORY_DEDUCTED',
+                payload: {
+                  transactionId: entry.id,
+                  itemId: item.id,
+                  previousQuantity: dbItem.stock_qty,
+                  newQuantity: newQty,
+                  deductedQuantity: item.quantity || 1,
+                  terminalId: entry.terminalId
+                },
+                actor_id: params.staffName || 'system',
+                created_at: new Date().toISOString()
+              });
+
+              // Publish Inventory Event
+              console.log(`[POS Inventory Event] Published InventoryDeducted: ${item.id} -> ${newQty}`);
+            }
+          } catch (e: any) {
+            console.error('[POS Inventory] Stock deduction error:', e.message);
+          }
+        })();
+      }
     }
 
     console.log(`[POS Gateway] ✓ Transaction updated: ${entry.id} | ${entry.status} | ${entry.host} | ₦${entry.amount}`);

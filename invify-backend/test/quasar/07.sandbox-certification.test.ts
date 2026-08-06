@@ -50,17 +50,25 @@ beforeAll(() => {
 certDescribe('PAT — Sandbox Certification', () => {
 
   it('PAT-01 Bootstrap sandbox environment', async () => {
-    const result = await client.bootstrapSandbox({
-      correlationId: crypto.randomUUID(),
-    });
+    const result = await client.bootstrapSandbox(
+      {
+        sandboxWebhookUrl:
+          process.env.INVIFY_QUASAR_WEBHOOK_URL ?? 'https://api.invify.app/webhooks/quasar',
+      },
+      { correlationId: crypto.randomUUID() },
+    );
     expect(result).toBeDefined();
     console.log('[PAT-01] Sandbox bootstrapped:', JSON.stringify(result).substring(0, 120));
   });
 
   it('PAT-02 Generate a virtual test account', async () => {
-    const account = await client.generateSandboxAccount({
-      correlationId: crypto.randomUUID(),
-    });
+    const accounts = await client.generateSandboxAccounts(
+      { accountName: 'Invify Cert VA', serviceSlug: 'invify' },
+      { correlationId: crypto.randomUUID() },
+    );
+    expect(Array.isArray(accounts)).toBe(true);
+    expect(accounts.length).toBeGreaterThan(0);
+    const account = accounts[0];
     expect(account).toHaveProperty('id');
     expect(account).toHaveProperty('accountNumber');
     sandboxAccountId = account.id;
@@ -69,7 +77,11 @@ certDescribe('PAT — Sandbox Certification', () => {
 
   it('PAT-03 Credit the test account with NGN 50,000', async () => {
     const correlationId = crypto.randomUUID();
-    const result = await client.creditSandboxAccount(sandboxAccountId, 50000, { correlationId });
+    const result = await client.creditSandboxAccount(
+      sandboxAccountId,
+      { amount: 5_000_000, reason: 'PAT certification funding' },
+      { correlationId },
+    );
     expect(result).toBeDefined();
     console.log(`[PAT-03] Account credited: ${JSON.stringify(result).substring(0, 120)}`);
   });
@@ -120,9 +132,10 @@ certDescribe('PAT — Sandbox Certification', () => {
   });
 
   it('PAT-08 Retrieve sandbox timeline', async () => {
-    const timeline = await client.getSandboxTimeline({
-      correlationId: crypto.randomUUID(),
-    });
+    const timeline = await client.getSandboxTimeline(
+      undefined,
+      { correlationId: crypto.randomUUID() },
+    );
     expect(Array.isArray(timeline)).toBe(true);
     console.log(`[PAT-08] Timeline events: ${timeline.length}`);
   });

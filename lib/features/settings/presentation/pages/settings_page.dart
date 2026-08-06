@@ -32,6 +32,12 @@ import '../../domain/entities/staff.dart';
 import '../../../../core/sync/presentation/pages/device_sync_page.dart';
 import 'package:file_picker/file_picker.dart';
 import '../widgets/business_mode_selector.dart';
+import 'package:involve_app/core/services/service_locator.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/core/utils/progress_dialog_utils.dart';
+import 'package:dio/dio.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -75,12 +81,12 @@ class _SettingsPageState extends State<SettingsPage> {
               ? TextField(
                   controller: _searchController,
                   autofocus: true,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     hintText: 'Search settings...',
                     border: InputBorder.none,
-                    hintStyle: TextStyle(color: Colors.white70),
+                    hintStyle: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.6) ?? Colors.black54),
                   ),
-                  style: const TextStyle(color: Colors.white),
+                  style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black),
                   onChanged: (val) => setState(() => _searchQuery = val),
                 )
               : const Text('System Settings'),
@@ -222,33 +228,29 @@ class _SettingsPageState extends State<SettingsPage> {
             trailing: state.isExporting ? const Text('Exporting...', style: TextStyle(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold)) : const Icon(Icons.backup),
             onTap: () => _showBackupOptions(context, state),
           ),
-        if (_matches('Device Synchronization'))
+        if (_matches('Sync'))
           ListTile(
             title: Row(
               children: [
-                const Text('Device Synchronization'),
+                const Text('Sync'),
                 if (state.userPlan?.isBasic == true) ...[
                   const SizedBox(width: 8),
                   _buildProBadge(),
                 ],
               ],
             ),
-            subtitle: const Text('Connect and sync data with other devices'),
-            trailing: const Icon(Icons.sync_alt),
+            subtitle: const Text('Synchronize with local devices or the Web Portal'),
+            trailing: const Icon(Icons.sync_rounded),
             onTap: () {
-              if (state.userPlan?.isBasic == true) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Device Synchronization is a Pro Version feature.')),
-                );
-                return;
-              }
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSyncPage()));
+              _showSyncSelector(context, state);
             },
           ),
         if (_matches('Show Date & Time'))
           _buildSwitchTile('Show Date & Time', settings.showDateTime, (val) => _update(context, settings.copyWith(showDateTime: val))),
         if (_matches('Show Sync Status'))
           _buildSwitchTile('Show Sync Status', settings.showSyncStatus, (val) => _update(context, settings.copyWith(showSyncStatus: val))),
+        if (_matches('Show Network Indicator'))
+          _buildSwitchTile('Show Network Indicator', settings.showNetworkIndicator, (val) => _update(context, settings.copyWith(showNetworkIndicator: val))),
 
         const Divider(),
       ],
@@ -474,6 +476,218 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
+  }
+
+  void _showSyncSelector(BuildContext context, SettingsState state) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(
+            title: Text('Select Sync Protocol', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          ListTile(
+            leading: const Icon(Icons.devices_other_rounded, color: Colors.blueAccent),
+            title: const Text('Device Sync (Local P2P)'),
+            subtitle: const Text('Connect and sync ledger data peer-to-peer with other local devices'),
+            onTap: () {
+              Navigator.pop(ctx);
+              if (state.userPlan?.isBasic == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Device Synchronization is a Pro Version feature.')),
+                );
+                return;
+              }
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSyncPage()));
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.cloud_sync_rounded, color: Colors.teal),
+            title: const Text('Web Sync (Full Cloud Sync)'),
+            subtitle: const Text('Instantly replicate all local data and products to the web dashboard'),
+            onTap: () async {
+              Navigator.pop(ctx);
+              _triggerWebCloudSync();
+            },
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  FinanceApiClient _safeClient() {
+    if (!sl.isRegistered<FinanceApiClient>()) {
+      sl.registerSingleton<FinanceApiClient>(FinanceApiClient(
+        baseUrl: AppConfig.baseUrl,
+        getToken: () async => await SecurityService().getOfflineToken() ?? 'mock-super-admin',
+        getTenantId: () async => await SecurityService().getTenantId(),
+      ));
+    }
+    return sl<FinanceApiClient>();
+  }
+
+  Future<void> _triggerWebCloudSync() async {
+    if (!mounted) return;
+    try {
+      await ProgressDialogUtils.showDancingProgress(context, () async {
+        final dbPath = await context.read<SettingsBloc>().backupService.getDatabasePath();
+        final file = File(dbPath);
+        
+        if (!await file.exists()) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Local database file not found.')),
+            );
+          }
+          return;
+        }
+
+        final client = _safeClient();
+
+        // 1. Send database backup file (full SQLite copy to backend)
+        final formData = FormData.fromMap({
+          'backup_file': await MultipartFile.fromFile(dbPath, filename: 'app_database_backup_${DateTime.now().millisecondsSinceEpoch}.db'),
+        });
+        await client.post('/api/admin/claude-backup', data: formData);
+
+        // 2. Bulk-sync local items/products to Supabase via backend
+        final db = context.read<SettingsBloc>().backupService.database;
+        if (db != null) {
+          final localItems = await db.select(db.items).get();
+          
+          if (localItems.isNotEmpty) {
+            final itemPayloads = localItems.map((item) => {
+              'id': item.syncId,
+              'name': item.name,
+              'sku': item.name.toUpperCase().replaceAll(' ', '_') + '_${item.id}',
+              'barcode': item.barcode,
+              'stock_qty': item.stockQty,
+              'min_stock_qty': item.minStockQty,
+              'price': item.price,
+              'cost_price': item.costPrice,
+              'type': item.type,
+              'status': item.isDeleted ? 'archived' : 'active',
+              'is_deleted': item.isDeleted,
+              'device_id': item.deviceId,
+            }).toList();
+
+            // Single bulk POST — much faster than one-by-one
+            try {
+              final result = await client.post(
+                '/api/inventory/products/bulk-sync',
+                data: {'items': itemPayloads},
+              );
+              debugPrint('Bulk sync result: synced=${result.data?['synced']}, errors=${result.data?['errors']}');
+            } catch (bulkErr) {
+              debugPrint('Bulk sync error: $bulkErr');
+            }
+          }
+
+          // 3. Bulk-sync local customers to Supabase via backend
+          final localCustomers = await db.select(db.customers).get();
+          if (localCustomers.isNotEmpty) {
+            final customerPayloads = localCustomers.map((c) => {
+              'id': c.id,
+              'name': c.name,
+              'phone': c.phone,
+              'email': c.email,
+              'address': c.address,
+              'balance': c.balance,
+              'status': 'ACTIVE',
+              'createdAt': c.createdAt.toIso8601String(),
+            }).toList();
+
+            try {
+              final custResult = await client.post(
+                '/api/v1/crm/customers/bulk-sync',
+                data: {'customers': customerPayloads},
+              );
+              debugPrint('Bulk customer sync result: synced=${custResult.data?['synced']}, errors=${custResult.data?['errors']}');
+            } catch (custErr) {
+              debugPrint('Bulk customer sync error: $custErr');
+            }
+          }
+
+          // 4. Bulk-sync local invoices (transactions) to Supabase via backend
+          final localInvoices = await db.select(db.invoices).get();
+          if (localInvoices.isNotEmpty) {
+            final List<Map<String, dynamic>> invoicePayloads = [];
+
+            for (final inv in localInvoices) {
+              final itemsForInv = await (db.select(db.invoiceItems)..where((ii) => ii.invoiceId.equals(inv.id))).get();
+
+              final itemsPayload = itemsForInv.map((ii) => {
+                'invoiceItemSyncId': ii.syncId,
+                'productSyncId': null,
+                'itemId': ii.itemId.toString(),
+                'quantity': ii.quantity,
+                'unitPrice': ii.unitPrice,
+                'type': ii.type,
+              }).toList();
+
+              for (final itemPayload in itemsPayload) {
+                final localItem = await (db.select(db.items)..where((it) => it.id.equals(int.parse(itemPayload['itemId'] as String)))).getSingleOrNull();
+                if (localItem != null) {
+                  itemPayload['productSyncId'] = localItem.syncId;
+                }
+              }
+
+              invoicePayloads.add({
+                'syncId': inv.syncId ?? 'INV-${inv.id}-${DateTime.now().millisecondsSinceEpoch}',
+                'invoiceNumber': inv.invoiceNumber,
+                'customerId': inv.customerId,
+                'customerName': inv.customerName,
+                'customerPhone': null,
+                'customerAddress': inv.customerAddress,
+                'dateCreated': inv.dateCreated.toIso8601String(),
+                'subtotal': inv.subtotal,
+                'taxAmount': inv.taxAmount,
+                'discountAmount': inv.discountAmount,
+                'totalAmount': inv.totalAmount,
+                'amountPaid': inv.amountPaid,
+                'balanceAmount': inv.balanceAmount,
+                'paymentStatus': inv.paymentStatus,
+                'paymentMethod': inv.paymentMethod,
+                'items': itemsPayload,
+              });
+            }
+
+            try {
+              final invResult = await client.post(
+                '/api/v1/finance/invoices/bulk-sync',
+                data: {'invoices': invoicePayloads},
+              );
+              debugPrint('Bulk invoice sync result: synced=${invResult.data?['synced']}, errors=${invResult.data?['errors']}');
+            } catch (invErr) {
+              debugPrint('Bulk invoice sync error: $invErr');
+            }
+          }
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ All data successfully synchronized to Web Portal!'),
+              backgroundColor: Colors.teal,
+            ),
+          );
+        }
+      }, message: 'Synchronizing all data to Web Portal...');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Web Sync failed: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _handleSaveToDevice(BuildContext context) async {

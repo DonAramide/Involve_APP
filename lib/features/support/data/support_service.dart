@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -6,7 +7,7 @@ import '../../settings/domain/services/security_service.dart';
 
 class SupportService {
   // Using global ngrok url for device testing
-  final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
+  final String baseUrl = AppConfig.baseUrl;
 
   Future<bool> submitComplaint({
     required String title,

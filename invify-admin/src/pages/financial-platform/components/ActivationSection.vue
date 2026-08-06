@@ -1,18 +1,18 @@
 <template>
   <div>
-    <ActivationWizard 
-      v-if="state === 'UNPROVISIONED'" 
-      @activate="handleActivate" 
+    <ActivationWizard
+      v-if="state === 'UNPROVISIONED'"
+      @activate="handleActivate"
     />
-    <ActivationTimeline 
-      v-else-if="state === 'PROVISIONING'" 
-      :steps="timelineSteps" 
+    <ActivationTimeline
+      v-else-if="state === 'PROVISIONING'"
+      :steps="timelineSteps"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import ActivationWizard from './ActivationWizard.vue'
 import ActivationTimeline from './ActivationTimeline.vue'
 import financialPlatformApi from 'src/api/financialPlatformApi'
@@ -44,22 +44,47 @@ const timelineSteps = ref([
 ])
 
 const handleActivate = async () => {
+  if (!props.tenantId) {
+    $q.notify({ type: 'negative', message: 'Missing tenant id — reload and try again.' })
+    return
+  }
+
   try {
-    const response = await financialPlatformApi.activate(props.tenantId)
-    const token = response.data.provisioningToken
-    
-    // Update local state and emit to parent
     emit('statusChange', 'PROVISIONING')
-    
-    // Start Polling
-    pollingService.start(token, 2500)
+    const response = await financialPlatformApi.activate(props.tenantId)
+    const data = response.data || {}
+    const token = data.provisioningToken
+
+    // Sync activate already returns ACTIVE — skip async polling when present
+    if (data.status === 'ACTIVE' || data.quasar_tenant_id) {
+      timelineSteps.value = timelineSteps.value.map((s) => ({
+        ...s,
+        status: 'DONE',
+        timestamp: new Date().toISOString()
+      }))
+      $q.notify({ type: 'positive', message: 'Financial Platform Activated!' })
+      emit('statusChange', 'ACTIVE')
+      return
+    }
+
+    if (token) {
+      pollingService.start(token, 2500)
+      return
+    }
+
+    // Fallback: treat 200 as success
+    $q.notify({ type: 'positive', message: 'Financial Platform Activated!' })
+    emit('statusChange', 'ACTIVE')
   } catch (error) {
     console.error('Activation failed', error)
-    $q.notify({ type: 'negative', message: error.response?.data?.error || 'Failed to activate financial services' })
+    emit('statusChange', 'UNPROVISIONED')
+    $q.notify({
+      type: 'negative',
+      message: error.response?.data?.error || error.response?.data?.details || 'Failed to activate financial services'
+    })
   }
 }
 
-// Setup polling listeners
 pollingService.onStatusChanged((status, data) => {
   if (data && data.length) {
     timelineSteps.value = data
@@ -74,6 +99,7 @@ pollingService.onCompleted(() => {
 
 pollingService.onFailed((errorMsg) => {
   $q.notify({ type: 'negative', message: errorMsg })
+  emit('statusChange', 'UNPROVISIONED')
 })
 
 onUnmounted(() => {

@@ -3,6 +3,8 @@
 import '../../../../core/services/finance_api_client.dart';
 import '../../data/models/finance_models.dart';
 import '../../domain/entities/virtual_account.dart'; // Reusing this as it's already well-defined
+import 'package:involve_app/features/stock/data/datasources/app_database.dart';
+import 'package:drift/drift.dart';
 
 import '../../data/datasources/finance_realtime_data_source.dart';
 
@@ -11,8 +13,9 @@ import '../../data/datasources/finance_realtime_data_source.dart';
 class FinanceRepository {
   final FinanceApiClient _client;
   final IFinanceRealtimeDataSource _realtime;
+  final AppDatabase? _db;
 
-  FinanceRepository(this._client, this._realtime);
+  FinanceRepository(this._client, this._realtime, [this._db]);
 
   FinanceApiClient get apiClient => _client;
 
@@ -134,6 +137,25 @@ class FinanceRepository {
       data: {
         'name': customerName,
         'phone': customerPhone,
+        'email': email,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Initiates a static virtual account generation for a staff member.
+  /// POST /api/finance/staff-virtual-account/:userId
+  Future<Map<String, dynamic>> initiateStaffVirtualAccount({
+    required String userId,
+    required String customLastName,
+    String? phone,
+    String? email,
+  }) async {
+    final response = await _client.post(
+      '/api/finance/staff-virtual-account/$userId',
+      data: {
+        'customLastName': customLastName,
+        'phone': phone,
         'email': email,
       },
     );
@@ -269,8 +291,73 @@ class FinanceRepository {
 
   /// Fetches the unified transaction audit ledger (Cash, Transfer, POS Attempts).
   Future<List<TransactionAuditModel>> getTransactionAuditLedger() async {
-    final response = await _client.get('/api/finance/audit/ledger');
+    try {
+      final response = await _client.get('/api/finance/audit/ledger');
+      final List<dynamic> data = response.data as List<dynamic>;
+      return data
+          .map((json) =>
+              TransactionAuditModel.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      if (_db == null) {
+        rethrow;
+      }
+      try {
+        final localInvoices = await (_db!.select(_db!.invoices)
+              ..orderBy([
+                (t) => OrderingTerm(
+                      expression: t.dateCreated,
+                      mode: OrderingMode.desc,
+                    )
+              ])
+              ..limit(100))
+            .get();
+
+        return localInvoices.map((inv) {
+          return TransactionAuditModel(
+            id: inv.id.toString(),
+            type: 'INVOICE',
+            paymentMethod: inv.paymentMethod ?? 'CASH',
+            amount: inv.totalAmount,
+            status: inv.paymentStatus == 'Paid'
+                ? 'Approved'
+                : (inv.paymentStatus ?? 'Pending'),
+            staffName: inv.staffName ?? 'System',
+            date: inv.dateCreated,
+            items: const [],
+            customerName: inv.customerName ?? 'Walk-in',
+            reference: inv.invoiceNumber,
+          );
+        }).toList();
+      } catch (_) {
+        rethrow;
+      }
+    }
+  }
+
+  /// Fetches all generated virtual accounts for the tenant.
+  /// GET /api/finance/virtual-accounts
+  Future<List<Map<String, dynamic>>> getVirtualAccounts() async {
+    final response = await _client.get('/api/finance/virtual-accounts');
     final List<dynamic> data = response.data as List<dynamic>;
-    return data.map((json) => TransactionAuditModel.fromJson(json as Map<String, dynamic>)).toList();
+    return data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  /// Fetches transaction history for a specific virtual account.
+  /// GET /api/finance/virtual-accounts/:accountNumber/transactions
+  Future<List<Map<String, dynamic>>> getVirtualAccountTransactions(String accountNumber) async {
+    final response = await _client.get('/api/finance/virtual-accounts/$accountNumber/transactions');
+    final List<dynamic> data = response.data as List<dynamic>;
+    return data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
+  /// Sweeps funds from a child virtual account to the business internal wallet.
+  /// POST /api/finance/virtual-accounts/:accountNumber/sweep
+  Future<Map<String, dynamic>> sweepVirtualAccount(String accountNumber, double amount) async {
+    final response = await _client.post(
+      '/api/finance/virtual-accounts/$accountNumber/sweep',
+      data: {'amount': amount},
+    );
+    return response.data as Map<String, dynamic>;
   }
 }

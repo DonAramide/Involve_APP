@@ -69,6 +69,7 @@
         narrow-indicator
       >
         <q-tab name="overview" label="Overview" icon="analytics" />
+        <q-tab name="financial" label="Financial Platform" icon="account_balance" />
         <q-tab name="kyc" label="KYC & Compliance" icon="verified_user" />
         <q-tab name="users" label="Users" icon="person" />
         <q-tab name="wallet" label="Wallet & Transactions" icon="wallet" />
@@ -299,6 +300,174 @@
           </div>
         </q-tab-panel>
 
+        <!-- Financial Platform Panel -->
+        <q-tab-panel name="financial">
+          <div class="row q-col-gutter-lg">
+            <div class="col-12 col-md-4">
+              <!-- Status & Actions Card -->
+              <q-card class="bg-blue-grey-9 border-cyan flat bordered rounded-borders q-pa-md text-center" style="height: 100%">
+                <q-avatar size="80px" color="indigo-10" text-color="cyan-3" icon="account_balance" class="q-mb-md" />
+                <div class="text-h6 text-white text-weight-bold q-mb-sm">Financial Platform State</div>
+                <div class="q-mb-lg">
+                  <q-chip 
+                    :color="financialHealth?.platformStatus === 'ACTIVE' ? 'green-9' : (financialHealth?.platformStatus === 'DEGRADED' ? 'orange-9' : 'red-9')" 
+                    text-color="white" 
+                    size="md" 
+                    class="text-weight-bold">
+                    {{ financialHealth?.platformStatus || 'UNPROVISIONED' }}
+                  </q-chip>
+                  <div class="text-caption text-grey-5 q-mt-xs">
+                    {{ financialHealth?.environment || 'Environment: Unknown' }}
+                  </div>
+                </div>
+
+                <div class="row q-gutter-sm justify-center">
+                  <q-btn 
+                    v-if="!financialHealth || financialHealth?.platformStatus === 'UNPROVISIONED'"
+                    color="cyan-6" 
+                    text-color="black"
+                    icon="flash_on" 
+                    label="Activate Platform" 
+                    @click="activateFinancialPlatform" 
+                    :loading="activatingPlatform"
+                    class="text-weight-bold" 
+                  />
+                  <q-btn 
+                    v-if="financialHealth?.platformStatus === 'ACTIVE' || financialHealth?.platformStatus === 'DEGRADED'"
+                    outline 
+                    color="amber-8" 
+                    icon="sync" 
+                    label="Rotate Credentials" 
+                    @click="rotateFinancialPlatform" 
+                    :loading="rotatingPlatform"
+                    class="text-weight-bold" 
+                  />
+                </div>
+              </q-card>
+            </div>
+
+            <div class="col-12 col-md-8">
+              <!-- Diagnostics Panel -->
+              <q-card class="bg-blue-grey-9 flat bordered rounded-borders q-pa-md border-indigo" style="height: 100%">
+                <div class="text-subtitle1 text-indigo-3 q-mb-md row items-center">
+                  <q-icon name="health_and_safety" class="q-mr-sm" size="sm" />
+                  Platform Diagnostics & Health
+                  <q-space />
+                  <q-chip outline color="cyan-4" size="sm" class="text-weight-bold">
+                    API: {{ financialHealth?.apiVersion || 'v1' }}
+                  </q-chip>
+                </div>
+                
+                <div class="row q-col-gutter-md">
+                  <div class="col-12 col-sm-6">
+                    <q-list dark separator class="rounded-borders">
+                      <q-item>
+                        <q-item-section>
+                          <q-item-label class="text-grey-5">Quasar Provider Status</q-item-label>
+                        </q-item-section>
+                        <q-item-section side>
+                          <q-icon 
+                            :name="financialHealth?.quasarStatus === 'up' ? 'check_circle' : 'error'" 
+                            :color="financialHealth?.quasarStatus === 'up' ? 'green-4' : 'red-4'" 
+                            size="sm"
+                          />
+                        </q-item-section>
+                      </q-item>
+                      <q-item>
+                        <q-item-section>
+                          <q-item-label class="text-grey-5">Vault Secure Storage</q-item-label>
+                        </q-item-section>
+                        <q-item-section side>
+                          <q-icon 
+                            :name="financialHealth?.vaultStatus === 'up' ? 'check_circle' : 'error'" 
+                            :color="financialHealth?.vaultStatus === 'up' ? 'green-4' : 'red-4'" 
+                            size="sm"
+                          />
+                        </q-item-section>
+                      </q-item>
+                      <q-item>
+                        <q-item-section>
+                          <q-item-label class="text-grey-5">Credential Validity</q-item-label>
+                        </q-item-section>
+                        <q-item-section side>
+                          <div class="text-white text-caption text-weight-bold">
+                            {{ financialHealth?.credentialValidity ? 'VALID' : 'INVALID/NONE' }}
+                          </div>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </div>
+
+                  <div class="col-12 col-sm-6">
+                    <q-list dark separator class="rounded-borders">
+                      <q-item>
+                        <q-item-section>
+                          <q-item-label class="text-grey-5">Circuit Breaker</q-item-label>
+                        </q-item-section>
+                        <q-item-section side>
+                          <q-chip :color="financialHealth?.circuitBreakerStatus === 'closed' ? 'green-9' : 'red-9'" size="sm" text-color="white">
+                            {{ financialHealth?.circuitBreakerStatus?.toUpperCase() || 'UNKNOWN' }}
+                          </q-chip>
+                        </q-item-section>
+                      </q-item>
+                      <q-item>
+                        <q-item-section>
+                          <q-item-label class="text-grey-5">API Latency</q-item-label>
+                        </q-item-section>
+                        <q-item-section side>
+                          <div class="text-white text-caption font-mono">
+                            {{ financialHealth?.apiLatencyMs ? financialHealth.apiLatencyMs + 'ms' : '--' }}
+                          </div>
+                        </q-item-section>
+                      </q-item>
+                      <q-item>
+                        <q-item-section>
+                          <q-item-label class="text-grey-5">Last Health Check</q-item-label>
+                        </q-item-section>
+                        <q-item-section side>
+                          <div class="text-white text-caption">
+                            {{ financialHealth?.lastHealthCheck ? new Date(financialHealth.lastHealthCheck).toLocaleTimeString() : '--' }}
+                          </div>
+                        </q-item-section>
+                      </q-item>
+                    </q-list>
+                  </div>
+                </div>
+              </q-card>
+            </div>
+
+            <!-- Audit Timeline -->
+            <div class="col-12 q-mt-lg">
+              <div class="text-subtitle1 text-indigo-3 q-mb-md row items-center">
+                <q-icon name="timeline" class="q-mr-sm" size="sm" />
+                Operational History & Audit Timeline
+              </div>
+              <q-card class="bg-blue-grey-10 flat border-cyan q-pa-md">
+                <div v-if="financialAudit.length > 0">
+                  <q-timeline color="cyan-4" dark>
+                    <q-timeline-entry
+                      v-for="(event, idx) in financialAudit"
+                      :key="idx"
+                      :title="event.action"
+                      :subtitle="new Date(event.timestamp).toLocaleString()"
+                      :color="event.status === 'success' ? 'green-4' : 'red-4'"
+                      :icon="event.status === 'success' ? 'check' : 'warning'"
+                    >
+                      <div class="text-caption text-grey-4">Operator: {{ event.operatorId }}</div>
+                      <div class="text-caption font-mono text-grey-6 q-mt-xs" style="font-size: 11px;">Audit ID: {{ event.auditId }}</div>
+                    </q-timeline-entry>
+                  </q-timeline>
+                </div>
+                <div v-else class="text-center q-pa-xl text-grey-6">
+                  <q-icon size="2em" name="history" class="q-mb-sm block mx-auto" />
+                  No financial operational history found.
+                </div>
+              </q-card>
+            </div>
+
+          </div>
+        </q-tab-panel>
+
         <!-- Users Panel -->
         <q-tab-panel name="users" class="q-pa-none">
           <q-table
@@ -306,6 +475,7 @@
             :columns="[
               { name: 'name', label: 'NAME', field: 'name', align: 'left', sortable: true },
               { name: 'email', label: 'EMAIL', field: 'email', align: 'left', sortable: true },
+              { name: 'phone', label: 'PHONE', field: 'phone', align: 'left' },
               { name: 'role', label: 'ROLE', field: 'role', align: 'center', format: val => val?.toUpperCase() },
               { name: 'status', label: 'STATUS', field: 'status', align: 'center' }
             ]"
@@ -463,6 +633,24 @@
             dark
             class="bg-blue-grey-10"
           >
+            <template v-slot:body-cell-deviceId="props">
+              <q-td :props="props">
+                <div v-if="props.row.deviceId" class="row items-center no-wrap q-gutter-x-xs">
+                  <q-icon name="phone_android" color="indigo-3" size="xs" />
+                  <span style="font-family: monospace; font-size: 11px; letter-spacing: 0.5px;" class="text-cyan-3">
+                    {{ props.row.deviceId }}
+                  </span>
+                  <q-btn flat dense round icon="content_copy" size="xs" color="grey-5"
+                    @click.stop="navigator.clipboard.writeText(props.row.deviceId).then(() => $q.notify({ type: 'positive', message: 'Device ID copied!' }))">
+                    <q-tooltip>Copy Device ID</q-tooltip>
+                  </q-btn>
+                </div>
+                <q-chip v-else icon="hourglass_empty" color="blue-grey-8" text-color="amber-4" size="xs" dense>
+                  Awaiting Activation
+                  <q-tooltip>This activation key has not yet been claimed by a device</q-tooltip>
+                </q-chip>
+              </q-td>
+            </template>
             <template v-slot:body-cell-status="props">
               <q-td :props="props">
                 <q-chip :color="props.row.status === 'ACTIVE' ? 'green-9' : 'red-9'" text-color="white" size="xs" dense>
@@ -480,6 +668,9 @@
                 <q-btn flat dense round icon="visibility" color="cyan-4" @click="reviewCertificate(props.row)" size="sm">
                   <q-tooltip>Review Certificate</q-tooltip>
                 </q-btn>
+                <q-btn v-if="isSuperAdmin && props.row.status === 'USED'" flat dense round icon="restore" color="orange-4" @click="resetActivationKey(props.row)" size="sm" class="q-ml-xs">
+                  <q-tooltip>Reset Activation Key (Reuse)</q-tooltip>
+                </q-btn>
               </q-td>
             </template>
           </q-table>
@@ -488,6 +679,37 @@
         <q-tab-panel name="kyc">
           <div class="text-subtitle1 text-indigo-3 q-mb-md">KYC & Compliance Verification</div>
           <div class="row q-col-gutter-md">
+            <div class="col-12">
+              <q-card flat bordered class="bg-blue-grey-9 border-amber">
+                <q-card-section>
+                  <div class="text-overline text-amber-3">Owner Contact & Business Profile</div>
+                  <q-list dark separator class="q-mt-sm">
+                    <q-item>
+                      <q-item-section>Owner Name</q-item-section>
+                      <q-item-section side class="text-white">{{ ownerDisplayName }}</q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>Email</q-item-section>
+                      <q-item-section side class="text-white">{{ ownerProfile.email || 'Not Provided' }}</q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>Phone</q-item-section>
+                      <q-item-section side class="text-white">{{ ownerProfile.phone || tenant.phone || 'Not Provided' }}</q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section>Business / Trade Name</q-item-section>
+                      <q-item-section side class="text-white">{{ ownerProfile.businessName || tenant.name || 'Not Provided' }}</q-item-section>
+                    </q-item>
+                    <q-item v-if="ownerProfile.city || ownerProfile.country">
+                      <q-item-section>Profile Location</q-item-section>
+                      <q-item-section side class="text-white">
+                        {{ [ownerProfile.city, ownerProfile.country].filter(Boolean).join(', ') || 'Not Provided' }}
+                      </q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-card-section>
+              </q-card>
+            </div>
             <div class="col-12 col-md-6">
               <q-card flat bordered class="bg-blue-grey-9 border-indigo">
                 <q-card-section>
@@ -549,9 +771,9 @@
                       <q-item-section>Street Address</q-item-section>
                       <q-item-section side class="text-white">{{ tenant.kyc_data?.streetAddress || tenant.street_address || 'Not Provided' }}</q-item-section>
                     </q-item>
-                    <q-item v-if="tenant.kyc_data?.lga || tenant.lga">
-                      <q-item-section>LGA / District</q-item-section>
-                      <q-item-section side class="text-white">{{ tenant.kyc_data?.lga || tenant.lga }}</q-item-section>
+                    <q-item>
+                      <q-item-section>City / LGA</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.lga || tenant.lga || ownerProfile.city || 'Not Provided' }}</q-item-section>
                     </q-item>
                     <q-item>
                       <q-item-section>State / Region</q-item-section>
@@ -559,7 +781,7 @@
                     </q-item>
                     <q-item>
                       <q-item-section>Country</q-item-section>
-                      <q-item-section side class="text-white">{{ tenant.kyc_data?.country || tenant.country || 'Not Provided' }}</q-item-section>
+                      <q-item-section side class="text-white">{{ tenant.kyc_data?.country || tenant.country || ownerProfile.country || 'Not Provided' }}</q-item-section>
                     </q-item>
                   </q-list>
                 </q-card-section>
@@ -763,8 +985,48 @@
       </q-card>
     </q-dialog>
 
+    <!-- RESET ACTIVATION KEY SECURITY CONFIRM DIALOG -->
+    <q-dialog v-model="showResetDialog" persistent>
+      <q-card class="bg-grey-9 text-white border-gold" style="min-width: 400px">
+        <q-card-section class="bg-indigo-10 q-py-md">
+          <div class="text-h6 row items-center no-wrap">
+            <q-icon name="security" class="q-mr-sm" color="amber-5" />
+            <span>Security Verification Required</span>
+          </div>
+          <div class="text-caption text-indigo-3 q-mt-xs">Please confirm your identity to reset activation key <strong>{{ resetDialogKey }}</strong></div>
+        </q-card-section>
+
+        <q-card-section class="q-pa-lg">
+          <q-input
+            v-model="resetPasswordInput"
+            type="password"
+            label="Super Admin Password"
+            dark filled
+            class="q-mb-md"
+            label-color="indigo-3"
+          />
+          <q-input
+            v-if="mfaEnabledForAdmin"
+            v-model="resetMfaInput"
+            type="text"
+            label="2FA / Google Authenticator Code"
+            dark filled
+            mask="######"
+            class="q-mb-md"
+            label-color="indigo-3"
+            hint="Enter the 6-digit verification code from your authenticator app"
+          />
+        </q-card-section>
+
+        <q-card-actions align="right" class="q-pa-md bg-grey-10">
+          <q-btn flat label="Cancel" color="grey-5" v-close-popup :disable="resettingKey" />
+          <q-btn color="orange-9" label="Verify & Reset" @click="submitResetKey" :loading="resettingKey" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     </div>
-    <q-inner-loading :showing="loading" dark color="indigo-4" />
+    <q-inner-loading :showing="loading || loadingResetSetup" dark color="indigo-4" />
   </q-page>
 </template>
 
@@ -797,6 +1059,54 @@ const certificates = ref([])
 const registeredDevices = ref([])
 const auditRecords = ref([])
 const kycDocuments = ref([])
+
+const showResetDialog = ref(false)
+const resetDialogKey = ref('')
+const resetPasswordInput = ref('')
+const resetMfaInput = ref('')
+const mfaEnabledForAdmin = ref(false)
+const loadingResetSetup = ref(false)
+const resettingKey = ref(false)
+
+const ownerUser = computed(() => {
+  const list = users.value || []
+  return list.find(u => String(u.role || '').toLowerCase() === 'owner')
+    || list.find(u => String(u.role || '').toLowerCase().includes('admin'))
+    || list[0]
+    || null
+})
+
+const ownerProfile = computed(() => {
+  const fromSettings = tenant.value?.settings?.owner_profile || {}
+  const owner = ownerUser.value
+  return {
+    firstName: fromSettings.firstName || '',
+    lastName: fromSettings.lastName || '',
+    email: fromSettings.email || owner?.email || '',
+    phone: fromSettings.phone || tenant.value?.phone || owner?.phone || '',
+    businessName: fromSettings.businessName || tenant.value?.name || '',
+    city: fromSettings.city || tenant.value?.lga || '',
+    country: fromSettings.country || tenant.value?.country || '',
+    name: owner?.name || '',
+  }
+})
+
+const ownerDisplayName = computed(() => {
+  const p = ownerProfile.value
+  const composed = [p.firstName, p.lastName].filter(Boolean).join(' ').trim()
+  return composed || p.name || 'Not Provided'
+})
+
+const isSuperAdmin = computed(() => {
+  const role = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
+  return role.toUpperCase().includes('SUPER_ADMIN')
+})
+
+// Financial Platform Refs
+const financialHealth = ref(null)
+const financialAudit = ref([])
+const activatingPlatform = ref(false)
+const rotatingPlatform = ref(false)
 
 const showPasswordDialog = ref(false)
 const tempPassword = ref('')
@@ -863,6 +1173,51 @@ const reviewCertificate = (cert) => {
   }
   lastGeneratedCode.value = cert.code
   showSuccessDialog.value = true
+}
+
+const resetActivationKey = async (cert) => {
+  loadingResetSetup.value = true
+  try {
+    const { data: profile } = await adminApi.getProfile()
+    mfaEnabledForAdmin.value = !!profile?.mfa_enabled
+    resetDialogKey.value = cert.code
+    resetPasswordInput.value = ''
+    resetMfaInput.value = ''
+    showResetDialog.value = true
+  } catch (e) {
+    console.error(e)
+    $q.notify({ type: 'negative', message: 'Failed to retrieve admin security setup.' })
+  } finally {
+    loadingResetSetup.value = false
+  }
+}
+
+const submitResetKey = async () => {
+  if (!resetPasswordInput.value) {
+    $q.notify({ type: 'negative', message: 'Admin password is required.' })
+    return
+  }
+  if (mfaEnabledForAdmin.value && !resetMfaInput.value) {
+    $q.notify({ type: 'negative', message: 'MFA verification code is required.' })
+    return
+  }
+
+  resettingKey.value = true
+  try {
+    await deviceApi.resetActivation(resetDialogKey.value, {
+      password: resetPasswordInput.value,
+      mfaToken: resetMfaInput.value
+    })
+    $q.notify({ type: 'positive', message: 'Activation key has been successfully reset!' })
+    showResetDialog.value = false
+    await fetchDetails()
+  } catch (e) {
+    console.error(e)
+    const errMessage = e.response?.data?.error || 'Failed to reset activation key.'
+    $q.notify({ type: 'negative', message: errMessage })
+  } finally {
+    resettingKey.value = false
+  }
 }
 
 const openActivationShortcut = () => {
@@ -1166,9 +1521,76 @@ const fetchDetails = async () => {
     } catch (e) {
       console.error('Failed to fetch KYC documents:', e)
     }
+
+    // Fetch Financial Platform Status
+    try {
+      const healthRes = await adminApi.getFinancialPlatformHealth(tenant.value.id)
+      financialHealth.value = healthRes.data || null
+    } catch (e) {
+      console.warn('Failed to fetch financial platform health (may not be provisioned):', e)
+      financialHealth.value = null
+    }
+
+    // Fetch Financial Platform Audit
+    try {
+      const auditRes = await adminApi.getFinancialPlatformAudit(tenant.value.id)
+      financialAudit.value = auditRes.data?.data || auditRes.data || []
+    } catch (e) {
+      console.warn('Failed to fetch financial platform audit:', e)
+      financialAudit.value = []
+    }
+
   } finally {
     loading.value = false
   }
+}
+
+const activateFinancialPlatform = async () => {
+  if (!tenant.value) return
+  $q.dialog({
+    title: 'Activate Financial Platform',
+    message: `Are you sure you want to provision Quasar financial capabilities for ${tenant.value.name}? This will allocate real-world ledger accounts.`,
+    cancel: true,
+    persistent: true,
+    dark: true,
+    color: 'cyan-6'
+  }).onOk(async () => {
+    activatingPlatform.value = true
+    try {
+      await adminApi.activateFinancialPlatform(tenant.value.id)
+      $q.notify({ type: 'positive', message: 'Financial Platform Activated Successfully' })
+      await fetchDetails()
+    } catch (err) {
+      console.error('Activation failed:', err)
+      $q.notify({ type: 'negative', message: err.response?.data?.error || 'Failed to activate financial platform' })
+    } finally {
+      activatingPlatform.value = false
+    }
+  })
+}
+
+const rotateFinancialPlatform = async () => {
+  if (!tenant.value) return
+  $q.dialog({
+    title: 'Rotate Credentials',
+    message: `WARNING: Rotating credentials will temporarily suspend API requests while the keys are rotated. Do you want to proceed for ${tenant.value.name}?`,
+    cancel: true,
+    persistent: true,
+    dark: true,
+    color: 'amber-8'
+  }).onOk(async () => {
+    rotatingPlatform.value = true
+    try {
+      await adminApi.rotateFinancialPlatformCredentials(tenant.value.id)
+      $q.notify({ type: 'positive', message: 'Credentials Rotated Successfully' })
+      await fetchDetails()
+    } catch (err) {
+      console.error('Rotation failed:', err)
+      $q.notify({ type: 'negative', message: err.response?.data?.error || 'Failed to rotate credentials' })
+    } finally {
+      rotatingPlatform.value = false
+    }
+  })
 }
 
 onMounted(fetchDetails)
@@ -1190,6 +1612,8 @@ watch(
       registeredDevices.value = []
       auditRecords.value = []
       kycDocuments.value = []
+      financialHealth.value = null
+      financialAudit.value = []
       tab.value = 'overview'
       fetchDetails()
     }

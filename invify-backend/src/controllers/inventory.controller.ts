@@ -39,6 +39,38 @@ export class InventoryController {
     }
   }
 
+  /**
+   * POST /api/inventory/products/bulk-sync
+   * Accepts an array of products from the mobile app and upserts them all.
+   * Idempotent — safe to call multiple times (uses SKU+tenant upsert).
+   */
+  static async bulkSyncItems(req: Request, res: Response) {
+    try {
+      const tenantId = (req as any).user?.tenantId;
+      const { items } = req.body as { items: any[] };
+
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'items array is required and must not be empty.' });
+      }
+
+      const result = await InventoryService.bulkUpsertItems(tenantId, items);
+      await AuditService.log({
+        eventType: 'inventory.product.bulk_sync' as any,
+        reference: `BULK-SYNC-${tenantId}`,
+        tenantId,
+        payload: { synced: result.synced, errors: result.errors.length },
+      });
+
+      return res.status(200).json({
+        success: result.errors.length === 0,
+        synced: result.synced,
+        errors: result.errors,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
   static async updateItem(req: Request, res: Response) {
     try {
       const tenantId = (req as any).user?.tenantId;
@@ -127,6 +159,34 @@ export class InventoryController {
       return res.status(200).json(data);
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
+    }
+  }
+
+  static async createSupplier(req: Request, res: Response) {
+    try {
+      const tenantId = (req as any).user?.tenantId;
+      if (!req.body.name) return res.status(400).json({ error: 'Supplier name is required.' });
+      const data = await InventoryService.createSupplier(tenantId, req.body);
+      await AuditService.log({ eventType: 'inventory.supplier.created' as any, reference: `SUP-${data.id}`, tenantId, payload: { id: data.id, name: data.name } });
+      return res.status(201).json(data);
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  static async addStock(req: Request, res: Response) {
+    try {
+      const tenantId = (req as any).user?.tenantId;
+      const { id } = req.params;
+      const { quantity, notes } = req.body;
+      if (!quantity || isNaN(Number(quantity))) {
+        return res.status(400).json({ error: 'quantity must be a valid number.' });
+      }
+      const data = await InventoryService.addStock(tenantId, id, Number(quantity), notes);
+      await AuditService.log({ eventType: 'inventory.stock.added' as any, reference: `STK-${id}`, tenantId, payload: { itemId: id, quantity } });
+      return res.status(200).json(data);
+    } catch (e: any) {
+      return res.status(e.message.includes('not found') ? 404 : 500).json({ error: e.message });
     }
   }
 }

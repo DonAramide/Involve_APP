@@ -40,6 +40,7 @@ class _ServiceBookingDialogState extends State<ServiceBookingDialog> {
   @override
   void initState() {
     super.initState();
+    _total = _quantity * widget.item.price;
     if (widget.item.billingType == 'per_days') {
        // logic for days
     }

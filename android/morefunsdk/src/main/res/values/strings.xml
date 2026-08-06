@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="morefun_pair_title">Pair MoreFun MPOS</string>
+    <string name="morefun_scanning">Scanning for Bluetooth devices…</string>
+    <string name="morefun_scan_finished">Scan finished (%1$d devices)</string>
+    <string name="morefun_scan">Scan</string>
+    <string name="morefun_connecting">Connecting to %1$s…</string>
+    <string name="morefun_connect_failed">Failed to connect to MPOS</string>
+    <string name="morefun_bt_unavailable">Bluetooth not available on this device</string>
+    <string name="morefun_bt_disabled">Enable Bluetooth and try again</string>
+</resources>

@@ -10,6 +10,7 @@ import '../../features/settings/domain/services/security_service.dart';
 import '../license/storage_service.dart';
 import '../license/license_validator.dart';
 import '../license/license_model.dart';
+import '../license/license_service.dart';
 
 
 // ── Custom Exceptions ──────────────────────────────────────────────────────────
@@ -26,7 +27,7 @@ class FinanceApiException implements Exception {
   });
 
   @override
-  String toString() => 'FinanceApiException($statusCode): $message';
+  String toString() => message;
 }
 
 class UnauthorizedException extends FinanceApiException {
@@ -72,7 +73,7 @@ class TenantInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     final tenantId = await getTenantId();
-    if (tenantId != null && tenantId.isNotEmpty) {
+    if (tenantId != null && tenantId.isNotEmpty && tenantId != 'undefined' && tenantId != 'null') {
       options.headers['X-Tenant-ID'] = tenantId;
     }
     super.onRequest(options, handler);
@@ -84,8 +85,11 @@ class TenantInterceptor extends Interceptor {
 class PlanGatingInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    // Always allow registration/onboarding device endpoint
-    if (options.path.contains('/api/admin/register-device')) {
+    // Always allow registration/onboarding device endpoint and essential public/auth endpoints
+    if (options.path.contains('/api/admin/register-device') ||
+        options.path.contains('/public/lookup') ||
+        options.path.contains('/api/license/verify') ||
+        options.path.contains('/api/auth/')) {
       return super.onRequest(options, handler);
     }
 
@@ -109,6 +113,9 @@ class PlanGatingInterceptor extends Interceptor {
 
   static Future<bool> checkIsOnlinePlan() async {
     try {
+      final isSyncEnabled = await StorageService.isOnlineSyncEnabled();
+      if (!isSyncEnabled) return false;
+
       // 1. Check for Lifetime status
       final isLifetime = await SecurityService().isDeviceAuthorized();
       if (isLifetime) return true;
@@ -133,6 +140,10 @@ class PlanGatingInterceptor extends Interceptor {
           }
         }
       }
+
+      // 4. Check for Trial validity
+      final isTrialValid = await LicenseService.isTrialValid();
+      if (isTrialValid) return true;
     } catch (_) {
       // Fallback
     }
@@ -238,7 +249,7 @@ class FinanceApiClient {
     _dio.interceptors.addAll([
       JwtInterceptor(getToken: getToken),
       TenantInterceptor(getTenantId: getTenantId),
-      // PlanGatingInterceptor(),
+      PlanGatingInterceptor(),
       ErrorInterceptor(),
       LogInterceptor(
         requestHeader: true,

@@ -217,12 +217,22 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
     // 3. Check for Activation Code License
     final settings = await repository.getSettings();
-    final license = await LicenseService.getActiveLicense(settings?.organizationName);
+    final license = await LicenseService.getActiveLicense(settings.organizationName);
     if (license != null && DateTime.now().isBefore(license.expiryDate)) {
       return UserPlan(
         planType: license.planType.name,
         expiryDate: license.expiryDate,
       );
+    }
+
+    // 4. Check for Trial validity
+    final isTrialValid = await LicenseService.isTrialValid();
+    if (isTrialValid) {
+      final trialStart = await StorageService.getTrialStartDate();
+      if (trialStart != null) {
+        final trialExpiry = trialStart.add(const Duration(days: 3));
+        return UserPlan(planType: 'pro', expiryDate: trialExpiry);
+      }
     }
     
     return const UserPlan(planType: 'basic');
@@ -320,11 +330,9 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   Future<void> _onVerifyPassword(VerifySystemPassword event, Emitter<SettingsState> emit) async {
     debugPrint('SettingsBloc: VerifySystemPassword called with input: ${event.password}');
-    final currentSettings = state.settings;
-    if (currentSettings == null) {
-      debugPrint('SettingsBloc: ERROR - Settings are NULL');
-      return;
-    }
+    
+    // Guard: Fallback to directly fetching settings if they haven't finished loading in state yet
+    final currentSettings = state.settings ?? await repository.getSettings();
 
     // Check if system is locked
     if (currentSettings.isLocked) {
@@ -346,7 +354,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
           error: null,
         ));
       } else {
-        emit(state.copyWith(isAuthorized: true, error: null));
+        emit(state.copyWith(isAuthorized: true, settings: currentSettings, error: null));
       }
       debugPrint('SettingsBloc: Emitted isAuthorized: true');
     } else {

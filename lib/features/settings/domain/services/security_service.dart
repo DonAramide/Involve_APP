@@ -40,15 +40,15 @@ class SecurityService {
     final hashedInput = _hash(input);
     
     if (stored == null) {
-      // Default: admin123 hashed
-      return hashedInput == _hash('admin123');
+      // Default: AdminPass123! hashed
+      return hashedInput == _hash('AdminPass123!');
     }
     return stored == hashedInput;
   }
   
   Future<String?> getStoredPassword() async {
     // This now returns the HASH. Useful for internal comparisons but never display.
-    return await _storage.read(key: _passwordKey) ?? _hash('admin123');
+    return await _storage.read(key: _passwordKey) ?? _hash('AdminPass123!');
   }
 
   Future<void> setOfflineToken(String token) async {
@@ -91,11 +91,7 @@ class SecurityService {
   }
 
   String _getDefaultSuperAdminPassword() {
-    final now = DateTime.now();
-    final mm = now.month.toString().padLeft(2, '0');
-    final dd = now.day.toString().padLeft(2, '0');
-    final yy = now.year.toString().substring(2);
-    return '$mm$dd${yy}iips@wendy';
+    return 'AdminPass123!';
   }
 
   // Device authorization (existing functionality)

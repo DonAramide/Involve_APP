@@ -10,6 +10,7 @@ router.get('/stats/payouts', ExecutiveFinanceController.getPayoutStats);
 router.get('/settlement-phases', ExecutiveFinanceController.getSettlementPhases);
 
 // Invoices (REST Wrapper around Sync Engine)
+router.post('/invoices/bulk-sync', InvoiceController.bulkSyncInvoices);
 router.post('/invoices', InvoiceController.createInvoice);
 router.get('/invoices', InvoiceController.getInvoices);
 router.get('/invoices/:id', InvoiceController.getInvoice);

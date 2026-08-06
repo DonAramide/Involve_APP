@@ -260,10 +260,15 @@
       bordered
       style="background-color: var(--sidebar-panel-bg); color: var(--enterprise-text-secondary);"
       class="sidebar-drawer"
-      :width="230"
+      :width="prefs.sidebarWidth || 230"
       :breakpoint="768"
     >
-      <div class="column fit" style="padding-top: 42px; overflow: hidden;">
+      <div class="column fit relative-position" style="padding-top: 42px; overflow: hidden;">
+        <div
+          class="sidebar-resize-handle"
+          title="Drag to resize sidebar"
+          @mousedown.prevent="startSidebarResize"
+        />
         
         <q-scroll-area class="col overflow-hidden">
           <!-- Workspace Overview block -->
@@ -450,7 +455,7 @@
 
       <router-view v-slot="{ Component }">
         <transition appear enter-active-class="animated fadeIn" leave-active-class="animated fadeOut">
-          <component :is="Component" :key="$route.fullPath" />
+          <component :is="Component" :key="$route.path" />
         </transition>
       </router-view>
     </q-page-container>
@@ -586,7 +591,31 @@ const toggleAlertDrawer = () => {
 }
 
 // Pull enhanced asynchronous persistent storage handlers
-const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, toggleTheme, togglePinView, isViewPinned, pushHistory, clearHistory, executeLogout, fetchPreferencesFromBackend, setWorkspaceOrder } = useOperatorPreferences()
+const { prefs, isSyncingBackend, setActiveWorkspace, setTenantScope, toggleSidebarCollapse, setSidebarWidth, toggleTheme, togglePinView, isViewPinned, pushHistory, clearHistory, executeLogout, fetchPreferencesFromBackend, setWorkspaceOrder } = useOperatorPreferences()
+
+const isResizingSidebar = ref(false)
+
+const onSidebarResizeMove = (event) => {
+  if (!isResizingSidebar.value) return
+  setSidebarWidth(event.clientX)
+}
+
+const stopSidebarResize = () => {
+  if (!isResizingSidebar.value) return
+  isResizingSidebar.value = false
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  window.removeEventListener('mousemove', onSidebarResizeMove)
+  window.removeEventListener('mouseup', stopSidebarResize)
+}
+
+const startSidebarResize = () => {
+  isResizingSidebar.value = true
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', onSidebarResizeMove)
+  window.addEventListener('mouseup', stopSidebarResize)
+}
 
 // useContextualIntelligence setup
 const {
@@ -857,6 +886,7 @@ const activeNavigationTree = computed(() => {
     
     case 'governance':
       return [
+        { label: 'Session Governance', path: '/governance/sessions', icon: 'security', color: 'teal-4' },
         { label: 'Operator Governance', path: '/governance/operators', icon: 'manage_accounts', color: 'blue-4' },
         { label: 'RBAC Capabilities & Matrix', path: '/governance/rbac-roles', icon: 'admin_panel_settings', color: 'amber-4' },
         { label: 'Approval Engine', path: '/governance/approvals', icon: 'fact_check', color: 'purple-4', badge: 'Queue', badgeBg: 'purple-10', badgeColor: 'purple-3' },
@@ -1056,6 +1086,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (throttleTimer) clearInterval(throttleTimer)
+  stopSidebarResize()
 })
 </script>
 
@@ -1064,6 +1095,22 @@ onUnmounted(() => {
 .border-top { border-top: 1px solid var(--enterprise-border); }
 .border-muted { border: 1px solid var(--enterprise-border); }
 .border-amber-left { border-left: 2px solid #fcc419; }
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle:active {
+  background-color: rgba(34, 184, 207, 0.45);
+}
 
 .workspace-tabs {
   height: 100%;

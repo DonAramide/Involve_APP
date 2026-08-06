@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -39,7 +40,7 @@ class _GoProPageState extends State<GoProPage> {
 
       // Try local host ports (resilient fallbacks for Android/iOS emulators and localhost)
       final urls = [
-        '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/public/onboarding/provision',
+        '${AppConfig.baseUrl}/public/onboarding/provision',
         'http://localhost:3004/public/onboarding/provision',
       ];
 

@@ -95,6 +95,21 @@ export class AgentRepository {
   }
 
   /**
+   * Update Agent profile details
+   */
+  async updateAgentProfile(agentId: string, updates: any) {
+    const { data, error } = await supabase
+      .from('agent_profiles')
+      .update(updates)
+      .eq('agent_id', agentId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
    * Updates Agent Status and logs history
    */
   async updateStatus(id: string, newStatus: string, oldStatus: string, changedBy: string, reason: string) {

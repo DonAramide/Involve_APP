@@ -57,7 +57,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         id: SYSTEM_USER_UUID,
         email: 'superadmin@invify.app',
         role: 'super_admin',
-        tenantId: req.headers['x-tenant-id'] || null
+        tenantId: (req.headers['x-tenant-id'] === 'undefined' || req.headers['x-tenant-id'] === 'null') ? null : (req.headers['x-tenant-id'] || null)
       };
       return next();
     }
@@ -98,7 +98,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       }
 
       // Extract identity from payload
-      const userId  = jwtPayload.sub;
+      const userId  = jwtPayload.sub || jwtPayload.id;
       const userEmail = jwtPayload.email || jwtPayload.user_metadata?.email || '';
 
       if (!userId) {
@@ -141,7 +141,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         let decodedRole = (jwtPayload.role === 'authenticated' || !jwtPayload.role)
           ? 'super_admin'
           : (jwtPayload.role || 'super_admin');
-        const decodedTenantId = jwtPayload.tenantId || null;
+        let decodedTenantId = jwtPayload.tenantId || jwtPayload.user_metadata?.tenantId || null;
+        if (decodedTenantId === 'undefined' || decodedTenantId === 'null') decodedTenantId = null;
 
         const { data: newProfile, error: insertError } = await supabaseAdmin.from('users').insert({
           id: userId,

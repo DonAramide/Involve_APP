@@ -6,23 +6,10 @@
         <div class="text-subtitle1 text-grey-7">Manage global & tenant-specific secrets, certificates, and webhooks securely.</div>
       </div>
       <div class="row op-gap-16">
+        <q-btn outline color="cyan-4" icon="new_releases" label="Go to ECS Workspace" to="/admin/ecs-workspace" />
         <q-btn unelevated color="blue-6" icon="add" label="Add Integration" @click="showAddDialog = true" />
       </div>
     </div>
-
-    <!-- QIP Core Identity Banner -->
-    <q-card flat class="bg-blue-grey-9 text-white q-mb-xl border-main">
-      <q-card-section class="row items-center justify-between">
-        <div class="row items-center op-gap-16">
-          <q-avatar color="cyan-9" icon="shield" text-color="cyan-3" />
-          <div>
-            <div class="text-h6 text-weight-bold">Quasar Identity Platform (QIP)</div>
-            <div class="text-caption text-grey-4">Core platform identity planes (Service & Client credentials)</div>
-          </div>
-        </div>
-        <q-btn outline color="cyan-3" label="Manage QIP Configuration" @click="qipManagerOpen = true" />
-      </q-card-section>
-    </q-card>
 
     <!-- Filters & Scopes -->
     <div class="row items-center q-mb-md justify-between bg-panel q-pa-md border-main rounded-borders">
@@ -61,7 +48,12 @@
           <q-card-section>
             <div class="row justify-between items-start">
               <div class="row items-center op-gap-8">
-                <q-avatar size="md" :color="getCategoryColor(integration.category)" text-color="white" icon="hub" />
+                <q-avatar
+                  size="md"
+                  :color="getCategoryColor(integration.category)"
+                  text-color="white"
+                  :icon="isQuasarIntegration(integration) ? 'webhook' : 'hub'"
+                />
                 <div>
                   <div class="text-weight-bold text-subtitle1">{{ integration.name }}</div>
                   <div class="text-caption text-grey-5">{{ integration.service_identifier }}</div>
@@ -83,6 +75,16 @@
               <span :class="getHealthColorClass(integration)">
                 <q-icon :name="getHealthIcon(integration)" class="q-mr-xs" />
                 {{ getHealthStatus(integration) }}
+              </span>
+            </div>
+            <div
+              class="row justify-between text-caption text-grey-4 q-mb-sm"
+              v-if="isQuasarIntegration(integration)"
+            >
+              <span>Webhook Secret</span>
+              <span :class="quasarWebhookConfigured ? 'text-green-4' : 'text-orange-4'">
+                <q-icon :name="quasarWebhookConfigured ? 'verified' : 'warning'" class="q-mr-xs" />
+                {{ quasarWebhookConfigured ? 'Configured' : 'Missing' }}
               </span>
             </div>
             <div class="row justify-between text-caption text-grey-4 q-mb-sm" v-if="integration.integration_usage_analytics?.length">
@@ -124,87 +126,6 @@
       </q-card>
     </q-dialog>
 
-    <!-- QIP Identity Manager Dialog -->
-    <q-dialog v-model="qipManagerOpen" maximized transition-show="slide-up" transition-hide="slide-down">
-      <q-card class="bg-panel text-main enterprise-panel">
-        <q-card-section class="row items-center border-bottom q-py-md bg-subpanel">
-          <div class="row items-center op-gap-16">
-            <q-avatar size="lg" color="cyan-9" text-color="white" icon="security" />
-            <div>
-              <div class="text-h6 text-weight-bold">QIP Core Credentials</div>
-              <div class="text-caption text-grey-5">Manage Quasar Identity Platform environments and authentication planes</div>
-            </div>
-          </div>
-          <q-space />
-          <q-btn icon="close" flat round dense v-close-popup />
-        </q-card-section>
-        
-        <q-card-section class="q-pa-xl" style="max-width: 800px; margin: 0 auto;">
-          <div class="text-subtitle1 text-cyan-3 q-mb-sm">Plane 1: Service Credentials (for QIP Administration)</div>
-          <div class="text-caption text-grey-5 q-mb-md">Issued by Quasar Platform team per vertical/service. NEVER commit real service credentials.</div>
-          <div class="row q-col-gutter-md q-mb-lg">
-            <div class="col-12 col-md-6">
-              <q-input outlined dense dark v-model="qipConfig.serviceId" label="QUASAR_SERVICE_ID" />
-            </div>
-            <div class="col-12 col-md-6">
-              <q-input outlined dense dark type="password" v-model="qipConfig.serviceSecret" label="QUASAR_SERVICE_SECRET" />
-            </div>
-          </div>
-
-          <q-separator dark class="q-my-lg opacity-20" />
-
-          <div class="text-subtitle1 text-cyan-3 q-mb-sm">Plane 2: Client Credentials (for Provisioning)</div>
-          
-          <div class="text-weight-bold q-mt-md q-mb-sm">Retail Client</div>
-          <div class="row q-col-gutter-md q-mb-md">
-            <div class="col-12 col-md-6">
-              <q-input outlined dense dark v-model="qipConfig.retailClientId" label="INVIFY_RETAIL_CLIENT_ID" />
-            </div>
-            <div class="col-12 col-md-6">
-              <q-input outlined dense dark type="password" v-model="qipConfig.retailClientSecret" label="INVIFY_RETAIL_CLIENT_SECRET" />
-            </div>
-          </div>
-
-          <div class="text-weight-bold q-mt-md q-mb-sm">School Client</div>
-          <div class="row q-col-gutter-md q-mb-md">
-            <div class="col-12 col-md-6">
-              <q-input outlined dense dark v-model="qipConfig.schoolClientId" label="INVIFY_SCHOOL_CLIENT_ID" />
-            </div>
-            <div class="col-12 col-md-6">
-              <q-input outlined dense dark type="password" v-model="qipConfig.schoolClientSecret" label="INVIFY_SCHOOL_CLIENT_SECRET" />
-            </div>
-          </div>
-
-          <div class="text-weight-bold q-mt-md q-mb-sm">Services Client</div>
-          <div class="row q-col-gutter-md q-mb-lg">
-            <div class="col-12 col-md-6">
-              <q-input outlined dense dark v-model="qipConfig.servicesClientId" label="INVIFY_SERVICES_CLIENT_ID" />
-            </div>
-            <div class="col-12 col-md-6">
-              <q-input outlined dense dark type="password" v-model="qipConfig.servicesClientSecret" label="INVIFY_SERVICES_CLIENT_SECRET" />
-            </div>
-          </div>
-
-          <q-separator dark class="q-my-lg opacity-20" />
-          <div class="text-subtitle1 text-cyan-3 q-mb-sm">Plane 3: Tenant Credentials (for Transactions)</div>
-          <div class="text-caption text-grey-5 q-mb-lg">Passed dynamically from the DB or frontend per merchant. e.g. sk_test_... or sk_live_...</div>
-
-          <q-separator dark class="q-my-lg opacity-20" />
-
-          <div class="text-subtitle1 text-cyan-3 q-mb-sm">General Config</div>
-          <div class="row q-col-gutter-md q-mb-lg">
-            <div class="col-12">
-              <q-input outlined dense dark v-model="qipConfig.baseUrl" label="QUASAR_BASE_URL" />
-            </div>
-          </div>
-          
-          <div class="row justify-end q-mt-xl">
-            <q-btn unelevated color="cyan-6" label="Save QIP Configuration" @click="saveQipConfig" />
-          </div>
-        </q-card-section>
-      </q-card>
-    </q-dialog>
-
   </q-page>
 </template>
 
@@ -219,6 +140,7 @@ const activeScope = ref('GLOBAL');
 const selectedTenant = ref(null);
 const tenantOptions = ref([{ label: 'Demo Retail Tenant', value: 'tenant-123' }]); // Need real tenant API
 const searchQuery = ref('');
+const quasarWebhookConfigured = ref(false);
 
 const integrations = ref([]);
 const showAddDialog = ref(false);
@@ -234,19 +156,6 @@ const newIntegration = ref({
   description: ''
 });
 
-const qipManagerOpen = ref(false);
-const qipConfig = ref({
-  serviceId: '',
-  serviceSecret: '',
-  retailClientId: '',
-  retailClientSecret: '',
-  schoolClientId: '',
-  schoolClientSecret: '',
-  servicesClientId: '',
-  servicesClientSecret: '',
-  baseUrl: 'https://api-quasar.iips.app/api/v1'
-});
-
 onMounted(() => {
   fetchVault();
 });
@@ -255,6 +164,14 @@ async function fetchVault() {
   try {
     const res = await vaultApi.listIntegrations(activeScope.value, selectedTenant.value?.value);
     integrations.value = res.data?.data || [];
+    if (activeScope.value === 'GLOBAL') {
+      try {
+        const statusRes = await vaultApi.getQuasarWebhookSecretStatus('PRODUCTION');
+        quasarWebhookConfigured.value = Boolean(statusRes.data?.data?.configured);
+      } catch {
+        quasarWebhookConfigured.value = false;
+      }
+    }
   } catch (err) {
     console.error(err);
     $q.notify({ type: 'negative', message: 'Failed to fetch integrations' });
@@ -281,11 +198,6 @@ async function saveNewIntegration() {
   }
 }
 
-function saveQipConfig() {
-  $q.notify({ type: 'positive', message: 'QIP Configuration saved securely to Vault.' });
-  qipManagerOpen.value = false;
-}
-
 const filteredIntegrations = computed(() => {
   if (!searchQuery.value) return integrations.value;
   const q = searchQuery.value.toLowerCase();
@@ -295,6 +207,11 @@ const filteredIntegrations = computed(() => {
 function openManager(integration) {
   selectedIntegration.value = integration;
   managerOpen.value = true;
+}
+
+function isQuasarIntegration(integration) {
+  const id = String(integration?.service_identifier || '').toLowerCase();
+  return id === 'quasar' || id === 'quasar_ledger' || id.includes('quasar');
 }
 
 function getCategoryColor(cat) {

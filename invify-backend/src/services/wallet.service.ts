@@ -1,5 +1,5 @@
 // invify-backend/src/services/wallet.service.ts
-import { supabase } from "../db/supabase";
+import { supabase, supabaseAdmin } from "../db/supabase";
 
 export class WalletService {
   /**
@@ -10,7 +10,7 @@ export class WalletService {
   static async getBalance(tenantId: string) {
     // The actual DB column is 'entry_type' (not 'type')
     // Columns: id, tenant_id, amount, entry_type, status, reference, idempotency_key, metadata, created_at, ledger_id
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('ledger_entries')
       .select('amount, entry_type')
       .eq('tenant_id', tenantId);
@@ -37,18 +37,15 @@ export class WalletService {
     };
   }
 
-  /**
-   * Full transaction history for a tenant.
-   */
   static async getTransactions(tenantId: string, params: any = {}) {
-    let query = supabase
+    let query = supabaseAdmin
       .from('ledger_entries')
       .select('*')
       .eq('tenant_id', tenantId);
 
-    if (params.account) {
-      query = query.eq('account', params.account);
-    }
+    // Default to 'REVENUE' account to prevent listing multiple debit/credit legs per transaction
+    const accountFilter = params.account || 'REVENUE';
+    query = query.eq('account', accountFilter);
 
     if (params.startDate) {
       query = query.gte('created_at', params.startDate);

@@ -93,7 +93,7 @@ export class FinanceRepository {
         const transactions = (data?.transactions || []).map((tx: any) => ({
           id: tx.id || tx.reference,
           amount: tx.amount,
-          entry_type: tx.type === 'credit' ? 'CREDIT' : 'DEBIT',
+          entry_type: (tx.type || '').toUpperCase() === 'CREDIT' ? 'CREDIT' : 'DEBIT',
           status: tx.status,
           reference: tx.reference,
           created_at: tx.created_at,
@@ -112,7 +112,7 @@ export class FinanceRepository {
     return QueryCache.get(
       `finance_payouts_${tenantId}`,
       async () => {
-        const { data } = await financeApi.getPayoutStats();
+        const { data } = await financeApi.getPayoutStats({ 'X-Tenant-ID': tenantId });
         return {
           pendingSettlement: data.pendingSettlement || 0,
           clearedToday: data.clearedToday || 0,
@@ -132,10 +132,18 @@ export class FinanceRepository {
       `finance_invoices_${tenantId}`,
       async () => {
         const { data } = await financeApi.getInvoices();
-        return data?.invoices || [];
+        return data?.data || [];
       },
       options
     );
+  }
+
+  /**
+   * GET /api/v1/finance/invoices/:id
+   */
+  static async getInvoice(id: string): Promise<any> {
+    const { data } = await financeApi.getInvoice(id);
+    return data && data.success ? data.data : data;
   }
 
   /**

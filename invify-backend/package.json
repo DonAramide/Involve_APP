@@ -7,7 +7,7 @@
     "start": "node dist/app.js",
     "dev": "nodemon --watch src src/app.ts",
     "dev:staging": "cross-env NODE_ENV=staging nodemon --watch src src/app.ts",
-    "build": "tsc",
+    "build": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc",
     "test": "jest --forceExit --runInBand",
     "test:watch": "jest --watch"
   },

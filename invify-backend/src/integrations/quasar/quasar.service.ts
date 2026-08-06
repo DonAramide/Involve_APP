@@ -1,19 +1,20 @@
 // src/integrations/quasar/quasar.service.ts
-import { QuasarClient } from "@iips/quasar-sdk";
+import { QuasarPaymentsClient } from './quasar-payments.client';
+import * as crypto from 'crypto';
 
 /**
- * QuasarService acts as a clean abstraction over the official Quasar SDK.
+ * QuasarService acts as a clean abstraction over the official Quasar API.
  * Rule: This is the ONLY integration point for Quasar in the application.
- * Responsibility: SDK interaction only. No database or business logic.
+ * Responsibility: API wrapper interaction only. No database or business logic.
  */
 export class QuasarService {
-  private client: QuasarClient;
+  private client: QuasarPaymentsClient;
   private webhookSecret: string;
   private apiKey: string;
 
   constructor(apiKey: string, webhookSecret: string = '') {
-    // Initialize QuasarClient with tenant-specific API key
-    this.client = new QuasarClient({ apiKey });
+    // Initialize QuasarPaymentsClient with tenant-specific API key
+    this.client = new QuasarPaymentsClient(apiKey);
     this.webhookSecret = webhookSecret;
     this.apiKey = apiKey;
   }
@@ -42,8 +43,7 @@ export class QuasarService {
 
 
   /**
-   * Creates a payment intent via the Quasar SDK.
-   * Aligns with SDK method: payments.createIntent
+   * Creates a payment intent via the Quasar API.
    */
   async createPaymentIntent(params: {
     amount: number;
@@ -54,9 +54,8 @@ export class QuasarService {
   }) {
     try {
       console.log(`[QuasarSDK] Creating payment intent for ref: ${params.reference}`);
-      return await this.client.payments.createIntent({
+      return await this.client.createPaymentIntent({
         ...params,
-        amount: params.amount.toString(),
         currency: params.currency || 'NGN'
       });
     } catch (error: any) {
@@ -67,12 +66,18 @@ export class QuasarService {
 
   /**
    * Verifies the HMAC signature of an incoming webhook payload.
-   * Aligns with SDK method: webhooks.verifySignature
    */
   async verifyWebhookSignature(payload: string, signature: string) {
     try {
-       // Validate that the request actually came from Quasar
-       return this.client.webhooks.verifySignature(payload, signature, this.webhookSecret);
+      if (!signature || !this.webhookSecret) return false;
+      const hash = crypto.createHmac('sha256', this.webhookSecret).update(payload).digest('hex');
+      const normalized = signature.replace(/^sha256=/i, '').trim().toLowerCase();
+      const expected = Buffer.from(hash, 'hex');
+      const provided = Buffer.from(normalized, 'hex');
+      if (expected.length !== provided.length || expected.length === 0) {
+        return false;
+      }
+      return crypto.timingSafeEqual(expected, provided);
     } catch (error: any) {
       console.error('[QuasarSDK] Webhook signature verification failed:', error.message);
       return false;
@@ -81,7 +86,6 @@ export class QuasarService {
 
   /**
    * Provisions a unique virtual account for an end user (child) under a counterparty (parent).
-   * Aligns with SDK method: endUsers.createVirtualAccount
    */
   async createVirtualAccount(params: {
     childId: string;
@@ -94,7 +98,25 @@ export class QuasarService {
   }) {
     try {
       console.log(`[QuasarSDK] Provisioning virtual account for child: ${params.childId}`);
-      return await this.client.endUsers.createVirtualAccount({
+      if (this.apiKey.startsWith('sk_test_')) {
+        console.log('[QuasarSDK] Test API key detected. Routing to sandbox account generator...');
+        const sandboxAccounts = await this.client.generateSandboxAccounts({
+          accountName: `${params.firstName || 'User'} ${params.lastName || 'Account'}`,
+          count: 1
+        });
+        
+        if (!sandboxAccounts || sandboxAccounts.length === 0) {
+          throw new Error('Sandbox account generation returned no accounts');
+        }
+        
+        return {
+          accountNumber: sandboxAccounts[0].accountNumber,
+          bankName: sandboxAccounts[0].bankName,
+          accountName: sandboxAccounts[0].accountName
+        };
+      }
+
+      return await this.client.createVirtualAccount({
         ...params,
         firstName: params.firstName || 'User',
         lastName: params.lastName || 'Account',
@@ -108,7 +130,6 @@ export class QuasarService {
 
   /**
    * Initiates a fund transfer (payout) to an external bank.
-   * Aligns with SDK method: transfers.create
    */
   async initiateTransfer(params: {
     amount: number;
@@ -126,9 +147,15 @@ export class QuasarService {
   }) {
     try {
       console.log(`[QuasarSDK] Initiating payout for tenant: ${params.metadata.tenantId}`);
-      return await this.client.transfers.create({
+      if (this.apiKey.startsWith('sk_test_')) {
+        console.log('[QuasarSDK] Test API key detected. Routing to sandbox transfers...');
+        return await this.client.createSandboxTransfer({
+          ...params,
+          currency: 'NGN'
+        });
+      }
+      return await this.client.createTransfer({
         ...params,
-        amount: params.amount.toString(),
         currency: 'NGN'
       });
     } catch (error: any) {
@@ -137,5 +164,58 @@ export class QuasarService {
     }
   }
 
-  // Add more SDK proxies here as needed, following the client structure.
+  /**
+   * Fetches supported banks for financial routing.
+   * GET /financial-routing/banks
+   */
+  async getBanks(country: string = 'nigeria'): Promise<any[]> {
+    try {
+      const baseUrl = (process.env.QUASAR_BASE_URL || 'https://api-quasar.iips.app/api/v1').replace(/\/$/, '');
+      const res = await fetch(`${baseUrl}/financial-routing/banks?country=${country}`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          Accept: "application/json",
+        }
+      });
+      const body = await res.json();
+      if (!res.ok || body.responseCode !== "00") {
+        throw new Error(body.responseMessage ?? `HTTP ${res.status}`);
+      }
+      return body.data;
+    } catch (error: any) {
+      console.error('[QuasarSDK] getBanks failed:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Resolves destination account number + bank code to the registered account name.
+   * POST /financial-routing/account-resolution
+   */
+  async resolveAccount(accountNumber: string, bankCode: string): Promise<{ account_number: string; bank_code: string; account_name: string }> {
+    try {
+      const baseUrl = (process.env.QUASAR_BASE_URL || 'https://api-quasar.iips.app/api/v1').replace(/\/$/, '');
+      const res = await fetch(`${baseUrl}/financial-routing/account-resolution`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          account_number: accountNumber,
+          bank_code: bankCode
+        })
+      });
+      const body = await res.json();
+      if (!res.ok || body.responseCode !== "00") {
+        throw new Error(body.responseMessage ?? `HTTP ${res.status}`);
+      }
+      return body.data;
+    } catch (error: any) {
+      console.error('[QuasarSDK] resolveAccount failed:', error.message);
+      throw error;
+    }
+  }
 }

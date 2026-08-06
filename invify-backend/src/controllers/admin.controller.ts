@@ -80,26 +80,40 @@ export class AdminController {
 
   static async getGlobalSettings(req: Request, res: Response) {
     try {
+      let settingsObj: any = AdminController.getGlobalSettingsData();
+
+      // Read from global_settings.json file cache if it exists
+      try {
+        const path = require('path');
+        const fs = require('fs');
+        const settingsPath = path.join(process.cwd(), 'global_settings.json');
+        if (fs.existsSync(settingsPath)) {
+          const fileData = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+          settingsObj = { ...settingsObj, ...fileData };
+        }
+      } catch (fileErr) {
+        console.warn('[AdminController] Failed to read global_settings.json cache:', fileErr);
+      }
+
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
-        return res.status(200).json(AdminController.getGlobalSettingsData());
+        return res.status(200).json(settingsObj);
       }
       
       const { data, error } = await supabaseAdmin.from('system_configurations').select('config_key, config_value');
       
-      if (error || !data || data.length === 0) {
-         console.warn('[AdminController] Failed to read system_configurations from DB. Falling back to in-memory defaults.', error);
-         return res.status(200).json(AdminController.getGlobalSettingsData());
-      }
-
-      // Reconstruct the JSON object from key-value pairs
-      const settingsObj: any = {};
-      for (const row of data) {
-         settingsObj[row.config_key] = row.config_value;
+      if (data && data.length > 0) {
+        for (const row of data) {
+           // Skip payout settings keys to let the local file cache (global_settings.json) be the source of truth
+           if (['daily_payout_time', 'manual_dispatch_fee', 'manual_dispatch_fee_type'].includes(row.config_key)) {
+             continue;
+           }
+           settingsObj[row.config_key] = row.config_value;
+        }
       }
       
       return res.status(200).json(settingsObj);
     } catch (error: any) {
-      console.warn('[AdminController] Exception in getGlobalSettings. Falling back to in-memory defaults.', error);
+      console.warn('[AdminController] Exception in getGlobalSettings. Returning merged cache/defaults.', error);
       return res.status(200).json(AdminController.getGlobalSettingsData());
     }
   }
@@ -109,14 +123,32 @@ export class AdminController {
       const updates = req.body;
       const operatorId = (req as any).user?.id || null;
       
+      // Update the local global_settings.json file cache
+      try {
+        const path = require('path');
+        const fs = require('fs');
+        const settingsPath = path.join(process.cwd(), 'global_settings.json');
+        let currentSettings: any = {};
+        if (fs.existsSync(settingsPath)) {
+          currentSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+        }
+        const updated = { ...currentSettings, ...updates };
+        fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf8');
+      } catch (fileErr) {
+        console.error('[AdminController] Failed to write to global_settings.json:', fileErr);
+      }
+
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
-        // Offline mock mode cannot save without dual write drift, return an error or fake success.
-        // Returning fake success to not break offline completely, but NO write to fs.
         return res.status(200).json(updates);
       }
       
-      // Update each key-value pair in system_configurations
+      // Update each key-value pair in system_configurations database table
       for (const [key, value] of Object.entries(updates)) {
+        // Skip payout settings keys that are not supported by the DB schema/triggers
+        if (['daily_payout_time', 'manual_dispatch_fee', 'manual_dispatch_fee_type'].includes(key)) {
+          continue;
+        }
+
         const { error } = await supabaseAdmin.from('system_configurations')
           .upsert({ config_key: key, config_value: value, updated_by: operatorId });
           
@@ -129,6 +161,41 @@ export class AdminController {
     } catch (error: any) {
       console.error('[AdminController] DB update failed. Returning 500 to prevent config drift.', error);
       return res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async getPlatformPayoutSettingsPublic(req: Request, res: Response) {
+    try {
+      let dailyPayoutTime = '23:59';
+      let manualDispatchFee = 500;
+      let manualDispatchFeeType = 'Fixed Amount';
+
+      // Read from global_settings.json file
+      try {
+        const path = require('path');
+        const fs = require('fs');
+        const settingsPath = path.join(process.cwd(), 'global_settings.json');
+        if (fs.existsSync(settingsPath)) {
+          const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+          dailyPayoutTime = settings.daily_payout_time || settings.dailyPayoutTime || dailyPayoutTime;
+          manualDispatchFee = settings.manual_dispatch_fee ?? settings.manualDispatchFee ?? manualDispatchFee;
+          manualDispatchFeeType = settings.manual_dispatch_fee_type || settings.manualDispatchFeeType || manualDispatchFeeType;
+        }
+      } catch (fileErr) {
+        console.warn('[AdminController] Failed to read public settings from file:', fileErr);
+      }
+
+      return res.status(200).json({
+        dailyPayoutTime,
+        manualDispatchFee,
+        manualDispatchFeeType
+      });
+    } catch (error: any) {
+      return res.status(200).json({
+        dailyPayoutTime: '23:59',
+        manualDispatchFee: 500,
+        manualDispatchFeeType: 'Fixed Amount'
+      });
     }
   }
 
@@ -354,7 +421,7 @@ export class AdminController {
 
       // Generate Virtual Account for Tenant using Quasar SDK
       try {
-        const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+        const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
         const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
         const quasar = new QuasarServiceModule(platformApiKey);
         
@@ -567,7 +634,11 @@ export class AdminController {
 
       return res.status(200).json({
         tenant: tenantRes.data,
-        users: usersRes.data,
+        users: (usersRes.data || []).map((u: any) => ({
+          ...u,
+          // Surface tenant phone on owner rows when users.phone column is empty
+          phone: u.phone || (String(u.role || '').toLowerCase() === 'owner' ? tenantRes.data?.phone : null) || null,
+        })),
         wallet: { balance: walletInfo.balance }, // Normalized structure for frontend
         recentUsage: usageRes.data,
         certificates,
@@ -592,7 +663,7 @@ export class AdminController {
       const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+      const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
       const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
       const quasar = new QuasarServiceModule(platformApiKey);
       const platformId = 'platform-admin-owner-id';
@@ -634,7 +705,7 @@ export class AdminController {
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
-          const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+          const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
           const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
           const quasar = new QuasarServiceModule(platformApiKey);
           const platformId = 'platform-admin-owner-id';
@@ -664,7 +735,7 @@ export class AdminController {
       // In real scenario, verify student exists in backend DB too.
       // Here we just provision directly for the given studentId under this tenant.
       
-      const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+      const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
       const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
       const quasar = new QuasarServiceModule(platformApiKey);
       const platformId = 'platform-admin-owner-id'; // or tenant's subaccount id
@@ -695,9 +766,31 @@ export class AdminController {
     try {
       const { id, customerId } = req.params;
 
+      // Get customer from database to use actual information and enforce it's fully populated
+      const { data: customer, error: customerErr } = await supabaseAdmin
+        .from('customers')
+        .select('*')
+        .eq('id', customerId)
+        .single();
+
+      if (customerErr || !customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+
+      if (!customer.name || customer.name.trim().split(/\s+/).length < 2 ||
+          !customer.email || customer.email.trim() === '' ||
+          !customer.phone || customer.phone.trim() === '') {
+        return res.status(400).json({ error: "Full customer details (first and last name, email, and phone) are required to provision a virtual account." });
+      }
+
+      const customerName = customer.name;
+      const email = customer.email;
+      const firstName = customerName.split(' ')[0] || 'Customer';
+      const lastName = customerName.split(' ').slice(1).join(' ') || customerId;
+
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
-          const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+          const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
           const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
           const quasar = new QuasarServiceModule(platformApiKey);
           const platformId = 'platform-admin-owner-id';
@@ -706,11 +799,11 @@ export class AdminController {
             childId: customerId,
             parentId: platformId,
             currency: 'NGN',
-            email: `customer-${customerId}@invify.app`,
-            firstName: 'Customer',
-            lastName: customerId,
+            email: email,
+            firstName: firstName,
+            lastName: lastName,
             parentShareBps: 0,
-            metadata: { type: 'customer_account', tenantId: id }
+            metadata: { type: 'customer_account', tenantId: id, phone: customer.phone }
           });
           
           return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
@@ -724,7 +817,7 @@ export class AdminController {
       const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+      const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
       const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
       const quasar = new QuasarServiceModule(platformApiKey);
       const platformId = 'platform-admin-owner-id';
@@ -733,11 +826,11 @@ export class AdminController {
         childId: customerId,
         parentId: platformId,
         currency: 'NGN',
-        email: `customer-${customerId}@invify.app`,
-        firstName: 'Customer',
-        lastName: customerId,
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
         parentShareBps: 0,
-        metadata: { type: 'customer_account', tenantId: id }
+        metadata: { type: 'customer_account', tenantId: id, phone: customer.phone }
       });
       
       return res.status(200).json({ success: true, va: { accountNumber: va.accountNumber, bankName: va.bankName } });
@@ -994,25 +1087,141 @@ export class AdminController {
   }
 
   /**
+   * GET /admin/profile
+   * Returns the authenticated user's profile plus tenant contact/business fields.
+   */
+  static async getProfile(req: Request, res: Response) {
+    try {
+      const { id: userId } = (req as any).user;
+
+      const { data: user, error: userErr } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (userErr) throw userErr;
+
+      let tenant: any = null;
+      if (user.tenant_id) {
+        const { data: tenantRow } = await supabaseAdmin
+          .from('tenants')
+          .select('id, name, phone, country, state, lga, street_address, settings, kyc_data, kyc_status')
+          .eq('id', user.tenant_id)
+          .maybeSingle();
+        tenant = tenantRow;
+      }
+
+      const ownerProfile = (tenant?.settings as any)?.owner_profile || {};
+      const nameParts = String(user.name || '').trim().split(/\s+/).filter(Boolean);
+
+      return res.status(200).json({
+        firstName: ownerProfile.firstName || nameParts[0] || '',
+        lastName: ownerProfile.lastName || nameParts.slice(1).join(' ') || '',
+        email: user.email,
+        phone: ownerProfile.phone || tenant?.phone || '',
+        businessName: ownerProfile.businessName || tenant?.name || '',
+        city: ownerProfile.city || tenant?.lga || '',
+        country: ownerProfile.country || tenant?.country || 'Nigeria',
+        bio: ownerProfile.bio || '',
+        role: user.role,
+        tenantId: user.tenant_id,
+        memberSince: user.created_at,
+      });
+    } catch (error: any) {
+      console.error('[AdminController] getProfile Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
    * PATCH /admin/profile
-   * Updates current user specific metadata (e.g. last_login_at)
+   * Updates current user profile and syncs owner contact/business onto the tenant
+   * so Admin Portal KYC & Users views can display the same data.
    */
   static async updateProfile(req: Request, res: Response) {
     try {
-      const { id: userId } = (req as any).user;
-      const { last_login_at } = req.body;
+      const { id: userId, tenantId } = (req as any).user;
+      const {
+        firstName,
+        lastName,
+        phone,
+        businessName,
+        city,
+        country,
+        bio,
+      } = req.body;
 
-      const { error } = await supabaseAdmin
-        .from('users')
-        .update({ 
-          last_login_at: last_login_at || new Date().toISOString(),
-          last_active_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+      const hasProfileFields =
+        firstName !== undefined ||
+        lastName !== undefined ||
+        phone !== undefined ||
+        businessName !== undefined ||
+        city !== undefined ||
+        country !== undefined ||
+        bio !== undefined;
 
-      if (error) throw error;
+      // Only update columns that exist on public.users (no last_active_at / last_login_at).
+      const userUpdate: Record<string, any> = {};
+      if (hasProfileFields) {
+        const fullName = [firstName, lastName].filter((v) => v != null && String(v).trim()).join(' ').trim();
+        if (fullName) userUpdate.name = fullName;
+      }
+
+      if (Object.keys(userUpdate).length > 0) {
+        const { error: userErr } = await supabaseAdmin
+          .from('users')
+          .update(userUpdate)
+          .eq('id', userId);
+        if (userErr) throw userErr;
+      }
+
+      // Persist contact/business onto the tenant for Admin Portal visibility
+      if (hasProfileFields && tenantId) {
+        const { data: tenantRow } = await supabaseAdmin
+          .from('tenants')
+          .select('settings, name, phone, country, lga')
+          .eq('id', tenantId)
+          .maybeSingle();
+
+        const existingSettings = (tenantRow?.settings && typeof tenantRow.settings === 'object')
+          ? { ...(tenantRow.settings as object) }
+          : {};
+        const prevOwner = (existingSettings as any).owner_profile || {};
+        const owner_profile = {
+          ...prevOwner,
+          ...(firstName !== undefined ? { firstName: String(firstName || '').trim() } : {}),
+          ...(lastName !== undefined ? { lastName: String(lastName || '').trim() } : {}),
+          ...(phone !== undefined ? { phone: String(phone || '').trim() } : {}),
+          ...(businessName !== undefined ? { businessName: String(businessName || '').trim() } : {}),
+          ...(city !== undefined ? { city: String(city || '').trim() } : {}),
+          ...(country !== undefined ? { country: String(country || '').trim() } : {}),
+          ...(bio !== undefined ? { bio: String(bio || '').trim() } : {}),
+          updatedAt: new Date().toISOString(),
+          updatedBy: userId,
+        };
+
+        const tenantUpdate: Record<string, any> = {
+          settings: { ...existingSettings, owner_profile },
+        };
+
+        // Keep tenant business/contact/location in sync for Admin Portal
+        if (businessName !== undefined && String(businessName).trim()) {
+          tenantUpdate.name = String(businessName).trim();
+        }
+        if (phone !== undefined) tenantUpdate.phone = String(phone || '').trim() || null;
+        if (country !== undefined) tenantUpdate.country = String(country || '').trim() || null;
+        if (city !== undefined) tenantUpdate.lga = String(city || '').trim() || null;
+
+        const { error: tenantErr } = await supabaseAdmin
+          .from('tenants')
+          .update(tenantUpdate)
+          .eq('id', tenantId);
+        if (tenantErr) throw tenantErr;
+      }
+
       return res.status(200).json({ status: 'success' });
     } catch (error: any) {
+      console.error('[AdminController] updateProfile Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }
@@ -1246,15 +1455,35 @@ export class AdminController {
 
   static async initVirtualAccountEngine(req: Request, res: Response) {
     try {
-      const { tenantId } = (req as any).user;
+      let tenantId = req.body.tenantId || (req as any).user.tenantId;
+
+      if (!tenantId || tenantId === 'undefined' || tenantId === 'null') {
+        return res.status(400).json({ error: 'Valid tenantId is required' });
+      }
+
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      let tenantName = 'Business-' + tenantId.substring(0, 8);
+      let tenantType = 'retail';
+
+      if (uuidRegex.test(tenantId)) {
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('*')
+          .eq('id', tenantId)
+          .single();
+        if (tenant) {
+          tenantName = tenant.name;
+          tenantType = tenant.type || 'retail';
+        }
+      }
+
       const QuasarProvisioningService = require('../integrations/quasar/quasar-provisioning.service').QuasarProvisioningService;
       
       // Async provision merchant on Quasar
       await QuasarProvisioningService.provisionMerchant({
-        tenantId,
-        businessName: 'Business-' + tenantId.substring(0, 8),
-        email: 'admin@' + tenantId.substring(0, 8) + '.com',
-        phone: '08000000000'
+        invifyTenantId: tenantId,
+        tenantName: tenantName,
+        tenantType: tenantType
       });
 
       return res.status(200).json({ message: 'Virtual Account engine initialized.' });

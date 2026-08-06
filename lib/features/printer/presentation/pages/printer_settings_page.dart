@@ -13,6 +13,7 @@ import 'package:involve_app/services/mpos_service.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/core/utils/device_info_service.dart';
 import 'package:involve_app/features/admin/presentation/widgets/device_access_dialog.dart';
+import 'package:involve_app/core/mpos/mpos_device_type.dart';
 
 class PrinterSettingsPage extends StatefulWidget {
   const PrinterSettingsPage({super.key});
@@ -47,7 +48,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     _deviceId = details['deviceId'];
     
     // Fetch MPOS Serial from paired Bluetooth name
-    final mposSn = await _mposService.getMposSerialNumber();
+    final mposSn = await _mposService.getMposSerialNumber(deviceType: _mposDeviceType);
 
     final cached = await TerminalSyncService.loadCachedConfig();
     _lastSyncTime = await TerminalSyncService.getLastSyncTime();
@@ -71,7 +72,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     final businessName = settingsBloc.state.settings?.organizationName;
     final enrollmentKey = await StorageService.getLicense();
     
-    final mposSn = await _mposService.getMposSerialNumber();
+    final mposSn = await _mposService.getMposSerialNumber(deviceType: _mposDeviceType);
 
     final androidId = details['androidId'] as String?;
     final serialNum = details['serialNumber'] as String?;
@@ -108,7 +109,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
         }
 
         if (isMposMismatch) {
-          await _mposService.unpairDevice();
+          await _mposService.unpairDevice(deviceType: _mposDeviceType);
           if (mounted) {
              setState(() {
                _mposSerialNumber = null;
@@ -235,8 +236,10 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isBasic = context.watch<SettingsBloc>().state.userPlan?.isBasic ?? true;
+
     return DefaultTabController(
-      length: 2,
+      length: isBasic ? 1 : 2,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Device Configuration'),
@@ -247,10 +250,11 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
               onPressed: () => _showDeviceDetails(context),
             ),
           ],
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(icon: Icon(Icons.print), text: 'Receipt Printer'),
-              Tab(icon: Icon(Icons.point_of_sale), text: 'POS Terminal'),
+              const Tab(icon: Icon(Icons.print), text: 'Receipt Printer'),
+              if (!isBasic)
+                const Tab(icon: Icon(Icons.point_of_sale), text: 'POS Terminal'),
             ],
           ),
         ),
@@ -259,30 +263,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
             // PRINTER TAB
             BlocBuilder<PrinterBloc, PrinterState>(
               builder: (context, state) {
-                if (_terminalConfig != null && _terminalConfig?.capabilities.printing != true) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.print_disabled, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            'Printing Features Disabled',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'This device is not authorized for printing. Please contact your administrator to upgrade this device.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
+
 
                 if (state.error != null) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -439,10 +420,11 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
               },
             ),
             
-            // POS TERMINAL TAB
-            RefreshIndicator(
-              onRefresh: () => _syncTerminalConfig(showLoading: true),
-              child: SingleChildScrollView(
+            if (!isBasic)
+              // POS TERMINAL TAB
+              RefreshIndicator(
+                onRefresh: () => _syncTerminalConfig(showLoading: true),
+                child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(16.0),
                 child: Builder(
@@ -556,33 +538,56 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
 
                             final disablePairing = isMissingMapping;
                             final disableDownload = hasMismatch || isMissingMapping || isInvalidDevice;
+                            final isMoreFun = MposDeviceType.isMoreFun(_terminalConfig?.terminalType);
+                            final disableBalance = disableDownload || _isCheckingBalance;
 
-                            return Row(
+                            return Column(
                               children: [
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: disablePairing ? null : _pairDevice,
-                                    icon: const Icon(Icons.bluetooth_connected, size: 18),
-                                    label: const Text('Pair Device'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.indigo.shade600,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: disablePairing ? null : _pairDevice,
+                                        icon: const Icon(Icons.bluetooth_connected, size: 18),
+                                        label: const Text('Pair Device'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.indigo.shade600,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: (_isLoadingParams || disableDownload) ? null : _downloadParams,
+                                        icon: _isLoadingParams 
+                                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                          : const Icon(Icons.download, size: 18),
+                                        label: Text(_isLoadingParams ? 'Loading...' : 'Download Terminal Params', style: const TextStyle(fontSize: 12)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.teal.shade600,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: (_isLoadingParams || disableDownload) ? null : _downloadParams,
-                                    icon: _isLoadingParams 
-                                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                      : const Icon(Icons.download, size: 18),
-                                    label: Text(_isLoadingParams ? 'Loading...' : 'Download Terminal Params', style: const TextStyle(fontSize: 12)),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.teal.shade600,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: disableBalance ? null : _checkCardBalance,
+                                    icon: _isCheckingBalance
+                                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                        : const Icon(Icons.account_balance_wallet_outlined, size: 18),
+                                    label: Text(
+                                      _isCheckingBalance
+                                          ? 'Checking balance...'
+                                          : (isMoreFun
+                                              ? 'Check Card Balance'
+                                              : 'Check Card Balance (MoreFun/MP63)'),
                                     ),
                                   ),
                                 ),
@@ -704,11 +709,17 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
   }
 
   bool _isLoadingParams = false;
+  bool _isCheckingBalance = false;
+
+  String get _mposDeviceType => MposDeviceType.channelValue(
+        MposDeviceType.resolve(_terminalConfig?.terminalType),
+      );
 
   Future<void> _pairDevice() async {
     try {
       final result = await _mposService.pairDevice(
         posSerialNumber: _terminalConfig?.posSerialNumber,
+        deviceType: _mposDeviceType,
       );
       if (!mounted) return;
       final isSuccess = result.status == 'success';
@@ -747,10 +758,29 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       final portNumber = _terminalConfig?.expressPayPort?.toString();
       final expressPayBaseUrl = _terminalConfig?.expressPayBaseUrl;
       final expressPayAuthToken = _terminalConfig?.expressPayAuthToken;
-      final ctmk = _terminalConfig?.primaryHost?['kimonoKeys']?['ctmk']?.toString() ?? 
-                   _terminalConfig?.primaryHost?['kimonoFallbackParameters']?['key1']?.toString();
+      final nibss = _terminalConfig?.primaryHost?['nibssConfig'] as Map?;
+      final ctmk = nibss?['ctmk']?.toString() ??
+          _terminalConfig?.primaryHost?['kimonoKeys']?['ctmk']?.toString() ??
+          _terminalConfig?.primaryHost?['kimonoFallbackParameters']?['key1']?.toString();
+      final key2 = nibss?['key2']?.toString() ??
+          _terminalConfig?.primaryHost?['kimonoKeys']?['key2']?.toString() ??
+          _terminalConfig?.primaryHost?['kimonoFallbackParameters']?['key2']?.toString();
       final timeoutRaw = _terminalConfig?.primaryHost?['timeout'];
       final timeoutSeconds = timeoutRaw is int ? timeoutRaw : int.tryParse(timeoutRaw?.toString() ?? '');
+      final isMoreFun = MposDeviceType.isMoreFun(_terminalConfig?.terminalType);
+      // MoreFun MP63 talks NIBSS directly over SSL by default.
+      final enableSsl = isMoreFun
+          ? (_terminalConfig?.primaryHost?['sslEnabled'] == true ||
+              _terminalConfig?.primaryHost?['sslEnabled'] == null)
+          : (_terminalConfig?.primaryHost?['sslEnabled'] == true);
+      final hostIp = isMoreFun
+          ? (_terminalConfig?.primaryHost?['ip']?.toString() ??
+              _terminalConfig?.expressPayHost)
+          : _terminalConfig?.expressPayHost;
+      final hostPort = isMoreFun
+          ? (_terminalConfig?.primaryHost?['port']?.toString() ??
+              _terminalConfig?.expressPayPort?.toString())
+          : _terminalConfig?.expressPayPort?.toString();
 
       showDialog(
         context: context,
@@ -780,13 +810,15 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       final result = await _mposService.loadParams(
         terminalId: terminalId,
         activeHost: activeHost,
-        ipAddress: ipAddress,
-        portNumber: portNumber,
-        enableSsl: _terminalConfig?.primaryHost?['sslEnabled'] == true,
+        ipAddress: hostIp ?? ipAddress,
+        portNumber: hostPort ?? portNumber,
+        enableSsl: enableSsl,
         expressPayBaseUrl: expressPayBaseUrl,
         expressPayAuthToken: expressPayAuthToken,
         key1: ctmk,
+        key2: key2,
         timeoutSeconds: timeoutSeconds,
+        deviceType: _mposDeviceType,
       );
       print('[DownloadParams] Native _mposService.loadParams returned: ${result.status} - ${result.message}');
       if (!mounted) return;
@@ -810,6 +842,104 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       }
     } finally {
       if (mounted) setState(() => _isLoadingParams = false);
+    }
+  }
+
+  Future<void> _checkCardBalance() async {
+    if (_terminalConfig == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Terminal not provisioned. Sync first.'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    if (!MposDeviceType.isMoreFun(_terminalConfig?.terminalType)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Check balance is available on MoreFun/MP63 devices. Map an MP63 in admin to use it.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isCheckingBalance = true);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 20),
+              Expanded(
+                child: StreamBuilder<String>(
+                  stream: _mposService.progressStream,
+                  initialData: 'Tap card and enter PIN...',
+                  builder: (context, snapshot) {
+                    return Text(snapshot.data ?? 'Processing...');
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    try {
+      final terminalId = _terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId;
+      final result = await _mposService.checkBalance(
+        terminalId: terminalId,
+        deviceType: _mposDeviceType,
+      );
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      final ok = result.status == 'balance_success';
+      final balance = result.transaction?.balance?.isNotEmpty == true
+          ? result.transaction!.balance
+          : result.transaction?.amount;
+      final pan = result.transaction?.maskedPan ?? '****';
+      final msg = result.error?.message ??
+          result.transaction?.message ??
+          (ok ? 'Balance check complete' : 'Balance check failed');
+
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(ok ? 'Card Balance' : 'Balance Check Failed'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (ok && balance != null && balance.isNotEmpty)
+                Text(
+                  '₦ $balance',
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                ),
+              const SizedBox(height: 8),
+              Text('Card: $pan'),
+              if (result.transaction?.statusCode != null)
+                Text('Code: ${result.transaction!.statusCode}'),
+              const SizedBox(height: 8),
+              Text(msg),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Balance check error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCheckingBalance = false);
     }
   }
 

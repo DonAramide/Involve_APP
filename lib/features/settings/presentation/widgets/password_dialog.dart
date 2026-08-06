@@ -16,6 +16,7 @@ class _PasswordDialogState extends State<PasswordDialog> {
   bool _isLocked = false;
   int _failedAttempts = 0;
   String? _errorMessage;
+  bool _hasPopped = false;
 
   @override
   void initState() {
@@ -50,7 +51,8 @@ class _PasswordDialogState extends State<PasswordDialog> {
         }
         
         // Close dialog on successful unlock/authorization
-        if (state.isAuthorized) {
+        if (state.isAuthorized && !_hasPopped) {
+          _hasPopped = true;
           Navigator.of(context, rootNavigator: true).pop(true);
         }
       },

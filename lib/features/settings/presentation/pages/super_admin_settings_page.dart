@@ -27,6 +27,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
   final _orgNameController = TextEditingController();
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _taxIdController = TextEditingController();
   
@@ -63,6 +64,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       _orgNameController.text = settings.organizationName;
       _addressController.text = settings.address;
       _phoneController.text = settings.phone;
+      _emailController.text = settings.email ?? '';
       _descriptionController.text = settings.businessDescription ?? '';
       _taxIdController.text = settings.taxId ?? '';
       _selectedLogo = settings.logo;
@@ -76,6 +78,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     _orgNameController.addListener(() => setState(() => _hasChanges = true));
     _addressController.addListener(() => setState(() => _hasChanges = true));
     _phoneController.addListener(() => setState(() => _hasChanges = true));
+    _emailController.addListener(() => setState(() => _hasChanges = true));
     _descriptionController.addListener(() => setState(() => _hasChanges = true));
     _taxIdController.addListener(() => setState(() => _hasChanges = true));
 
@@ -92,6 +95,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
     _orgNameController.dispose();
     _addressController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _descriptionController.dispose();
     _taxIdController.dispose();
     _licenseBusinessNameController.dispose();
@@ -210,6 +214,18 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
                     validator: (val) {
                       if (val != null && val.isNotEmpty && val.length < 10) {
                         return 'Phone must be at least 10 digits';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _emailController,
+                    label: 'Email Address',
+                    icon: Icons.email,
+                    validator: (val) {
+                      if (val != null && val.isNotEmpty && !val.contains('@')) {
+                        return 'Enter a valid email address';
                       }
                       return null;
                     },
@@ -432,6 +448,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
         _orgNameController.text = settings.organizationName;
         _addressController.text = settings.address;
         _phoneController.text = settings.phone;
+        _emailController.text = settings.email ?? '';
         _descriptionController.text = settings.businessDescription ?? '';
         _taxIdController.text = settings.taxId ?? '';
         _selectedLogo = settings.logo;
@@ -454,6 +471,7 @@ class _SuperAdminSettingsPageState extends State<SuperAdminSettingsPage> {
       organizationName: _orgNameController.text,
       address: _addressController.text,
       phone: _phoneController.text,
+      email: _emailController.text,
       businessDescription: _descriptionController.text,
       taxId: _taxIdController.text,
       logo: _selectedLogo,

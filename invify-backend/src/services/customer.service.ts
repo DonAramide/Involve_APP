@@ -92,8 +92,7 @@ export class CustomerService {
         phone: data.phone,
         address: data.address,
         balance: data.balance || 0,
-        email: data.email,
-        status: data.status || 'ACTIVE'
+        email: data.email
       })
       .select()
       .single();
@@ -110,8 +109,7 @@ export class CustomerService {
         name: data.name,
         phone: data.phone,
         address: data.address,
-        email: data.email,
-        status: data.status
+        email: data.email
       })
       .eq('tenant_id', tenantId)
       .eq('id', customerId)
@@ -121,6 +119,47 @@ export class CustomerService {
     if (error) throw new Error(`Failed to update customer: ${error.message}`);
     
     return CustomerService.mapToDTO(updated);
+  }
+
+  async bulkUpsertCustomers(tenantId: string, customers: any[]): Promise<{ synced: number; errors: string[] }> {
+    const errors: string[] = [];
+    let synced = 0;
+
+    if (customers.length === 0) return { synced: 0, errors: [] };
+
+    const toRow = (cust: any) => ({
+      id: cust.id,
+      tenant_id: tenantId,
+      name: cust.name || 'Unknown',
+      phone: cust.phone || null,
+      address: cust.address || null,
+      balance: cust.balance ?? 0,
+      email: cust.email || null,
+      virtual_account_number: cust.virtualAccountNumber || cust.virtual_account_number || null,
+      virtual_account_name: cust.virtualAccountName || cust.virtual_account_name || null,
+      virtual_account_bank: cust.virtualAccountBank || cust.virtual_account_bank || null,
+      created_at: cust.createdAt || cust.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    const rows = customers.map(toRow);
+
+    const BATCH = 50;
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const batch = rows.slice(i, i + BATCH);
+      const { data, error } = await supabase
+        .from('customers')
+        .upsert(batch, { onConflict: 'id' })
+        .select();
+
+      if (error) {
+        errors.push(`Upsert batch ${Math.floor(i / BATCH) + 1}: ${error.message}`);
+      } else {
+        synced += (data || []).length;
+      }
+    }
+
+    return { synced, errors };
   }
 
   private static mapToDTO(entity: any): CustomerDTO {

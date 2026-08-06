@@ -4355,6 +4355,11 @@ class $SettingsTable extends Settings
   late final GeneratedColumn<String> phone = GeneratedColumn<String>(
       'phone', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+      'email', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _businessDescriptionMeta =
       const VerificationMeta('businessDescription');
   @override
@@ -4710,6 +4715,16 @@ class $SettingsTable extends Settings
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("show_stock_value_chart" IN (0, 1))'),
       defaultValue: const Constant(true));
+  static const VerificationMeta _showNetworkIndicatorMeta =
+      const VerificationMeta('showNetworkIndicator');
+  @override
+  late final GeneratedColumn<bool> showNetworkIndicator = GeneratedColumn<bool>(
+      'show_network_indicator', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("show_network_indicator" IN (0, 1))'),
+      defaultValue: const Constant(true));
   static const VerificationMeta _businessModeMeta =
       const VerificationMeta('businessMode');
   @override
@@ -4819,6 +4834,7 @@ class $SettingsTable extends Settings
         organizationName,
         address,
         phone,
+        email,
         businessDescription,
         taxId,
         logoPath,
@@ -4861,6 +4877,7 @@ class $SettingsTable extends Settings
         showExpensePieChart,
         showTopSellingChart,
         showStockValueChart,
+        showNetworkIndicator,
         businessMode,
         menuOrder,
         skipSplash,
@@ -4906,6 +4923,10 @@ class $SettingsTable extends Settings
           _phoneMeta, phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta));
     } else if (isInserting) {
       context.missing(_phoneMeta);
+    }
+    if (data.containsKey('email')) {
+      context.handle(
+          _emailMeta, email.isAcceptableOrUnknown(data['email']!, _emailMeta));
     }
     if (data.containsKey('business_description')) {
       context.handle(
@@ -5137,6 +5158,12 @@ class $SettingsTable extends Settings
           showStockValueChart.isAcceptableOrUnknown(
               data['show_stock_value_chart']!, _showStockValueChartMeta));
     }
+    if (data.containsKey('show_network_indicator')) {
+      context.handle(
+          _showNetworkIndicatorMeta,
+          showNetworkIndicator.isAcceptableOrUnknown(
+              data['show_network_indicator']!, _showNetworkIndicatorMeta));
+    }
     if (data.containsKey('business_mode')) {
       context.handle(
           _businessModeMeta,
@@ -5223,6 +5250,8 @@ class $SettingsTable extends Settings
           .read(DriftSqlType.string, data['${effectivePrefix}address'])!,
       phone: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}phone'])!,
+      email: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}email']),
       businessDescription: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}business_description']),
       taxId: attachedDatabase.typeMapping
@@ -5313,6 +5342,8 @@ class $SettingsTable extends Settings
           DriftSqlType.bool, data['${effectivePrefix}show_top_selling_chart'])!,
       showStockValueChart: attachedDatabase.typeMapping.read(
           DriftSqlType.bool, data['${effectivePrefix}show_stock_value_chart'])!,
+      showNetworkIndicator: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}show_network_indicator'])!,
       businessMode: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}business_mode'])!,
       menuOrder: attachedDatabase.typeMapping
@@ -5352,6 +5383,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final String organizationName;
   final String address;
   final String phone;
+  final String? email;
   final String? businessDescription;
   final String? taxId;
   final String? logoPath;
@@ -5394,6 +5426,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
   final bool showExpensePieChart;
   final bool showTopSellingChart;
   final bool showStockValueChart;
+  final bool showNetworkIndicator;
   final String businessMode;
   final String? menuOrder;
   final bool skipSplash;
@@ -5411,6 +5444,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.organizationName,
       required this.address,
       required this.phone,
+      this.email,
       this.businessDescription,
       this.taxId,
       this.logoPath,
@@ -5453,6 +5487,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       required this.showExpensePieChart,
       required this.showTopSellingChart,
       required this.showStockValueChart,
+      required this.showNetworkIndicator,
       required this.businessMode,
       this.menuOrder,
       required this.skipSplash,
@@ -5472,6 +5507,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['organization_name'] = Variable<String>(organizationName);
     map['address'] = Variable<String>(address);
     map['phone'] = Variable<String>(phone);
+    if (!nullToAbsent || email != null) {
+      map['email'] = Variable<String>(email);
+    }
     if (!nullToAbsent || businessDescription != null) {
       map['business_description'] = Variable<String>(businessDescription);
     }
@@ -5537,6 +5575,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
     map['show_expense_pie_chart'] = Variable<bool>(showExpensePieChart);
     map['show_top_selling_chart'] = Variable<bool>(showTopSellingChart);
     map['show_stock_value_chart'] = Variable<bool>(showStockValueChart);
+    map['show_network_indicator'] = Variable<bool>(showNetworkIndicator);
     map['business_mode'] = Variable<String>(businessMode);
     if (!nullToAbsent || menuOrder != null) {
       map['menu_order'] = Variable<String>(menuOrder);
@@ -5565,6 +5604,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       organizationName: Value(organizationName),
       address: Value(address),
       phone: Value(phone),
+      email:
+          email == null && nullToAbsent ? const Value.absent() : Value(email),
       businessDescription: businessDescription == null && nullToAbsent
           ? const Value.absent()
           : Value(businessDescription),
@@ -5626,6 +5667,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showExpensePieChart: Value(showExpensePieChart),
       showTopSellingChart: Value(showTopSellingChart),
       showStockValueChart: Value(showStockValueChart),
+      showNetworkIndicator: Value(showNetworkIndicator),
       businessMode: Value(businessMode),
       menuOrder: menuOrder == null && nullToAbsent
           ? const Value.absent()
@@ -5655,6 +5697,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       organizationName: serializer.fromJson<String>(json['organizationName']),
       address: serializer.fromJson<String>(json['address']),
       phone: serializer.fromJson<String>(json['phone']),
+      email: serializer.fromJson<String?>(json['email']),
       businessDescription:
           serializer.fromJson<String?>(json['businessDescription']),
       taxId: serializer.fromJson<String?>(json['taxId']),
@@ -5708,6 +5751,8 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           serializer.fromJson<bool>(json['showTopSellingChart']),
       showStockValueChart:
           serializer.fromJson<bool>(json['showStockValueChart']),
+      showNetworkIndicator:
+          serializer.fromJson<bool>(json['showNetworkIndicator']),
       businessMode: serializer.fromJson<String>(json['businessMode']),
       menuOrder: serializer.fromJson<String?>(json['menuOrder']),
       skipSplash: serializer.fromJson<bool>(json['skipSplash']),
@@ -5731,6 +5776,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'organizationName': serializer.toJson<String>(organizationName),
       'address': serializer.toJson<String>(address),
       'phone': serializer.toJson<String>(phone),
+      'email': serializer.toJson<String?>(email),
       'businessDescription': serializer.toJson<String?>(businessDescription),
       'taxId': serializer.toJson<String?>(taxId),
       'logoPath': serializer.toJson<String?>(logoPath),
@@ -5776,6 +5822,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       'showExpensePieChart': serializer.toJson<bool>(showExpensePieChart),
       'showTopSellingChart': serializer.toJson<bool>(showTopSellingChart),
       'showStockValueChart': serializer.toJson<bool>(showStockValueChart),
+      'showNetworkIndicator': serializer.toJson<bool>(showNetworkIndicator),
       'businessMode': serializer.toJson<String>(businessMode),
       'menuOrder': serializer.toJson<String?>(menuOrder),
       'skipSplash': serializer.toJson<bool>(skipSplash),
@@ -5797,6 +5844,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           String? organizationName,
           String? address,
           String? phone,
+          Value<String?> email = const Value.absent(),
           Value<String?> businessDescription = const Value.absent(),
           Value<String?> taxId = const Value.absent(),
           Value<String?> logoPath = const Value.absent(),
@@ -5839,6 +5887,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           bool? showExpensePieChart,
           bool? showTopSellingChart,
           bool? showStockValueChart,
+          bool? showNetworkIndicator,
           String? businessMode,
           Value<String?> menuOrder = const Value.absent(),
           bool? skipSplash,
@@ -5856,6 +5905,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         organizationName: organizationName ?? this.organizationName,
         address: address ?? this.address,
         phone: phone ?? this.phone,
+        email: email.present ? email.value : this.email,
         businessDescription: businessDescription.present
             ? businessDescription.value
             : this.businessDescription,
@@ -5908,6 +5958,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showExpensePieChart: showExpensePieChart ?? this.showExpensePieChart,
         showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
         showStockValueChart: showStockValueChart ?? this.showStockValueChart,
+        showNetworkIndicator: showNetworkIndicator ?? this.showNetworkIndicator,
         businessMode: businessMode ?? this.businessMode,
         menuOrder: menuOrder.present ? menuOrder.value : this.menuOrder,
         skipSplash: skipSplash ?? this.skipSplash,
@@ -5931,6 +5982,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           : this.organizationName,
       address: data.address.present ? data.address.value : this.address,
       phone: data.phone.present ? data.phone.value : this.phone,
+      email: data.email.present ? data.email.value : this.email,
       businessDescription: data.businessDescription.present
           ? data.businessDescription.value
           : this.businessDescription,
@@ -6030,6 +6082,9 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
       showStockValueChart: data.showStockValueChart.present
           ? data.showStockValueChart.value
           : this.showStockValueChart,
+      showNetworkIndicator: data.showNetworkIndicator.present
+          ? data.showNetworkIndicator.value
+          : this.showNetworkIndicator,
       businessMode: data.businessMode.present
           ? data.businessMode.value
           : this.businessMode,
@@ -6071,6 +6126,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('organizationName: $organizationName, ')
           ..write('address: $address, ')
           ..write('phone: $phone, ')
+          ..write('email: $email, ')
           ..write('businessDescription: $businessDescription, ')
           ..write('taxId: $taxId, ')
           ..write('logoPath: $logoPath, ')
@@ -6113,6 +6169,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           ..write('showExpensePieChart: $showExpensePieChart, ')
           ..write('showTopSellingChart: $showTopSellingChart, ')
           ..write('showStockValueChart: $showStockValueChart, ')
+          ..write('showNetworkIndicator: $showNetworkIndicator, ')
           ..write('businessMode: $businessMode, ')
           ..write('menuOrder: $menuOrder, ')
           ..write('skipSplash: $skipSplash, ')
@@ -6135,6 +6192,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         organizationName,
         address,
         phone,
+        email,
         businessDescription,
         taxId,
         logoPath,
@@ -6177,6 +6235,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
         showExpensePieChart,
         showTopSellingChart,
         showStockValueChart,
+        showNetworkIndicator,
         businessMode,
         menuOrder,
         skipSplash,
@@ -6198,6 +6257,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.organizationName == this.organizationName &&
           other.address == this.address &&
           other.phone == this.phone &&
+          other.email == this.email &&
           other.businessDescription == this.businessDescription &&
           other.taxId == this.taxId &&
           other.logoPath == this.logoPath &&
@@ -6241,6 +6301,7 @@ class SettingsTable extends DataClass implements Insertable<SettingsTable> {
           other.showExpensePieChart == this.showExpensePieChart &&
           other.showTopSellingChart == this.showTopSellingChart &&
           other.showStockValueChart == this.showStockValueChart &&
+          other.showNetworkIndicator == this.showNetworkIndicator &&
           other.businessMode == this.businessMode &&
           other.menuOrder == this.menuOrder &&
           other.skipSplash == this.skipSplash &&
@@ -6261,6 +6322,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<String> organizationName;
   final Value<String> address;
   final Value<String> phone;
+  final Value<String?> email;
   final Value<String?> businessDescription;
   final Value<String?> taxId;
   final Value<String?> logoPath;
@@ -6303,6 +6365,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
   final Value<bool> showExpensePieChart;
   final Value<bool> showTopSellingChart;
   final Value<bool> showStockValueChart;
+  final Value<bool> showNetworkIndicator;
   final Value<String> businessMode;
   final Value<String?> menuOrder;
   final Value<bool> skipSplash;
@@ -6320,6 +6383,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.organizationName = const Value.absent(),
     this.address = const Value.absent(),
     this.phone = const Value.absent(),
+    this.email = const Value.absent(),
     this.businessDescription = const Value.absent(),
     this.taxId = const Value.absent(),
     this.logoPath = const Value.absent(),
@@ -6362,6 +6426,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showExpensePieChart = const Value.absent(),
     this.showTopSellingChart = const Value.absent(),
     this.showStockValueChart = const Value.absent(),
+    this.showNetworkIndicator = const Value.absent(),
     this.businessMode = const Value.absent(),
     this.menuOrder = const Value.absent(),
     this.skipSplash = const Value.absent(),
@@ -6380,6 +6445,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     required String organizationName,
     required String address,
     required String phone,
+    this.email = const Value.absent(),
     this.businessDescription = const Value.absent(),
     this.taxId = const Value.absent(),
     this.logoPath = const Value.absent(),
@@ -6422,6 +6488,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     this.showExpensePieChart = const Value.absent(),
     this.showTopSellingChart = const Value.absent(),
     this.showStockValueChart = const Value.absent(),
+    this.showNetworkIndicator = const Value.absent(),
     this.businessMode = const Value.absent(),
     this.menuOrder = const Value.absent(),
     this.skipSplash = const Value.absent(),
@@ -6442,6 +6509,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<String>? organizationName,
     Expression<String>? address,
     Expression<String>? phone,
+    Expression<String>? email,
     Expression<String>? businessDescription,
     Expression<String>? taxId,
     Expression<String>? logoPath,
@@ -6484,6 +6552,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     Expression<bool>? showExpensePieChart,
     Expression<bool>? showTopSellingChart,
     Expression<bool>? showStockValueChart,
+    Expression<bool>? showNetworkIndicator,
     Expression<String>? businessMode,
     Expression<String>? menuOrder,
     Expression<bool>? skipSplash,
@@ -6502,6 +6571,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       if (organizationName != null) 'organization_name': organizationName,
       if (address != null) 'address': address,
       if (phone != null) 'phone': phone,
+      if (email != null) 'email': email,
       if (businessDescription != null)
         'business_description': businessDescription,
       if (taxId != null) 'tax_id': taxId,
@@ -6559,6 +6629,8 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
         'show_top_selling_chart': showTopSellingChart,
       if (showStockValueChart != null)
         'show_stock_value_chart': showStockValueChart,
+      if (showNetworkIndicator != null)
+        'show_network_indicator': showNetworkIndicator,
       if (businessMode != null) 'business_mode': businessMode,
       if (menuOrder != null) 'menu_order': menuOrder,
       if (skipSplash != null) 'skip_splash': skipSplash,
@@ -6581,6 +6653,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<String>? organizationName,
       Value<String>? address,
       Value<String>? phone,
+      Value<String?>? email,
       Value<String?>? businessDescription,
       Value<String?>? taxId,
       Value<String?>? logoPath,
@@ -6623,6 +6696,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       Value<bool>? showExpensePieChart,
       Value<bool>? showTopSellingChart,
       Value<bool>? showStockValueChart,
+      Value<bool>? showNetworkIndicator,
       Value<String>? businessMode,
       Value<String?>? menuOrder,
       Value<bool>? skipSplash,
@@ -6640,6 +6714,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       organizationName: organizationName ?? this.organizationName,
       address: address ?? this.address,
       phone: phone ?? this.phone,
+      email: email ?? this.email,
       businessDescription: businessDescription ?? this.businessDescription,
       taxId: taxId ?? this.taxId,
       logoPath: logoPath ?? this.logoPath,
@@ -6688,6 +6763,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
       showExpensePieChart: showExpensePieChart ?? this.showExpensePieChart,
       showTopSellingChart: showTopSellingChart ?? this.showTopSellingChart,
       showStockValueChart: showStockValueChart ?? this.showStockValueChart,
+      showNetworkIndicator: showNetworkIndicator ?? this.showNetworkIndicator,
       businessMode: businessMode ?? this.businessMode,
       menuOrder: menuOrder ?? this.menuOrder,
       skipSplash: skipSplash ?? this.skipSplash,
@@ -6718,6 +6794,9 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     }
     if (phone.present) {
       map['phone'] = Variable<String>(phone.value);
+    }
+    if (email.present) {
+      map['email'] = Variable<String>(email.value);
     }
     if (businessDescription.present) {
       map['business_description'] = Variable<String>(businessDescription.value);
@@ -6851,6 +6930,10 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
     if (showStockValueChart.present) {
       map['show_stock_value_chart'] = Variable<bool>(showStockValueChart.value);
     }
+    if (showNetworkIndicator.present) {
+      map['show_network_indicator'] =
+          Variable<bool>(showNetworkIndicator.value);
+    }
     if (businessMode.present) {
       map['business_mode'] = Variable<String>(businessMode.value);
     }
@@ -6898,6 +6981,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('organizationName: $organizationName, ')
           ..write('address: $address, ')
           ..write('phone: $phone, ')
+          ..write('email: $email, ')
           ..write('businessDescription: $businessDescription, ')
           ..write('taxId: $taxId, ')
           ..write('logoPath: $logoPath, ')
@@ -6940,6 +7024,7 @@ class SettingsCompanion extends UpdateCompanion<SettingsTable> {
           ..write('showExpensePieChart: $showExpensePieChart, ')
           ..write('showTopSellingChart: $showTopSellingChart, ')
           ..write('showStockValueChart: $showStockValueChart, ')
+          ..write('showNetworkIndicator: $showNetworkIndicator, ')
           ..write('businessMode: $businessMode, ')
           ..write('menuOrder: $menuOrder, ')
           ..write('skipSplash: $skipSplash, ')
@@ -11770,6 +11855,12 @@ class $StudentsTable extends Students
   late final GeneratedColumn<String> virtualAccountStatus =
       GeneratedColumn<String>('virtual_account_status', aliasedName, true,
           type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _departmentMeta =
+      const VerificationMeta('department');
+  @override
+  late final GeneratedColumn<String> department = GeneratedColumn<String>(
+      'department', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -11822,6 +11913,7 @@ class $StudentsTable extends Students
         virtualAccountNumber,
         virtualAccountBank,
         virtualAccountStatus,
+        department,
         syncId,
         updatedAt,
         createdAt,
@@ -11933,6 +12025,12 @@ class $StudentsTable extends Students
           virtualAccountStatus.isAcceptableOrUnknown(
               data['virtual_account_status']!, _virtualAccountStatusMeta));
     }
+    if (data.containsKey('department')) {
+      context.handle(
+          _departmentMeta,
+          department.isAcceptableOrUnknown(
+              data['department']!, _departmentMeta));
+    }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
           syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
@@ -11998,6 +12096,8 @@ class $StudentsTable extends Students
       virtualAccountStatus: attachedDatabase.typeMapping.read(
           DriftSqlType.string,
           data['${effectivePrefix}virtual_account_status']),
+      department: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}department']),
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -12035,6 +12135,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
   final String? virtualAccountNumber;
   final String? virtualAccountBank;
   final String? virtualAccountStatus;
+  final String? department;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -12058,6 +12159,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       this.virtualAccountNumber,
       this.virtualAccountBank,
       this.virtualAccountStatus,
+      this.department,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -12100,6 +12202,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
     }
     if (!nullToAbsent || virtualAccountStatus != null) {
       map['virtual_account_status'] = Variable<String>(virtualAccountStatus);
+    }
+    if (!nullToAbsent || department != null) {
+      map['department'] = Variable<String>(department);
     }
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
@@ -12152,6 +12257,9 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       virtualAccountStatus: virtualAccountStatus == null && nullToAbsent
           ? const Value.absent()
           : Value(virtualAccountStatus),
+      department: department == null && nullToAbsent
+          ? const Value.absent()
+          : Value(department),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -12191,6 +12299,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           serializer.fromJson<String?>(json['virtualAccountBank']),
       virtualAccountStatus:
           serializer.fromJson<String?>(json['virtualAccountStatus']),
+      department: serializer.fromJson<String?>(json['department']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -12219,6 +12328,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       'virtualAccountNumber': serializer.toJson<String?>(virtualAccountNumber),
       'virtualAccountBank': serializer.toJson<String?>(virtualAccountBank),
       'virtualAccountStatus': serializer.toJson<String?>(virtualAccountStatus),
+      'department': serializer.toJson<String?>(department),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -12245,6 +12355,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           Value<String?> virtualAccountNumber = const Value.absent(),
           Value<String?> virtualAccountBank = const Value.absent(),
           Value<String?> virtualAccountStatus = const Value.absent(),
+          Value<String?> department = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -12275,6 +12386,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         virtualAccountStatus: virtualAccountStatus.present
             ? virtualAccountStatus.value
             : this.virtualAccountStatus,
+        department: department.present ? department.value : this.department,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -12317,6 +12429,8 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
       virtualAccountStatus: data.virtualAccountStatus.present
           ? data.virtualAccountStatus.value
           : this.virtualAccountStatus,
+      department:
+          data.department.present ? data.department.value : this.department,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -12345,6 +12459,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           ..write('virtualAccountNumber: $virtualAccountNumber, ')
           ..write('virtualAccountBank: $virtualAccountBank, ')
           ..write('virtualAccountStatus: $virtualAccountStatus, ')
+          ..write('department: $department, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -12373,6 +12488,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
         virtualAccountNumber,
         virtualAccountBank,
         virtualAccountStatus,
+        department,
         syncId,
         updatedAt,
         createdAt,
@@ -12400,6 +12516,7 @@ class StudentTable extends DataClass implements Insertable<StudentTable> {
           other.virtualAccountNumber == this.virtualAccountNumber &&
           other.virtualAccountBank == this.virtualAccountBank &&
           other.virtualAccountStatus == this.virtualAccountStatus &&
+          other.department == this.department &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -12425,6 +12542,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
   final Value<String?> virtualAccountNumber;
   final Value<String?> virtualAccountBank;
   final Value<String?> virtualAccountStatus;
+  final Value<String?> department;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -12448,6 +12566,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.virtualAccountNumber = const Value.absent(),
     this.virtualAccountBank = const Value.absent(),
     this.virtualAccountStatus = const Value.absent(),
+    this.department = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -12472,6 +12591,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     this.virtualAccountNumber = const Value.absent(),
     this.virtualAccountBank = const Value.absent(),
     this.virtualAccountStatus = const Value.absent(),
+    this.department = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -12499,6 +12619,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
     Expression<String>? virtualAccountNumber,
     Expression<String>? virtualAccountBank,
     Expression<String>? virtualAccountStatus,
+    Expression<String>? department,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -12526,6 +12647,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
         'virtual_account_bank': virtualAccountBank,
       if (virtualAccountStatus != null)
         'virtual_account_status': virtualAccountStatus,
+      if (department != null) 'department': department,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -12552,6 +12674,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       Value<String?>? virtualAccountNumber,
       Value<String?>? virtualAccountBank,
       Value<String?>? virtualAccountStatus,
+      Value<String?>? department,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -12575,6 +12698,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
       virtualAccountBank: virtualAccountBank ?? this.virtualAccountBank,
       virtualAccountStatus: virtualAccountStatus ?? this.virtualAccountStatus,
+      department: department ?? this.department,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -12639,6 +12763,9 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
       map['virtual_account_status'] =
           Variable<String>(virtualAccountStatus.value);
     }
+    if (department.present) {
+      map['department'] = Variable<String>(department.value);
+    }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
     }
@@ -12677,6 +12804,7 @@ class StudentsCompanion extends UpdateCompanion<StudentTable> {
           ..write('virtualAccountNumber: $virtualAccountNumber, ')
           ..write('virtualAccountBank: $virtualAccountBank, ')
           ..write('virtualAccountStatus: $virtualAccountStatus, ')
+          ..write('department: $department, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -12991,6 +13119,12 @@ class $TeachersTable extends Teachers
   late final GeneratedColumn<Uint8List> image = GeneratedColumn<Uint8List>(
       'image', aliasedName, true,
       type: DriftSqlType.blob, requiredDuringInsert: false);
+  static const VerificationMeta _classIdsMeta =
+      const VerificationMeta('classIds');
+  @override
+  late final GeneratedColumn<String> classIds = GeneratedColumn<String>(
+      'class_ids', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _syncIdMeta = const VerificationMeta('syncId');
   @override
   late final GeneratedColumn<String> syncId = GeneratedColumn<String>(
@@ -13036,6 +13170,7 @@ class $TeachersTable extends Teachers
         employmentDate,
         certificates,
         image,
+        classIds,
         syncId,
         updatedAt,
         createdAt,
@@ -13101,6 +13236,10 @@ class $TeachersTable extends Teachers
       context.handle(
           _imageMeta, image.isAcceptableOrUnknown(data['image']!, _imageMeta));
     }
+    if (data.containsKey('class_ids')) {
+      context.handle(_classIdsMeta,
+          classIds.isAcceptableOrUnknown(data['class_ids']!, _classIdsMeta));
+    }
     if (data.containsKey('sync_id')) {
       context.handle(_syncIdMeta,
           syncId.isAcceptableOrUnknown(data['sync_id']!, _syncIdMeta));
@@ -13150,6 +13289,8 @@ class $TeachersTable extends Teachers
           .read(DriftSqlType.string, data['${effectivePrefix}certificates']),
       image: attachedDatabase.typeMapping
           .read(DriftSqlType.blob, data['${effectivePrefix}image']),
+      classIds: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}class_ids']),
       syncId: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}sync_id']),
       updatedAt: attachedDatabase.typeMapping
@@ -13180,6 +13321,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
   final DateTime employmentDate;
   final String? certificates;
   final Uint8List? image;
+  final String? classIds;
   final String? syncId;
   final DateTime? updatedAt;
   final DateTime? createdAt;
@@ -13196,6 +13338,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
       required this.employmentDate,
       this.certificates,
       this.image,
+      this.classIds,
       this.syncId,
       this.updatedAt,
       this.createdAt,
@@ -13223,6 +13366,9 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
     }
     if (!nullToAbsent || image != null) {
       map['image'] = Variable<Uint8List>(image);
+    }
+    if (!nullToAbsent || classIds != null) {
+      map['class_ids'] = Variable<String>(classIds);
     }
     if (!nullToAbsent || syncId != null) {
       map['sync_id'] = Variable<String>(syncId);
@@ -13260,6 +13406,9 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
           : Value(certificates),
       image:
           image == null && nullToAbsent ? const Value.absent() : Value(image),
+      classIds: classIds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(classIds),
       syncId:
           syncId == null && nullToAbsent ? const Value.absent() : Value(syncId),
       updatedAt: updatedAt == null && nullToAbsent
@@ -13289,6 +13438,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
       employmentDate: serializer.fromJson<DateTime>(json['employmentDate']),
       certificates: serializer.fromJson<String?>(json['certificates']),
       image: serializer.fromJson<Uint8List?>(json['image']),
+      classIds: serializer.fromJson<String?>(json['classIds']),
       syncId: serializer.fromJson<String?>(json['syncId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
@@ -13310,6 +13460,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
       'employmentDate': serializer.toJson<DateTime>(employmentDate),
       'certificates': serializer.toJson<String?>(certificates),
       'image': serializer.toJson<Uint8List?>(image),
+      'classIds': serializer.toJson<String?>(classIds),
       'syncId': serializer.toJson<String?>(syncId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'createdAt': serializer.toJson<DateTime?>(createdAt),
@@ -13329,6 +13480,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
           DateTime? employmentDate,
           Value<String?> certificates = const Value.absent(),
           Value<Uint8List?> image = const Value.absent(),
+          Value<String?> classIds = const Value.absent(),
           Value<String?> syncId = const Value.absent(),
           Value<DateTime?> updatedAt = const Value.absent(),
           Value<DateTime?> createdAt = const Value.absent(),
@@ -13346,6 +13498,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
         certificates:
             certificates.present ? certificates.value : this.certificates,
         image: image.present ? image.value : this.image,
+        classIds: classIds.present ? classIds.value : this.classIds,
         syncId: syncId.present ? syncId.value : this.syncId,
         updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
         createdAt: createdAt.present ? createdAt.value : this.createdAt,
@@ -13371,6 +13524,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
           ? data.certificates.value
           : this.certificates,
       image: data.image.present ? data.image.value : this.image,
+      classIds: data.classIds.present ? data.classIds.value : this.classIds,
       syncId: data.syncId.present ? data.syncId.value : this.syncId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -13392,6 +13546,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
           ..write('employmentDate: $employmentDate, ')
           ..write('certificates: $certificates, ')
           ..write('image: $image, ')
+          ..write('classIds: $classIds, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -13413,6 +13568,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
       employmentDate,
       certificates,
       $driftBlobEquality.hash(image),
+      classIds,
       syncId,
       updatedAt,
       createdAt,
@@ -13432,6 +13588,7 @@ class TeacherTable extends DataClass implements Insertable<TeacherTable> {
           other.employmentDate == this.employmentDate &&
           other.certificates == this.certificates &&
           $driftBlobEquality.equals(other.image, this.image) &&
+          other.classIds == this.classIds &&
           other.syncId == this.syncId &&
           other.updatedAt == this.updatedAt &&
           other.createdAt == this.createdAt &&
@@ -13450,6 +13607,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
   final Value<DateTime> employmentDate;
   final Value<String?> certificates;
   final Value<Uint8List?> image;
+  final Value<String?> classIds;
   final Value<String?> syncId;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> createdAt;
@@ -13466,6 +13624,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
     this.employmentDate = const Value.absent(),
     this.certificates = const Value.absent(),
     this.image = const Value.absent(),
+    this.classIds = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -13483,6 +13642,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
     this.employmentDate = const Value.absent(),
     this.certificates = const Value.absent(),
     this.image = const Value.absent(),
+    this.classIds = const Value.absent(),
     this.syncId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -13500,6 +13660,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
     Expression<DateTime>? employmentDate,
     Expression<String>? certificates,
     Expression<Uint8List>? image,
+    Expression<String>? classIds,
     Expression<String>? syncId,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? createdAt,
@@ -13517,6 +13678,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
       if (employmentDate != null) 'employment_date': employmentDate,
       if (certificates != null) 'certificates': certificates,
       if (image != null) 'image': image,
+      if (classIds != null) 'class_ids': classIds,
       if (syncId != null) 'sync_id': syncId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (createdAt != null) 'created_at': createdAt,
@@ -13536,6 +13698,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
       Value<DateTime>? employmentDate,
       Value<String?>? certificates,
       Value<Uint8List?>? image,
+      Value<String?>? classIds,
       Value<String?>? syncId,
       Value<DateTime?>? updatedAt,
       Value<DateTime?>? createdAt,
@@ -13552,6 +13715,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
       employmentDate: employmentDate ?? this.employmentDate,
       certificates: certificates ?? this.certificates,
       image: image ?? this.image,
+      classIds: classIds ?? this.classIds,
       syncId: syncId ?? this.syncId,
       updatedAt: updatedAt ?? this.updatedAt,
       createdAt: createdAt ?? this.createdAt,
@@ -13593,6 +13757,9 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
     if (image.present) {
       map['image'] = Variable<Uint8List>(image.value);
     }
+    if (classIds.present) {
+      map['class_ids'] = Variable<String>(classIds.value);
+    }
     if (syncId.present) {
       map['sync_id'] = Variable<String>(syncId.value);
     }
@@ -13624,6 +13791,7 @@ class TeachersCompanion extends UpdateCompanion<TeacherTable> {
           ..write('employmentDate: $employmentDate, ')
           ..write('certificates: $certificates, ')
           ..write('image: $image, ')
+          ..write('classIds: $classIds, ')
           ..write('syncId: $syncId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('createdAt: $createdAt, ')
@@ -23804,6 +23972,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   required String organizationName,
   required String address,
   required String phone,
+  Value<String?> email,
   Value<String?> businessDescription,
   Value<String?> taxId,
   Value<String?> logoPath,
@@ -23846,6 +24015,7 @@ typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showExpensePieChart,
   Value<bool> showTopSellingChart,
   Value<bool> showStockValueChart,
+  Value<bool> showNetworkIndicator,
   Value<String> businessMode,
   Value<String?> menuOrder,
   Value<bool> skipSplash,
@@ -23864,6 +24034,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<String> organizationName,
   Value<String> address,
   Value<String> phone,
+  Value<String?> email,
   Value<String?> businessDescription,
   Value<String?> taxId,
   Value<String?> logoPath,
@@ -23906,6 +24077,7 @@ typedef $$SettingsTableUpdateCompanionBuilder = SettingsCompanion Function({
   Value<bool> showExpensePieChart,
   Value<bool> showTopSellingChart,
   Value<bool> showStockValueChart,
+  Value<bool> showNetworkIndicator,
   Value<String> businessMode,
   Value<String?> menuOrder,
   Value<bool> skipSplash,
@@ -23941,6 +24113,9 @@ class $$SettingsTableFilterComposer
 
   ColumnFilters<String> get phone => $composableBuilder(
       column: $table.phone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get businessDescription => $composableBuilder(
       column: $table.businessDescription,
@@ -24089,6 +24264,10 @@ class $$SettingsTableFilterComposer
       column: $table.showStockValueChart,
       builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<bool> get showNetworkIndicator => $composableBuilder(
+      column: $table.showNetworkIndicator,
+      builder: (column) => ColumnFilters(column));
+
   ColumnFilters<String> get businessMode => $composableBuilder(
       column: $table.businessMode, builder: (column) => ColumnFilters(column));
 
@@ -24154,6 +24333,9 @@ class $$SettingsTableOrderingComposer
 
   ColumnOrderings<String> get phone => $composableBuilder(
       column: $table.phone, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get businessDescription => $composableBuilder(
       column: $table.businessDescription,
@@ -24308,6 +24490,10 @@ class $$SettingsTableOrderingComposer
       column: $table.showStockValueChart,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get showNetworkIndicator => $composableBuilder(
+      column: $table.showNetworkIndicator,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get businessMode => $composableBuilder(
       column: $table.businessMode,
       builder: (column) => ColumnOrderings(column));
@@ -24374,6 +24560,9 @@ class $$SettingsTableAnnotationComposer
 
   GeneratedColumn<String> get phone =>
       $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get email =>
+      $composableBuilder(column: $table.email, builder: (column) => column);
 
   GeneratedColumn<String> get businessDescription => $composableBuilder(
       column: $table.businessDescription, builder: (column) => column);
@@ -24501,6 +24690,9 @@ class $$SettingsTableAnnotationComposer
   GeneratedColumn<bool> get showStockValueChart => $composableBuilder(
       column: $table.showStockValueChart, builder: (column) => column);
 
+  GeneratedColumn<bool> get showNetworkIndicator => $composableBuilder(
+      column: $table.showNetworkIndicator, builder: (column) => column);
+
   GeneratedColumn<String> get businessMode => $composableBuilder(
       column: $table.businessMode, builder: (column) => column);
 
@@ -24568,6 +24760,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<String> organizationName = const Value.absent(),
             Value<String> address = const Value.absent(),
             Value<String> phone = const Value.absent(),
+            Value<String?> email = const Value.absent(),
             Value<String?> businessDescription = const Value.absent(),
             Value<String?> taxId = const Value.absent(),
             Value<String?> logoPath = const Value.absent(),
@@ -24610,6 +24803,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showExpensePieChart = const Value.absent(),
             Value<bool> showTopSellingChart = const Value.absent(),
             Value<bool> showStockValueChart = const Value.absent(),
+            Value<bool> showNetworkIndicator = const Value.absent(),
             Value<String> businessMode = const Value.absent(),
             Value<String?> menuOrder = const Value.absent(),
             Value<bool> skipSplash = const Value.absent(),
@@ -24628,6 +24822,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             organizationName: organizationName,
             address: address,
             phone: phone,
+            email: email,
             businessDescription: businessDescription,
             taxId: taxId,
             logoPath: logoPath,
@@ -24670,6 +24865,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             showExpensePieChart: showExpensePieChart,
             showTopSellingChart: showTopSellingChart,
             showStockValueChart: showStockValueChart,
+            showNetworkIndicator: showNetworkIndicator,
             businessMode: businessMode,
             menuOrder: menuOrder,
             skipSplash: skipSplash,
@@ -24688,6 +24884,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             required String organizationName,
             required String address,
             required String phone,
+            Value<String?> email = const Value.absent(),
             Value<String?> businessDescription = const Value.absent(),
             Value<String?> taxId = const Value.absent(),
             Value<String?> logoPath = const Value.absent(),
@@ -24730,6 +24927,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             Value<bool> showExpensePieChart = const Value.absent(),
             Value<bool> showTopSellingChart = const Value.absent(),
             Value<bool> showStockValueChart = const Value.absent(),
+            Value<bool> showNetworkIndicator = const Value.absent(),
             Value<String> businessMode = const Value.absent(),
             Value<String?> menuOrder = const Value.absent(),
             Value<bool> skipSplash = const Value.absent(),
@@ -24748,6 +24946,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             organizationName: organizationName,
             address: address,
             phone: phone,
+            email: email,
             businessDescription: businessDescription,
             taxId: taxId,
             logoPath: logoPath,
@@ -24790,6 +24989,7 @@ class $$SettingsTableTableManager extends RootTableManager<
             showExpensePieChart: showExpensePieChart,
             showTopSellingChart: showTopSellingChart,
             showStockValueChart: showStockValueChart,
+            showNetworkIndicator: showNetworkIndicator,
             businessMode: businessMode,
             menuOrder: menuOrder,
             skipSplash: skipSplash,
@@ -28189,6 +28389,7 @@ typedef $$StudentsTableCreateCompanionBuilder = StudentsCompanion Function({
   Value<String?> virtualAccountNumber,
   Value<String?> virtualAccountBank,
   Value<String?> virtualAccountStatus,
+  Value<String?> department,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -28213,6 +28414,7 @@ typedef $$StudentsTableUpdateCompanionBuilder = StudentsCompanion Function({
   Value<String?> virtualAccountNumber,
   Value<String?> virtualAccountBank,
   Value<String?> virtualAccountStatus,
+  Value<String?> department,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -28327,6 +28529,9 @@ class $$StudentsTableFilterComposer
   ColumnFilters<String> get virtualAccountStatus => $composableBuilder(
       column: $table.virtualAccountStatus,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get department => $composableBuilder(
+      column: $table.department, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -28465,6 +28670,9 @@ class $$StudentsTableOrderingComposer
       column: $table.virtualAccountStatus,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get department => $composableBuilder(
+      column: $table.department, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
 
@@ -28574,6 +28782,9 @@ class $$StudentsTableAnnotationComposer
 
   GeneratedColumn<String> get virtualAccountStatus => $composableBuilder(
       column: $table.virtualAccountStatus, builder: (column) => column);
+
+  GeneratedColumn<String> get department => $composableBuilder(
+      column: $table.department, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -28693,6 +28904,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> virtualAccountNumber = const Value.absent(),
             Value<String?> virtualAccountBank = const Value.absent(),
             Value<String?> virtualAccountStatus = const Value.absent(),
+            Value<String?> department = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -28717,6 +28929,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             virtualAccountNumber: virtualAccountNumber,
             virtualAccountBank: virtualAccountBank,
             virtualAccountStatus: virtualAccountStatus,
+            department: department,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -28741,6 +28954,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             Value<String?> virtualAccountNumber = const Value.absent(),
             Value<String?> virtualAccountBank = const Value.absent(),
             Value<String?> virtualAccountStatus = const Value.absent(),
+            Value<String?> department = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -28765,6 +28979,7 @@ class $$StudentsTableTableManager extends RootTableManager<
             virtualAccountNumber: virtualAccountNumber,
             virtualAccountBank: virtualAccountBank,
             virtualAccountStatus: virtualAccountStatus,
+            department: department,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -29003,6 +29218,7 @@ typedef $$TeachersTableCreateCompanionBuilder = TeachersCompanion Function({
   Value<DateTime> employmentDate,
   Value<String?> certificates,
   Value<Uint8List?> image,
+  Value<String?> classIds,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -29020,6 +29236,7 @@ typedef $$TeachersTableUpdateCompanionBuilder = TeachersCompanion Function({
   Value<DateTime> employmentDate,
   Value<String?> certificates,
   Value<Uint8List?> image,
+  Value<String?> classIds,
   Value<String?> syncId,
   Value<DateTime?> updatedAt,
   Value<DateTime?> createdAt,
@@ -29097,6 +29314,9 @@ class $$TeachersTableFilterComposer
 
   ColumnFilters<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get classIds => $composableBuilder(
+      column: $table.classIds, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnFilters(column));
@@ -29194,6 +29414,9 @@ class $$TeachersTableOrderingComposer
   ColumnOrderings<Uint8List> get image => $composableBuilder(
       column: $table.image, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get classIds => $composableBuilder(
+      column: $table.classIds, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get syncId => $composableBuilder(
       column: $table.syncId, builder: (column) => ColumnOrderings(column));
 
@@ -29265,6 +29488,9 @@ class $$TeachersTableAnnotationComposer
 
   GeneratedColumn<Uint8List> get image =>
       $composableBuilder(column: $table.image, builder: (column) => column);
+
+  GeneratedColumn<String> get classIds =>
+      $composableBuilder(column: $table.classIds, builder: (column) => column);
 
   GeneratedColumn<String> get syncId =>
       $composableBuilder(column: $table.syncId, builder: (column) => column);
@@ -29356,6 +29582,7 @@ class $$TeachersTableTableManager extends RootTableManager<
             Value<DateTime> employmentDate = const Value.absent(),
             Value<String?> certificates = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
+            Value<String?> classIds = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -29373,6 +29600,7 @@ class $$TeachersTableTableManager extends RootTableManager<
             employmentDate: employmentDate,
             certificates: certificates,
             image: image,
+            classIds: classIds,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,
@@ -29390,6 +29618,7 @@ class $$TeachersTableTableManager extends RootTableManager<
             Value<DateTime> employmentDate = const Value.absent(),
             Value<String?> certificates = const Value.absent(),
             Value<Uint8List?> image = const Value.absent(),
+            Value<String?> classIds = const Value.absent(),
             Value<String?> syncId = const Value.absent(),
             Value<DateTime?> updatedAt = const Value.absent(),
             Value<DateTime?> createdAt = const Value.absent(),
@@ -29407,6 +29636,7 @@ class $$TeachersTableTableManager extends RootTableManager<
             employmentDate: employmentDate,
             certificates: certificates,
             image: image,
+            classIds: classIds,
             syncId: syncId,
             updatedAt: updatedAt,
             createdAt: createdAt,

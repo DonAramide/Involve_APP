@@ -103,6 +103,115 @@ export class AdminAgentController {
   }
 
   /**
+   * Update Agent KYC Status
+   * PATCH /admin/agents/:id/kyc
+   */
+  static async updateKycStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { kycStatus } = req.body;
+      const actorId = (req as any).user?.id || '00000000-0000-0000-0000-000000000000';
+
+      if (!kycStatus) {
+        return res.status(400).json({ success: false, message: 'kycStatus is required' });
+      }
+
+      const updatedAgent = await agentService.updateKycStatus(
+        id,
+        kycStatus,
+        actorId,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: 'Agent KYC status successfully updated',
+        data: updatedAgent
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /**
+   * Get Agent Commissions
+   * GET /admin/agents/:id/commissions
+   */
+  static async getCommissions(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const commissions = await agentService.getCommissions(id);
+      return res.status(200).json({ success: true, data: commissions });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /**
+   * Update Agent Commissions
+   * PATCH /admin/agents/:id/commissions
+   */
+  static async updateCommissions(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const actorId = (req as any).user?.id || '00000000-0000-0000-0000-000000000000';
+      const updatedPlan = await agentService.updateCommissions(
+        id,
+        req.body,
+        actorId,
+        req.ip,
+        req.headers['user-agent']
+      );
+      return res.status(200).json({ success: true, data: updatedPlan });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /**
+   * Send Direct Message to Agent
+   * POST /admin/agents/:id/message
+   */
+  static async messageAgent(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+      const actorId = (req as any).user?.id || '00000000-0000-0000-0000-000000000000';
+
+      if (!message) {
+        return res.status(400).json({ success: false, message: 'Message is required' });
+      }
+
+      await agentService.messageAgent(id, message, actorId);
+      return res.status(200).json({ success: true, message: 'Message successfully sent to agent' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /**
+   * Broadcast message to all tenants managed by agent
+   * POST /admin/agents/:id/message-tenants
+   */
+  static async messageTenants(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { message } = req.body;
+      const actorId = (req as any).user?.id || '00000000-0000-0000-0000-000000000000';
+
+      if (!message) {
+        return res.status(400).json({ success: false, message: 'Message is required' });
+      }
+
+      await agentService.messageTenants(id, message, actorId);
+      return res.status(200).json({ success: true, message: 'Broadcast message successfully queued for tenants' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
+  /**
    * Global Audit Logs
    * GET /admin/agents/audit-logs
    */

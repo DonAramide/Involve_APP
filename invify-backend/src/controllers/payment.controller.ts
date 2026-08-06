@@ -58,4 +58,55 @@ export class PaymentController {
       return res.status(500).json({ error: error.message });
     }
   }
+
+  static async getPaymentIntent(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const result = await PaymentService.getIntent(id);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error('[PaymentController] getPaymentIntent Error:', error.message);
+      return res.status(error.message.includes('not found') ? 404 : 500).json({ error: error.message });
+    }
+  }
+
+  static async cancelPaymentIntent(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const result = await PaymentService.cancelIntent(id);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error('[PaymentController] cancelPaymentIntent Error:', error.message);
+      return res.status(error.message.includes('not found') ? 404 : 500).json({ error: error.message });
+    }
+  }
+
+  static async getPaymentHistory(req: Request, res: Response) {
+    try {
+      const { tenantId } = req.query;
+      if (!tenantId) {
+        return res.status(400).json({ error: "tenantId query parameter is required." });
+      }
+      const result = await PaymentService.getHistory(tenantId as string);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error('[PaymentController] getPaymentHistory Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async refundPaymentIntent(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { amount, reason } = req.body;
+      if (!amount) {
+        return res.status(400).json({ error: "amount is required for processing refunds." });
+      }
+      const result = await PaymentService.refundIntent(id, amount, reason);
+      return res.status(200).json(result);
+    } catch (error: any) {
+      console.error('[PaymentController] refundPaymentIntent Error:', error.message);
+      return res.status(error.message.includes('not found') ? 404 : 500).json({ error: error.message });
+    }
+  }
 }

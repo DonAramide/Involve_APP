@@ -24,34 +24,63 @@
       <div class="col-12 col-lg-8">
         <q-card class="bg-card-dark border-grey-9 q-pa-lg fit">
           <div class="text-h6 text-weight-bold text-white q-mb-xs">Dynamic Module Provisioning Matrix</div>
-          <div class="text-caption text-grey-5 q-mb-md">This layout shows the workspace operational module assigned to this tenant. Each business profile is configured for exactly one mode of operation.</div>
+          <div class="text-caption text-grey-5 q-mb-md">Workspace operational module provisioned for this tenant. Contact Super Admin to switch mode.</div>
 
-          <div class="q-pa-md rounded-borders border-grey-9 bg-red-10 text-red-3 row items-center op-gap-8 text-caption q-mb-md font-mono" style="border: 1px solid rgba(239, 68, 68, 0.2);">
-            <q-icon name="info" size="sm" color="red-4" />
-            <span><strong>PROVISIONING LOCK:</strong> Workspaces are locked to their administration-assigned mode. To switch this business to a different mode, please contact Invify Super Admin.</span>
-          </div>
-
-          <div class="column q-gutter-y-sm">
-            <div 
-              v-for="mod in modules" 
-              :key="mod.id" 
-              class="q-pa-md rounded-borders border-grey-9 row items-center justify-between transition-3"
-              :class="activeModule === mod.id ? 'active-module' : 'bg-black-transparent opacity-50'"
-              style="cursor: not-allowed;"
-            >
-              <div class="row items-center op-gap-12 col">
-                <q-icon :name="mod.icon" :color="activeModule === mod.id ? mod.color : 'grey-7'" size="sm" />
-                <div class="col">
-                  <div class="text-caption text-weight-bold" :class="activeModule === mod.id ? 'text-white' : 'text-grey-7'">{{ mod.name }}</div>
-                  <div class="text-caption text-grey-7" style="font-size: 11px;">{{ mod.desc }}</div>
+          <!-- Active Module — prominently displayed -->
+          <div
+            v-for="mod in modules.filter(m => m.id === activeModule)"
+            :key="mod.id"
+            class="q-pa-md rounded-borders row items-center justify-between q-mb-md active-module"
+          >
+            <div class="row items-center op-gap-12 col">
+              <q-icon :name="mod.icon" :color="mod.color" size="sm" />
+              <div class="col">
+                <div class="text-caption text-weight-bold text-white">{{ mod.name }}</div>
+                <div class="text-caption text-grey-5" style="font-size: 11px;">{{ mod.desc }}</div>
+                <!-- School-specific feature chips -->
+                <div class="row q-gutter-x-xs q-mt-xs" v-if="mod.id === 'school'">
+                  <q-chip dense size="xs" color="indigo-10" text-color="indigo-3" icon="menu_book">Curriculum Tools</q-chip>
+                  <q-chip dense size="xs" color="indigo-10" text-color="indigo-3" icon="assignment">Lesson Report Cards</q-chip>
+                  <q-chip dense size="xs" color="indigo-10" text-color="indigo-3" icon="people">Student Attendance</q-chip>
+                  <q-chip dense size="xs" color="indigo-10" text-color="indigo-3" icon="payments">Tuition Fee Matrix</q-chip>
                 </div>
               </div>
-              <div class="row items-center op-gap-8">
-                <q-badge color="indigo-10" text-color="indigo-3" class="text-metric-sm text-weight-bold" v-if="activeModule === mod.id">ACTIVE PREFERENCE</q-badge>
-                <q-radio v-model="activeModule" :val="mod.id" dark color="indigo-4" disable />
-              </div>
+            </div>
+            <div class="row items-center op-gap-8">
+              <q-badge color="green-10" text-color="green-3" class="text-metric-sm text-weight-bold q-px-sm">
+                <q-icon name="check_circle" size="xs" class="q-mr-xs" />ACTIVE PREFERENCE
+              </q-badge>
             </div>
           </div>
+
+          <!-- Collapsed: other modules (hidden by default) -->
+          <q-expansion-item
+            dense
+            dark
+            icon="visibility_off"
+            label="Other Available Modules (Not Provisioned)"
+            header-class="text-grey-6 text-caption q-pa-none"
+            expand-icon-class="text-grey-7"
+            class="q-mt-xs"
+          >
+            <div class="column q-gutter-y-sm q-mt-sm">
+              <div
+                v-for="mod in modules.filter(m => m.id !== activeModule)"
+                :key="mod.id"
+                class="q-pa-sm rounded-borders row items-center justify-between bg-black-transparent opacity-40"
+                style="border: 1px solid rgba(255,255,255,0.04);"
+              >
+                <div class="row items-center op-gap-8 col">
+                  <q-icon :name="mod.icon" color="grey-8" size="xs" />
+                  <div class="col">
+                    <div class="text-caption text-grey-7">{{ mod.name }}</div>
+                    <div class="text-grey-8" style="font-size: 10px;">{{ mod.desc }}</div>
+                  </div>
+                </div>
+                <q-badge color="grey-9" text-color="grey-6" class="text-metric-sm" size="xs">NOT PROVISIONED</q-badge>
+              </div>
+            </div>
+          </q-expansion-item>
         </q-card>
       </div>
 
@@ -117,16 +146,42 @@
       <div class="col-12 col-md-6">
         <q-card class="bg-card-dark border-grey-9 q-pa-lg fit column justify-between">
           <div>
-            <div class="text-h6 text-weight-bold text-white q-mb-xs">API Credentials Infrastructure</div>
-            <div class="text-caption text-grey-5 q-mb-md">Connect external inventory systems or ERP databases safely.</div>
+            <div class="row items-center justify-between q-mb-xs">
+              <div class="text-h6 text-weight-bold text-white">API Credentials Infrastructure</div>
+              <q-badge
+                :color="apiKey ? 'green-8' : 'amber-8'"
+                :label="apiKey ? 'PROVISIONED' : 'NOT PROVISIONED'"
+                class="text-weight-bold text-caption"
+              />
+            </div>
+            <div class="text-caption text-grey-5 q-mb-md">Connect external inventory systems or ERP databases safely. Public key only — secrets are vault-protected.</div>
 
-            <q-input v-model="apiKey" dark outlined dense readonly label="Active Production Client Secret Key" class="font-mono text-caption q-mb-md">
-              <template v-slot:append>
+            <!-- Public API Key field -->
+            <q-input
+              v-model="apiKey"
+              dark outlined dense readonly
+              :label="apiKey ? 'Active Public API Key (pk_test_…)' : 'Public API Key'"
+              :placeholder="apiKey ? '' : 'Not yet provisioned — activate Financial Platform first'"
+              class="font-mono text-caption q-mb-md"
+            >
+              <template v-slot:prepend v-if="!apiKey">
+                <q-icon name="lock_open" color="amber-5" size="xs" />
+              </template>
+              <template v-slot:prepend v-if="apiKey">
+                <q-icon name="verified_user" color="green-4" size="xs" />
+              </template>
+              <template v-slot:append v-if="apiKey">
                 <q-btn flat dense color="indigo-4" icon="content_copy" @click="copyKey" />
               </template>
             </q-input>
 
-            <q-input v-model="webhookUrl" dark outlined dense label="Quasar Webhook Notification Endpoint URL" class="font-mono text-caption" />
+            <q-input
+              v-model="webhookUrl"
+              dark outlined dense
+              label="Your Webhook Notification Endpoint URL"
+              placeholder="e.g. https://yourdomain.com/api/v1/quasar-webhook"
+              class="font-mono text-caption"
+            />
           </div>
 
           <q-btn outline color="indigo-4" label="Regenerate API Credentials" @click="regenKey" class="full-width q-mt-md text-weight-bold letter-spacing-1" />
@@ -162,13 +217,15 @@ const savePreferences = () => {
 }
 
 const copyKey = () => {
-  const el = document.createElement('textarea');
-  el.value = apiKey.value;
-  document.body.appendChild(el);
-  el.select();
-  document.execCommand('copy');
-  document.body.removeChild(el);
-  $q.notify({ type: 'positive', message: 'API client secret copied to clipboard.' });
+  navigator.clipboard?.writeText(apiKey.value).catch(() => {
+    const el = document.createElement('textarea');
+    el.value = apiKey.value;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  });
+  $q.notify({ type: 'positive', message: 'Public API key copied to clipboard.' });
 }
 
 const regenKey = () => {

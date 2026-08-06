@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -41,7 +42,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
       
       final verifyUrls = [
         'http://localhost:3004/auth/verify-whatsapp-otp',
-        '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/auth/verify-whatsapp-otp',
+        '${AppConfig.baseUrl}/auth/verify-whatsapp-otp',
       ];
 
       bool otpVerified = false;
@@ -85,7 +86,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
       final phone = widget.payload['phone'];
       final urls = [
         'http://localhost:3004/auth/send-whatsapp-otp',
-        '${dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004'}/auth/send-whatsapp-otp',
+        '${AppConfig.baseUrl}/auth/send-whatsapp-otp',
       ];
 
       bool otpSent = false;
@@ -125,6 +126,10 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SafeArea(

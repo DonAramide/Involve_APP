@@ -524,7 +524,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         final updatedBill = existingBill.copyWith(
           amountPaid: existingBill.amountPaid + event.amount,
           balanceAmount: existingBill.balanceAmount - event.amount,
-          paymentStatus: (existingBill.balanceAmount - event.amount) <= 0 ? 'Paid' : 'Partial',
+          paymentStatus: event.method == 'Transfer' ? 'Pending' : ((existingBill.balanceAmount - event.amount) <= 0 ? 'Paid' : 'Partial'),
           paymentMethod: event.method, // Update to latest payment method
         );
         await invoiceRepository.updateInvoice(updatedBill);
@@ -552,7 +552,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           totalAmount: student.balance,
           amountPaid: event.amount,
           balanceAmount: newBalance,
-          paymentStatus: newBalance <= 0 ? 'Paid' : 'Partial',
+          paymentStatus: event.method == 'Transfer' ? 'Pending' : (newBalance <= 0 ? 'Paid' : 'Partial'),
           paymentMethod: event.method,
           businessMode: 'school',
           items: [
@@ -586,7 +586,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
     try {
       if (apiClient == null) {
-        throw Exception("API Client not available.");
+        throw Exception("Dedicated Virtual Account provisioning is only available in online mode. Please check your internet connection.");
       }
       
       // We don't need to append the tenant id in URL since it's injected via headers,
@@ -622,7 +622,10 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         throw Exception("Failed to provision account");
       }
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      final errorMsg = e.toString().startsWith('Exception: ') 
+          ? e.toString().substring('Exception: '.length) 
+          : e.toString();
+      emit(state.copyWith(error: errorMsg, status: SchoolStatus.failure));
     }
   }
 

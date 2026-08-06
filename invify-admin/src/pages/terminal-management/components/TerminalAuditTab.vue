@@ -1,17 +1,30 @@
 <template>
   <div>
     <div class="row q-mb-md q-col-gutter-sm items-center">
-      <div class="col-12 col-sm-4">
-        <q-input v-model="filters.terminalId" dense outlined placeholder="Filter by Terminal ID" @keyup.enter="fetchLogs">
+      <div class="col-12 col-sm-5">
+        <q-input v-model="filters.terminalId" dense outlined clearable placeholder="Search by Terminal ID / device..." @keyup.enter="fetchLogs">
           <template v-slot:append>
             <q-icon name="search" class="cursor-pointer" @click="fetchLogs" />
           </template>
         </q-input>
       </div>
       <div class="col-12 col-sm-4">
-        <q-select v-model="filters.actionType" :options="actionOptions" dense outlined emit-value map-options label="Action Type" @update:model-value="fetchLogs" clearable />
+        <q-select
+          v-model="filters.actionType"
+          :options="filteredActionOptions"
+          dense
+          outlined
+          emit-value
+          map-options
+          label="Action Type"
+          clearable
+          use-input
+          input-debounce="0"
+          @filter="filterActions"
+          @update:model-value="fetchLogs"
+        />
       </div>
-      <div class="col-12 col-sm-4 row justify-end">
+      <div class="col-12 col-sm-3 row justify-end">
         <q-btn icon="refresh" flat round color="primary" @click="fetchLogs" />
       </div>
     </div>
@@ -22,6 +35,7 @@
       row-key="id"
       v-model:pagination="pagination"
       :loading="loading"
+      :rows-per-page-options="[10, 30, 50, 100]"
       @request="onRequest"
       flat
       bordered
@@ -51,7 +65,7 @@ import { date } from 'quasar'
 const $q = useQuasar()
 const loading = ref(false)
 const logs = ref([])
-const pagination = ref({ page: 1, rowsPerPage: 50, rowsNumber: 0 })
+const pagination = ref({ page: 1, rowsPerPage: 30, rowsNumber: 0 })
 const filters = ref({ terminalId: '', actionType: '' })
 
 const actionOptions = [
@@ -63,6 +77,17 @@ const actionOptions = [
   { label: 'BULK_IMPORT', value: 'BULK_IMPORT' },
   { label: 'EDITED', value: 'EDITED' }
 ]
+
+const filteredActionOptions = ref([...actionOptions])
+
+const filterActions = (val, update) => {
+  update(() => {
+    const needle = String(val || '').toLowerCase().trim()
+    filteredActionOptions.value = !needle
+      ? actionOptions
+      : actionOptions.filter(opt => String(opt.label).toLowerCase().includes(needle))
+  })
+}
 
 const columns = [
   { name: 'created_at', label: 'Timestamp', field: row => date.formatDate(row.created_at, 'YYYY-MM-DD HH:mm:ss'), align: 'left' },

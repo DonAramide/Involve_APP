@@ -4,10 +4,12 @@
       <!-- HEADER -->
       <q-card-section class="row items-center border-bottom q-py-md bg-subpanel">
         <div class="row items-center op-gap-16">
-          <q-avatar size="lg" :color="getCategoryColor(integration?.category)" text-color="white" icon="hub" />
+          <q-avatar size="lg" :color="getCategoryColor(integration?.category)" text-color="white" :icon="isQuasar ? 'webhook' : 'hub'" />
           <div>
             <div class="text-h6 text-weight-bold">{{ integration?.name }} Vault</div>
-            <div class="text-caption text-grey-5">Manage credentials, certificates, and environments</div>
+            <div class="text-caption text-grey-5">
+              {{ isQuasar ? 'Manage Quasar webhook signing secret and payment credentials' : 'Manage credentials, certificates, and environments' }}
+            </div>
           </div>
         </div>
         <q-space />
@@ -15,7 +17,7 @@
       </q-card-section>
 
       <q-card-section class="q-pa-xl" style="max-width: 1200px; margin: 0 auto;">
-        
+
         <!-- Environment Toggle -->
         <div class="row items-center q-mb-lg justify-between">
           <q-btn-toggle
@@ -27,8 +29,101 @@
               {label: 'PRODUCTION', value: 'PRODUCTION'},
               {label: 'SANDBOX', value: 'SANDBOX'}
             ]"
+            @update:model-value="onEnvironmentChange"
           />
-          <q-btn outline color="cyan-4" icon="add" label="Add New Version" @click="showAddDialog = true" />
+          <q-btn outline color="cyan-4" icon="add" label="Add New Version" @click="openAddDialog()" />
+        </div>
+
+        <!-- Quasar webhook card (same visual language as vault cards) -->
+        <div v-if="isQuasar" class="row q-col-gutter-md q-mb-lg">
+          <div class="col-12 col-md-6">
+            <q-card flat class="enterprise-panel bg-subpanel border-main">
+              <q-card-section>
+                <div class="row justify-between items-start">
+                  <div class="row items-center op-gap-8">
+                    <q-avatar size="md" color="teal-8" text-color="teal-2" icon="webhook" />
+                    <div>
+                      <div class="text-weight-bold text-subtitle1">Outbound Webhook Signing</div>
+                      <div class="text-caption text-grey-5">QUASAR_WEBHOOK_SIGNING_SECRET</div>
+                    </div>
+                  </div>
+                  <q-chip
+                    dense size="sm"
+                    :color="webhookStatus?.configured ? 'green-9' : 'orange-10'"
+                    :text-color="webhookStatus?.configured ? 'green-3' : 'orange-2'"
+                  >
+                    {{ webhookStatus?.configured ? 'CONFIGURED' : 'MISSING' }}
+                  </q-chip>
+                </div>
+
+                <q-separator dark class="q-my-md opacity-20" />
+
+                <div class="row justify-between text-caption text-grey-4 q-mb-sm">
+                  <span>Header</span>
+                  <span class="text-cyan-3">x-quasar-signature</span>
+                </div>
+                <div class="row justify-between text-caption text-grey-4 q-mb-sm">
+                  <span>Endpoint</span>
+                  <span class="text-white">POST /webhooks/quasar</span>
+                </div>
+                <div class="row justify-between text-caption text-grey-4 q-mb-md">
+                  <span>Sources</span>
+                  <span>
+                    <span :class="webhookStatus?.sources?.runtimeEnv ? 'text-green-4' : 'text-grey-6'">env</span>
+                    ·
+                    <span :class="webhookStatus?.sources?.integrationVault ? 'text-green-4' : 'text-grey-6'">vault</span>
+                  </span>
+                </div>
+
+                <q-input
+                  outlined dense dark
+                  v-model="webhookSecretInput"
+                  :type="revealWebhook ? 'text' : 'password'"
+                  label="Paste Quasar Outbound signing secret"
+                  hint="From Quasar Admin → Webhooks → Outbound defaults"
+                  autocomplete="new-password"
+                  data-lpignore="true"
+                  class="q-mb-md"
+                >
+                  <template #append>
+                    <q-btn flat round dense :icon="revealWebhook ? 'visibility_off' : 'visibility'" @click="revealWebhook = !revealWebhook" />
+                  </template>
+                </q-input>
+
+                <q-btn
+                  unelevated color="cyan-6" class="full-width"
+                  icon="lock"
+                  label="Save Webhook Secret"
+                  :loading="savingWebhook"
+                  :disable="!webhookSecretInput || webhookSecretInput.length < 10"
+                  @click="saveWebhookSecret"
+                />
+              </q-card-section>
+            </q-card>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <q-card flat class="enterprise-panel bg-subpanel border-main">
+              <q-card-section>
+                <div class="row justify-between items-start">
+                  <div class="row items-center op-gap-8">
+                    <q-avatar size="md" color="blue-grey-8" text-color="cyan-2" icon="info" />
+                    <div>
+                      <div class="text-weight-bold text-subtitle1">How to configure</div>
+                      <div class="text-caption text-grey-5">Quasar → Invify HMAC</div>
+                    </div>
+                  </div>
+                </div>
+                <q-separator dark class="q-my-md opacity-20" />
+                <ol class="text-caption text-grey-4 q-pl-md" style="line-height: 1.7;">
+                  <li>Open Quasar Admin → Platform → Webhooks → Outbound</li>
+                  <li>Set Invify service URL to your receiver (e.g. http://127.0.0.1:3004/webhooks/quasar)</li>
+                  <li>Copy the one-time Signing secret</li>
+                  <li>Paste it here and Save Webhook Secret</li>
+                </ol>
+              </q-card-section>
+            </q-card>
+          </div>
         </div>
 
         <!-- Credentials Table -->
@@ -50,11 +145,11 @@
                 </q-chip>
               </q-td>
             </template>
-            
+
             <template v-slot:body-cell-secret="props">
               <q-td :props="props">
                 <div class="row items-center">
-                  <span class="text-grey-4 q-mr-sm text-monospace" v-if="!props.row.revealed">••••••••••••••••</span>
+                  <span class="text-grey-4 q-mr-sm text-monospace" v-if="!props.row.revealed">{{ getMaskedSecret(props.row.plaintext_value) }}</span>
                   <span class="text-white q-mr-sm text-monospace" v-else>{{ props.row.plaintext_value || '********' }}</span>
                   <q-btn flat round dense size="sm" color="grey-5" :icon="props.row.revealed ? 'visibility_off' : 'visibility'" @click="props.row.revealed = !props.row.revealed" />
                 </div>
@@ -118,7 +213,7 @@
 
       </q-card-section>
     </q-card>
-    
+
     <!-- Dialog for Adding new credential -->
     <q-dialog v-model="showAddDialog">
       <q-card class="bg-panel enterprise-panel text-main border-main" style="width: 500px; max-width: 90vw;">
@@ -143,7 +238,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
 import { vaultApi } from '../../api';
 
@@ -160,8 +255,17 @@ watch(isOpen, val => emit('update:modelValue', val));
 
 const activeEnvironment = ref('PRODUCTION');
 const showAddDialog = ref(false);
+const webhookSecretInput = ref('');
+const revealWebhook = ref(false);
+const savingWebhook = ref(false);
+const webhookStatus = ref(null);
 
 const newCred = ref({ type: 'API_KEY', key_name: '', value: '', expires_at: '', rotate: false });
+
+const isQuasar = computed(() => {
+  const id = String(props.integration?.service_identifier || '').toLowerCase();
+  return id === 'quasar' || id === 'quasar_ledger' || id.includes('quasar');
+});
 
 const columns = [
   { name: 'key_name', label: 'Version Name', align: 'left', field: 'key_name' },
@@ -171,7 +275,6 @@ const columns = [
   { name: 'expires', label: 'Expires', align: 'left', field: 'expires_at' },
   { name: 'actions', label: 'Actions', align: 'right' }
 ];
-
 
 const credentialsForEnv = computed(() => {
   const creds = props.integration?.integration_credentials || [];
@@ -194,6 +297,64 @@ function isExpired(dateString) {
   return new Date(dateString) < new Date();
 }
 
+function getMaskedSecret(secret) {
+  if (!secret) return '••••••••••••••••';
+  if (secret.length <= 6) return secret.substring(0, 1) + '••••' + secret.substring(secret.length - 1);
+  return secret.substring(0, 3) + '••••••••••' + secret.substring(secret.length - 3);
+}
+
+async function loadWebhookStatus() {
+  if (!isQuasar.value) return;
+  try {
+    const res = await vaultApi.getQuasarWebhookSecretStatus(activeEnvironment.value);
+    webhookStatus.value = res.data?.data || res.data || null;
+  } catch (err) {
+    console.error(err);
+    webhookStatus.value = { configured: false, sources: { runtimeEnv: false, integrationVault: false } };
+  }
+}
+
+function onEnvironmentChange() {
+  loadWebhookStatus();
+}
+
+async function saveWebhookSecret() {
+  if (!webhookSecretInput.value || webhookSecretInput.value.length < 10) {
+    $q.notify({ type: 'warning', message: 'Paste a valid signing secret (min 10 characters).' });
+    return;
+  }
+  try {
+    savingWebhook.value = true;
+    const res = await vaultApi.saveQuasarWebhookSigningSecret({
+      signingSecret: webhookSecretInput.value.trim(),
+      environment: activeEnvironment.value,
+    });
+    $q.notify({
+      type: 'positive',
+      message: res.data?.responseMessage || 'Webhook signing secret saved.',
+    });
+    webhookSecretInput.value = '';
+    revealWebhook.value = false;
+    await loadWebhookStatus();
+    emit('refresh');
+  } catch (err) {
+    console.error(err);
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.responseMessage || err.response?.data?.error || 'Failed to save webhook secret.',
+    });
+  } finally {
+    savingWebhook.value = false;
+  }
+}
+
+function openAddDialog(prefill = {}) {
+  showAddDialog.value = true;
+  if (prefill.type) newCred.value.type = prefill.type;
+  if (prefill.key_name) newCred.value.key_name = prefill.key_name;
+  if (prefill.rotate) newCred.value.rotate = true;
+}
+
 async function testConnection(cred) {
   $q.notify({ type: 'info', message: `Pinging ${props.integration?.name}...` });
   try {
@@ -211,8 +372,7 @@ async function testConnection(cred) {
 }
 
 function rotateSecret() {
-  showAddDialog.value = true;
-  newCred.value.rotate = true;
+  openAddDialog({ rotate: true });
 }
 
 async function activateSecret(cred) {
@@ -257,21 +417,43 @@ async function saveNewCredential() {
   }
 
   try {
-    await vaultApi.addCredential(props.integration.id, {
-      credential_type: newCred.value.type,
-      environment: activeEnvironment.value,
-      plaintext_value: newCred.value.value,
-      key_name: newCred.value.key_name,
-      expires_at: newCred.value.expires_at || null,
-      rotate_existing: newCred.value.rotate
-    });
+    // Quasar webhook secrets also activate runtime HMAC verification
+    if (isQuasar.value && newCred.value.type === 'WEBHOOK_SECRET') {
+      await vaultApi.saveQuasarWebhookSigningSecret({
+        signingSecret: newCred.value.value.trim(),
+        environment: activeEnvironment.value,
+      });
+    } else {
+      await vaultApi.addCredential(props.integration.id, {
+        credential_type: newCred.value.type,
+        environment: activeEnvironment.value,
+        plaintext_value: newCred.value.value,
+        key_name: newCred.value.key_name,
+        expires_at: newCred.value.expires_at || null,
+        rotate_existing: newCred.value.rotate
+      });
+    }
     $q.notify({ type: 'positive', message: 'Credential encrypted and saved successfully.' });
     showAddDialog.value = false;
     newCred.value = { type: 'API_KEY', key_name: '', value: '', expires_at: '', rotate: false };
+    await loadWebhookStatus();
     emit('refresh');
   } catch (err) {
     console.error(err);
     $q.notify({ type: 'negative', message: 'Failed to save credential.' });
   }
 }
+
+watch(isQuasar, (val) => {
+  if (val) loadWebhookStatus();
+}, { immediate: true });
+
+onMounted(() => {
+  if (isQuasar.value) loadWebhookStatus();
+});
 </script>
+
+<style scoped>
+.op-gap-8 { gap: 8px; }
+.op-gap-16 { gap: 16px; }
+</style>

@@ -51,8 +51,8 @@ export const CanonicalEnvelopeSchema = {
     "targetScopes",
     "replayEligible",
     "launcherMode",
-    "priorityLane",
-    "locationContext"
+    "priorityLane"
+    // locationContext is OPTIONAL — geolocation is not available in admin console environments
   ],
   properties: {
     broadcastId: { type: "string", format: "uuid" },

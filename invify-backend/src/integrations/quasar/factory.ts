@@ -1,18 +1,47 @@
 // src/integrations/quasar/factory.ts
 import { QuasarService } from "./quasar.service";
+import { IntegrationVaultService } from "../../services/integration-vault.service";
 
 /**
  * Factory function to retrieve a correctly initialized QuasarService.
- * RULE: Platform-level credentials only. NEVER use per-tenant API keys.
- * Production model: single platform Quasar account (QUASER_API_KEY env var).
- * tenantId parameter retained for signature compatibility.
+ * Dynamically resolves the tenant-specific sk_live_* key from the Integration Vault
+ * and falls back to the platform API key if none is provisioned.
  */
 export const getQuasarService = async (tenantId: string): Promise<QuasarService> => {
-  const platformApiKey = process.env.QUASER_API_KEY;
-  if (!platformApiKey) {
-    console.error(`[Quasar Factory] QUASER_API_KEY environment variable is not set. Cannot initialize QuasarService for tenant: ${tenantId}`);
-    throw new Error('QUASER_API_KEY environment variable is required for Quasar integration');
+  let apiKey = '';
+
+  if (tenantId) {
+    try {
+      const tenantServiceId = `quasarTenant:${tenantId}`;
+      const decrypted =
+        await IntegrationVaultService.getDecryptedCredential(tenantServiceId, 'PRODUCTION', tenantId, 'apiKeySecret')
+        || await IntegrationVaultService.getDecryptedCredential(tenantServiceId, 'STAGING', tenantId, 'apiKeySecret')
+        || await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'PRODUCTION', tenantId, 'apiKeySecret')
+        || await IntegrationVaultService.getDecryptedCredential('quasarTenant', 'STAGING', tenantId, 'apiKeySecret');
+      
+      if (decrypted) {
+        apiKey = decrypted;
+      }
+    } catch (vaultErr) {
+      console.warn(`[Quasar Factory] Failed to resolve tenant secret key from vault for tenant: ${tenantId}`, vaultErr);
+    }
   }
-  const webhookSecret = process.env.QUASER_WEBHOOK_SECRET || '';
-  return new QuasarService(platformApiKey, webhookSecret);
+
+  if (!apiKey) {
+    apiKey =
+      process.env.QUASAR_API_KEY?.trim() ||
+      process.env.QUASER_API_KEY?.trim() ||
+      '';
+  }
+
+  if (!apiKey || apiKey.includes('your-quaser')) {
+    console.error(`[Quasar Factory] QUASAR_API_KEY is not set. Cannot initialize QuasarService for tenant: ${tenantId}`);
+    throw new Error('QUASAR_API_KEY (sk_test_* / sk_live_*) is required for Quasar integration');
+  }
+
+  const webhookSecret =
+    process.env.QUASAR_WEBHOOK_SECRET ||
+    process.env.QUASER_WEBHOOK_SECRET ||
+    '';
+  return new QuasarService(apiKey, webhookSecret);
 };

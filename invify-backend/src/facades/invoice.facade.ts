@@ -40,9 +40,10 @@ export class InvoiceFacade {
       .select('*, customer:customer_id(*)')
       .eq('tenant_id', tenantId)
       .eq('id', id)
-      .single();
+      .maybeSingle();
       
     if (error) throw new Error(error.message);
+    if (!invoice) return null;
     
     const { data: items, error: itemsError } = await supabaseAdmin
       .from('invoice_items')
@@ -50,8 +51,29 @@ export class InvoiceFacade {
       .eq('invoice_id', id);
       
     if (itemsError) throw new Error(itemsError.message);
+
+    const itemIds = (items || []).map((i: any) => i.item_id).filter(Boolean);
+    const itemMap: Record<string, string> = {};
+    if (itemIds.length > 0) {
+      const { data: dbItems, error: dbItemsErr } = await supabaseAdmin
+        .from('items')
+        .select('id, name')
+        .in('id', itemIds);
+      if (dbItemsErr) console.error('Error fetching item details:', dbItemsErr);
+      if (dbItems) {
+        dbItems.forEach((it: any) => {
+          itemMap[it.id] = it.name;
+        });
+      }
+    }
     
-    return { ...invoice, items };
+    const enrichedItems = (items || []).map((i: any) => ({
+      ...i,
+      name: itemMap[i.item_id] || 'Product Item',
+      total: Number(i.quantity || 0) * Number(i.unit_price || 0)
+    }));
+    
+    return { ...invoice, items: enrichedItems };
   }
 
   static async recordPayment(tenantId: string, id: string, payload: any) {

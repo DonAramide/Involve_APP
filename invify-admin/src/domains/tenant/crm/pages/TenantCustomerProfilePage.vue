@@ -4,7 +4,7 @@
     <!-- Top Nav -->
     <div class="row items-center q-mb-md">
       <q-btn flat round icon="arrow_back" color="white" @click="router.back()" class="q-mr-sm" />
-      <div class="text-h5 text-weight-bold">Student Profile</div>
+      <div class="text-h5 text-weight-bold">{{ profileTitle }}</div>
     </div>
 
     <!-- Header Card -->
@@ -13,10 +13,10 @@
         {{ initials }}
       </q-avatar>
       <div class="column justify-center flex-grow">
-        <div class="text-h4 text-weight-bolder">{{ student?.first_name }} {{ student?.last_name }}</div>
+        <div class="text-h4 text-weight-bolder">{{ displayName }}</div>
         <div class="text-subtitle1 text-grey-5 q-mt-xs">{{ student?.email }} • {{ student?.phone }}</div>
         <div class="row q-mt-sm op-gap-8">
-          <q-chip color="cyan-9" text-color="black" size="sm" class="text-weight-bold font-mono">
+          <q-chip color="cyan-9" text-color="black" size="sm" class="text-weight-bold font-mono" v-if="isSchool">
             {{ student?.metadata?.class || 'N/A' }}
           </q-chip>
           <q-chip color="green-10" text-color="green-3" size="sm" class="text-weight-bold font-mono" v-if="student?.status === 'ACTIVE'">
@@ -28,7 +28,7 @@
         <div class="text-caption text-grey-5 text-uppercase">Current Balance</div>
         <div class="row items-center justify-end q-mt-xs op-gap-8">
           <div :class="['text-h4 font-mono text-weight-bolder', balanceColor]">
-            ₦{{ balance.toLocaleString() }}
+            {{ formattedBalance }}
           </div>
           <q-chip 
             v-if="balance > 0" 
@@ -43,7 +43,7 @@
             text-color="green-3" 
             size="sm" 
             class="text-weight-bold font-mono"
-          >CREDIT</q-chip>
+          >SURPLUS</q-chip>
         </div>
       </div>
     </q-card>
@@ -61,7 +61,7 @@
       >
         <q-tab name="general" label="General Info" />
         <q-tab name="billing" label="Billing Records" />
-        <q-tab name="results" label="Academic Results" />
+        <q-tab name="results" label="Academic Results" v-if="isSchool" />
         <q-tab name="payments" label="Payment History" />
       </q-tabs>
 
@@ -74,19 +74,19 @@
             <div class="col-12 col-md-6">
               <div class="text-caption text-grey-5 text-uppercase q-mb-sm">Demographics</div>
               <div class="q-mb-md">
-                <div class="text-grey-4">Admission Number</div>
+                <div class="text-grey-4">{{ isSchool ? 'Admission Number' : 'Customer Account ID' }}</div>
                 <div class="text-body1 font-mono">{{ student?.id || 'N/A' }}</div>
               </div>
               <div class="q-mb-md">
                 <div class="text-grey-4">Registration Date</div>
                 <div class="text-body1">{{ new Date(student?.created_at || Date.now()).toLocaleDateString() }}</div>
               </div>
-              <div class="q-mb-md">
+              <div class="q-mb-md" v-if="isSchool">
                 <div class="text-grey-4">Gender</div>
                 <div class="text-body1">{{ student?.metadata?.gender || 'N/A' }}</div>
               </div>
             </div>
-            <div class="col-12 col-md-6">
+            <div class="col-12 col-md-6" v-if="isSchool">
               <div class="text-caption text-grey-5 text-uppercase q-mb-sm">Guardians</div>
               <div class="q-mb-md" v-if="student?.metadata?.guardianName">
                 <div class="text-grey-4">Primary Guardian</div>
@@ -101,7 +101,7 @@
         <!-- BILLING TAB -->
         <q-tab-panel name="billing" class="q-pa-none">
           <q-table
-            :rows="mockInvoices"
+            :rows="customerInvoices"
             :columns="invoiceColumns"
             row-key="id"
             dark
@@ -157,7 +157,7 @@
         <!-- PAYMENTS TAB -->
         <q-tab-panel name="payments" class="q-pa-none">
           <q-table
-            :rows="mockPayments"
+            :rows="customerPayments"
             :columns="paymentColumns"
             row-key="id"
             dark
@@ -198,15 +198,25 @@
             <div class="text-subtitle1">{{ selectedPayment.method }}</div>
           </div>
           <div class="row items-center justify-between q-mb-lg">
-            <div class="text-grey-5">Student</div>
-            <div class="text-subtitle1">{{ student?.first_name }} {{ student?.last_name }}</div>
+            <div class="text-grey-5">{{ entityLabel }}</div>
+            <div class="text-subtitle1">{{ displayName }}</div>
           </div>
           
           <q-separator dark class="border-grey-9 q-mb-md" />
+
+          <!-- Itemized Details for Retail -->
+          <div v-if="!isSchool && selectedPayment.items && selectedPayment.items.length" class="q-mb-lg">
+            <div class="text-caption text-grey-5 text-uppercase q-mb-sm">Items purchased</div>
+            <div v-for="item in selectedPayment.items" :key="item.name" class="row items-center justify-between q-py-xs text-caption">
+              <div class="text-grey-3">{{ item.name }} (x{{ item.quantity }})</div>
+              <div class="font-mono">₦{{ item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
+            </div>
+            <q-separator dark class="border-grey-9 q-mt-md q-mb-none" />
+          </div>
           
           <div class="row items-center justify-between">
             <div class="text-h6">Amount Paid</div>
-            <div class="text-h5 font-mono text-weight-bolder text-green-4">₦{{ selectedPayment.amount.toLocaleString() }}</div>
+            <div class="text-h5 font-mono text-weight-bolder text-green-4">₦{{ selectedPayment.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
           </div>
         </q-card-section>
 
@@ -247,15 +257,25 @@
             <div class="text-subtitle1 text-right" style="max-width: 60%;">{{ selectedInvoice.description }}</div>
           </div>
           <div class="row items-center justify-between q-mb-lg">
-            <div class="text-grey-5">Student</div>
-            <div class="text-subtitle1">{{ student?.first_name }} {{ student?.last_name }}</div>
+            <div class="text-grey-5">{{ entityLabel }}</div>
+            <div class="text-subtitle1">{{ displayName }}</div>
           </div>
           
           <q-separator dark class="border-grey-9 q-mb-md" />
+
+          <!-- Itemized Details for Invoice -->
+          <div v-if="selectedInvoice.items && selectedInvoice.items.length" class="q-mb-lg">
+            <div class="text-caption text-grey-5 text-uppercase q-mb-sm">Invoice Items</div>
+            <div v-for="item in selectedInvoice.items" :key="item.name" class="row items-center justify-between q-py-xs text-caption">
+              <div class="text-grey-3">{{ item.name }} (x{{ item.quantity }})</div>
+              <div class="font-mono">₦{{ item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
+            </div>
+            <q-separator dark class="border-grey-9 q-mt-md q-mb-none" />
+          </div>
           
           <div class="row items-center justify-between">
             <div class="text-h6">Amount Due</div>
-            <div class="text-h5 font-mono text-weight-bolder">₦{{ selectedInvoice.amount.toLocaleString() }}</div>
+            <div class="text-h5 font-mono text-weight-bolder">₦{{ selectedInvoice.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
           </div>
         </q-card-section>
 
@@ -274,6 +294,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { CrmRepository } from '../../../../repositories/CrmRepository'
+import { FinanceRepository } from '../../../../repositories/FinanceRepository'
 
 const route = useRoute()
 const router = useRouter()
@@ -285,27 +306,96 @@ const selectedPayment = ref(null)
 const showInvoiceDialog = ref(false)
 const selectedInvoice = ref(null)
 
+const customerInvoices = ref([])
+const customerPayments = ref([])
+
+const isSchool = computed(() => {
+  const type = localStorage.getItem('tenant_type') || 'school'
+  return type.toLowerCase() === 'school'
+})
+
+const profileTitle = computed(() => isSchool.value ? 'Student Profile' : 'Customer Profile')
+const entityLabel = computed(() => isSchool.value ? 'Student' : 'Customer')
+
+const loadRealInvoicesAndPayments = async (tenantId) => {
+  try {
+    const allInvoices = await FinanceRepository.getInvoices(tenantId, { refresh: true });
+    
+    // Filter for this customer ID (match case-insensitive or direct match)
+    customerInvoices.value = allInvoices
+      .filter(inv => inv.customer_id === route.params.id)
+      .map(inv => {
+        return {
+          id: inv.id,
+          date: inv.created_at ? new Date(inv.created_at).toISOString().split('T')[0] : 'N/A',
+          description: inv.invoice_number || 'Billing Invoice',
+          amount: inv.total_amount || 0,
+          status: inv.payment_status || inv.status || 'UNPAID',
+          invoice_number: inv.invoice_number,
+          items: inv.items || []
+        };
+      });
+
+    // Populate payments tab with paid invoices
+    customerPayments.value = customerInvoices.value
+      .filter(inv => inv.status?.toUpperCase() === 'PAID')
+      .map(inv => {
+        return {
+          id: inv.id,
+          date: inv.date,
+          receipt: inv.invoice_number || `REC-${inv.id.slice(0, 8)}`,
+          method: inv.metadata?.payment?.method || 'Cash',
+          amount: inv.amount,
+          items: inv.items || []
+        };
+      });
+  } catch (err) {
+    console.error('Failed to load real customer invoices:', err);
+  }
+}
+
 onMounted(async () => {
   if (route.query.tab) {
     tab.value = route.query.tab
   }
 
   const tenantId = localStorage.getItem('tenant_id') || 'demo-tenant'
-  // In a real app we would call getCustomerProfile(id)
-  // But since the stub is in getCustomers, we'll fetch all and find
-  const students = await CrmRepository.getCustomers(tenantId, 'STUDENT')
+  const type = isSchool.value ? 'STUDENT' : 'CUSTOMER'
+  const students = await CrmRepository.getCustomers(tenantId, type)
   student.value = students.find(s => s.id === route.params.id) || students[0]
+
+  await loadRealInvoicesAndPayments(tenantId)
+})
+
+const displayName = computed(() => {
+  return student.value?.name || (student.value?.first_name ? `${student.value.first_name} ${student.value.last_name}` : 'Unknown')
 })
 
 const initials = computed(() => {
   if (!student.value) return ''
+  if (student.value.name) {
+    const parts = student.value.name.split(' ')
+    return (parts[0]?.[0] || '') + (parts[1]?.[0] || '')
+  }
   return (student.value.first_name?.[0] || '') + (student.value.last_name?.[0] || '')
 })
 
-const balance = computed(() => student.value?.metadata?.balance || 0)
-const balanceColor = computed(() => balance.value > 0 ? 'text-red-4' : 'text-green-4')
+const balance = computed(() => student.value?.balance !== undefined ? student.value.balance : (student.value?.metadata?.balance || 0))
+const balanceColor = computed(() => {
+  const val = Number(balance.value || 0)
+  if (val > 0) return 'text-red-4'
+  if (val < 0) return 'text-green-4'
+  return 'text-grey-5'
+})
+const formattedBalance = computed(() => {
+  const val = Number(balance.value || 0)
+  if (val < 0) {
+    return `-₦${Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+  return `₦${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+})
 
-// --- MOCK DATA ---
+// --- DATA COLUMNS ---
 
 const invoiceColumns = [
   { name: 'date', label: 'DATE', align: 'left', field: 'date', sortable: true },
@@ -313,23 +403,134 @@ const invoiceColumns = [
   { name: 'amount', label: 'AMOUNT (₦)', align: 'right', field: 'amount', sortable: true },
   { name: 'status', label: 'STATUS', align: 'right', field: 'status' }
 ]
-const mockInvoices = [
-  { id: 1, date: '2026-06-01', description: 'Term 3 Tuition', amount: 45000, status: 'PAID' },
-  { id: 2, date: '2026-06-01', description: 'School Bus Fee', amount: 15000, status: 'UNPAID' }
-]
 
-const viewInvoiceDetails = (evt, row) => {
+const viewInvoiceDetails = async (evt, row) => {
   selectedInvoice.value = row
   showInvoiceDialog.value = true
+  
+  if (!row.items || !row.items.length) {
+    try {
+      const detailed = await FinanceRepository.getInvoice(row.id);
+      if (detailed && detailed.items) {
+        selectedInvoice.value = {
+          ...row,
+          items: detailed.items
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load invoice items:', e);
+    }
+  }
 }
 
 const downloadInvoice = () => {
-  $q.notify({
-    type: 'info',
-    message: 'Downloading Invoice PDF...',
-    position: 'top-right',
-    icon: 'download'
-  })
+  if (!selectedInvoice.value) return;
+  const inv = selectedInvoice.value;
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+  
+  const itemsHtml = (inv.items || []).map(item => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.name || 'Product Item'}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">₦${Number(item.unit_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">₦${Number(item.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <html` + `>
+      <head>
+        <title>Invoice - ${inv.invoice_number}</title>
+        <style>
+          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; margin: 40px; }
+          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 20px; }
+          .logo { font-size: 24px; font-weight: bold; color: #1098ad; }
+          .title { font-size: 24px; font-weight: bold; text-align: right; }
+          .details { display: flex; justify-content: space-between; margin-top: 30px; }
+          .details div { width: 45%; }
+          .table { width: 100%; border-collapse: collapse; margin-top: 40px; }
+          .table th { background: #f5f5f5; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
+          .summary { margin-top: 30px; display: flex; justify-content: flex-end; }
+          .summary table { width: 300px; border-collapse: collapse; }
+          .summary td { padding: 8px 0; }
+          .summary .total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; padding-top: 10px; }
+          @media print {
+            body { margin: 20px; }
+          }
+        </style>
+      </head>
+      <body` + `>
+        <div class="header">
+          <div>
+            <div class="logo">INVIFY</div>
+            <div style="margin-top: 5px; font-size: 12px; color: #666;">SaaS Financial Orchestration Center</div>
+          </div>
+          <div>
+            <div class="title">INVOICE</div>
+            <div style="margin-top: 5px; text-align: right; font-size: 14px;"><strong>No:</strong> ${inv.invoice_number}</div>
+            <div style="text-align: right; font-size: 14px;"><strong>Date:</strong> ${inv.date}</div>
+          </div>
+        </div>
+        <div class="details">
+          <div>
+            <h3 style="margin-top: 0; color: #666; font-size: 14px; text-transform: uppercase;">Billed To</h3>
+            <strong>${displayName.value}</strong><br>
+            ${student.value?.email || ''}<br>
+            ${student.value?.phone || ''}
+          </div>
+          <div style="text-align: right;">
+            <h3 style="margin-top: 0; color: #666; font-size: 14px; text-transform: uppercase;">Payment Details</h3>
+            <strong>Status:</strong> ${inv.status || 'UNPAID'}<br>
+            <strong>Method:</strong> ${inv.payment_method || 'N/A'}
+          </div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th style="text-align: center;">Qty</th>
+              <th style="text-align: right;">Unit Price</th>
+              <th style="text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml.length ? itemsHtml : '<tr><td colspan="4" style="padding: 10px; text-align: center; color: #888;">No items registered.</td></tr>'}
+          </tbody>
+        </table>
+        <div class="summary">
+          <table>
+            <tr>
+              <td>Subtotal:</td>
+              <td style="text-align: right;">₦${Number(inv.subtotal || inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+            ${inv.tax_amount > 0 ? `
+            <tr>
+              <td>Tax:</td>
+              <td style="text-align: right;">₦${Number(inv.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>` : ''}
+            ${inv.discount_amount > 0 ? `
+            <tr>
+              <td>Discount:</td>
+              <td style="text-align: right;">-₦${Number(inv.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>` : ''}
+            <tr class="total">
+              <td>Total Value:</td>
+              <td style="text-align: right; color: #1098ad;">₦${Number(inv.amount || inv.total_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          </table>
+        </div>
+        <script` + `>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          }
+        </script` + `>
+      </body` + `>
+    </html` + `>
+  `;
+  printWindow.document.write(html);
+  printWindow.document.close();
 }
 
 const processPayment = () => {
@@ -376,14 +577,24 @@ const paymentColumns = [
   { name: 'method', label: 'METHOD', align: 'left', field: 'method' },
   { name: 'amount', label: 'AMOUNT (₦)', align: 'right', field: 'amount', sortable: true }
 ]
-const mockPayments = [
-  { id: 1, date: '2026-06-05', receipt: 'REC-2026-9812', method: 'Bank Transfer', amount: 45000 },
-  { id: 2, date: '2026-01-10', receipt: 'REC-2026-1102', method: 'Card (Paystack)', amount: 60000 }
-]
 
-const viewPaymentReceipt = (evt, row) => {
+const viewPaymentReceipt = async (evt, row) => {
   selectedPayment.value = row
   showReceiptDialog.value = true
+
+  if (!row.items || !row.items.length) {
+    try {
+      const detailed = await FinanceRepository.getInvoice(row.id);
+      if (detailed && detailed.items) {
+        selectedPayment.value = {
+          ...row,
+          items: detailed.items
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load payment items:', e);
+    }
+  }
 }
 
 const sendEmailReceipt = () => {
@@ -396,12 +607,100 @@ const sendEmailReceipt = () => {
 }
 
 const downloadPdfReceipt = () => {
-  $q.notify({
-    type: 'info',
-    message: 'Downloading PDF receipt...',
-    position: 'top-right',
-    icon: 'download'
-  })
+  if (!selectedPayment.value) return;
+  const pay = selectedPayment.value;
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
+
+  const itemsHtml = (pay.items || []).map(item => `
+    <tr>
+      <td style="padding: 10px; border-bottom: 1px solid #ddd;">${item.name || 'Product Item'}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity || 1}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">₦${Number(item.unit_price || item.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">₦${Number(item.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <html` + `>
+      <head>
+        <title>Receipt - ${pay.id.substring(0, 8).toUpperCase()}</title>
+        <style>
+          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; margin: 40px; }
+          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 20px; }
+          .logo { font-size: 24px; font-weight: bold; color: #2e7d32; }
+          .title { font-size: 24px; font-weight: bold; text-align: right; }
+          .details { display: flex; justify-content: space-between; margin-top: 30px; }
+          .details div { width: 45%; }
+          .table { width: 100%; border-collapse: collapse; margin-top: 40px; }
+          .table th { background: #f5f5f5; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; }
+          .summary { margin-top: 30px; display: flex; justify-content: flex-end; }
+          .summary table { width: 300px; border-collapse: collapse; }
+          .summary td { padding: 8px 0; }
+          .summary .total { font-weight: bold; font-size: 18px; border-top: 2px solid #333; padding-top: 10px; }
+          @media print {
+            body { margin: 20px; }
+          }
+        </style>
+      </head>
+      <body` + `>
+        <div class="header">
+          <div>
+            <div class="logo">INVIFY</div>
+            <div style="margin-top: 5px; font-size: 12px; color: #666;">SaaS Financial Orchestration Center</div>
+          </div>
+          <div>
+            <div class="title">PAYMENT RECEIPT</div>
+            <div style="margin-top: 5px; text-align: right; font-size: 14px;"><strong>Ref:</strong> ${pay.id.substring(0, 8).toUpperCase()}</div>
+            <div style="text-align: right; font-size: 14px;"><strong>Date:</strong> ${new Date(pay.created_at || pay.date).toLocaleDateString()}</div>
+          </div>
+        </div>
+        <div class="details">
+          <div>
+            <h3 style="margin-top: 0; color: #666; font-size: 14px; text-transform: uppercase;">Customer Info</h3>
+            <strong>${displayName.value}</strong><br>
+            ${student.value?.email || ''}<br>
+            ${student.value?.phone || ''}
+          </div>
+          <div style="text-align: right;">
+            <h3 style="margin-top: 0; color: #666; font-size: 14px; text-transform: uppercase;">Payment Details</h3>
+            <strong>Status:</strong> SUCCESSFUL<br>
+            <strong>Method:</strong> ${pay.payment_method || pay.channel || 'N/A'}<br>
+            <strong>Invoice:</strong> ${pay.description || 'N/A'}
+          </div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Item Name</th>
+              <th style="text-align: center;">Qty</th>
+              <th style="text-align: right;">Price</th>
+              <th style="text-align: right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml.length ? itemsHtml : `<tr><td style="padding: 10px; border-bottom: 1px solid #ddd;">${pay.description || 'Customer Payment'}</td><td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">1</td><td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">₦${Number(pay.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">₦${Number(pay.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`}
+          </tbody>
+        </table>
+        <div class="summary">
+          <table>
+            <tr class="total">
+              <td>Amount Paid:</td>
+              <td style="text-align: right; color: #2e7d32;">₦${Number(pay.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            </tr>
+          </table>
+        </div>
+        <script` + `>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          }
+        </script` + `>
+      </body` + `>
+    </html` + `>
+  `;
+  printWindow.document.write(html);
+  printWindow.document.close();
 }
 </script>
 

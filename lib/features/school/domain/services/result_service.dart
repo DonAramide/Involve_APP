@@ -5,6 +5,7 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../entities/school_entities.dart';
 import '../../../settings/domain/entities/settings.dart';
+import 'package:involve_app/features/invoicing/domain/templates/invoice_template.dart';
 
 class ResultService {
   Future<Uint8List> generateResultPdf({
@@ -297,5 +298,96 @@ class ResultService {
       default:
         return 'th';
     }
+  }
+
+  List<PrintCommand> generateResultThermalCommands({
+    required Student student,
+    required List<AcademicResult> results,
+    required List<Subject> subjects,
+    required AppSettings settings,
+    AcademicYear? academicYear,
+    Term? term,
+    String? className,
+    double? classAverage,
+    int? studentPosition,
+    int? classSize,
+  }) {
+    final List<PrintCommand> commands = [];
+
+    // Header
+    commands.add(TextCommand(settings.organizationName.toUpperCase(), isBold: true, align: 'center'));
+    if (settings.address.isNotEmpty) {
+      commands.add(TextCommand(settings.address, align: 'center'));
+    }
+    if (settings.phone.isNotEmpty) {
+      commands.add(TextCommand('Tel: ${settings.phone}', align: 'center'));
+    }
+    commands.add(DividerCommand());
+
+    // Title
+    commands.add(TextCommand('ACADEMIC REPORT CARD', isBold: true, align: 'center'));
+    commands.add(SizedBoxCommand(height: 1));
+
+    // Student Info
+    commands.add(TextCommand('Student: ${student.fullName}', isBold: true));
+    commands.add(TextCommand('Adm No: ${student.admissionNumber}'));
+    if (className != null) {
+      commands.add(TextCommand('Class: $className'));
+    }
+    if (academicYear != null) {
+      commands.add(TextCommand('Year: ${academicYear.name}'));
+    }
+    if (term != null) {
+      commands.add(TextCommand('Term: ${term.name}'));
+    }
+    commands.add(DividerCommand());
+
+    // Results Header
+    commands.add(TextCommand('SUBJECT RESULTS', isBold: true, align: 'center'));
+    commands.add(SizedBoxCommand(height: 1));
+
+    // Results List
+    for (final result in results) {
+      final subject = subjects.firstWhere(
+        (s) => s.id == result.subjectId,
+        orElse: () => Subject(name: 'Unknown Subject', id: result.subjectId),
+      );
+      commands.add(TextCommand(subject.name.toUpperCase(), isBold: true));
+      commands.add(TextCommand(
+        'CA: ${result.assessmentScore.toStringAsFixed(1)} | Exam: ${result.examScore.toStringAsFixed(1)}',
+      ));
+      final gradeStr = result.grade != null ? ' [${result.grade}]' : '';
+      commands.add(TextCommand(
+        'Total: ${result.totalScore.toStringAsFixed(1)}$gradeStr',
+        isBold: true,
+      ));
+      if (result.remarks != null && result.remarks!.isNotEmpty) {
+        commands.add(TextCommand('Remarks: ${result.remarks}'));
+      }
+      commands.add(SizedBoxCommand(height: 1));
+    }
+    commands.add(DividerCommand());
+
+    // Summary Statistics
+    if (results.isNotEmpty) {
+      final totalScore = results.fold(0.0, (sum, r) => sum + r.totalScore);
+      final avgScore = totalScore / results.length;
+      commands.add(TextCommand('Total Score: ${totalScore.toStringAsFixed(1)}', isBold: true));
+      commands.add(TextCommand('Student Avg: ${avgScore.toStringAsFixed(2)}%', isBold: true));
+      if (classAverage != null) {
+        commands.add(TextCommand('Class Avg: ${classAverage.toStringAsFixed(2)}%'));
+      }
+      if (studentPosition != null) {
+        final ordinal = _getOrdinalSuffix(studentPosition);
+        final sizeStr = classSize != null ? ' out of $classSize' : '';
+        commands.add(TextCommand('Position: $studentPosition$ordinal$sizeStr', isBold: true));
+      }
+      commands.add(DividerCommand());
+    }
+
+    commands.add(TextCommand('Powered by Invify.iips.app', align: 'center'));
+    commands.add(SizedBoxCommand(height: 3)); // feed paper
+
+    return commands;
   }
 }

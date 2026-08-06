@@ -1,5 +1,5 @@
 // invify-backend/src/services/ledger.service.ts
-import { supabase } from "../db/supabase";
+import { supabase, supabaseAdmin } from "../db/supabase";
 import { PoolClient } from "pg";
 
 export type LedgerEntryType = "DEBIT" | "CREDIT";
@@ -73,7 +73,7 @@ export class LedgerService {
         error = err;
       }
     } else {
-      const rpcRes = await supabase.rpc('process_ledger_double_entry', {
+      const rpcRes = await supabaseAdmin.rpc('process_ledger_double_entry', {
         p_tenant_id: tenantId,
         p_idempotency_key: idempotencyKey,
         p_reference: reference,

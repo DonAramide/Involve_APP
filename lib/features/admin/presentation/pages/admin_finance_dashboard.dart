@@ -31,34 +31,53 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AdminBloc, AdminState>(
-      builder: (context, state) {
-        return Scaffold(
-          appBar: AppBar(title: const Text('Internal Ledger Analytics')),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildBalanceOverview(context, state.metrics),
-                const SizedBox(height: 24),
-                _buildRevenueStreamChart(context),
-                const SizedBox(height: 24),
-                _buildRecentTransactions(context),
-              ],
-            ),
-          ),
+      builder: (context, adminState) {
+        return BlocBuilder<HistoryBloc, HistoryState>(
+          builder: (context, historyState) {
+            final invoices = historyState is HistoryLoaded ? historyState.invoices : <Invoice>[];
+            
+            double totalWallet = 0.0;
+            double cashOnHand = 0.0;
+            double pendingQuasar = 0.0;
+
+            for (final inv in invoices) {
+              final method = inv.paymentMethod?.toLowerCase() ?? 'cash';
+              final amount = inv.amountPaid;
+              if (method == 'cash') {
+                cashOnHand += amount;
+              } else {
+                totalWallet += amount;
+              }
+              if (inv.paymentStatus != 'Paid') {
+                pendingQuasar += inv.balanceAmount;
+              }
+            }
+
+            return Scaffold(
+              appBar: AppBar(title: const Text('Internal Ledger Analytics')),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildBalanceOverview(context, totalWallet, cashOnHand, pendingQuasar),
+                    const SizedBox(height: 24),
+                    _buildRevenueStreamChart(context),
+                    const SizedBox(height: 24),
+                    _buildRecentTransactions(context),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildBalanceOverview(BuildContext context, Map<String, dynamic> metrics) {
+  Widget _buildBalanceOverview(BuildContext context, double wallet, double cash, double pending) {
     final formatter = NumberFormat.compactCurrency(symbol: '₦', decimalDigits: 1);
     
-    final wallet = metrics['internal_wallet'] ?? 0.0;
-    final cash = metrics['cash_on_hand'] ?? 0.0;
-    final pending = metrics['pending_quasar'] ?? 0.0;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

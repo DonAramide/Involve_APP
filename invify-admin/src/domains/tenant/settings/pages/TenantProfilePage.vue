@@ -642,7 +642,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useQuasar } from 'quasar';
-import { api } from '../../../../api';
+import { api, adminApi } from '../../../../api';
 
 const $q = useQuasar();
 const activeTab = ref('profile');
@@ -675,17 +675,73 @@ const countryOptions = ['Nigeria', 'Ghana', 'Kenya', 'South Africa', 'Uganda', '
 
 const saving = ref({ profile: false, password: false, notifications: false, bank: false });
 
+const cacheProfileLocally = () => {
+  localStorage.setItem('operator_first_name', profile.value.firstName || '');
+  localStorage.setItem('operator_last_name', profile.value.lastName || '');
+  localStorage.setItem('operator_phone', profile.value.phone || '');
+  localStorage.setItem('operator_city', profile.value.city || '');
+  localStorage.setItem('operator_country', profile.value.country || '');
+  localStorage.setItem('operator_bio', profile.value.bio || '');
+  if (profile.value.businessName) {
+    localStorage.setItem('tenant_name', profile.value.businessName);
+  }
+};
+
+const applyServerProfile = (data) => {
+  if (!data) return;
+  // Prefer server values when present; keep local cache for fields never synced yet
+  if (data.firstName) profile.value.firstName = data.firstName;
+  if (data.lastName !== undefined && data.lastName !== '') profile.value.lastName = data.lastName;
+  if (data.email) profile.value.email = data.email;
+  if (data.phone) profile.value.phone = data.phone;
+  if (data.businessName) profile.value.businessName = data.businessName;
+  if (data.city) profile.value.city = data.city;
+  if (data.country) profile.value.country = data.country;
+  if (data.bio) profile.value.bio = data.bio;
+  if (data.role) profile.value.role = data.role;
+  if (data.memberSince) {
+    profile.value.memberSince = new Date(data.memberSince).toLocaleDateString('en-NG', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+  Object.assign(originalProfile, JSON.parse(JSON.stringify(profile.value)));
+  cacheProfileLocally();
+};
+
+const loadProfile = async () => {
+  try {
+    const { data } = await adminApi.getProfile();
+    applyServerProfile(data);
+  } catch (err) {
+    console.warn('[TenantProfile] Could not load server profile, using local cache.', err?.message || err);
+  }
+};
+
 const saveProfile = async () => {
   saving.value.profile = true;
-  await new Promise(r => setTimeout(r, 900));
-  localStorage.setItem('operator_first_name', profile.value.firstName);
-  localStorage.setItem('operator_last_name', profile.value.lastName);
-  localStorage.setItem('operator_phone', profile.value.phone);
-  localStorage.setItem('operator_city', profile.value.city);
-  localStorage.setItem('operator_country', profile.value.country);
-  localStorage.setItem('operator_bio', profile.value.bio);
-  saving.value.profile = false;
-  $q.notify({ type: 'positive', message: 'Profile updated successfully.', icon: 'person' });
+  try {
+    await adminApi.updateProfile({
+      firstName: profile.value.firstName,
+      lastName: profile.value.lastName,
+      phone: profile.value.phone,
+      businessName: profile.value.businessName,
+      city: profile.value.city,
+      country: profile.value.country,
+      bio: profile.value.bio,
+    });
+    cacheProfileLocally();
+    Object.assign(originalProfile, JSON.parse(JSON.stringify(profile.value)));
+    $q.notify({ type: 'positive', message: 'Profile updated successfully.', icon: 'person' });
+  } catch (err) {
+    $q.notify({
+      type: 'negative',
+      message: err?.response?.data?.error || 'Failed to save profile to server.',
+      icon: 'error',
+    });
+  } finally {
+    saving.value.profile = false;
+  }
 };
 
 const resetProfile = () => {
@@ -968,6 +1024,8 @@ const notifyComingSoon = (feature) => {
 };
 
 onMounted(async () => {
+  await loadProfile();
+
   // Load saved notification prefs from localStorage
   const saved = localStorage.getItem('tenant_notification_prefs');
   if (saved) {

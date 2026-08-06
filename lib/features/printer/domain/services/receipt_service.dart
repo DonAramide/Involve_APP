@@ -11,10 +11,47 @@ import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/utils/number_to_words.dart';
 import '../../../settings/domain/entities/user_plan.dart';
 
+import 'package:http/http.dart' as http;
+
 class ReceiptService {
+  static Uint8List? _customFontData;
+  static Uint8List? _customBoldFontData;
+
+  static Future<pw.Font> _loadRegularFont() async {
+    if (_customFontData != null) {
+      return pw.Font.ttf(ByteData.sublistView(_customFontData!));
+    }
+    try {
+      final response = await http.get(Uri.parse('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf')).timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        _customFontData = response.bodyBytes;
+        return pw.Font.ttf(ByteData.sublistView(_customFontData!));
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return await PdfGoogleFonts.notoSansRegular();
+  }
+
+  static Future<pw.Font> _loadBoldFont() async {
+    if (_customBoldFontData != null) {
+      return pw.Font.ttf(ByteData.sublistView(_customBoldFontData!));
+    }
+    try {
+      final response = await http.get(Uri.parse('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf')).timeout(const Duration(seconds: 3));
+      if (response.statusCode == 200) {
+        _customBoldFontData = response.bodyBytes;
+        return pw.Font.ttf(ByteData.sublistView(_customBoldFontData!));
+      }
+    } catch (e) {
+      // Fallback
+    }
+    return await PdfGoogleFonts.notoSansBold();
+  }
+
   Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride, String? receiptTitle, UserPlan? userPlan}) async {
-    final font = await PdfGoogleFonts.notoSansRegular();
-    final boldFont = await PdfGoogleFonts.notoSansBold();
+    final font = await _loadRegularFont();
+    final boldFont = await _loadBoldFont();
 
     final pdf = pw.Document(
       theme: pw.ThemeData.withFont(

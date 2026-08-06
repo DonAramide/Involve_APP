@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
@@ -17,7 +18,7 @@ class _TwoFactorAuthPageState extends State<TwoFactorAuthPage> {
   FinanceApiClient get _client {
     if (!sl.isRegistered<FinanceApiClient>()) {
       sl.registerSingleton<FinanceApiClient>(FinanceApiClient(
-        baseUrl: dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004',
+        baseUrl: AppConfig.baseUrl,
         getToken: () async => await SecurityService().getOfflineToken() ?? 'mock-super-admin',
         getTenantId: () async => await SecurityService().getTenantId(),
       ));

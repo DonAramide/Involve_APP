@@ -4,6 +4,9 @@ import 'package:intl/intl.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_bloc.dart';
+import 'package:involve_app/features/printer/presentation/bloc/printer_state.dart';
+import 'package:involve_app/features/school/domain/services/result_service.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +14,11 @@ import 'package:collection/collection.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
 import 'result_preview_page.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
+import 'package:involve_app/services/mpos_service.dart';
+import 'package:involve_app/core/mpos/mpos_device_type.dart';
+import 'package:involve_app/services/socket_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class StudentProfilePage extends StatefulWidget {
   final int studentId;
@@ -109,7 +117,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   student.fullName,
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                Text('Class: ${sClass.name} | ID: ${student.admissionNumber ?? "N/A"}'),
+                Text('Class: ${sClass.name}${student.department != null ? ' • ${student.department}' : ''} | ID: ${student.admissionNumber ?? "N/A"}'),
                 if (assignedTeacher != null)
                   Text('Teacher: ${assignedTeacher.fullName}', style: const TextStyle(fontSize: 14, color: Colors.blueGrey)),
                 const SizedBox(height: 8),
@@ -475,31 +483,180 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   }
 
   void _printResults(BuildContext context) {
+    final schoolState = context.read<SchoolBloc>().state;
+    final student = schoolState.students.firstWhere((s) => s.id == widget.studentId);
+    
+    AcademicYear? selectedYear = schoolState.activeYear;
+    Term? selectedTerm = schoolState.activeTerm;
+    String printMode = 'pdf'; // 'pdf' or 'thermal'
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Print Results Options'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Select Academic Period', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int?>(
+                    value: selectedYear?.id,
+                    decoration: const InputDecoration(
+                      labelText: 'Academic Year',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: schoolState.academicYears.map((y) => DropdownMenuItem(value: y.id, child: Text(y.name))).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        selectedYear = schoolState.academicYears.firstWhereOrNull((y) => y.id == val);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int?>(
+                    value: selectedTerm?.id,
+                    decoration: const InputDecoration(
+                      labelText: 'Academic Term',
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    items: schoolState.terms.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
+                    onChanged: (val) {
+                      setState(() {
+                        selectedTerm = schoolState.terms.firstWhereOrNull((t) => t.id == val);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  const Text('Select Print Mode', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('A4 PDF / System'),
+                          selected: printMode == 'pdf',
+                          onSelected: (selected) {
+                            if (selected) setState(() => printMode = 'pdf');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Direct Thermal'),
+                          selected: printMode == 'thermal',
+                          onSelected: (selected) {
+                            if (selected) setState(() => printMode = 'thermal');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('CANCEL'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _executePrint(context, student, selectedYear, selectedTerm, printMode);
+                  },
+                  child: const Text('PROCEED'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _executePrint(
+    BuildContext context,
+    Student student,
+    AcademicYear? year,
+    Term? term,
+    String mode,
+  ) {
     final state = context.read<SchoolBloc>().state;
-    final student = state.students.firstWhere((s) => s.id == widget.studentId);
     final results = state.results.where((r) => 
-      r.studentId == widget.studentId &&
-      r.termId == state.activeTerm?.id &&
-      r.academicYearId == state.activeYear?.id
+      r.studentId == student.id &&
+      r.termId == term?.id &&
+      r.academicYearId == year?.id
     ).toList();
+    
+    if (results.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No results found for ${student.fullName} in ${term?.name ?? "selected term"} (${year?.name ?? "selected year"}).'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ResultPreviewPage(
-          student: student,
-          results: results,
-          subjects: state.subjects,
-          academicYear: state.activeYear,
-          term: state.activeTerm,
-          className: sClass?.name,
-          classAverage: state.classAverage,
-          studentPosition: state.studentPosition,
-          classSize: state.classSize,
+    if (mode == 'pdf') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResultPreviewPage(
+            student: student,
+            results: results,
+            subjects: state.subjects,
+            academicYear: year,
+            term: term,
+            className: sClass?.name,
+            classAverage: state.classAverage,
+            studentPosition: state.studentPosition,
+            classSize: state.classSize,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      // Direct thermal printing using PrinterBloc
+      final printerBloc = context.read<PrinterBloc>();
+      if (printerBloc.state.connectedDevice == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No external printer connected. Please connect a printer in Settings > Printer Settings.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final settings = context.read<SettingsBloc>().state.settings;
+      if (settings == null) return;
+
+      final commands = ResultService().generateResultThermalCommands(
+        student: student,
+        results: results,
+        subjects: state.subjects,
+        settings: settings,
+        academicYear: year,
+        term: term,
+        className: sClass?.name,
+        classAverage: state.classAverage,
+        studentPosition: state.studentPosition,
+        classSize: state.classSize,
+      );
+
+      printerBloc.add(PrintCommandsEvent(commands, settings.paperWidth));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sending result to external printer...')),
+      );
+    }
   }
 
   Widget _buildSummaryItem(String label, String value, IconData icon, Color color, {String? subtitle}) {
@@ -674,58 +831,337 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  void _showPaymentDialog(BuildContext context, Student student) {
+  void _showPaymentDialog(BuildContext context, Student student) async {
+    final config = await TerminalSyncService.loadCachedConfig();
+    final bool isPosConfigured = config != null &&
+        config.posSerialNumber != null &&
+        config.posSerialNumber!.isNotEmpty;
+
     final amountController = TextEditingController(text: student.balance.toString());
     final remarksController = TextEditingController();
     String paymentMethod = 'Cash';
+    bool isProcessing = false;
+    String? statusMessage;
+    void Function(dynamic)? socketCallback;
+
+    final List<String> methods = ['Cash'];
+    if (isPosConfigured) {
+      methods.add('POS');
+    }
+    methods.add('Transfer');
+
+    if (!context.mounted) return;
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Processes Payment'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Amount to Pay', prefixText: '₦ '),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: paymentMethod,
-                decoration: const InputDecoration(labelText: 'Payment Method'),
-                items: ['Cash', 'POS', 'Transfer'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: (val) => setDialogState(() => paymentMethod = val!),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: remarksController,
-                decoration: const InputDecoration(labelText: 'Remarks (Optional)'),
-              ),
-            ],
+      barrierDismissible: false,
+      builder: (ctx) {
+        void cleanup() {
+          if (socketCallback != null) {
+            SocketService().offEvent('payment.success', socketCallback);
+            socketCallback = null;
+          }
+        }
+
+        return PopScope(
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) {
+              cleanup();
+            }
+          },
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              if (paymentMethod == 'Transfer' && socketCallback == null) {
+                socketCallback = (data) {
+                  debugPrint('[StudentPaymentSocket] Received event: $data');
+                  if (data != null && data['metadata'] != null) {
+                    final meta = data['metadata'];
+                    final sId = meta['studentId']?.toString();
+                    if (sId == student.id.toString()) {
+                      cleanup();
+                      
+                      final amount = double.tryParse(data['amount']?.toString() ?? '') ?? 0.0;
+                      if (amount > 0) {
+                        context.read<SchoolBloc>().add(MakeStudentPaymentEvent(
+                          studentId: student.id!,
+                          amount: amount,
+                          method: 'Transfer',
+                          remarks: remarksController.text.isNotEmpty 
+                              ? remarksController.text 
+                              : 'Confirmed via Transfer Webhook',
+                        ));
+                      }
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Payment of ₦${amount.toStringAsFixed(2)} confirmed via Transfer!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                      
+                      Navigator.pop(ctx);
+                    }
+                  }
+                };
+                SocketService().onEvent('payment.success', socketCallback!);
+              } else if (paymentMethod != 'Transfer' && socketCallback != null) {
+                cleanup();
+              }
+
+              final hasVirtualAccount = student.virtualAccountNumber != null && 
+                  student.virtualAccountBank != null;
+
+              return AlertDialog(
+                title: const Text('Processes Payment'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isProcessing) ...[
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(
+                          statusMessage ?? 'Processing payment...',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontStyle: FontStyle.italic),
+                        ),
+                      ] else ...[
+                        TextField(
+                          controller: amountController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Amount to Pay', prefixText: '₦ '),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          value: paymentMethod,
+                          decoration: const InputDecoration(labelText: 'Payment Method'),
+                          items: methods.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                          onChanged: (val) => setDialogState(() {
+                            paymentMethod = val!;
+                          }),
+                        ),
+                        const SizedBox(height: 16),
+                        if (paymentMethod == 'Transfer') ...[
+                          if (hasVirtualAccount) ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Text(
+                                    'TRANSFER TO THIS ACCOUNT',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.blue),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    student.virtualAccountNumber!,
+                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 2),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    student.virtualAccountBank!,
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  Text(
+                                    student.fullName,
+                                    style: const TextStyle(fontSize: 12),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const Divider(),
+                                  const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Waiting for payment confirmation...',
+                                        style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...[
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+                              ),
+                              child: const Column(
+                                children: [
+                                  Icon(Icons.warning, color: Colors.red),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Dedicated Virtual Account not found. Please generate a virtual account first.',
+                                    style: TextStyle(color: Colors.red, fontSize: 12),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                        ],
+                        TextField(
+                          controller: remarksController,
+                          decoration: const InputDecoration(labelText: 'Remarks (Optional)'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isProcessing 
+                        ? null 
+                        : () {
+                            cleanup();
+                            Navigator.pop(ctx);
+                          },
+                    child: const Text('Cancel'),
+                  ),
+                  if (paymentMethod != 'Transfer')
+                    ElevatedButton(
+                      onPressed: isProcessing 
+                          ? null 
+                          : () async {
+                              final amount = double.tryParse(amountController.text) ?? 0.0;
+                              if (amount <= 0) return;
+
+                              if (paymentMethod == 'POS') {
+                                final connectivityResult = await Connectivity().checkConnectivity();
+                                if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
+                                  if (context.mounted) {
+                                    showDialog(
+                                      context: context,
+                                      builder: (c) => AlertDialog(
+                                        title: const Text('No Internet'),
+                                        content: const Text('POS requires an active network connection.'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+
+                                final terminalId = config!.terminalId ?? config.mposTerminalId ?? '2214OTGF';
+                                final activeHost = config.activeHost ?? 'MEDUSA';
+                                final deviceType = MposDeviceType.channelValue(MposDeviceType.resolve(config.terminalType));
+                                final routingRules = config.routingRules ?? {};
+                                final processOnDevice = routingRules['processOnDevice'] == true;
+                                final effectiveProcessOnDevice = MposDeviceType.isMoreFun(config.terminalType) ? true : processOnDevice;
+
+                                try {
+                                  setDialogState(() {
+                                    isProcessing = true;
+                                    statusMessage = 'Connecting to POS terminal... Please insert card';
+                                  });
+
+                                  final result = await MposService().initiatePayment(
+                                    amount: amount,
+                                    terminalId: terminalId,
+                                    activeHost: activeHost,
+                                    processOnDevice: effectiveProcessOnDevice,
+                                    deviceType: deviceType,
+                                  );
+
+                                  if (result.status == 'payment_success') {
+                                    if (context.mounted) {
+                                      context.read<SchoolBloc>().add(MakeStudentPaymentEvent(
+                                        studentId: student.id!,
+                                        amount: amount,
+                                        method: 'POS',
+                                        remarks: remarksController.text.isNotEmpty 
+                                            ? remarksController.text 
+                                            : 'POS Approved: ${result.transaction?.rrn ?? ""}',
+                                      ));
+                                    }
+
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('POS Payment Approved!'),
+                                          backgroundColor: Colors.green,
+                                        ),
+                                      );
+                                    }
+
+                                    Navigator.pop(ctx);
+                                  } else {
+                                    final errorMsg = result.error?.message ?? result.transaction?.message ?? 'POS Transaction Failed';
+                                    setDialogState(() {
+                                      isProcessing = false;
+                                      statusMessage = null;
+                                    });
+
+                                    if (context.mounted) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (c) => AlertDialog(
+                                          title: const Text('POS Payment Failed'),
+                                          content: Text(errorMsg),
+                                          actions: [
+                                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
+                                          ],
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } catch (e) {
+                                  setDialogState(() {
+                                    isProcessing = false;
+                                    statusMessage = null;
+                                  });
+
+                                  if (context.mounted) {
+                                    showDialog(
+                                      context: context,
+                                      builder: (c) => AlertDialog(
+                                        title: const Text('POS Payment Error'),
+                                        content: Text('An unexpected error occurred: $e'),
+                                        actions: [
+                                          TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                }
+                              } else {
+                                // Cash
+                                context.read<SchoolBloc>().add(MakeStudentPaymentEvent(
+                                  studentId: student.id!,
+                                  amount: amount,
+                                  method: paymentMethod,
+                                  remarks: remarksController.text,
+                                ));
+                                Navigator.pop(ctx);
+                              }
+                            },
+                      child: const Text('Submit Payment'),
+                    ),
+                ],
+              );
+            },
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                final amount = double.tryParse(amountController.text) ?? 0;
-                if (amount > 0) {
-                  context.read<SchoolBloc>().add(MakeStudentPaymentEvent(
-                    studentId: student.id!,
-                    amount: amount,
-                    method: paymentMethod,
-                    remarks: remarksController.text,
-                  ));
-                  Navigator.pop(ctx);
-                }
-              },
-              child: const Text('Submit Payment'),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 }

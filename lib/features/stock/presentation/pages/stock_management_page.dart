@@ -28,6 +28,22 @@ class StockManagementPage extends StatefulWidget {
 
 class _StockManagementPageState extends State<StockManagementPage> {
   bool _showLowStockOnly = false;
+  String _selectedCategoryFilter = 'All';
+
+  String _getCategoryName(Item item, List<dynamic> categories) {
+    if (item.categoryId != null) {
+      final cat = categories.firstWhereOrNull((c) => c.id == item.categoryId);
+      return cat?.name ?? 'Uncategorized';
+    }
+    final name = item.name.toLowerCase();
+    if (name.contains('rice') || name.contains('beans') || name.contains('food')) {
+      return 'Grains & Food';
+    }
+    if (name.contains('book') || name.contains('fee') || name.contains('tuition')) {
+      return 'Education';
+    }
+    return 'General Store';
+  }
 
   @override
   void initState() {
@@ -129,7 +145,6 @@ class _StockManagementPageState extends State<StockManagementPage> {
       ),
       body: BlocBuilder<SettingsBloc, SettingsState>(
         builder: (context, settingsState) {
-          final businessMode = settingsState.settings?.businessMode;
           return BlocBuilder<StockBloc, StockState>(
             builder: (context, state) {
               if (state is StockLoading) {
@@ -144,48 +159,158 @@ class _StockManagementPageState extends State<StockManagementPage> {
                 ).toList();
               }
 
+              // All unique categories for filter row
+              final allCategories = groupBy(state.items, (Item item) => _getCategoryName(item, state.categories)).keys.toList()..sort();
+
+              // Filter displayItems by category filter
+              if (_selectedCategoryFilter != 'All') {
+                displayItems = displayItems.where((item) => 
+                  _getCategoryName(item, state.categories) == _selectedCategoryFilter
+                ).toList();
+              }
+
+              // Group displayItems by category
+              final groupedItems = groupBy(displayItems, (Item item) => _getCategoryName(item, state.categories));
+              final sortedCategories = groupedItems.keys.toList()..sort();
+
               if (displayItems.isNotEmpty) {
-                // Group items by category
-                final groupedItems = groupBy(displayItems, (Item item) {
-                  if (item.categoryId != null) {
-                    final cat = state.categories.firstWhereOrNull((c) => c.id == item.categoryId);
-                    return cat?.name ?? 'Uncategorized';
-                  }
-                  return item.category.name.toUpperCase();
-                });
-
-                final sortedCategories = groupedItems.keys.toList()..sort();
-
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: sortedCategories.length,
-                  itemBuilder: (context, catIndex) {
-                    final categoryName = sortedCategories[catIndex];
-                    final items = groupedItems[categoryName]!;
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                          child: Text(
-                            categoryName,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
-                              letterSpacing: 1.2,
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Card(
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Categories',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${allCategories.length}',
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                        ...items.map((item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12.0),
-                          child: _buildItemCard(context, item, settingsState.settings),
-                        )),
-                        const SizedBox(height: 16),
-                      ],
-                    );
-                  },
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Card(
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      'Total Products',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${displayItems.length}',
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Category Filters scrolling row
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          'All',
+                          ...allCategories
+                        ].map((catName) {
+                          final isSelected = _selectedCategoryFilter == catName;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(
+                                catName,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.black : Colors.grey[700],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: Theme.of(context).colorScheme.primary,
+                              backgroundColor: Colors.grey[200],
+                              onSelected: (selected) {
+                                setState(() {
+                                  _selectedCategoryFilter = catName;
+                                });
+                              },
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        itemCount: sortedCategories.length,
+                        itemBuilder: (context, catIndex) {
+                          final categoryName = sortedCategories[catIndex];
+                          final items = groupedItems[categoryName]!;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                                child: Text(
+                                  categoryName,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                              ...items.map((item) => Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: _buildItemCard(context, item, settingsState.settings),
+                              )),
+                              const SizedBox(height: 16),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 );
               }
 

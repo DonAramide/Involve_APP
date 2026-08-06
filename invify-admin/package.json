@@ -4,7 +4,7 @@
   "description": "IIPS Admin Panel with Engine Unit Tests",
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "test": "jest --forceExit --runInBand --verbose",
     "test:coverage": "jest --forceExit --runInBand --coverage --verbose",

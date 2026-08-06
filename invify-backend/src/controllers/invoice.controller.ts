@@ -35,6 +35,50 @@ export class InvoiceController {
     }
   }
 
+  static async bulkSyncInvoices(req: Request, res: Response) {
+    try {
+      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+      const deviceId = (req.headers['x-device-id'] as string) || 'dashboard';
+      const { invoices } = req.body as { invoices: any[] };
+
+      if (!tenantId) {
+        return res.status(401).json({ success: false, message: 'Tenant ID required' });
+      }
+      if (!Array.isArray(invoices) || invoices.length === 0) {
+        return res.status(400).json({ success: false, message: 'invoices array is required and must not be empty.' });
+      }
+
+      let synced = 0;
+      const errors: string[] = [];
+
+      for (const invoice of invoices) {
+        try {
+          const idempotencyKey = invoice.idempotencyKey || invoice.syncId || randomUUID();
+          const correlationId = invoice.correlationId || randomUUID();
+          await InvoiceFacade.createInvoice(
+            invoice,
+            { tenantId, deviceId },
+            idempotencyKey,
+            correlationId
+          );
+          synced++;
+        } catch (err: any) {
+          console.error(`[InvoiceController.bulkSyncInvoices] Failed for invoice ${invoice.invoiceNumber || invoice.syncId}: ${err.message}`);
+          errors.push(`${invoice.invoiceNumber || invoice.syncId}: ${err.message}`);
+        }
+      }
+
+      return res.status(200).json({
+        success: errors.length === 0,
+        synced,
+        errors
+      });
+    } catch (err: any) {
+      console.error(`[InvoiceController.bulkSyncInvoices] Fatal: ${err.message}`);
+      return res.status(500).json({ success: false, message: err.message });
+    }
+  }
+
   static async getInvoices(req: Request, res: Response) {
     try {
       const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];

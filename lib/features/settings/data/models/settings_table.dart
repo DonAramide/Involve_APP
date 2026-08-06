@@ -6,6 +6,7 @@ class Settings extends Table {
   TextColumn get organizationName => text().withLength(min: 1, max: 100)();
   TextColumn get address => text()();
   TextColumn get phone => text()();
+  TextColumn get email => text().nullable()();
   TextColumn get businessDescription => text().nullable()();
   TextColumn get taxId => text().nullable()();
   TextColumn get logoPath => text().nullable()();
@@ -60,6 +61,7 @@ class Settings extends Table {
   BoolColumn get showExpensePieChart => boolean().withDefault(const Constant(true))();
   BoolColumn get showTopSellingChart => boolean().withDefault(const Constant(true))();
   BoolColumn get showStockValueChart => boolean().withDefault(const Constant(true))();
+  BoolColumn get showNetworkIndicator => boolean().withDefault(const Constant(true))();
   TextColumn get businessMode => text().withDefault(const Constant('retail'))();
   TextColumn get menuOrder => text().nullable()(); // JSON list of menu IDs
   BoolColumn get skipSplash => boolean().withDefault(const Constant(false))();

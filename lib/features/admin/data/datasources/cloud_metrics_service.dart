@@ -1,3 +1,4 @@
+import 'package:involve_app/core/utils/app_config.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -5,7 +6,7 @@ import '../../../../services/terminal_sync_service.dart';
 import '../../../settings/domain/services/security_service.dart';
 
 class CloudMetricsService {
-  final String baseUrl = dotenv.env['BASE_URL'] ?? 'http://192.168.1.194:3004';
+  final String baseUrl = AppConfig.baseUrl;
 
   Future<Map<String, String>> _getHeaders() async {
     // In a real scenario, fetch the JWT token from Supabase/Auth Service

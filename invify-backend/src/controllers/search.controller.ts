@@ -81,10 +81,16 @@ export class SearchController {
 
       let tenants: any[] = [];
       try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query);
         let q = supabase
           .from('tenants')
-          .select('id, name, type, status')
-          .or(`id.ilike.%${query}%,name.ilike.%${query}%`);
+          .select('id, name, type, status');
+          
+        if (isUuid) {
+          q = q.or(`id.eq.${query},name.ilike.%${query}%`);
+        } else {
+          q = q.ilike('name', `%${query}%`);
+        }
           
         if (user?.role !== 'super_admin' && user?.tenantId) {
           q = q.eq('id', user.tenantId);
