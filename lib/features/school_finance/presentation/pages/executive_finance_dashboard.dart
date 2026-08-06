@@ -1,5 +1,4 @@
-// lib/features/school_finance/presentation/pages/executive_finance_dashboard.dart
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/repositories/finance_repository_new.dart';
@@ -10,6 +9,9 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_state.d
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
+import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
+import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
+import 'package:involve_app/services/socket_service.dart';
 import 'reconciliation_page.dart';
 import 'virtual_accounts_page.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
@@ -27,6 +29,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   List<dynamic> _recentActivity = [];
   bool _isLoading = true;
   String? _error;
+  StreamSubscription? _walletCreditSub;
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -36,6 +39,56 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
     super.initState();
     context.read<HistoryBloc>().add(LoadHistory());
     _loadData();
+    _walletCreditSub =
+        CustomerWalletCreditService.instance.onWalletCredited.listen((_) {
+      if (!mounted) return;
+      _loadData();
+    });
+    SocketService().onEvent('payment.success', _onPaymentSuccess);
+  }
+
+  void _onPaymentSuccess(dynamic _) {
+    if (!mounted) return;
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _walletCreditSub?.cancel();
+    SocketService().offEvent('payment.success', _onPaymentSuccess);
+    super.dispose();
+  }
+
+  /// Same rule as Customer Lookup: balance > 0 = owing.
+  Future<Map<String, dynamic>> _customerLedgerMetrics() async {
+    try {
+      final customers =
+          await context.read<IServicesRepository>().getCustomers();
+      int owing = 0;
+      int paid = 0;
+      double outstanding = 0;
+      for (final c in customers) {
+        if (c.balance > 0.01) {
+          owing++;
+          outstanding += c.balance;
+        } else {
+          paid++;
+        }
+      }
+      return {
+        'total': customers.length,
+        'owing': owing,
+        'paid': paid,
+        'outstanding': outstanding,
+      };
+    } catch (_) {
+      return {
+        'total': 0,
+        'owing': 0,
+        'paid': 0,
+        'outstanding': 0.0,
+      };
+    }
   }
 
   Future<void> _loadData() async {
@@ -43,45 +96,42 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       _isLoading = true;
       _error = null;
     });
+
+    final ledger = await _customerLedgerMetrics();
+
     try {
       final summary = await _repository.getExecutiveSummary(
         startDate: _startDate != null ? DateFormat('yyyy-MM-dd').format(_startDate!) : null,
         endDate: _endDate != null ? DateFormat('yyyy-MM-dd').format(_endDate!) : null,
       );
       final history = await _repository.getPayoutHistory(limit: 5);
+
+      // Prefer local customer ledger for Paid/Owing/Outstanding so it matches Customer Lookup.
+      summary['studentMetrics'] = {
+        'total': ledger['total'],
+        'paid': ledger['paid'],
+        'owing': ledger['owing'],
+      };
+      summary['outstanding'] = ledger['outstanding'];
       
       setState(() {
         _summary = summary;
         _recentActivity = history['data'];
         _isLoading = false;
+        _error = null;
       });
-    } catch (_) {
-      // Offline fallback: Dynamically extract real localized totals directly from SQLite history storage
+    } catch (e) {
+      // Offline fallback: local ledger only — never invent Quasar ratios.
       double localCollected = 0.0;
-      int localCustomersCount = 0;
       List<dynamic> localActivities = [];
-      int localOwing = 0;
       if (mounted) {
         final historyState = context.read<HistoryBloc>().state;
         if (historyState is HistoryLoaded) {
           final invoices = historyState.invoices;
-          final Map<String, double> customerBalanceMap = {};
 
           for (final inv in invoices) {
-            localCollected += inv.totalAmount;
-            final name = inv.customerName ?? 'Guest';
-            final unpaid = inv.totalAmount - inv.amountPaid;
-            customerBalanceMap[name] = (customerBalanceMap[name] ?? 0.0) + unpaid;
+            localCollected += inv.amountPaid;
           }
-
-          final uniqueCustomers = invoices.map((e) => e.customerName).where((n) => n != null && n.isNotEmpty).toSet();
-          localCustomersCount = uniqueCustomers.isNotEmpty ? uniqueCustomers.length : invoices.length;
-
-          customerBalanceMap.forEach((name, unpaid) {
-            if (unpaid > 0.01) {
-              localOwing++;
-            }
-          });
 
           localActivities = invoices.take(5).map((inv) => {
             'created_at': inv.dateCreated.toIso8601String(),
@@ -91,33 +141,32 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         }
       }
 
-      // Clean up fallback figures to zero instead of mock demo values for production
-      final finalCollected = localCollected > 0 ? localCollected : 0.0;
-      final finalCustomers = localCustomersCount > 0 ? localCustomersCount : 0;
-      final finalActivities = localActivities.isNotEmpty ? localActivities : [];
-      final finalOwing = localOwing;
-      final finalPaid = (finalCustomers - finalOwing) < 0 ? 0 : (finalCustomers - finalOwing);
-
       setState(() {
         _summary = {
-          'walletBalance': finalCollected * 0.25, // Simulated available sweep fraction
-          'totalCollected': finalCollected,
-          'revenueInRange': finalCollected * 0.18,
-          'totalQuasarCollected': finalCollected * 0.82,
-          'totalQuasarRemitted': finalCollected * 0.50,
+          'walletBalance': 0.0,
+          'totalCollected': localCollected,
+          'revenueInRange': localCollected,
+          'totalQuasarCollected': 0.0,
+          'totalQuasarRemitted': 0.0,
+          'pendingQuasarRemittance': 0.0,
+          'pendingVirtualAccountFunds': 0.0,
+          'outstanding': ledger['outstanding'],
           'alerts': {
             'unmatchedCount': 0,
             'failedPayoutsCount': 0,
           },
           'studentMetrics': {
-            'total': finalCustomers,
-            'paid': finalPaid,
-            'owing': finalOwing,
+            'total': ledger['total'],
+            'paid': ledger['paid'],
+            'owing': ledger['owing'],
           },
+          '_offline': true,
         };
-        _recentActivity = finalActivities;
+        _recentActivity = localActivities;
         _isLoading = false;
+        _error = null;
       });
+      debugPrint('[ExecutiveDashboard] summary fallback (API failed): $e');
     }
   }
 
@@ -175,10 +224,22 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                           delegate: SliverChildListDelegate([
                             _buildKpiCard('Available Balance', _summary?['walletBalance'], Icons.account_balance_wallet_rounded, Colors.indigo),
                             _buildKpiCard(collectedLabel, _summary?['totalCollected'], Icons.payments_rounded, Colors.green),
-                            _buildKpiCard('To be Remitted (Quasar)', _summary?['totalQuasarCollected'], Icons.account_balance_rounded, Colors.blue),
+                            _buildKpiCard(
+                              'To be Remitted (Quasar)',
+                              _summary?['pendingQuasarRemittance'] ??
+                                  _summary?['totalQuasarCollected'],
+                              Icons.account_balance_rounded,
+                              Colors.blue,
+                            ),
                             _buildKpiCard('Remitted (Quasar)', _summary?['totalQuasarRemitted'], Icons.check_circle_outline_rounded, Colors.teal),
-                            _buildKpiCard('Revenue (Range)', _summary?['revenueInRange'], Icons.trending_up_rounded, Colors.purple),
-                            _buildKpiCard('Outstanding', 0, Icons.warning_amber_rounded, Colors.orange),
+                            _buildKpiCard(
+                              'Pending VA Funds',
+                              _summary?['pendingVirtualAccountFunds'] ??
+                                  _summary?['revenueInRange'],
+                              Icons.trending_up_rounded,
+                              Colors.purple,
+                            ),
+                            _buildKpiCard('Outstanding', _summary?['outstanding'], Icons.warning_amber_rounded, Colors.orange),
                           ]),
                         ),
                       ),

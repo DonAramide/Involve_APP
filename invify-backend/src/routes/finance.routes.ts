@@ -1,11 +1,16 @@
 import { Router } from 'express';
 import { ExecutiveFinanceController } from '../controllers/finance.controller';
 import { InvoiceController } from '../controllers/invoice.controller';
+import { checkRole } from '../middleware/rbac.middleware';
 
 const router = Router();
 
-// Executive Finance
-router.get('/executive-summary', ExecutiveFinanceController.getSummary);
+// Executive Finance (mounted under /api/v1/finance with authenticate)
+router.get(
+  '/executive-summary',
+  checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']),
+  ExecutiveFinanceController.getSummary,
+);
 router.get('/stats/payouts', ExecutiveFinanceController.getPayoutStats);
 router.get('/settlement-phases', ExecutiveFinanceController.getSettlementPhases);
 

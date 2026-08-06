@@ -7,6 +7,7 @@ import '../../../dashboard/presentation/widgets/notification_bell.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../data/datasources/finance_realtime_data_source.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
 
 class GlobalPaymentNotificationListener extends StatefulWidget {
   final Widget child;
@@ -37,8 +38,24 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
     // Socket.io payment banners are handled globally in SocketService.
     // This listener covers Supabase Realtime inserts into financial_events.
     final repo = sl<FinanceRepository>();
-    _subscription = repo.watchGlobalEvents().listen((event) {
+    _subscription = repo.watchGlobalEvents().listen((event) async {
       if (event.type == FinanceEventType.paymentSuccess) {
+        final eventTenant = event.data['tenant_id']?.toString() ??
+            event.data['tenantId']?.toString();
+        try {
+          final myTenant = await SecurityService().getTenantId();
+          if (eventTenant != null &&
+              eventTenant.isNotEmpty &&
+              myTenant != null &&
+              myTenant.isNotEmpty &&
+              eventTenant != myTenant) {
+            debugPrint(
+              '[GlobalPaymentNotification] Ignoring other-tenant event $eventTenant',
+            );
+            return;
+          }
+        } catch (_) {}
+
         final amount = event.data['amount'] ?? 0;
         final metadataRaw = event.data['metadata'] ?? {};
         Map metadata = {};

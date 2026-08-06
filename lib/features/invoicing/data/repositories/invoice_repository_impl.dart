@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:uuid/uuid.dart';
 import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import '../../domain/entities/invoice.dart';
@@ -82,6 +83,41 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         );
       }
 
+      // Snapshot unpaid before wallet auto-apply — customer ledger uses this.
+      var paymentStatus = invoice.paymentStatus;
+      var amountPaid = invoice.amountPaid;
+      var balanceAmount = invoice.balanceAmount;
+      var paymentMethod = invoice.paymentMethod;
+      final unpaidBeforeWalletApply = balanceAmount;
+
+      // Pay Later / partial cash: auto-apply existing wallet credit onto the invoice
+      // so Amount Paid / Status match the net wallet (credit is already in customers.balance).
+      if (invoice.paymentMethod != 'Wallet' &&
+          finalCustomerId != null &&
+          balanceAmount > 1e-9) {
+        final customer = await (db.select(db.customers)
+              ..where((t) => t.id.equals(finalCustomerId!)))
+            .getSingleOrNull();
+        final credit =
+            customer != null && customer.balance < 0 ? -customer.balance : 0.0;
+        if (credit > 1e-9) {
+          final applied = math.min(credit, balanceAmount);
+          amountPaid += applied;
+          balanceAmount =
+              (balanceAmount - applied).clamp(0.0, double.infinity);
+          paymentStatus = balanceAmount <= 1e-9
+              ? 'Paid'
+              : (amountPaid > 1e-9 ? 'Partial' : paymentStatus);
+          final method = (paymentMethod ?? '').trim();
+          if (method.isEmpty || method == 'Deferred') {
+            paymentMethod =
+                balanceAmount <= 1e-9 ? 'Wallet' : 'Deferred + Wallet';
+          } else if (!method.toLowerCase().contains('wallet')) {
+            paymentMethod = '$method + Wallet';
+          }
+        }
+      }
+
       final invoiceId = await db.into(db.invoices).insert(
             InvoicesCompanion.insert(
               invoiceNumber: invoice.invoiceNumber,
@@ -91,13 +127,13 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
               discountAmount: invoice.discountAmount,
               discountType: Value(invoice.discountType.name),
               totalAmount: invoice.totalAmount,
-              paymentStatus: invoice.paymentStatus,
-              amountPaid: Value(invoice.amountPaid),
-              balanceAmount: Value(invoice.balanceAmount),
+              paymentStatus: paymentStatus,
+              amountPaid: Value(amountPaid),
+              balanceAmount: Value(balanceAmount),
               customerName: Value(invoice.customerName),
               customerId: Value(finalCustomerId),
               customerAddress: Value(invoice.customerAddress),
-              paymentMethod: Value(invoice.paymentMethod),
+              paymentMethod: Value(paymentMethod),
               staffId: Value(invoice.staffId),
               staffName: Value(invoice.staffName),
               syncId: Value(invoice.syncId ?? invoiceSyncId),
@@ -221,14 +257,16 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           // Paid using wallet/credit. Invoice is "Paid", but we must add the total to their debt (or reduce their credit)
           balanceChange = invoice.totalAmount;
         } else {
-          // Regular invoice, add whatever wasn't paid (the balance) to their debt
+          // Regular invoice: charge the unpaid portion before wallet auto-apply.
+          // Auto-applied credit only updates invoice amountPaid/status for display;
+          // customers.balance already nets credit when we add this full unpaid amount.
           double carryForwardAmount = 0.0;
           for (final item in invoice.items) {
             if (item.item.name == 'Previous Term Balance' || item.item.name == 'Previous Balance') {
               carryForwardAmount += (item.unitPrice * item.quantity);
             }
           }
-          balanceChange = invoice.balanceAmount - carryForwardAmount;
+          balanceChange = unpaidBeforeWalletApply - carryForwardAmount;
         }
         
         await db.customUpdate(
@@ -350,6 +388,70 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     query.orderBy([(t) => OrderingTerm(expression: t.dateCreated, mode: OrderingMode.desc)]);
     
     return _getInvoicesWithItems(query);
+  }
+
+  @override
+  Future<void> reconcileWalletCreditOnCustomerInvoices(String customerId) async {
+    if (customerId.isEmpty) return;
+
+    final customer = await (db.select(db.customers)
+          ..where((t) => t.id.equals(customerId)))
+        .getSingleOrNull();
+    if (customer == null) return;
+
+    // Only needed when net balance is owing (credit already consumed into debt).
+    if (customer.balance <= 1e-9) return;
+
+    final openInvoices = await (db.select(db.invoices)
+          ..where((t) =>
+              t.isDeleted.equals(false) &
+              t.balanceAmount.isBiggerThanValue(0) &
+              (t.customerId.equals(customerId) |
+                  t.customerName.equals(customer.name)))
+          ..orderBy([
+            (t) => OrderingTerm(
+                expression: t.dateCreated, mode: OrderingMode.asc)
+          ]))
+        .get();
+    if (openInvoices.isEmpty) return;
+
+    final unpaidOnInvoices =
+        openInvoices.fold<double>(0, (s, i) => s + i.balanceAmount);
+    // Hidden credit already netted into customers.balance but not shown as paid.
+    var hiddenCredit = unpaidOnInvoices - customer.balance;
+    if (hiddenCredit <= 1e-9) return;
+
+    final now = DateTime.now();
+    for (final inv in openInvoices) {
+      if (hiddenCredit <= 1e-9) break;
+      final apply = math.min(hiddenCredit, inv.balanceAmount);
+      if (apply <= 1e-9) continue;
+
+      final newPaid = inv.amountPaid + apply;
+      final newBal =
+          (inv.balanceAmount - apply).clamp(0.0, double.infinity);
+      final newStatus = newBal <= 1e-9
+          ? 'Paid'
+          : (newPaid > 1e-9 ? 'Partial' : inv.paymentStatus);
+      final method = (inv.paymentMethod ?? '').trim();
+      final newMethod = method.isEmpty || method == 'Deferred'
+          ? (newBal <= 1e-9 ? 'Wallet' : 'Deferred + Wallet')
+          : (!method.toLowerCase().contains('wallet')
+              ? '$method + Wallet'
+              : method);
+
+      await (db.update(db.invoices)..where((t) => t.id.equals(inv.id)))
+          .write(
+        InvoicesCompanion(
+          amountPaid: Value(newPaid),
+          balanceAmount: Value(newBal),
+          paymentStatus: Value(newStatus),
+          paymentMethod: Value(newMethod),
+          updatedAt: Value(now),
+        ),
+      );
+      hiddenCredit -= apply;
+    }
   }
 
   Future<List<Invoice>> _getInvoicesWithItems(SimpleSelectStatement<$InvoicesTable, InvoiceTable> query) async {

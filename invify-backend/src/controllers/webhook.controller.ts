@@ -353,13 +353,10 @@ export class WebhookController {
                   }
                 };
                 io.to(`tenant:${resolvedTenantId}`).emit('payment.success', payload);
-                // Local/sandbox: also broadcast so devices still notify if tenant room mapping is off
-                if (isSandbox || process.env.NODE_ENV !== 'production') {
-                  io.to('all').emit('payment.success', payload);
-                }
+                // Never fan out payment alerts to room "all" — that notifies every online device.
+                // Offline devices recover via /api/finance/missed-payments catch-up on reconnect.
                 console.log(
-                  `[Socket.io] Emitted payment.success to tenant:${resolvedTenantId}` +
-                    `${isSandbox || process.env.NODE_ENV !== 'production' ? ' + all' : ''} for ref ${reference}`,
+                  `[Socket.io] Emitted payment.success to tenant:${resolvedTenantId} for ref ${reference}`,
                 );
               } else {
                 console.warn('[Socket.io] io instance unavailable — deposit notification not pushed');

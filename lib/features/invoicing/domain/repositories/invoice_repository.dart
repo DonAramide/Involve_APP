@@ -12,7 +12,13 @@ abstract class InvoiceRepository {
   Future<List<Invoice>> getInvoicesByStudentId(int studentId);
   Future<List<String>> getAllCustomerNames();
   Future<List<Invoice>> getInvoicesByCustomerName(String customerName, {DateTime? start, DateTime? end});
-  
+
+  /// Align unpaid invoice paid/balance fields with net customer wallet.
+  /// When Pay Later was used while the customer had credit, the ledger already
+  /// netted credit into [customers.balance] but invoices still showed Unpaid/₦0.
+  /// This rewrites invoice payment rows only (does not change customer balance).
+  Future<void> reconcileWalletCreditOnCustomerInvoices(String customerId);
+
   // Stock Returns & Replacements
   Future<void> returnItems({
     required int invoiceId,

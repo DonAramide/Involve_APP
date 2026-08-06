@@ -30,6 +30,8 @@ export class ExecutiveFinanceController {
         invoicesRes,
         allInvoicesRes,
         payoutsRes,
+        quasarCreditsRes,
+        quasarSweepsRes,
         studentsRes,
         customersRes,
         unmatchedRes,
@@ -39,6 +41,18 @@ export class ExecutiveFinanceController {
         invoiceQuery,
         supabaseAdmin.from('invoices').select('customer_id, amount_paid, payment_method, created_at').eq('tenant_id', tenantId),
         supabaseAdmin.from('transactions_log').select('amount').eq('tenant_id', tenantId).eq('type', 'payout').eq('status', 'SUCCESS'),
+        supabaseAdmin
+          .from('transactions_log')
+          .select('amount, type, reference')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'SUCCESS')
+          .in('type', ['CREDIT', 'DEPOSIT', 'INWARD', 'INWARD_PAYMENT', 'VIRTUAL_ACCOUNT_CREDIT']),
+        supabaseAdmin
+          .from('transactions_log')
+          .select('amount')
+          .eq('tenant_id', tenantId)
+          .eq('status', 'SUCCESS')
+          .in('type', ['SWEEP', 'DEBIT', 'WITHDRAWAL']),
         supabaseAdmin.from('students').select('id, running_balance').eq('school_id', tenantId),
         supabaseAdmin.from('customers').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
         supabaseAdmin.from('transactions_log').select('id').eq('tenant_id', tenantId).eq('status', 'PENDING').is('metadata->studentId', null),
@@ -49,6 +63,8 @@ export class ExecutiveFinanceController {
       const invoices = invoicesRes.data;
       const allInvoices = allInvoicesRes.data;
       const payouts = payoutsRes.data;
+      const quasarCredits = quasarCreditsRes.data;
+      const quasarSweeps = quasarSweepsRes.data;
       const students = studentsRes.data;
       const custCount = customersRes.count;
       const unmatched = unmatchedRes.data;
@@ -82,19 +98,46 @@ export class ExecutiveFinanceController {
 
       const allTimeCollected = allInvoices?.reduce((sum, inv) => sum + Number(inv.amount_paid || 0), 0) || 0;
 
-      let totalQuasarCollected = 0;
+      // Invoice rails (card/POS/transfer) — legacy Quasar sales path
+      let totalQuasarFromInvoices = 0;
       for (const inv of (allInvoices || [])) {
         const paid = Number(inv.amount_paid || 0);
         const method = (inv.payment_method || '').toLowerCase();
-        // Quasar rails: bank transfer (VA) + card/POS — cash stays local
         if (method === 'transfer' || method === 'card' || method === 'pos') {
-          totalQuasarCollected += paid;
+          totalQuasarFromInvoices += paid;
         }
       }
+
+      // Live Quasar VA / webhook deposits (dedupe by reference)
+      const seenCreditRefs = new Set<string>();
+      let totalQuasarFromDeposits = 0;
+      for (const tx of (quasarCredits || [])) {
+        const ref = String(tx.reference || '').trim();
+        if (ref) {
+          if (seenCreditRefs.has(ref)) continue;
+          seenCreditRefs.add(ref);
+        }
+        const amount = Number(tx.amount) || 0;
+        if (amount > 0) totalQuasarFromDeposits += amount;
+      }
+
+      const totalQuasarSwept =
+        (quasarSweeps || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0) || 0;
+
+      // Prefer deposits when present (sandbox VA flow); otherwise invoice rails.
+      const totalQuasarCollected =
+        totalQuasarFromDeposits > 0
+          ? totalQuasarFromDeposits + totalQuasarFromInvoices
+          : totalQuasarFromInvoices;
 
       const totalQuasarRemitted = payouts?.reduce((sum, p) => sum + Number(p.amount || 0), 0) || 0;
       // Funds still held / awaiting remittance to merchant bank
       const pendingQuasarRemittance = Math.max(0, totalQuasarCollected - totalQuasarRemitted);
+      // VA credits not yet swept into tenant wallet (matches Virtual Accounts Sweep)
+      const pendingVirtualAccountFunds = Math.max(
+        0,
+        totalQuasarFromDeposits - totalQuasarSwept,
+      );
 
       let totalCount = 0;
       let owingCount = 0;
@@ -125,14 +168,16 @@ export class ExecutiveFinanceController {
 
       return res.status(200).json({
         walletBalance: wallet?.balance || 0,
-        totalCollected: allTimeCollected,
+        totalCollected: allTimeCollected + totalQuasarFromDeposits,
         revenueInRange: totalCollected,
-        /** All-time card + transfer (Quasar) collections */
+        /** All-time Quasar inflows (VA deposits + card/transfer invoices) */
         totalQuasarCollected,
         /** Successful remittances / payouts to merchant */
         totalQuasarRemitted,
         /** Still to remit = Quasar collections − remitted */
         pendingQuasarRemittance,
+        /** VA credits not yet swept into tenant wallet */
+        pendingVirtualAccountFunds,
         salesSummary: {
           totalInvoiced,
           totalCollected,
@@ -304,6 +349,92 @@ export class ExecutiveFinanceController {
     } catch (error: any) {
       console.error('[ExecutiveFinanceController] getQuasarTransactions Error:', error.message);
       return res.status(500).json({ error: 'Failed to fetch Quasar transactions' });
+    }
+  }
+
+  /**
+   * GET /api/finance/missed-payments?since=ISO8601
+   * Returns SUCCESS inbound credits for this tenant since [since],
+   * so offline devices can catch up wallet credits + local notifications on reconnect.
+   */
+  static async getMissedPayments(req: Request, res: Response) {
+    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    if (!tenantId) {
+      return res.status(400).json({ error: 'Tenant ID required' });
+    }
+
+    try {
+      const sinceRaw = typeof req.query.since === 'string' ? req.query.since : '';
+      const sinceDate = sinceRaw ? new Date(sinceRaw) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      if (Number.isNaN(sinceDate.getTime())) {
+        return res.status(400).json({ error: 'Invalid since timestamp' });
+      }
+
+      // Cap lookback to 30 days to keep payloads small
+      const maxLookback = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const since = sinceDate < maxLookback ? maxLookback : sinceDate;
+
+      const { data, error } = await supabaseAdmin
+        .from('transactions_log')
+        .select('id, reference, amount, type, status, metadata, created_at, wallet_id')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'SUCCESS')
+        .gte('created_at', since.toISOString())
+        .order('created_at', { ascending: true })
+        .limit(200);
+
+      if (error) throw error;
+
+      const inboundTypes = new Set([
+        'CREDIT',
+        'DEPOSIT',
+        'INWARD',
+        'INWARD_PAYMENT',
+        'VIRTUAL_ACCOUNT_CREDIT',
+        '',
+      ]);
+
+      const payments = (data || [])
+        .filter((tx: any) => inboundTypes.has(String(tx.type || '').toUpperCase()))
+        .map((tx: any) => {
+          const meta = tx.metadata || {};
+          return {
+            id: tx.id,
+            reference: tx.reference,
+            amount: Number(tx.amount) || 0,
+            type: 'payment.success',
+            status: tx.status,
+            createdAt: tx.created_at,
+            walletId: tx.wallet_id,
+            customerId: meta.customerId || meta.customer_id || null,
+            metadata: {
+              virtualAccountNumber:
+                meta.virtualAccountNumber ||
+                meta.accountNumber ||
+                meta.virtual_account_number ||
+                null,
+              accountNumber:
+                meta.accountNumber ||
+                meta.virtualAccountNumber ||
+                meta.virtual_account_number ||
+                null,
+              senderName: meta.senderName || meta.studentName || 'Unknown Sender',
+              studentName: meta.studentName || meta.senderName || 'Unknown Sender',
+              senderBank: meta.senderBank || meta.bankName || '',
+              sandbox: meta.sandbox === true,
+            },
+          };
+        });
+
+      return res.status(200).json({
+        success: true,
+        since: since.toISOString(),
+        count: payments.length,
+        data: payments,
+      });
+    } catch (error: any) {
+      console.error('[ExecutiveFinanceController] getMissedPayments Error:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch missed payments' });
     }
   }
 }

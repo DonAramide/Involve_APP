@@ -351,6 +351,23 @@ class FinanceRepository {
     return data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
   }
 
+  /// Missed inbound payments since [since] for offline catch-up.
+  /// GET /api/finance/missed-payments?since=
+  Future<List<Map<String, dynamic>>> getMissedPayments({required DateTime since}) async {
+    final response = await _client.get(
+      '/api/finance/missed-payments',
+      queryParameters: {'since': since.toUtc().toIso8601String()},
+    );
+    final body = response.data;
+    final List<dynamic> rows = body is Map && body['data'] is List
+        ? body['data'] as List<dynamic>
+        : (body is List ? body : const []);
+    return rows
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
   /// Sweeps funds from a child virtual account to the business internal wallet.
   /// POST /api/finance/virtual-accounts/:accountNumber/sweep
   Future<Map<String, dynamic>> sweepVirtualAccount(String accountNumber, double amount) async {

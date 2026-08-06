@@ -54,6 +54,36 @@ class CustomerWalletCreditService {
         .toList();
   }
 
+  Future<bool> hasProcessedReference(String reference) async {
+    final ledger = await loadLedger();
+    return ledger.any((e) => e['reference']?.toString() == reference);
+  }
+
+  /// Record a reference as processed without changing wallet balance
+  /// (used by catch-up when no local customer VA matched).
+  Future<void> markReferenceNotified({
+    required String reference,
+    required double amount,
+    String? senderName,
+    Map<String, dynamic>? metadata,
+    String? createdAt,
+  }) async {
+    if (await hasProcessedReference(reference)) return;
+    final ledger = await loadLedger();
+    ledger.insert(0, {
+      'id': reference,
+      'reference': reference,
+      'amount': amount,
+      'type': 'CREDIT',
+      'status': 'SUCCESS',
+      'createdAt': createdAt ?? DateTime.now().toIso8601String(),
+      'source': 'catchup_notify_only',
+      'senderName': senderName ?? 'Unknown Sender',
+      if (metadata != null) 'metadata': metadata,
+    });
+    await _saveLedger(ledger);
+  }
+
   /// Handle payment.success payload from Socket.IO / realtime.
   Future<ServiceCustomer?> applyPaymentSuccess(dynamic data) async {
     final repo = _repository;

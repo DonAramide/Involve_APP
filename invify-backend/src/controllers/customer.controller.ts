@@ -498,6 +498,9 @@ function computePendingFundsByVa(txns: any[]): Map<string, number> {
   ]);
   const outbound = new Set(['SWEEP', 'DEBIT', 'WITHDRAWAL']);
   const map = new Map<string, number>();
+  // Deduplicate by VA+reference so pending matches customer Funds totals.
+  const seenInbound = new Set<string>();
+  const seenOutbound = new Set<string>();
 
   for (const tx of txns || []) {
     const va = extractVaFromMetadata(tx.metadata);
@@ -505,10 +508,16 @@ function computePendingFundsByVa(txns: any[]): Map<string, number> {
     const amount = Number(tx.amount) || 0;
     if (!Number.isFinite(amount) || amount <= 0) continue;
     const type = String(tx.type || '').toUpperCase();
+    const ref = String(tx.reference || tx.id || '').trim();
+    const key = `${va}:${ref || `${type}:${amount}:${tx.created_at || ''}`}`;
     const current = map.get(va) || 0;
     if (inbound.has(type) || type === '') {
+      if (seenInbound.has(key)) continue;
+      seenInbound.add(key);
       map.set(va, current + amount);
     } else if (outbound.has(type)) {
+      if (seenOutbound.has(key)) continue;
+      seenOutbound.add(key);
       map.set(va, Math.max(0, current - amount));
     }
   }

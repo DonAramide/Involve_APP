@@ -4,6 +4,7 @@ import 'package:involve_app/core/license/storage_service.dart';
 import 'package:involve_app/core/services/payment_alert_sound.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
+import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
 import 'dart:developer';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
@@ -95,6 +96,10 @@ class SocketService {
       if (joinData.isNotEmpty) {
         _socket!.emit('join_room', joinData);
       }
+
+      // Catch up wallet credits + local notifications missed while offline.
+      PaymentCatchUpService.instance.scaffoldMessengerKey = scaffoldMessengerKey;
+      unawaited(PaymentCatchUpService.instance.runCatchUp());
     });
 
     _socket!.onConnectError((err) {
@@ -124,7 +129,26 @@ class SocketService {
 
     _socket!.on('payment.success', (data) {
       debugPrint('[SocketService] payment.success received: $data');
+      // Defense-in-depth: ignore payments for other tenants if payload includes tenantId.
+      try {
+        final map = data is Map
+            ? Map<String, dynamic>.from(data as Map)
+            : <String, dynamic>{};
+        final eventTenant = map['tenantId']?.toString();
+        if (eventTenant != null &&
+            eventTenant.isNotEmpty &&
+            _lastTenantId != null &&
+            _lastTenantId!.isNotEmpty &&
+            eventTenant != _lastTenantId) {
+          debugPrint(
+            '[SocketService] Ignoring payment.success for other tenant '
+            '$eventTenant (this device=$_lastTenantId)',
+          );
+          return;
+        }
+      } catch (_) {}
       unawaited(CustomerWalletCreditService.instance.applyPaymentSuccess(data));
+      unawaited(PaymentCatchUpService.instance.markSeenFromLivePayment(data));
       _showPaymentSuccessBanner(data);
     });
 

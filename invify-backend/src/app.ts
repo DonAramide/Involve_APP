@@ -577,8 +577,9 @@ app.get('/api/payout/banks', authenticate, PayoutController.getBanks);
 app.post('/api/payout/resolve-account', authenticate, PayoutController.resolveAccount);
 
 // Executive Dashboard
-app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff']), ExecutiveFinanceController.getSummary);
+app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSummary);
 app.get('/api/finance/quasar-transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin']), ExecutiveFinanceController.getQuasarTransactions);
+app.get('/api/finance/missed-payments', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getMissedPayments);
 app.get('/api/finance/audit/ledger', authenticate, AuditController.getTransactionLedger);
 
 // POS Operations (Medusa | Cpoint-Kimono | NIBSS)

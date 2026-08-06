@@ -15,6 +15,7 @@ import 'package:involve_app/features/school_finance/domain/repositories/finance_
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
 
 class CustomerHistoryPage extends StatefulWidget {
@@ -40,6 +41,8 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
   List<Map<String, dynamic>> _fundTransactions = [];
   bool _loadingFunds = false;
   String? _fundsError;
+  /// Canonical VA credit total from server (matches Sweep pending when nothing swept).
+  double _remoteFundsReceived = 0;
   StreamSubscription? _walletCreditSub;
 
   @override
@@ -48,9 +51,7 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
     _currentCustomer = widget.customer;
     _selectedRange = widget.initialDateRange;
     _tabController = TabController(length: 2, vsync: this);
-    _loadHistory();
-    _refreshCustomer();
-    _loadFundTransactions();
+    _bootstrap();
     _walletCreditSub =
         CustomerWalletCreditService.instance.onWalletCredited.listen((c) {
       if (!mounted) return;
@@ -58,6 +59,29 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
       setState(() => _currentCustomer = c);
       _loadFundTransactions();
     });
+  }
+
+  Future<void> _bootstrap() async {
+    await _reconcileHiddenWalletCredit();
+    if (!mounted) return;
+    context.read<HistoryBloc>().add(LoadHistory(
+          customerName: _currentCustomer.name,
+          start: _selectedRange?.start,
+          end: _selectedRange?.end,
+        ));
+    _refreshCustomer();
+    _loadFundTransactions();
+  }
+
+  /// Fix invoices that still show Unpaid/₦0 after wallet credit was netted into balance.
+  Future<void> _reconcileHiddenWalletCredit() async {
+    try {
+      await context
+          .read<InvoiceRepository>()
+          .reconcileWalletCreditOnCustomerInvoices(_currentCustomer.id);
+    } catch (e) {
+      debugPrint('[CustomerHistory] wallet reconcile skipped: $e');
+    }
   }
 
   @override
@@ -79,11 +103,14 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
   }
 
   void _loadHistory() {
-    context.read<HistoryBloc>().add(LoadHistory(
-      customerName: _currentCustomer.name,
-      start: _selectedRange?.start,
-      end: _selectedRange?.end,
-    ));
+    _reconcileHiddenWalletCredit().then((_) {
+      if (!mounted) return;
+      context.read<HistoryBloc>().add(LoadHistory(
+            customerName: _currentCustomer.name,
+            start: _selectedRange?.start,
+            end: _selectedRange?.end,
+          ));
+    });
   }
 
   Future<void> _loadFundTransactions() async {
@@ -165,18 +192,32 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
       }
 
       final merged = <String, Map<String, dynamic>>{};
-      for (final tx in [...remote, ...local]) {
+      // Authoritative received total = unique SUCCESS remote credits for this VA.
+      final remoteCreditByRef = <String, double>{};
+      for (final tx in remote) {
         final ref = (tx['reference'] ?? tx['id'] ?? '').toString();
         if (ref.isEmpty) continue;
+        final type = (tx['type'] ?? 'CREDIT').toString().toUpperCase();
+        if (type == 'SWEEP' || type == 'DEBIT' || type == 'WITHDRAWAL') continue;
         final amount = tx['amount'] is num
             ? (tx['amount'] as num).toDouble()
             : double.tryParse('${tx['amount']}') ?? 0;
+        if (amount <= 0) continue;
+        remoteCreditByRef[ref] = amount;
+      }
+      final remoteFundsTotal =
+          remoteCreditByRef.values.fold<double>(0, (a, b) => a + b);
+
+      for (final tx in remote) {
+        final ref = (tx['reference'] ?? tx['id'] ?? '').toString();
+        if (ref.isEmpty) continue;
+        final amount = remoteCreditByRef[ref] ??
+            (tx['amount'] is num
+                ? (tx['amount'] as num).toDouble()
+                : double.tryParse('${tx['amount']}') ?? 0);
         final meta = tx['metadata'] is Map
             ? Map<String, dynamic>.from(tx['metadata'] as Map)
             : <String, dynamic>{};
-        final existing = merged[ref];
-        // Prefer local ledger rows (they include balanceBefore/After + autoDebit).
-        if (existing != null && existing['balanceAfter'] != null) continue;
         merged[ref] = {
           'id': tx['id'] ?? ref,
           'reference': ref,
@@ -196,25 +237,47 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
               meta['virtualAccountNumber'] ??
               meta['accountNumber'] ??
               va,
-          'source': tx['source'] ?? 'remote',
-          if (tx['balanceBefore'] != null) 'balanceBefore': tx['balanceBefore'],
-          if (tx['balanceAfter'] != null) 'balanceAfter': tx['balanceAfter'],
-          if (tx['appliedToDebt'] != null) 'appliedToDebt': tx['appliedToDebt'],
-          if (tx['remainingAsCredit'] != null)
-            'remainingAsCredit': tx['remainingAsCredit'],
-          if (tx['autoDebit'] != null) 'autoDebit': tx['autoDebit'],
+          'source': 'remote',
+          'amountSource': 'remote',
         };
       }
 
-      // Prefer local enriched copies over remote stubs.
+      // Enrich with local auto-debit details; never override remote amount.
       for (final tx in local) {
         final ref = (tx['reference'] ?? tx['id'] ?? '').toString();
         if (ref.isEmpty) continue;
-        merged[ref] = {
-          ...?merged[ref],
-          ...tx,
-          'reference': ref,
-        };
+        final source = (tx['source'] ?? '').toString();
+        if (source == 'catchup_notify_only') continue;
+
+        final localAmount = tx['amount'] is num
+            ? (tx['amount'] as num).toDouble()
+            : double.tryParse('${tx['amount']}') ?? 0;
+
+        if (merged.containsKey(ref)) {
+          merged[ref] = {
+            ...merged[ref]!,
+            ...tx,
+            'reference': ref,
+            // Keep server amount so totals match Virtual Accounts Sweep.
+            'amount': merged[ref]!['amount'],
+            'amountSource': 'remote',
+            if (tx['balanceBefore'] != null) 'balanceBefore': tx['balanceBefore'],
+            if (tx['balanceAfter'] != null) 'balanceAfter': tx['balanceAfter'],
+            if (tx['appliedToDebt'] != null) 'appliedToDebt': tx['appliedToDebt'],
+            if (tx['remainingAsCredit'] != null)
+              'remainingAsCredit': tx['remainingAsCredit'],
+            if (tx['autoDebit'] != null) 'autoDebit': tx['autoDebit'],
+          };
+        } else if (remote.isEmpty) {
+          // Offline-only: show local credits when server history unavailable.
+          merged[ref] = {
+            ...tx,
+            'reference': ref,
+            'amount': localAmount,
+            'amountSource': 'local',
+          };
+        }
+        // If remote loaded successfully, ignore local-only orphans (prevents ₦21 drift).
       }
 
       final list = merged.values.toList()
@@ -227,6 +290,16 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
       if (!mounted) return;
       setState(() {
         _fundTransactions = list;
+        _remoteFundsReceived = remote.isNotEmpty
+            ? remoteFundsTotal
+            : list.fold<double>(
+                0,
+                (sum, tx) =>
+                    sum +
+                    ((tx['amount'] as num?)?.toDouble() ??
+                        double.tryParse('${tx['amount']}') ??
+                        0),
+              );
         _loadingFunds = false;
       });
     } catch (e) {
@@ -384,8 +457,12 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
   }
 
   double get _totalFundsReceived {
+    // Prefer server VA credit total so this matches Virtual Accounts Sweep pending
+    // (when no sweeps have been made yet).
+    if (_remoteFundsReceived > 0) return _remoteFundsReceived;
     double sum = 0;
     for (final tx in _fundTransactions) {
+      if ((tx['source'] ?? '').toString() == 'catchup_notify_only') continue;
       final amount = (tx['amount'] as num?)?.toDouble() ??
           double.tryParse('${tx['amount']}') ??
           0;
@@ -1182,7 +1259,7 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
             children: [
               const Text('WALLET BALANCE', style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
               Text(
-                '₦${customer.balance.toStringAsFixed(2)}',
+                '₦${customer.balance.abs().toStringAsFixed(2)}',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -1194,7 +1271,10 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
           if (customer.balance > 0)
             const Padding(
               padding: EdgeInsets.only(top: 4.0),
-              child: Text('Customer owes you this amount.', style: TextStyle(color: Colors.red, fontSize: 12)),
+              child: Text(
+                'Customer owes you this amount (wallet credit already applied to unpaid purchases).',
+                style: TextStyle(color: Colors.red, fontSize: 12),
+              ),
             )
           else if (customer.balance < 0)
             const Padding(
