@@ -2,6 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/core/services/service_locator.dart';
+import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/features/invoicing/presentation/widgets/staff_auth_dialog.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 import '../bloc/history_bloc.dart';
 import '../bloc/history_state.dart';
 import '../../../domain/entities/invoice.dart';
@@ -15,6 +19,7 @@ import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart'
 import 'package:involve_app/features/settings/presentation/bloc/staff_state.dart';
 import 'package:involve_app/features/settings/domain/entities/staff.dart';
 import '../../pages/receipt_preview_page.dart';
+import '../../pages/invoice_success_page.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/features/invoicing/domain/services/report_generator.dart' as reports hide DateTimeRange;
 import 'package:involve_app/features/invoicing/domain/entities/report_date_range.dart';
@@ -246,6 +251,20 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   width: (constraints.maxWidth - 44) / 2,
                   child: _buildPaymentStatusFilter(context, state),
                 ),
+                SizedBox(
+                  width: (constraints.maxWidth - 44) / 2,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showPendingTransfersPopup(context),
+                    icon: const Icon(Icons.hourglass_empty_rounded, size: 14),
+                    label: const Text('Pending Transfers', style: TextStyle(fontSize: 11)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.lightBlue.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    ),
+                  ),
+                ),
               ],
             )
           : Row(
@@ -280,6 +299,21 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 Expanded(
                   flex: 1,
                   child: _buildPaymentStatusFilter(context, state),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 150,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showPendingTransfersPopup(context),
+                    icon: const Icon(Icons.hourglass_empty_rounded, size: 14),
+                    label: const Text('Pending', style: TextStyle(fontSize: 11)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.lightBlue.shade700,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -485,6 +519,10 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                   _buildHistorySummaryRow('Change Given', invoice.changeGiven, context, color: Colors.green),
                 if (invoice.balanceAmount > 0)
                   _buildHistorySummaryRow('Balance', invoice.balanceAmount, context, color: Colors.red, isBold: true),
+                if (invoice.staffName != null && invoice.staffName!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  _buildHistoryTextRow('Billed By', invoice.staffName!, context),
+                ],
               ],
             ),
           ),
@@ -542,6 +580,32 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
             style: TextStyle(
               fontWeight: (isTotal || isBold) ? FontWeight.bold : FontWeight.normal,
               fontSize: isTotal ? 14 : 12,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryTextRow(String label, String value, BuildContext context, {bool isBold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label, 
+            style: TextStyle(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              fontSize: 12,
+            )
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              fontSize: 12,
               color: color,
             ),
           ),
@@ -1733,5 +1797,695 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
         context.read<SettingsBloc>().add(RestoreFromBytes(file.bytes!));
       }
     }
+  }
+
+  Future<List<Invoice>> _getPendingTransferInvoices() async {
+    try {
+      final repo = context.read<HistoryBloc>().getHistory.repository;
+      final all = await repo.getAllInvoices();
+      return all.where((inv) =>
+        (inv.paymentMethod == 'Transfer' || inv.paymentMethod == 'VirtualAccount') &&
+        (inv.paymentStatus.toLowerCase() == 'pending' || inv.paymentStatus.toLowerCase() == 'unpaid')
+      ).toList();
+    } catch (e) {
+      debugPrint('[InvoiceHistoryPage] Failed to fetch pending transfers: $e');
+      return [];
+    }
+  }
+
+  void _navigateToPaymentSuccess(Invoice invoice, {bool autoPrint = true}) {
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => InvoiceSuccessPage(
+          invoice: invoice,
+          successTitle: 'Payment Confirmed Successfully!',
+          autoPrint: autoPrint,
+        ),
+        settings: const RouteSettings(name: '/invoice_success'),
+      ),
+    );
+  }
+
+  void _showPendingTransfersPopup(BuildContext context) async {
+    final staff = await showDialog<Staff>(
+      context: context,
+      builder: (ctx) => const StaffAuthDialog(),
+    );
+    if (staff == null) return; 
+
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        List<Invoice> pendingInvoices = [];
+        List<Map<String, dynamic>> receivedTransfers = [];
+        bool isLoadingInvoices = true;
+        bool isLoadingTransfers = false;
+        bool hasLoadedTransfers = false;
+        int transferFetchCount = 0;
+
+        Invoice? selectedInvoice;
+        final Set<String> selectedTransferIds = {};
+        bool isSubmitting = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Load Pending Invoices
+            if (isLoadingInvoices) {
+              _getPendingTransferInvoices().then((list) {
+                if (dialogContext.mounted) {
+                  setState(() {
+                    pendingInvoices = list.where((inv) => inv.staffId == staff.id).toList();
+                    isLoadingInvoices = false;
+                  });
+                }
+              });
+            }
+
+            // Load Received Transfers (Poll up to 6 times, spaced by 5 seconds)
+            if (!isLoadingInvoices && !hasLoadedTransfers && !isLoadingTransfers) {
+              if (staff.virtualAccountNumber != null && staff.virtualAccountNumber!.trim().isNotEmpty) {
+                isLoadingTransfers = true;
+                sl<FinanceRepository>()
+                    .getVirtualAccountTransactions(staff.virtualAccountNumber!.trim())
+                    .then((txns) {
+                  if (dialogContext.mounted) {
+                    setState(() {
+                      receivedTransfers = txns.where((tx) {
+                        final status = (tx['status'] as String?)?.toUpperCase() ?? '';
+                        final type = (tx['type'] as String?)?.toUpperCase() ?? '';
+                        final isSuccess = status == 'SUCCESS' || status == 'COMPLETED' || status == 'PAID';
+                        // Webhook deposits use type "deposit"; older paths may use CREDIT/INWARD
+                        final isInbound = type == 'CREDIT' ||
+                            type == 'DEPOSIT' ||
+                            type == 'INWARD' ||
+                            type == 'INWARD_PAYMENT' ||
+                            type == 'VIRTUAL_ACCOUNT_CREDIT' ||
+                            type.isEmpty;
+                        return isSuccess && isInbound;
+                      }).toList();
+                      isLoadingTransfers = false;
+                      hasLoadedTransfers = true;
+                      transferFetchCount++;
+                      if (transferFetchCount < 6) {
+                        Future.delayed(const Duration(seconds: 5), () {
+                          if (dialogContext.mounted) {
+                            setState(() {
+                              hasLoadedTransfers = false;
+                            });
+                          }
+                        });
+                      }
+                    });
+                  }
+                }).catchError((err) {
+                  if (dialogContext.mounted) {
+                    setState(() {
+                      isLoadingTransfers = false;
+                      hasLoadedTransfers = true;
+                      transferFetchCount++;
+                      if (transferFetchCount < 6) {
+                        Future.delayed(const Duration(seconds: 5), () {
+                          if (dialogContext.mounted) {
+                            setState(() {
+                              hasLoadedTransfers = false;
+                            });
+                          }
+                        });
+                      }
+                    });
+                  }
+                });
+              } else {
+                hasLoadedTransfers = true;
+              }
+            }
+
+            // Calculations
+            double selectedTransfersSum = 0.0;
+            for (var txId in selectedTransferIds) {
+              final tx = receivedTransfers.firstWhereOrNull((t) => t['id'] == txId);
+              if (tx != null) {
+                selectedTransfersSum += (tx['amount'] as num).toDouble();
+              }
+            }
+
+            final pendingAmount = selectedInvoice != null
+                ? selectedInvoice!.totalAmount - selectedInvoice!.amountPaid
+                : 0.0;
+
+            final double remainingBalance = pendingAmount - selectedTransfersSum;
+
+            return AlertDialog(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Reconciliation Workspace',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Virtual Account: ${staff.virtualAccountNumber ?? "Not Set"} (${staff.name})',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(dialogContext),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: 800,
+                height: 500,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // LEFT COLUMN: RECEIVED TRANSFERS
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              selectedInvoice?.paymentMethod == 'Transfer'
+                                  ? 'Manual Verification'
+                                  : '1. Received Transfers (${receivedTransfers.length})',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                            ),
+                            const SizedBox(height: 8),
+                            if (selectedInvoice?.paymentMethod == 'Transfer')
+                              Expanded(
+                                child: Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.account_balance, size: 48, color: Colors.amber.shade700),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          'Manual Bank Transfer',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'This invoice was checked out via manual bank transfer. Please check your bank statement/alerts to verify that you have received the payment of:',
+                                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber.shade50,
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: Colors.amber.shade200),
+                                          ),
+                                          child: Text(
+                                            CurrencyFormatter.format(selectedInvoice!.totalAmount),
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.amber.shade900,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Click the "Confirm Paid (Manual)" button below to mark this invoice as paid.',
+                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else if (isLoadingTransfers)
+                              const Expanded(
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            else if (receivedTransfers.isEmpty)
+                              const Expanded(
+                                child: Center(
+                                  child: Text(
+                                    'No success transfers found on this account.',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              )
+                            else
+                              Expanded(
+                                child: ListView.separated(
+                                  itemCount: receivedTransfers.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 8),
+                                  itemBuilder: (context, index) {
+                                    final tx = receivedTransfers[index];
+                                    final txId = tx['id'] as String;
+                                    final txAmount = (tx['amount'] as num).toDouble();
+                                    final isSelected = selectedTransferIds.contains(txId);
+
+                                    final meta = tx['metadata'];
+                                    String? senderName;
+                                    String? senderBank;
+                                    if (meta is Map) {
+                                      senderName = meta['senderName'] as String?;
+                                      senderBank = meta['senderBank'] as String?;
+                                    }
+
+                                    return CheckboxListTile(
+                                      enabled: selectedInvoice != null,
+                                      value: isSelected,
+                                      title: Text(
+                                        CurrencyFormatter.format(txAmount),
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                      subtitle: Padding(
+                                        padding: const EdgeInsets.only(top: 2.0),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Ref: ${tx['reference'] ?? "N/A"}',
+                                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                            ),
+                                            if (senderName != null || senderBank != null)
+                                              Text(
+                                                'Sender: ${senderName ?? "Unknown"} (${senderBank ?? "N/A"})',
+                                                style: const TextStyle(fontSize: 10, color: Colors.blueGrey, fontWeight: FontWeight.w500),
+                                              ),
+                                            Text(
+                                              'Date: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.parse(tx['createdAt']))}',
+                                              style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      onChanged: (val) {
+                                        setState(() {
+                                          if (val == true) {
+                                            selectedTransferIds.add(txId);
+                                          } else {
+                                            selectedTransferIds.remove(txId);
+                                          }
+                                        });
+                                      },
+                                      contentPadding: EdgeInsets.zero,
+                                      controlAffinity: ListTileControlAffinity.leading,
+                                    );
+                                  },
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // RIGHT COLUMN: PENDING INVOICES
+                    Expanded(
+                      flex: 1,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '2. Select Pending Invoice (${pendingInvoices.length})',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                            ),
+                            const SizedBox(height: 8),
+                            if (isLoadingInvoices)
+                              const Expanded(
+                                child: Center(child: CircularProgressIndicator()),
+                              )
+                            else if (pendingInvoices.isEmpty)
+                              const Expanded(
+                                child: Center(
+                                  child: Text(
+                                    'No pending transfer checkout invoices.',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              )
+                            else
+                              Expanded(
+                                child: ListView.builder(
+                                  itemCount: pendingInvoices.length,
+                                  itemBuilder: (context, index) {
+                                    final inv = pendingInvoices[index];
+                                    final isSelected = selectedInvoice?.id == inv.id;
+
+                                    return Card(
+                                      color: isSelected ? Colors.blue.shade50 : Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        side: BorderSide(
+                                          color: isSelected ? Colors.blue : Colors.grey.shade300,
+                                          width: isSelected ? 1.5 : 1,
+                                        ),
+                                      ),
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      child: ListTile(
+                                        title: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              inv.invoiceNumber,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                            Text(
+                                              CurrencyFormatter.format(inv.totalAmount),
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green),
+                                            ),
+                                          ],
+                                        ),
+                                        subtitle: Padding(
+                                          padding: const EdgeInsets.only(top: 4.0),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text('Customer: ${inv.customerName ?? "Guest"}', style: const TextStyle(fontSize: 11)),
+                                              Text(
+                                                'Date: ${DateFormat('yyyy-MM-dd HH:mm').format(inv.dateCreated)}',
+                                                style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                              ),
+                                              Wrap(
+                                                spacing: 4,
+                                                runSpacing: 4,
+                                                children: [
+                                                  Container(
+                                                    margin: const EdgeInsets.only(top: 4),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: inv.paymentMethod == 'Transfer' 
+                                                          ? Colors.amber.shade50 
+                                                          : Colors.purple.shade50,
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      border: Border.all(
+                                                        color: inv.paymentMethod == 'Transfer'
+                                                            ? Colors.amber.shade200
+                                                            : Colors.purple.shade200,
+                                                      ),
+                                                    ),
+                                                    child: Text(
+                                                      inv.paymentMethod == 'Transfer'
+                                                          ? 'Manual Bank Transfer'
+                                                          : 'Virtual Account',
+                                                      style: TextStyle(
+                                                        color: inv.paymentMethod == 'Transfer'
+                                                            ? Colors.amber.shade800
+                                                            : Colors.purple.shade800,
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    margin: const EdgeInsets.only(top: 4),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: inv.paymentMethod == 'Transfer' 
+                                                          ? Colors.orange.shade50 
+                                                          : Colors.blue.shade50,
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: Text(
+                                                      inv.paymentMethod == 'Transfer'
+                                                          ? 'Awaiting Admin Confirmation'
+                                                          : 'Awaiting Payment',
+                                                      style: TextStyle(
+                                                        color: inv.paymentMethod == 'Transfer'
+                                                            ? Colors.orange.shade700
+                                                            : Colors.blue.shade700,
+                                                        fontSize: 9,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              if (inv.items.isNotEmpty) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'Items: ${inv.items.map((i) => i.item.name).take(3).join(', ')}${inv.items.length > 3 ? "..." : ""}',
+                                                  style: const TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Colors.blueGrey),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        onTap: () {
+                                          setState(() {
+                                            if (isSelected) {
+                                              selectedInvoice = null;
+                                              selectedTransferIds.clear();
+                                            } else {
+                                              selectedInvoice = inv;
+                                              selectedTransferIds.clear();
+                                            }
+                                          });
+                                        },
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                if (selectedInvoice != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Selected Invoice Pending: ${CurrencyFormatter.format(pendingAmount)}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              'Mapped Transfers: ${CurrencyFormatter.format(selectedTransfersSum)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: selectedTransfersSum > 0 ? Colors.green : Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ],
+                isSubmitting
+                    ? const Padding(
+                        padding: EdgeInsets.only(right: 16),
+                        child: CircularProgressIndicator(),
+                      )
+                    : ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade800,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        onPressed: (selectedInvoice == null || 
+                                (selectedInvoice!.paymentMethod != 'Transfer' && selectedTransferIds.isEmpty))
+                            ? null
+                            : () async {
+                                if (selectedInvoice!.paymentMethod == 'Transfer') {
+                                  // Manual bank transfer confirmation
+                                  setState(() => isSubmitting = true);
+                                  try {
+                                    final repository = context.read<HistoryBloc>().getHistory.repository;
+                                    final updated = selectedInvoice!.copyWith(
+                                      paymentStatus: 'Paid',
+                                      amountPaid: selectedInvoice!.totalAmount,
+                                      balanceAmount: 0.0,
+                                      paymentMethod: 'Transfer',
+                                    );
+                                    await repository.updateInvoice(updated);
+
+                                    if (context.mounted) {
+                                      context.read<HistoryBloc>().add(LoadHistory());
+                                    }
+
+                                    Navigator.pop(dialogContext);
+                                    _navigateToPaymentSuccess(updated);
+                                  } catch (e) {
+                                    if (dialogContext.mounted) {
+                                      setState(() => isSubmitting = false);
+                                    }
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Verification failed: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } else if (remainingBalance > 0.01) {
+                                  // Underpaid: prompt user how to top up
+                                  final choice = await showDialog<String>(
+                                    context: context,
+                                    builder: (choiceCtx) => AlertDialog(
+                                      title: const Text('Reconcile Remaining Balance'),
+                                      content: Text(
+                                        'The selected transfers total ${CurrencyFormatter.format(selectedTransfersSum)}, '
+                                        'which is less than the invoice pending balance of ${CurrencyFormatter.format(pendingAmount)}.\n\n'
+                                        'How would you like to handle the remaining ${CurrencyFormatter.format(remainingBalance)}?'
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(choiceCtx, 'CASH'),
+                                          child: const Text('Top up with Cash'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(choiceCtx, 'PARTIAL'),
+                                          child: const Text('Pay remaining later'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(choiceCtx, 'CANCEL'),
+                                          child: const Text('Cancel Reconciliation', style: TextStyle(color: Colors.red)),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (choice == null || choice == 'CANCEL') return;
+
+                                  setState(() => isSubmitting = true);
+                                  try {
+                                    final repository = context.read<HistoryBloc>().getHistory.repository;
+                                    late final Invoice updated;
+
+                                    if (choice == 'CASH') {
+                                      // Marks the invoice as Paid, with cash + transfer mapping
+                                      updated = selectedInvoice!.copyWith(
+                                        paymentStatus: 'Paid',
+                                        amountPaid: selectedInvoice!.totalAmount,
+                                        balanceAmount: 0.0,
+                                        paymentMethod: 'Transfer + Cash',
+                                      );
+                                      await repository.updateInvoice(updated);
+                                    } else {
+                                      // Marks as Partial, with remaining balance unpaid
+                                      updated = selectedInvoice!.copyWith(
+                                        paymentStatus: 'Partial',
+                                        amountPaid: selectedInvoice!.amountPaid + selectedTransfersSum,
+                                        balanceAmount: remainingBalance,
+                                        paymentMethod: 'Transfer',
+                                      );
+                                      await repository.updateInvoice(updated);
+                                    }
+
+                                    // Refresh lists
+                                    if (context.mounted) {
+                                      context.read<HistoryBloc>().add(LoadHistory());
+                                    }
+
+                                    Navigator.pop(dialogContext);
+
+                                    if (choice == 'CASH') {
+                                      _navigateToPaymentSuccess(updated);
+                                    } else if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Invoice ${updated.invoiceNumber} reconciled as partial payment.'),
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (dialogContext.mounted) {
+                                      setState(() => isSubmitting = false);
+                                    }
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Reconciliation failed: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                } else {
+                                  // Exact match or overpaid: Reconcile as paid
+                                  setState(() => isSubmitting = true);
+                                  try {
+                                    final repository = context.read<HistoryBloc>().getHistory.repository;
+                                    final updated = selectedInvoice!.copyWith(
+                                      paymentStatus: 'Paid',
+                                      amountPaid: selectedInvoice!.totalAmount,
+                                      balanceAmount: 0.0,
+                                      paymentMethod: 'Transfer',
+                                    );
+                                    await repository.updateInvoice(updated);
+
+                                    if (context.mounted) {
+                                      context.read<HistoryBloc>().add(LoadHistory());
+                                    }
+
+                                    Navigator.pop(dialogContext);
+                                    _navigateToPaymentSuccess(updated);
+                                  } catch (e) {
+                                    if (dialogContext.mounted) {
+                                      setState(() => isSubmitting = false);
+                                    }
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Match mapping failed: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                        child: Text(selectedInvoice?.paymentMethod == 'Transfer' 
+                            ? 'Confirm Paid (Manual)' 
+                            : 'Complete Match'),
+                      ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }
