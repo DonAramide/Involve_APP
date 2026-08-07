@@ -74,8 +74,15 @@ export const useRuntimeStore = defineStore('runtime', {
       if (this.isReady) return; // Already hydrated
       this.isLoading = true;
       try {
-        const response = await api.get('/api/v1/runtime/config');
+        const tenantId = localStorage.getItem('tenant_id');
+        const response = await api.get('/api/v1/runtime/config', {
+          params: tenantId && tenantId !== 'global' ? { tenantId } : undefined,
+        });
         this.config = response.data;
+        // Keep portal tenant scope aligned with runtime
+        if (this.config?.tenant?.id && this.config.tenant.id !== 'system') {
+          localStorage.setItem('tenant_id', this.config.tenant.id);
+        }
         this.lastHydrated = Date.now();
         this.error = null;
       } catch (err: any) {
@@ -88,8 +95,14 @@ export const useRuntimeStore = defineStore('runtime', {
     async refresh() {
       this.isLoading = true;
       try {
-        const response = await api.get('/api/v1/runtime/config');
+        const tenantId = localStorage.getItem('tenant_id');
+        const response = await api.get('/api/v1/runtime/config', {
+          params: tenantId && tenantId !== 'global' ? { tenantId } : undefined,
+        });
         this.config = response.data;
+        if (this.config?.tenant?.id && this.config.tenant.id !== 'system') {
+          localStorage.setItem('tenant_id', this.config.tenant.id);
+        }
         this.lastHydrated = Date.now();
         this.error = null;
       } catch (err: any) {

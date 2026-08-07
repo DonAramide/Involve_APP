@@ -3,7 +3,8 @@ package com.demo.mpossdk.internal.utils
 import android.util.Log
 import com.demo.mpossdk.BuildConfig
 
-internal object LogUtil {
+// Public for Java interop (keystore utils are Java).
+object LogUtil {
     private var tag = "MposSdkLogUtil"
     private var isLogEnabled = BuildConfig.DEBUG
 
@@ -19,27 +20,27 @@ internal object LogUtil {
         }
     }
 
-    fun e(e: String) {
+    fun e(e: String?) {
         if (isLogEnabled) {
-            Log.e(tag, e)
+            Log.e(tag, e ?: "null")
         }
     }
 
     fun d(d: String) {
         if (isLogEnabled) {
-            Log.e(tag, d)
+            Log.d(tag, d)
         }
     }
 
     fun v(v: String) {
         if (isLogEnabled) {
-            Log.e(tag, v)
+            Log.v(tag, v)
         }
     }
 
     fun printSeparator(level: Int, text: String?) {
         val msg =
-            ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> \$text <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+            ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> $text <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
         when (level) {
             Log.VERBOSE -> {
                 v("  ")

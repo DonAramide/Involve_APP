@@ -438,6 +438,9 @@ const routes = [
       { path: 'compliance', component: () => import('src/domains/tenant/compliance/pages/TenantCompliancePage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Compliance', requiresAuth: true, permission: 'tenant.compliance.view' } },
       { path: 'audit', component: () => import('src/domains/tenant/audit/pages/TenantAuditPage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Audit Logs', requiresAuth: true, permission: 'tenant.audit.view' } },
       { path: 'analytics', component: () => import('src/domains/tenant/analytics/pages/TenantAnalyticsPage.vue').catch(() => import('pages/ErrorNotFound.vue')), meta: { title: 'Analytics', requiresAuth: true, permission: 'tenant.analytics.view' } },
+
+      // School roster synced from Flutter Web Sync
+      { path: 'school-roster', component: () => import('pages/school/AcademicsPage.vue'), meta: { title: 'School Roster', requiresAuth: true } },
       
       // Dynamic School Mode Routes nested under Tenant Layout namespace
       { path: 'curriculum', component: () => import('pages/CurriculumPage.vue'), meta: { requiresAuth: true } },

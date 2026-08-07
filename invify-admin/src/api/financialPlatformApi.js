@@ -37,6 +37,14 @@ export default {
   },
 
   /**
+   * Change Invify tenant type and re-provision Quasar under the new vertical partner.
+   * Body: { type, confirmPhrase: 'CHANGE VERTICAL', reason? }
+   */
+  async changeVertical(tenantId, data) {
+    return api.post(`/api/v1/tenants/${tenantId}/financial-platform/change-vertical`, data)
+  },
+
+  /**
    * Initiate the deactivation of the financial platform.
    */
   async deactivate(tenantId, reason) {

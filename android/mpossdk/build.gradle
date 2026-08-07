@@ -38,7 +38,9 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled true
+            minifyEnabled false
+            // Keep shrink/obfuscation off for the SDK AAR; app-level R8 handles release shrinking.
+            // minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             if (localProperties['SIGNING_JKS_FILE_PATH'] != null) {
                 signingConfig signingConfigs.release

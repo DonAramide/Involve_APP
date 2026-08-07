@@ -162,6 +162,29 @@ class FinanceRepository {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Initiates a static virtual account generation for a school student.
+  /// POST /api/finance/student-virtual-account/:studentId
+  Future<Map<String, dynamic>> initiateStudentVirtualAccount({
+    required String studentId,
+    required String firstName,
+    required String lastName,
+    required String admissionNumber,
+    String? phone,
+    String? email,
+  }) async {
+    final response = await _client.post(
+      '/api/finance/student-virtual-account/$studentId',
+      data: {
+        'firstName': firstName,
+        'lastName': lastName,
+        'admissionNumber': admissionNumber,
+        'phone': phone,
+        'email': email,
+      },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   /// Fetches the reconciliation report for the school.
   /// GET /api/reconciliation
   Future<Map<String, dynamic>> getReconciliationReport({

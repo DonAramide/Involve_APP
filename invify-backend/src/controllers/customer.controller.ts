@@ -350,6 +350,39 @@ export class CustomerController {
         });
       }
 
+      // 3b. School students with dedicated VAs
+      try {
+        const { data: students, error: stuErr } = await supabaseAdmin
+          .from('students')
+          .select('id, first_name, last_name, admission_number, virtual_account_number, virtual_account_bank, virtual_account_status')
+          .or(`tenant_id.eq.${tenantId},school_id.eq.${tenantId}`)
+          .not('virtual_account_number', 'is', null);
+
+        if (stuErr) {
+          console.warn('[CustomerController] students VA query failed:', stuErr.message);
+        } else {
+          for (const st of (students || [])) {
+            const va = String(st.virtual_account_number || '').trim();
+            if (!va || list.some((row) => row.accountNumber === va)) continue;
+            const pendingBalance = pendingByVa.get(va) ?? 0;
+            const name = `${st.first_name || ''} ${st.last_name || ''}`.trim() || st.admission_number || 'Student';
+            list.push({
+              id: st.id,
+              name,
+              phone: 'N/A',
+              email: 'N/A',
+              accountNumber: st.virtual_account_number,
+              bankName: st.virtual_account_bank || 'Quasar Sandbox Bank',
+              accountName: name,
+              holderType: 'Student',
+              balance: pendingBalance,
+            });
+          }
+        }
+      } catch (err: any) {
+        console.warn('[CustomerController] students VA query threw:', err.message);
+      }
+
       return res.status(200).json(list);
     } catch (error: any) {
       console.error('[CustomerController] listTenantVirtualAccounts Error:', error.message);

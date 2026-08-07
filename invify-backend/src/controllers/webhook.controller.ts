@@ -44,6 +44,8 @@ export class WebhookController {
       let resolvedTenantId: string | null = null;
       let resolvedWalletId: string | null = null;
       let resolvedCustomerId: string | null = null;
+      let resolvedStudentId: string | null = null;
+      let resolvedAdmissionNumber: string | null = null;
       let transaction: any = null;
 
       // Try finding the pre-existing checkout transaction by reference in transactions_log
@@ -57,6 +59,10 @@ export class WebhookController {
         transaction = foundTx;
         resolvedTenantId = transaction.tenant_id;
         resolvedWalletId = transaction.wallet_id;
+        const meta = (transaction.metadata || {}) as Record<string, any>;
+        resolvedCustomerId = meta.customerId || meta.customer_id || null;
+        resolvedStudentId = meta.studentId || meta.student_id || null;
+        resolvedAdmissionNumber = meta.admissionNumber || meta.admission_number || null;
       } else {
         // Unsolicited credit (direct virtual account transfer)
         const virtualAccountNumber = event.data?.accountNumber || event.data?.virtualAccountNumber || event.data?.metadata?.virtualAccountNumber;
@@ -71,16 +77,20 @@ export class WebhookController {
           if (tenantRec) {
             resolvedTenantId = tenantRec.id;
           } else {
-            // Check customers
+            // Check customers (includes school students mirrored as customers)
             const { data: custRec } = await supabaseAdmin
               .from('customers')
-              .select('id, tenant_id')
+              .select('id, tenant_id, name')
               .eq('virtual_account_number', virtualAccountNumber)
               .maybeSingle();
 
             if (custRec) {
               resolvedTenantId = custRec.tenant_id;
               resolvedCustomerId = custRec.id;
+              if (typeof custRec.id === 'string' && custRec.id.startsWith('stu-')) {
+                resolvedStudentId = custRec.id;
+                resolvedAdmissionNumber = custRec.id.slice(4);
+              }
             } else {
               // Check staff users with assigned virtual accounts
               const { data: staffUser } = await supabaseAdmin
@@ -92,15 +102,32 @@ export class WebhookController {
               if (staffUser?.tenant_id) {
                 resolvedTenantId = staffUser.tenant_id;
               } else {
-                // Check student VAs
-                const { data: studentVa } = await supabaseAdmin
-                  .from('student_virtual_accounts')
-                  .select('student_id, school_id')
-                  .eq('account_number', virtualAccountNumber)
+                // Check cloud students table (school VA provision path)
+                const { data: studentRec } = await supabaseAdmin
+                  .from('students')
+                  .select('id, school_id, tenant_id, admission_number, first_name, last_name')
+                  .eq('virtual_account_number', virtualAccountNumber)
                   .maybeSingle();
 
-                if (studentVa) {
-                  resolvedTenantId = studentVa.school_id;
+                if (studentRec) {
+                  resolvedTenantId = studentRec.tenant_id || studentRec.school_id;
+                  resolvedStudentId = studentRec.id;
+                  resolvedAdmissionNumber = studentRec.admission_number || null;
+                  if (!resolvedCustomerId && typeof studentRec.id === 'string') {
+                    resolvedCustomerId = studentRec.id;
+                  }
+                } else {
+                  // Legacy student_virtual_accounts table
+                  const { data: studentVa } = await supabaseAdmin
+                    .from('student_virtual_accounts')
+                    .select('student_id, school_id')
+                    .eq('account_number', virtualAccountNumber)
+                    .maybeSingle();
+
+                  if (studentVa) {
+                    resolvedTenantId = studentVa.school_id;
+                    resolvedStudentId = studentVa.student_id;
+                  }
                 }
               }
             }
@@ -307,6 +334,8 @@ export class WebhookController {
                   sandbox: isSandbox,
                   quasarEvent: event.event,
                   ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
+                  ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
+                  ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
                 }
               });
             if (insertErr) {
@@ -342,6 +371,7 @@ export class WebhookController {
                   walletId: resolvedWalletId,
                   amount: creditAmount,
                   customerId: resolvedCustomerId,
+                  studentId: resolvedStudentId,
                   metadata: {
                     virtualAccountNumber,
                     accountNumber: virtualAccountNumber,
@@ -350,6 +380,8 @@ export class WebhookController {
                     senderBank,
                     sandbox: isSandbox,
                     ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
+                    ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
+                    ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
                   }
                 };
                 io.to(`tenant:${resolvedTenantId}`).emit('payment.success', payload);
@@ -390,6 +422,9 @@ export class WebhookController {
                   studentName: senderName, // Map to studentName for mobile display compatibility
                   senderBank,
                   sandbox: isSandbox,
+                  ...(resolvedCustomerId ? { customerId: resolvedCustomerId } : {}),
+                  ...(resolvedStudentId ? { studentId: resolvedStudentId } : {}),
+                  ...(resolvedAdmissionNumber ? { admissionNumber: resolvedAdmissionNumber } : {}),
                 },
                 idempotencyKey: `event:deposit_success:${reference}`
               });

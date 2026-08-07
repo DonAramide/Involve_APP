@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/services/service_locator.dart';
 import '../../../../core/services/payment_alert_sound.dart';
 import '../../../dashboard/presentation/widgets/notification_bell.dart';
@@ -8,6 +9,7 @@ import '../../domain/repositories/finance_repository_new.dart';
 import '../../data/datasources/finance_realtime_data_source.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
+import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 
 class GlobalPaymentNotificationListener extends StatefulWidget {
   final Widget child;
@@ -27,11 +29,27 @@ class GlobalPaymentNotificationListener extends StatefulWidget {
 
 class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotificationListener> {
   StreamSubscription? _subscription;
+  StreamSubscription? _studentCreditSub;
 
   @override
   void initState() {
     super.initState();
     _initListener();
+    _studentCreditSub =
+        CustomerWalletCreditService.instance.onStudentCredited.listen((student) {
+      debugPrint(
+        '[GlobalPaymentNotification] Student credited: ${student.fullName} '
+        'balance=${student.balance} credit=${student.creditBalance}',
+      );
+      final ctx = widget.navigatorKey.currentContext;
+      if (ctx != null) {
+        try {
+          ctx.read<SchoolBloc>().add(LoadSchoolData());
+        } catch (e) {
+          debugPrint('[GlobalPaymentNotification] SchoolBloc refresh skipped: $e');
+        }
+      }
+    });
   }
 
   void _initListener() {
@@ -113,6 +131,7 @@ class _GlobalPaymentNotificationListenerState extends State<GlobalPaymentNotific
   @override
   void dispose() {
     _subscription?.cancel();
+    _studentCreditSub?.cancel();
     super.dispose();
   }
 

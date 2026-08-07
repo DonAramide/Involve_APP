@@ -9,11 +9,68 @@ const api = axios.create({
   }
 });
 
+function decodeJwtPayload(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(''),
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve active tenant: JWT wins for tenant operators; localStorage for platform impersonation. */
+function resolveClientTenantId() {
+  const stored = localStorage.getItem('tenant_id');
+  const role = String(localStorage.getItem('operator_role') || '').toUpperCase();
+  const isPlatform = ['SUPER_ADMIN', 'ADMIN', 'AGENT', 'SUPPORT', 'PLATFORM_ADMIN'].includes(role);
+
+  const token = localStorage.getItem('invify_token');
+  const payload = token ? decodeJwtPayload(token) : null;
+  const jwtTenant =
+    payload?.tenantId ||
+    payload?.user_metadata?.tenant_id ||
+    payload?.user_metadata?.tenantId ||
+    payload?.app_metadata?.tenant_id ||
+    null;
+
+  // Platform operators may browse/impersonate via localStorage tenant_id.
+  if (isPlatform) {
+    return stored && stored !== 'undefined' && stored !== 'null' && stored !== 'global'
+      ? stored
+      : jwtTenant;
+  }
+
+  // Tenant operators: never keep a stale twin tenant from an older session.
+  if (jwtTenant) {
+    if (stored !== jwtTenant) {
+      localStorage.setItem('tenant_id', jwtTenant);
+    }
+    return jwtTenant;
+  }
+
+  return stored && stored !== 'undefined' && stored !== 'null' && stored !== 'global'
+    ? stored
+    : null;
+}
+
 api.interceptors.request.use((config) => {
-  // Setup authorization header later if needed
   const token = localStorage.getItem('invify_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Tenant portal / impersonation: always scope requests to the active tenant.
+  // Without this, super_admin JWTs resolve to the system tenant and school roster looks empty.
+  const tenantId = resolveClientTenantId();
+  if (tenantId) {
+    config.headers['X-Tenant-ID'] = tenantId;
   }
   return config;
 });
@@ -49,10 +106,8 @@ api.interceptors.response.use(
         timeout: 4000,
         icon: 'lock'
       });
-      // Return empty data gracefully for GET requests so lists just appear empty instead of breaking the UI
-      if (error.config.method === 'get') {
-        return Promise.resolve({ data: [] });
-      }
+      // Keep rejecting so callers can keep their default empty object/array shape.
+      // (Resolving `{ data: [] }` broke pages that expect an object, e.g. school roster.)
     }
     return Promise.reject(error);
   }
@@ -83,6 +138,8 @@ export const adminApi = {
   getFinancialPlatformAudit: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/audit`),
   activateFinancialPlatform: (tenantId) => api.post(`/api/v1/tenants/${tenantId}/financial-platform/activate`),
   rotateFinancialPlatformCredentials: (tenantId) => api.post(`/api/v1/tenants/${tenantId}/financial-platform/rotate`),
+  changeFinancialPlatformVertical: (tenantId, data) =>
+    api.post(`/api/v1/tenants/${tenantId}/financial-platform/change-vertical`, data),
 
   getLedger: (params) => api.get('/admin/ledger', { params }),
   getPayments: (params) => api.get('/admin/payments', { params }),
@@ -209,6 +266,13 @@ export const attendanceApi = {
   autoSave: (data) => api.post('/attendance/save', data),
   bulkPresent: (data) => api.post('/attendance/bulk-present', data),
   getHistory: () => api.get('/attendance/history'),
+};
+
+/** School-mode roster synced from Flutter Web Sync */
+export const schoolApi = {
+  getRoster: (config) => api.get('/api/school/roster', config),
+  getAcademics: () => api.get('/api/school/roster', { params: { type: 'result' } }),
+  bulkSync: (data) => api.post('/api/school/bulk-sync', data),
 };
 
 export const insightsApi = {

@@ -31,6 +31,16 @@ abstract class SchoolRepository {
   Future<void> promoteStudents(List<int> studentIds, int targetClassId, {int? academicYearId});
   Future<String?> getLastAdmissionNumber();
   Future<Student?> getStudentById(int id);
+  Future<Student?> getStudentByVirtualAccount(String accountNumber);
+  Future<Student?> getStudentByAdmissionNumber(String admissionNumber);
+  /// Apply a VA deposit: reduce debt first, remainder increases creditBalance.
+  Future<Student?> creditStudentFromDeposit({
+    required double amount,
+    required String reference,
+    String? virtualAccountNumber,
+    String? admissionNumber,
+    String? studentKey,
+  });
 
   // Subjects
   Future<List<Subject>> getSubjects();

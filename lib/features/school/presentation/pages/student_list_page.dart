@@ -252,9 +252,10 @@ class _StudentListPageState extends State<StudentListPage> {
         if (_selectedDepartmentFilter != 'None' && s.department != _selectedDepartmentFilter) return false;
       }
 
-      final dynamicBalance = invoices
+      final invoiceOwing = invoices
           .where((inv) => inv.studentId == s.id)
           .fold(0.0, (sum, inv) => sum + (inv.totalAmount - inv.amountPaid));
+      final dynamicBalance = s.balance > 0 ? s.balance : invoiceOwing;
       final isOwing = dynamicBalance > 0;
       if (_selectedOwingFilter == 'Owing' && !isOwing) return false;
       if (_selectedOwingFilter == 'Not Owing' && isOwing) return false;
@@ -303,13 +304,23 @@ class _StudentListPageState extends State<StudentListPage> {
               children: [
                 Text('Class: ${sClass.name}${student.department != null ? ' • ${student.department}' : ''} | ID: ${student.admissionNumber ?? 'N/A'}'),
                 (() {
-                  final dynamicBalance = state.studentInvoices
+                  // Prefer student ledger balance (kept in sync with bills on VA credit).
+                  // Fall back to invoice sum when student.balance is 0 but open bills exist.
+                  final invoiceOwing = state.studentInvoices
                       .where((inv) => inv.studentId == student.id)
                       .fold(0.0, (sum, inv) => sum + (inv.totalAmount - inv.amountPaid));
+                  final dynamicBalance =
+                      student.balance > 0 ? student.balance : invoiceOwing;
                   if (dynamicBalance > 0) {
                     return Text(
                       'Balance: ${CurrencyFormatter.format(dynamicBalance)}',
                       style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
+                    );
+                  }
+                  if (student.creditBalance > 0) {
+                    return Text(
+                      'Credit: ${CurrencyFormatter.format(student.creditBalance)}',
+                      style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 12),
                     );
                   }
                   return const SizedBox.shrink();

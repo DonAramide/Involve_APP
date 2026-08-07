@@ -62,9 +62,8 @@ const fetchData = async (forceRefresh = false) => {
 };
 
 onMounted(() => {
-  if (!financeStore.summary) {
-    fetchData();
-  }
+  // Always refresh so post-sync invoice totals appear (avoid sticky ₦0 cache).
+  fetchData(true);
 });
 </script>
 

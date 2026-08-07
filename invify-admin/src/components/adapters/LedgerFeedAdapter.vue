@@ -64,9 +64,7 @@ const fetchData = async (forceRefresh = false) => {
 };
 
 onMounted(() => {
-  if (financeStore.transactions.length === 0) {
-    fetchData();
-  }
+  fetchData(true);
 });
 </script>
 

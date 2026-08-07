@@ -140,7 +140,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
     
     final walletValue = formatter.format(parseSafe(metrics['internal_wallet']));
-    final revenueValue = formatter.format(parseSafe(metrics['monthly_revenue']));
+    final revenueValue = formatter.format(
+      parseSafe(metrics['monthly_revenue'] ?? metrics['total_revenue']),
+    );
 
     return Row(
       children: [

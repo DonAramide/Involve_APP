@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { RuntimeConfigService } from '../services/runtime.service';
 import { SYSTEM_TENANT_UUID } from '../config/constants';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 
 export class RuntimeController {
   /**
@@ -9,13 +10,9 @@ export class RuntimeController {
    */
   static async getConfig(req: Request, res: Response) {
     try {
-      const user = (req as any).user;
-      
-      // The user object should contain tenantId from the authenticate middleware
-      // For enterprise structure, we usually get this directly from the JWT or context
-      const tenantId = user?.tenantId || (req.query.tenantId as string);
+      const tenantId = resolveTenantScope(req);
 
-      if (!tenantId || tenantId === SYSTEM_TENANT_UUID) {
+      if (!tenantId || tenantId === SYSTEM_TENANT_UUID || tenantId === 'system' || tenantId === 'global') {
         // Return a default system-level configuration for Global Admins and Agents
         // who do not belong to a specific tenant but need a hydrated runtime store.
         return res.status(200).json({

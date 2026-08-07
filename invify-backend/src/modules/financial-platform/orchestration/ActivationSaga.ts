@@ -5,6 +5,10 @@ import { ObservabilityContext, AuditLogger, DomainEventPublisher, MetricsExporte
 import { QuasarIntegrationStore } from '../../../integrations/quasar/quasar-integration.store';
 import { VaultEncryptionUtil } from '../../../utils/vault-encryption.util';
 import { supabaseAdmin } from '../../../db/supabase';
+import {
+  QuasarPlatformClient as VerticalResolver,
+  type InvifyVertical,
+} from '../../../integrations/quasar/quasar-platform.client';
 
 export class ActivationSaga {
   constructor(
@@ -19,12 +23,39 @@ export class ActivationSaga {
    * Executes the activation workflow using the Saga pattern.
    * Idempotent across retries. Handles Quasar slug conflicts without mistaking
    * the Invify UUID (embedded in the slug) for the Quasar tenant id.
+   *
+   * @param options.forceNewProvision — clear any prior integration and mint a fresh Quasar tenant
+   * @param options.slugSuffix — append to slug (e.g. "school") to avoid colliding with an old vertical's slug
+   * @param options.preferResolvedVertical — always persist newly resolved vertical (ignore prior row)
    */
-  async execute(tenantId: string, tenantData: any, context: ObservabilityContext): Promise<string> {
+  async execute(
+    tenantId: string,
+    tenantData: any,
+    context: ObservabilityContext,
+    options?: {
+      forceNewProvision?: boolean;
+      slugSuffix?: string;
+      preferResolvedVertical?: boolean;
+    }
+  ): Promise<string> {
     const startTime = Date.now();
     let quasarTenantId: string | null = null;
     let vaultUrn: string | null = null;
-    const slug = `tenant-${tenantData.id}`;
+    const vertical = this.resolveVertical(tenantData);
+    const suffix = String(options?.slugSuffix || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const slug = suffix
+      ? `tenant-${tenantData.id}-${suffix}`
+      : `tenant-${tenantData.id}`;
+
+    if (options?.forceNewProvision) {
+      console.log(`[ActivationSaga] forceNewProvision — clearing prior Quasar link for ${tenantId}`);
+      try {
+        await this.vaultClient.delete(`quasarTenant/${tenantId}`);
+      } catch (e: any) {
+        console.warn('[ActivationSaga] Vault clear during forceNewProvision:', e?.message);
+      }
+      await this.clearBogusCheckpoint(tenantId);
+    }
 
     try {
       // Step 1: Resume from prior checkpoint — but only if Quasar still recognizes the id
@@ -41,7 +72,7 @@ export class ActivationSaga {
           );
           await this.clearBogusCheckpoint(tenantId);
         } else {
-          const stillExists = await this.quasarClient.verifyTenantExists(candidate, context);
+          const stillExists = await this.quasarClient.verifyTenantExists(candidate, context, vertical);
           if (stillExists) {
             quasarTenantId = candidate;
             console.log(
@@ -58,14 +89,14 @@ export class ActivationSaga {
 
       // Step 2: Provision in Quasar (or recover / use recovery slug on conflict)
       if (!quasarTenantId) {
-        const tenantPayload = await this.provisionQuasarTenant(tenantId, tenantData, slug, context);
+        const tenantPayload = await this.provisionQuasarTenant(tenantId, tenantData, slug, vertical, context);
         quasarTenantId = tenantPayload.id;
 
         await this.checkpointQuasarTenant(tenantId, {
           quasarTenantId,
           slug: tenantPayload.slug || slug,
           code: tenantPayload.code || (tenantPayload.slug || slug).slice(0, 8).toUpperCase(),
-          vertical: tenantPayload.vertical || 'invify_retail',
+          vertical: tenantPayload.vertical || vertical,
         });
       }
 
@@ -74,7 +105,7 @@ export class ActivationSaga {
       const apiKeyResp = await this.quasarClient.createTenantApiKey(quasarTenantId!, {
         name: `Invify MPOS — ${tenantData.name}`,
         environment: 'test'
-      }, context, keyIdempotency);
+      }, context, keyIdempotency, vertical);
 
       const keyPayload = this.unwrapQuasarEntity(apiKeyResp);
       const secretKey = keyPayload.secretKey;
@@ -97,12 +128,15 @@ export class ActivationSaga {
 
       // Step 5: Persist Metadata
       const prior = await QuasarIntegrationStore.getByInvifyTenantId(tenantId);
+      const verticalToPersist = options?.preferResolvedVertical
+        ? vertical
+        : ((prior?.quasar_vertical as InvifyVertical) || vertical);
       await QuasarIntegrationStore.upsert({
         invifyTenantId: tenantId,
         quasarTenantId: quasarTenantId!,
         quasarTenantSlug: prior?.quasar_tenant_slug || slug,
         quasarTenantCode: prior?.quasar_tenant_code || slug.slice(0, 8).toUpperCase(),
-        vertical: (prior?.quasar_vertical as any) || 'invify_retail',
+        vertical: verticalToPersist,
         publicKey: publicKey ?? null,
         secretKey,
         environment: 'test',
@@ -151,6 +185,20 @@ export class ActivationSaga {
     }
   }
 
+  /** Map Invify tenant.type / business_mode → Quasar vertical (school|services|retail). */
+  private resolveVertical(tenantData: any): InvifyVertical {
+    const raw = String(
+      tenantData?.type || tenantData?.business_mode || tenantData?.businessMode || 'retail',
+    )
+      .trim()
+      .toLowerCase();
+    const vertical = VerticalResolver.resolveVertical(raw);
+    console.log(
+      `[ActivationSaga] Resolved Quasar vertical "${vertical}" from tenant type "${raw}" (${tenantData?.name || tenantData?.id})`,
+    );
+    return vertical;
+  }
+
   /**
    * Create Quasar tenant; on unrecoverable slug conflict, create under a unique recovery slug.
    */
@@ -158,13 +206,14 @@ export class ActivationSaga {
     tenantId: string,
     tenantData: any,
     slug: string,
+    vertical: InvifyVertical,
     context: ObservabilityContext
   ): Promise<{ id: string; slug?: string; code?: string; vertical?: string }> {
     try {
       const quasarTenant = await this.quasarClient.createTenant({
         name: tenantData.name,
         slug,
-        vertical: 'invify_retail',
+        vertical,
         defaultCurrency: 'NGN'
       }, context, `provision-tenant:${tenantId}`);
 
@@ -186,7 +235,7 @@ export class ActivationSaga {
         const recovered = await this.quasarClient.createTenant({
           name: tenantData.name,
           slug: recoverySlug,
-          vertical: 'invify_retail',
+          vertical,
           defaultCurrency: 'NGN'
         }, context, `provision-tenant-recovery:${tenantId}`);
 

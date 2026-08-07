@@ -61,7 +61,19 @@ class LessonNoteApiService implements IAIService {
       if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
         throw const NetworkException('Connection timed out. Please check your signal.');
       }
-      throw Exception('Generation failed: ${e.message}');
+      if (e.response?.statusCode == 404) {
+        throw Exception(
+          'Lesson note AI endpoint not found on server. Please update/restart the backend.',
+        );
+      }
+      final serverMsg = e.response?.data is Map
+          ? (e.response!.data['error'] ?? e.response!.data['message'])
+          : null;
+      throw Exception(
+        serverMsg != null
+            ? 'Generation failed: $serverMsg'
+            : 'Generation failed (${e.response?.statusCode ?? 'network error'}). Please try again.',
+      );
     } catch (e) {
       rethrow;
     }

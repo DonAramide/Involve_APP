@@ -392,6 +392,8 @@ class AppDependencies {
       sl.registerSingleton<IServicesRepository>(servicesRepo);
     }
     CustomerWalletCreditService.instance.bind(servicesRepo);
+    CustomerWalletCreditService.instance.bindSchool(schoolRepository);
+    CustomerWalletCreditService.instance.bindInvoices(invoiceRepository);
 
     return AppDependencies(
       database: database,
@@ -661,6 +663,7 @@ class _InvolveAppState extends State<InvolveApp> {
               repository: dependencies.schoolRepository,
               itemRepository: dependencies.itemRepository,
               invoiceRepository: dependencies.invoiceRepository,
+              financeRepository: dependencies.financeRepositoryNew,
             ),
           ),
           BlocProvider(

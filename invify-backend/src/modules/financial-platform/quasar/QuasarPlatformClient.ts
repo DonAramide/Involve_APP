@@ -25,7 +25,12 @@ export class QuasarPlatformClient {
     });
 
     this.http.interceptors.request.use(async (config) => {
-      const creds = await this.credentialProvider.getPlatformCredentials();
+      // Vertical-aware partner auth: school tenants must use INVIFY_SCHOOL, not RETAIL
+      const vertical =
+        (config as any).quasarVertical ||
+        (config.headers as any)?.['X-Invify-Quasar-Vertical'] ||
+        'invify_retail';
+      const creds = await this.credentialProvider.getPlatformCredentials(String(vertical));
       config.headers['X-Quasar-Client-Id'] = creds.clientId;
       config.headers['X-Quasar-Client-Secret'] = creds.clientSecret;
       return config;
@@ -46,13 +51,15 @@ export class QuasarPlatformClient {
       return this.retryPolicy.execute(async () => {
         try {
           const response = await this.http.post('/integration/platform/tenants', params, {
+            quasarVertical: params.vertical,
             headers: {
               'Idempotency-Key': idempotencyKey,
               'X-Correlation-Id': context.correlationId,
               'X-Request-Id': context.requestId,
-              'X-Trace-Id': context.traceId
+              'X-Trace-Id': context.traceId,
+              'X-Invify-Quasar-Vertical': params.vertical,
             }
-          });
+          } as any);
           return response.data;
         } catch (error: any) {
           if (error?.response?.status === 409) {
@@ -66,12 +73,12 @@ export class QuasarPlatformClient {
                 `[QuasarPlatformClient] 409 for slug "${params.slug}" — attempting slug lookup. Body:`,
                 JSON.stringify(body)
               );
-              recovered = await this.findTenantBySlug(params.slug, context, forbiddenIds);
+              recovered = await this.findTenantBySlug(params.slug, context, forbiddenIds, params.vertical);
             }
 
             if (recovered?.id && !forbiddenIds.has(recovered.id.toLowerCase())) {
               // Verify the recovered id actually exists on Quasar before trusting it
-              const verified = await this.verifyTenantExists(recovered.id, context);
+              const verified = await this.verifyTenantExists(recovered.id, context, params.vertical);
               if (verified) {
                 console.warn(
                   `[QuasarPlatformClient] Recovered existing Quasar tenant ${recovered.id} for slug "${params.slug}"`
@@ -102,18 +109,21 @@ export class QuasarPlatformClient {
   async findTenantBySlug(
     slug: string,
     context: ObservabilityContext,
-    forbiddenIds: Set<string> = new Set()
+    forbiddenIds: Set<string> = new Set(),
+    vertical: string = 'invify_retail'
   ): Promise<{ id: string; slug: string; [key: string]: any } | null> {
     const headers = {
       'X-Correlation-Id': context.correlationId,
       'X-Request-Id': context.requestId,
-      'X-Trace-Id': context.traceId
+      'X-Trace-Id': context.traceId,
+      'X-Invify-Quasar-Vertical': vertical,
     };
+    const reqOpts = { headers, quasarVertical: vertical } as any;
 
     const attempts: Array<() => Promise<any>> = [
-      () => this.http.get('/integration/platform/tenants', { params: { slug }, headers }),
-      () => this.http.get(`/integration/platform/tenants/by-slug/${encodeURIComponent(slug)}`, { headers }),
-      () => this.http.get(`/integration/platform/tenants/slug/${encodeURIComponent(slug)}`, { headers }),
+      () => this.http.get('/integration/platform/tenants', { params: { slug }, ...reqOpts }),
+      () => this.http.get(`/integration/platform/tenants/by-slug/${encodeURIComponent(slug)}`, reqOpts),
+      () => this.http.get(`/integration/platform/tenants/slug/${encodeURIComponent(slug)}`, reqOpts),
     ];
 
     for (const attempt of attempts) {
@@ -128,9 +138,13 @@ export class QuasarPlatformClient {
     return null;
   }
 
-  async verifyTenantExists(tenantId: string, context: ObservabilityContext): Promise<boolean> {
+  async verifyTenantExists(
+    tenantId: string,
+    context: ObservabilityContext,
+    vertical: string = 'invify_retail'
+  ): Promise<boolean> {
     try {
-      await this.getTenant(tenantId, context);
+      await this.getTenant(tenantId, context, vertical);
       return true;
     } catch (err: any) {
       if (err?.response?.status === 404) return false;
@@ -219,35 +233,61 @@ export class QuasarPlatformClient {
 
   async createTenantApiKey(
     tenantId: string,
-    params: { name: string; environment: string },
+    params: { name: string; environment: string; scopes?: string[] },
     context: ObservabilityContext,
-    idempotencyKey: string
+    idempotencyKey: string,
+    vertical: string = 'invify_retail'
   ) {
     return this.circuitBreaker.execute(async () => {
       return this.retryPolicy.execute(async () => {
-        const response = await this.http.post(`/integration/platform/tenants/${tenantId}/api-keys`, params, {
+        const payload = {
+          name: params.name,
+          environment: params.environment,
+          scopes: params.scopes ?? [
+            'payments:create',
+            'payments:read',
+            'wallets:read',
+            'transfers:create',
+            'transfers:read',
+            'virtual_accounts:read',
+            'virtual_accounts:write',
+            'webhooks:endpoints:manage',
+            'webhooks:read',
+            'integration:read',
+            'pos:icc:write',
+            'pos:card:execute',
+            'sandbox:read',
+            'sandbox:write',
+            'financial_routing:read',
+          ],
+        };
+        const response = await this.http.post(`/integration/platform/tenants/${tenantId}/api-keys`, payload, {
+          quasarVertical: vertical,
           headers: {
             'Idempotency-Key': idempotencyKey,
             'X-Correlation-Id': context.correlationId,
             'X-Request-Id': context.requestId,
-            'X-Trace-Id': context.traceId
+            'X-Trace-Id': context.traceId,
+            'X-Invify-Quasar-Vertical': vertical,
           }
-        });
+        } as any);
         return response.data;
       }, context);
     }, context);
   }
 
-  async getTenant(tenantId: string, context: ObservabilityContext) {
+  async getTenant(tenantId: string, context: ObservabilityContext, vertical: string = 'invify_retail') {
     return this.circuitBreaker.execute(async () => {
       return this.retryPolicy.execute(async () => {
         const response = await this.http.get(`/integration/platform/tenants/${tenantId}`, {
+          quasarVertical: vertical,
           headers: {
             'X-Correlation-Id': context.correlationId,
             'X-Request-Id': context.requestId,
-            'X-Trace-Id': context.traceId
+            'X-Trace-Id': context.traceId,
+            'X-Invify-Quasar-Vertical': vertical,
           }
-        });
+        } as any);
         return response.data;
       }, context);
     }, context);

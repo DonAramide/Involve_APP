@@ -154,7 +154,7 @@ class PaymentCatchUpService {
             ? amount.toStringAsFixed(0)
             : amount.toStringAsFixed(2);
         await NotificationInbox.add(
-          message: credited != null
+          message: credited
               ? '₦$formatted received from $sender (synced)'
               : '₦$formatted payment while offline · $sender',
           type: 'payment',
@@ -165,7 +165,7 @@ class PaymentCatchUpService {
           },
         );
 
-        if (credited == null) {
+        if (!credited) {
           await CustomerWalletCreditService.instance.markReferenceNotified(
             reference: reference,
             amount: amount,

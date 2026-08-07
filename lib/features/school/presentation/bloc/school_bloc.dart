@@ -13,7 +13,7 @@ import 'package:involve_app/features/invoicing/domain/repositories/invoice_repos
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
-import 'package:involve_app/core/services/finance_api_client.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 
 part 'school_event.dart';
 
@@ -21,13 +21,13 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   final SchoolRepository repository;
   final ItemRepository itemRepository;
   final InvoiceRepository invoiceRepository;
-  final FinanceApiClient? apiClient;
+  final FinanceRepository? financeRepository;
 
   SchoolBloc({
     required this.repository, 
     required this.itemRepository,
     required this.invoiceRepository,
-    this.apiClient,
+    this.financeRepository,
   }) : super(const SchoolState()) {
     on<LoadSchoolData>(_onLoadSchoolData, transformer: sequential());
     on<AddAcademicYearEvent>(_onAddAcademicYear, transformer: sequential());
@@ -337,6 +337,18 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         classSize: classSize,
         isLoading: false,
       ));
+
+      // Auto-fix negative balance into credit so CLEAR/PAY chips stay correct.
+      if (student != null && student.balance < -0.001) {
+        final fixed = student.copyWith(
+          balance: 0,
+          creditBalance: student.creditBalance + (-student.balance),
+        );
+        await repository.updateStudent(fixed);
+        emit(state.copyWith(
+          students: state.students.map((s) => s.id == fixed.id ? fixed : s).toList(),
+        ));
+      }
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
     }
@@ -585,97 +597,140 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   Future<void> _onProvisionVirtualAccount(ProvisionStudentVirtualAccountEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
     try {
-      if (apiClient == null) {
-        throw Exception("Dedicated Virtual Account provisioning is only available in online mode. Please check your internet connection.");
-      }
-      
-      // We don't need to append the tenant id in URL since it's injected via headers,
-      // but let's see how the backend expects it.
-      // Based on the endpoint: /admin/tenants/:id/students/:studentId/provision-va
-      // We will need to get the tenantId.
-      final tenantId = 'default'; // TenantInterceptor handles header injection anyway
-      // But we need :id in the path... Let's just use 'current' or try to fetch it.
-      
-      // Let's execute the call without tenantId in path if backend accepts it, or we need to extract it.
-      // Wait, let's just make the call. We know we need to pass the tenant ID somehow if the URL requires it.
-      // Alternatively, I will just call the backend and pass dummy id, if backend reads from JWT or X-Tenant-ID anyway.
-      final response = await apiClient!.post('/admin/tenants/0/students/${event.studentId}/provision-va');
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Fetch the updated student details from the backend?
-        // Or wait for background sync. Since we have local DB, let's update it locally.
-        final va = response.data['va'];
-        final student = state.students.firstWhere((s) => s.id == event.studentId);
-        
-        final updatedStudent = student.copyWith(
-          virtualAccountNumber: va['accountNumber'],
-          virtualAccountBank: va['bankName'],
-          virtualAccountStatus: 'ACTIVE',
+      if (financeRepository == null) {
+        throw Exception(
+          'Dedicated Virtual Account provisioning is only available in online mode. Please check your internet connection.',
         );
-        
-        await repository.updateStudent(updatedStudent);
-        
-        emit(state.copyWith(status: SchoolStatus.success));
-        add(LoadSchoolData());
-        add(LoadStudentRecordsEvent(event.studentId)); // Refresh
-      } else {
-        throw Exception("Failed to provision account");
       }
+
+      final student = state.students.firstWhereOrNull((s) => s.id == event.studentId);
+      if (student == null) {
+        throw Exception('Student not found. Please refresh and try again.');
+      }
+      if (student.firstName.trim().isEmpty || student.lastName.trim().isEmpty) {
+        throw Exception("Student's first and last name are required to generate a virtual account.");
+      }
+
+      // Stable cloud/Quasar child id (admission numbers are unique per school device)
+      final studentKey = 'stu-${student.admissionNumber.trim()}';
+
+      final result = await financeRepository!.initiateStudentVirtualAccount(
+        studentId: studentKey,
+        firstName: student.firstName.trim(),
+        lastName: student.lastName.trim(),
+        admissionNumber: student.admissionNumber.trim(),
+        phone: student.parentPhone?.trim().isEmpty == true ? null : student.parentPhone?.trim(),
+      );
+
+      final accountNumber = result['accountNumber']?.toString();
+      final bankName = result['bankName']?.toString();
+      if (accountNumber == null || accountNumber.isEmpty) {
+        throw Exception('Failed to provision account. No account number returned.');
+      }
+
+      final updatedStudent = student.copyWith(
+        virtualAccountNumber: accountNumber,
+        virtualAccountBank: bankName ?? 'Quasar Sandbox Bank',
+        virtualAccountStatus: 'ACTIVE',
+      );
+
+      await repository.updateStudent(updatedStudent);
+
+      final updatedStudents = state.students
+          .map((s) => s.id == event.studentId ? updatedStudent : s)
+          .toList();
+
+      emit(state.copyWith(
+        students: updatedStudents,
+        status: SchoolStatus.success,
+        isLoading: false,
+        error: null,
+      ));
+      add(LoadSchoolData());
+      add(LoadStudentRecordsEvent(event.studentId));
     } catch (e) {
-      final errorMsg = e.toString().startsWith('Exception: ') 
-          ? e.toString().substring('Exception: '.length) 
+      final errorMsg = e.toString().startsWith('Exception: ')
+          ? e.toString().substring('Exception: '.length)
           : e.toString();
-      emit(state.copyWith(error: errorMsg, status: SchoolStatus.failure));
+      emit(state.copyWith(error: errorMsg, status: SchoolStatus.failure, isLoading: false));
     }
   }
 
   Future<void> _onClearStudentDebit(ClearStudentDebitEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
     try {
-      final student = state.students.firstWhere((s) => s.id == event.studentId);
-      
-      if (student.balance <= 0) {
-        throw Exception("Student does not have any pending debit.");
+      var student = state.students.firstWhere((s) => s.id == event.studentId);
+
+      // Fold accidental negative balance into credit (over-applied debt field).
+      if (student.balance < -0.001) {
+        student = student.copyWith(
+          balance: 0,
+          creditBalance: student.creditBalance + (-student.balance),
+        );
+        await repository.updateStudent(student);
       }
+
       if (student.creditBalance <= 0) {
         throw Exception("Student does not have sufficient credit.");
       }
 
-      final amountToClear = student.balance > student.creditBalance ? student.creditBalance : student.balance;
-      
-      final newBalance = student.balance - amountToClear;
-      final newCreditBalance = student.creditBalance - amountToClear;
-
-      final updatedStudent = student.copyWith(
-        balance: newBalance,
-        creditBalance: newCreditBalance,
-      );
-
-      await repository.updateStudent(updatedStudent);
-
-      // Now create a payment record for the cleared amount
-      final activeTerm = state.terms.where((t) => t.isActive).firstOrNull ?? state.terms.firstOrNull;
       final invoices = await invoiceRepository.getInvoicesByStudentId(student.id!);
-      
-      final existingBill = invoices.firstWhereOrNull((inv) => 
-        inv.invoiceNumber.startsWith('BILL-') && 
-        inv.termId == activeTerm?.id &&
-        inv.paymentStatus != 'Paid'
-      );
+      final unpaid = invoices
+          .where((inv) {
+            final owing = inv.totalAmount - inv.amountPaid;
+            return owing > 0.001 && inv.paymentStatus != 'Paid';
+          })
+          .toList()
+        ..sort((a, b) {
+          final aBill = a.invoiceNumber.startsWith('BILL-') ? 0 : 1;
+          final bBill = b.invoiceNumber.startsWith('BILL-') ? 0 : 1;
+          if (aBill != bBill) return aBill.compareTo(bBill);
+          return a.dateCreated.compareTo(b.dateCreated);
+        });
 
-      if (existingBill != null) {
-        final updatedBill = existingBill.copyWith(
-          amountPaid: existingBill.amountPaid + amountToClear,
-          balanceAmount: existingBill.balanceAmount - amountToClear,
-          paymentStatus: (existingBill.balanceAmount - amountToClear) <= 0 ? 'Paid' : 'Partial',
-          paymentMethod: 'Credit Balance',
+      final invoiceDebt = unpaid.fold<double>(0, (sum, inv) {
+        final owing = inv.totalAmount - inv.amountPaid;
+        return sum + (owing > 0 ? owing : 0);
+      });
+      final ledgerDebt = student.balance > 0 ? student.balance : 0.0;
+      final debtToClear = invoiceDebt > 0.001 ? invoiceDebt : ledgerDebt;
+
+      if (debtToClear <= 0.001) {
+        // Nothing owing — just persist the normalized credit/balance and refresh.
+        emit(state.copyWith(status: SchoolStatus.success, isLoading: false));
+        add(LoadSchoolData());
+        add(LoadStudentRecordsEvent(event.studentId));
+        return;
+      }
+
+      var creditLeft = student.creditBalance;
+      var clearedTotal = 0.0;
+
+      for (final inv in unpaid) {
+        if (creditLeft <= 0.001) break;
+        final owing = inv.totalAmount - inv.amountPaid;
+        final pay = creditLeft < owing ? creditLeft : owing;
+        final newBalance = (owing - pay).clamp(0.0, double.infinity);
+        await invoiceRepository.updateInvoice(
+          inv.copyWith(
+            amountPaid: inv.amountPaid + pay,
+            balanceAmount: newBalance,
+            paymentStatus: newBalance <= 0.001 ? 'Paid' : 'Partial',
+            paymentMethod: 'Credit Balance',
+          ),
         );
-        await invoiceRepository.updateInvoice(updatedBill);
-      } else {
+        creditLeft -= pay;
+        clearedTotal += pay;
+      }
+
+      // If no open invoices but ledger still shows debt, write a payment receipt.
+      if (unpaid.isEmpty && ledgerDebt > 0.001 && creditLeft > 0.001) {
+        final amountToClear = creditLeft < ledgerDebt ? creditLeft : ledgerDebt;
+        final activeTerm = state.terms.where((t) => t.isActive).firstOrNull ?? state.terms.firstOrNull;
         final activeYear = state.academicYears.where((y) => y.isActive).firstOrNull ?? state.academicYears.firstOrNull;
         final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
 
-        final invoice = Invoice(
+        await invoiceRepository.saveInvoice(Invoice(
           invoiceNumber: 'PMT-${DateTime.now().millisecondsSinceEpoch}',
           dateCreated: DateTime.now(),
           customerName: student.fullName,
@@ -712,15 +767,33 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
               type: 'service',
             ),
           ],
-        );
-        await invoiceRepository.saveInvoice(invoice);
+        ));
+        creditLeft -= amountToClear;
+        clearedTotal += amountToClear;
       }
-      
+
+      final refreshed = await invoiceRepository.getInvoicesByStudentId(student.id!);
+      final remainingDebt = refreshed.fold<double>(0, (sum, inv) {
+        final owing = inv.totalAmount - inv.amountPaid;
+        return sum + (owing > 0 ? owing : 0);
+      });
+
+      final updatedStudent = student.copyWith(
+        balance: remainingDebt,
+        creditBalance: creditLeft < 0 ? 0.0 : creditLeft,
+      );
+      await repository.updateStudent(updatedStudent);
+
+      debugPrint(
+        '[SchoolBloc] Cleared ₦$clearedTotal from credit for ${student.fullName}; '
+        'debt=$remainingDebt credit=${updatedStudent.creditBalance}',
+      );
+
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
       add(LoadStudentRecordsEvent(event.studentId));
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure, isLoading: false));
     }
   }
 

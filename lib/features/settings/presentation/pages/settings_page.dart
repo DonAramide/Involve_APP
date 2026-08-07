@@ -38,6 +38,7 @@ import 'package:involve_app/core/utils/app_config.dart';
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:involve_app/core/utils/progress_dialog_utils.dart';
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -653,6 +654,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 'balanceAmount': inv.balanceAmount,
                 'paymentStatus': inv.paymentStatus,
                 'paymentMethod': inv.paymentMethod,
+                'studentId': inv.studentId,
+                'classId': inv.classId,
+                'termId': inv.termId,
+                'academicYearId': inv.academicYearId,
+                'admissionNumber': inv.admissionNumber,
+                'className': inv.className,
+                'termName': inv.termName,
+                'academicYearName': inv.academicYearName,
+                'businessMode': inv.businessMode,
                 'items': itemsPayload,
               });
             }
@@ -666,6 +676,171 @@ class _SettingsPageState extends State<SettingsPage> {
             } catch (invErr) {
               debugPrint('Bulk invoice sync error: $invErr');
             }
+          }
+
+          // 5. School-mode roster + academics → web portal
+          try {
+            final years = await db.select(db.academicYears).get();
+            final terms = await db.select(db.terms).get();
+            final classes = await db.select(db.classes).get();
+            final teachers = await db.select(db.teachers).get();
+            final subjects = await db.select(db.subjects).get();
+            final students = await db.select(db.students).get();
+            List<dynamic> results = [];
+            try {
+              results = await db.select(db.results).get();
+            } catch (_) {
+              results = [];
+            }
+
+            String syncKey(String entity, dynamic row) {
+              final existing = (row as dynamic).syncId?.toString();
+              if (existing != null &&
+                  existing.isNotEmpty &&
+                  !existing.startsWith('local-') &&
+                  RegExp(
+                    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+                  ).hasMatch(existing)) {
+                return existing;
+              }
+              // Students: prefer admission number so web upserts stay 1:1 with mobile.
+              if (entity == 'student') {
+                final admission =
+                    (row as dynamic).admissionNumber?.toString().trim() ?? '';
+                if (admission.isNotEmpty) {
+                  return const Uuid().v5(
+                    '6ba7b811-9dad-11d1-80b4-00c04fd430c8',
+                    'invify-school-student-admission-$admission',
+                  );
+                }
+              }
+              // Stable UUID from local row id so re-syncs upsert cleanly.
+              // Namespace.URL = 6ba7b811-9dad-11d1-80b4-00c04fd430c8
+              return const Uuid().v5(
+                '6ba7b811-9dad-11d1-80b4-00c04fd430c8',
+                'invify-school-$entity-${row.id}',
+              );
+            }
+
+            final classNameById = {
+              for (final c in classes) c.id: c.name,
+            };
+
+            final schoolPayload = {
+              'years': years
+                  .map((y) => {
+                        'id': y.id,
+                        'syncId': syncKey('year', y),
+                        'name': y.name,
+                        'startDate': y.startDate.toIso8601String(),
+                        'endDate': y.endDate.toIso8601String(),
+                        'isCurrent': y.isCurrent,
+                        'isDeleted': y.isDeleted,
+                      })
+                  .toList(),
+              'terms': terms
+                  .map((t) => {
+                        'id': t.id,
+                        'syncId': syncKey('term', t),
+                        'name': t.name,
+                        'academicYearId': t.academicYearId,
+                        'startDate': t.startDate.toIso8601String(),
+                        'endDate': t.endDate.toIso8601String(),
+                        'isCurrent': t.isCurrent,
+                        'isDeleted': t.isDeleted,
+                      })
+                  .toList(),
+              'classes': classes
+                  .map((c) => {
+                        'id': c.id,
+                        'syncId': syncKey('class', c),
+                        'name': c.name,
+                        'description': c.description,
+                        'isDeleted': c.isDeleted,
+                      })
+                  .toList(),
+              'teachers': teachers
+                  .map((t) => {
+                        'id': t.id,
+                        'syncId': syncKey('teacher', t),
+                        'fullName': t.fullName,
+                        'phone': t.phone,
+                        'profession': t.profession,
+                        'classId': t.classId,
+                        'salary': t.salary,
+                        'yearsInSchool': t.yearsInSchool,
+                        'employmentDate': t.employmentDate.toIso8601String(),
+                        'isDeleted': t.isDeleted,
+                      })
+                  .toList(),
+              'subjects': subjects
+                  .map((s) => {
+                        'id': s.id,
+                        'syncId': syncKey('subject', s),
+                        'name': s.name,
+                        'code': s.code,
+                        'teacherId': s.teacherId,
+                        'isDeleted': s.isDeleted,
+                      })
+                  .toList(),
+              'students': students
+                  .map((s) => {
+                        'id': s.id,
+                        'syncId': syncKey('student', s),
+                        'admissionNumber': s.admissionNumber,
+                        'firstName': s.firstName,
+                        'lastName': s.lastName,
+                        'classId': s.classId,
+                        'className': classNameById[s.classId],
+                        'academicYearId': s.academicYearId,
+                        'parentName': s.parentName,
+                        'parentPhone': s.parentPhone,
+                        'balance': s.balance,
+                        'creditBalance': s.creditBalance,
+                        'gender': s.gender,
+                        'department': s.department,
+                        'virtualAccountNumber': s.virtualAccountNumber,
+                        'virtualAccountBank': s.virtualAccountBank,
+                        'virtualAccountStatus': s.virtualAccountStatus,
+                        'isDeleted': s.isDeleted,
+                      })
+                  .toList(),
+              'results': results
+                  .map((r) => {
+                        'id': r.id,
+                        'syncId': syncKey('result', r),
+                        'studentId': r.studentId,
+                        'subjectId': r.subjectId,
+                        'termId': r.termId,
+                        'academicYearId': r.academicYearId,
+                        'assessmentScore': r.assessmentScore,
+                        'examScore': r.examScore,
+                        'totalScore': r.totalScore,
+                        'grade': r.grade,
+                        'remarks': r.remarks,
+                        'isDeleted': r.isDeleted,
+                      })
+                  .toList(),
+            };
+
+            final hasSchoolData = (schoolPayload['students'] as List).isNotEmpty ||
+                (schoolPayload['classes'] as List).isNotEmpty ||
+                (schoolPayload['teachers'] as List).isNotEmpty ||
+                (schoolPayload['years'] as List).isNotEmpty;
+
+            if (hasSchoolData) {
+              final schoolResult = await client.post(
+                '/api/school/bulk-sync',
+                data: schoolPayload,
+              );
+              debugPrint(
+                'School sync result: synced=${schoolResult.data?['synced']}, errors=${schoolResult.data?['errors']}',
+              );
+            } else {
+              debugPrint('School sync skipped: no local academic/student rows');
+            }
+          } catch (schoolErr) {
+            debugPrint('School bulk sync error: $schoolErr');
           }
         }
 

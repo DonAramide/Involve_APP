@@ -1,6 +1,7 @@
 // src/controllers/finance.controller.ts
 import { Request, Response } from 'express';
 import { supabase, supabaseAdmin } from '../db/supabase';
+import { resolveTenantScope } from '../utils/resolve-tenant-scope';
 
 export class ExecutiveFinanceController {
   /**
@@ -8,7 +9,7 @@ export class ExecutiveFinanceController {
    * Returns a high-level financial overview for school executives.
    */
   static async getSummary(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    const tenantId = resolveTenantScope(req);
     const { startDate, endDate } = req.query;
 
     if (!tenantId) {
@@ -53,7 +54,7 @@ export class ExecutiveFinanceController {
           .eq('tenant_id', tenantId)
           .eq('status', 'SUCCESS')
           .in('type', ['SWEEP', 'DEBIT', 'WITHDRAWAL']),
-        supabaseAdmin.from('students').select('id, running_balance').eq('school_id', tenantId),
+        supabaseAdmin.from('students').select('id, admission_number, running_balance').eq('school_id', tenantId),
         supabaseAdmin.from('customers').select('*', { count: 'exact', head: true }).eq('tenant_id', tenantId),
         supabaseAdmin.from('transactions_log').select('id').eq('tenant_id', tenantId).eq('status', 'PENDING').is('metadata->studentId', null),
         supabaseAdmin.from('transactions_log').select('id').eq('tenant_id', tenantId).eq('status', 'FAILED').eq('type', 'payout')
@@ -144,8 +145,20 @@ export class ExecutiveFinanceController {
       let paidCount = 0;
 
       if (students && students.length > 0) {
-        totalCount = students.length;
-        owingCount = students.filter(s => Number(s.running_balance || 0) < 0).length;
+        // Dedupe twin sync rows (same admission / name+class) before counting.
+        const seen = new Set<string>();
+        const unique = students.filter((s: any) => {
+          const adm = String(s.admission_number || '').trim().toLowerCase();
+          const key = adm
+            ? `adm:${adm}`
+            : `id:${s.id}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        totalCount = unique.length;
+        // App convention: balance > 0 = owing, balance < 0 = credit
+        owingCount = unique.filter((s: any) => Number(s.running_balance || 0) > 0).length;
         paidCount = Math.max(0, totalCount - owingCount);
       } else {
         const customerInvoiceMap = new Map<string, string[]>();
@@ -209,7 +222,7 @@ export class ExecutiveFinanceController {
    */
   static async getPayoutStats(req: Request, res: Response) {
     try {
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req.query.tenantId as string) || (req as any).user?.tenantId;
+      const tenantId = resolveTenantScope(req);
 
       let creditsQuery = supabaseAdmin
         .from('ledger_entries')
@@ -277,7 +290,7 @@ export class ExecutiveFinanceController {
    * Returns a chronological timeline of settlement events derived from actual ledger/settlement records.
    */
   static async getSettlementPhases(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    const tenantId = resolveTenantScope(req);
     if (!tenantId) return res.status(400).json({ error: 'Tenant ID required' });
 
     try {
@@ -321,7 +334,7 @@ export class ExecutiveFinanceController {
   }
 
   static async getQuasarTransactions(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    const tenantId = resolveTenantScope(req);
     const { date } = req.query; // YYYY-MM-DD format
 
     if (!tenantId) {
@@ -358,7 +371,7 @@ export class ExecutiveFinanceController {
    * so offline devices can catch up wallet credits + local notifications on reconnect.
    */
   static async getMissedPayments(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+    const tenantId = resolveTenantScope(req);
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
     }

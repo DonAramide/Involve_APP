@@ -36,6 +36,7 @@ import { RetentionController } from './controllers/retention.controller';
 import { WebhookController } from './controllers/webhook.controller';
 import { ReconciliationController } from './controllers/reconciliation.controller';
 import { StudentController } from './controllers/student.controller';
+import { SchoolSyncController } from './controllers/school-sync.controller';
 import { PayoutController } from './controllers/payout.controller';
 import { ExecutiveFinanceController } from './controllers/finance.controller';
 import { DefaultersController } from './controllers/defaulters.controller';
@@ -173,7 +174,9 @@ app.post('/api/auth/reset-password', authLimiter, AuthController.resetPassword);
 app.get('/public/invites/validate/:token', InviteController.validateInvite);
 app.post('/public/invites/accept', InviteController.acceptInvite);
 
-// AI Generation Endpoints
+// AI Generation Endpoints (Flutter uses /api/ai/*, admin may use /ai/*)
+app.post('/api/ai/lesson-note/generate', authenticate, AIController.generateLessonNote);
+app.post('/api/ai/lesson-note/refresh', authenticate, AIController.refreshLessonNote);
 app.post('/ai/lesson-note/generate', authenticate, AIController.generateLessonNote);
 app.post('/ai/lesson-note/refresh', authenticate, AIController.refreshLessonNote);
 
@@ -635,11 +638,26 @@ app.post('/api/notifications/read-all', authenticate, NotificationController.mar
 
 // Student & Finance Core
 app.get('/api/finance/virtual-account/:studentId', authenticate, StudentController.getVirtualAccount);
+app.post('/api/finance/student-virtual-account/:studentId', authenticate, StudentController.provisionStudentVirtualAccount);
 app.post('/api/finance/customer-virtual-account/:customerId', authenticate, CustomerController.getVirtualAccount);
 app.post('/api/finance/staff-virtual-account/:userId', authenticate, CustomerController.getStaffVirtualAccount);
 app.get('/api/finance/virtual-accounts', authenticate, CustomerController.listTenantVirtualAccounts);
 app.get('/api/finance/virtual-accounts/:accountNumber/transactions', authenticate, CustomerController.getVirtualAccountTransactions);
 app.post('/api/finance/virtual-accounts/:accountNumber/sweep', authenticate, CustomerController.sweepVirtualAccountFunds);
+
+// School-mode Web Sync (students, academics, teachers, results)
+app.post(
+  '/api/school/bulk-sync',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  SchoolSyncController.bulkSync,
+);
+app.get(
+  '/api/school/roster',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  SchoolSyncController.getRoster,
+);
 
 // CRM Routes
 app.get('/api/v1/crm/customers', authenticate, CustomerController.searchCustomers);

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../bloc/school_bloc.dart';
@@ -19,6 +21,7 @@ import 'package:involve_app/services/mpos_service.dart';
 import 'package:involve_app/core/mpos/mpos_device_type.dart';
 import 'package:involve_app/services/socket_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 
 class StudentProfilePage extends StatefulWidget {
   final int studentId;
@@ -29,15 +32,60 @@ class StudentProfilePage extends StatefulWidget {
 }
 
 class _StudentProfilePageState extends State<StudentProfilePage> {
+  bool _awaitingVaProvision = false;
+  StreamSubscription<Student>? _studentCreditSub;
+
   @override
   void initState() {
     super.initState();
     context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
+    _studentCreditSub =
+        CustomerWalletCreditService.instance.onStudentCredited.listen((student) {
+      if (!mounted || student.id != widget.studentId) return;
+      context.read<SchoolBloc>().add(LoadSchoolData());
+      context.read<SchoolBloc>().add(LoadStudentRecordsEvent(widget.studentId));
+    });
+  }
+
+  @override
+  void dispose() {
+    _studentCreditSub?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SchoolBloc, SchoolState>(
+    return BlocConsumer<SchoolBloc, SchoolState>(
+      listener: (context, state) {
+        if (!_awaitingVaProvision) return;
+
+        if (state.error != null && state.status == SchoolStatus.failure) {
+          setState(() => _awaitingVaProvision = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.error!),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          return;
+        }
+
+        if (state.status == SchoolStatus.success && !state.isLoading) {
+          final student = state.students.firstWhereOrNull((s) => s.id == widget.studentId);
+          if (student?.virtualAccountNumber != null) {
+            setState(() => _awaitingVaProvision = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Virtual account generated: ${student!.virtualAccountNumber}',
+                ),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      },
       builder: (context, state) {
         final student = state.students.firstWhere(
           (s) => s.id == widget.studentId, 
@@ -75,11 +123,11 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             ),
             body: Column(
               children: [
-                _buildHeader(context, student, sClass, assignedTeacher, currency),
+                _buildHeader(context, student, sClass, assignedTeacher, currency, state.studentInvoices),
                 Expanded(
                   child: TabBarView(
                     children: [
-                      _buildGeneralTab(student),
+                      _buildGeneralTab(student, isProvisioningVa: _awaitingVaProvision),
                        _buildRecordsTab(student, state.studentInvoices, currency),
                       _buildResultsTab(state.results),
                       _buildPaymentsTab(state.studentInvoices, currency),
@@ -94,97 +142,142 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, Student student, SchoolClass sClass, Teacher? assignedTeacher, String currency) {
+  Widget _buildHeader(
+    BuildContext context,
+    Student student,
+    SchoolClass sClass,
+    Teacher? assignedTeacher,
+    String currency,
+    List<Invoice> studentInvoices,
+  ) {
+    final theme = Theme.of(context);
+    // Convention: balance > 0 = debt owed. Negative balance is a sync glitch (over-applied).
+    final rawBalance = student.balance;
+    final ledgerDebt = rawBalance > 0 ? rawBalance : 0.0;
+    final invoiceDebt = studentInvoices
+        .where((inv) => inv.studentId == student.id)
+        .fold(0.0, (sum, inv) {
+      final owing = inv.totalAmount - inv.amountPaid;
+      return sum + (owing > 0 ? owing : 0);
+    });
+    final debt = ledgerDebt > 0.001 ? ledgerDebt : invoiceDebt;
+    final hasDebit = debt > 0.001;
+    final hasCredit = student.creditBalance > 0.001;
+    // CLEAR applies wallet credit to open debt / bills.
+    final canClearWithCredit = hasCredit && (hasDebit || rawBalance < -0.001);
+
     return Container(
-      padding: const EdgeInsets.all(24),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary.withOpacity(0.05),
-        border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.2))),
+        color: theme.colorScheme.primary.withOpacity(0.05),
+        border: Border(bottom: BorderSide(color: Colors.grey.withOpacity(0.15))),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
-            radius: 40,
+            radius: 32,
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
             backgroundImage: student.image != null ? MemoryImage(student.image!) : null,
-            child: student.image == null ? const Icon(Icons.person, size: 40) : null,
+            child: student.image == null
+                ? Icon(Icons.person_rounded, size: 34, color: theme.colorScheme.primary)
+                : null,
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   student.fullName,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, height: 1.2),
                 ),
-                Text('Class: ${sClass.name}${student.department != null ? ' • ${student.department}' : ''} | ID: ${student.admissionNumber ?? "N/A"}'),
-                if (assignedTeacher != null)
-                  Text('Teacher: ${assignedTeacher.fullName}', style: const TextStyle(fontSize: 14, color: Colors.blueGrey)),
-                const SizedBox(height: 8),
-                Row(
+                const SizedBox(height: 4),
+                Text(
+                  [
+                    sClass.name,
+                    if (student.department != null && student.department!.isNotEmpty) student.department!,
+                    'ID ${student.admissionNumber}',
+                  ].join(' · '),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                ),
+                if (assignedTeacher != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Teacher: ${assignedTeacher.fullName}',
+                    style: TextStyle(fontSize: 13, color: Colors.blueGrey.shade600),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: student.balance > 0 ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                        color: hasDebit ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        'Balance: ${CurrencyFormatter.formatWithSymbol(student.balance, symbol: currency)}',
+                        hasDebit
+                            ? 'Balance: ${CurrencyFormatter.formatWithSymbol(debt, symbol: currency)}'
+                            : 'Balance: ${CurrencyFormatter.formatWithSymbol(0, symbol: currency)}',
                         style: TextStyle(
-                          color: student.balance > 0 ? Colors.red : Colors.green,
+                          color: hasDebit ? Colors.red.shade700 : Colors.green.shade700,
                           fontWeight: FontWeight.bold,
+                          fontSize: 13,
                         ),
                       ),
                     ),
-                    if (student.balance > 0) ...[
-                      const SizedBox(width: 8),
+                    if (hasCredit)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Credit: ${CurrencyFormatter.formatWithSymbol(student.creditBalance, symbol: currency)}',
+                          style: TextStyle(
+                            color: Colors.teal.shade700,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    if (hasDebit)
                       TextButton.icon(
                         onPressed: () => _showPaymentDialog(context, student),
                         icon: const Icon(Icons.payment, size: 16),
-                        label: const Text('PAY BALANCE'),
+                        label: const Text('PAY'),
                         style: TextButton.styleFrom(
                           foregroundColor: Colors.white,
-                          backgroundColor: Colors.blue,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          backgroundColor: theme.colorScheme.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
-                      if (student.creditBalance > 0) ...[
-                        const SizedBox(width: 8),
-                        TextButton.icon(
-                          onPressed: () {
-                            context.read<SchoolBloc>().add(ClearStudentDebitEvent(student.id!));
-                          },
-                          icon: const Icon(Icons.auto_fix_high, size: 16),
-                          label: const Text('CLEAR DEBIT'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white,
-                            backgroundColor: Colors.green,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
+                    if (canClearWithCredit)
+                      TextButton.icon(
+                        onPressed: () {
+                          context.read<SchoolBloc>().add(ClearStudentDebitEvent(student.id!));
+                        },
+                        icon: const Icon(Icons.auto_fix_high, size: 16),
+                        label: const Text('CLEAR'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.green.shade700,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                      ],
-                    ],
+                      ),
                   ],
                 ),
-                if (student.creditBalance > 0) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'Credit: ${CurrencyFormatter.formatWithSymbol(student.creditBalance, symbol: currency)}',
-                      style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -193,62 +286,136 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  Widget _buildGeneralTab(Student student) {
+  Widget _buildGeneralTab(Student student, {bool isProvisioningVa = false}) {
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                children: [
-                  _buildInfoTile('Parent/Guardian', student.parentName ?? 'Not Set', Icons.person_outline),
-                  _buildInteractivePhoneTile('Phone', student.parentPhone ?? 'Not Set', Icons.phone_android),
-                  _buildVirtualAccountSection(context, student),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            if (student.image != null)
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  image: DecorationImage(
-                    image: MemoryImage(student.image!),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              )
-            else
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.person, size: 50, color: Colors.grey),
-              ),
-          ],
-        ),
-        const Divider(height: 32),
-        _buildInfoTile('Date of Birth', student.dateOfBirth != null ? DateFormat('dd MMM yyyy').format(student.dateOfBirth!) : 'Not Set', Icons.cake_outlined),
-        _buildInfoTile('Gender', student.gender ?? 'Not Set', Icons.transgender_outlined),
-        _buildInfoTile('Registration Date', student.registrationDate != null ? DateFormat('dd MMM yyyy').format(student.registrationDate!) : 'Not Set', Icons.calendar_today_outlined),
+        _buildSectionLabel('Payment Account'),
+        const SizedBox(height: 10),
+        _buildVirtualAccountSection(context, student, isProvisioningVa: isProvisioningVa),
+        const SizedBox(height: 22),
+        _buildSectionLabel('Guardian Contact'),
+        const SizedBox(height: 10),
+        _buildDetailsCard([
+          _buildInfoRow(
+            icon: Icons.person_outline_rounded,
+            label: 'Parent / Guardian',
+            value: student.parentName?.trim().isNotEmpty == true ? student.parentName! : 'Not set',
+          ),
+          _buildInfoRow(
+            icon: Icons.phone_android_rounded,
+            label: 'Phone',
+            value: student.parentPhone?.trim().isNotEmpty == true ? student.parentPhone! : 'Not set',
+            onTap: student.parentPhone?.trim().isNotEmpty == true
+                ? () => _showCommunicationOptions(context, student.parentPhone!)
+                : null,
+            trailing: student.parentPhone?.trim().isNotEmpty == true
+                ? Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.grey.shade500)
+                : null,
+          ),
+        ]),
+        const SizedBox(height: 22),
+        _buildSectionLabel('Personal Details'),
+        const SizedBox(height: 10),
+        _buildDetailsCard([
+          _buildInfoRow(
+            icon: Icons.cake_outlined,
+            label: 'Date of Birth',
+            value: student.dateOfBirth != null
+                ? DateFormat('dd MMM yyyy').format(student.dateOfBirth!)
+                : 'Not set',
+          ),
+          _buildInfoRow(
+            icon: Icons.wc_outlined,
+            label: 'Gender',
+            value: student.gender?.trim().isNotEmpty == true ? student.gender! : 'Not set',
+          ),
+          _buildInfoRow(
+            icon: Icons.event_available_outlined,
+            label: 'Registered',
+            value: DateFormat('dd MMM yyyy').format(student.registrationDate),
+            showDivider: false,
+          ),
+        ]),
       ],
     );
   }
 
-  Widget _buildInteractivePhoneTile(String label, String value, IconData icon) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.blueGrey),
-      title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-      contentPadding: const EdgeInsets.symmetric(vertical: 4),
-      onTap: value == 'Not Set' ? null : () => _showCommunicationOptions(context, value),
+  Widget _buildSectionLabel(String title) {
+    return Text(
+      title.toUpperCase(),
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.8,
+        color: Colors.grey.shade600,
+      ),
+    );
+  }
+
+  Widget _buildDetailsCard(List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.15)),
+      ),
+      child: Column(children: children),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+    Widget? trailing,
+    bool showDivider = true,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.blueGrey.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: Colors.blueGrey.shade600, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        value,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                if (trailing != null) trailing,
+              ],
+            ),
+          ),
+        ),
+        if (showDivider)
+          Divider(height: 1, indent: 66, color: Colors.grey.withOpacity(0.12)),
+      ],
     );
   }
 
@@ -320,15 +487,6 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
-  }
-
-  Widget _buildInfoTile(String label, String value, IconData icon) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.blueGrey),
-      title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      subtitle: Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-      contentPadding: const EdgeInsets.symmetric(vertical: 4),
-    );
   }
 
   Widget _buildResultsTab(List<AcademicResult> results) {
@@ -795,39 +953,289 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  Widget _buildVirtualAccountSection(BuildContext context, Student student) {
-    if (student.virtualAccountNumber != null && student.virtualAccountBank != null) {
-      return Card(
-        margin: const EdgeInsets.only(top: 16, bottom: 8),
-        color: Colors.green.shade50,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Dedicated Virtual Account', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('Bank: ${student.virtualAccountBank}'),
-              Text('Account: ${student.virtualAccountNumber}'),
-              Text('Status: ${student.virtualAccountStatus ?? "ACTIVE"}'),
-            ],
-          ),
+  Widget _buildVirtualAccountSection(BuildContext context, Student student, {bool isProvisioningVa = false}) {
+    final hasVa = student.virtualAccountNumber != null &&
+        student.virtualAccountNumber!.trim().isNotEmpty &&
+        student.virtualAccountBank != null &&
+        student.virtualAccountBank!.trim().isNotEmpty;
+
+    if (!hasVa) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.blueGrey.withOpacity(0.04),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blueGrey.withOpacity(0.12)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.account_balance_rounded, color: Colors.blue.shade800),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'No virtual account yet',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Generate a dedicated account for fee payments.',
+                        style: TextStyle(fontSize: 12, color: Colors.blueGrey),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: isProvisioningVa
+                    ? null
+                    : () {
+                        setState(() => _awaitingVaProvision = true);
+                        context.read<SchoolBloc>().add(ProvisionStudentVirtualAccountEvent(student.id!));
+                      },
+                icon: isProvisioningVa
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.add_card_rounded),
+                label: Text(isProvisioningVa ? 'Generating…' : 'Generate Virtual Account'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade800,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: ElevatedButton.icon(
-        onPressed: () {
-          context.read<SchoolBloc>().add(ProvisionStudentVirtualAccountEvent(student.id!));
-        },
-        icon: const Icon(Icons.account_balance),
-        label: const Text('Generate Virtual Account'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue.shade800,
-          foregroundColor: Colors.white,
+
+    final accountNumber = student.virtualAccountNumber!.trim();
+    final bankName = student.virtualAccountBank!.trim();
+    final status = (student.virtualAccountStatus ?? 'ACTIVE').toUpperCase();
+    final accountName = student.fullName;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xFF0F766E), const Color(0xFF0D9488)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F766E).withOpacity(0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.account_balance_rounded, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'DEDICATED VIRTUAL ACCOUNT',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.9,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  status,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Account Number',
+            style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  accountNumber,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.4,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Copy account number',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: accountNumber));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Account number copied'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy_rounded, color: Colors.white),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withOpacity(0.14),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                _buildVaMetaRow('Bank', bankName),
+                const SizedBox(height: 8),
+                _buildVaMetaRow('Account Name', accountName),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final details =
+                        'Pay school fees for $accountName\nBank: $bankName\nAccount: $accountNumber';
+                    Clipboard.setData(ClipboardData(text: details));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Payment details copied'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.content_copy_rounded, size: 16),
+                  label: const Text('Copy details'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.white.withOpacity(0.35)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: student.parentPhone?.trim().isNotEmpty == true
+                      ? () async {
+                          final phone = student.parentPhone!.replaceAll(RegExp(r'\D'), '');
+                          final message = Uri.encodeComponent(
+                            'Payment details for $accountName:\n'
+                            'Bank: $bankName\n'
+                            'Account Number: $accountNumber\n\n'
+                            'Please use this account for school fee payments.',
+                          );
+                          final url = Uri.parse('https://wa.me/$phone?text=$message');
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url, mode: LaunchMode.externalApplication);
+                          }
+                        }
+                      : null,
+                  icon: const Icon(Icons.share_rounded, size: 16),
+                  label: const Text('Share'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF0F766E),
+                    disabledBackgroundColor: Colors.white24,
+                    disabledForegroundColor: Colors.white54,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVaMetaRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 96,
+          child: Text(
+            label,
+            style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 12),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -875,21 +1283,31 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                 socketCallback = (data) {
                   debugPrint('[StudentPaymentSocket] Received event: $data');
                   if (data != null && data['metadata'] != null) {
-                    final meta = data['metadata'];
+                    final meta = data['metadata'] is Map
+                        ? Map<String, dynamic>.from(data['metadata'] as Map)
+                        : <String, dynamic>{};
                     final sId = meta['studentId']?.toString();
-                    if (sId == student.id.toString()) {
+                    final admission = meta['admissionNumber']?.toString();
+                    final va = (meta['virtualAccountNumber'] ?? meta['accountNumber'])
+                        ?.toString()
+                        .trim();
+                    final matchesStudent = sId == student.id.toString() ||
+                        sId == 'stu-${student.admissionNumber}' ||
+                        admission == student.admissionNumber ||
+                        (va != null &&
+                            va.isNotEmpty &&
+                            va == student.virtualAccountNumber?.trim());
+                    if (matchesStudent) {
                       cleanup();
                       
                       final amount = double.tryParse(data['amount']?.toString() ?? '') ?? 0.0;
                       if (amount > 0) {
-                        context.read<SchoolBloc>().add(MakeStudentPaymentEvent(
-                          studentId: student.id!,
-                          amount: amount,
-                          method: 'Transfer',
-                          remarks: remarksController.text.isNotEmpty 
-                              ? remarksController.text 
-                              : 'Confirmed via Transfer Webhook',
-                        ));
+                        // Local VA credit path already applies debt/credit; still record payment receipt.
+                        unawaited(
+                          CustomerWalletCreditService.instance.applyPaymentSuccess(data),
+                        );
+                        context.read<SchoolBloc>().add(LoadSchoolData());
+                        context.read<SchoolBloc>().add(LoadStudentRecordsEvent(student.id!));
                       }
                       
                       ScaffoldMessenger.of(context).showSnackBar(

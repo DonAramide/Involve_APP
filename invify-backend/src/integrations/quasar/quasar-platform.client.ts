@@ -168,8 +168,21 @@ export class QuasarPlatformClient {
    * Resolve the correct vertical from an Invify tenant type string.
    */
   static resolveVertical(type: string): InvifyVertical {
-    if (type === 'school') return 'invify_school';
-    if (type === 'services') return 'invify_services';
+    const normalized = String(type || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+
+    if (normalized === 'school' || normalized === 'education' || normalized === 'invify_school') {
+      return 'invify_school';
+    }
+    if (
+      normalized === 'services' ||
+      normalized === 'service' ||
+      normalized === 'invify_services'
+    ) {
+      return 'invify_services';
+    }
     return 'invify_retail';
   }
 

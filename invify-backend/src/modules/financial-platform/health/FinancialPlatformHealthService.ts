@@ -78,10 +78,21 @@ export class FinancialPlatformHealthService {
 
       try {
         const quasarPingStart = Date.now();
-        await this.quasarClient.getTenant(connection.quasar_tenant_id, context);
+        // Partner credentials are vertical-scoped — must use stored quasar_vertical
+        // (school activations fail/degrade if we default to invify_retail).
+        const vertical =
+          connection.quasar_vertical ||
+          connection.vertical ||
+          'invify_retail';
+        await this.quasarClient.getTenant(
+          connection.quasar_tenant_id,
+          context,
+          String(vertical),
+        );
         diagnostics.apiLatencyMs = Date.now() - quasarPingStart;
         diagnostics.quasarStatus = 'HEALTHY';
         diagnostics.healthStatus = 'HEALTHY';
+        diagnostics.quasarVertical = vertical;
       } catch {
         diagnostics.quasarStatus = 'DEGRADED';
         diagnostics.healthStatus = 'DEGRADED';

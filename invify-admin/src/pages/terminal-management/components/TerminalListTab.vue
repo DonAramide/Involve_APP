@@ -131,21 +131,31 @@ const tidCols = [
 const fetchData = async () => {
   loading.value = true
   try {
+    const unwrap = (payload) => {
+      if (Array.isArray(payload)) return payload
+      if (Array.isArray(payload?.data)) return payload.data
+      return []
+    }
+
     if (inventoryTab.value === 'tablets') {
       const { data } = await terminalApi.getTablets()
-      tablets.value = data.data || []
+      tablets.value = unwrap(data)
     } else if (inventoryTab.value === 'mpos') {
       const { data } = await terminalApi.getMpos()
-      mpos.value = data.data || []
+      mpos.value = unwrap(data)
     } else if (inventoryTab.value === 'printers') {
       const { data } = await terminalApi.getPrinters()
-      printers.value = data.data || []
+      printers.value = unwrap(data)
     } else if (inventoryTab.value === 'tids') {
       const { data } = await terminalApi.getTids()
-      tids.value = data.data || []
+      tids.value = unwrap(data)
     }
   } catch (error) {
-    $q.notify({ type: 'negative', message: `Failed to load ${inventoryTab.value}` })
+    console.error('[TerminalListTab] load failed', error)
+    $q.notify({
+      type: 'negative',
+      message: error?.response?.data?.error || `Failed to load ${inventoryTab.value}`,
+    })
   } finally {
     loading.value = false
   }

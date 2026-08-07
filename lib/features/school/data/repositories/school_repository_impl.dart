@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
 import '../../domain/repositories/school_repository.dart';
@@ -296,6 +297,75 @@ class SchoolRepositoryImpl implements SchoolRepository {
     final query = database.select(database.students)..where((t) => t.id.equals(id));
     final row = await query.getSingleOrNull();
     if (row == null) return null;
+    return _mapStudentRow(row);
+  }
+
+  @override
+  Future<Student?> getStudentByVirtualAccount(String accountNumber) async {
+    final va = accountNumber.trim();
+    if (va.isEmpty) return null;
+    final query = database.select(database.students)
+      ..where((t) => t.virtualAccountNumber.equals(va));
+    final row = await query.getSingleOrNull();
+    if (row == null) return null;
+    return _mapStudentRow(row);
+  }
+
+  @override
+  Future<Student?> getStudentByAdmissionNumber(String admissionNumber) async {
+    final adm = admissionNumber.trim();
+    if (adm.isEmpty) return null;
+    final query = database.select(database.students)
+      ..where((t) => t.admissionNumber.equals(adm));
+    final row = await query.getSingleOrNull();
+    if (row == null) return null;
+    return _mapStudentRow(row);
+  }
+
+  @override
+  Future<Student?> creditStudentFromDeposit({
+    required double amount,
+    required String reference,
+    String? virtualAccountNumber,
+    String? admissionNumber,
+    String? studentKey,
+  }) async {
+    if (amount <= 0 || reference.trim().isEmpty) return null;
+
+    Student? student;
+    if (virtualAccountNumber != null && virtualAccountNumber.trim().isNotEmpty) {
+      student = await getStudentByVirtualAccount(virtualAccountNumber.trim());
+    }
+    if (student == null && admissionNumber != null && admissionNumber.trim().isNotEmpty) {
+      student = await getStudentByAdmissionNumber(admissionNumber.trim());
+    }
+    if (student == null && studentKey != null && studentKey.trim().isNotEmpty) {
+      final key = studentKey.trim();
+      if (key.startsWith('stu-')) {
+        student = await getStudentByAdmissionNumber(key.substring(4));
+      } else {
+        student = await getStudentByAdmissionNumber(key);
+      }
+    }
+    if (student == null || student.id == null) return null;
+
+    // Pay down outstanding debt first; remainder becomes student credit.
+    final debt = student.balance > 0 ? student.balance : 0.0;
+    final appliedToDebt = amount <= debt ? amount : debt;
+    final remainder = amount - appliedToDebt;
+    final updated = student.copyWith(
+      balance: (student.balance - appliedToDebt).clamp(0.0, double.infinity),
+      creditBalance: student.creditBalance + remainder,
+    );
+    await updateStudent(updated);
+    debugPrint(
+      '[SchoolRepo] Credited student ${updated.fullName} ₦$amount '
+      '(debt-$appliedToDebt, credit+$remainder, ref=$reference)',
+    );
+    return updated;
+  }
+
+  Student _mapStudentRow(db.StudentTable row) {
     return Student(
       id: row.id,
       admissionNumber: row.admissionNumber,
@@ -314,6 +384,7 @@ class SchoolRepositoryImpl implements SchoolRepository {
       virtualAccountNumber: row.virtualAccountNumber,
       virtualAccountBank: row.virtualAccountBank,
       virtualAccountStatus: row.virtualAccountStatus,
+      department: row.department,
     );
   }
 

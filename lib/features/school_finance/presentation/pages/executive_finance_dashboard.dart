@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/repositories/finance_repository_new.dart';
@@ -9,8 +10,11 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_state.d
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_bloc.dart';
 import 'package:involve_app/features/invoicing/presentation/history/bloc/history_state.dart';
+import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
+import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
+import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/services/socket_service.dart';
 import 'reconciliation_page.dart';
 import 'virtual_accounts_page.dart';
@@ -27,9 +31,11 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   final _repository = sl<FinanceRepository>();
   Map<String, dynamic>? _summary;
   List<dynamic> _recentActivity = [];
+  List<double> _monthCollected = List<double>.filled(6, 0);
   bool _isLoading = true;
   String? _error;
   StreamSubscription? _walletCreditSub;
+  StreamSubscription? _studentCreditSub;
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -44,6 +50,11 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       if (!mounted) return;
       _loadData();
     });
+    _studentCreditSub =
+        CustomerWalletCreditService.instance.onStudentCredited.listen((_) {
+      if (!mounted) return;
+      _loadData();
+    });
     SocketService().onEvent('payment.success', _onPaymentSuccess);
   }
 
@@ -55,40 +66,114 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   @override
   void dispose() {
     _walletCreditSub?.cancel();
+    _studentCreditSub?.cancel();
     SocketService().offEvent('payment.success', _onPaymentSuccess);
     super.dispose();
   }
 
-  /// Same rule as Customer Lookup: balance > 0 = owing.
-  Future<Map<String, dynamic>> _customerLedgerMetrics() async {
+  bool get _isSchoolMode {
+    final mode = context.read<SettingsBloc>().state.settings?.businessMode;
+    return mode == 'school';
+  }
+
+  /// Local ledger + invoices — updates immediately after a sale (API can lag).
+  Future<Map<String, dynamic>> _localFinanceSnapshot() async {
+    double collected = 0;
+    double invoiceOutstanding = 0;
+    final monthCollected = List<double>.filled(6, 0);
+    final now = DateTime.now();
+    List<Invoice> invoices = const [];
+
     try {
-      final customers =
-          await context.read<IServicesRepository>().getCustomers();
-      int owing = 0;
-      int paid = 0;
-      double outstanding = 0;
-      for (final c in customers) {
-        if (c.balance > 0.01) {
-          owing++;
-          outstanding += c.balance;
-        } else {
-          paid++;
+      invoices = await context.read<InvoiceRepository>().getAllInvoices();
+      for (final inv in invoices) {
+        if (_startDate != null && inv.dateCreated.isBefore(_startDate!)) continue;
+        if (_endDate != null &&
+            inv.dateCreated.isAfter(_endDate!.add(const Duration(days: 1)))) {
+          continue;
+        }
+        collected += inv.amountPaid;
+        final owing = inv.totalAmount - inv.amountPaid;
+        if (owing > 0.01) invoiceOutstanding += owing;
+
+        final monthsAgo =
+            (now.year - inv.dateCreated.year) * 12 + now.month - inv.dateCreated.month;
+        if (monthsAgo >= 0 && monthsAgo < 6) {
+          monthCollected[5 - monthsAgo] += inv.amountPaid;
         }
       }
-      return {
-        'total': customers.length,
-        'owing': owing,
-        'paid': paid,
-        'outstanding': outstanding,
-      };
-    } catch (_) {
-      return {
-        'total': 0,
-        'owing': 0,
-        'paid': 0,
-        'outstanding': 0.0,
-      };
+    } catch (e) {
+      debugPrint('[ExecutiveDashboard] invoice snapshot failed: $e');
     }
+
+    int total = 0;
+    int owingCount = 0;
+    int paidCount = 0;
+    double outstanding = 0;
+
+    if (_isSchoolMode) {
+      try {
+        final students =
+            await context.read<SchoolRepository>().getStudentSummaries();
+        total = students.length;
+        for (final s in students) {
+          if (s.balance > 0.01) {
+            owingCount++;
+            outstanding += s.balance;
+          } else {
+            paidCount++;
+          }
+        }
+        if (outstanding < 0.01 && invoiceOutstanding > 0.01) {
+          outstanding = invoiceOutstanding;
+        }
+      } catch (e) {
+        debugPrint('[ExecutiveDashboard] school ledger failed: $e');
+        outstanding = invoiceOutstanding;
+      }
+    } else {
+      try {
+        final customers =
+            await context.read<IServicesRepository>().getCustomers();
+        total = customers.length;
+        for (final c in customers) {
+          if (c.balance > 0.01) {
+            owingCount++;
+            outstanding += c.balance;
+          } else {
+            paidCount++;
+          }
+        }
+        if (outstanding < 0.01 && invoiceOutstanding > 0.01) {
+          outstanding = invoiceOutstanding;
+        }
+      } catch (e) {
+        debugPrint('[ExecutiveDashboard] customer ledger failed: $e');
+        outstanding = invoiceOutstanding;
+      }
+    }
+
+    final recent = invoices.take(8).map((inv) {
+      return {
+        'created_at': inv.dateCreated.toIso8601String(),
+        'type': inv.amountPaid > 0 ? 'fee' : 'invoice',
+        'amount': inv.amountPaid > 0 ? inv.amountPaid : inv.totalAmount,
+        'reference': inv.invoiceNumber,
+        'status': inv.paymentStatus,
+        'customerName': inv.customerName,
+      };
+    }).toList();
+
+    return {
+      'collected': collected,
+      'outstanding': outstanding,
+      'invoiceOutstanding': invoiceOutstanding,
+      'total': total,
+      'paid': paidCount,
+      'owing': owingCount,
+      'monthCollected': monthCollected,
+      'recent': recent,
+    };
   }
 
   Future<void> _loadData() async {
@@ -97,7 +182,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       _error = null;
     });
 
-    final ledger = await _customerLedgerMetrics();
+    final local = await _localFinanceSnapshot();
 
     try {
       final summary = await _repository.getExecutiveSummary(
@@ -106,63 +191,56 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
       );
       final history = await _repository.getPayoutHistory(limit: 5);
 
-      // Prefer local customer ledger for Paid/Owing/Outstanding so it matches Customer Lookup.
+      final apiCollected = (summary['totalCollected'] is num)
+          ? (summary['totalCollected'] as num).toDouble()
+          : double.tryParse('${summary['totalCollected']}') ?? 0.0;
+      final localCollected = (local['collected'] as num?)?.toDouble() ?? 0.0;
+
+      // Local sales land here immediately; cloud catch-up can lag behind device invoices.
+      summary['totalCollected'] = math.max(apiCollected, localCollected);
+      summary['outstanding'] = local['outstanding'];
       summary['studentMetrics'] = {
-        'total': ledger['total'],
-        'paid': ledger['paid'],
-        'owing': ledger['owing'],
+        'total': local['total'],
+        'paid': local['paid'],
+        'owing': local['owing'],
       };
-      summary['outstanding'] = ledger['outstanding'];
-      
+
+      final payoutRows = (history['data'] is List) ? history['data'] as List : <dynamic>[];
+      final recent = payoutRows.isNotEmpty
+          ? payoutRows
+          : (local['recent'] as List<dynamic>? ?? <dynamic>[]);
+
       setState(() {
         _summary = summary;
-        _recentActivity = history['data'];
+        _recentActivity = recent;
+        _monthCollected = List<double>.from(local['monthCollected'] as List<double>);
         _isLoading = false;
         _error = null;
       });
     } catch (e) {
-      // Offline fallback: local ledger only — never invent Quasar ratios.
-      double localCollected = 0.0;
-      List<dynamic> localActivities = [];
-      if (mounted) {
-        final historyState = context.read<HistoryBloc>().state;
-        if (historyState is HistoryLoaded) {
-          final invoices = historyState.invoices;
-
-          for (final inv in invoices) {
-            localCollected += inv.amountPaid;
-          }
-
-          localActivities = invoices.take(5).map((inv) => {
-            'created_at': inv.dateCreated.toIso8601String(),
-            'type': 'fee',
-            'amount': inv.totalAmount,
-          }).toList();
-        }
-      }
-
       setState(() {
         _summary = {
           'walletBalance': 0.0,
-          'totalCollected': localCollected,
-          'revenueInRange': localCollected,
+          'totalCollected': local['collected'],
+          'revenueInRange': local['collected'],
           'totalQuasarCollected': 0.0,
           'totalQuasarRemitted': 0.0,
           'pendingQuasarRemittance': 0.0,
           'pendingVirtualAccountFunds': 0.0,
-          'outstanding': ledger['outstanding'],
+          'outstanding': local['outstanding'],
           'alerts': {
             'unmatchedCount': 0,
             'failedPayoutsCount': 0,
           },
           'studentMetrics': {
-            'total': ledger['total'],
-            'paid': ledger['paid'],
-            'owing': ledger['owing'],
+            'total': local['total'],
+            'paid': local['paid'],
+            'owing': local['owing'],
           },
           '_offline': true,
         };
-        _recentActivity = localActivities;
+        _recentActivity = local['recent'] as List<dynamic>? ?? [];
+        _monthCollected = List<double>.from(local['monthCollected'] as List<double>);
         _isLoading = false;
         _error = null;
       });
@@ -172,7 +250,14 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<SettingsBloc, SettingsState>(
+    return BlocListener<HistoryBloc, HistoryState>(
+      listenWhen: (prev, next) => next is HistoryLoaded && prev != next,
+      listener: (context, state) {
+        // New local sales land in history — refresh KPIs that previously only
+        // mirrored cloud totals (so Outstanding wasn't the only card that moved).
+        _loadData();
+      },
+      child: BlocBuilder<SettingsBloc, SettingsState>(
       builder: (context, state) {
         final settings = state.settings;
         final isRetail = settings?.businessMode == 'retail';
@@ -277,26 +362,20 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                             crossAxisAlignment: CrossAxisAlignment.end,
                                             children: [
-                                              _buildMiniBar(0.4, Colors.blue),
-                                              _buildMiniBar(0.7, Colors.indigo),
-                                              _buildMiniBar(0.5, Colors.blue),
-                                              _buildMiniBar(0.9, Colors.indigo),
-                                              _buildMiniBar(0.6, Colors.blue),
-                                              _buildMiniBar(1.0, Colors.green),
+                                              for (var i = 0; i < 6; i++)
+                                                _buildMiniBar(
+                                                  _monthBarFactor(i),
+                                                  i == 5 ? Colors.green : (i.isEven ? Colors.blue : Colors.indigo),
+                                                ),
                                             ],
                                           ),
                                         ),
                                         const SizedBox(height: 8),
-                                        const Row(
+                                        Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                          children: [
-                                            Text('Jan', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                            Text('Feb', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                            Text('Mar', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                            Text('Apr', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                            Text('May', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                            Text('Jun', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                          ],
+                                          children: _monthLabels()
+                                              .map((label) => Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)))
+                                              .toList(),
                                         ),
                                       ],
                                     ),
@@ -333,6 +412,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
                 ),
         );
       },
+    ),
     );
   }
 
@@ -519,6 +599,22 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
         ],
       ),
     );
+  }
+
+  double _monthBarFactor(int index) {
+    if (_monthCollected.isEmpty) return 0.08;
+    final maxVal = _monthCollected.reduce(math.max);
+    if (maxVal <= 0) return 0.08;
+    final factor = _monthCollected[index] / maxVal;
+    return factor < 0.08 ? 0.08 : factor;
+  }
+
+  List<String> _monthLabels() {
+    final now = DateTime.now();
+    return List.generate(6, (i) {
+      final dt = DateTime(now.year, now.month - (5 - i), 1);
+      return DateFormat('MMM').format(dt);
+    });
   }
 
   Widget _buildMiniBar(double factor, Color color) {

@@ -342,6 +342,15 @@
                     :loading="rotatingPlatform"
                     class="text-weight-bold" 
                   />
+                  <q-btn
+                    outline
+                    color="deep-purple-4"
+                    icon="swap_horiz"
+                    label="Change Vertical"
+                    @click="openChangeVerticalDialog"
+                    :loading="changingVertical"
+                    class="text-weight-bold"
+                  />
                 </div>
               </q-card>
             </div>
@@ -1025,6 +1034,72 @@
       </q-card>
     </q-dialog>
 
+    <!-- CHANGE VERTICAL DIALOG -->
+    <q-dialog v-model="showChangeVerticalDialog" persistent>
+      <q-card class="bg-grey-9 text-white" style="min-width: 440px; max-width: 520px">
+        <q-card-section class="bg-deep-purple-10 q-py-md">
+          <div class="text-h6 row items-center no-wrap">
+            <q-icon name="swap_horiz" class="q-mr-sm" color="deep-purple-3" />
+            <span>Change Vertical</span>
+          </div>
+          <div class="text-caption text-deep-purple-2 q-mt-xs">
+            Moves {{ tenant?.name || 'this tenant' }} from
+            <strong>{{ (tenant?.type || 'retail').toUpperCase() }}</strong>
+            to a new Invify type and re-provisions Quasar under the matching partner.
+          </div>
+        </q-card-section>
+
+        <q-card-section class="q-pa-lg q-gutter-md">
+          <q-banner dense class="bg-amber-10 text-amber-2 rounded-borders">
+            This unlinks the current Quasar tenant locally and creates a new one under the target vertical.
+            The old Quasar tenant is not deleted remotely — clean it up in Quasar if needed.
+          </q-banner>
+
+          <q-select
+            v-model="changeVerticalForm.type"
+            :options="verticalTypeOptions"
+            label="New tenant type / vertical"
+            dark
+            filled
+            emit-value
+            map-options
+            label-color="deep-purple-3"
+          />
+
+          <q-input
+            v-model="changeVerticalForm.reason"
+            label="Reason (optional)"
+            dark
+            filled
+            type="textarea"
+            autogrow
+            label-color="deep-purple-3"
+          />
+
+          <q-input
+            v-model="changeVerticalForm.confirmPhrase"
+            label='Type CHANGE VERTICAL to confirm'
+            dark
+            filled
+            label-color="deep-purple-3"
+            :error="changeVerticalForm.confirmPhrase.length > 0 && changeVerticalForm.confirmPhrase.toUpperCase() !== 'CHANGE VERTICAL'"
+            error-message="Must match CHANGE VERTICAL exactly"
+          />
+        </q-card-section>
+
+        <q-card-actions align="right" class="q-pa-md bg-grey-10">
+          <q-btn flat label="Cancel" color="grey-5" v-close-popup :disable="changingVertical" />
+          <q-btn
+            color="deep-purple-6"
+            label="Change Vertical"
+            :loading="changingVertical"
+            :disable="!canSubmitChangeVertical"
+            @click="submitChangeVertical"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     </div>
     <q-inner-loading :showing="loading || loadingResetSetup" dark color="indigo-4" />
   </q-page>
@@ -1107,6 +1182,27 @@ const financialHealth = ref(null)
 const financialAudit = ref([])
 const activatingPlatform = ref(false)
 const rotatingPlatform = ref(false)
+const changingVertical = ref(false)
+const showChangeVerticalDialog = ref(false)
+const changeVerticalForm = ref({
+  type: 'school',
+  reason: '',
+  confirmPhrase: '',
+})
+const verticalTypeOptions = [
+  { label: 'School → invify_school', value: 'school' },
+  { label: 'Retail → invify_retail', value: 'retail' },
+  { label: 'Services → invify_services', value: 'services' },
+]
+const canSubmitChangeVertical = computed(() => {
+  const type = changeVerticalForm.value.type
+  const current = String(tenant.value?.type || '').toLowerCase()
+  return (
+    !!type &&
+    type !== current &&
+    changeVerticalForm.value.confirmPhrase.trim().toUpperCase() === 'CHANGE VERTICAL'
+  )
+})
 
 const showPasswordDialog = ref(false)
 const tempPassword = ref('')
@@ -1591,6 +1687,49 @@ const rotateFinancialPlatform = async () => {
       rotatingPlatform.value = false
     }
   })
+}
+
+const openChangeVerticalDialog = () => {
+  const current = String(tenant.value?.type || 'retail').toLowerCase()
+  const preferred = verticalTypeOptions.find((o) => o.value !== current)?.value || 'school'
+  changeVerticalForm.value = {
+    type: preferred,
+    reason: '',
+    confirmPhrase: '',
+  }
+  showChangeVerticalDialog.value = true
+}
+
+const submitChangeVertical = async () => {
+  if (!tenant.value || !canSubmitChangeVertical.value) return
+  changingVertical.value = true
+  try {
+    const res = await adminApi.changeFinancialPlatformVertical(tenant.value.id, {
+      type: changeVerticalForm.value.type,
+      confirmPhrase: changeVerticalForm.value.confirmPhrase.trim().toUpperCase(),
+      reason: changeVerticalForm.value.reason || undefined,
+    })
+    const data = res?.data || res
+    showChangeVerticalDialog.value = false
+    $q.notify({
+      type: 'positive',
+      message: data?.message || `Vertical changed to ${changeVerticalForm.value.type}`,
+      timeout: 6000,
+    })
+    if (data?.warning) {
+      $q.notify({ type: 'warning', message: data.warning, timeout: 10000 })
+    }
+    await fetchDetails()
+  } catch (err) {
+    console.error('Change vertical failed:', err)
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || err.response?.data?.details || 'Failed to change vertical',
+      timeout: 8000,
+    })
+  } finally {
+    changingVertical.value = false
+  }
 }
 
 onMounted(fetchDetails)

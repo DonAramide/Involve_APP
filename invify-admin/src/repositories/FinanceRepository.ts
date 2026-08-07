@@ -39,15 +39,28 @@ export class FinanceRepository {
   /**
    * GET /api/v1/finance/executive-summary
    */
-  static async getExecutiveSummary(tenantId: string, options?: { refresh?: boolean }): Promise<ExecutiveSummaryDTO> {
+  static async getExecutiveSummary(tenantId: string, options?: { refresh?: boolean }): Promise<ExecutiveSummaryDTO & { salesSummary?: any }> {
+    const scopedTenant =
+      tenantId ||
+      localStorage.getItem('tenant_id') ||
+      'unknown';
     return QueryCache.get(
-      `finance_summary_${tenantId}`,
+      `finance_summary_${scopedTenant}`,
       async () => {
         const { data } = await financeApi.getExecutiveSummary();
         return {
           walletBalance: data.walletBalance || 0,
           totalCollected: data.totalCollected || 0,
           revenueInRange: data.revenueInRange || 0,
+          salesSummary: data.salesSummary || {
+            totalInvoiced: 0,
+            totalCollected: 0,
+            card: 0,
+            transfer: 0,
+            cash: 0,
+            wallet: 0,
+            invoiceCount: 0,
+          },
           studentMetrics: { 
             total: data.studentMetrics?.total || 0, 
             paid: data.studentMetrics?.paid || 0, 
@@ -57,7 +70,7 @@ export class FinanceRepository {
             unmatchedCount: data.alerts?.unmatchedCount || 0, 
             failedPayoutsCount: data.alerts?.failedPayoutsCount || 0 
           }
-        } as ExecutiveSummaryDTO;
+        } as ExecutiveSummaryDTO & { salesSummary?: any };
       },
       options
     );

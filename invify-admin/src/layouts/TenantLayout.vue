@@ -209,29 +209,38 @@ const activeBusinessName = ref('')
 const activeIndustry = ref(localStorage.getItem('tenant_type') || '')
 
 const getTenantIdFromToken = () => {
-  // 1. Try explicit local storage first (set during login)
-  const explicitId = localStorage.getItem('tenant_id')
-  if (explicitId) return explicitId
-
-  // 2. Fallback to JWT payload extraction (for mocked auth/legacy)
+  // Prefer JWT tenantId for tenant operators so a stale twin in localStorage cannot stick.
   const token = localStorage.getItem('invify_token')
-  if (!token) return null
-  try {
-    const base64Url = token.split('.')[1]
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-    }).join(''))
-    const payload = JSON.parse(jsonPayload)
-    return payload.tenantId || payload.user_metadata?.tenant_id || payload.app_metadata?.tenant_id || null
-  } catch (e) {
-    return null
+  const role = String(localStorage.getItem('operator_role') || '').toUpperCase()
+  const isPlatform = ['SUPER_ADMIN', 'ADMIN', 'AGENT', 'SUPPORT', 'PLATFORM_ADMIN'].includes(role)
+
+  let jwtTenant = null
+  if (token) {
+    try {
+      const base64Url = token.split('.')[1]
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+      }).join(''))
+      const payload = JSON.parse(jsonPayload)
+      jwtTenant = payload.tenantId || payload.user_metadata?.tenant_id || payload.app_metadata?.tenant_id || null
+    } catch (e) {
+      jwtTenant = null
+    }
   }
+
+  const explicitId = localStorage.getItem('tenant_id')
+  if (isPlatform) {
+    return explicitId || jwtTenant
+  }
+  return jwtTenant || explicitId
 }
 
 const loadTenantDetails = async () => {
   const tenantId = getTenantIdFromToken()
   if (tenantId) {
+    // Keep tenant_id in sync so API interceptor can send X-Tenant-ID
+    localStorage.setItem('tenant_id', tenantId)
     try {
       const res = await adminApi.getTenantDetails(tenantId)
       if (res.data && res.data.tenant) {
@@ -282,9 +291,9 @@ const industryNavigationTree = computed(() => {
     return [
       { label: 'Dashboard', path: '/tenant/analytics', icon: 'dashboard', color: 'indigo-4', mode: 'SCHOOL' },
       { label: 'Admissions', path: '/tenant/users?pipeline=ADMISSION', icon: 'how_to_reg', color: 'indigo-3', mode: 'SCHOOL' },
-      { label: 'Students', path: '/tenant/users?type=STUDENT', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
+      { label: 'Students', path: '/tenant/school-roster', icon: 'face', color: 'green-4', mode: 'SCHOOL' },
       { label: 'Guardians', path: '/tenant/users?type=GUARDIAN', icon: 'family_restroom', color: 'cyan-4', mode: 'SCHOOL' },
-      { label: 'Academics', path: '/tenant/curriculum', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },
+      { label: 'Academics', path: '/tenant/school-roster', icon: 'school', color: 'purple-4', mode: 'SCHOOL' },
       { label: 'Finance', path: '/tenant/transactions', icon: 'receipt_long', color: 'amber-4', mode: 'SCHOOL' },
       { label: 'Inventory', path: '/tenant/retail/inventory', icon: 'inventory_2', color: 'deep-orange-4', mode: 'SCHOOL' },
       { label: 'Library', path: '/tenant/curriculum', icon: 'library_books', color: 'brown-4', mode: 'SCHOOL' },

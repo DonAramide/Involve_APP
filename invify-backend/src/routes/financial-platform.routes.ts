@@ -37,33 +37,80 @@ class InMemoryActivationLockProvider {
 
 import { IntegrationVaultService } from '../services/integration-vault.service';
 
+/** Resolve Quasar partner credentials for a vertical (school/retail/services). */
+async function resolveQuasarPlatformCreds(verticalRaw?: string) {
+  const vertical = String(verticalRaw || 'invify_retail').trim().toLowerCase() || 'invify_retail';
+
+  const verticalMap: Record<string, {
+    clientIdEnv: string[];
+    secretEnv: string[];
+    vaultSecretKeys: string[];
+    defaultClientId: string;
+  }> = {
+    invify_school: {
+      clientIdEnv: ['INVIFY_SCHOOL_CLIENT_ID'],
+      secretEnv: ['INVIFY_SCHOOL_CLIENT_SECRET'],
+      vaultSecretKeys: ['qip.schoolClientSecret'],
+      defaultClientId: 'INVIFY_SCHOOL',
+    },
+    invify_services: {
+      clientIdEnv: ['INVIFY_SERVICES_CLIENT_ID'],
+      secretEnv: ['INVIFY_SERVICES_CLIENT_SECRET'],
+      vaultSecretKeys: ['qip.servicesClientSecret'],
+      defaultClientId: 'INVIFY_SERVICES',
+    },
+    invify_retail: {
+      clientIdEnv: ['QUASAR_CLIENT_ID', 'INVIFY_RETAIL_CLIENT_ID'],
+      secretEnv: ['QUASAR_CLIENT_SECRET', 'INVIFY_RETAIL_CLIENT_SECRET', 'QUASAR_SERVICE_SECRET'],
+      vaultSecretKeys: ['qip.retailClientSecret'],
+      defaultClientId: 'INVIFY_RETAIL',
+    },
+  };
+
+  const cfg = verticalMap[vertical] || verticalMap.invify_retail;
+
+  let clientSecret: string | null = null;
+  for (const vaultKey of cfg.vaultSecretKeys) {
+    clientSecret =
+      (await IntegrationVaultService.getDecryptedCredential('qip', 'STAGING', undefined, vaultKey)) ||
+      (await IntegrationVaultService.getDecryptedCredential('qip', 'PRODUCTION', undefined, vaultKey));
+    if (clientSecret) break;
+  }
+
+  let clientId = cfg.defaultClientId;
+  for (const envKey of cfg.clientIdEnv) {
+    if (process.env[envKey]) {
+      clientId = process.env[envKey] as string;
+      break;
+    }
+  }
+
+  if (!clientSecret) {
+    for (const envKey of cfg.secretEnv) {
+      if (process.env[envKey]) {
+        clientSecret = process.env[envKey] as string;
+        break;
+      }
+    }
+  }
+
+  if (!clientSecret) {
+    console.warn(
+      `[FinancialPlatform] No Quasar client secret for vertical "${vertical}". ` +
+        `Set ${cfg.secretEnv[0]} in .env or save ${cfg.vaultSecretKeys[0]} via ECS Workspace.`
+    );
+    return { clientId, clientSecret: '' };
+  }
+
+  console.log(`[FinancialPlatform] Using Quasar partner ${clientId} for vertical ${vertical}`);
+  return { clientId, clientSecret };
+}
+
 const mockVaultClient = {
   async read(key: string) {
-    if (key === 'quasarPlatform') {
-      // The ECS workspace saves QIP secrets under namespace 'qip' with key_name 'qip.retailClientSecret'
-      // ClientId (INVIFY_RETAIL) is a plain config value (isSecretReference: false), not stored in vault
-      const clientSecret = await IntegrationVaultService.getDecryptedCredential('qip', 'STAGING', undefined, 'qip.retailClientSecret')
-        || await IntegrationVaultService.getDecryptedCredential('qip', 'PRODUCTION', undefined, 'qip.retailClientSecret');
-
-      // ClientId: read from env vars (it's not a vault secret per QIP schema)
-      const clientId =
-        process.env.QUASAR_CLIENT_ID ||
-        process.env.INVIFY_RETAIL_CLIENT_ID ||
-        'INVIFY_RETAIL';  // Safe default matching ECS config
-
-      if (!clientSecret) {
-        // Final fallback: use env var secret if vault write hasn't happened yet
-        const envSecret =
-          process.env.QUASAR_CLIENT_SECRET ||
-          process.env.INVIFY_RETAIL_CLIENT_SECRET ||
-          process.env.QUASAR_SERVICE_SECRET ||
-          '';
-        if (!envSecret) {
-          console.warn('[FinancialPlatform] No Quasar client secret found. Save credentials via ECS Workspace or set INVIFY_RETAIL_CLIENT_SECRET in .env');
-        }
-        return { clientId, clientSecret: envSecret };
-      }
-      return { clientId, clientSecret };
+    if (key === 'quasarPlatform' || key.startsWith('quasarPlatform:')) {
+      const vertical = key.includes(':') ? key.split(':')[1] : 'invify_retail';
+      return resolveQuasarPlatformCreds(vertical);
     }
     if (key.startsWith('quasarTenant/')) {
       const tenantId = key.split('/')[1];
@@ -262,6 +309,17 @@ const deactivationSaga = new DeactivationSaga(
 const deactivationService = new FinancialPlatformDeactivationService(lockProvider, deactivationSaga);
 const deactivationController = new FinancialPlatformDeactivationController(deactivationService);
 
+import { FinancialPlatformChangeVerticalService } from '../modules/financial-platform/activation/FinancialPlatformChangeVerticalService';
+import { FinancialPlatformChangeVerticalController } from '../modules/financial-platform/activation/FinancialPlatformChangeVerticalController';
+
+const changeVerticalService = new FinancialPlatformChangeVerticalService(
+  lockProvider,
+  activationSaga,
+  mockVaultClient,
+  mockAuditLogger,
+);
+const changeVerticalController = new FinancialPlatformChangeVerticalController(changeVerticalService);
+
 const activationController = new FinancialPlatformActivationController(activationService);
 const rotationController = new FinancialPlatformRotationController(rotationService);
 const healthController = new FinancialPlatformHealthController(healthService);
@@ -273,6 +331,7 @@ const router = Router();
 router.post('/tenants/:id/financial-platform/activate', authenticate, checkTenantAccess, (req, res) => activationController.activate(req, res));
 router.post('/tenants/:id/financial-platform/rotate', authenticate, checkTenantAccess, (req, res) => rotationController.rotate(req, res));
 router.post('/tenants/:id/financial-platform/deactivate', authenticate, checkTenantAccess, (req, res) => deactivationController.deactivate(req, res));
+router.post('/tenants/:id/financial-platform/change-vertical', authenticate, checkTenantAccess, (req, res) => changeVerticalController.changeVertical(req, res));
 router.get('/tenants/:id/financial-platform/health', authenticate, checkTenantAccess, (req, res) => healthController.getHealth(req, res));
 router.get('/tenants/:id/financial-platform/audit', authenticate, checkTenantAccess, (req, res) => auditController.getAuditLog(req, res));
 

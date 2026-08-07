@@ -106,13 +106,31 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       }
 
       // ── Step 2: Fetch user profile from DB (supabaseAdmin bypasses RLS) ──
+      // Prefer auth UUID; fall back to email when JWT sub ≠ users.id (common after rebinds).
       let { data: profile, error: profileError } = await supabaseAdmin
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      if (profileError) {
+      if (!profile && userEmail) {
+        const byEmail = await supabaseAdmin
+          .from('users')
+          .select('*')
+          .ilike('email', userEmail.trim())
+          .maybeSingle();
+        if (byEmail.data) {
+          profile = byEmail.data;
+          profileError = null;
+          console.warn(
+            `[AuthMiddleware] Resolved profile by email for JWT sub=${userId} → users.id=${profile.id} tenant=${profile.tenant_id}`,
+          );
+        } else if (byEmail.error) {
+          profileError = byEmail.error;
+        }
+      }
+
+      if (profileError && !profile) {
         const errStatus = (profileError as any).status;
         const isDbTimeout =
           profileError.message?.includes('fetch failed') ||

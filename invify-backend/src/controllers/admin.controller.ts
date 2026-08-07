@@ -913,36 +913,86 @@ export class AdminController {
         ? req.query.tenantId as string 
         : tenantId;
 
-      // 1. Fetch Insight Aggregation from Scoped RPC
-      let stats;
-      const { data: rpcStats, error: rpcError } = await supabaseAdmin.rpc('get_tenant_dashboard_stats', { 
-        p_tenant_id: targetTenantId 
-      });
-
-      if (rpcError) {
-        console.warn(`[AdminController] RPC get_tenant_dashboard_stats failed: ${rpcError.message}. Using fallback calculations.`);
-        // Fallback calculation
-        const { data: ledgers } = await supabaseAdmin.from('ledger_entries')
-          .select('amount')
+      // Always compute from operational tables (invoices / students / wallets).
+      // Legacy RPC hardcodes students/invoices to 0 and filters ledger incorrectly.
+      const [
+        invoicesRes,
+        studentsRes,
+        walletRes,
+        quasarCreditsRes,
+      ] = await Promise.all([
+        supabaseAdmin
+          .from('invoices')
+          .select('amount_paid, payment_status')
+          .eq('tenant_id', targetTenantId),
+        supabaseAdmin
+          .from('students')
+          .select('id', { count: 'exact', head: true })
+          .or(`tenant_id.eq.${targetTenantId},school_id.eq.${targetTenantId}`),
+        supabaseAdmin
+          .from('wallets')
+          .select('balance')
           .eq('tenant_id', targetTenantId)
-          .eq('type', 'credit')
-          .eq('status', 'COMPLETED');
-          
-        const totalRevenue = ledgers ? ledgers.reduce((sum, r) => sum + Number(r.amount), 0) : 0;
-        
-        stats = {
-          total_revenue: totalRevenue,
-          active_students: 0,
-          pending_invoices: 0,
-          internal_wallet: 0.0,
-          cash_on_hand: 0.0,
-          pending_quasar: 0.0
-        };
-      } else {
-        stats = rpcStats;
+          .maybeSingle(),
+        supabaseAdmin
+          .from('transactions_log')
+          .select('amount, type')
+          .eq('tenant_id', targetTenantId)
+          .eq('status', 'SUCCESS')
+          .in('type', [
+            'CREDIT',
+            'DEPOSIT',
+            'INWARD',
+            'INWARD_PAYMENT',
+            'VIRTUAL_ACCOUNT_CREDIT',
+          ]),
+      ]);
+
+      const invoices = invoicesRes.data || [];
+      const totalRevenue = invoices.reduce(
+        (sum, inv) => sum + Number(inv.amount_paid || 0),
+        0,
+      );
+      const pendingInvoices = invoices.filter((inv) => {
+        const status = String(inv.payment_status || '').toLowerCase();
+        return status && !['paid', 'success', 'completed'].includes(status);
+      }).length;
+
+      const pendingQuasar = (quasarCreditsRes.data || []).reduce(
+        (sum, tx) => sum + Number(tx.amount || 0),
+        0,
+      );
+
+      let stats = {
+        total_revenue: totalRevenue,
+        monthly_revenue: totalRevenue,
+        active_students: studentsRes.count || 0,
+        pending_invoices: pendingInvoices,
+        internal_wallet: Number(walletRes.data?.balance || 0),
+        cash_on_hand: 0,
+        pending_quasar: pendingQuasar,
+      };
+
+      // Optional: merge RPC if it returns richer fields later
+      try {
+        const { data: rpcStats, error: rpcError } = await supabaseAdmin.rpc(
+          'get_tenant_dashboard_stats',
+          { p_tenant_id: targetTenantId },
+        );
+        if (!rpcError && rpcStats) {
+          const row = Array.isArray(rpcStats) ? rpcStats[0] : rpcStats;
+          if (row && Number(row.active_students) > 0) {
+            stats.active_students = Number(row.active_students);
+          }
+          if (row && Number(row.total_revenue) > stats.total_revenue) {
+            stats.total_revenue = Number(row.total_revenue);
+            stats.monthly_revenue = Number(row.total_revenue);
+          }
+        }
+      } catch (_) {
+        /* keep table-based stats */
       }
 
-      // 2. Fetch Quota Status for the KPI card
       const billing = await BillingService.getBillingStatus(targetTenantId);
 
       return res.status(200).json({
@@ -962,6 +1012,7 @@ export class AdminController {
           console.warn('[AdminController] Supabase offline fallback triggered for getDashboardStats.');
           return res.status(200).json({
             total_revenue: 0,
+            monthly_revenue: 0,
             active_students: 0,
             pending_invoices: 0,
             internal_wallet: 0.0,
