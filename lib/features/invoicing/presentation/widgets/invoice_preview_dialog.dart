@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,6 +28,7 @@ import 'package:involve_app/services/terminal_sync_service.dart';
 import 'package:involve_app/core/offline/offline_webhook_service.dart';
 import 'package:involve_app/core/utils/iso_response_codes.dart';
 import 'package:involve_app/core/mpos/mpos_device_type.dart';
+import 'package:involve_app/core/utils/progress_dialog_utils.dart';
 import 'package:dio/dio.dart';
 import 'package:involve_app/features/services/domain/repositories/services_repository.dart';
 
@@ -547,6 +550,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                   ),
                   ElevatedButton(
                     onPressed: (invoiceState.isSaving ||
+                            invoiceState.isGeneratingAccount ||
+                            _isProcessingPos ||
                             (settings?.paymentMethodsEnabled == true &&
                                 invoiceState.paymentMethod == null))
                         ? null
@@ -554,8 +559,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                             _handleCheckout(context, invoiceState, settings,
                                 printReceipt: false);
                           },
-                    child: invoiceState.isSaving
-                        ? const Text('SAVING...')
+                    child: (invoiceState.isSaving || _isProcessingPos)
+                        ? const Text('PROCESSING...')
                         : Text(invoiceState.paymentMethod == 'POS'
                             ? 'CHARGE POS & PREVIEW'
                             : 'SAVE & PREVIEW'),
@@ -633,7 +638,12 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Confirm POS Payment'),
-            content: Text('Charge \ to POS terminal?'),
+            content: Text(
+              'Charge ${CurrencyFormatter.formatWithSymbol(
+                amountToCharge,
+                symbol: settings?.currency ?? '₦',
+              )} to POS terminal?',
+            ),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(ctx, false),
@@ -662,84 +672,161 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             MposDeviceType.isMoreFun(_terminalConfig?.terminalType)
                 ? true
                 : processOnDevice;
-        var result = await MposService().initiatePayment(
-          amount: amountToCharge,
-          terminalId: terminalId,
-          activeHost: activeHost,
-          processOnDevice: effectiveProcessOnDevice,
-          deviceType: deviceType,
-        );
 
-        if (result.status != 'payment_success' &&
-            _terminalConfig?.secondaryHost != null) {
-          final secondaryHostName =
-              _terminalConfig!.secondaryHost!['hostName'] as String?;
-          if (secondaryHostName != null && secondaryHostName != activeHost) {
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(
-                    'Primary host failed. Falling back to secondary host: \...')));
-            result = await MposService().initiatePayment(
-              amount: amountToCharge,
-              terminalId: terminalId,
-              activeHost: secondaryHostName,
-              processOnDevice: effectiveProcessOnDevice,
-              deviceType: deviceType,
-            );
-          }
+        late MposTransactionResponse result;
+        try {
+          result = await ProgressDialogUtils.showUpdatableProgress(
+            context,
+            (setMessage) async {
+              setMessage('Waiting for card on terminal…');
+              var payment = await MposService().initiatePayment(
+                amount: amountToCharge,
+                terminalId: terminalId,
+                activeHost: activeHost,
+                processOnDevice: effectiveProcessOnDevice,
+                deviceType: deviceType,
+              );
+
+              if (payment.status != 'payment_success' &&
+                  _terminalConfig?.secondaryHost != null) {
+                final secondaryHostName = _terminalConfig!
+                        .secondaryHost!['hostCode'] as String? ??
+                    _terminalConfig!.secondaryHost!['hostName'] as String?;
+                if (secondaryHostName != null &&
+                    secondaryHostName.toUpperCase() !=
+                        activeHost.toUpperCase()) {
+                  setMessage('Trying backup host ($secondaryHostName)…');
+                  payment = await MposService().initiatePayment(
+                    amount: amountToCharge,
+                    terminalId: terminalId,
+                    activeHost: secondaryHostName,
+                    processOnDevice: effectiveProcessOnDevice,
+                    deviceType: deviceType,
+                  );
+                }
+              }
+
+              // Switchboard path: device returns EMV only — wait for host approval.
+              if (payment.status == 'emv_data_ready' &&
+                  payment.emvData != null) {
+                setMessage('Confirming payment with host…\nThis can take up to a minute.');
+                final financeRepo = context.read<FinanceRepository>();
+                final posRes = await financeRepo.apiClient.post(
+                  '/api/pos/transaction',
+                  data: {
+                    'terminalId': terminalId,
+                    'amount': amountToCharge,
+                    'emvData': payment.emvData!.toJson(),
+                    'staffName': invoiceState.staffName,
+                    'items': invoiceState.items
+                        .map((i) => {
+                              'id': i.item.id,
+                              'quantity': i.quantity,
+                              'name': i.item.name,
+                            })
+                        .toList(),
+                  },
+                );
+                final body = posRes.data is Map
+                    ? Map<String, dynamic>.from(posRes.data as Map)
+                    : <String, dynamic>{};
+                final approved = body['paymentSuccess'] == true ||
+                    body['statusCode']?.toString() == '00';
+                if (!approved) {
+                  final code = body['statusCode']?.toString() ?? '';
+                  final rawMsg = body['message']?.toString() ??
+                      body['error']?.toString() ??
+                      (code.isNotEmpty
+                          ? NibssResponseCodes.getMessage(code)
+                          : 'Host did not approve this card payment');
+                  throw _PosHostDeclinedException(
+                      _tenantFacingPosMessage(rawMsg));
+                }
+                return MposTransactionResponse(
+                  status: 'payment_success',
+                  transaction: MposTransactionData(
+                    paymentSuccess: true,
+                    statusCode: body['statusCode']?.toString() ?? '00',
+                    message: body['message']?.toString() ?? 'Approved',
+                    rrn: body['rrn']?.toString(),
+                    stan: body['stan']?.toString(),
+                    authCode: body['authCode']?.toString(),
+                    maskedPan: body['maskedPan']?.toString(),
+                    amount: amountToCharge.toStringAsFixed(2),
+                  ),
+                  emvData: payment.emvData,
+                );
+              }
+
+              return payment;
+            },
+            initialMessage: 'Starting POS payment…',
+          );
+        } on _PosHostDeclinedException catch (e) {
+          if (!mounted) return;
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('POS Payment Not Approved'),
+              content: Text(e.message),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'))
+              ],
+            ),
+          );
+          setState(() => _isProcessingPos = false);
+          return;
+        } catch (e) {
+          if (!mounted) return;
+          final raw = e is DioException
+              ? (e.response?.data is Map
+                  ? (e.response!.data['message'] ??
+                          e.response!.data['error'] ??
+                          e.message)
+                      .toString()
+                  : (e.message ?? e.toString()))
+              : e.toString();
+          await showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('POS Payment Incomplete'),
+              content: Text(_tenantFacingPosMessage(raw)),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK'))
+              ],
+            ),
+          );
+          setState(() => _isProcessingPos = false);
+          return;
         }
         if (!mounted) return;
 
         posTransactionData = result.transaction;
 
-        if (result.status == 'payment_failed') {
-          final msg = result.transaction?.message ?? 'Unknown Error';
-          final formattedMsg = getIsoResponseMessage(msg);
-          bool proceed = false;
-          await showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('POS Declined'),
-              content: Text(
-                  'Transaction declined by MPOS (\).\n\nDo you want to proceed by generating the invoice anyway?'),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('CANCEL')),
-                ElevatedButton(
-                  onPressed: () {
-                    proceed = true;
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('PROCEED'),
-                )
-              ],
-            ),
-          );
-          if (!proceed) {
-            setState(() => _isProcessingPos = false);
-            return;
-          }
-        } else if (result.status == 'error' ||
-            (result.transaction != null &&
-                result.transaction?.paymentSuccess != true &&
-                result.status != 'payment_success' &&
-                result.status != 'payment_failed')) {
-          String errorMessage = result.error?.message ??
+        final posApproved = result.status == 'payment_success' &&
+            (result.transaction == null ||
+                result.transaction!.paymentSuccess == true);
+
+        if (!posApproved) {
+          final msg = result.error?.message ??
               result.transaction?.message ??
-              'Unknown Error';
-          if (result.transaction?.statusCode != null &&
-              result.transaction!.statusCode!.isNotEmpty) {
-            final codeMsg =
-                NibssResponseCodes.getMessage(result.transaction!.statusCode);
-            errorMessage = 'Code \: ';
-          }
+              'Card payment was not completed successfully';
+          final formattedMsg = result.transaction?.statusCode != null &&
+                  result.transaction!.statusCode!.isNotEmpty
+              ? NibssResponseCodes.getMessage(result.transaction!.statusCode)
+              : getIsoResponseMessage(msg);
+          final display = _tenantFacingPosMessage(
+              formattedMsg.isNotEmpty ? formattedMsg : msg);
           if (!mounted) return;
           await showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('POS Payment Failed'),
-              content: Text(errorMessage),
+              content: Text(display),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(ctx),
@@ -751,49 +838,37 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
           return;
         }
 
-        // Notify user of success explicitly since we removed the success dialog
-        if (result.status == 'payment_success') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('POS Payment Approved!'),
-                backgroundColor: Colors.green),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('POS Payment Approved!'),
+              backgroundColor: Colors.green),
+        );
 
-        // FIRE AND FORGET webhook/sync for success or failure
-        if (result.status == 'payment_success' ||
-            result.status == 'payment_failed') {
-          _processWebhookAndSuccess(
-                  context,
-                  webhookUrl ?? '',
-                  result,
-                  {
-                    'terminalId': terminalId,
-                    'amount': amountToCharge,
-                    'isDeviceProcessed': true,
-                    'deviceStatus': result.status,
-                    'tenantProfile': _terminalConfig?.tenantPolicy,
-                    'deviceInfo': {
-                      'terminalId': _terminalConfig?.terminalId,
-                      'mposTerminalId': _terminalConfig?.mposTerminalId,
-                      'posSerialNumber': _terminalConfig?.posSerialNumber,
-                    },
-                    'emvData': result.emvData?.toJson(),
-                    'transactionResponse': result.transaction?.toJson(),
-                  },
-                  shouldPrint: false)
-              .catchError((e) => debugPrint(e.toString()));
-        } else if (result.status == 'emv_data_ready' &&
-            result.emvData != null) {
-          final financeRepo = context.read<FinanceRepository>();
-          financeRepo.apiClient.post(
-            '/api/pos/transaction',
-            data: {
+        // Report device-processed outcomes to Invify (non-blocking, after approval)
+        if (effectiveProcessOnDevice) {
+          unawaited(_processWebhookAndSuccess(
+            context,
+            webhookUrl ?? '',
+            result,
+            {
               'terminalId': terminalId,
               'amount': amountToCharge,
-              'emvData': result.emvData!.toJson()
+              'isDeviceProcessed': true,
+              'deviceStatus': result.status,
+              'tenantProfile': _terminalConfig?.tenantPolicy,
+              'deviceInfo': {
+                'terminalId': _terminalConfig?.terminalId,
+                'mposTerminalId': _terminalConfig?.mposTerminalId,
+                'posSerialNumber': _terminalConfig?.posSerialNumber,
+              },
+              'emvData': result.emvData?.toJson(),
+              'transactionResponse': result.transaction?.toJson(),
             },
-          ).catchError((e) => debugPrint(e.toString()));
+            shouldPrint: false,
+          ).catchError((Object e) {
+            debugPrint(e.toString());
+          }));
         }
       }
 
@@ -1240,4 +1315,43 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         .read<PrinterBloc>()
         .add(PrintCommandsEvent(commands, 58)); // Assuming 58mm
   }
+
+  /// Hide ops/env internals from cashiers; keep NIBSS host messages intact.
+  String _tenantFacingPosMessage(String raw) {
+    final msg = raw.trim();
+    if (msg.isEmpty) {
+      return 'Card payment could not be completed. Please try again.';
+    }
+    final lower = msg.toLowerCase();
+    final looksLikeSetup = lower.contains('encryption key') ||
+        lower.contains('quasar_pos') ||
+        lower.contains('posencryption') ||
+        lower.contains('pos-encryption') ||
+        lower.contains('quasar_api') ||
+        lower.contains('sk_live') ||
+        lower.contains('sk_test') ||
+        lower.contains('pos_setup_incomplete') ||
+        lower.contains('vault credential') ||
+        lower.contains('not fully set up') ||
+        RegExp(r'QUASAR_|process\.env|/pos/', caseSensitive: false)
+            .hasMatch(msg);
+    if (looksLikeSetup) {
+      return 'Card payments are not fully set up for this business yet. Please contact Invify support.';
+    }
+    if (lower.contains('econnrefused') ||
+        lower.contains('timeout') ||
+        lower.contains('fetch failed') ||
+        lower.contains('socket hang up')) {
+      return 'Unable to reach the payment network. Check your internet connection and try again.';
+    }
+    return msg;
+  }
+}
+
+class _PosHostDeclinedException implements Exception {
+  final String message;
+  _PosHostDeclinedException(this.message);
+
+  @override
+  String toString() => message;
 }

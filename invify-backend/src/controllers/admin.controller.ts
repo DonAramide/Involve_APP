@@ -68,6 +68,7 @@ export class AdminController {
       whatsapp_business_account_id: '',
       quasar_client_id: '',
       quasar_client_secret: '',
+      quasar_base_url: '',
       lesson_ai_api_key: '',
       commissions: {
         globalDefaultOnboardingFee: 10.0,
@@ -90,12 +91,20 @@ export class AdminController {
         if (fs.existsSync(settingsPath)) {
           const fileData = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
           settingsObj = { ...settingsObj, ...fileData };
+          if (fileData.quasar_pos_encryption_key_base64) {
+            settingsObj.quasar_pos_encryption_key_configured = true;
+            delete settingsObj.quasar_pos_encryption_key_base64;
+          }
         }
       } catch (fileErr) {
         console.warn('[AdminController] Failed to read global_settings.json cache:', fileErr);
       }
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
+        if (settingsObj.quasar_pos_encryption_key_base64) {
+          settingsObj.quasar_pos_encryption_key_configured = true;
+          delete settingsObj.quasar_pos_encryption_key_base64;
+        }
         return res.status(200).json(settingsObj);
       }
       
@@ -107,14 +116,130 @@ export class AdminController {
            if (['daily_payout_time', 'manual_dispatch_fee', 'manual_dispatch_fee_type'].includes(row.config_key)) {
              continue;
            }
+           // Never send plaintext POS encryption key to the browser
+           if (row.config_key === 'quasar_pos_encryption_key_base64') {
+             settingsObj.quasar_pos_encryption_key_configured = Boolean(row.config_value);
+             continue;
+           }
            settingsObj[row.config_key] = row.config_value;
         }
       }
       
+      if (settingsObj.quasar_pos_encryption_key_base64) {
+        settingsObj.quasar_pos_encryption_key_configured = true;
+        delete settingsObj.quasar_pos_encryption_key_base64;
+      }
+
       return res.status(200).json(settingsObj);
     } catch (error: any) {
       console.warn('[AdminController] Exception in getGlobalSettings. Returning merged cache/defaults.', error);
       return res.status(200).json(AdminController.getGlobalSettingsData());
+    }
+  }
+
+  /** GET /admin/quasar/pos-encryption-key/status — never returns plaintext key */
+  static async getQuasarPosEncryptionKeyStatus(req: Request, res: Response) {
+    try {
+      const { QuasarPosKeyService } = require('../integrations/quasar/quasar-pos-key.service');
+      const invifyTenantId = (req.query.invifyTenantId as string) || undefined;
+      const status = await QuasarPosKeyService.getStatus(invifyTenantId);
+      return res.status(200).json(status);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/quasar/pos-encryption-key/rotate
+   * Body: { invifyTenantId?, quasarTenantId?, adminJwt?, applyAsPlatformDefault? }
+   */
+  static async rotateQuasarPosEncryptionKey(req: Request, res: Response) {
+    try {
+      const { QuasarPosKeyService } = require('../integrations/quasar/quasar-pos-key.service');
+      const result = await QuasarPosKeyService.rotateAndStore({
+        invifyTenantId: req.body?.invifyTenantId,
+        quasarTenantId: req.body?.quasarTenantId,
+        adminJwt: req.body?.adminJwt,
+        applyAsPlatformDefault: req.body?.applyAsPlatformDefault !== false,
+        operatorId: (req as any).user?.id,
+      });
+      return res.status(200).json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('[AdminController] rotateQuasarPosEncryptionKey failed:', error.message);
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  /** POST /admin/quasar/pos-encryption-key/store — manual paste of encryption_key_base64 */
+  static async storeQuasarPosEncryptionKey(req: Request, res: Response) {
+    try {
+      const { QuasarPosKeyService } = require('../integrations/quasar/quasar-pos-key.service');
+      const result = await QuasarPosKeyService.storeExistingKey({
+        encryptionKeyBase64: req.body?.encryption_key_base64 || req.body?.encryptionKeyBase64,
+        invifyTenantId: req.body?.invifyTenantId,
+        applyAsPlatformDefault: req.body?.applyAsPlatformDefault !== false,
+      });
+      return res.status(200).json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('[AdminController] storeQuasarPosEncryptionKey failed:', error.message);
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /admin/quasar/api-key/issue-live
+   * Body: { invifyTenantId }
+   * Issues sk_live_* on Quasar (required for /pos/*) and stores it.
+   */
+  static async issueQuasarLiveApiKey(req: Request, res: Response) {
+    try {
+      const invifyTenantId = String(req.body?.invifyTenantId || '').trim();
+      if (!invifyTenantId) {
+        return res.status(400).json({ error: 'invifyTenantId is required' });
+      }
+      const { QuasarLiveKeyService } = require('../integrations/quasar/quasar-live-key.service');
+      const result = await QuasarLiveKeyService.issueAndStore({
+        invifyTenantId,
+        operatorId: (req as any).user?.id,
+      });
+      return res.status(200).json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('[AdminController] issueQuasarLiveApiKey failed:', error.message);
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  /** GET /admin/quasar/api-key/status?invifyTenantId= */
+  static async getQuasarApiKeyStatus(req: Request, res: Response) {
+    try {
+      const invifyTenantId = String(req.query.invifyTenantId || '').trim();
+      if (!invifyTenantId) {
+        return res.status(400).json({ error: 'invifyTenantId is required' });
+      }
+      const { QuasarLiveKeyService } = require('../integrations/quasar/quasar-live-key.service');
+      const status = await QuasarLiveKeyService.getStatus(invifyTenantId);
+      return res.status(200).json(status);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /** GET /admin/quasar/integrations — Quasar↔Invify mappings for POS key UI */
+  static async listQuasarIntegrations(req: Request, res: Response) {
+    try {
+      const { QuasarIntegrationStore } = require('../integrations/quasar/quasar-integration.store');
+      const rows = await QuasarIntegrationStore.listAll();
+      return res.status(200).json({
+        data: (rows || []).map((r: any) => ({
+          invifyTenantId: r.invify_tenant_id,
+          quasarTenantId: r.quasar_tenant_id,
+          vertical: r.quasar_vertical,
+          environment: r.quasar_environment,
+          status: r.status,
+        })),
+      });
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
     }
   }
 
@@ -133,6 +258,23 @@ export class AdminController {
           currentSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
         }
         const updated = { ...currentSettings, ...updates };
+        if (Object.prototype.hasOwnProperty.call(updates, 'quasar_base_url')) {
+          try {
+            const {
+              normalizeQuasarBaseUrl,
+              setQuasarBaseUrlOverride,
+            } = require('../integrations/quasar/quasar-base-url');
+            const normalized = normalizeQuasarBaseUrl(updates.quasar_base_url as string);
+            updated.quasar_base_url = normalized;
+            (updates as any).quasar_base_url = normalized;
+            setQuasarBaseUrlOverride(normalized || null);
+            console.log(
+              `[AdminController] Quasar base URL → ${normalized || '(env/default fallback)'}`,
+            );
+          } catch (e: any) {
+            console.warn('[AdminController] Failed to apply Quasar base URL override:', e.message);
+          }
+        }
         fs.writeFileSync(settingsPath, JSON.stringify(updated, null, 2), 'utf8');
       } catch (fileErr) {
         console.error('[AdminController] Failed to write to global_settings.json:', fileErr);
@@ -146,6 +288,10 @@ export class AdminController {
       for (const [key, value] of Object.entries(updates)) {
         // Skip payout settings keys that are not supported by the DB schema/triggers
         if (['daily_payout_time', 'manual_dispatch_fee', 'manual_dispatch_fee_type'].includes(key)) {
+          continue;
+        }
+        // POS encryption key is managed only via /admin/quasar/pos-encryption-key/*
+        if (key === 'quasar_pos_encryption_key_base64') {
           continue;
         }
 

@@ -23,6 +23,17 @@ class ServicesDashboardPage extends StatelessWidget {
     final currencySymbol = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Services Overview'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+      ),
       body: BlocListener<ServicesBloc, ServicesState>(
         listener: (context, state) {
           if (state.successMessage != null) {
@@ -62,11 +73,6 @@ class ServicesDashboardPage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'Services Overview',
-                              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 16),
                             _buildProfitSummary(context, totalRevenue, amountPaid, currencySymbol),
                             const SizedBox(height: 16),
                             _buildStatsRow(totalRevenue, amountPaid, activeJobs, readyJobs, currencySymbol),
@@ -119,7 +125,10 @@ class ServicesDashboardPage extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text('Error: ${state.errorMessage}'),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text('Error: ${state.errorMessage}', textAlign: TextAlign.center),
+                      ),
                       ElevatedButton(
                         onPressed: () => context.read<ServicesBloc>().add(const LoadServicesJobs()),
                         child: const Text('Retry'),

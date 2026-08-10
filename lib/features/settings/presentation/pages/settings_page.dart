@@ -253,6 +253,14 @@ class _SettingsPageState extends State<SettingsPage> {
         if (_matches('Show Network Indicator'))
           _buildSwitchTile('Show Network Indicator', settings.showNetworkIndicator, (val) => _update(context, settings.copyWith(showNetworkIndicator: val))),
 
+        if (_matches('Reset System Password', ['password', 'admin', 'security', 'unlock']))
+          ListTile(
+            title: const Text('Reset System Password'),
+            subtitle: const Text('Requires Super Admin. Restores default AdminPass123!'),
+            trailing: const Icon(Icons.lock_reset, color: Colors.deepPurple),
+            onTap: () => _resetSystemPasswordWithSuperAdmin(context),
+          ),
+
         const Divider(),
       ],
 
@@ -993,6 +1001,36 @@ class _SettingsPageState extends State<SettingsPage> {
             Navigator.pop(ctx);
           }, child: const Text('SET')),
         ],
+      ),
+    );
+  }
+
+  Future<void> _resetSystemPasswordWithSuperAdmin(BuildContext context) async {
+    final settingsBloc = context.read<SettingsBloc>();
+    settingsBloc.add(ResetSuperAdminAuth());
+
+    final authorized = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => SuperAdminPasswordDialog(bloc: settingsBloc),
+    );
+
+    if (authorized != true || !context.mounted) return;
+
+    final ok = await SecurityService().resetPasswordToDefault();
+    if (!context.mounted) return;
+
+    // Also clear failed-attempt lockout so Admin Hub is usable immediately.
+    settingsBloc.add(ResetFailedAttempts());
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'System password reset to AdminPass123!'
+              : 'Failed to reset system password',
+        ),
+        backgroundColor: ok ? Colors.green : Colors.red,
       ),
     );
   }

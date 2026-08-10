@@ -155,6 +155,19 @@ export const adminApi = {
   updateProfile: (data) => api.patch('/admin/profile', data),
   getGlobalSettings: () => api.get('/admin/settings'),
   updateGlobalSettings: (data) => api.patch('/admin/settings', data),
+  listQuasarIntegrations: () => api.get('/admin/quasar/integrations'),
+  getQuasarHealth: () => api.get('/api/admin/quasar/health'),
+  pingQuasar: () => api.get('/api/admin/quasar/health/live'),
+  getQuasarPosEncryptionKeyStatus: (params) =>
+    api.get('/admin/quasar/pos-encryption-key/status', { params }),
+  rotateQuasarPosEncryptionKey: (data) =>
+    api.post('/admin/quasar/pos-encryption-key/rotate', data),
+  storeQuasarPosEncryptionKey: (data) =>
+    api.post('/admin/quasar/pos-encryption-key/store', data),
+  getQuasarApiKeyStatus: (params) =>
+    api.get('/admin/quasar/api-key/status', { params }),
+  issueQuasarLiveApiKey: (data) =>
+    api.post('/admin/quasar/api-key/issue-live', data),
   getPlatformPayoutSettings: () => api.get('/api/payout/platform-settings'),
   getTenantPayoutSettings: () => api.get('/api/payout/settings'),
   saveTenantPayoutSettings: (data) => api.post('/api/payout/settings', data),
@@ -370,6 +383,12 @@ export const vaultApi = {
     api.get('/api/admin/quasar/webhook-secret/status', { params: { environment } }),
   saveQuasarWebhookSigningSecret: (data) =>
     api.put('/api/admin/quasar/webhook-secret/global', data),
+  getQuasarAdminCredentialsStatus: (environment = 'PRODUCTION') =>
+    api.get('/api/admin/quasar/admin-credentials/status', { params: { environment } }),
+  saveQuasarAdminCredentials: (data) =>
+    api.put('/api/admin/quasar/admin-credentials', data),
+  testQuasarAdminCredentials: (data = {}) =>
+    api.post('/api/admin/quasar/admin-credentials/test', data),
 };
 
 export const ecsApi = {

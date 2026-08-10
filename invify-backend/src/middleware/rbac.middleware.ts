@@ -34,9 +34,9 @@ export const checkRole = (allowedRoles: string[]) => {
     if (allowedLower.includes('super_admin')) {
       const path = req.path.toLowerCase();
       
-      if (userRoles.includes('admin_deploy')) {
-        // admin_deploy has privilege "Release Channels, Global Settings"
-        if (path.startsWith('/admin/settings') || path.startsWith('/api/admin/apk') || path.startsWith('/admin/pos/routing') || path.startsWith('/admin/pos/kimono-params') || path.startsWith('/admin/pos/observability') || path.startsWith('/admin/commissions') || path.startsWith('/admin/tenants') || path.startsWith('/admin/users')) {
+      if (userRoles.includes('admin_deploy') || userRoles.includes('owner') || userRoles.includes('admin')) {
+        // Platform operators: Release Channels, Global Settings, POS Switchboard
+        if (path.startsWith('/admin/settings') || path.startsWith('/api/admin/apk') || path.startsWith('/admin/pos') || path.startsWith('/admin/commissions') || path.startsWith('/admin/tenants') || path.startsWith('/admin/users')) {
           return next();
         }
       }

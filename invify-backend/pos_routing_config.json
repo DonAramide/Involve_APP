@@ -10,67 +10,39 @@
   "thresholdRulesMatrix": [],
   "tenantRoutingProfiles": [
     {
-      "processOnDevice": true,
-      "webhookUrl": "https://bertie-archegoniate-causelessly.ngrok-free.dev/api/v1/pos/transactionFromMpos",
-      "scopeType": "Tenant",
-      "targetValue": "",
-      "profileId": "prof_1781452052847",
+      "profileId": "prof_1786301975122",
+      "scopeType": "Group",
+      "targetValue": "Default",
       "category": "Retail",
       "preferredHosts": [
-        "express_pay"
+        "nibss"
       ],
-      "fallbackHosts": []
+      "fallbackHosts": [],
+      "processOnDevice": false,
+      "webhookUrl": "",
+      "amountThresholds": [],
+      "transactionTypeRules": []
     }
   ],
   "hosts": [
     {
-      "hostName": "Express Pay",
-      "hostCode": "express_pay",
-      "ip": "196.6.103.18",
-      "port": 4018,
-      "sslEnabled": false,
-      "sslCertMetadata": null,
-      "timeoutSeconds": 3600,
-      "priority": 1,
-      "failoverPriority": 1,
-      "healthScore": 100,
-      "status": "ONLINE",
-      "thresholdMin": 0,
-      "thresholdMax": 999999999,
-      "supportedCardSchemes": [],
-      "supportedTerminalTypes": [],
-      "supportedTenantCategories": [],
-      "supportedTransactionTypes": [],
-      "isActive": false,
-      "baseUrl": "http://80.88.8.56:552/api/GetPlainMasterKey",
-      "authToken": "23152270dea19ada8fc8494e8fb8e70b:61a58568c36a0b3c494dd5ad8ba48df85711510a75ef22ce1e7f7a478835724190467234b9c49c6dc0af7d0422184facd231a70bbec7184f93b3a6ebc567c15417a189ad75da6169a91a927fff4fa0a5"
-    },
-    {
-      "hostName": "NIBSS",
       "hostCode": "nibss",
-      "ip": "196.6.103.18",
-      "port": 5001,
-      "sslEnabled": true,
-      "sslCertMetadata": null,
-      "timeoutSeconds": 3600,
-      "priority": 2,
-      "failoverPriority": 2,
-      "healthScore": 100,
-      "status": "ONLINE",
-      "thresholdMin": 0,
-      "thresholdMax": 999999999,
-      "supportedCardSchemes": [],
-      "supportedTerminalTypes": [],
-      "supportedTenantCategories": [],
-      "supportedTransactionTypes": [],
       "isActive": true,
+      "ip": "196.6.103.18",
+      "port": 4001,
       "nibssConfig": {
-        "institutionCode": "",
-        "terminalId": "",
+        "ctmk": "66D4AF3321D8564E9F6F35411755E730"
+      },
+      "kimonoKeys": {},
+      "kimonoFallbackParameters": {
         "merchantId": "",
-        "ctmk": "66D4AF3321D8564E9F6F35411755E730",
-        "ptspCode": ""
-      }
+        "uniqueId": "",
+        "institutionId": "",
+        "settlementAccount": "",
+        "keyLabel": ""
+      },
+      "timeoutSeconds": 3600,
+      "sslEnabled": true
     }
   ]
 }

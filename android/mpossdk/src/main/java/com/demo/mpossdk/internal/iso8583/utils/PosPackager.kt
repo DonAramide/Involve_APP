@@ -41,6 +41,7 @@ internal class PosPackager : ISOBasePackager() {
             IFA_LLNUM(11, "ACQUIRING INSTITUTION IDENTITY CODE"),
             IFA_LLNUM(11, "FORWARDING INSTITUTION IDENTITY CODE"),
             IFA_LLCHAR(28, "PAN EXTENDED"),
+            // Accelerex/mpos IsoPackager: IFA_LLNUM. Use 'D' separator (not '=') on the value.
             IFA_LLNUM(37, "TRACK 2 DATA"),
             IFA_LLLCHAR(104, "TRACK 3 DATA"),
             IF_CHAR(12, "RETRIEVAL REFERENCE NUMBER"),
@@ -70,6 +71,8 @@ internal class PosPackager : ISOBasePackager() {
             IFA_LLLCHAR(999, "RESERVED PRIVATE"),
             IFA_LLLCHAR(999, "RESERVED PRIVATE"),
             IFA_LLLLCHAR(9999, "RESERVED PRIVATE"),
+            // Accelerex/mpos IsoPackager: MAC is 32 raw bytes (IFA_BINARY). IF_CHAR(64) hex ASCII
+            // causes host mis-parse → peer-disconnect on :4001.
             IFA_BINARY(32, "MESSAGE AUTHENTICATION CODE FIELD"),
             IFA_BINARY(16, "BITMAP, EXTENDED"),
             IFA_NUMERIC(1, "SETTLEMENT CODE"),

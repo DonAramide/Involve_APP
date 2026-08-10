@@ -807,10 +807,19 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
             
             final existing = await (database.select(database.localCounters)..where((t) => t.type.equals(type))).getSingleOrNull();
             if (existing == null || lastValue > existing.lastValue) {
-               await database.into(database.localCounters).insertOnConflictUpdate(LocalCountersCompanion(
-                 type: Value(type),
-                 lastValue: Value(lastValue),
-               ));
+              // Select-then-write: avoid UPSERT for older Android SQLite.
+              if (existing == null) {
+                await database.into(database.localCounters).insert(
+                  LocalCountersCompanion.insert(
+                    type: type,
+                    lastValue: Value(lastValue),
+                  ),
+                );
+              } else {
+                await (database.update(database.localCounters)
+                      ..where((t) => t.type.equals(type)))
+                    .write(LocalCountersCompanion(lastValue: Value(lastValue)));
+              }
             }
           }
         }

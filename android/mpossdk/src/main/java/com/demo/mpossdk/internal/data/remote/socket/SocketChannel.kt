@@ -1,11 +1,8 @@
 package com.demo.mpossdk.internal.data.remote.socket
 
-import com.demo.mpossdk.BuildConfig
 import com.demo.mpossdk.internal.domain.repository.SessionManager
 import com.demo.mpossdk.internal.iso8583.utils.PosPackager
-import org.jpos.iso.channel.PostChannel
 import org.jpos.util.Logger
-import org.jpos.util.SimpleLogListener
 
 internal class SocketChannel constructor(
     private val sessionManager: SessionManager,
@@ -30,13 +27,9 @@ internal class SocketChannel constructor(
             transactionPackager
         )
         channel.timeout = if (terminalParameters?.timeoutSeconds != null) terminalParameters.timeoutSeconds!! * 1000 else 60000
-        
-        if (terminalParameters?.enableSSL == true) {
-            channel.socketFactory = TcpSsLConnection()
-        }
 
         val logger = Logger()
-        logger.addListener { ev -> 
+        logger.addListener { ev ->
             val builder = java.lang.StringBuilder()
             ev.dump(java.io.PrintStream(object : java.io.OutputStream() {
                 override fun write(b: Int) { builder.append(b.toChar()) }
@@ -46,9 +39,16 @@ internal class SocketChannel constructor(
         }
         channel.setLogger(logger, "channel")
 
-        channel.timeout = if (terminalParameters?.timeoutSeconds != null) terminalParameters.timeoutSeconds!! * 1000 else 60000
-        
-        if (terminalParameters?.enableSSL == true) {
+        // Accelerex GA :4001 is always TLS. Plain TCP connect "succeeds" then peer-closes on send.
+        val forceSsl =
+            terminalParameters?.enableSSL == true ||
+                host == "196.6.103.18" ||
+                port == 4001
+        android.util.Log.i(
+            "SocketChannel",
+            "ISO channel host=$host port=$port ssl=$forceSsl (param=${terminalParameters?.enableSSL})"
+        )
+        if (forceSsl) {
             channel.socketFactory = TcpSsLConnection()
         } else {
             channel.socketFactory = TimeoutSocketFactory(15000)

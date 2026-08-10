@@ -23,12 +23,12 @@ function parseFileToRows(buffer: Buffer, mimetype: string, originalName: string)
     // Handle both Windows (\r\n) and Unix (\n) line endings
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length === 0) return [];
-    // Strip BOM, carriage returns, and quotes from headers
+    // Strip BOM, tabs, carriage returns, and quotes from headers
     const headers = lines[0].split(',').map(h =>
-      h.replace(/^\uFEFF/, '').trim().replace(/"/g, '').replace(/\r/g, '')
+      h.replace(/^\uFEFF/, '').replace(/\t/g, '').trim().replace(/"/g, '').replace(/\r/g, '')
     );
     return lines.slice(1).map(line => {
-      const vals = line.split(',').map(v => v.trim().replace(/"/g, '').replace(/\r/g, ''));
+      const vals = line.split(',').map(v => v.replace(/\t/g, '').trim().replace(/"/g, '').replace(/\r/g, ''));
       const row: any = {};
       headers.forEach((h, i) => { row[h] = vals[i] || ''; });
       return row;
@@ -56,9 +56,9 @@ function normalizeColumnNames(rows: any[]): any[] {
   return rows.map(row => {
     const normalized: any = {};
     for (const [key, value] of Object.entries(row)) {
-      const trimmedKey = key.trim();
+      const trimmedKey = String(key).replace(/\t/g, '').trim();
       const mappedKey = columnMap[key] || columnMap[trimmedKey] || trimmedKey;
-      normalized[mappedKey] = value;
+      normalized[mappedKey] = typeof value === 'string' ? value.replace(/\t/g, '').trim() : value;
     }
     return normalized;
   });
@@ -133,7 +133,7 @@ export class TerminalController {
     }
   }
 
-  // POST /api/admin/inventory/assignments
+  // POST /api/admin/inventory/assign
   static async assignHardware(req: Request, res: Response) {
     try {
       const assignment = await TerminalInventoryService.assignHardware(req.body);
@@ -147,6 +147,12 @@ export class TerminalController {
 
       return res.status(200).json(assignment);
     } catch (error: any) {
+      const msg = error?.message || 'Assign failed';
+      if (
+        /required|not found|already assigned|Unassign first|duplicate key|unique constraint/i.test(msg)
+      ) {
+        return res.status(400).json({ error: msg });
+      }
       return handleError(res, error);
     }
   }

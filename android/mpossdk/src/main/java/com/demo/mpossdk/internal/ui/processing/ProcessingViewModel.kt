@@ -369,9 +369,17 @@ internal class ProcessingViewModel(
 
             val prePack = isoMsg.pack()
             val hexString = org.jpos.iso.ISOUtil.hexString(prePack)
+            // IsoMessageBuilder may rewrite 9F34 in DE55 after EmvDetailResult.iccData was set —
+            // keep iccData aligned with the packed message so Invify/Quasar icc_token matches F55.
+            val finalIcc = try {
+                isoMsg.getString(55)?.trim()?.takeIf { it.isNotEmpty() }
+            } catch (_: Throwable) {
+                null
+            }
             val terminalParameters = sessionManager.getTerminalParameters()
             emvDetailResult = emvDetailResult.copy(
                 packedIsoMessage = hexString,
+                iccData = finalIcc ?: emvDetailResult.iccData,
                 serverIP = terminalParameters?.serverIP,
                 port = terminalParameters?.port
             )
@@ -432,7 +440,18 @@ internal class ProcessingViewModel(
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
-                    _errorFlow.send(ErrorData(ErrorType.UNKNOWN_ERROR, "Socket communication failed: ${e.message}"))
+                    val tid = sessionManager.getTerminalParameters()?.terminalId ?: "?"
+                    val peer = e.message?.contains("disconnect", ignoreCase = true) == true ||
+                        e.message?.contains("EOF", ignoreCase = true) == true ||
+                        e is java.io.EOFException
+                    val msg = if (peer) {
+                        "Host closed connection (peer-disconnect). ISO fields/MAC look OK — " +
+                            "re-run Load Params, then ask Accelerex/GA to confirm TID $tid " +
+                            "is purchase-enabled on 196.6.103.18:4001."
+                    } else {
+                        "Socket communication failed: ${e.message}"
+                    }
+                    _errorFlow.send(ErrorData(ErrorType.UNKNOWN_ERROR, msg))
                 }
             } else {
                 _transactionStatusFlow.send(
@@ -574,31 +593,48 @@ internal class ProcessingViewModel(
 
         val buf = ByteArray(256)
         val len = IntArray(2)
-
-        var iccData = ""
+        val values = linkedMapOf<String, String>()
         val tagList = ISOUtils.getIccDataTags()
+
         for (emvTLV in tagList) {
             val ret = CommonApi.Common_GetTLV_Api(emvTLV.value.toInt(16), buf, len)
-            if (ret == 0) {
-                val tagValue = CommonConvert.bcdToASCString(buf, 0, len[0])
-                val tagLength = countByTwoGetSize(tagValue)
-                LogUtil.d("TLV : ${emvTLV.value + tagLength + tagValue.uppercase()}")
-                LogUtil.d("------------------------------------")
-                iccData += (emvTLV.value + tagLength + tagValue.uppercase())
+            if (ret == 0 && len[0] > 0) {
+                val tagValue = CommonConvert.bcdToASCString(buf, 0, len[0]).uppercase()
+                LogUtil.d("TLV : ${emvTLV.value}${countByTwoGetSize(tagValue)}$tagValue")
+                values[emvTLV.value] = tagValue
+            } else {
+                LogUtil.d("TLV missing: ${emvTLV.value} ret=$ret")
             }
         }
 
+        // Terminal-sourced tags Accelerex requires — inject when kernel omits them.
+        if (!values.containsKey("9F33")) values["9F33"] = "E0F1C8"
+        // Do not default 9F34 here — IsoMessageBuilder chooses online (42) vs offline (41)
+        // based on AID + pinBlock. Inventing 410302 made Mastercard skip f52 → RC 59.
+        if (!values.containsKey("9F35")) values["9F35"] = "22"
+        if (!values.containsKey("9F41")) values["9F41"] = "0001"
+
+        // Emit in Accelerex/NIBSS order (order matters for some hosts).
+        var iccData = ""
+        for (emvTLV in tagList) {
+            val tagValue = values[emvTLV.value] ?: continue
+            iccData += emvTLV.value + countByTwoGetSize(tagValue) + tagValue
+        }
+
+        LogUtil.i(
+            "ICC DATA len=${iccData.length} has9F33=${values.containsKey("9F33")} " +
+                "has9F34=${values.containsKey("9F34")} has9F35=${values.containsKey("9F35")} " +
+                "has9F41=${values.containsKey("9F41")} tags=${values.keys}"
+        )
         LogUtil.d("ICC DATA : $iccData")
         emvDetailResult = emvDetailResult.copy(iccData = iccData)
     }
 
     private fun countByTwoGetSize(inputString: String): String {
-        val halfLength = inputString.length / 2
-        return if (halfLength <= 9) {
-            String.format("%02d", halfLength) // Format with leading zero if single digit
-        } else {
-            Integer.toHexString(halfLength) // Return normal string representation otherwise
-        }
+        val byteLen = inputString.length / 2
+        // Always 2-digit hex length (EMV BER-TLV). Old path used decimal for <=9 and
+        // unpadded hex above — that corrupts tags with length >= 10.
+        return String.format("%02X", byteLen)
     }
 
     private fun getPIN(amount: String): Int {

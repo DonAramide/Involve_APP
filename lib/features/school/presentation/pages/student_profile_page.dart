@@ -262,21 +262,21 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                         ),
                       ),
                     if (canClearWithCredit)
-                      TextButton.icon(
-                        onPressed: () {
-                          context.read<SchoolBloc>().add(ClearStudentDebitEvent(student.id!));
-                        },
-                        icon: const Icon(Icons.auto_fix_high, size: 16),
+                        TextButton.icon(
+                          onPressed: () {
+                            context.read<SchoolBloc>().add(ClearStudentDebitEvent(student.id!));
+                          },
+                          icon: const Icon(Icons.auto_fix_high, size: 16),
                         label: const Text('CLEAR'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
                           backgroundColor: Colors.green.shade700,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                         ),
-                      ),
-                  ],
+                      ],
                 ),
               ],
             ),
@@ -381,7 +381,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Row(
-              children: [
+          children: [
                 Container(
                   width: 40,
                   height: 40,
@@ -392,10 +392,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                   child: Icon(icon, color: Colors.blueGrey.shade600, size: 20),
                 ),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
+            Expanded(
+              child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                children: [
                       Text(
                         label,
                         style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
@@ -968,9 +968,9 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.blueGrey.withOpacity(0.12)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Row(
               children: [
                 Container(
@@ -996,21 +996,21 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                         'Generate a dedicated account for fee payments.',
                         style: TextStyle(fontSize: 12, color: Colors.blueGrey),
                       ),
-                    ],
-                  ),
-                ),
+            ],
+          ),
+        ),
               ],
             ),
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+      child: ElevatedButton.icon(
                 onPressed: isProvisioningVa
                     ? null
                     : () {
                         setState(() => _awaitingVaProvision = true);
-                        context.read<SchoolBloc>().add(ProvisionStudentVirtualAccountEvent(student.id!));
-                      },
+          context.read<SchoolBloc>().add(ProvisionStudentVirtualAccountEvent(student.id!));
+        },
                 icon: isProvisioningVa
                     ? const SizedBox(
                         width: 18,
@@ -1019,9 +1019,9 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                       )
                     : const Icon(Icons.add_card_rounded),
                 label: Text(isProvisioningVa ? 'Generating…' : 'Generate Virtual Account'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade800,
-                  foregroundColor: Colors.white,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue.shade800,
+          foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),

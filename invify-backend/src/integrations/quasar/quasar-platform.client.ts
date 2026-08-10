@@ -85,7 +85,8 @@ export class QuasarPlatformClient {
   private readonly baseUrl: string;
 
   constructor() {
-    this.baseUrl = process.env.QUASAR_BASE_URL ?? 'https://api-quasar.iips.app/api/v1';
+    const { resolveQuasarBaseUrl } = require('./quasar-base-url');
+    this.baseUrl = resolveQuasarBaseUrl();
   }
 
   private buildClient(vertical: InvifyVertical): QuasarApiClient {

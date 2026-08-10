@@ -31,6 +31,9 @@ class TerminalConfig {
   final String? activeHost;
   final String? expressPayHost;
   final int? expressPayPort;
+  final String? nibssIp;
+  final int? nibssPort;
+  final bool nibssSsl;
 
   // New Phase X parameters
   final Map<String, dynamic>? primaryHost;
@@ -77,6 +80,9 @@ class TerminalConfig {
     this.activeHost,
     this.expressPayHost,
     this.expressPayPort,
+    this.nibssIp,
+    this.nibssPort,
+    this.nibssSsl = false,
     this.primaryHost,
     this.secondaryHost,
     this.routingRules,
@@ -98,9 +104,13 @@ class TerminalConfig {
   });
 
   factory TerminalConfig.fromJson(Map<String, dynamic> json) {
+    final terminalId = json['terminalId']?.toString();
+    final hasTerminal = terminalId != null && terminalId.isNotEmpty;
+    final assignedFlag = json['assigned'] == true;
+    // Do not treat bare success:true as assigned (USER_DEVICE responses can be successful).
     return TerminalConfig(
-      assigned: json['assigned'] == true || json['success'] == true,
-      terminalId: json['terminalId']?.toString(),
+      assigned: assignedFlag || hasTerminal,
+      terminalId: terminalId,
       mposTerminalId: json['mposTerminalId']?.toString(),
       posSerialNumber: json['posSerialNumber']?.toString(),
       businessName: json['businessName']?.toString(),
@@ -121,6 +131,14 @@ class TerminalConfig {
       activeHost: json['activeHost']?.toString(),
       expressPayHost: json['expressPayHost']?.toString(),
       expressPayPort: (json['expressPayPort'] as num?)?.toInt(),
+      nibssIp: json['nibssIp']?.toString() ??
+          (json['primaryHost'] is Map ? (json['primaryHost'] as Map)['ip']?.toString() : null),
+      nibssPort: (json['nibssPort'] as num?)?.toInt() ??
+          (json['primaryHost'] is Map
+              ? ((json['primaryHost'] as Map)['port'] as num?)?.toInt()
+              : null),
+      nibssSsl: json['nibssSsl'] == true ||
+          (json['primaryHost'] is Map && (json['primaryHost'] as Map)['sslEnabled'] == true),
       primaryHost: json['primaryHost'] != null ? Map<String, dynamic>.from(json['primaryHost'] as Map) : null,
       secondaryHost: json['secondaryHost'] != null ? Map<String, dynamic>.from(json['secondaryHost'] as Map) : null,
       routingRules: json['routingRules'] != null ? Map<String, dynamic>.from(json['routingRules'] as Map) : null,
@@ -165,6 +183,9 @@ class TerminalConfig {
     'activeHost': activeHost,
     'expressPayHost': expressPayHost,
     'expressPayPort': expressPayPort,
+    'nibssIp': nibssIp,
+    'nibssPort': nibssPort,
+    'nibssSsl': nibssSsl,
     'primaryHost': primaryHost,
     'secondaryHost': secondaryHost,
     'routingRules': routingRules,

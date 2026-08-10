@@ -87,6 +87,16 @@
                 {{ quasarWebhookConfigured ? 'Configured' : 'Missing' }}
               </span>
             </div>
+            <div
+              class="row justify-between text-caption text-grey-4 q-mb-sm"
+              v-if="isQuasarIntegration(integration)"
+            >
+              <span>Admin Login</span>
+              <span :class="quasarAdminCredsConfigured ? 'text-green-4' : 'text-orange-4'">
+                <q-icon :name="quasarAdminCredsConfigured ? 'verified' : 'warning'" class="q-mr-xs" />
+                {{ quasarAdminCredsConfigured ? 'Configured' : 'Missing' }}
+              </span>
+            </div>
             <div class="row justify-between text-caption text-grey-4 q-mb-sm" v-if="integration.integration_usage_analytics?.length">
               <span>Usage Today</span>
               <span class="text-white">{{ getUsage(integration) }}</span>
@@ -138,9 +148,10 @@ import { vaultApi } from '../../api';
 const $q = useQuasar();
 const activeScope = ref('GLOBAL');
 const selectedTenant = ref(null);
-const tenantOptions = ref([{ label: 'Demo Retail Tenant', value: 'tenant-123' }]); // Need real tenant API
+const tenantOptions = ref([]); // real tenants from /admin/tenants
 const searchQuery = ref('');
 const quasarWebhookConfigured = ref(false);
+const quasarAdminCredsConfigured = ref(false);
 
 const integrations = ref([]);
 const showAddDialog = ref(false);
@@ -158,11 +169,33 @@ const newIntegration = ref({
 
 onMounted(() => {
   fetchVault();
+  loadTenantOptions();
 });
+
+async function loadTenantOptions() {
+  try {
+    const { adminApi } = await import('../../api');
+    const res = await adminApi.getTenants({ limit: 200 });
+    const rows = res.data?.data || res.data || [];
+    tenantOptions.value = (Array.isArray(rows) ? rows : []).map((t) => ({
+      label: t.business_name || t.name || t.id,
+      value: t.id,
+    })).filter((t) => t.value && /^[0-9a-f-]{36}$/i.test(String(t.value)));
+  } catch (e) {
+    console.warn('Failed to load tenants for vault filter', e);
+    tenantOptions.value = [];
+  }
+}
 
 async function fetchVault() {
   try {
-    const res = await vaultApi.listIntegrations(activeScope.value, selectedTenant.value?.value);
+    // Never query TENANT scope with a non-UUID (Supabase rejects "tenant-123")
+    const tenantId = selectedTenant.value?.value;
+    if (activeScope.value === 'TENANT' && (!tenantId || !/^[0-9a-f-]{36}$/i.test(String(tenantId)))) {
+      integrations.value = [];
+      return;
+    }
+    const res = await vaultApi.listIntegrations(activeScope.value, tenantId);
     integrations.value = res.data?.data || [];
     if (activeScope.value === 'GLOBAL') {
       try {
@@ -170,6 +203,12 @@ async function fetchVault() {
         quasarWebhookConfigured.value = Boolean(statusRes.data?.data?.configured);
       } catch {
         quasarWebhookConfigured.value = false;
+      }
+      try {
+        const adminRes = await vaultApi.getQuasarAdminCredentialsStatus('PRODUCTION');
+        quasarAdminCredsConfigured.value = Boolean(adminRes.data?.data?.configured);
+      } catch {
+        quasarAdminCredsConfigured.value = false;
       }
     }
   } catch (err) {

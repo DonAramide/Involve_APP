@@ -36,6 +36,14 @@ export class WebhookController {
       const event = req.body;
       const { reference, amount, status } = event?.data || {};
 
+      // Card notification webhooks (Quasar → Invify) — ack even if HTTP timed out on switch path
+      if (
+        typeof event?.event === 'string' &&
+        event.event.startsWith('card.transaction.')
+      ) {
+        return WebhookController._handleCardTransactionWebhook(req, res, event, signature, rawBody);
+      }
+
       // 1. RESOLVE TRANSACTION & TENANT (Never trust tenantId from payload)
       if (!reference) {
         return res.status(400).json({ error: 'Missing reference in payload' });
@@ -684,5 +692,155 @@ export class WebhookController {
     console.log(`[Event] Emit payment.failed for ${reference}`);
   }
 
+  /**
+   * Quasar card rail notifications — do not credit wallets.
+   * Used so Invify still learns ISO/KIMONO/MPOS outcomes when the sync HTTP call timed out.
+   * Updates the tenant POS attempt (idempotent by data.reference / RRN+STAN).
+   */
+  private static async _handleCardTransactionWebhook(
+    req: Request,
+    res: Response,
+    event: any,
+    signature: string,
+    rawBody: string,
+  ) {
+    const reference = event?.data?.reference;
+    const quasarTenantId =
+      typeof event?.data?.tenantId === 'string' ? event.data.tenantId : null;
+
+    if (!reference) {
+      return res.status(400).json({ error: 'Missing reference in card payload' });
+    }
+
+    let resolvedTenantId: string | null = null;
+    if (quasarTenantId) {
+      try {
+        const mapped = await QuasarIntegrationStore.getByQuasarTenantId(quasarTenantId);
+        if (mapped?.invify_tenant_id) {
+          resolvedTenantId = mapped.invify_tenant_id;
+        }
+      } catch {
+        /* fall through */
+      }
+      if (!resolvedTenantId) {
+        const { data: byId } = await supabaseAdmin
+          .from('tenants')
+          .select('id')
+          .eq('id', quasarTenantId)
+          .maybeSingle();
+        resolvedTenantId = byId?.id || null;
+      }
+    }
+
+    if (!resolvedTenantId) {
+      console.warn(
+        `[Webhook] card event ${event.event} ref=${reference} — tenant unresolved; acknowledging`,
+      );
+      return res.status(200).json({ received: true, note: 'card_unknown_tenant' });
+    }
+
+    const integration = await QuasarIntegrationStore.getByInvifyTenantId(resolvedTenantId);
+    const candidateSecrets: string[] = [];
+    const pushSecret = (value?: string | null) => {
+      if (value && typeof value === 'string' && value.length >= 8 && !candidateSecrets.includes(value)) {
+        candidateSecrets.push(value);
+      }
+    };
+    if (integration) {
+      try {
+        pushSecret(QuasarIntegrationStore.decryptSigningSecret(integration));
+      } catch {
+        /* ignore */
+      }
+    }
+    pushSecret(process.env.QUASAR_WEBHOOK_SIGNING_SECRET);
+    pushSecret(process.env.QUASAR_SANDBOX_WEBHOOK_SECRET);
+
+    let isValid = false;
+    for (const secret of candidateSecrets) {
+      if (QuasarWebhookService.verifySignature(rawBody, signature, secret, event?.timestamp)) {
+        isValid = true;
+        break;
+      }
+      if (QuasarWebhookService.verifySignature(rawBody, signature, secret, undefined)) {
+        isValid = true;
+        break;
+      }
+    }
+    if (!isValid && process.env.NODE_ENV !== 'production') {
+      console.warn('[Webhook] Card HMAC mismatch — accepting in development');
+      isValid = true;
+    }
+    if (!isValid) {
+      return res.status(401).json({ error: 'Auth failure' });
+    }
+
+    await AuditService.log({
+      eventType: 'webhook.received',
+      reference,
+      tenantId: resolvedTenantId,
+      payload: event,
+    });
+
+    let applyResult: {
+      updated: boolean;
+      duplicate: boolean;
+      created: boolean;
+      attemptId: string;
+      status: string;
+    } | null = null;
+
+    try {
+      const { PosService } = await import('../services/pos.service');
+      applyResult = await PosService.applyCardWebhookUpdate({
+        tenantId: resolvedTenantId,
+        event: event.event,
+        data: event.data || {},
+      });
+    } catch (e: any) {
+      console.error(`[Webhook] Failed to apply card txn update for ${reference}:`, e.message);
+      return res.status(500).json({ error: 'Failed to update card transaction', reference });
+    }
+
+    try {
+      const { io } = require('../app');
+      if (io) {
+        io.to(`tenant:${resolvedTenantId}`).emit('card.transaction', {
+          type: event.event,
+          reference,
+          tenantId: resolvedTenantId,
+          approved: event.data?.approved === true,
+          status: event.data?.status,
+          outcome: event.data?.outcome,
+          mode: event.data?.mode,
+          amount: event.data?.amount,
+          rrn: event.data?.rrn,
+          stan: event.data?.stan,
+          terminalId: event.data?.terminalId,
+          attemptId: applyResult?.attemptId,
+          localStatus: applyResult?.status,
+          duplicate: applyResult?.duplicate === true,
+        });
+      }
+    } catch (e: any) {
+      console.error('[Socket.io] Failed to emit card.transaction:', e.message);
+    }
+
+    console.log(
+      `[Webhook] Card ${event.event} ack tenant=${resolvedTenantId} ref=${reference} ` +
+        `approved=${event.data?.approved} attempt=${applyResult?.attemptId} ` +
+        `dup=${applyResult?.duplicate} created=${applyResult?.created} status=${applyResult?.status}`,
+    );
+    return res.status(200).json({
+      received: true,
+      event: event.event,
+      reference,
+      attemptId: applyResult?.attemptId,
+      status: applyResult?.status,
+      duplicate: applyResult?.duplicate === true,
+      created: applyResult?.created === true,
+      updated: applyResult?.updated === true,
+    });
+  }
 
 }

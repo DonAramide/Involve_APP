@@ -280,7 +280,16 @@ const printerOptions = computed(() => {
     .filter(p => !assigned.has(p.id) && !assigned.has(p.printer_mac_address))
     .map(p => ({ label: printerLabel(p), value: p.id }))
 })
-const tidOptions = computed(() => tids.value.map(t => ({ label: tidLabel(t), value: t.id })))
+const tidOptions = computed(() => {
+  const assigned = getActiveIds('terminal_id')
+  return tids.value
+    .filter(t => {
+      const status = String(t.assignment_status || '').toLowerCase()
+      if (status === 'assigned') return false
+      return !assigned.has(t.id) && !assigned.has(t.terminal_id)
+    })
+    .map(t => ({ label: tidLabel(t), value: t.id }))
+})
 const tenantOptions = computed(() => tenants.value.map(t => ({ label: t.name || t.business_name || t.id, value: t.id })))
 
 const makeOptionFilter = (allOptions, filteredRef) => (val, update) => {

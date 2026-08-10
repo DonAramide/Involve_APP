@@ -107,10 +107,109 @@
               <q-card-section>
                 <div class="row justify-between items-start">
                   <div class="row items-center op-gap-8">
+                    <q-avatar size="md" color="deep-purple-8" text-color="purple-2" icon="admin_panel_settings" />
+                    <div>
+                      <div class="text-weight-bold text-subtitle1">Quasar Admin Login</div>
+                      <div class="text-caption text-grey-5">QUASAR_ADMIN_USERNAME / PASSWORD</div>
+                    </div>
+                  </div>
+                  <q-chip
+                    dense size="sm"
+                    :color="adminCredStatus?.configured ? 'green-9' : 'orange-10'"
+                    :text-color="adminCredStatus?.configured ? 'green-3' : 'orange-2'"
+                  >
+                    {{ adminCredStatus?.configured ? 'CONFIGURED' : 'MISSING' }}
+                  </q-chip>
+                </div>
+
+                <q-separator dark class="q-my-md opacity-20" />
+
+                <div class="text-caption text-grey-4 q-mb-md">
+                  Used by Platform Config → Generate Global POS Key to call
+                  <code>POST /admin/auth/login</code> then rotate the POS encryption key.
+                </div>
+                <div class="row justify-between text-caption text-grey-4 q-mb-md">
+                  <span>Sources</span>
+                  <span>
+                    <span :class="adminCredStatus?.sources?.runtimeEnv ? 'text-green-4' : 'text-grey-6'">env</span>
+                    ·
+                    <span :class="adminCredStatus?.sources?.integrationVault ? 'text-green-4' : 'text-grey-6'">vault</span>
+                    ·
+                    <span :class="adminCredStatus?.sources?.adminJwtEnv ? 'text-green-4' : 'text-grey-6'">jwt-env</span>
+                  </span>
+                </div>
+
+                <q-input
+                  outlined dense dark
+                  v-model="adminUsernameInput"
+                  label="Quasar Admin Username"
+                  autocomplete="off"
+                  data-lpignore="true"
+                  class="q-mb-md"
+                />
+                <q-input
+                  outlined dense dark
+                  v-model="adminPasswordInput"
+                  :type="revealAdminPassword ? 'text' : 'password'"
+                  label="Quasar Admin Password"
+                  autocomplete="new-password"
+                  data-lpignore="true"
+                  class="q-mb-md"
+                >
+                  <template #append>
+                    <q-btn
+                      flat round dense
+                      :icon="revealAdminPassword ? 'visibility_off' : 'visibility'"
+                      @click="revealAdminPassword = !revealAdminPassword"
+                    />
+                  </template>
+                </q-input>
+
+                <div class="row q-col-gutter-sm">
+                  <div class="col-12 col-sm-6">
+                    <q-btn
+                      unelevated color="deep-purple-6" class="full-width"
+                      icon="lock"
+                      label="Save Admin Credentials"
+                      :loading="savingAdminCreds"
+                      :disable="!adminUsernameInput || !adminPasswordInput"
+                      @click="saveAdminCredentials"
+                    />
+                  </div>
+                  <div class="col-12 col-sm-6">
+                    <q-btn
+                      outline color="deep-purple-3" class="full-width"
+                      icon="wifi_tethering"
+                      label="Test Admin Login"
+                      :loading="testingAdminCreds"
+                      :disable="!adminCredStatus?.configured && (!adminUsernameInput || !adminPasswordInput)"
+                      @click="testAdminLogin"
+                    />
+                  </div>
+                </div>
+                <div
+                  v-if="adminLoginPing"
+                  class="q-mt-md text-caption"
+                  :class="adminLoginPing.ok ? 'text-green-4' : 'text-negative'"
+                >
+                  {{ adminLoginPing.message }}
+                  <span v-if="adminLoginPing.latencyMs != null" class="text-grey-5">
+                    · {{ adminLoginPing.latencyMs }}ms · {{ adminLoginPing.quasarBaseUrl }}
+                  </span>
+                </div>
+              </q-card-section>
+            </q-card>
+          </div>
+
+          <div class="col-12 col-md-6">
+            <q-card flat class="enterprise-panel bg-subpanel border-main">
+              <q-card-section>
+                <div class="row justify-between items-start">
+                  <div class="row items-center op-gap-8">
                     <q-avatar size="md" color="blue-grey-8" text-color="cyan-2" icon="info" />
                     <div>
                       <div class="text-weight-bold text-subtitle1">How to configure</div>
-                      <div class="text-caption text-grey-5">Quasar → Invify HMAC</div>
+                      <div class="text-caption text-grey-5">Quasar → Invify HMAC + Admin</div>
                     </div>
                   </div>
                 </div>
@@ -118,8 +217,10 @@
                 <ol class="text-caption text-grey-4 q-pl-md" style="line-height: 1.7;">
                   <li>Open Quasar Admin → Platform → Webhooks → Outbound</li>
                   <li>Set Invify service URL to your receiver (e.g. http://127.0.0.1:3004/webhooks/quasar)</li>
-                  <li>Copy the one-time Signing secret</li>
-                  <li>Paste it here and Save Webhook Secret</li>
+                  <li>Copy the one-time Signing secret → Save Webhook Secret</li>
+                  <li>Save Quasar Admin Username/Password here for POS key rotate</li>
+                  <li>Click Test Admin Login to verify Quasar accepts those credentials</li>
+                  <li>Then open Platform Config → Quasar Switch → Generate Global POS Key (leave JWT blank)</li>
                 </ol>
               </q-card-section>
             </q-card>
@@ -260,6 +361,14 @@ const revealWebhook = ref(false);
 const savingWebhook = ref(false);
 const webhookStatus = ref(null);
 
+const adminUsernameInput = ref('');
+const adminPasswordInput = ref('');
+const revealAdminPassword = ref(false);
+const savingAdminCreds = ref(false);
+const testingAdminCreds = ref(false);
+const adminCredStatus = ref(null);
+const adminLoginPing = ref(null);
+
 const newCred = ref({ type: 'API_KEY', key_name: '', value: '', expires_at: '', rotate: false });
 
 const isQuasar = computed(() => {
@@ -314,8 +423,23 @@ async function loadWebhookStatus() {
   }
 }
 
+async function loadAdminCredStatus() {
+  if (!isQuasar.value) return;
+  try {
+    const res = await vaultApi.getQuasarAdminCredentialsStatus(activeEnvironment.value);
+    adminCredStatus.value = res.data?.data || res.data || null;
+  } catch (err) {
+    console.error(err);
+    adminCredStatus.value = {
+      configured: false,
+      sources: { runtimeEnv: false, integrationVault: false, adminJwtEnv: false },
+    };
+  }
+}
+
 function onEnvironmentChange() {
   loadWebhookStatus();
+  loadAdminCredStatus();
 }
 
 async function saveWebhookSecret() {
@@ -345,6 +469,90 @@ async function saveWebhookSecret() {
     });
   } finally {
     savingWebhook.value = false;
+  }
+}
+
+async function saveAdminCredentials() {
+  if (!adminUsernameInput.value || !adminPasswordInput.value) {
+    $q.notify({ type: 'warning', message: 'Username and password are required.' });
+    return;
+  }
+  try {
+    savingAdminCreds.value = true;
+    const res = await vaultApi.saveQuasarAdminCredentials({
+      username: adminUsernameInput.value.trim(),
+      password: adminPasswordInput.value,
+      environment: activeEnvironment.value,
+    });
+    $q.notify({
+      type: 'positive',
+      message: res.data?.responseMessage || 'Quasar admin credentials saved.',
+    });
+    adminPasswordInput.value = '';
+    revealAdminPassword.value = false;
+    adminLoginPing.value = null;
+    await loadAdminCredStatus();
+    emit('refresh');
+  } catch (err) {
+    console.error(err);
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.responseMessage || err.response?.data?.error || 'Failed to save admin credentials.',
+    });
+  } finally {
+    savingAdminCreds.value = false;
+  }
+}
+
+async function testAdminLogin() {
+  const hasFormCreds = Boolean(adminUsernameInput.value && adminPasswordInput.value);
+  if (!hasFormCreds && !adminCredStatus.value?.configured) {
+    $q.notify({
+      type: 'warning',
+      message: 'Save Quasar admin credentials first, or enter username/password to ping.',
+    });
+    return;
+  }
+  try {
+    testingAdminCreds.value = true;
+    adminLoginPing.value = null;
+    const payload = hasFormCreds
+      ? {
+          username: adminUsernameInput.value.trim(),
+          password: adminPasswordInput.value,
+          environment: activeEnvironment.value,
+        }
+      : { environment: activeEnvironment.value };
+    const res = await vaultApi.testQuasarAdminCredentials(payload);
+    const data = res.data?.data || res.data || {};
+    adminLoginPing.value = {
+      ok: true,
+      message: res.data?.responseMessage || data.message || 'Login OK',
+      latencyMs: data.latencyMs,
+      quasarBaseUrl: data.quasarBaseUrl,
+    };
+    $q.notify({
+      type: 'positive',
+      message: adminLoginPing.value.message,
+      timeout: 5000,
+    });
+  } catch (err) {
+    console.error(err);
+    const data = err.response?.data?.data || {};
+    const message =
+      err.response?.data?.responseMessage ||
+      err.response?.data?.error ||
+      err.message ||
+      'Login ping failed';
+    adminLoginPing.value = {
+      ok: false,
+      message,
+      latencyMs: data.latencyMs,
+      quasarBaseUrl: data.quasarBaseUrl,
+    };
+    $q.notify({ type: 'negative', message, timeout: 8000 });
+  } finally {
+    testingAdminCreds.value = false;
   }
 }
 
@@ -445,11 +653,17 @@ async function saveNewCredential() {
 }
 
 watch(isQuasar, (val) => {
-  if (val) loadWebhookStatus();
+  if (val) {
+    loadWebhookStatus();
+    loadAdminCredStatus();
+  }
 }, { immediate: true });
 
 onMounted(() => {
-  if (isQuasar.value) loadWebhookStatus();
+  if (isQuasar.value) {
+    loadWebhookStatus();
+    loadAdminCredStatus();
+  }
 });
 </script>
 

@@ -49,6 +49,8 @@ export interface RequestOptions {
   correlationId?: string;
   /** If true, do not retry on failure */
   noRetry?: boolean;
+  /** Per-request timeout override (ms). Card rails often need 60–90s. */
+  timeoutMs?: number;
 }
 
 import { SimpleCircuitBreaker, ExponentialBackoffRetryPolicy } from '../../modules/financial-platform/infrastructure/ResiliencePolicies';
@@ -118,15 +120,45 @@ export class QuasarApiClient {
 
   // ── QFP envelope unwrapper ────────────────────────────────────────────────
 
-  private unwrap<T>(response: QFPResponse<T>, path: string): T {
-    if (response.responseCode !== '00') {
-      throw new QuasarApiError(
-        response.responseMessage || 'Quasar API returned non-00 response',
-        response.responseCode,
-        path,
-      );
+  private unwrap<T>(response: QFPResponse<T> | T, path: string): T {
+    let body: any = response;
+
+    // Standard Quasar envelope: { responseCode, responseMessage, data }
+    if (body && typeof body === 'object' && typeof body.responseCode === 'string') {
+      if (body.responseCode !== '00') {
+        throw new QuasarApiError(
+          body.responseMessage || 'Quasar API returned non-00 response',
+          body.responseCode,
+          path,
+        );
+      }
+      body = body.data;
     }
-    return response.data as T;
+
+    // POS controllers return `{ data: payload }`; the interceptor wraps again →
+    // after envelope unwrap one nested `{ data }` may remain (see @iips/quasar-sdk unwrapPosControllerData).
+    body = this.peelNestedData(body);
+
+    return body as T;
+  }
+
+  /** Peel `{ data: … }` shells until a real payload is found (max 3). */
+  private peelNestedData(body: any): any {
+    let cur = body;
+    for (let i = 0; i < 3; i++) {
+      if (
+        cur &&
+        typeof cur === 'object' &&
+        !Array.isArray(cur) &&
+        Object.prototype.hasOwnProperty.call(cur, 'data') &&
+        Object.keys(cur).length === 1
+      ) {
+        cur = cur.data;
+        continue;
+      }
+      break;
+    }
+    return cur;
   }
 
   // ── Core request with retry + circuit breaker ─────────────────────────────
@@ -158,6 +190,7 @@ export class QuasarApiClient {
           const response = await this.http.request<QFPResponse<T>>({
             ...config,
             headers: { ...config.headers, ...headers },
+            ...(reqOpts.timeoutMs ? { timeout: reqOpts.timeoutMs } : {}),
           });
 
           return this.unwrap<T>(response.data, path);

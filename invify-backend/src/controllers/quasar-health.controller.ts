@@ -188,4 +188,87 @@ export class QuasarHealthController {
       return res.status(500).json({ responseCode: '99', responseMessage: err.message });
     }
   }
+
+  /**
+   * PUT /api/admin/quasar/admin-credentials
+   * Store Quasar admin username/password in Integration Vault (for POS key rotate).
+   * Body: { username, password, environment? }
+   */
+  static async upsertAdminCredentials(req: Request, res: Response) {
+    try {
+      const { username, password, environment } = req.body || {};
+      if (!username || !password) {
+        return res.status(400).json({
+          responseCode: '02',
+          responseMessage: 'username and password are required',
+        });
+      }
+      console.log('[QuasarHealthController] Saving Quasar admin credentials to vault…');
+      const { IntegrationVaultService } = await import('../services/integration-vault.service');
+      const result = await IntegrationVaultService.upsertQuasarAdminCredentials(
+        { username: String(username), password: String(password) },
+        environment === 'SANDBOX' ? 'SANDBOX' : 'PRODUCTION',
+      );
+      return res.status(200).json({
+        responseCode: '00',
+        responseMessage: 'Quasar admin credentials saved to Integration Vault',
+        data: {
+          vaultId: result.vaultId,
+          environment: result.environment,
+          keys: result.keys,
+          configured: true,
+        },
+      });
+    } catch (err: any) {
+      console.error('[QuasarHealthController] upsertAdminCredentials failed:', err.message);
+      return res.status(500).json({ responseCode: '99', responseMessage: err.message });
+    }
+  }
+
+  /**
+   * GET /api/admin/quasar/admin-credentials/status
+   * Never returns password.
+   */
+  static async getAdminCredentialsStatus(req: Request, res: Response) {
+    try {
+      const environment = (req.query.environment as string) === 'SANDBOX' ? 'SANDBOX' : 'PRODUCTION';
+      const { IntegrationVaultService } = await import('../services/integration-vault.service');
+      const status = await IntegrationVaultService.getQuasarAdminCredentialsStatus(environment);
+      return res.status(200).json({
+        responseCode: '00',
+        responseMessage: status.configured
+          ? 'Quasar admin credentials are configured'
+          : 'Quasar admin credentials are not configured',
+        data: status,
+      });
+    } catch (err: any) {
+      console.error('[QuasarHealthController] getAdminCredentialsStatus failed:', err.message);
+      return res.status(500).json({ responseCode: '99', responseMessage: err.message });
+    }
+  }
+
+  /**
+   * POST /api/admin/quasar/admin-credentials/test
+   * Login ping against Quasar POST /admin/auth/login.
+   * Body optional: { username?, password?, environment? } — if omitted, uses vault/env.
+   * Never returns the full access token.
+   */
+  static async testAdminCredentials(req: Request, res: Response) {
+    try {
+      const { username, password } = req.body || {};
+      const { testQuasarAdminLogin } = await import('../integrations/quasar/quasar-pos-key.service');
+      const result = await testQuasarAdminLogin({
+        username: username ? String(username) : undefined,
+        password: password ? String(password) : undefined,
+      });
+      return res.status(result.ok ? 200 : 400).json({
+        responseCode: result.ok ? '00' : '01',
+        responseMessage: result.message,
+        data: result,
+      });
+    } catch (err: any) {
+      console.error('[QuasarHealthController] testAdminCredentials failed:', err.message);
+      return res.status(500).json({ responseCode: '99', responseMessage: err.message });
+    }
+  }
 }

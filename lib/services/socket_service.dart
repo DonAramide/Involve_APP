@@ -5,6 +5,7 @@ import 'package:involve_app/core/services/payment_alert_sound.dart';
 import 'package:involve_app/features/dashboard/presentation/widgets/notification_bell.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
 import 'dart:developer';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
@@ -124,6 +125,22 @@ class SocketService {
         } catch (e) {
           debugPrint('Error saving broadcast: $e');
         }
+      }
+    });
+
+    _socket!.on('pos_routing_updated', (data) async {
+      debugPrint('[SocketService] pos_routing_updated received: $data');
+      final deviceId = _lastDeviceId;
+      if (deviceId == null || deviceId.isEmpty) {
+        debugPrint('[SocketService] Skipping routing re-sync (no deviceId)');
+        return;
+      }
+      try {
+        await TerminalSyncService.syncTerminalConfig(deviceId: deviceId);
+        final version = data is Map ? data['configVersion'] : null;
+        debugPrint('[SocketService] Terminal routing re-synced (v$version)');
+      } catch (e) {
+        debugPrint('[SocketService] Failed to re-sync routing config: $e');
       }
     });
 

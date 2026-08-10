@@ -37,7 +37,8 @@ export class QuasarServiceClient {
   private readonly serviceSecret: string;
 
   constructor(opts?: QuasarServiceClientOptions) {
-    this.baseUrl = opts?.baseUrl ?? process.env.QUASAR_BASE_URL ?? 'https://api-quasar.iips.app/api/v1';
+    const { resolveQuasarBaseUrl } = require('./quasar-base-url');
+    this.baseUrl = opts?.baseUrl ?? resolveQuasarBaseUrl();
     
     const sid = opts?.serviceId ?? process.env.QUASAR_SERVICE_ID;
     const ssecret = opts?.serviceSecret ?? process.env.QUASAR_SERVICE_SECRET;

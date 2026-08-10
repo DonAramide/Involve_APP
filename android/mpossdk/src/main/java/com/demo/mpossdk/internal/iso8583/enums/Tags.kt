@@ -39,6 +39,8 @@ internal enum class Tags(val value: String) {
     TRANSACTION_DATE("9A"),
     CARDHOLDER_NAME("5F20"),
     UNPREDICTABLE_NUMBER("9F37"),
+    /** EMV Transaction Sequence Counter — required by Accelerex/NIBSS DE55 */
+    TRANSACTION_SEQUENCE_COUNTER("9F41"),
     CUSTOMER_EXCLUSIVE_DATA("9F7C"),
     MERCHANT_NAME_LOCATION("9F4E"),
     TERMINAL_TRANSACTION_QUALIFIERS("9F66"),

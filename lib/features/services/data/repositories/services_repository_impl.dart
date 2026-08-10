@@ -567,15 +567,25 @@ class ServicesRepositoryImpl implements IServicesRepository {
 
   Future<int> _getNextJobCounter() async {
     const type = 'INV-SRV';
-    final existing = await (db.select(db.localCounters)..where((t) => t.type.equals(type))).getSingleOrNull();
-    
+    // Avoid INSERT ... ON CONFLICT (UPSERT): drift_sqflite uses the device
+    // SQLite, and Android 9 / API 28 and below ship SQLite < 3.24 which
+    // rejects ON CONFLICT DO UPDATE with "near ON: syntax error".
+    final existing = await (db.select(db.localCounters)
+          ..where((t) => t.type.equals(type)))
+        .getSingleOrNull();
+
     final nextValue = (existing?.lastValue ?? 0) + 1;
-    
-    await db.into(db.localCounters).insertOnConflictUpdate(LocalCountersCompanion(
-      type: const Value(type),
-      lastValue: Value(nextValue),
-    ));
-    
+
+    if (existing == null) {
+      await db.into(db.localCounters).insert(LocalCountersCompanion.insert(
+        type: type,
+        lastValue: Value(nextValue),
+      ));
+    } else {
+      await (db.update(db.localCounters)..where((t) => t.type.equals(type)))
+          .write(LocalCountersCompanion(lastValue: Value(nextValue)));
+    }
+
     return nextValue;
   }
 

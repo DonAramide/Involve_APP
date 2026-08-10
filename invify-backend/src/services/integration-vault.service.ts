@@ -250,4 +250,112 @@ export class IntegrationVaultService {
       header: 'x-quasar-signature',
     };
   }
+
+  /**
+   * Ensure global Quasar vault exists and store admin username + password
+   * for POS encryption key rotate (Quasar /admin/auth/login).
+   */
+  static async upsertQuasarAdminCredentials(
+    params: { username: string; password: string },
+    environment: string = 'PRODUCTION',
+  ) {
+    const username = String(params.username || '').trim();
+    const password = String(params.password || '');
+    if (!username || !password) {
+      throw new Error('username and password are required');
+    }
+
+    const serviceIdentifier = 'quasar';
+    let vaultId: string | null = null;
+    const { data: existing } = await supabaseAdmin
+      .from('integration_vault')
+      .select('id')
+      .eq('service_identifier', serviceIdentifier)
+      .eq('scope', 'GLOBAL')
+      .maybeSingle();
+
+    if (existing?.id) {
+      vaultId = existing.id;
+    } else {
+      const created = await this.registerIntegration({
+        service_identifier: serviceIdentifier,
+        name: 'Quasar Payments',
+        description:
+          'Quasar outbound webhook HMAC, admin credentials for POS key rotate, and payment credentials.',
+        category: 'PAYMENTS',
+        scope: 'GLOBAL',
+        tenant_id: null,
+      });
+      vaultId = created.id;
+    }
+
+    await this.addCredential(vaultId!, {
+      credential_type: 'API_KEY',
+      environment,
+      plaintext_value: username,
+      key_name: 'QUASAR_ADMIN_USERNAME',
+      rotate_existing: true,
+    });
+    await this.addCredential(vaultId!, {
+      credential_type: 'CLIENT_SECRET',
+      environment,
+      plaintext_value: password,
+      key_name: 'QUASAR_ADMIN_PASSWORD',
+      rotate_existing: true,
+    });
+
+    // Apply immediately without restart
+    process.env.QUASAR_ADMIN_USERNAME = username;
+    process.env.QUASAR_ADMIN_PASSWORD = password;
+
+    console.log(
+      `[IntegrationVault] Quasar admin credentials stored vaultId=${vaultId} env=${environment}`,
+    );
+
+    return { vaultId, environment, keys: ['QUASAR_ADMIN_USERNAME', 'QUASAR_ADMIN_PASSWORD'] };
+  }
+
+  /** Status-only — never returns password. */
+  static async getQuasarAdminCredentialsStatus(environment: string = 'PRODUCTION') {
+    const fromEnv = Boolean(
+      process.env.QUASAR_ADMIN_USERNAME?.trim() && process.env.QUASAR_ADMIN_PASSWORD?.trim(),
+    );
+    const fromEnvJwt = Boolean(process.env.QUASAR_ADMIN_JWT?.trim());
+    const usernameVault = Boolean(
+      await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_ADMIN_USERNAME'),
+    );
+    const passwordVault = Boolean(
+      await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_ADMIN_PASSWORD'),
+    );
+    const fromVault = usernameVault && passwordVault;
+
+    return {
+      configured: fromEnv || fromVault || fromEnvJwt,
+      sources: {
+        runtimeEnv: fromEnv,
+        integrationVault: fromVault,
+        adminJwtEnv: fromEnvJwt,
+      },
+      environment,
+      usernameConfigured: Boolean(process.env.QUASAR_ADMIN_USERNAME?.trim()) || usernameVault,
+      passwordConfigured: Boolean(process.env.QUASAR_ADMIN_PASSWORD?.trim()) || passwordVault,
+    };
+  }
+
+  /** Decrypt Quasar admin login pair for server-side use only. */
+  static async getQuasarAdminCredentials(
+    environment: string = 'PRODUCTION',
+  ): Promise<{ username: string; password: string } | null> {
+    const username =
+      (await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_ADMIN_USERNAME')) ||
+      process.env.QUASAR_ADMIN_USERNAME?.trim() ||
+      process.env.QUASAR_ADMIN_EMAIL?.trim() ||
+      '';
+    const password =
+      (await this.getDecryptedCredential('quasar', environment, undefined, 'QUASAR_ADMIN_PASSWORD')) ||
+      process.env.QUASAR_ADMIN_PASSWORD?.trim() ||
+      '';
+    if (!username || !password) return null;
+    return { username, password };
+  }
 }

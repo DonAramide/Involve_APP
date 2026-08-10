@@ -158,7 +158,7 @@ class MainActivity: FlutterActivity() {
                         val expressPayAuthToken = call.argument<String>("expressPayAuthToken")
                         val ipAddress = call.argument<String>("ipAddress")
                         val portNumber = call.argument<String>("portNumber")
-                        val enableSsl = call.argument<Boolean>("enableSsl") ?: false
+                        val enableSsl = call.argument<Boolean>("enableSsl") ?: true
                         val terminalId = call.argument<String>("terminalId")
                         val key1 = call.argument<String>("key1")
                         val timeoutSeconds = call.argument<Int>("timeoutSeconds")

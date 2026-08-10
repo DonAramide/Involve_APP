@@ -170,7 +170,8 @@ export class QuasarService {
    */
   async getBanks(country: string = 'nigeria'): Promise<any[]> {
     try {
-      const baseUrl = (process.env.QUASAR_BASE_URL || 'https://api-quasar.iips.app/api/v1').replace(/\/$/, '');
+      const { resolveQuasarBaseUrl } = require('./quasar-base-url');
+      const baseUrl = resolveQuasarBaseUrl();
       const res = await fetch(`${baseUrl}/financial-routing/banks?country=${country}`, {
         method: "GET",
         headers: {
@@ -195,7 +196,8 @@ export class QuasarService {
    */
   async resolveAccount(accountNumber: string, bankCode: string): Promise<{ account_number: string; bank_code: string; account_name: string }> {
     try {
-      const baseUrl = (process.env.QUASAR_BASE_URL || 'https://api-quasar.iips.app/api/v1').replace(/\/$/, '');
+      const { resolveQuasarBaseUrl } = require('./quasar-base-url');
+      const baseUrl = resolveQuasarBaseUrl();
       const res = await fetch(`${baseUrl}/financial-routing/account-resolution`, {
         method: "POST",
         headers: {
@@ -217,5 +219,101 @@ export class QuasarService {
       console.error('[QuasarSDK] resolveAccount failed:', error.message);
       throw error;
     }
+  }
+
+  /**
+   * Encrypt ICC hex with tenant Quasar POS key (AES-256-GCM).
+   * Wire format matches Quasar FieldCryptoService / SDK encryptIccHex.
+   */
+  static encryptIccHex(iccHex: string, encryptionKeyBase64: string): string {
+    const normalized = String(iccHex || '').replace(/\s/g, '').toUpperCase();
+    if (!normalized || normalized.length < 20 || normalized.length % 2 !== 0) {
+      throw new Error('ICC data must be an even-length hex string');
+    }
+    const rawKey = Buffer.from(encryptionKeyBase64.trim(), 'base64');
+    if (rawKey.length !== 32) {
+      throw new Error('Tenant POS encryption key must decode to 32 bytes');
+    }
+    const key = crypto.createHash('sha256').update(rawKey).digest();
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
+    const enc = Buffer.concat([
+      cipher.update(normalized, 'utf8'),
+      cipher.final(),
+      cipher.getAuthTag(),
+    ]);
+    return Buffer.concat([iv, enc]).toString('base64');
+  }
+
+  /**
+   * Primary Invify → Quasar card path (iso_tcp).
+   * 1) encrypt + submit ICC → icc_token
+   * 2) POST /pos/card-transaction with ISO fields (no 55) + transport
+   */
+  async executeIsoCardTransaction(params: {
+    quasarTenantId: string;
+    invifyTenantId: string;
+    terminalId: string;
+    reference: string;
+    iccHex: string;
+    posEncryptionKeyBase64: string;
+    fields: Record<string, string>;
+    /** Device packed ISO hex (includes DE55+MAC). Preferred — Quasar forwards as-is. */
+    packedIsoHex?: string;
+    transport: {
+      type: 'iso_tcp';
+      host: string;
+      port: number;
+      ssl: boolean;
+      framing?: string;
+      /** Passed through to Quasar; false skips switch cert verification (dev / IP hosts). */
+      tls_reject_unauthorized?: boolean;
+    };
+    deviceId?: string;
+  }): Promise<any> {
+    if (this.apiKey.startsWith('sk_test_')) {
+      throw new Error(
+        'Quasar POS requires sk_live_* (this tenant still has sk_test_*). ' +
+          'Platform Config → Quasar Switch → Issue Live API Key, then retry the card charge.',
+      );
+    }
+
+    const encrypted_icc = QuasarService.encryptIccHex(params.iccHex, params.posEncryptionKeyBase64);
+    console.log(`[QuasarSDK] Submitting ICC for card-tx ref=${params.reference} terminal=${params.terminalId}`);
+    const icc = await this.client.submitIccData({
+      tenant_id: params.quasarTenantId,
+      encrypted_icc,
+      reference: params.reference,
+      terminal_id: params.terminalId,
+      device_id: params.deviceId,
+      ttl_sec: 300,
+    });
+
+    const iccToken =
+      (icc as any)?.icc_token ||
+      (icc as any)?.iccToken ||
+      (icc as any)?.data?.icc_token;
+    if (!iccToken) {
+      const keys =
+        icc && typeof icc === 'object' ? Object.keys(icc as object).join(',') : String(icc);
+      console.error(`[QuasarSDK] icc-data unexpected shape keys=[${keys}]`);
+      throw new Error('Quasar icc-data did not return icc_token');
+    }
+
+    console.log(
+      `[QuasarSDK] ICC token received; executing Quasar card-transaction iso_tcp → ${params.transport.host}:${params.transport.port}`,
+    );
+    return this.client.executeCardTransaction({
+      tenant_id: params.quasarTenantId,
+      reference: params.reference,
+      terminal_id: params.terminalId,
+      device_id: params.deviceId,
+      icc_token: String(iccToken),
+      transport: params.transport,
+      fields: params.fields,
+      ...(params.packedIsoHex
+        ? { packed_iso_hex: params.packedIsoHex.replace(/\s/g, '') }
+        : {}),
+    });
   }
 }

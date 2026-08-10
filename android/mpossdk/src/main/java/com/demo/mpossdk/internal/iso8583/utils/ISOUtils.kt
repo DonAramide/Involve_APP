@@ -162,23 +162,31 @@ internal object ISOUtils {
         }
     }
 
+    /**
+     * Accelerex GA / NIBSS purchase DE55 tag order (matches morefunsdk NIBSS_FIELD55_TAGS).
+     * Missing 9F33/9F34/9F35/9F41 causes host peer-disconnect on :4001.
+     */
     fun getIccDataTags(): List<Tags> {
         return listOf(
-            Tags.APPLICATION_CRYPTOGRAM,
-            Tags.CRYPTOGRAM_INFORMATION_DATA,
-            Tags.ISSUER_APPLICATION_DATA,
-            Tags.UNPREDICTABLE_NUMBER,
-            Tags.APPLICATION_TRANSACTION_COUNTER,
-            Tags.TERMINAL_VERIFICATION_RESULTS,
-            Tags.TRANSACTION_DATE,
-            Tags.TRANSACTION_TYPE,
-            Tags.AMOUNT_AUTHORIZED_NUMERIC,
-            Tags.TRANSACTION_CURRENCY_CODE,
-            Tags.APPLICATION_INTERCHANGE_PROFILE,
-            Tags.TERMINAL_COUNTRY_CODE,
-            Tags.AMOUNT_CASHBACK,
-            Tags.APPLICATION_PAN_SEQUENCE_NUMBER,
-            Tags.DF_NAME,
+            Tags.APPLICATION_CRYPTOGRAM,          // 9F26
+            Tags.CRYPTOGRAM_INFORMATION_DATA,     // 9F27
+            Tags.ISSUER_APPLICATION_DATA,         // 9F10
+            Tags.UNPREDICTABLE_NUMBER,            // 9F37
+            Tags.APPLICATION_TRANSACTION_COUNTER, // 9F36
+            Tags.TERMINAL_VERIFICATION_RESULTS,   // 95
+            Tags.TRANSACTION_DATE,                // 9A
+            Tags.TRANSACTION_TYPE,                // 9C
+            Tags.AMOUNT_AUTHORIZED_NUMERIC,       // 9F02
+            Tags.TRANSACTION_CURRENCY_CODE,       // 5F2A
+            Tags.APPLICATION_PAN_SEQUENCE_NUMBER, // 5F34
+            Tags.APPLICATION_INTERCHANGE_PROFILE, // 82
+            Tags.TERMINAL_COUNTRY_CODE,           // 9F1A
+            Tags.AMOUNT_CASHBACK,                 // 9F03
+            Tags.TERMINAL_CAPABILITIES,           // 9F33
+            Tags.DF_NAME,                         // 84
+            Tags.CVM_RESULT,                      // 9F34
+            Tags.TERMINAL_TYPE,                   // 9F35
+            Tags.TRANSACTION_SEQUENCE_COUNTER,   // 9F41
         )
     }
 

@@ -46,6 +46,7 @@
       :dark="prefs.isDarkMode"
     >
       <q-tab name="hosts"         icon="lan"            label="Processor Hosts" />
+      <q-tab name="quasar"        icon="cloud_sync"     label="Quasar Switch URL" />
       <q-tab name="matrix"        icon="grid_on"        label="Rules Matrix" />
       <q-tab name="profiles"      icon="supervised_user_circle" label="Tenant Profiles" />
       <q-tab name="simulation"    icon="psychology"     label="Route Simulator" />
@@ -55,6 +56,60 @@
     </q-tabs>
 
     <q-tab-panels v-model="activeTab" animated keep-alive class="bg-transparent text-main">
+
+      <!-- ════════════════════════════════════════════════════════════
+           TAB — QUASAR SWITCH URL (superadmin)
+           ════════════════════════════════════════════════════════════ -->
+      <q-tab-panel name="quasar" class="q-pa-none">
+        <q-card class="bg-panel border-main" flat :dark="prefs.isDarkMode">
+          <q-card-section>
+            <div class="text-h6 text-purple-3 q-mb-xs">
+              <q-icon name="cloud_sync" class="q-mr-sm" />Quasar Card Switch Base URL
+            </div>
+            <div class="text-caption text-secondary q-mb-md">
+              Devices still POST Invify <code>/api/pos/transaction</code>. Invify then calls Quasar
+              <code>/pos/card-transaction</code> with tenant <code>sk_…</code> auth.
+            </div>
+            <div class="row q-col-gutter-md items-start">
+              <div class="col-12 col-md-8">
+                <q-input
+                  v-model="quasarBaseUrl"
+                  filled
+                  :dark="prefs.isDarkMode"
+                  label="Quasar API Base URL"
+                  hint="Ends with /api/v1 — e.g. http://192.168.1.193:4000/api/v1"
+                  placeholder="http://192.168.1.193:4000/api/v1"
+                  clearable
+                  class="q-mb-md"
+                />
+                <div class="bg-subpanel rounded-borders q-pa-md q-mb-md">
+                  <div class="text-caption text-secondary q-mb-xs">Resolved card endpoints</div>
+                  <div class="font-mono text-cyan-3 text-caption">{{ quasarCardTxPreview }}</div>
+                  <div class="font-mono text-cyan-3 text-caption q-mt-xs">{{ quasarIccPreview }}</div>
+                </div>
+                <div class="row q-gutter-sm">
+                  <q-btn dense outline color="purple-4" label="LAN :4000" no-caps
+                    @click="quasarBaseUrl = 'http://192.168.1.193:4000/api/v1'" :dark="prefs.isDarkMode" />
+                  <q-btn dense outline color="purple-4" label="127.0.0.1:4000" no-caps
+                    @click="quasarBaseUrl = 'http://127.0.0.1:4000/api/v1'" :dark="prefs.isDarkMode" />
+                  <q-btn dense outline color="purple-4" label="Production" no-caps
+                    @click="quasarBaseUrl = 'https://api-quasar.iips.app/api/v1'" :dark="prefs.isDarkMode" />
+                </div>
+              </div>
+              <div class="col-12 col-md-4">
+                <q-btn
+                  unelevated color="purple-8" icon="save" label="Save Quasar URL"
+                  class="full-width" :loading="savingQuasarUrl" @click="saveQuasarBaseUrl"
+                  :dark="prefs.isDarkMode"
+                />
+                <div class="text-caption text-secondary q-mt-sm">
+                  Also editable under Admin → Platform Configuration → Quasar Switch.
+                </div>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </q-tab-panel>
 
       <!-- ════════════════════════════════════════════════════════════
            TAB 1 — PROCESSOR HOSTS
@@ -387,7 +442,17 @@
                   <q-list dense flat class="bg-subpanel rounded-borders q-pa-sm font-mono text-caption" style="line-height: 1.6">
                     <q-item>
                       <q-item-section avatar><q-icon name="check" color="green-4" size="xs" /></q-item-section>
-                      <q-item-section>Tenant ID parsed and resolved Category profile to <b>{{ simData.tenantCategory }}</b>.</q-item-section>
+                      <q-item-section>
+                        Matched profile:
+                        <b v-if="simResult.matchedProfile">
+                          {{ simResult.matchedProfile.scopeType }} / {{ simResult.matchedProfile.targetValue }}
+                        </b>
+                        <b v-else class="text-grey-5">none (host priority + SLA only)</b>
+                      </q-item-section>
+                    </q-item>
+                    <q-item>
+                      <q-item-section avatar><q-icon name="check" color="green-4" size="xs" /></q-item-section>
+                      <q-item-section>Tenant category context <b>{{ simData.tenantCategory }}</b>.</q-item-section>
                     </q-item>
                     <q-item>
                       <q-item-section avatar><q-icon name="check" color="green-4" size="xs" /></q-item-section>
@@ -544,7 +609,7 @@
                 </q-input>
               </div>
               <div class="col-12 col-sm-6 col-md-2">
-                <q-select v-model="fHost" :options="['All','KIMONO','MEDUSA','NIBSS','EXPRESS_PAY']" dense filled label="Host" :dark="prefs.isDarkMode" />
+                <q-select v-model="fHost" :options="['All','KIMONO','MEDUSA','NIBSS','EXPRESS_PAY','MPOS_DEVICE']" dense filled label="Host" :dark="prefs.isDarkMode" />
               </div>
               <div class="col-12 col-sm-6 col-md-2">
                 <q-select v-model="fStatus" :options="['All','Approved','Declined']" dense filled label="Status" :dark="prefs.isDarkMode" />
@@ -583,9 +648,9 @@
             </template>
             <template v-slot:body-cell-status="props">
             <q-td :props="props">
-              <q-badge :color="props.value === 'Approved' ? 'green-10' : 'red-10'"
-                :text-color="props.value === 'Approved' ? 'green-4' : 'red-4'" class="text-weight-bold font-mono">
-                {{ props.value.toUpperCase() }}
+              <q-badge :color="(props.value === 'Approved') ? 'green-10' : 'red-10'"
+                :text-color="(props.value === 'Approved') ? 'green-4' : 'red-4'" class="text-weight-bold font-mono">
+                {{ String(props.value || 'UNKNOWN').toUpperCase() }}
               </q-badge>
             </q-td>
           </template>
@@ -695,7 +760,14 @@
             <template v-if="editingHost.hostCode === 'nibss'">
               <q-separator color="purple-10" />
               <div class="text-caption text-secondary text-weight-bold">NIBSS SPECIFICS</div>
-              <q-input v-model="editingHost.nibssConfig.ctmk" filled label="Component Terminal Master Key (CTMK)" type="password" :dark="prefs.isDarkMode" />
+              <q-input
+                v-model="editingHost.nibssConfig.ctmk"
+                filled
+                label="Component Terminal Master Key (CTMK)"
+                type="password"
+                :dark="prefs.isDarkMode"
+                hint="32+ hex chars. Leave blank to keep the existing stored CTMK."
+              />
               <q-input v-model="editingHost.nibssConfig.ptspCode" filled label="PTSP Code (e.g. GA)" :dark="prefs.isDarkMode" />
             </template>
           </div>
@@ -728,7 +800,7 @@
 
     <!-- ── Profile Dialog ──────────────────────────────────────────── -->
     <q-dialog v-model="showProfileDialog" :dark="prefs.isDarkMode">
-      <q-card style="min-width:420px" class="bg-panel text-main border-main" :dark="prefs.isDarkMode">
+      <q-card style="min-width:520px; max-width:640px" class="bg-panel text-main border-main" :dark="prefs.isDarkMode">
         <q-card-section class="bg-subpanel text-purple-4 text-weight-bold">
           <q-icon name="supervised_user_circle" class="q-mr-sm" />{{ editingProfile ? 'Edit Tenant Profile' : 'Add Tenant Profile' }}
         </q-card-section>
@@ -741,14 +813,73 @@
           
           <q-select v-else-if="profileForm.scopeType === 'Tenant'" v-model="profileForm.targetValue" :options="tenantOptions" :option-label="opt => opt.name || opt.id || opt" :option-value="opt => opt.id || opt" emit-value map-options filled label="Select Tenant" :dark="prefs.isDarkMode" />
           
-          <q-select v-else-if="profileForm.scopeType === 'Group'" v-model="profileForm.targetValue" :options="groupOptions" filled label="Select Group" :dark="prefs.isDarkMode" />
+          <q-select
+            v-else-if="profileForm.scopeType === 'Group'"
+            v-model="profileForm.targetValue"
+            :options="groupOptionsFiltered"
+            use-input
+            fill-input
+            hide-selected
+            input-debounce="0"
+            @filter="filterGroupOptions"
+            @new-value="createGroupOption"
+            filled
+            label="Select / Create Group"
+            hint="Matches Express Pay host Terminal Group (set under Processor Hosts)"
+            :dark="prefs.isDarkMode"
+          />
 
           <q-input v-else v-model="profileForm.targetValue" filled :label="profileForm.scopeType + ' ID'" :dark="prefs.isDarkMode" />
 
           <q-select v-model="profileForm.preferredHosts" multiple use-chips :options="['express_pay', 'kimono', 'medusa', 'nibss']" filled label="Preferred Hosts List" :dark="prefs.isDarkMode" />
 
           <q-select v-model="profileForm.fallbackHosts" multiple use-chips :options="['express_pay', 'kimono', 'medusa', 'nibss']" filled label="Fallback Hosts List" :dark="prefs.isDarkMode" />
-          
+
+          <q-separator :dark="prefs.isDarkMode" />
+
+          <!-- Amount Threshold Rules -->
+          <div>
+            <div class="row items-center justify-between q-mb-sm">
+              <div class="text-caption text-secondary text-weight-bold">AMOUNT LIMIT RULES</div>
+              <q-btn flat dense size="sm" color="purple-3" icon="add" label="Add" @click="addAmountThreshold" />
+            </div>
+            <div v-if="!(profileForm.amountThresholds || []).length" class="text-caption text-grey-6 q-mb-sm">No amount rules — preferred hosts apply for all amounts.</div>
+            <div v-for="(rule, idx) in (profileForm.amountThresholds || [])" :key="'amt-'+idx" class="row q-col-gutter-xs items-center q-mb-xs">
+              <div class="col-3">
+                <q-input v-model.number="rule.min" type="number" dense filled label="Min" :dark="prefs.isDarkMode" />
+              </div>
+              <div class="col-3">
+                <q-input v-model.number="rule.max" type="number" dense filled label="Max" :dark="prefs.isDarkMode" />
+              </div>
+              <div class="col-4">
+                <q-select v-model="rule.host" dense filled :options="['express_pay', 'kimono', 'medusa', 'nibss']" label="Host" :dark="prefs.isDarkMode" />
+              </div>
+              <div class="col-2">
+                <q-btn flat round dense icon="delete" color="red-4" size="sm" @click="profileForm.amountThresholds.splice(idx, 1)" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Transaction Type Rules -->
+          <div>
+            <div class="row items-center justify-between q-mb-sm">
+              <div class="text-caption text-secondary text-weight-bold">TRANSACTION TYPE RULES</div>
+              <q-btn flat dense size="sm" color="purple-3" icon="add" label="Add" @click="addTxTypeRule" />
+            </div>
+            <div v-if="!(profileForm.transactionTypeRules || []).length" class="text-caption text-grey-6 q-mb-sm">No tx-type rules.</div>
+            <div v-for="(rule, idx) in (profileForm.transactionTypeRules || [])" :key="'tx-'+idx" class="row q-col-gutter-xs items-center q-mb-xs">
+              <div class="col-5">
+                <q-select v-model="rule.txType" dense filled :options="['PURCHASE', 'CASH_OUT', 'REFUND', 'REVERSAL']" label="Tx Type" :dark="prefs.isDarkMode" />
+              </div>
+              <div class="col-5">
+                <q-select v-model="rule.host" dense filled :options="['express_pay', 'kimono', 'medusa', 'nibss']" label="Host" :dark="prefs.isDarkMode" />
+              </div>
+              <div class="col-2">
+                <q-btn flat round dense icon="delete" color="red-4" size="sm" @click="profileForm.transactionTypeRules.splice(idx, 1)" />
+              </div>
+            </div>
+          </div>
+
           <q-separator :dark="prefs.isDarkMode" />
           <q-toggle v-model="profileForm.processOnDevice" label="Process Transactions Directly on MPOS Device" color="purple-3" :dark="prefs.isDarkMode" />
           <q-input v-if="profileForm.processOnDevice" v-model="profileForm.webhookUrl" filled label="Webhook Endpoint URL" placeholder="https://your.webhook.com/api/pos/transaction" :dark="prefs.isDarkMode" hint="Endpoint to hit after device processing succeeds/fails" />
@@ -818,22 +949,68 @@
         </q-card-section>
         <q-card-section v-if="selectedTx" class="q-pa-lg">
           <div class="row q-col-gutter-md q-mb-md">
-            <div class="col-6"><div class="text-caption text-secondary">Host</div><div class="font-mono text-weight-bold text-white">{{ selectedTx.host }}</div></div>
-            <div class="col-6"><div class="text-caption text-secondary">Response Code</div>
-              <div class="font-mono text-weight-bold" :class="selectedTx.statusCode === '00' ? 'text-green-4' : 'text-red-4'">{{ selectedTx.statusCode }}</div></div>
-            <div class="col-6"><div class="text-caption text-secondary">Amount</div><div class="text-weight-bold text-white">{{ currentCurrency.symbol }}{{ Number(selectedTx.amount).toLocaleString() }}</div></div>
-            <div class="col-6"><div class="text-caption text-secondary">Terminal</div><div class="font-mono text-weight-bold text-white">{{ selectedTx.terminalId }}</div></div>
-            <div class="col-6"><div class="text-caption text-secondary">RRN</div><div class="font-mono text-weight-bold text-white">{{ selectedTx.rrn }}</div></div>
-            <div class="col-6"><div class="text-caption text-secondary">STAN</div><div class="font-mono text-weight-bold text-white">{{ selectedTx.stan }}</div></div>
-            <div class="col-6"><div class="text-caption text-secondary">Card</div><div class="font-mono text-weight-bold text-white">{{ selectedTx.maskedPan }}</div></div>
-            <div class="col-6"><div class="text-caption text-secondary">Tenant</div><div class="font-mono text-weight-bold text-white">{{ selectedTx.tenantId || '—' }}</div></div>
+            <div class="col-12 col-sm-6">
+              <div class="text-caption text-secondary">Tenant / Business</div>
+              <div class="text-weight-bold text-white">{{ selectedTx.tenantName || '—' }}</div>
+              <div class="text-caption text-grey-5 font-mono">{{ selectedTx.tenantId || '—' }}</div>
+            </div>
+            <div class="col-12 col-sm-6">
+              <div class="text-caption text-secondary">Date &amp; Time</div>
+              <div class="font-mono text-weight-bold text-white">{{ formatTxDate(selectedTx.date) }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">Host</div>
+              <div class="font-mono text-weight-bold text-white">{{ selectedTx.host || '—' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">Processed By</div>
+              <div class="font-mono text-weight-bold text-purple-3">{{ selectedTx.processedBy || '—' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">Staff</div>
+              <div class="text-weight-bold text-white">{{ selectedTx.staffName || '—' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">Response Code</div>
+              <div class="font-mono text-weight-bold" :class="selectedTx.statusCode === '00' ? 'text-green-4' : 'text-red-4'">
+                {{ selectedTx.statusCode || '—' }}
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">Amount</div>
+              <div class="text-weight-bold text-white">{{ currentCurrency.symbol }}{{ Number(selectedTx.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">Terminal</div>
+              <div class="font-mono text-weight-bold text-white">{{ selectedTx.terminalId || '—' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">RRN</div>
+              <div class="font-mono text-weight-bold text-cyan-3">{{ selectedTx.rrn || 'N/A' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">STAN</div>
+              <div class="font-mono text-weight-bold text-cyan-3">{{ selectedTx.stan || 'N/A' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">Auth Code</div>
+              <div class="font-mono text-weight-bold text-white">{{ selectedTx.authCode || 'N/A' }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-caption text-secondary">Card</div>
+              <div class="font-mono text-weight-bold text-white">{{ selectedTx.maskedPan || '—' }}</div>
+            </div>
+            <div class="col-12" v-if="selectedTx.message || txDetailMessage">
+              <div class="text-caption text-secondary">Message</div>
+              <div class="text-body2 text-grey-3">{{ selectedTx.message || txDetailMessage }}</div>
+            </div>
             <div class="col-12">
               <div class="text-caption text-secondary q-mb-xs">Raw Request</div>
-              <pre class="bg-subpanel rounded-borders q-pa-sm text-caption font-mono text-grey-4" style="max-height:120px;overflow:auto;white-space:pre-wrap">{{ selectedTx.rawRequest }}</pre>
+              <pre class="bg-subpanel rounded-borders q-pa-sm text-caption font-mono text-grey-4" style="max-height:120px;overflow:auto;white-space:pre-wrap">{{ formatRawJson(selectedTx.rawRequest) }}</pre>
             </div>
             <div class="col-12">
               <div class="text-caption text-secondary q-mb-xs">Raw Response</div>
-              <pre class="bg-subpanel rounded-borders q-pa-sm text-caption font-mono text-grey-4" style="max-height:120px;overflow:auto;white-space:pre-wrap">{{ selectedTx.rawResponse }}</pre>
+              <pre class="bg-subpanel rounded-borders q-pa-sm text-caption font-mono text-grey-4" style="max-height:120px;overflow:auto;white-space:pre-wrap">{{ formatRawJson(selectedTx.rawResponse) }}</pre>
             </div>
           </div>
         </q-card-section>
@@ -868,6 +1045,55 @@ const history    = ref([])
 const showTxDialog = ref(false)
 const selectedTx   = ref(null)
 
+// Quasar switch base URL (superadmin global setting)
+const quasarBaseUrl = ref('')
+const savingQuasarUrl = ref(false)
+const normalizeQuasarBase = (raw) => {
+  let u = String(raw || '').trim()
+  if (!u) return 'https://api-quasar.iips.app/api/v1'
+  u = u.split('?')[0].split('#')[0].replace(/\/+$/, '')
+  const suffixes = ['/pos/card-transaction', '/pos/icc-data', '/pos/transactionFromMpos', '/pos/icc']
+  for (const s of suffixes) {
+    if (u.toLowerCase().endsWith(s)) {
+      u = u.slice(0, -s.length).replace(/\/+$/, '')
+      break
+    }
+  }
+  return u || 'https://api-quasar.iips.app/api/v1'
+}
+const quasarCardTxPreview = computed(() => `${normalizeQuasarBase(quasarBaseUrl.value)}/pos/card-transaction`)
+const quasarIccPreview = computed(() => `${normalizeQuasarBase(quasarBaseUrl.value)}/pos/icc-data`)
+
+const loadQuasarBaseUrl = async () => {
+  try {
+    const res = await adminApi.getGlobalSettings()
+    quasarBaseUrl.value = res.data?.quasar_base_url || res.data?.quasarBaseUrl || ''
+  } catch (e) {
+    console.warn('Failed to load Quasar base URL setting', e)
+  }
+}
+
+const saveQuasarBaseUrl = async () => {
+  savingQuasarUrl.value = true
+  try {
+    const normalized = String(quasarBaseUrl.value || '').trim()
+      ? normalizeQuasarBase(quasarBaseUrl.value)
+      : ''
+    await adminApi.updateGlobalSettings({ quasar_base_url: normalized })
+    quasarBaseUrl.value = normalized
+    $q.notify({
+      type: 'positive',
+      message: normalized
+        ? `Quasar base URL saved → ${normalized}`
+        : 'Cleared Quasar URL (env/production fallback)',
+    })
+  } catch (e) {
+    $q.notify({ type: 'negative', message: e.response?.data?.error || e.message || 'Save failed' })
+  } finally {
+    savingQuasarUrl.value = false
+  }
+}
+
 // Host details drawer
 const showHostDrawer = ref(false)
 const editingHost = ref(null)
@@ -880,13 +1106,62 @@ const matrixRuleForm = ref({ minAmount: 0, maxAmount: 10000, preferredHost: 'exp
 // Profile Dialog
 const showProfileDialog = ref(false)
 const editingProfile = ref(null)
-const profileForm = ref({ profileId: null, scopeType: 'Category', targetValue: 'Retail', category: 'Retail', preferredHosts: [], fallbackHosts: [], processOnDevice: false, webhookUrl: '' })
+const profileForm = ref({
+  profileId: null,
+  scopeType: 'Category',
+  targetValue: 'Retail',
+  category: 'Retail',
+  preferredHosts: [],
+  fallbackHosts: [],
+  processOnDevice: false,
+  webhookUrl: '',
+  amountThresholds: [],
+  transactionTypeRules: []
+})
 const agentOptions = ref([])
 const tenantOptions = ref([])
-const groupOptions = ref(['Standard Group', 'VIP Group', 'Beta Group', 'Default'])
+const groupOptions = ref(['Default'])
+const groupOptionsFiltered = ref(['Default'])
 const affectedDevices = ref([])
 const loadingAffectedDevices = ref(false)
 
+const refreshGroupOptions = () => {
+  const fromHosts = (config.value.hosts || [])
+    .map(h => h.terminalGroup)
+    .filter(Boolean)
+  const fromProfiles = (config.value.tenantRoutingProfiles || [])
+    .filter(p => p.scopeType === 'Group' && p.targetValue)
+    .map(p => p.targetValue)
+  groupOptions.value = [...new Set(['Default', ...fromHosts, ...fromProfiles])]
+  groupOptionsFiltered.value = [...groupOptions.value]
+}
+
+const filterGroupOptions = (val, update) => {
+  update(() => {
+    if (!val) {
+      groupOptionsFiltered.value = [...groupOptions.value]
+      return
+    }
+    const needle = val.toLowerCase()
+    groupOptionsFiltered.value = groupOptions.value.filter(g => String(g).toLowerCase().includes(needle))
+  })
+}
+
+const createGroupOption = (val, done) => {
+  if (!val) return
+  if (!groupOptions.value.includes(val)) groupOptions.value.push(val)
+  done(val)
+}
+
+const addAmountThreshold = () => {
+  if (!profileForm.value.amountThresholds) profileForm.value.amountThresholds = []
+  profileForm.value.amountThresholds.push({ min: 0, max: 50000, host: 'express_pay' })
+}
+
+const addTxTypeRule = () => {
+  if (!profileForm.value.transactionTypeRules) profileForm.value.transactionTypeRules = []
+  profileForm.value.transactionTypeRules.push({ txType: 'PURCHASE', host: 'express_pay' })
+}
 // Sync Payload Preview
 const showSyncPayloadDialog = ref(false)
 
@@ -1010,11 +1285,14 @@ const getHostRankBadge = (hostCode) => {
 
 // ── Columns definitions ────────────────────────────────────────────
 const txColumns = [
-  { name: 'date',       label: 'Date',        field: r => new Date(r.date).toLocaleString(), align: 'left',   sortable: true },
-  { name: 'tenantId',   label: 'Business Owner', field: 'tenantId',   align: 'left'   },
+  { name: 'date',       label: 'Date',        field: r => formatTxDate(r.date), align: 'left',   sortable: true },
+  { name: 'tenantId',   label: 'Business Owner', field: r => r.tenantName || r.tenantId || '—', align: 'left' },
   { name: 'terminalId', label: 'Terminal ID',  field: 'terminalId',   align: 'left'   },
   { name: 'host',       label: 'Routed Host',  field: 'host',         align: 'center' },
-    { name: 'processedBy',label: 'Processed By', field: 'processedBy',  align: 'center' },
+  { name: 'processedBy',label: 'Processed By', field: 'processedBy',  align: 'center' },
+  { name: 'staffName',  label: 'Staff',        field: r => r.staffName || '—', align: 'left' },
+  { name: 'rrn',        label: 'RRN',          field: r => r.rrn || 'N/A', align: 'left' },
+  { name: 'stan',       label: 'STAN',         field: r => r.stan || 'N/A', align: 'left' },
   { name: 'amount',     label: 'Amount',       field: 'amount',       align: 'right',  sortable: true },
   { name: 'maskedPan',  label: 'Card PAN',     field: 'maskedPan',    align: 'left'   },
   { name: 'statusCode', label: 'Code',         field: 'statusCode',   align: 'center' },
@@ -1118,7 +1396,10 @@ const maskHost = (host) => {
 // ── Filtered history ───────────────────────────────────────────────
 const filteredHistory = computed(() => {
   return history.value.filter(tx => {
-    if (fTenant.value    && !String(tx.tenantId || '').toLowerCase().includes(fTenant.value.toLowerCase())) return false
+    if (fTenant.value    && !(
+      String(tx.tenantId || '').toLowerCase().includes(fTenant.value.toLowerCase()) ||
+      String(tx.tenantName || '').toLowerCase().includes(fTenant.value.toLowerCase())
+    )) return false
     if (fAmountMin.value && tx.amount < fAmountMin.value) return false
     if (fAmountMax.value && tx.amount > fAmountMax.value) return false
     if (fDate.value      && !new Date(tx.date).toISOString().startsWith(fDate.value))                        return false
@@ -1292,26 +1573,51 @@ const hostIcon      = h => h === 'KIMONO' ? 'cloud'     : h === 'MEDUSA' ? 'sett
 const loadAll = async () => {
   loading.value = true
   try {
-    const [cfgRes, histRes, obsRes] = await Promise.all([
-      posApi.getRoutingConfig(),
-      posApi.getHistory(),
-      posApi.getObservabilityMetrics()
-    ])
-    config.value  = cfgRes.data || {}
-    history.value = histRes.data || []
-    metrics.value = obsRes.data || {}
-    
+    await loadQuasarBaseUrl()
+    let cfgOk = false
     try {
-      const aRes = await adminApi.listAgents({ limit: 100 })
-      agentOptions.value = aRes.data?.data || aRes.data || []
-    } catch(e) {}
+      const cfgRes = await posApi.getRoutingConfig()
+      config.value = cfgRes.data || {}
+      if (!Array.isArray(config.value.tenantRoutingProfiles)) {
+        config.value.tenantRoutingProfiles = []
+      }
+      cfgOk = true
+      refreshGroupOptions()
+    } catch (e) {
+      const status = e?.response?.status
+      $q.notify({
+        type: 'negative',
+        message: status === 403
+          ? 'Forbidden loading routing config (need owner/super_admin). Profiles cannot display.'
+          : 'Failed to load routing config: ' + (e.message || status || 'unknown')
+      })
+    }
+
     try {
-      const tRes = await adminApi.getTenants({ limit: 100 })
-      tenantOptions.value = tRes.data?.data || tRes.data || []
-    } catch(e) {}
-    
-  } catch (e) {
-    $q.notify({ type: 'negative', message: 'Failed to load POS data: ' + e.message })
+      const histRes = await posApi.getHistory()
+      const hist = histRes.data
+      history.value = Array.isArray(hist) ? hist : (Array.isArray(hist?.data) ? hist.data : [])
+    } catch (e) {
+      history.value = []
+    }
+
+    try {
+      const obsRes = await posApi.getObservabilityMetrics()
+      metrics.value = obsRes.data || {}
+    } catch (e) {
+      metrics.value = {}
+    }
+
+    if (cfgOk) {
+      try {
+        const aRes = await adminApi.listAgents({ limit: 100 })
+        agentOptions.value = aRes.data?.data || aRes.data || []
+      } catch (e) {}
+      try {
+        const tRes = await adminApi.getTenants({ limit: 100 })
+        tenantOptions.value = tRes.data?.data || tRes.data || []
+      } catch (e) {}
+    }
   } finally {
     loading.value = false
   }
@@ -1319,15 +1625,23 @@ const loadAll = async () => {
 
 const saveConfig = async (reason = 'Updated POS routing configuration') => {
   try {
-    await posApi.updateRoutingConfig({
+    const res = await posApi.updateRoutingConfig({
       config: config.value,
       adminId: 'SuperAdmin',
       reason
     })
-    $q.notify({ type: 'positive', message: 'Switchboard configuration saved & broadcasted.' })
+    const broadcasted = res.data?.broadcasted === true
+    const version = res.data?.configVersion
+    $q.notify({
+      type: 'positive',
+      message: broadcasted
+        ? `Switchboard configuration saved & broadcasted${version ? ` (v${version})` : ''}.`
+        : `Switchboard configuration saved${version ? ` (v${version})` : ''}. Devices will pick up on next sync.`
+    })
     // Reload to update audit trail and metrics
     const obsRes = await posApi.getObservabilityMetrics()
     metrics.value = obsRes.data || {}
+    refreshGroupOptions()
   } catch (e) {
     $q.notify({ type: 'negative', message: 'Failed to save config: ' + e.message })
   }
@@ -1349,14 +1663,30 @@ const openHostDrawer = (code) => {
       editingHost.value.kimonoFallbackParameters = { merchantId: '', uniqueId: '', institutionId: '', settlementAccount: '', keyLabel: '', token: '[SECRET_MASKED]' }
     }
     if (editingHost.value.hostCode === 'nibss') {
-      if (!editingHost.value.nibssConfig) editingHost.value.nibssConfig = { institutionCode: '', terminalId: '', merchantId: '', ctmk: '[SECRET_MASKED]', ptspCode: 'GA' }
-      if (!editingHost.value.nibssConfig.ctmk) editingHost.value.nibssConfig.ctmk = '[SECRET_MASKED]'
-      
-      // Default NIBSS Prod Parameters
+      if (!editingHost.value.nibssConfig) {
+        editingHost.value.nibssConfig = {
+          institutionCode: '',
+          terminalId: '',
+          merchantId: '',
+          ctmk: '',
+          ptspCode: 'GA',
+        }
+      }
+      // Never inject [SECRET_MASKED] into the editable model (that was previously saved to devices)
+      if (
+        editingHost.value.nibssConfig.ctmk === '[SECRET_MASKED]' ||
+        String(editingHost.value.nibssConfig.ctmk || '').toUpperCase().includes('SECRET_MASKED')
+      ) {
+        editingHost.value.nibssConfig.ctmk = ''
+      }
+
+      // Default NIBSS Prod Parameters (SSL key exchange — not Express Pay's 4018)
       if (!editingHost.value.ip) editingHost.value.ip = '196.6.103.18'
-      if (!editingHost.value.port) editingHost.value.port = 4018
-      if (!editingHost.value.timeoutSeconds) editingHost.value.timeoutSeconds = 30
-      if (typeof editingHost.value.sslEnabled !== 'boolean') editingHost.value.sslEnabled = false
+      if (!editingHost.value.port || Number(editingHost.value.port) === 4018) {
+        editingHost.value.port = 5001
+      }
+      if (!editingHost.value.timeoutSeconds) editingHost.value.timeoutSeconds = 3600
+      if (typeof editingHost.value.sslEnabled !== 'boolean') editingHost.value.sslEnabled = true
     }
     showHostDrawer.value = true
   }
@@ -1383,7 +1713,7 @@ const saveHostDetails = async () => {
       if (updatedHost.kimonoFallbackParameters && updatedHost.kimonoFallbackParameters.token === '[SECRET_MASKED]') {
         delete updatedHost.kimonoFallbackParameters.token
       }
-      if (updatedHost.nibssConfig && updatedHost.nibssConfig.ctmk === '[SECRET_MASKED]') {
+      if (updatedHost.nibssConfig && (updatedHost.nibssConfig.ctmk === '[SECRET_MASKED]' || !String(updatedHost.nibssConfig.ctmk || '').trim())) {
         delete updatedHost.nibssConfig.ctmk
       }
 
@@ -1436,12 +1766,35 @@ const deleteMatrixRule = async (rule) => {
 
 // Tenant Profiles
 const openProfileDialog = (profile = null) => {
+  refreshGroupOptions()
   if (profile) {
     editingProfile.value = profile
-    profileForm.value = { processOnDevice: false, webhookUrl: '', scopeType: 'Category', targetValue: profile.category || '', ...profile }
+    profileForm.value = {
+      profileId: profile.profileId || null,
+      scopeType: profile.scopeType || 'Category',
+      targetValue: profile.targetValue || profile.category || '',
+      category: profile.category || profile.targetValue || '',
+      preferredHosts: [...(profile.preferredHosts || [])],
+      fallbackHosts: [...(profile.fallbackHosts || [])],
+      processOnDevice: !!profile.processOnDevice,
+      webhookUrl: profile.webhookUrl || '',
+      amountThresholds: (profile.amountThresholds || []).map(r => ({ ...r })),
+      transactionTypeRules: (profile.transactionTypeRules || []).map(r => ({ ...r })),
+    }
   } else {
     editingProfile.value = null
-    profileForm.value = { profileId: 'prof_' + Date.now(), scopeType: 'Category', targetValue: 'Retail', category: 'Retail', preferredHosts: [], fallbackHosts: [], processOnDevice: false, webhookUrl: '' }
+    profileForm.value = {
+      profileId: 'prof_' + Date.now(),
+      scopeType: 'Category',
+      targetValue: 'Retail',
+      category: 'Retail',
+      preferredHosts: [],
+      fallbackHosts: [],
+      processOnDevice: false,
+      webhookUrl: '',
+      amountThresholds: [],
+      transactionTypeRules: []
+    }
   }
   showProfileDialog.value = true
 }
@@ -1451,13 +1804,45 @@ const saveProfile = async () => {
   
   if (!profileForm.value.profileId) profileForm.value.profileId = 'prof_' + Date.now()
   if (profileForm.value.scopeType === 'Category') profileForm.value.category = profileForm.value.targetValue
-  
-  if (editingProfile.value) {
-    const idx = config.value.tenantRoutingProfiles.findIndex(p => p.profileId === editingProfile.value.profileId || (p.category && p.category === editingProfile.value.category))
-    if (idx !== -1) config.value.tenantRoutingProfiles[idx] = { ...profileForm.value }
-  } else {
-    config.value.tenantRoutingProfiles.push({ ...profileForm.value })
+  if (profileForm.value.scopeType === 'Group' && profileForm.value.targetValue) {
+    if (!groupOptions.value.includes(profileForm.value.targetValue)) {
+      groupOptions.value.push(profileForm.value.targetValue)
+    }
   }
+  
+  const payload = {
+    ...profileForm.value,
+    processOnDevice: !!profileForm.value.processOnDevice,
+    webhookUrl: profileForm.value.processOnDevice ? (profileForm.value.webhookUrl || '') : '',
+    amountThresholds: [...(profileForm.value.amountThresholds || [])],
+    transactionTypeRules: [...(profileForm.value.transactionTypeRules || [])],
+  }
+
+  const sameScopeTarget = (p) =>
+    String(p.scopeType || '') === String(payload.scopeType || '') &&
+    String(p.targetValue || p.category || '').toLowerCase() ===
+      String(payload.targetValue || payload.category || '').toLowerCase()
+
+  // Upsert by profileId, then by scope+target — never leave duplicate Group/Default rows
+  // (find() on sync would keep returning the older processOnDevice:false copy).
+  let idx = -1
+  if (editingProfile.value?.profileId) {
+    idx = config.value.tenantRoutingProfiles.findIndex(
+      (p) => p.profileId && p.profileId === editingProfile.value.profileId,
+    )
+  }
+  if (idx === -1) idx = config.value.tenantRoutingProfiles.findIndex(sameScopeTarget)
+  if (idx !== -1) config.value.tenantRoutingProfiles[idx] = payload
+  else {
+    config.value.tenantRoutingProfiles.push(payload)
+    idx = config.value.tenantRoutingProfiles.length - 1
+  }
+
+  // Drop any other duplicates for the same scope+target
+  config.value.tenantRoutingProfiles = config.value.tenantRoutingProfiles.filter(
+    (p, i) => i === idx || !sameScopeTarget(p),
+  )
+
   await saveConfig(`Updated routing profile for ${profileForm.value.targetValue || profileForm.value.category}`)
   showProfileDialog.value = false
 }
@@ -1486,6 +1871,39 @@ const runSimulation = async () => {
 }
 
 const viewTxDetail = row => { selectedTx.value = row; showTxDialog.value = true }
+
+const formatTxDate = (value) => {
+  if (!value) return '—'
+  try {
+    return new Date(value).toLocaleString()
+  } catch {
+    return String(value)
+  }
+}
+
+const formatRawJson = (raw) => {
+  if (raw == null || raw === '') return '—'
+  if (typeof raw === 'object') {
+    try { return JSON.stringify(raw, null, 2) } catch { return String(raw) }
+  }
+  const s = String(raw)
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2)
+  } catch {
+    return s
+  }
+}
+
+const txDetailMessage = computed(() => {
+  const raw = selectedTx.value?.rawResponse
+  if (!raw) return ''
+  try {
+    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return obj?.message || obj?.responseMessage || ''
+  } catch {
+    return ''
+  }
+})
 
 onMounted(loadAll)
 </script>

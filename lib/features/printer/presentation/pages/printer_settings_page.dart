@@ -753,34 +753,88 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     setState(() => _isLoadingParams = true);
     try {
       final terminalId = _terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId ?? '2214OTGF';
-      final activeHost = _terminalConfig?.activeHost ?? 'MEDUSA';
-      final ipAddress = _terminalConfig?.expressPayHost;
-      final portNumber = _terminalConfig?.expressPayPort?.toString();
-      final expressPayBaseUrl = _terminalConfig?.expressPayBaseUrl;
-      final expressPayAuthToken = _terminalConfig?.expressPayAuthToken;
-      final nibss = _terminalConfig?.primaryHost?['nibssConfig'] as Map?;
-      final ctmk = nibss?['ctmk']?.toString() ??
-          _terminalConfig?.primaryHost?['kimonoKeys']?['ctmk']?.toString() ??
-          _terminalConfig?.primaryHost?['kimonoFallbackParameters']?['key1']?.toString();
-      final key2 = nibss?['key2']?.toString() ??
-          _terminalConfig?.primaryHost?['kimonoKeys']?['key2']?.toString() ??
-          _terminalConfig?.primaryHost?['kimonoFallbackParameters']?['key2']?.toString();
-      final timeoutRaw = _terminalConfig?.primaryHost?['timeout'];
-      final timeoutSeconds = timeoutRaw is int ? timeoutRaw : int.tryParse(timeoutRaw?.toString() ?? '');
+      final activeHost = (_terminalConfig?.activeHost ??
+              _terminalConfig?.routingRules?['activeHost']?.toString() ??
+              'NIBSS')
+          .toString()
+          .toUpperCase();
+      final primary = _terminalConfig?.primaryHost;
+      final nibss = primary?['nibssConfig'] as Map?;
+
+      String? scrubSecret(dynamic raw) {
+        final v = raw?.toString().trim();
+        if (v == null || v.isEmpty) return null;
+        if (v == '[SECRET_MASKED]' || v.toUpperCase().contains('SECRET_MASKED')) {
+          return null;
+        }
+        return v;
+      }
+
+      final ctmk = scrubSecret(nibss?['ctmk']) ??
+          scrubSecret(primary?['kimonoKeys']?['ctmk']) ??
+          scrubSecret(primary?['kimonoFallbackParameters']?['key1']);
+      final key2 = scrubSecret(nibss?['key2']) ??
+          scrubSecret(primary?['kimonoKeys']?['key2']) ??
+          scrubSecret(primary?['kimonoFallbackParameters']?['key2']);
+
+      final timeoutRaw = primary?['timeoutSeconds'] ?? primary?['timeout'];
+      final timeoutSeconds =
+          timeoutRaw is int ? timeoutRaw : int.tryParse(timeoutRaw?.toString() ?? '');
+
       final isMoreFun = MposDeviceType.isMoreFun(_terminalConfig?.terminalType);
-      // MoreFun MP63 talks NIBSS directly over SSL by default.
-      final enableSsl = isMoreFun
-          ? (_terminalConfig?.primaryHost?['sslEnabled'] == true ||
-              _terminalConfig?.primaryHost?['sslEnabled'] == null)
-          : (_terminalConfig?.primaryHost?['sslEnabled'] == true);
-      final hostIp = isMoreFun
-          ? (_terminalConfig?.primaryHost?['ip']?.toString() ??
+      final isNibss = activeHost.contains('NIBSS');
+
+      // Always prefer synced primaryHost for NIBSS / MoreFun. Express Pay fields are only for EXPRESS_PAY.
+      final usePrimaryHost = isMoreFun || isNibss || activeHost == 'MEDUSA';
+      final enableSsl = usePrimaryHost
+          ? (primary?['sslEnabled'] == true ||
+              (isNibss && primary?['sslEnabled'] == null))
+          : (primary?['sslEnabled'] == true);
+      final hostIp = usePrimaryHost
+          ? (primary?['ip']?.toString() ??
+              _terminalConfig?.nibssIp ??
               _terminalConfig?.expressPayHost)
           : _terminalConfig?.expressPayHost;
-      final hostPort = isMoreFun
-          ? (_terminalConfig?.primaryHost?['port']?.toString() ??
+      final hostPort = usePrimaryHost
+          ? (primary?['port']?.toString() ??
+              _terminalConfig?.nibssPort?.toString() ??
               _terminalConfig?.expressPayPort?.toString())
           : _terminalConfig?.expressPayPort?.toString();
+
+      print(
+        '[DownloadParams] activeHost=$activeHost terminalType=${_terminalConfig?.terminalType} '
+        'ip=$hostIp port=$hostPort ssl=$enableSsl ctmk=${ctmk == null ? "MISSING" : "set(len=${ctmk.length})"}',
+      );
+
+      if (isNibss && (ctmk == null || ctmk.length < 32)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'NIBSS CTMK missing or masked in terminal sync. '
+                'Open POS Switch Board → NIBSS host → set CTMK, Save, then Sync again.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 8),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (hostIp == null || hostIp.isEmpty || hostPort == null || hostPort.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Host IP/port missing for $activeHost. Check POS Switch Board primary host, then Sync.',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
 
       showDialog(
         context: context,
@@ -805,16 +859,16 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
           );
         },
       );
-      
+
       print('[DownloadParams] Calling native _mposService.loadParams and waiting for response...');
       final result = await _mposService.loadParams(
         terminalId: terminalId,
         activeHost: activeHost,
-        ipAddress: hostIp ?? ipAddress,
-        portNumber: hostPort ?? portNumber,
+        ipAddress: hostIp,
+        portNumber: hostPort,
         enableSsl: enableSsl,
-        expressPayBaseUrl: expressPayBaseUrl,
-        expressPayAuthToken: expressPayAuthToken,
+        expressPayBaseUrl: scrubSecret(_terminalConfig?.expressPayBaseUrl),
+        expressPayAuthToken: scrubSecret(_terminalConfig?.expressPayAuthToken),
         key1: ctmk,
         key2: key2,
         timeoutSeconds: timeoutSeconds,
@@ -1008,6 +1062,16 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     // Validate MPOS Match
     final isMposMismatch = config.posSerialNumber != null && _mposSerialNumber != null && _mposSerialNumber!.isNotEmpty && !_isDeviceNameMatch(config.posSerialNumber, _mposSerialNumber);
 
+    final hostIp = config.nibssIp ??
+        config.primaryHost?['ip']?.toString() ??
+        config.expressPayHost;
+    final hostPort = config.nibssPort?.toString() ??
+        config.primaryHost?['port']?.toString() ??
+        config.expressPayPort?.toString();
+    final hostEndpoint = (hostIp == null || hostIp.isEmpty)
+        ? null
+        : (hostPort != null && hostPort.isNotEmpty ? '$hostIp:$hostPort' : hostIp);
+
     return Column(
       children: [
         if (isMposMismatch)
@@ -1121,8 +1185,22 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
                     const SizedBox(height: 10),
                     _buildReadOnlyField(
                       label: 'Business Name',
-                      value: config.businessName,
+                      value: config.businessName ?? config.merchantName,
                       icon: Icons.business,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildReadOnlyField(
+                      label: 'Active Host',
+                      value: config.activeHost,
+                      icon: Icons.cloud_done_outlined,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildReadOnlyField(
+                      label: 'Host Endpoint',
+                      value: hostEndpoint,
+                      icon: Icons.lan_outlined,
+                      isMonospace: true,
+                      color: Colors.teal.shade700,
                     ),
                     if (config.printerMac != null) ...
                       [

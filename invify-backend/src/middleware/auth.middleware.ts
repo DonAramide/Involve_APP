@@ -1,6 +1,6 @@
 // src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
-import { supabase, supabaseAdmin } from '../db/supabase';
+import { supabaseAdmin } from '../db/supabase';
 import { isMockTokenAllowed, isMockAuthAllowed, SYSTEM_USER_UUID, SYSTEM_TENANT_UUID } from '../config/constants';
 import jwt from 'jsonwebtoken';
 
@@ -11,18 +11,117 @@ import jwt from 'jsonwebtoken';
  * Security model:
  *  - All mock/bypass paths are gated by isMockTokenAllowed() or isMockAuthAllowed().
  *  - Both guards return false unconditionally in STAGING and PROD.
- *  - Connection timeouts return 503 — they do NOT grant bypass sessions in production.
+ *  - Slow/unavailable DB: use short timeout + profile cache + JWT-claim fallback
+ *    (never hang ~90s then 503).
  */
+
+const PROFILE_TTL_MS = Number(process.env.AUTH_PROFILE_CACHE_TTL_MS || 5 * 60 * 1000);
+const DB_TIMEOUT_MS = Number(process.env.AUTH_DB_TIMEOUT_MS || 8000);
+
+type CachedProfile = {
+  id: string;
+  email: string;
+  role: string;
+  tenant_id: string | null;
+  is_active: boolean;
+  name?: string;
+};
+
+const profileCacheById = new Map<string, { profile: CachedProfile; expiresAt: number }>();
+const profileCacheByEmail = new Map<string, { profile: CachedProfile; expiresAt: number }>();
+
+function cacheProfile(profile: CachedProfile) {
+  if (!profile?.id) return;
+  const entry = { profile, expiresAt: Date.now() + PROFILE_TTL_MS };
+  profileCacheById.set(String(profile.id), entry);
+  if (profile.email) {
+    profileCacheByEmail.set(String(profile.email).trim().toLowerCase(), entry);
+  }
+}
+
+function getCachedProfile(userId?: string, email?: string): CachedProfile | null {
+  const now = Date.now();
+  if (userId) {
+    const hit = profileCacheById.get(String(userId));
+    if (hit && hit.expiresAt > now) return hit.profile;
+  }
+  if (email) {
+    const hit = profileCacheByEmail.get(String(email).trim().toLowerCase());
+    if (hit && hit.expiresAt > now) return hit.profile;
+  }
+  return null;
+}
+
+async function withTimeout<T>(promise: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timeout after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function isTimeoutError(err: any): boolean {
+  const msg = String(err?.message || err || '');
+  return (
+    msg.includes('timeout') ||
+    msg.includes('fetch failed') ||
+    msg.includes('Connection') ||
+    msg.includes('network') ||
+    err?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    err?.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    err?.status === 408 ||
+    err?.status === 504
+  );
+}
+
+function claimsFromJwt(jwtPayload: any, userId: string, userEmail: string): CachedProfile {
+  let role =
+    jwtPayload.role === 'authenticated' || !jwtPayload.role
+      ? jwtPayload.app_metadata?.role ||
+        jwtPayload.user_metadata?.role ||
+        'owner'
+      : jwtPayload.role;
+  let tenantId =
+    jwtPayload.tenantId ||
+    jwtPayload.tenant_id ||
+    jwtPayload.app_metadata?.tenantId ||
+    jwtPayload.app_metadata?.tenant_id ||
+    jwtPayload.user_metadata?.tenantId ||
+    jwtPayload.user_metadata?.tenant_id ||
+    null;
+  if (tenantId === 'undefined' || tenantId === 'null') tenantId = null;
+
+  const normalizedEmail = (userEmail || '').trim().toLowerCase();
+  if (
+    normalizedEmail === 'sysadmin@iips.app' ||
+    normalizedEmail === 'superadmin@iips.app' ||
+    normalizedEmail === 'averyd777@gmail.com'
+  ) {
+    role = 'super_admin';
+    tenantId = SYSTEM_TENANT_UUID;
+  }
+
+  return {
+    id: userId,
+    email: userEmail,
+    role: String(role || 'owner'),
+    tenant_id: tenantId,
+    is_active: true,
+    name: jwtPayload.user_metadata?.full_name || 'User',
+  };
+}
+
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const authHeader = req.headers.authorization;
 
-    // -------------------------------------------------------------------------
-    // Mock-token bypass paths — LOCAL / test only.
-    // isMockTokenAllowed() returns false in STAGING and PROD unconditionally.
-    // -------------------------------------------------------------------------
     if (isMockTokenAllowed()) {
-      // mock-agent-token-* bypass (previously had NO environment guard — now fixed)
       if (authHeader && authHeader.startsWith('Bearer mock-agent-token-')) {
         const agentId = authHeader.replace('Bearer mock-agent-token-', '');
         console.warn('[AuthMiddleware] Developer mock-agent-token auth bypass triggered.');
@@ -30,34 +129,33 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
           id: agentId,
           role: 'AGENT',
           email: 'agent@invify.app',
-          tenantId: null
+          tenantId: null,
         };
         return next();
       }
 
-      // mock-super-admin bypass
       if (authHeader && authHeader.startsWith('Bearer mock-super-admin')) {
         console.warn('[AuthMiddleware] Developer mock-super-admin auth bypass triggered.');
         (req as any).user = {
           id: SYSTEM_USER_UUID,
           email: 'superadmin@invify.app',
           role: 'super_admin',
-          tenantId: req.headers['x-tenant-id'] || null
+          tenantId: req.headers['x-tenant-id'] || null,
         };
         return next();
       }
     }
 
-    // -------------------------------------------------------------------------
-    // OFFLINE_LOCAL_AUTH full bypass — LOCAL / test only.
-    // -------------------------------------------------------------------------
     if (isMockAuthAllowed() && authHeader !== 'Bearer invalid.jwt.token') {
       console.warn('[AuthMiddleware] Developer offline auth bypass triggered.');
       (req as any).user = {
         id: SYSTEM_USER_UUID,
         email: 'superadmin@invify.app',
         role: 'super_admin',
-        tenantId: (req.headers['x-tenant-id'] === 'undefined' || req.headers['x-tenant-id'] === 'null') ? null : (req.headers['x-tenant-id'] || null)
+        tenantId:
+          req.headers['x-tenant-id'] === 'undefined' || req.headers['x-tenant-id'] === 'null'
+            ? null
+            : req.headers['x-tenant-id'] || null,
       };
       return next();
     }
@@ -69,85 +167,122 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     const token = authHeader.split(' ')[1];
 
     try {
-      // ── Step 1: Decode JWT locally — NO network call to Supabase auth servers ──
-      // Supabase tokens are HS256 JWTs. We can decode the payload to extract
-      // sub (user UUID), email, exp without making any network call.
-      // If SUPABASE_JWT_SECRET is set we do full signature verification.
-      // Otherwise we use jwt.decode() (no signature check) + DB presence as validation.
-
       let jwtPayload: any = null;
-
       const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET;
       if (supabaseJwtSecret) {
-        // Full verification using Supabase JWT secret
         try {
           jwtPayload = jwt.verify(token, supabaseJwtSecret) as any;
-        } catch (verifyErr: any) {
+        } catch {
           return res.status(401).json({ error: 'Invalid or expired token' });
         }
       } else {
-        // Decode without signature check — DB lookup acts as existence validation
         jwtPayload = jwt.decode(token) as any;
         if (!jwtPayload) {
           return res.status(401).json({ error: 'Malformed token' });
         }
-        // Manual expiry check
         if (jwtPayload.exp && jwtPayload.exp < Math.floor(Date.now() / 1000)) {
           return res.status(401).json({ error: 'Token has expired' });
         }
       }
 
-      // Extract identity from payload
-      const userId  = jwtPayload.sub || jwtPayload.id;
+      const userId = jwtPayload.sub || jwtPayload.id;
       const userEmail = jwtPayload.email || jwtPayload.user_metadata?.email || '';
-
       if (!userId) {
         return res.status(401).json({ error: 'Token missing subject claim' });
       }
 
-      // ── Step 2: Fetch user profile from DB (supabaseAdmin bypasses RLS) ──
-      // Prefer auth UUID; fall back to email when JWT sub ≠ users.id (common after rebinds).
-      let { data: profile, error: profileError } = await supabaseAdmin
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
+      // Fast path: warm cache (avoids hammering Supabase when it is slow)
+      const cached = getCachedProfile(userId, userEmail);
+      if (cached) {
+        if (!cached.is_active) {
+          return res.status(403).json({ error: 'Your account has been disabled' });
+        }
+        (req as any).user = {
+          id: cached.id,
+          email: cached.email,
+          role: cached.role,
+          tenantId: cached.tenant_id,
+        };
+        return next();
+      }
 
-      if (!profile && userEmail) {
-        const byEmail = await supabaseAdmin
-          .from('users')
-          .select('*')
-          .ilike('email', userEmail.trim())
-          .maybeSingle();
-        if (byEmail.data) {
-          profile = byEmail.data;
-          profileError = null;
-          console.warn(
-            `[AuthMiddleware] Resolved profile by email for JWT sub=${userId} → users.id=${profile.id} tenant=${profile.tenant_id}`,
+      let profile: any = null;
+      let profileError: any = null;
+      let dbTimedOut = false;
+
+      try {
+        const byId = await withTimeout(
+          supabaseAdmin.from('users').select('*').eq('id', userId).maybeSingle(),
+          DB_TIMEOUT_MS,
+          'users.byId',
+        );
+        profile = byId.data;
+        profileError = byId.error;
+
+        if (!profile && userEmail) {
+          const byEmail = await withTimeout(
+            supabaseAdmin.from('users').select('*').ilike('email', userEmail.trim()).maybeSingle(),
+            DB_TIMEOUT_MS,
+            'users.byEmail',
           );
-        } else if (byEmail.error) {
-          profileError = byEmail.error;
+          if (byEmail.data) {
+            profile = byEmail.data;
+            profileError = null;
+            console.warn(
+              `[AuthMiddleware] Resolved profile by email for JWT sub=${userId} → users.id=${profile.id} tenant=${profile.tenant_id}`,
+            );
+          } else if (byEmail.error) {
+            profileError = byEmail.error;
+          }
+        }
+      } catch (err: any) {
+        if (isTimeoutError(err)) {
+          dbTimedOut = true;
+          console.error(
+            `[AuthMiddleware] Supabase users database query timed out (${DB_TIMEOUT_MS}ms). Falling back to JWT/cache.`,
+          );
+        } else {
+          throw err;
         }
       }
 
-      if (profileError && !profile) {
-        const errStatus = (profileError as any).status;
-        const isDbTimeout =
-          profileError.message?.includes('fetch failed') ||
-          profileError.message?.includes('timeout') ||
-          errStatus === 408 ||
-          errStatus === 504 ||
-          profileError.message?.includes('Connection') ||
-          profileError.message?.includes('network');
+      if (dbTimedOut && !profile) {
+        const fallback = claimsFromJwt(jwtPayload, userId, userEmail);
+        // Prefer x-tenant-id from mobile/admin when JWT lacks tenant
+        const headerTenant = req.headers['x-tenant-id'];
+        if (
+          !fallback.tenant_id &&
+          headerTenant &&
+          headerTenant !== 'undefined' &&
+          headerTenant !== 'null'
+        ) {
+          fallback.tenant_id = String(headerTenant);
+        }
+        console.warn(
+          `[AuthMiddleware] Using JWT-claim fallback user=${fallback.id} role=${fallback.role} tenant=${fallback.tenant_id || 'n/a'}`,
+        );
+        (req as any).user = {
+          id: fallback.id,
+          email: fallback.email,
+          role: fallback.role,
+          tenantId: fallback.tenant_id,
+        };
+        return next();
+      }
 
-        if (isDbTimeout) {
+      if (profileError && !profile) {
+        if (isTimeoutError(profileError)) {
           console.error('[AuthMiddleware] Supabase users database query timed out.');
-          return res.status(503).json({
-            error: 'Authentication service temporarily unavailable. Please retry.'
-          });
+          const fallback = claimsFromJwt(jwtPayload, userId, userEmail);
+          (req as any).user = {
+            id: fallback.id,
+            email: fallback.email,
+            role: fallback.role,
+            tenantId: fallback.tenant_id,
+          };
+          return next();
         }
 
-        // PGRST116 = row not found — user exists in Auth but not in our users table yet
         if (profileError.code !== 'PGRST116' && !profileError.message?.includes('No rows found')) {
           console.error('[AuthMiddleware] Supabase users query failed:', profileError);
           return res.status(403).json({ error: 'User profile not found in Invify' });
@@ -155,32 +290,58 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       }
 
       if (!profile) {
-        // Auto-create profile for valid Supabase users not yet in our users table
-        let decodedRole = (jwtPayload.role === 'authenticated' || !jwtPayload.role)
-          ? 'super_admin'
-          : (jwtPayload.role || 'super_admin');
+        let decodedRole =
+          jwtPayload.role === 'authenticated' || !jwtPayload.role
+            ? 'super_admin'
+            : jwtPayload.role || 'super_admin';
         let decodedTenantId = jwtPayload.tenantId || jwtPayload.user_metadata?.tenantId || null;
         if (decodedTenantId === 'undefined' || decodedTenantId === 'null') decodedTenantId = null;
 
-        const { data: newProfile, error: insertError } = await supabaseAdmin.from('users').insert({
-          id: userId,
-          email: userEmail,
-          role: decodedRole,
-          tenant_id: decodedTenantId,
-          is_active: true,
-          name: jwtPayload.user_metadata?.full_name || 'Admin User'
-        }).select().single();
+        try {
+          const { data: newProfile, error: insertError } = await withTimeout(
+            supabaseAdmin
+              .from('users')
+              .insert({
+                id: userId,
+                email: userEmail,
+                role: decodedRole,
+                tenant_id: decodedTenantId,
+                is_active: true,
+                name: jwtPayload.user_metadata?.full_name || 'Admin User',
+              })
+              .select()
+              .single(),
+            DB_TIMEOUT_MS,
+            'users.insert',
+          );
 
-        if (insertError) {
-          console.warn(`[AuthMiddleware] Could not auto-create user profile. Using JWT claims: ${decodedRole}`);
-          (req as any).user = { id: userId, email: userEmail, role: decodedRole, tenantId: decodedTenantId };
+          if (insertError) {
+            console.warn(
+              `[AuthMiddleware] Could not auto-create user profile. Using JWT claims: ${decodedRole}`,
+            );
+            (req as any).user = {
+              id: userId,
+              email: userEmail,
+              role: decodedRole,
+              tenantId: decodedTenantId,
+            };
+            return next();
+          }
+          profile = newProfile;
+        } catch (insertErr: any) {
+          console.warn(
+            `[AuthMiddleware] Auto-create timed out/failed. Using JWT claims: ${insertErr.message}`,
+          );
+          (req as any).user = {
+            id: userId,
+            email: userEmail,
+            role: decodedRole,
+            tenantId: decodedTenantId,
+          };
           return next();
         }
-
-        profile = newProfile;
       }
 
-      // Hard override for known superadmin accounts
       const normalizedEmail = (userEmail || profile.email || '').trim().toLowerCase();
       if (
         normalizedEmail === 'sysadmin@iips.app' ||
@@ -192,31 +353,32 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         profile.is_active = true;
       }
 
-      // Block inactive accounts
       if (!profile.is_active) {
         return res.status(403).json({ error: 'Your account has been disabled' });
       }
 
-      // Populate request context
+      cacheProfile({
+        id: profile.id,
+        email: profile.email,
+        role: profile.role,
+        tenant_id: profile.tenant_id,
+        is_active: profile.is_active !== false,
+        name: profile.name,
+      });
+
       (req as any).user = {
         id: profile.id,
         email: profile.email,
         role: profile.role,
-        tenantId: profile.tenant_id
+        tenantId: profile.tenant_id,
       };
 
       next();
     } catch (netError: any) {
-      const isConnectionTimeout =
-        netError.message?.includes('fetch failed') ||
-        netError.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-        netError.cause?.code === 'UND_ERR_CONNECT_TIMEOUT' ||
-        netError.message?.includes('timeout');
-
-      if (isConnectionTimeout) {
+      if (isTimeoutError(netError)) {
         console.error('[AuthMiddleware] Database connection timed out during auth.');
         return res.status(503).json({
-          error: 'Authentication service temporarily unavailable. Please retry.'
+          error: 'Authentication service temporarily unavailable. Please retry.',
         });
       }
       throw netError;

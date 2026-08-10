@@ -165,7 +165,8 @@ export class QuasarPaymentsClient {
    *                   from the encrypted quasar_integrations table.
    */
   constructor(skSecret: string) {
-    const baseUrl = process.env.QUASAR_BASE_URL ?? 'https://api-quasar.iips.app/api/v1';
+    const { resolveQuasarBaseUrl } = require('./quasar-base-url');
+    const baseUrl = resolveQuasarBaseUrl();
     this.client = new QuasarApiClient({
       baseUrl,
       tenantAuth: { apiKey: skSecret },
@@ -307,13 +308,40 @@ export class QuasarPaymentsClient {
     );
   }
 
-  /** POST /pos/card-transaction — Primary card execution path */
+  /** POST /pos/card-transaction — Primary card execution path (Quasar switch) */
   async executeCardTransaction(params: any, opts?: RequestOptions): Promise<any> {
     const idempotencyKey = opts?.idempotencyKey ?? `card-tx:${params.reference ?? crypto.randomUUID()}`;
-    return this.client.post('/pos/card-transaction', params, { ...opts, idempotencyKey });
+    return this.client.post('/pos/card-transaction', params, {
+      ...opts,
+      idempotencyKey,
+      noRetry: true,
+      timeoutMs: opts?.timeoutMs ?? 90_000,
+    });
   }
 
-  /** POST /pos/icc — EMV ICC field 55 */
+  /**
+   * POST /pos/icc-data — Submit AES-GCM encrypted ICC hex; returns icc_token.
+   * See Quasar ISO8583_SWITCH.md.
+   */
+  async submitIccData(
+    params: {
+      tenant_id: string;
+      encrypted_icc: string;
+      reference: string;
+      terminal_id?: string;
+      device_id?: string;
+      ttl_sec?: number;
+    },
+    opts?: RequestOptions,
+  ): Promise<{ icc_token: string; expires_at?: string; key_version?: number }> {
+    return this.client.post('/pos/icc-data', params, {
+      ...opts,
+      noRetry: true,
+      idempotencyKey: opts?.idempotencyKey ?? `icc-data:${params.reference}`,
+    });
+  }
+
+  /** POST /pos/icc — EMV ICC field 55 (legacy) */
   async submitIcc(params: { field55: string; reference: string }, opts?: RequestOptions): Promise<any> {
     return this.client.post('/pos/icc', params, { ...opts, noRetry: true });
   }

@@ -4,6 +4,22 @@ import { supabaseAdmin } from '../db/supabase';
 /** Admin inventory reads/writes must use service role — uploads already do. */
 const db = () => supabaseAdmin;
 
+function _mapAssignmentBundle(data: any) {
+  return {
+    terminal_id: { tid: data.terminal_id },
+    mpos: data.mpos_terminal_id
+      ? {
+          id: data.mpos_terminal_id,
+          serial_number: data.pos_serial_number || data.mpos_terminal_id,
+          hardware_type: data.terminal_type || 'MPOS',
+        }
+      : null,
+    printer: data.printer_mac_address
+      ? { mac_address: data.printer_mac_address, model: data.printer_model || 'XP-58' }
+      : null,
+  };
+}
+
 export class TerminalInventoryService {
 
   static async getTablets() {
@@ -87,40 +103,205 @@ export class TerminalInventoryService {
       .from('terminal_inventory')
       .select('*')
       .eq('assigned_device_id', deviceId)
+      .eq('assignment_status', 'assigned')
       .maybeSingle();
 
     if (error) throw error;
-    if (!data) return null;
+    if (!data) {
+      // Fallback: any row bound to this device (legacy rows without status filter).
+      const fallback = await db()
+        .from('terminal_inventory')
+        .select('*')
+        .eq('assigned_device_id', deviceId)
+        .maybeSingle();
+      if (fallback.error) throw fallback.error;
+      if (!fallback.data) return null;
+      return _mapAssignmentBundle(fallback.data);
+    }
 
-    return {
-      terminal_id: { tid: data.terminal_id },
-      mpos: data.mpos_terminal_id
-        ? {
-            id: data.mpos_terminal_id,
-            serial_number: data.pos_serial_number || data.mpos_terminal_id,
-            hardware_type: data.terminal_type || 'MPOS',
-          }
-        : null,
-      printer: data.printer_mac_address
-        ? { mac_address: data.printer_mac_address, model: data.printer_model || 'XP-58' }
-        : null,
-    };
+    return _mapAssignmentBundle(data);
   }
 
   static async assignHardware(data: any) {
     const tenantId = data.tenant_id || data.tenantId;
-    const tabletId = data.tablet_id || data.serialNumber;
-    const { data: updated, error } = await db()
+    const tabletRowId = data.tablet_id || data.tabletId;
+    const mposRowId = data.mpos_id || data.mposId || data.hardwareId;
+    const printerRowId = data.printer_id || data.printerId;
+    const tidRowId = data.terminal_id_id || data.terminalId || data.tid_id || data.tidId;
+
+    if (!tenantId) throw new Error('tenant_id is required');
+    if (!tabletRowId) throw new Error('tablet_id is required');
+    if (!tidRowId) throw new Error('Bank Terminal ID (TID) is required');
+
+    // Resolve tablet from devices table (UUID id or device_id string).
+    let tablet: any = null;
+    {
+      const byUuid = await db().from('devices').select('*').eq('id', tabletRowId).maybeSingle();
+      tablet = byUuid.data;
+      if (!tablet) {
+        const byDeviceId = await db()
+          .from('devices')
+          .select('*')
+          .eq('device_id', tabletRowId)
+          .maybeSingle();
+        tablet = byDeviceId.data;
+      }
+    }
+    if (!tablet) throw new Error(`Tablet not found: ${tabletRowId}`);
+    const tabletDeviceId = tablet.device_id || tablet.id;
+
+    // Resolve bank TID row (primary assignment record).
+    let tidRow: any = null;
+    {
+      const byUuid = await db().from('terminal_inventory').select('*').eq('id', tidRowId).maybeSingle();
+      tidRow = byUuid.data;
+      if (!tidRow) {
+        const byTid = await db()
+          .from('terminal_inventory')
+          .select('*')
+          .eq('terminal_id', tidRowId)
+          .maybeSingle();
+        tidRow = byTid.data;
+      }
+    }
+    if (!tidRow) throw new Error(`Bank Terminal ID not found: ${tidRowId}`);
+    if (String(tidRow.assignment_status || '').toLowerCase() === 'assigned') {
+      throw new Error(
+        `TID ${tidRow.terminal_id} is already assigned` +
+          (tidRow.assigned_device_id ? ` to device ${tidRow.assigned_device_id}` : ''),
+      );
+    }
+
+    // Ensure this tablet is not already bound to another active assignment.
+    {
+      const { data: existing } = await db()
+        .from('terminal_inventory')
+        .select('terminal_id')
+        .eq('assigned_device_id', tabletDeviceId)
+        .eq('assignment_status', 'assigned')
+        .maybeSingle();
+      if (existing) {
+        throw new Error(
+          `Tablet ${tabletDeviceId} already has TID ${existing.terminal_id} assigned. Unassign first.`,
+        );
+      }
+    }
+
+    let mposTerminalId = tidRow.mpos_terminal_id || null;
+    let posSerial = tidRow.pos_serial_number || tabletDeviceId;
+    let printerMac = tidRow.printer_mac_address || null;
+    let printerModel = tidRow.printer_model || null;
+    let terminalType = tidRow.terminal_type || null;
+    let mposSourceId: string | null = null;
+    let printerSourceId: string | null = null;
+
+    if (mposRowId) {
+      const { data: mpos } = await db()
+        .from('terminal_inventory')
+        .select('*')
+        .eq('id', mposRowId)
+        .maybeSingle();
+      if (!mpos) throw new Error(`MPOS device not found: ${mposRowId}`);
+      mposTerminalId = mpos.mpos_terminal_id || mpos.pos_serial_number || mpos.terminal_id;
+      posSerial = mpos.pos_serial_number || mposTerminalId || posSerial;
+      terminalType = mpos.terminal_type || terminalType || 'MPOS';
+      if (mpos.id !== tidRow.id) mposSourceId = mpos.id;
+    }
+
+    if (printerRowId) {
+      const { data: printer } = await db()
+        .from('terminal_inventory')
+        .select('*')
+        .eq('id', printerRowId)
+        .maybeSingle();
+      if (!printer) throw new Error(`Printer not found: ${printerRowId}`);
+      printerMac = printer.printer_mac_address || printer.mac_address || printer.terminal_id;
+      printerModel = printer.printer_model || printer.model || printerModel || 'XP-58';
+      if (printer.id !== tidRow.id) printerSourceId = printer.id;
+    }
+
+    // Unique indexes (idx_mpos_terminal_id / printer MAC) only allow one row per value.
+    // Clear those keys on other rows BEFORE writing them onto the TID assignment row.
+    if (mposTerminalId) {
+      await db()
+        .from('terminal_inventory')
+        .update({
+          mpos_terminal_id: null,
+          pos_serial_number: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('mpos_terminal_id', mposTerminalId)
+        .neq('id', tidRow.id);
+    }
+    if (printerMac) {
+      await db()
+        .from('terminal_inventory')
+        .update({
+          printer_mac_address: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('printer_mac_address', printerMac)
+        .neq('id', tidRow.id);
+    }
+
+    const now = new Date().toISOString();
+    const { data: updated, error: updateErr } = await db()
       .from('terminal_inventory')
       .update({
         assigned_tenant_id: tenantId,
+        assigned_device_id: tabletDeviceId,
+        pos_serial_number: posSerial,
+        mpos_terminal_id: mposTerminalId,
+        printer_mac_address: printerMac,
+        printer_model: printerModel,
+        terminal_type: terminalType,
         assignment_status: 'assigned',
-        assigned_at: new Date().toISOString(),
+        assigned_at: now,
+        updated_at: now,
+        config_version: (tidRow.config_version || 1) + 1,
       })
-      .or(`pos_serial_number.eq.${tabletId},terminal_id.eq.${tabletId}`)
+      .eq('id', tidRow.id)
       .select()
-      .single();
-    if (error) throw error;
+      .maybeSingle();
+
+    if (updateErr) throw updateErr;
+    if (!updated) throw new Error('Failed to update TID assignment row');
+
+    // Remove emptied standalone MPOS/printer inventory shells (now merged into TID).
+    for (const sourceId of [mposSourceId, printerSourceId]) {
+      if (!sourceId || sourceId === tidRow.id) continue;
+      await db().from('terminal_inventory').delete().eq('id', sourceId);
+    }
+
+    // Best-effort: stamp tablet + promote to COMPANY_DEVICE so mobile sync sees the bundle.
+    try {
+      await db()
+        .from('devices')
+        .update({
+          tenant_id: tenantId,
+          device_category: 'COMPANY_DEVICE',
+          device_role: 'TABLET',
+        })
+        .eq('id', tablet.id);
+    } catch (_) {
+      try {
+        await db()
+          .from('devices')
+          .update({ tenant_id: tenantId })
+          .eq('id', tablet.id);
+      } catch (_) {}
+    }
+    try {
+      await db()
+        .from('device_registrations')
+        .update({
+          tenant_id: tenantId,
+          device_category: 'COMPANY_DEVICE',
+          device_role: 'TABLET',
+        })
+        .eq('device_id', tabletDeviceId);
+    } catch (_) {}
+
     return updated;
   }
 
@@ -210,7 +391,6 @@ export class TerminalInventoryService {
             continue;
           }
           const { error } = await adminDb.from('terminal_inventory').insert({
-            tenant_id: tenantId || null,
             terminal_id: row.serial_number,
             mpos_terminal_id: row.serial_number,
             pos_serial_number: row.serial_number,
@@ -229,11 +409,11 @@ export class TerminalInventoryService {
             duplicates++;
             continue;
           }
+          // terminal_inventory has no tenant_id column — use assigned_tenant_id only when assigning.
           const { error } = await adminDb.from('terminal_inventory').insert({
-            tenant_id: tenantId || null,
             terminal_id: row.mac_address,
             printer_mac_address: row.mac_address,
-            printer_model: row.model || 'XP-58',
+            printer_model: row.model || row.printer_type || 'XP-58',
             assignment_status: 'unassigned',
           });
           if (error) throw error;

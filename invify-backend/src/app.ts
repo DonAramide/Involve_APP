@@ -241,6 +241,9 @@ app.get('/api/admin/quasar/integrations', authenticate, checkRole(['super_admin'
 app.put('/api/admin/quasar/integrations/:tenantId/webhook-secret', authenticate, checkRole(['super_admin', 'admin', 'owner']), QuasarHealthController.updateWebhookSigningSecret);
 app.put('/api/admin/quasar/webhook-secret/global', authenticate, checkRole(['super_admin', 'admin', 'owner']), QuasarHealthController.updateGlobalWebhookSigningSecret);
 app.get('/api/admin/quasar/webhook-secret/status', authenticate, checkRole(['super_admin', 'admin', 'owner']), QuasarHealthController.getWebhookSecretStatus);
+app.put('/api/admin/quasar/admin-credentials', authenticate, checkRole(['super_admin']), QuasarHealthController.upsertAdminCredentials);
+app.get('/api/admin/quasar/admin-credentials/status', authenticate, checkRole(['super_admin']), QuasarHealthController.getAdminCredentialsStatus);
+app.post('/api/admin/quasar/admin-credentials/test', authenticate, checkRole(['super_admin']), QuasarHealthController.testAdminCredentials);
 
 // ── QFS Financial Sandbox API (/api/v1/sandbox/*) ─────────────────────────────
 import { qfsApiKeyAuth } from './middleware/qfs-api-key.middleware';
@@ -412,6 +415,14 @@ app.patch('/admin/settings', authenticate, checkRole(['super_admin']), AdminCont
 app.get('/admin/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.getGlobalCommissions);
 app.patch('/admin/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.updateGlobalCommissions);
 app.post('/admin/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
+
+// Quasar POS encryption key (card switch ICC crypto)
+app.get('/admin/quasar/integrations', authenticate, checkRole(['super_admin']), AdminController.listQuasarIntegrations);
+app.get('/admin/quasar/pos-encryption-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarPosEncryptionKeyStatus);
+app.post('/admin/quasar/pos-encryption-key/rotate', authenticate, checkRole(['super_admin']), AdminController.rotateQuasarPosEncryptionKey);
+app.post('/admin/quasar/pos-encryption-key/store', authenticate, checkRole(['super_admin']), AdminController.storeQuasarPosEncryptionKey);
+app.get('/admin/quasar/api-key/status', authenticate, checkRole(['super_admin']), AdminController.getQuasarApiKeyStatus);
+app.post('/admin/quasar/api-key/issue-live', authenticate, checkRole(['super_admin']), AdminController.issueQuasarLiveApiKey);
 
 // Commission Command Center
 app.get('/admin/commissions/approvals', authenticate, checkRole(['super_admin']), CommissionController.listApprovals);
@@ -591,11 +602,12 @@ app.post('/api/pos/transactionFromMpos', authenticate, PosController.processTran
 app.post('/api/v1/pos/transactionFromMpos', authenticate, PosController.processTransaction);
 app.get('/api/pos/history', authenticate, PosController.getTransactionHistory);
 app.post('/api/pos/test-iso', authenticate, PosController.testIso);  // ISO8583 debug parser
-app.get('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.getRoutingConfig);
-app.post('/admin/pos/routing', authenticate, checkRole(['super_admin']), PosController.updateRoutingConfig);
-app.get('/admin/pos/routing/affected-devices', authenticate, checkRole(['super_admin']), PosController.getAffectedDevices);
-app.post('/admin/pos/kimono-params/refresh', authenticate, checkRole(['super_admin']), PosController.refreshKimonoParams);
-app.get('/admin/pos/observability', authenticate, checkRole(['super_admin']), PosController.getObservabilityMetrics);
+app.get('/admin/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getRoutingConfig);
+app.post('/admin/pos/routing', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.updateRoutingConfig);
+app.get('/admin/pos/routing/affected-devices', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getAffectedDevices);
+app.post('/admin/pos/kimono-params/refresh', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.refreshKimonoParams);
+app.get('/admin/pos/observability', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.getObservabilityMetrics);
+app.post('/admin/pos/simulate', authenticate, checkRole(['super_admin', 'owner', 'admin']), PosController.simulateRoute);
 
 // Terminal & Inventory Management Operations
 app.get('/api/admin/inventory/stats', authenticate, TerminalController.getStats);
@@ -809,37 +821,71 @@ io.use(async (socket, next) => {
     }
     
     const userId = jwtPayload.sub || jwtPayload.id;
+    const userEmail = jwtPayload.email || jwtPayload.user_metadata?.email || '';
     if (!userId) {
       return next(new Error('Authentication error: Missing subject claim'));
     }
 
     let profile = null;
     let profileErr = null;
+    const socketDbTimeoutMs = Number(process.env.AUTH_DB_TIMEOUT_MS || 8000);
     try {
-      const { data, error } = await supabaseAdmin
+      const byIdPromise = supabaseAdmin
+        .from('users')
+        .select('tenant_id, role, email')
+        .eq('id', userId)
+        .maybeSingle();
+      const timed = await Promise.race([
+        byIdPromise,
+        new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error('socket users.byId timeout')), socketDbTimeoutMs),
+        ),
+      ]);
+      profile = timed.data;
+      profileErr = timed.error;
+
+      if (!profile && userEmail) {
+        const byEmailPromise = supabaseAdmin
           .from('users')
-          .select('tenant_id, role')
-          .eq('id', userId)
-          .single();
-      profile = data;
-      profileErr = error;
+          .select('tenant_id, role, email')
+          .ilike('email', String(userEmail).trim())
+          .maybeSingle();
+        const timedEmail = await Promise.race([
+          byEmailPromise,
+          new Promise<any>((_, reject) =>
+            setTimeout(() => reject(new Error('socket users.byEmail timeout')), socketDbTimeoutMs),
+          ),
+        ]);
+        if (timedEmail.data) {
+          profile = timedEmail.data;
+          profileErr = null;
+        }
+      }
     } catch (dbErr) {
       profileErr = dbErr;
     }
-        
+
     if (profileErr || !profile) {
-      // Always allow if tenantId can be resolved from the JWT payload or handshake data
-      const fallbackTenantId = jwtPayload.tenant_id || jwtPayload.tenantId ||
-                               socket.handshake.auth?.tenantId ||
-                               socket.handshake.query?.tenantId as string;
+      const fallbackTenantId =
+        jwtPayload.tenant_id ||
+        jwtPayload.tenantId ||
+        jwtPayload.app_metadata?.tenantId ||
+        jwtPayload.user_metadata?.tenantId ||
+        socket.handshake.auth?.tenantId ||
+        (socket.handshake.query?.tenantId as string);
       if (fallbackTenantId) {
-        console.warn(`[Socket.io] User profile not found for ${userId}. Using JWT/handshake tenantId=${fallbackTenantId}.`);
+        console.warn(
+          `[Socket.io] User profile not found for ${userId}. Using JWT/handshake tenantId=${fallbackTenantId}.`,
+        );
         profile = { tenant_id: fallbackTenantId, role: jwtPayload.role || 'admin' };
       } else if (process.env.NODE_ENV === 'development' || process.env.OFFLINE_MOCK_AUTH === 'true') {
-        console.warn(`[Socket.io] User profile not found in DB for user ${userId}. Falling back to dev mock profile.`);
+        console.warn(
+          `[Socket.io] User profile not found in DB for user ${userId}. Falling back to dev mock profile.`,
+        );
         profile = {
-          tenant_id: jwtPayload.tenant_id || jwtPayload.tenantId || '71ac6795-6c26-4efd-80db-12bfe4126b47',
-          role: 'admin'
+          tenant_id:
+            jwtPayload.tenant_id || jwtPayload.tenantId || '71ac6795-6c26-4efd-80db-12bfe4126b47',
+          role: 'admin',
         };
       } else {
         return next(new Error('Authentication error: User profile not found'));

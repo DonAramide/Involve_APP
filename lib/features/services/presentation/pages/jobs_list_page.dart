@@ -20,6 +20,16 @@ class _JobsListPageState extends State<JobsListPage> {
   final _searchController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // Fresh load so a prior Create Job SQLite error does not stick on this screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ServicesBloc>().add(const LoadServicesJobs());
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();

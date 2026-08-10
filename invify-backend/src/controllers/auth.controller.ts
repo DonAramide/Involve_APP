@@ -5,6 +5,97 @@ import { UserDeviceService } from '../services/user-device.service';
 import { SYSTEM_TENANT_UUID } from '../config/constants';
 import { GovAuditService } from '../services/gov-audit.service';
 
+/** Love School (device / JWT from live tablet sessions). */
+const LOVE_SCHOOL_TENANT_ID = '0e9ccdf3-f96b-4914-8aed-76165655ad01';
+const LOVE_SCHOOL_OWNER_ID = 'eb9f0b3c-c874-4d96-b624-5d4d63a60e4e';
+
+function isAuthConnectivityFailure(err: any): boolean {
+  const msg = String(err?.message || err || '');
+  const causeMsg = String(err?.cause?.message || err?.cause || '');
+  const code = err?.code || err?.cause?.code;
+  return (
+    code === 'UND_ERR_CONNECT_TIMEOUT' ||
+    /fetch failed/i.test(msg) ||
+    /ConnectTimeoutError/i.test(msg) ||
+    /Connect Timeout/i.test(msg) ||
+    /timeout/i.test(msg) ||
+    /fetch failed/i.test(causeMsg) ||
+    /Connect Timeout/i.test(causeMsg) ||
+    /network/i.test(msg)
+  );
+}
+
+function offlineAuthAllowed(variantService: { isLocal(): boolean; isStaging(): boolean; isProd(): boolean }): boolean {
+  if (variantService.isProd()) return false;
+  // Explicit flag, or auto when Supabase is down in local/staging.
+  return process.env.OFFLINE_LOCAL_AUTH === 'true' || variantService.isLocal() || variantService.isStaging();
+}
+
+function resolveOfflineIdentity(emailRaw: string): {
+  role: string;
+  tenantId: string;
+  userId: string;
+} {
+  const email = (emailRaw || '').trim().toLowerCase();
+  if (
+    email === 'sysadmin@iips.app' ||
+    email === 'superadmin@iips.app' ||
+    email === 'averyd777@gmail.com' ||
+    email.includes('admin@iips')
+  ) {
+    return {
+      role: 'SUPER_ADMIN',
+      tenantId: SYSTEM_TENANT_UUID,
+      userId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    };
+  }
+  if (
+    email === 'info.iips.ng@gmail.com' ||
+    (email.includes('love') && email.includes('school'))
+  ) {
+    return {
+      role: 'owner',
+      tenantId: LOVE_SCHOOL_TENANT_ID,
+      userId: LOVE_SCHOOL_OWNER_ID,
+    };
+  }
+  if (email === 'olive@invify.com') {
+    return {
+      role: 'TENANT_OPERATOR',
+      tenantId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
+      userId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
+    };
+  }
+  if (email.includes('admin') || email.includes('iips')) {
+    return {
+      role: 'SUPER_ADMIN',
+      tenantId: SYSTEM_TENANT_UUID,
+      userId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+    };
+  }
+  return {
+    role: 'TENANT_OPERATOR',
+    tenantId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
+    userId: '88a18bc0-d128-4e1b-b413-58019ab268f7',
+  };
+}
+
+function buildOfflineToken(email: string, identity: { role: string; tenantId: string; userId: string }): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
+  const payload = Buffer.from(
+    JSON.stringify({
+      id: identity.userId,
+      email,
+      role: identity.role,
+      tenantId: identity.tenantId,
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
+    }),
+  )
+    .toString('base64')
+    .replace(/=/g, '');
+  return `${header}.${payload}.local_dev_signature`;
+}
+
 async function validateDeviceOrBlock(userId: string, email: string, req: Request): Promise<{ allowed: boolean; errorResponse?: any }> {
   try {
     let enforce = false;
@@ -98,33 +189,16 @@ export class AuthController {
       }
       const variantService = require('../config/build-variant').BuildVariantService.getInstance();
 
-      // Offline Developer Bypass
-      if (process.env.OFFLINE_LOCAL_AUTH === 'true' && variantService.isLocal()) {
+      // Offline Developer Bypass (local + staging when flag set)
+      if (process.env.OFFLINE_LOCAL_AUTH === 'true' && offlineAuthAllowed(variantService)) {
         if (password === 'wrongpassword' || email.includes('notauser')) {
           return res.status(401).json({ error: 'Invalid credentials' });
         }
         console.log(`[AuthController] OFFLINE_LOCAL_AUTH is true. Bypassing Supabase for: ${email}`);
-        let role = 'TENANT_OPERATOR';
-        let tenantId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382';
-        let userId = '88a18bc0-d128-4e1b-b413-58019ab268f7';
+        const identity = resolveOfflineIdentity(email);
+        const mockToken = buildOfflineToken(email, identity);
         
-        if (email.toLowerCase().includes('admin') || email.toLowerCase().includes('iips')) {
-          role = 'SUPER_ADMIN';
-          tenantId = SYSTEM_TENANT_UUID;
-          userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-        }
-        
-        const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString('base64');
-        const payload = Buffer.from(JSON.stringify({
-          id: userId,
-          email: email,
-          role: role,
-          tenantId: tenantId,
-          exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7)
-        })).toString('base64').replace(/=/g, '');
-        const mockToken = `${header}.${payload}.local_dev_signature`;
-        
-        const check = await validateDeviceOrBlock(userId, email, req);
+        const check = await validateDeviceOrBlock(identity.userId, email, req);
         if (!check.allowed) {
           return res.status(403).json(check.errorResponse);
         }
@@ -132,44 +206,73 @@ export class AuthController {
         return res.status(200).json({
           token: mockToken,
           refreshToken: 'mock_refresh_token',
-          user: { id: userId, email: email, role: role }
+          user: { id: identity.userId, email: email, role: identity.role, tenantId: identity.tenantId }
         });
       }
 
       // 1. Authenticate with Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      let authData: any = null;
+      let authError: any = null;
+      try {
+        const result = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        authData = result.data;
+        authError = result.error;
+      } catch (networkErr: any) {
+        authError = networkErr;
+      }
 
-      if (authError || !authData.user || !authData.session) {
+      if (authError || !authData?.user || !authData?.session) {
+        // Supabase unreachable — do not pretend this is a bad password.
+        if (isAuthConnectivityFailure(authError)) {
+          console.error(
+            `[AuthController] Supabase Auth unreachable: ${authError?.message || authError}` +
+              (authError?.cause ? ` cause=${authError.cause?.message || authError.cause}` : ''),
+          );
+
+          if (offlineAuthAllowed(variantService)) {
+            console.warn(
+              `[AuthController] Issuing offline login token for ${email} (Supabase connect timeout)`,
+            );
+            const identity = resolveOfflineIdentity(email);
+            const mockToken = buildOfflineToken(email, identity);
+            const check = await validateDeviceOrBlock(identity.userId, email, req);
+            if (!check.allowed) {
+              return res.status(403).json(check.errorResponse);
+            }
+            return res.status(200).json({
+              token: mockToken,
+              refreshToken: 'mock_refresh_token',
+              user: {
+                id: identity.userId,
+                email,
+                role: identity.role,
+                tenantId: identity.tenantId,
+              },
+              offlineAuth: true,
+              warning: 'Logged in offline — Supabase Auth is unreachable from this machine',
+            });
+          }
+
+          return res.status(503).json({
+            error: 'AUTH_SERVICE_UNAVAILABLE',
+            message:
+              'Cannot reach Supabase Auth (connect timeout). Check network/VPN/firewall to *.supabase.co:443, or set OFFLINE_LOCAL_AUTH=true for local/staging.',
+            retryable: true,
+          });
+        }
+
         // Dynamic Developer Bypass for local environment sandbox presets
         const devAccounts = ['olive@invify.com', 'sysadmin@iips.app', 'superadmin@iips.app', 'averyd777@gmail.com'];
         const normalizedEmail = (email || '').trim().toLowerCase();
         if (devAccounts.includes(normalizedEmail) && variantService.isLocal()) {
           console.log(`[AuthController] Dev sandbox credentials bypass activated for: ${normalizedEmail}`);
+          const identity = resolveOfflineIdentity(normalizedEmail);
+          const mockToken = buildOfflineToken(email, identity);
           
-          let role = 'TENANT_OPERATOR';
-          let tenantId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382';
-          let userId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382'; // Olive Valid UUID
-          
-          if (normalizedEmail === 'sysadmin@iips.app' || normalizedEmail === 'superadmin@iips.app' || normalizedEmail === 'averyd777@gmail.com') {
-            role = 'SUPER_ADMIN';
-            tenantId = SYSTEM_TENANT_UUID;
-            userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // Admin Valid UUID
-          }
-          
-          const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString('base64');
-          const payload = Buffer.from(JSON.stringify({
-            id: userId,
-            email: email,
-            role: role,
-            tenantId: tenantId,
-            exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 1 week
-          })).toString('base64').replace(/=/g, '');
-          const mockToken = `${header}.${payload}.local_dev_signature`;
-          
-          const check = await validateDeviceOrBlock(userId, email, req);
+          const check = await validateDeviceOrBlock(identity.userId, email, req);
           if (!check.allowed) {
             return res.status(403).json(check.errorResponse);
           }
@@ -178,9 +281,10 @@ export class AuthController {
             token: mockToken,
             refreshToken: 'mock_refresh_token',
             user: {
-              id: userId,
+              id: identity.userId,
               email: email,
-              role: role
+              role: identity.role,
+              tenantId: identity.tenantId,
             }
           });
         }
@@ -276,44 +380,14 @@ export class AuthController {
     } catch (error: any) {
       console.error('[AuthController] Login Error:', error.message);
       
-      const isConnectionFailure = error.message?.includes('fetch failed') || 
-                                 error.message?.includes('ConnectTimeoutError') ||
-                                 error.message?.includes('timeout') ||
-                                 error.code === 'UND_ERR_CONNECT_TIMEOUT';
-                                 
       const variantService = require('../config/build-variant').BuildVariantService.getInstance();
-      if (isConnectionFailure && variantService.isLocal()) {
-        console.log('[AuthController] Network/Supabase connectivity timeout detected. Activating Local Developer Fallback Auth Matrix...');
-        
-        // Map common dev accounts or default dynamically
+      if (isAuthConnectivityFailure(error) && offlineAuthAllowed(variantService)) {
+        console.log('[AuthController] Network/Supabase connectivity timeout detected. Activating offline auth fallback...');
         const email = req.body.email;
-        let role = 'TENANT_OPERATOR';
-        let tenantId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382';
-        let userId = '88a18bc0-d128-4e1b-b413-58019ab268f7'; // Default Operator UUID
+        const identity = resolveOfflineIdentity(email);
+        const mockToken = buildOfflineToken(email, identity);
         
-        if (email === 'sysadmin@IIPS.app') {
-          role = 'SUPER_ADMIN';
-          tenantId = SYSTEM_TENANT_UUID;
-          userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // Admin UUID
-        } else if (email === 'olive@invify.com') {
-          role = 'TENANT_OPERATOR';
-          tenantId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382';
-          userId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382'; // Olive UUID
-        }
-        
-        // Create a mock JWT token so the frontend base64 decoders function perfectly!
-        const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString('base64');
-        const payload = Buffer.from(JSON.stringify({
-          id: userId,
-          email: email,
-          role: role,
-          tenantId: tenantId,
-          exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 1 week
-        })).toString('base64').replace(/=/g, '');
-        const signature = 'local_dev_signature';
-        const mockToken = `${header}.${payload}.${signature}`;
-        
-        const check = await validateDeviceOrBlock(userId, email, req);
+        const check = await validateDeviceOrBlock(identity.userId, email, req);
         if (!check.allowed) {
           return res.status(403).json(check.errorResponse);
         }
@@ -322,10 +396,22 @@ export class AuthController {
           token: mockToken,
           refreshToken: 'mock_refresh_token',
           user: {
-            id: userId,
+            id: identity.userId,
             email: email,
-            role: role
-          }
+            role: identity.role,
+            tenantId: identity.tenantId,
+          },
+          offlineAuth: true,
+          warning: 'Logged in offline — Supabase Auth is unreachable from this machine',
+        });
+      }
+
+      if (isAuthConnectivityFailure(error)) {
+        return res.status(503).json({
+          error: 'AUTH_SERVICE_UNAVAILABLE',
+          message:
+            'Cannot reach Supabase Auth (connect timeout). Check network/VPN/firewall to *.supabase.co:443.',
+          retryable: true,
         });
       }
       

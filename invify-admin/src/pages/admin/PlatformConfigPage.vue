@@ -21,6 +21,7 @@
       narrow-indicator
     >
       <q-tab name="general" icon="settings" label="General" />
+      <q-tab name="quasar" icon="account_balance" label="Quasar Switch" />
       <q-tab name="localization" icon="language" label="Localization & Currency" />
       <q-tab name="security" icon="security" label="Security Policies" />
       <q-tab name="branding" icon="palette" label="Branding & Whitelabel" />
@@ -78,6 +79,358 @@
                     <q-icon name="report_problem" color="red-4" />
                   </template>
                   Activating Maintenance Mode will immediately prevent logins for all normal tenant operator and agent accounts globally. Only Super Admins will be permitted to access.
+                </q-banner>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </q-tab-panel>
+
+      <!-- QUASAR SWITCH TAB -->
+      <q-tab-panel name="quasar" class="q-pa-none">
+        <q-card flat class="enterprise-panel bg-panel border-main">
+          <q-card-section>
+            <div class="text-h6 q-mb-sm text-main">Quasar Card Switch Base URL</div>
+            <div class="text-caption text-muted q-mb-md">
+              Invify backend calls Quasar with this base (Bearer <code>sk_…</code>). Flutter still posts to Invify
+              <code>/api/pos/transaction</code>; Invify then hits Quasar
+              <code>/pos/card-transaction</code>.
+            </div>
+            <div class="row q-col-gutter-md">
+              <div class="col-12 col-md-8">
+                <q-input
+                  outlined dense dark
+                  v-model="mockSettings.quasarBaseUrl"
+                  label="Quasar API Base URL"
+                  hint="Must end with /api/v1 — e.g. http://192.168.1.193:4000/api/v1"
+                  placeholder="http://192.168.1.193:4000/api/v1"
+                  class="q-mb-md"
+                  clearable
+                >
+                  <template v-slot:prepend>
+                    <q-icon name="link" />
+                  </template>
+                </q-input>
+                <q-banner rounded class="bg-subpanel text-main border-main q-mb-md">
+                  <div class="text-caption text-muted q-mb-xs">Resolved endpoints</div>
+                  <div class="font-mono text-cyan-3 text-caption q-mb-xs">
+                    Card TX: {{ quasarCardTransactionPreview }}
+                  </div>
+                  <div class="font-mono text-cyan-3 text-caption q-mb-xs">
+                    ICC data: {{ quasarIccDataPreview }}
+                  </div>
+                  <div class="font-mono text-grey-5 text-caption q-mb-sm">
+                    MPOS backup: {{ quasarMposBackupPreview }}
+                  </div>
+                  <div class="row items-center q-gutter-sm">
+                    <q-btn
+                      dense
+                      unelevated
+                      color="cyan-7"
+                      icon="network_check"
+                      label="Ping Quasar"
+                      :loading="pingingQuasar"
+                      no-caps
+                      @click="pingQuasarSwitch"
+                    />
+                    <q-chip
+                      v-if="quasarPingResult"
+                      dense
+                      :color="quasarPingResult.ok ? 'positive' : 'negative'"
+                      text-color="white"
+                      :icon="quasarPingResult.ok ? 'check_circle' : 'error'"
+                    >
+                      {{ quasarPingResult.label }}
+                    </q-chip>
+                  </div>
+                  <div v-if="quasarPingResult?.detail" class="text-caption text-grey-5 q-mt-xs">
+                    {{ quasarPingResult.detail }}
+                  </div>
+                </q-banner>
+                <div class="text-caption text-grey-6">
+                  Leave blank to fall back to <code>QUASAR_BASE_URL</code> env, then production
+                  <code>https://api-quasar.iips.app/api/v1</code>.
+                  Pasting a full <code>…/pos/card-transaction</code> URL is OK — it will be normalized to the base.
+                </div>
+              </div>
+              <div class="col-12 col-md-4">
+                <q-banner rounded class="bg-subpanel text-muted border-main">
+                  <template v-slot:avatar>
+                    <q-icon name="info" color="cyan-4" />
+                  </template>
+                  Presets
+                  <div class="q-mt-sm column q-gutter-xs">
+                    <q-btn
+                      dense outline color="cyan-4" size="sm" no-caps
+                      label="LAN Quasar :4000"
+                      @click="mockSettings.quasarBaseUrl = 'http://192.168.1.193:4000/api/v1'"
+                    />
+                    <q-btn
+                      dense outline color="cyan-4" size="sm" no-caps
+                      label="Loopback :4000"
+                      @click="mockSettings.quasarBaseUrl = 'http://127.0.0.1:4000/api/v1'"
+                    />
+                    <q-btn
+                      dense outline color="cyan-4" size="sm" no-caps
+                      label="Production"
+                      @click="mockSettings.quasarBaseUrl = 'https://api-quasar.iips.app/api/v1'"
+                    />
+                  </div>
+                </q-banner>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+
+        <q-card flat class="enterprise-panel bg-panel border-main q-mt-md">
+          <q-card-section>
+            <div class="text-h6 q-mb-sm text-main">Global POS Encryption Key (ICC)</div>
+            <div class="text-caption text-muted q-mb-md">
+              Platform-wide Invify key used for Quasar <code>/pos/icc-data</code> when a tenant
+              has no vault key. Quasar still issues keys per Quasar tenant — rotate once for your
+              linked Quasar tenant, then store it here as the <strong>global</strong> Invify default.
+            </div>
+
+            <div class="row q-col-gutter-md items-start">
+              <div class="col-12 col-md-7">
+                <q-banner rounded class="bg-subpanel border-main text-main q-mb-md">
+                  <div class="text-caption text-muted q-mb-xs">Global key status</div>
+                  <q-chip
+                    dense
+                    :color="globalPosKeyConfigured ? 'positive' : 'negative'"
+                    text-color="white"
+                    :label="globalPosKeyConfigured ? 'GLOBAL KEY SET' : 'GLOBAL KEY MISSING'"
+                  />
+                  <div class="text-caption q-mt-sm font-mono">
+                    Settings: {{ posKeyStatus?.sources?.globalSettings ? 'yes' : 'no' }} ·
+                    Env: {{ posKeyStatus?.sources?.runtimeEnv ? 'yes' : 'no' }}
+                  </div>
+                </q-banner>
+
+                <q-select
+                  outlined dense dark
+                  v-model="posKeyForm.selectedIntegration"
+                  :options="quasarIntegrationOptions"
+                  label="Quasar-linked tenant (optional for paste)"
+                  emit-value
+                  map-options
+                  clearable
+                  class="q-mb-md"
+                  :loading="loadingQuasarIntegrations"
+                  hint="Used to resolve Quasar tenant UUID for Generate/Rotate"
+                />
+                <q-input
+                  outlined dense dark
+                  v-model="posKeyForm.quasarTenantId"
+                  label="Quasar Tenant UUID"
+                  class="q-mb-md"
+                  hint="Required to Generate/Rotate on Quasar. Auto-filled from the mapping above when available."
+                  clearable
+                />
+                <q-input
+                  outlined dense dark
+                  v-model="posKeyForm.adminJwt"
+                  label="Quasar Admin JWT (optional)"
+                  type="password"
+                  class="q-mb-md"
+                  clearable
+                  hint="Leave blank — vault Quasar Admin Login is preferred. Clear this if it was auto-filled with an Invify token (that caused the 401)."
+                />
+                <q-toggle
+                  v-model="posKeyForm.applyAsPlatformDefault"
+                  color="cyan-4"
+                  dark
+                  label="Store as global platform key (recommended)"
+                  class="q-mb-sm"
+                />
+                <div class="text-caption text-grey-6 q-mb-md">
+                  When on, the key is written to <code>global_settings.json</code> and runtime env so every tenant can use it.
+                </div>
+                <div class="row q-gutter-sm">
+                  <q-btn
+                    unelevated color="cyan-8" icon="vpn_key"
+                    label="Generate Global POS Key"
+                    :loading="rotatingPosKey"
+                    :disable="!canRotatePosKey"
+                    @click="confirmRotatePosKey"
+                  />
+                  <q-btn
+                    outline color="cyan-4" icon="content_paste"
+                    label="Paste as Global Key"
+                    @click="openPasteGlobalPosKey"
+                  />
+                </div>
+              </div>
+              <div class="col-12 col-md-5">
+                <q-banner rounded class="bg-subpanel border-main text-main">
+                  <div class="text-caption text-muted q-mb-xs">Selected tenant vault</div>
+                  <q-chip
+                    dense
+                    :color="posKeyStatus?.sources?.tenantVault ? 'positive' : 'grey-8'"
+                    text-color="white"
+                    :label="posKeyStatus?.sources?.tenantVault ? 'TENANT VAULT SET' : 'NO TENANT VAULT'"
+                  />
+                  <div v-if="posKeyForm.quasarTenantId" class="text-caption text-grey-5 q-mt-sm font-mono">
+                    Quasar tenant: {{ posKeyForm.quasarTenantId }}
+                  </div>
+                  <q-btn
+                    flat dense color="cyan-4" icon="refresh" label="Refresh status"
+                    class="q-mt-sm" @click="refreshPosKeyStatus" :loading="loadingPosKeyStatus"
+                  />
+                </q-banner>
+                <q-banner rounded class="bg-orange-10 text-orange-2 q-mt-md border-main">
+                  <template v-slot:avatar>
+                    <q-icon name="warning" color="orange-4" />
+                  </template>
+                  Rotating on Quasar invalidates the previous key for that Quasar tenant. Invify stores the new value as the global default when the toggle is on.
+                </q-banner>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+
+        <q-dialog v-model="showPosKeyRevealDialog" persistent>
+          <q-card class="bg-panel text-main" style="min-width: 480px">
+            <q-card-section>
+              <div class="text-h6">POS Key Generated</div>
+              <div class="text-caption text-muted">
+                Shown once. Already stored on Invify. Copy if you need an offline backup.
+              </div>
+            </q-card-section>
+            <q-card-section>
+              <div class="text-caption">Fingerprint: {{ lastPosKeyResult?.fingerprint }}</div>
+              <div class="text-caption q-mb-sm">Key version: {{ lastPosKeyResult?.keyVersion ?? 'n/a' }}</div>
+              <div class="text-caption q-mb-sm text-cyan-3" v-if="lastPosKeyResult?.stored?.globalSettings">
+                Stored as global platform key
+              </div>
+              <q-input
+                outlined dense dark readonly
+                :model-value="lastPosKeyResult?.encryptionKeyBase64 || ''"
+                type="textarea"
+                autogrow
+              />
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn flat label="Copy key" color="cyan-4" @click="copyPosKey" />
+              <q-btn unelevated color="cyan-8" label="Done" v-close-popup />
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+
+        <q-dialog v-model="showPastePosKeyDialog">
+          <q-card class="bg-panel text-main" style="min-width: 480px">
+            <q-card-section>
+              <div class="text-h6">Paste as Global POS Key</div>
+              <div class="text-caption text-muted">
+                Paste <code>encryption_key_base64</code> from Quasar rotate. No tenant mapping required.
+              </div>
+            </q-card-section>
+            <q-card-section>
+              <q-input
+                outlined dense dark
+                v-model="pastePosKeyValue"
+                type="textarea"
+                autogrow
+                label="encryption_key_base64"
+              />
+              <q-toggle
+                class="q-mt-md"
+                v-model="posKeyForm.applyAsPlatformDefault"
+                color="cyan-4"
+                dark
+                label="Store as global platform key"
+              />
+            </q-card-section>
+            <q-card-actions align="right">
+              <q-btn flat label="Cancel" v-close-popup color="grey-5" />
+              <q-btn unelevated color="cyan-8" label="Store Global Key" :loading="storingPosKey" @click="storePastedPosKey" />
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+
+        <q-card flat class="enterprise-panel bg-panel border-main q-mt-md">
+          <q-card-section>
+            <div class="text-h6 q-mb-sm text-main">Tenant Quasar API Key (card rails)</div>
+            <div class="text-caption text-muted q-mb-md">
+              <code>/pos/icc-data</code> and <code>/pos/card-transaction</code> require
+              <code>sk_live_*</code>. Activation currently stores <code>sk_test_*</code> (sandbox only).
+            </div>
+            <div class="row q-col-gutter-md items-start">
+              <div class="col-12 col-md-7">
+                <q-select
+                  outlined dense dark
+                  v-model="posKeyForm.selectedIntegration"
+                  :options="quasarIntegrationOptions"
+                  label="Quasar-linked tenant"
+                  emit-value
+                  map-options
+                  class="q-mb-md"
+                  clearable
+                />
+                <div class="row q-gutter-sm">
+                  <q-btn
+                    unelevated color="amber-9" icon="vpn_key"
+                    label="Issue Live API Key"
+                    :loading="issuingLiveApiKey"
+                    :disable="!posKeyForm.selectedIntegration"
+                    @click="confirmIssueLiveApiKey"
+                  />
+                  <q-btn
+                    outline color="cyan-4" icon="refresh"
+                    label="Refresh key status"
+                    :loading="loadingApiKeyStatus"
+                    :disable="!posKeyForm.selectedIntegration"
+                    @click="refreshApiKeyStatus"
+                  />
+                </div>
+              </div>
+              <div class="col-12 col-md-5">
+                <q-banner rounded class="bg-subpanel border-main text-main">
+                  <div class="text-caption text-muted q-mb-xs">Tenant API key</div>
+                  <q-chip
+                    dense
+                    :color="apiKeyStatus?.keyPrefix === 'sk_live_*' ? 'positive' : (apiKeyStatus?.keyPrefix === 'sk_test_*' ? 'orange-9' : 'grey-8')"
+                    text-color="white"
+                    :label="apiKeyStatus?.keyPrefix || 'UNKNOWN'"
+                  />
+                  <q-chip
+                    dense
+                    class="q-ml-sm"
+                    :color="apiKeyStatus?.environment === 'live' ? 'positive' : 'grey-8'"
+                    text-color="white"
+                    :label="(apiKeyStatus?.environment || 'n/a').toUpperCase()"
+                  />
+                  <div class="text-caption text-grey-5 q-mt-sm" v-if="apiKeyStatus?.quasarTenantId">
+                    Quasar tenant: {{ apiKeyStatus.quasarTenantId }}
+                  </div>
+                  <div class="text-caption text-orange-3 q-mt-sm" v-if="apiKeyStatus?.keyPrefix === 'sk_test_*'">
+                    Card POS will fail with 403 until you issue sk_live_*.
+                  </div>
+                </q-banner>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+
+        <q-card flat class="enterprise-panel bg-panel border-main q-mt-md">
+          <q-card-section>
+            <div class="text-h6 q-mb-md text-main">Quasar Partner Credentials (optional)</div>
+            <div class="row q-col-gutter-md">
+              <div class="col-12 col-md-6">
+                <q-input outlined dense dark v-model="mockSettings.quasarClientId" label="Quasar Client ID" class="q-mb-md" />
+                <q-input
+                  outlined dense dark
+                  v-model="mockSettings.quasarClientSecret"
+                  label="Quasar Client Secret"
+                  type="password"
+                  class="q-mb-md"
+                />
+              </div>
+              <div class="col-12 col-md-6">
+                <q-banner rounded class="bg-subpanel text-muted border-main">
+                  Tenant card execution still uses per-tenant <code>sk_live_*</code> /
+                  <code>sk_test_*</code> from the Integration Vault (or <code>QUASAR_API_KEY</code>).
+                  These client credentials are for platform partner APIs, not Flutter.
                 </q-banner>
               </div>
             </div>
@@ -358,8 +711,303 @@ const mockSettings = ref({
   whatsappBusinessAccountId: '',
   quasarClientId: '',
   quasarClientSecret: '',
+  quasarBaseUrl: '',
   lessonAiApiKey: ''
 });
+
+const quasarBaseNormalized = computed(() => {
+  let u = String(mockSettings.value.quasarBaseUrl || '').trim();
+  if (!u) return 'https://api-quasar.iips.app/api/v1';
+  u = u.split('?')[0].split('#')[0].replace(/\/+$/, '');
+  const suffixes = ['/pos/card-transaction', '/pos/icc-data', '/pos/transactionFromMpos', '/pos/icc'];
+  for (const s of suffixes) {
+    if (u.toLowerCase().endsWith(s)) {
+      u = u.slice(0, -s.length).replace(/\/+$/, '');
+      break;
+    }
+  }
+  return u || 'https://api-quasar.iips.app/api/v1';
+});
+const quasarCardTransactionPreview = computed(() => `${quasarBaseNormalized.value}/pos/card-transaction`);
+const quasarIccDataPreview = computed(() => `${quasarBaseNormalized.value}/pos/icc-data`);
+const quasarMposBackupPreview = computed(() => `${quasarBaseNormalized.value}/pos/transactionFromMpos`);
+
+const pingingQuasar = ref(false);
+const quasarPingResult = ref(null);
+
+async function pingQuasarSwitch() {
+  pingingQuasar.value = true;
+  quasarPingResult.value = null;
+  const started = Date.now();
+  try {
+    // Prefer live probe; fall back to full health report for richer errors
+    let liveOk = false;
+    let liveMsg = '';
+    try {
+      const live = await adminApi.pingQuasar();
+      liveOk = live?.data?.data?.alive === true || live?.status === 200;
+      liveMsg = live?.data?.responseMessage || 'reachable';
+    } catch (e) {
+      liveOk = false;
+      liveMsg = e?.response?.data?.responseMessage || e?.message || 'unreachable';
+    }
+
+    let detail = liveMsg;
+    try {
+      const full = await adminApi.getQuasarHealth();
+      const report = full?.data?.data || full?.data;
+      if (report) {
+        detail = [
+          `status=${report.overallStatus || (liveOk ? 'healthy' : 'unreachable')}`,
+          report.apiLatencyMs != null ? `latency=${report.apiLatencyMs}ms` : `rtt=${Date.now() - started}ms`,
+          report.apiReachable != null ? `apiReachable=${report.apiReachable}` : null,
+          Array.isArray(report.alerts) && report.alerts.length ? `alerts=${report.alerts.length}` : null,
+        ].filter(Boolean).join(' · ');
+        if (report.apiReachable === false) liveOk = false;
+        if (report.apiReachable === true) liveOk = true;
+      }
+    } catch (_) {
+      detail = `${liveMsg} · rtt=${Date.now() - started}ms · base=${quasarBaseNormalized.value}`;
+    }
+
+    quasarPingResult.value = {
+      ok: liveOk,
+      label: liveOk ? 'Quasar UP' : 'Quasar DOWN',
+      detail: `${detail} · ${quasarBaseNormalized.value}`,
+    };
+    $q.notify({
+      type: liveOk ? 'positive' : 'negative',
+      message: liveOk ? 'Quasar is reachable' : 'Quasar did not respond',
+      caption: detail,
+    });
+  } catch (e) {
+    quasarPingResult.value = {
+      ok: false,
+      label: 'Quasar DOWN',
+      detail: e?.message || 'Ping failed',
+    };
+    $q.notify({ type: 'negative', message: 'Quasar ping failed: ' + (e?.message || e) });
+  } finally {
+    pingingQuasar.value = false;
+  }
+}
+
+// POS encryption key (Quasar rotate)
+const quasarIntegrations = ref([]);
+const loadingQuasarIntegrations = ref(false);
+const posKeyStatus = ref(null);
+const loadingPosKeyStatus = ref(false);
+const rotatingPosKey = ref(false);
+const storingPosKey = ref(false);
+const showPosKeyRevealDialog = ref(false);
+const showPastePosKeyDialog = ref(false);
+const pastePosKeyValue = ref('');
+const lastPosKeyResult = ref(null);
+const apiKeyStatus = ref(null);
+const loadingApiKeyStatus = ref(false);
+const issuingLiveApiKey = ref(false);
+const posKeyForm = ref({
+  selectedIntegration: null,
+  quasarTenantId: '',
+  adminJwt: '',
+  applyAsPlatformDefault: true,
+});
+
+const quasarIntegrationOptions = computed(() =>
+  (quasarIntegrations.value || []).map((row) => ({
+    label: `${row.invifyTenantId?.slice(0, 8)}… → ${row.quasarTenantId?.slice(0, 8)}… (${row.vertical || 'n/a'} / ${row.status})`,
+    value: row.invifyTenantId,
+    quasarTenantId: row.quasarTenantId,
+  })),
+);
+
+const globalPosKeyConfigured = computed(
+  () =>
+    Boolean(posKeyStatus.value?.globalConfigured) ||
+    Boolean(posKeyStatus.value?.sources?.globalSettings) ||
+    Boolean(posKeyStatus.value?.sources?.runtimeEnv),
+);
+
+const canRotatePosKey = computed(() => Boolean(String(posKeyForm.value.quasarTenantId || '').trim()));
+
+async function loadQuasarIntegrations() {
+  loadingQuasarIntegrations.value = true;
+  try {
+    const res = await adminApi.listQuasarIntegrations();
+    quasarIntegrations.value = res.data?.data || res.data || [];
+    if (!posKeyForm.value.selectedIntegration && quasarIntegrations.value.length === 1) {
+      posKeyForm.value.selectedIntegration = quasarIntegrations.value[0].invifyTenantId;
+      posKeyForm.value.quasarTenantId = quasarIntegrations.value[0].quasarTenantId || '';
+    }
+  } catch (e) {
+    console.warn('Failed to load Quasar integrations', e);
+  } finally {
+    loadingQuasarIntegrations.value = false;
+  }
+}
+
+async function refreshPosKeyStatus() {
+  loadingPosKeyStatus.value = true;
+  try {
+    const res = await adminApi.getQuasarPosEncryptionKeyStatus({
+      invifyTenantId: posKeyForm.value.selectedIntegration || undefined,
+    });
+    posKeyStatus.value = res.data;
+    if (!posKeyForm.value.quasarTenantId && res.data?.quasarTenantId) {
+      posKeyForm.value.quasarTenantId = res.data.quasarTenantId;
+    }
+  } catch (e) {
+    console.warn('Failed to load POS key status', e);
+  } finally {
+    loadingPosKeyStatus.value = false;
+  }
+}
+
+async function refreshApiKeyStatus() {
+  if (!posKeyForm.value.selectedIntegration) {
+    apiKeyStatus.value = null;
+    return;
+  }
+  loadingApiKeyStatus.value = true;
+  try {
+    const res = await adminApi.getQuasarApiKeyStatus({
+      invifyTenantId: posKeyForm.value.selectedIntegration,
+    });
+    apiKeyStatus.value = res.data;
+  } catch (e) {
+    console.warn('Failed to load Quasar API key status', e);
+    apiKeyStatus.value = null;
+  } finally {
+    loadingApiKeyStatus.value = false;
+  }
+}
+
+function confirmIssueLiveApiKey() {
+  if (!posKeyForm.value.selectedIntegration) return;
+  $q.dialog({
+    title: 'Issue Quasar sk_live_*?',
+    message:
+      'Creates a live tenant API key on Quasar (required for /pos/icc-data and card-transaction), then stores it in Invify vault + quasar_integrations. Replaces the current sk_test_* for this tenant.',
+    cancel: true,
+    persistent: true,
+    ok: { label: 'Issue Live Key', color: 'amber-9' },
+  }).onOk(() => issueLiveApiKey());
+}
+
+async function issueLiveApiKey() {
+  issuingLiveApiKey.value = true;
+  try {
+    const res = await adminApi.issueQuasarLiveApiKey({
+      invifyTenantId: posKeyForm.value.selectedIntegration,
+    });
+    $q.notify({
+      type: 'positive',
+      message: `Live key issued (${res.data?.fingerprint || res.data?.keyPrefix || 'sk_live_*'})`,
+      timeout: 6000,
+    });
+    await refreshApiKeyStatus();
+  } catch (e) {
+    $q.notify({
+      type: 'negative',
+      message: e.response?.data?.error || e.message || 'Failed to issue live API key',
+      timeout: 8000,
+    });
+  } finally {
+    issuingLiveApiKey.value = false;
+  }
+}
+
+function openPasteGlobalPosKey() {
+  posKeyForm.value.applyAsPlatformDefault = true;
+  showPastePosKeyDialog.value = true;
+}
+
+function confirmRotatePosKey() {
+  $q.dialog({
+    title: 'Generate global POS encryption key?',
+    message:
+      'This rotates the key on Quasar for the Quasar tenant UUID below, then stores it as Invify’s global platform key (when the toggle is on).',
+    cancel: true,
+    persistent: true,
+    ok: { label: 'Generate & Store Global', color: 'cyan-8' },
+  }).onOk(() => rotatePosKey());
+}
+
+async function rotatePosKey() {
+  rotatingPosKey.value = true;
+  try {
+    const res = await adminApi.rotateQuasarPosEncryptionKey({
+      invifyTenantId: posKeyForm.value.selectedIntegration || undefined,
+      quasarTenantId: String(posKeyForm.value.quasarTenantId || '').trim(),
+      adminJwt: posKeyForm.value.adminJwt || undefined,
+      applyAsPlatformDefault: posKeyForm.value.applyAsPlatformDefault !== false,
+    });
+    lastPosKeyResult.value = res.data;
+    showPosKeyRevealDialog.value = true;
+    posKeyForm.value.adminJwt = '';
+    $q.notify({ type: 'positive', message: 'Global POS encryption key generated and stored' });
+    await refreshPosKeyStatus();
+  } catch (e) {
+    $q.notify({
+      type: 'negative',
+      message: e.response?.data?.error || e.message || 'Rotate failed',
+      timeout: 8000,
+    });
+    // Stale Invify/expired JWT in the field often causes 401 — clear so next try uses vault login
+    if (String(e.response?.data?.error || e.message || '').includes('401')) {
+      posKeyForm.value.adminJwt = '';
+    }
+  } finally {
+    rotatingPosKey.value = false;
+  }
+}
+
+async function storePastedPosKey() {
+  storingPosKey.value = true;
+  try {
+    const res = await adminApi.storeQuasarPosEncryptionKey({
+      encryption_key_base64: pastePosKeyValue.value,
+      invifyTenantId: posKeyForm.value.selectedIntegration || undefined,
+      applyAsPlatformDefault: true,
+    });
+    lastPosKeyResult.value = res.data;
+    showPastePosKeyDialog.value = false;
+    pastePosKeyValue.value = '';
+    showPosKeyRevealDialog.value = true;
+    $q.notify({ type: 'positive', message: 'Global POS key stored on Invify' });
+    await refreshPosKeyStatus();
+  } catch (e) {
+    $q.notify({
+      type: 'negative',
+      message: e.response?.data?.error || e.message || 'Store failed',
+    });
+  } finally {
+    storingPosKey.value = false;
+  }
+}
+
+async function copyPosKey() {
+  const key = lastPosKeyResult.value?.encryptionKeyBase64;
+  if (!key) return;
+  try {
+    await navigator.clipboard.writeText(key);
+    $q.notify({ type: 'positive', message: 'Key copied' });
+  } catch {
+    $q.notify({ type: 'warning', message: 'Could not copy — select and copy manually' });
+  }
+}
+
+watch(
+  () => posKeyForm.value.selectedIntegration,
+  (invifyId) => {
+    const selected = quasarIntegrationOptions.value.find((o) => o.value === invifyId);
+    if (selected?.quasarTenantId) {
+      posKeyForm.value.quasarTenantId = selected.quasarTenantId;
+    }
+    refreshPosKeyStatus();
+    refreshApiKeyStatus();
+  },
+);
 
 // Payout settings — thin alias to the shared Pinia store.
 // The store auto-hydrates from localStorage and is reactive:
@@ -397,6 +1045,9 @@ onMounted(async () => {
   updateDebug();
   setInterval(updateDebug, 1000);
   await fetchSettings();
+  await loadQuasarIntegrations();
+  await refreshPosKeyStatus();
+  await refreshApiKeyStatus();
   const savedList = localStorage.getItem('platform_currencies_list');
   if (savedList) {
     currencyList.value = JSON.parse(savedList);
@@ -431,6 +1082,7 @@ async function fetchSettings() {
       mockSettings.value.whatsappBusinessAccountId = data.whatsapp_business_account_id || '';
       mockSettings.value.quasarClientId = data.quasar_client_id || '';
       mockSettings.value.quasarClientSecret = data.quasar_client_secret || '';
+      mockSettings.value.quasarBaseUrl = data.quasar_base_url || data.quasarBaseUrl || '';
       mockSettings.value.lessonAiApiKey = data.lesson_ai_api_key || '';
 
       // Populate Payout Settings Store
@@ -469,6 +1121,7 @@ async function saveAllSettings() {
       whatsapp_business_account_id: mockSettings.value.whatsappBusinessAccountId,
       quasar_client_id: mockSettings.value.quasarClientId,
       quasar_client_secret: mockSettings.value.quasarClientSecret,
+      quasar_base_url: String(mockSettings.value.quasarBaseUrl || '').trim(),
       lesson_ai_api_key: mockSettings.value.lessonAiApiKey,
       // Payout settings keys — written to global_settings.json on the server
       daily_payout_time: payoutStore.dailyPayoutTime,

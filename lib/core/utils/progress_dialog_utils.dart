@@ -1,38 +1,54 @@
 // lib/core/utils/progress_dialog_utils.dart
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ProgressDialogUtils {
   /// Executes any asynchronous Future task while rendering an immersive, barrier-locked
   /// progress dialog complete with a continuous "dancing" Invify logo micro-animation.
   static Future<T> showDancingProgress<T>(
-    BuildContext context, 
+    BuildContext context,
     Future<T> Function() asyncTask, {
     String message = 'Processing network handshake...',
   }) async {
-    // Trigger immersive barrier-locked loading matrix
+    return showUpdatableProgress<T>(
+      context,
+      (_) => asyncTask(),
+      initialMessage: message,
+    );
+  }
+
+  /// Same as [showDancingProgress], but the task can update the status line.
+  static Future<T> showUpdatableProgress<T>(
+    BuildContext context,
+    Future<T> Function(void Function(String message) setMessage) asyncTask, {
+    String initialMessage = 'Processing...',
+  }) async {
+    final message = ValueNotifier<String>(initialMessage);
     showDialog(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
       builder: (BuildContext dialogContext) {
         return PopScope(
-          canPop: false, // Enforce zero abort interruptions during transaction relay
+          canPop: false,
           child: Dialog(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            child: DancingLogoWidget(message: message),
+            child: ValueListenableBuilder<String>(
+              valueListenable: message,
+              builder: (_, msg, __) => DancingLogoWidget(message: msg),
+            ),
           ),
         );
       },
     );
 
     try {
-      // Execute continuous target task awaiting fulfillment
-      return await asyncTask();
+      return await asyncTask((m) {
+        message.value = m;
+      });
     } finally {
-      // Guarantee dialog closure routing matrix executes reliably
+      message.dispose();
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -42,7 +58,8 @@ class ProgressDialogUtils {
 
 class DancingLogoWidget extends StatelessWidget {
   final String message;
-  const DancingLogoWidget({super.key, this.message = 'Loading platform matrices...'});
+  const DancingLogoWidget(
+      {super.key, this.message = 'Loading platform matrices...'});
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +86,9 @@ class DancingLogoWidget extends StatelessWidget {
             ),
           ],
           border: Border.all(
-            color: isDark ? Colors.white.withOpacity(0.08) : Colors.black.withOpacity(0.05),
+            color: isDark
+                ? Colors.white.withOpacity(0.08)
+                : Colors.black.withOpacity(0.05),
           ),
         ),
         child: InvifyLoadingIndicator(message: message),

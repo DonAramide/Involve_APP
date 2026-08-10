@@ -4,22 +4,7 @@
 
 import { PosService } from '../src/services/pos.service';
 import type { MposEmvData } from '../src/types/pos.types';
-
-// ─── Mock iso8583-js ──────────────────────────────────────────────────────────
-jest.mock('iso8583-js', () => ({
-  parse: (buf: Buffer) => {
-    // Simulate a parsed message object where field 39 is "00"
-    const fields: Record<string, string> = {
-      '039': '00',
-      '037': '123456789012',
-      '011': '000001',
-      '038': 'AUTH01',
-    };
-    return {
-      get: (id: string) => fields[id] ?? null,
-    };
-  },
-}));
+import { packPosMessage } from '../src/services/iso/pos-packager';
 
 // ─── Shared EMV fixture matching com.demo.mposaisino EmvDetailResult ─────────
 const EMV_FIXTURE: MposEmvData = {
@@ -257,6 +242,80 @@ describe('PosService — Routing Logic', () => {
     }
     expect(() => (PosService as any).determineRoute(5000)).toThrow('All hosts are inactive');
   });
+
+  it('should prefer Tenant-scoped profile over Category profile', () => {
+    const nibss = PosService.routingConfig.hosts.find(h => h.hostCode === 'nibss');
+    if (nibss) nibss.isActive = true;
+    PosService.routingConfig.tenantRoutingProfiles = [
+      {
+        scopeType: 'Category',
+        targetValue: 'Retail',
+        category: 'Retail',
+        preferredHosts: ['kimono'],
+        fallbackHosts: ['medusa'],
+      },
+      {
+        scopeType: 'Tenant',
+        targetValue: 'tenant-abc',
+        category: 'Retail',
+        preferredHosts: ['nibss'],
+        fallbackHosts: ['express_pay'],
+      },
+    ];
+    PosService.tenantContextCache.set('tenant-abc', { category: 'Retail', agentCode: null });
+    const route = PosService.determineRoute(10000, 'tenant-abc', 'PURCHASE', 'VISA');
+    expect(route.name).toBe('NIBSS');
+  });
+
+  it('should match Group-scoped profile via terminalGroup context', () => {
+    const express = PosService.routingConfig.hosts.find(h => h.hostCode === 'express_pay');
+    if (express) {
+      express.isActive = true;
+      express.terminalGroup = 'Default';
+    }
+    PosService.routingConfig.tenantRoutingProfiles = [
+      {
+        scopeType: 'Group',
+        targetValue: 'Default',
+        category: 'Retail',
+        preferredHosts: ['express_pay'],
+        fallbackHosts: ['nibss'],
+      },
+    ];
+    const route = PosService.determineRoute(
+      10000,
+      'tenant-xyz',
+      'PURCHASE',
+      'VISA',
+      undefined,
+      { category: 'Retail', terminalGroup: 'Default' }
+    );
+    expect(route.name).toBe('EXPRESS_PAY');
+  });
+
+  it('should apply per-profile amountThresholds when profile matches', () => {
+    const nibss = PosService.routingConfig.hosts.find(h => h.hostCode === 'nibss');
+    if (nibss) nibss.isActive = true;
+    PosService.routingConfig.tenantRoutingProfiles = [
+      {
+        scopeType: 'Category',
+        targetValue: 'Retail',
+        category: 'Retail',
+        preferredHosts: [],
+        fallbackHosts: [],
+        amountThresholds: [{ min: 0, max: 20000, host: 'nibss' }],
+      },
+    ];
+    const route = PosService.determineRoute(
+      10000,
+      'Retail',
+      'PURCHASE',
+      'VISA',
+      undefined,
+      { category: 'Retail' }
+    );
+    expect(route.name).toBe('NIBSS');
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -265,24 +324,33 @@ describe('PosService — Routing Logic', () => {
 
 describe('PosService — parseIsoMessage', () => {
 
-  it('should extract field 39 response code "00" from mocked iso8583-js', () => {
-    const dummyBuf = Buffer.from('0210some_iso_message', 'ascii');
-    const result = PosService.parseIsoMessage(dummyBuf, 'TEST');
+  it('should extract field 39 response code "00" from PosPackager buffer', () => {
+    const packed = packPosMessage({
+      0: '0210',
+      11: '000001',
+      37: '123456789012',
+      39: '00',
+      41: '204435SA',
+    });
+    const result = PosService.parseIsoMessage(packed, 'TEST');
     expect(result.responseCode).toBe('00');
-    expect(result.isoFields['039']).toBe('00');
+    expect(result.isoFields['39']).toBe('00');
   });
 
   it('should return isoFields with RRN and STAN', () => {
-    const dummyBuf = Buffer.from('0210', 'ascii');
-    const result = PosService.parseIsoMessage(dummyBuf, 'TEST');
-    expect(result.isoFields['037']).toBe('123456789012');
-    expect(result.isoFields['011']).toBe('000001');
+    const packed = packPosMessage({
+      0: '0210',
+      11: '000001',
+      37: '123456789012',
+      39: '00',
+    });
+    const result = PosService.parseIsoMessage(packed, 'TEST');
+    expect(result.isoFields['37']).toBe('123456789012');
+    expect(result.isoFields['11']).toBe('000001');
   });
 
-  it('should fall back to heuristic when iso8583-js throws', () => {
-    const iso = require('iso8583-js');
-    jest.spyOn(iso, 'parse').mockImplementationOnce(() => { throw new Error('parse error'); });
-    // Build a buffer where "00" appears at position 20
+  it('should fall back to heuristic when PosPackager unpack fails', () => {
+    // Build a buffer where "00" appears at position 20 (not a valid PosPackager body)
     const buf = Buffer.alloc(30, 0x20); // spaces
     buf.write('00', 20, 'ascii');
     const result = PosService.parseIsoMessage(buf, 'FALLBACK');

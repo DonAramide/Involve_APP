@@ -175,13 +175,16 @@ object MposSdk {
 
                         val finalIp = if (request.ipAddress.isNullOrEmpty()) "196.6.103.18" else request.ipAddress
                         val finalPort = request.portNumber?.toIntOrNull() ?: 4018
+                        // Accelerex GA :4001 always needs TLS (Flutter default enableSsl can be false).
+                        val finalSsl =
+                            request.enableSsl || finalIp == "196.6.103.18" || finalPort == 4001
 
                         com.demo.mpossdk.internal.domain.model.TerminalParameters(
                             terminalId = finalTerminalId,
                             ctmk = request.key1 ?: "",
                             serverIP = finalIp,
                             port = finalPort,
-                            enableSSL = request.enableSsl,
+                            enableSSL = finalSsl,
                             activeHost = ActiveHost.EXPRESS_PAY,
                             expressPayBaseUrl = finalBaseUrl,
                             expressPayAuthToken = finalAuthToken,

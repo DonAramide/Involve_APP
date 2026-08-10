@@ -61,8 +61,14 @@ const CREDENTIAL_ENV_MAP: Record<InvifyVertical, { id: string; secret: string }>
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export class QuasarConnectivityHealthService {
-  private static readonly BASE_URL =
-    process.env.QUASAR_BASE_URL ?? 'https://api-quasar.iips.app/api/v1';
+  private static resolveBaseUrl(): string {
+    try {
+      const { resolveQuasarBaseUrl } = require('./quasar-base-url');
+      return resolveQuasarBaseUrl();
+    } catch {
+      return process.env.QUASAR_BASE_URL ?? 'https://api-quasar.iips.app/api/v1';
+    }
+  }
 
   /**
    * Full health check — safe to call on a schedule or via admin endpoint.
@@ -148,7 +154,7 @@ export class QuasarConnectivityHealthService {
 
   private static async pingHealth(): Promise<{ reachable: boolean; latencyMs: number | null }> {
     // Use the origin (without /api/v1) for the public health endpoint
-    const origin = QuasarConnectivityHealthService.BASE_URL.replace('/api/v1', '');
+    const origin = QuasarConnectivityHealthService.resolveBaseUrl().replace('/api/v1', '');
     const start = Date.now();
     try {
       const httpClient = new EnterpriseHttpClient({ providerName: 'QuasarHealthCheck' });
@@ -202,7 +208,7 @@ export class QuasarConnectivityHealthService {
 
         const correlationId = crypto.randomUUID();
         const client = new QuasarApiClient({
-          baseUrl: QuasarConnectivityHealthService.BASE_URL,
+          baseUrl: QuasarConnectivityHealthService.resolveBaseUrl(),
           tenantAuth: { apiKey: sk },
           timeoutMs: 8_000,
           maxRetries: 1,
