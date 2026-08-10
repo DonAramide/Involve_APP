@@ -595,13 +595,16 @@ abstract class SchoolBaseTemplate extends InvoiceTemplate {
         TextCommand('PERIOD: ${invoice.termName ?? ""} ${invoice.academicYearName ?? ""}'),
       
       TextCommand('-' * width),
-      TextCommand(_formatRow('FEE DESCRIPTION', 'AMOUNT', width), isBold: true),
+      TextCommand(_formatRow('FEE / QTY', 'AMOUNT', width), isBold: true),
       TextCommand('-' * width),
       
       ...invoice.items.map((item) {
         final usePrint = settings.customReceiptPricingEnabled && item.printPrice != null;
         final amount = CurrencyFormatter.format(usePrint ? item.totalPrint : item.total);
-        return TextCommand(_formatRow(item.item.name, amount, width));
+        final label = item.quantity > 1
+            ? '${item.item.name} x${item.quantity}'
+            : item.item.name;
+        return TextCommand(_formatRow(label, amount, width));
       }),
       
       TextCommand('-' * width),

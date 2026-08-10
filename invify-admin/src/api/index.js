@@ -286,6 +286,11 @@ export const schoolApi = {
   getRoster: (config) => api.get('/api/school/roster', config),
   getAcademics: () => api.get('/api/school/roster', { params: { type: 'result' } }),
   bulkSync: (data) => api.post('/api/school/bulk-sync', data),
+  getPayments: (config) => api.get('/api/school/payments', config),
+  syncPayments: (data) => api.post('/api/school/payments/sync', data),
+  getPaymentDisputes: (config) => api.get('/api/school/payment-disputes', config),
+  raisePaymentDispute: (data) => api.post('/api/school/payment-disputes', data),
+  updatePaymentDispute: (id, data) => api.patch(`/api/school/payment-disputes/${id}`, data),
 };
 
 export const insightsApi = {

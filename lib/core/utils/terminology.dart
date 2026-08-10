@@ -90,6 +90,12 @@ extension BusinessTerminology on AppSettings {
     if (businessMode == 'services') return 'Assign to Client';
     return 'Add Customer Name & Phone';
   }
+
+  String get assignExternalCustomerLabel {
+    if (businessMode == 'school') return 'Add External Customer/Student';
+    if (businessMode == 'services') return 'Add Walk-in Client';
+    return 'Add Walk-in Customer';
+  }
   
   String get customerInfoLabel {
     if (businessMode == 'school') return 'Student Information';

@@ -41,7 +41,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
   }
 
   @override
-  Future<void> saveInvoice(Invoice invoice) async {
+  @override
+  Future<void> saveInvoice(Invoice invoice, {bool adjustStudentBalance = true}) async {
     final now = DateTime.now();
     final deviceId = await DeviceInfoService.getDeviceSuffix();
     final invoiceSyncId = _uuid.v4();
@@ -213,7 +214,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
       }
 
       // 3. Update Student Balance if student is associated with invoice
-      if (invoice.studentId != null) {
+      if (adjustStudentBalance && invoice.studentId != null) {
         final double balanceChange;
         
         if (invoice.invoiceNumber.startsWith('PMT-')) {
@@ -578,6 +579,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
   }
 
   // New method for partial payments
+  @override
   Future<void> recordPayment(int invoiceId, double additionalAmount, String method) async {
     final now = DateTime.now();
     final invoice = await getInvoiceById(invoiceId);

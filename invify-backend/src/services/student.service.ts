@@ -2,6 +2,7 @@
 import { supabase } from '../db/supabase';
 import { getQuasarService } from '../integrations/quasar/factory';
 import { AuditService } from './audit.service';
+import { toQuasarChildUuid } from '../integrations/quasar/quasar-child-id';
 
 export class StudentService {
   /**
@@ -34,20 +35,21 @@ export class StudentService {
       // 3. Resolve Quasar Service (Multi-Tenant)
       const quasar = await getQuasarService(schoolId);
 
-      // 4. Call Quasar SDK
-      // Using student ID + timestamp as reference for Quasar-side idempotency if needed
-      const reference = `VA-${studentId.split('-')[0]}-${Date.now()}`;
-      
+      // 4. Call Quasar SDK (childId must be UUID; map stu-* keys deterministically)
+      const quasarChildId = toQuasarChildUuid(schoolId, studentId);
+      const reference = `VA-${quasarChildId.substring(0, 8)}-${Date.now()}`;
+
       const quasarAccount = await quasar.createVirtualAccount({
-        childId: studentId,
+        childId: quasarChildId,
         parentId: schoolId,
         email: `${student.admission_number}@invify.edu`, // Fallback email
         firstName: student.first_name,
         lastName: student.last_name,
         metadata: {
           admissionNumber: student.admission_number,
-          source: 'student_provisioning'
-        }
+          source: 'student_provisioning',
+          externalStudentKey: studentId,
+        },
       });
 
       // 5. Store in Database

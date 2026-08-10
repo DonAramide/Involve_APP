@@ -13,6 +13,7 @@ import '../../../settings/presentation/bloc/settings_state.dart';
 import '../pages/receipt_preview_page.dart';
 import '../pages/invoice_success_page.dart';
 import '../../domain/templates/concrete_templates.dart';
+import '../../domain/templates/pos_receipt_commands.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
 import '../../../settings/domain/entities/settings.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
@@ -744,15 +745,19 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                 }
                 return MposTransactionResponse(
                   status: 'payment_success',
-                  transaction: MposTransactionData(
-                    paymentSuccess: true,
-                    statusCode: body['statusCode']?.toString() ?? '00',
-                    message: body['message']?.toString() ?? 'Approved',
-                    rrn: body['rrn']?.toString(),
-                    stan: body['stan']?.toString(),
-                    authCode: body['authCode']?.toString(),
-                    maskedPan: body['maskedPan']?.toString(),
-                    amount: amountToCharge.toStringAsFixed(2),
+                  transaction: enrichPosTransactionFromEmv(
+                    MposTransactionData(
+                      paymentSuccess: true,
+                      statusCode: body['statusCode']?.toString() ?? '00',
+                      message: body['message']?.toString() ?? 'Approved',
+                      rrn: body['rrn']?.toString(),
+                      stan: body['stan']?.toString(),
+                      authCode: body['authCode']?.toString(),
+                      maskedPan: body['maskedPan']?.toString(),
+                      amount: amountToCharge.toStringAsFixed(2),
+                    ),
+                    payment.emvData,
+                    amountFallback: amountToCharge,
                   ),
                   emvData: payment.emvData,
                 );
@@ -805,7 +810,11 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         }
         if (!mounted) return;
 
-        posTransactionData = result.transaction;
+        posTransactionData = enrichPosTransactionFromEmv(
+          result.transaction,
+          result.emvData,
+          amountFallback: amountToCharge,
+        );
 
         final posApproved = result.status == 'payment_success' &&
             (result.transaction == null ||
@@ -971,8 +980,11 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
       if (printReceipt && settings != null) {
         _printInvoice(context, invoice, settings,
             posTx: posTransactionData, copyType: 'Customer Copy');
-        // also print merchant copy if POS
         if (posTransactionData != null) {
+          // Separate card slip when not merged into the invoice body
+          if (settings.mergePosReceipt != true) {
+            _printPosReceipt(posTransactionData, copyType: 'Customer Copy');
+          }
           final enableTenantCopy = settings.enableTenantReceiptCopy ?? false;
           if (enableTenantCopy) {
             _printPosReceipt(posTransactionData, copyType: 'Merchant Copy');
@@ -1005,7 +1017,13 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
         nav.popUntil(
             (route) => route.settings.name == '/dashboard' || route.isFirst);
         nav.push(MaterialPageRoute(
-            builder: (_) => InvoiceSuccessPage(invoice: invoice),
+            builder: (_) => InvoiceSuccessPage(
+                  invoice: invoice,
+                  posTransaction: posTransactionData,
+                  terminalId: _terminalConfig?.terminalId ??
+                      _terminalConfig?.mposTerminalId,
+                  merchantName: _terminalConfig?.businessName,
+                ),
             settings: const RouteSettings(name: '/invoice_success')));
       }
     } catch (e) {
@@ -1049,8 +1067,15 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     final commands =
         template.generateCommands(invoice, settings, copyType: copyType);
     if (posTx != null && settings.mergePosReceipt == true) {
-      commands
-          .addAll(_getPosReceiptCommands(posTx, settings, copyType: copyType));
+      commands.addAll(buildPosReceiptCommands(
+        tx: posTx,
+        merchantName: _terminalConfig?.businessName ?? settings.organizationName,
+        terminalId:
+            _terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId,
+        currency: settings.currency,
+        copyType: copyType,
+        isMerged: true,
+      ));
     }
     context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
   }
@@ -1275,45 +1300,19 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
     }
   }
 
-  List<PrintCommand> _getPosReceiptCommands(
-      MposTransactionData tx, AppSettings? settings,
-      {String? copyType}) {
-    final String merchantName = _terminalConfig?.businessName ??
-        settings?.organizationName ??
-        'MERCHANT';
-    final String merchantId = _terminalConfig?.terminalId ?? 'N/A';
-    final currency = settings?.currency ?? 'NGN';
-    final bool isMerged = settings?.mergePosReceipt ?? false;
-
-    return [
-      TextCommand('================================', align: 'center'),
-      TextCommand('POS PAYMENT RECEIPT', isBold: true, align: 'center'),
-      if (copyType != null)
-        TextCommand('***  ***', align: 'center', isBold: true),
-      TextCommand('================================', align: 'center'),
-      if (!isMerged) TextCommand(merchantName, align: 'center'),
-      TextCommand('Terminal ID: ', align: 'center'),
-      SizedBoxCommand(height: 1),
-      TextCommand('Card Holder: '),
-      TextCommand('Card Type: '),
-      TextCommand('PAN: '),
-      TextCommand('Amount: ', isBold: true),
-      TextCommand('Auth Code: '),
-      TextCommand('RRN: '),
-      TextCommand('STAN: '),
-      TextCommand('Date: '),
-      TextCommand('================================', align: 'center'),
-      TextCommand('APPROVED', isBold: true, align: 'center'),
-      TextCommand('================================', align: 'center'),
-    ];
-  }
-
   void _printPosReceipt(MposTransactionData tx, {String? copyType}) {
     final settings = context.read<SettingsBloc>().state.settings;
-    final commands = _getPosReceiptCommands(tx, settings, copyType: copyType);
-    context
-        .read<PrinterBloc>()
-        .add(PrintCommandsEvent(commands, 58)); // Assuming 58mm
+    final commands = buildPosReceiptCommands(
+      tx: tx,
+      merchantName:
+          _terminalConfig?.businessName ?? settings?.organizationName,
+      terminalId:
+          _terminalConfig?.terminalId ?? _terminalConfig?.mposTerminalId,
+      currency: settings?.currency,
+      copyType: copyType,
+      isMerged: settings?.mergePosReceipt ?? false,
+    );
+    context.read<PrinterBloc>().add(PrintCommandsEvent(commands, 58));
   }
 
   /// Hide ops/env internals from cashiers; keep NIBSS host messages intact.

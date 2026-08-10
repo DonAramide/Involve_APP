@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
@@ -22,6 +25,13 @@ import 'package:involve_app/core/mpos/mpos_device_type.dart';
 import 'package:involve_app/services/socket_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
+import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/core/utils/progress_dialog_utils.dart';
+import 'package:involve_app/core/utils/nibss_response_codes.dart';
+import 'package:involve_app/core/utils/iso_response_codes.dart';
+import 'package:involve_app/features/invoicing/domain/templates/pos_receipt_commands.dart';
+import 'package:involve_app/features/invoicing/domain/templates/invoice_template.dart';
+import 'package:involve_app/features/invoicing/domain/templates/template_registry.dart';
 
 class StudentProfilePage extends StatefulWidget {
   final int studentId;
@@ -33,6 +43,8 @@ class StudentProfilePage extends StatefulWidget {
 
 class _StudentProfilePageState extends State<StudentProfilePage> {
   bool _awaitingVaProvision = false;
+  bool _awaitingPaymentSuccess = false;
+  MposTransactionData? _pendingPosTx;
   StreamSubscription<Student>? _studentCreditSub;
 
   @override
@@ -57,6 +69,42 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   Widget build(BuildContext context) {
     return BlocConsumer<SchoolBloc, SchoolState>(
       listener: (context, state) {
+        if (_awaitingPaymentSuccess &&
+            state.status == SchoolStatus.success &&
+            state.lastPaymentReceipt != null) {
+          _awaitingPaymentSuccess = false;
+          final receipt = state.lastPaymentReceipt!;
+          final posTx = _pendingPosTx;
+          _pendingPosTx = null;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            unawaited(_showPaymentSuccessAndPrint(
+              receipt: receipt,
+              posTx: posTx,
+            ));
+          });
+        }
+
+        if (_awaitingPaymentSuccess &&
+            state.status == SchoolStatus.failure &&
+            state.error != null) {
+          _awaitingPaymentSuccess = false;
+          _pendingPosTx = null;
+          showDialog(
+            context: context,
+            builder: (c) => AlertDialog(
+              title: const Text('Payment Failed'),
+              content: Text(state.error!),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(c),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+
         if (!_awaitingVaProvision) return;
 
         if (state.error != null && state.status == SchoolStatus.failure) {
@@ -130,7 +178,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                       _buildGeneralTab(student, isProvisioningVa: _awaitingVaProvision),
                        _buildRecordsTab(student, state.studentInvoices, currency),
                       _buildResultsTab(state.results),
-                      _buildPaymentsTab(state.studentInvoices, currency),
+                      _buildPaymentsTab(student, state.studentInvoices, currency),
                     ],
                   ),
                 ),
@@ -155,12 +203,13 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     final rawBalance = student.balance;
     final ledgerDebt = rawBalance > 0 ? rawBalance : 0.0;
     final invoiceDebt = studentInvoices
-        .where((inv) => inv.studentId == student.id)
+        .where((inv) => inv.studentId == student.id && !inv.invoiceNumber.startsWith('PMT-'))
         .fold(0.0, (sum, inv) {
       final owing = inv.totalAmount - inv.amountPaid;
       return sum + (owing > 0 ? owing : 0);
     });
-    final debt = ledgerDebt > 0.001 ? ledgerDebt : invoiceDebt;
+    // Prefer live open-bill debt; fall back to ledger when bills are missing.
+    final debt = invoiceDebt > 0.001 ? invoiceDebt : ledgerDebt;
     final hasDebit = debt > 0.001;
     final hasCredit = student.creditBalance > 0.001;
     // CLEAR applies wallet credit to open debt / bills.
@@ -910,7 +959,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
-  Widget _buildPaymentsTab(List<Invoice> invoices, String currency) {
+  Widget _buildPaymentsTab(Student student, List<Invoice> invoices, String currency) {
     // Extract invoices with amountPaid > 0 as "Payments"
     final paidInvoices = invoices.where((inv) => inv.amountPaid > 0).toList();
     if (paidInvoices.isEmpty) {
@@ -923,7 +972,9 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         return ListTile(
           leading: const Icon(Icons.check_circle, color: Colors.green),
           title: Text('Payment for Bill #${inv.invoiceNumber}'),
-          subtitle: Text('Method: ${inv.paymentMethod ?? "Unknown"} | ${DateFormat('dd MMM yyyy').format(inv.dateCreated)}'),
+          subtitle: Text(
+            'Method: ${inv.paymentMethod ?? "Unknown"} | ${DateFormat('dd MMM yyyy').format(inv.dateCreated)}',
+          ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -933,12 +984,472 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
               ),
               const SizedBox(width: 8),
               IconButton(
-                icon: const Icon(Icons.print, color: Colors.blueGrey, size: 20),
-                onPressed: () => _openReceipt(context, inv, "PAYMENT RECEIPT"),
+                icon: const Icon(Icons.info_outline, color: Colors.blueGrey),
+                tooltip: 'Transaction details',
+                onPressed: () => _showTransactionDetailsSheet(
+                  context,
+                  student: student,
+                  invoice: inv,
+                  currency: currency,
+                ),
               ),
             ],
           ),
-          onTap: () => _openReceipt(context, inv, "PAYMENT RECEIPT"),
+          onTap: () => _showTransactionDetailsSheet(
+            context,
+            student: student,
+            invoice: inv,
+            currency: currency,
+          ),
+        );
+      },
+    );
+  }
+
+  Map<String, dynamic>? _paymentBalanceMeta(Invoice invoice) {
+    for (final item in invoice.items) {
+      final raw = item.serviceMeta;
+      if (raw == null || raw.trim().isEmpty) continue;
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          final map = Map<String, dynamic>.from(decoded);
+          if (map.containsKey('balanceBefore') || map.containsKey('balanceAfter')) {
+            return map;
+          }
+        }
+      } catch (_) {
+        // ignore malformed meta
+      }
+    }
+    return null;
+  }
+
+  String _fmtLedgerAmount(double? value, String currency, {required bool isCredit}) {
+    if (value == null) return '—';
+    final label = isCredit ? 'Credit' : 'Balance';
+    return '$label ${CurrencyFormatter.formatWithSymbol(value, symbol: currency)}';
+  }
+
+  void _showTransactionDetailsSheet(
+    BuildContext context, {
+    required Student student,
+    required Invoice invoice,
+    required String currency,
+  }) {
+    final meta = _paymentBalanceMeta(invoice);
+    final amount = invoice.amountPaid > 0 ? invoice.amountPaid : invoice.totalAmount;
+    final method = invoice.paymentMethod ?? 'Unknown';
+    final when = DateFormat('dd MMM yyyy HH:mm').format(invoice.dateCreated);
+
+    double? asDouble(dynamic v) => v == null ? null : (v as num?)?.toDouble();
+
+    final balanceBefore = asDouble(meta?['balanceBefore']);
+    final creditBefore = asDouble(meta?['creditBefore']);
+    final balanceAfter = asDouble(meta?['balanceAfter']);
+    final creditAfter = asDouble(meta?['creditAfter']);
+    final appliedToBills = asDouble(meta?['appliedToBills']);
+    final toCredit = asDouble(meta?['toCredit']);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 12,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const Text(
+                  'Transaction Details',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  student.fullName,
+                  style: TextStyle(color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 16),
+                _txDetailRow('Receipt / Bill', '#${invoice.invoiceNumber}'),
+                _txDetailRow('Amount paid', CurrencyFormatter.formatWithSymbol(amount, symbol: currency)),
+                _txDetailRow('Method', method),
+                _txDetailRow('Status', invoice.paymentStatus),
+                _txDetailRow('Date', when),
+                if (invoice.className != null && invoice.className!.isNotEmpty)
+                  _txDetailRow('Class', invoice.className!),
+                if (invoice.termName != null && invoice.termName!.isNotEmpty)
+                  _txDetailRow('Term', invoice.termName!),
+                const Divider(height: 28),
+                Text(
+                  'BALANCE IMPACT',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (meta == null)
+                  Text(
+                    'Before/after balance was not stored for this older payment.',
+                    style: TextStyle(fontSize: 13, color: Colors.orange.shade800),
+                  )
+                else ...[
+                  _txDetailRow(
+                    'Balance before',
+                    _fmtLedgerAmount(balanceBefore, currency, isCredit: false),
+                  ),
+                  _txDetailRow(
+                    'Credit before',
+                    _fmtLedgerAmount(creditBefore, currency, isCredit: true),
+                  ),
+                  if ((appliedToBills ?? 0) > 0.001)
+                    _txDetailRow(
+                      'Applied to bills',
+                      CurrencyFormatter.formatWithSymbol(appliedToBills!, symbol: currency),
+                    ),
+                  if ((toCredit ?? 0) > 0.001)
+                    _txDetailRow(
+                      'Added to credit',
+                      CurrencyFormatter.formatWithSymbol(toCredit!, symbol: currency),
+                    ),
+                  _txDetailRow(
+                    'Balance after',
+                    _fmtLedgerAmount(balanceAfter, currency, isCredit: false),
+                  ),
+                  _txDetailRow(
+                    'Credit after',
+                    _fmtLedgerAmount(creditAfter, currency, isCredit: true),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showTransactionFullDetailsDialog(
+                            context,
+                            student: student,
+                            invoice: invoice,
+                            currency: currency,
+                            meta: meta,
+                          );
+                        },
+                        icon: const Icon(Icons.visibility_outlined, size: 18),
+                        label: const Text('View Details'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _openReceipt(context, invoice, 'PAYMENT RECEIPT');
+                        },
+                        icon: const Icon(Icons.print_outlined, size: 18),
+                        label: const Text('Print / Preview'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade700,
+                      side: BorderSide(color: Colors.red.shade200),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showRaiseDisputeDialog(
+                        context,
+                        student: student,
+                        invoice: invoice,
+                        currency: currency,
+                      );
+                    },
+                    icon: const Icon(Icons.report_gmailerrorred_outlined, size: 18),
+                    label: const Text('Raise Dispute'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _txDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTransactionFullDetailsDialog(
+    BuildContext context, {
+    required Student student,
+    required Invoice invoice,
+    required String currency,
+    required Map<String, dynamic>? meta,
+  }) {
+    final amount = invoice.amountPaid > 0 ? invoice.amountPaid : invoice.totalAmount;
+    final itemNames = invoice.items.map((i) => i.item.name).where((n) => n.trim().isNotEmpty).join(', ');
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Payment Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _txDetailRow('Student', student.fullName),
+              _txDetailRow('Admission', student.admissionNumber),
+              _txDetailRow('Receipt', '#${invoice.invoiceNumber}'),
+              _txDetailRow(
+                'Amount',
+                CurrencyFormatter.formatWithSymbol(amount, symbol: currency),
+              ),
+              _txDetailRow('Method', invoice.paymentMethod ?? '—'),
+              _txDetailRow('Status', invoice.paymentStatus),
+              _txDetailRow(
+                'Date',
+                DateFormat('dd MMM yyyy HH:mm:ss').format(invoice.dateCreated),
+              ),
+              if (itemNames.isNotEmpty) _txDetailRow('Description', itemNames),
+              if (meta != null) ...[
+                const Divider(height: 20),
+                _txDetailRow(
+                  'Balance before',
+                  _fmtLedgerAmount(
+                    (meta['balanceBefore'] as num?)?.toDouble(),
+                    currency,
+                    isCredit: false,
+                  ),
+                ),
+                _txDetailRow(
+                  'Credit before',
+                  _fmtLedgerAmount(
+                    (meta['creditBefore'] as num?)?.toDouble(),
+                    currency,
+                    isCredit: true,
+                  ),
+                ),
+                _txDetailRow(
+                  'Balance after',
+                  _fmtLedgerAmount(
+                    (meta['balanceAfter'] as num?)?.toDouble(),
+                    currency,
+                    isCredit: false,
+                  ),
+                ),
+                _txDetailRow(
+                  'Credit after',
+                  _fmtLedgerAmount(
+                    (meta['creditAfter'] as num?)?.toDouble(),
+                    currency,
+                    isCredit: true,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openReceipt(context, invoice, 'PAYMENT RECEIPT');
+            },
+            child: const Text('PRINT / PREVIEW'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('CLOSE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRaiseDisputeDialog(
+    BuildContext context, {
+    required Student student,
+    required Invoice invoice,
+    required String currency,
+  }) {
+    final reasonController = TextEditingController();
+    String reason = 'Incorrect amount';
+    final reasons = <String>[
+      'Incorrect amount',
+      'Duplicate payment',
+      'Wrong student credited',
+      'Card charged but not reflected',
+      'Other',
+    ];
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            return AlertDialog(
+              title: const Text('Raise Dispute'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Dispute payment #${invoice.invoiceNumber} for ${student.fullName}.',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: reason,
+                      decoration: const InputDecoration(labelText: 'Reason'),
+                      items: reasons
+                          .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                          .toList(),
+                      onChanged: (v) => setLocal(() => reason = v ?? reason),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Details (optional)',
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('CANCEL'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final amount = invoice.amountPaid > 0
+                        ? invoice.amountPaid
+                        : invoice.totalAmount;
+                    final notes = reasonController.text.trim();
+                    final pageContext = this.context;
+
+                    Navigator.pop(ctx);
+
+                    String? apiError;
+                    try {
+                      final financeRepo = pageContext.read<FinanceRepository>();
+                      await financeRepo.raiseSchoolPaymentDispute({
+                        'localInvoiceNumber': invoice.invoiceNumber,
+                        'admissionNumber': student.admissionNumber,
+                        'studentKey': 'stu-${student.admissionNumber}',
+                        'studentName': student.fullName,
+                        'amount': amount,
+                        'paymentMethod': invoice.paymentMethod,
+                        'reason': reason,
+                        'details': notes.isEmpty ? null : notes,
+                        'raisedBy': 'school_app',
+                      });
+                    } catch (e) {
+                      apiError = e.toString();
+                      // Fallback: still allow sharing if offline / API down.
+                      final body = StringBuffer()
+                        ..writeln('PAYMENT DISPUTE')
+                        ..writeln(
+                          'Student: ${student.fullName} (ID ${student.admissionNumber})',
+                        )
+                        ..writeln('Receipt: ${invoice.invoiceNumber}')
+                        ..writeln(
+                          'Amount: ${CurrencyFormatter.formatWithSymbol(amount, symbol: currency)}',
+                        )
+                        ..writeln('Method: ${invoice.paymentMethod ?? 'Unknown'}')
+                        ..writeln(
+                          'Date: ${DateFormat('dd MMM yyyy HH:mm').format(invoice.dateCreated)}',
+                        )
+                        ..writeln('Reason: $reason');
+                      if (notes.isNotEmpty) body.writeln('Details: $notes');
+                      await Share.share(
+                        body.toString(),
+                        subject: 'Payment dispute — ${invoice.invoiceNumber}',
+                      );
+                    }
+
+                    if (!pageContext.mounted) return;
+                    showDialog<void>(
+                      context: pageContext,
+                      builder: (c) => AlertDialog(
+                        title: Text(
+                          apiError == null
+                              ? 'Dispute Submitted'
+                              : 'Dispute Shared Offline',
+                        ),
+                        content: Text(
+                          apiError == null
+                              ? 'Dispute was sent to your school admin web under School Payments → Disputes.'
+                              : 'Could not reach the server ($apiError). A share note was opened instead.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(c),
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: const Text('SUBMIT'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1245,7 +1756,21 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         config.posSerialNumber != null &&
         config.posSerialNumber!.isNotEmpty;
 
-    final amountController = TextEditingController(text: student.balance.toString());
+    // Prefill with open bill debt (same as Balance chip), not a stale ledger-only figure.
+    final schoolState = context.read<SchoolBloc>().state;
+    final openDebt = schoolState.studentInvoices
+        .where((inv) =>
+            inv.studentId == student.id && !inv.invoiceNumber.startsWith('PMT-'))
+        .fold<double>(0, (sum, inv) {
+      final owing = inv.totalAmount - inv.amountPaid;
+      return sum + (owing > 0 ? owing : 0);
+    });
+    final ledgerDebt = student.balance > 0 ? student.balance : 0.0;
+    final suggestPay = openDebt > 0.001 ? openDebt : ledgerDebt;
+
+    final amountController = TextEditingController(
+      text: suggestPay > 0 ? suggestPay.toStringAsFixed(2) : '',
+    );
     final remarksController = TextEditingController();
     String paymentMethod = 'Cash';
     bool isProcessing = false;
@@ -1462,16 +1987,20 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                               if (amount <= 0) return;
 
                               if (paymentMethod == 'POS') {
-                                final connectivityResult = await Connectivity().checkConnectivity();
-                                if (connectivityResult.contains(ConnectivityResult.none) || connectivityResult.isEmpty) {
+                                if (config == null) {
                                   if (context.mounted) {
                                     showDialog(
                                       context: context,
                                       builder: (c) => AlertDialog(
-                                        title: const Text('No Internet'),
-                                        content: const Text('POS requires an active network connection.'),
+                                        title: const Text('POS Not Configured'),
+                                        content: const Text(
+                                          'Terminal config is missing. Sync POS settings and try again.',
+                                        ),
                                         actions: [
-                                          TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(c),
+                                            child: const Text('OK'),
+                                          ),
                                         ],
                                       ),
                                     );
@@ -1479,83 +2008,151 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                                   return;
                                 }
 
-                                final terminalId = config!.terminalId ?? config.mposTerminalId ?? '2214OTGF';
-                                final activeHost = config.activeHost ?? 'MEDUSA';
-                                final deviceType = MposDeviceType.channelValue(MposDeviceType.resolve(config.terminalType));
-                                final routingRules = config.routingRules ?? {};
-                                final processOnDevice = routingRules['processOnDevice'] == true;
-                                final effectiveProcessOnDevice = MposDeviceType.isMoreFun(config.terminalType) ? true : processOnDevice;
+                                final connectivityResult =
+                                    await Connectivity().checkConnectivity();
+                                if (connectivityResult
+                                        .contains(ConnectivityResult.none) ||
+                                    connectivityResult.isEmpty) {
+                                  if (context.mounted) {
+                                    showDialog(
+                                      context: context,
+                                      builder: (c) => AlertDialog(
+                                        title: const Text('No Internet'),
+                                        content: const Text(
+                                          'POS requires an active network connection.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(c),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+
+                                final currency = context
+                                        .read<SettingsBloc>()
+                                        .state
+                                        .settings
+                                        ?.currency ??
+                                    '₦';
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('Confirm POS Payment'),
+                                    content: Text(
+                                      'Charge ${CurrencyFormatter.formatWithSymbol(amount, symbol: currency)} to POS terminal for ${student.fullName}?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(c, false),
+                                        child: const Text('CANCEL'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(c, true),
+                                        child: const Text('CHARGE'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm != true) return;
+
+                                setDialogState(() {
+                                  isProcessing = true;
+                                  statusMessage =
+                                      'Connecting to POS terminal... Please insert card';
+                                });
 
                                 try {
-                                  setDialogState(() {
-                                    isProcessing = true;
-                                    statusMessage = 'Connecting to POS terminal... Please insert card';
-                                  });
-
-                                  final result = await MposService().initiatePayment(
+                                  final result =
+                                      await _runStudentPosPayment(
+                                    pageContext: context,
+                                    config: config,
                                     amount: amount,
-                                    terminalId: terminalId,
-                                    activeHost: activeHost,
-                                    processOnDevice: effectiveProcessOnDevice,
-                                    deviceType: deviceType,
+                                    student: student,
+                                    remarks: remarksController.text,
                                   );
 
-                                  if (result.status == 'payment_success') {
-                                    if (context.mounted) {
-                                      context.read<SchoolBloc>().add(MakeStudentPaymentEvent(
-                                        studentId: student.id!,
-                                        amount: amount,
-                                        method: 'POS',
-                                        remarks: remarksController.text.isNotEmpty 
-                                            ? remarksController.text 
-                                            : 'POS Approved: ${result.transaction?.rrn ?? ""}',
-                                      ));
-                                    }
+                                  final approved =
+                                      result.status == 'payment_success' &&
+                                          (result.transaction == null ||
+                                              result.transaction!
+                                                      .paymentSuccess ==
+                                                  true);
 
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('POS Payment Approved!'),
-                                          backgroundColor: Colors.green,
-                                        ),
-                                      );
-                                    }
-
-                                    Navigator.pop(ctx);
-                                  } else {
-                                    final errorMsg = result.error?.message ?? result.transaction?.message ?? 'POS Transaction Failed';
-                                    setDialogState(() {
-                                      isProcessing = false;
-                                      statusMessage = null;
-                                    });
-
-                                    if (context.mounted) {
-                                      showDialog(
-                                        context: context,
-                                        builder: (c) => AlertDialog(
-                                          title: const Text('POS Payment Failed'),
-                                          content: Text(errorMsg),
-                                          actions: [
-                                            TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
-                                          ],
-                                        ),
-                                      );
-                                    }
+                                  if (!approved) {
+                                    final msg = result.error?.message ??
+                                        result.transaction?.message ??
+                                        'Card payment was not completed successfully';
+                                    final formatted =
+                                        result.transaction?.statusCode !=
+                                                    null &&
+                                                result.transaction!.statusCode!
+                                                    .isNotEmpty
+                                            ? NibssResponseCodes.getMessage(
+                                                result.transaction!.statusCode)
+                                            : getIsoResponseMessage(msg);
+                                    throw Exception(
+                                      formatted.isNotEmpty ? formatted : msg,
+                                    );
                                   }
+
+                                  if (context.mounted) {
+                                    setState(() {
+                                      _awaitingPaymentSuccess = true;
+                                      _pendingPosTx = enrichPosTransactionFromEmv(
+                                        result.transaction,
+                                        result.emvData,
+                                        amountFallback: amount,
+                                      );
+                                    });
+                                    context.read<SchoolBloc>().add(
+                                          MakeStudentPaymentEvent(
+                                            studentId: student.id!,
+                                            amount: amount,
+                                            method: 'POS',
+                                            remarks: remarksController
+                                                    .text.isNotEmpty
+                                                ? remarksController.text
+                                                : 'POS Approved: ${result.transaction?.rrn ?? ""}',
+                                          ),
+                                        );
+                                  }
+                                  cleanup();
+                                  Navigator.pop(ctx);
                                 } catch (e) {
                                   setDialogState(() {
                                     isProcessing = false;
                                     statusMessage = null;
                                   });
-
                                   if (context.mounted) {
+                                    final raw = e is DioException
+                                        ? (e.response?.data is Map
+                                            ? (e.response!.data['message'] ??
+                                                    e.response!.data['error'] ??
+                                                    e.message)
+                                                .toString()
+                                            : (e.message ?? e.toString()))
+                                        : e.toString();
                                     showDialog(
                                       context: context,
                                       builder: (c) => AlertDialog(
-                                        title: const Text('POS Payment Error'),
-                                        content: Text('An unexpected error occurred: $e'),
+                                        title: const Text(
+                                          'POS Payment Incomplete',
+                                        ),
+                                        content: Text(
+                                          raw.replaceFirst('Exception: ', ''),
+                                        ),
                                         actions: [
-                                          TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(c),
+                                            child: const Text('OK'),
+                                          ),
                                         ],
                                       ),
                                     );
@@ -1563,12 +2160,17 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                                 }
                               } else {
                                 // Cash
+                                setState(() {
+                                  _awaitingPaymentSuccess = true;
+                                  _pendingPosTx = null;
+                                });
                                 context.read<SchoolBloc>().add(MakeStudentPaymentEvent(
                                   studentId: student.id!,
                                   amount: amount,
                                   method: paymentMethod,
                                   remarks: remarksController.text,
                                 ));
+                                cleanup();
                                 Navigator.pop(ctx);
                               }
                             },
@@ -1581,5 +2183,298 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
         );
       },
     );
+  }
+
+  /// Same Quasar/switchboard path as invoice checkout:
+  /// device may return [emv_data_ready] → POST /api/pos/transaction for host approval.
+  Future<MposTransactionResponse> _runStudentPosPayment({
+    required BuildContext pageContext,
+    required TerminalConfig config,
+    required double amount,
+    required Student student,
+    required String remarks,
+  }) async {
+    final terminalId =
+        config.terminalId ?? config.mposTerminalId ?? '2214OTGF';
+    final activeHost = config.activeHost ?? 'MEDUSA';
+    final deviceType = MposDeviceType.channelValue(
+      MposDeviceType.resolve(config.terminalType),
+    );
+    final routingRules = config.routingRules ?? {};
+    final processOnDevice = routingRules['processOnDevice'] == true;
+    final effectiveProcessOnDevice =
+        MposDeviceType.isMoreFun(config.terminalType)
+            ? true
+            : processOnDevice;
+
+    return ProgressDialogUtils.showUpdatableProgress(
+      pageContext,
+      (setMessage) async {
+        setMessage('Waiting for card on terminal…');
+        var payment = await MposService().initiatePayment(
+          amount: amount,
+          terminalId: terminalId,
+          activeHost: activeHost,
+          processOnDevice: effectiveProcessOnDevice,
+          deviceType: deviceType,
+        );
+
+        if (payment.status != 'payment_success' &&
+            config.secondaryHost != null) {
+          final secondaryHostName =
+              config.secondaryHost!['hostCode'] as String? ??
+                  config.secondaryHost!['hostName'] as String?;
+          if (secondaryHostName != null &&
+              secondaryHostName.toUpperCase() != activeHost.toUpperCase()) {
+            setMessage('Trying backup host ($secondaryHostName)…');
+            payment = await MposService().initiatePayment(
+              amount: amount,
+              terminalId: terminalId,
+              activeHost: secondaryHostName,
+              processOnDevice: effectiveProcessOnDevice,
+              deviceType: deviceType,
+            );
+          }
+        }
+
+        // Quasar / switchboard: EMV captured on device, host confirms via Invify.
+        if (payment.status == 'emv_data_ready' && payment.emvData != null) {
+          setMessage(
+            'Confirming payment with host…\nThis can take up to a minute.',
+          );
+          final financeRepo = pageContext.read<FinanceRepository>();
+          final posRes = await financeRepo.apiClient.post(
+            '/api/pos/transaction',
+            data: {
+              'terminalId': terminalId,
+              'amount': amount,
+              'emvData': payment.emvData!.toJson(),
+              'staffName': 'School Fees',
+              'items': [
+                {
+                  'name': remarks.trim().isEmpty
+                      ? 'Student fees — ${student.fullName} (${student.admissionNumber})'
+                      : remarks.trim(),
+                  'quantity': 1,
+                },
+              ],
+              'metadata': {
+                'source': 'student_profile_pos',
+                'studentId': student.id,
+                'admissionNumber': student.admissionNumber,
+              },
+            },
+          );
+          final body = posRes.data is Map
+              ? Map<String, dynamic>.from(posRes.data as Map)
+              : <String, dynamic>{};
+          final approved = body['paymentSuccess'] == true ||
+              body['statusCode']?.toString() == '00';
+          if (!approved) {
+            final code = body['statusCode']?.toString() ?? '';
+            final rawMsg = body['message']?.toString() ??
+                body['error']?.toString() ??
+                (code.isNotEmpty
+                    ? NibssResponseCodes.getMessage(code)
+                    : 'Host did not approve this card payment');
+            throw Exception(rawMsg);
+          }
+          return MposTransactionResponse(
+            status: 'payment_success',
+            transaction: enrichPosTransactionFromEmv(
+              MposTransactionData(
+                paymentSuccess: true,
+                statusCode: body['statusCode']?.toString() ?? '00',
+                message: body['message']?.toString() ?? 'Approved',
+                rrn: body['rrn']?.toString(),
+                stan: body['stan']?.toString(),
+                authCode: body['authCode']?.toString(),
+                maskedPan: body['maskedPan']?.toString(),
+                amount: amount.toStringAsFixed(2),
+              ),
+              payment.emvData,
+              amountFallback: amount,
+            ),
+            emvData: payment.emvData,
+          );
+        }
+
+        return payment;
+      },
+      initialMessage: 'Starting POS payment…',
+    );
+  }
+
+  Future<void> _showPaymentSuccessAndPrint({
+    required Invoice receipt,
+    MposTransactionData? posTx,
+  }) async {
+    final currency =
+        context.read<SettingsBloc>().state.settings?.currency ?? '₦';
+    final amountText = CurrencyFormatter.formatWithSymbol(
+      receipt.amountPaid > 0 ? receipt.amountPaid : receipt.totalAmount,
+      symbol: currency,
+    );
+    final method = receipt.paymentMethod ?? 'Payment';
+
+    // Auto-print when a thermal printer is connected.
+    final printResult = _printStudentPaymentReceipt(receipt, posTx: posTx);
+
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text('Payment Successful'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('$method payment of $amountText recorded.'),
+            const SizedBox(height: 8),
+            Text(
+              'Receipt: ${receipt.invoiceNumber}',
+              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+            ),
+            if (posTx?.rrn != null && posTx!.rrn!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                'RRN: ${posTx.rrn}',
+                style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Text(
+              printResult == null
+                  ? 'Receipt sent to printer.'
+                  : printResult,
+              style: TextStyle(
+                color: printResult == null
+                    ? Colors.green.shade700
+                    : Colors.orange.shade800,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openReceipt(context, receipt, 'PAYMENT RECEIPT');
+            },
+            child: const Text('VIEW RECEIPT'),
+          ),
+          TextButton(
+            onPressed: () {
+              final retry = _printStudentPaymentReceipt(receipt, posTx: posTx);
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    retry == null ? 'Sent to printer again.' : retry,
+                  ),
+                ),
+              );
+            },
+            child: const Text('PRINT'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('DONE'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Returns null on success, or a short reason if printing was skipped/failed.
+  String? _printStudentPaymentReceipt(
+    Invoice invoice, {
+    MposTransactionData? posTx,
+  }) {
+    final printerBloc = context.read<PrinterBloc>();
+    final settings = context.read<SettingsBloc>().state.settings;
+    if (settings == null) return 'Settings not loaded — print skipped.';
+    if (printerBloc.state.connectedDevice == null) {
+      return 'No printer connected. Tap PRINT after connecting one, or VIEW RECEIPT.';
+    }
+
+    try {
+      final templateName =
+          (settings.defaultInvoiceTemplate == 'compact' &&
+                  settings.businessMode == 'school')
+              ? 'school_academic'
+              : (settings.defaultInvoiceTemplate ?? 'compact');
+
+      TemplateType type;
+      switch (templateName) {
+        case 'detailed':
+          type = TemplateType.detailed;
+          break;
+        case 'professional':
+          type = TemplateType.professional;
+          break;
+        case 'modern':
+          type = TemplateType.modern;
+          break;
+        case 'classic':
+          type = TemplateType.classic;
+          break;
+        case 'minimalist':
+          type = TemplateType.minimalist;
+          break;
+        case 'school_teal':
+          type = TemplateType.schoolTeal;
+          break;
+        case 'school_color':
+          type = TemplateType.schoolColor;
+          break;
+        case 'school_academic':
+          type = TemplateType.schoolAcademic;
+          break;
+        case 'school_traditional':
+          type = TemplateType.schoolTraditional;
+          break;
+        default:
+          type = TemplateType.compact;
+      }
+
+      final template = TemplateRegistry.getTemplate(type);
+      final commands = List<PrintCommand>.from(
+        template.generateCommands(invoice, settings),
+      );
+      commands.insert(
+        0,
+        TextCommand(
+          '*** PAYMENT RECEIPT (PAID) ***',
+          align: 'center',
+          isBold: true,
+        ),
+      );
+
+      if (posTx != null) {
+        commands.addAll(
+          buildPosReceiptCommands(
+            tx: posTx,
+            merchantName: settings.organizationName,
+            terminalId: null,
+            currency: settings.currency,
+            copyType: 'MERCHANT COPY',
+            isMerged: true,
+          ),
+        );
+      }
+
+      printerBloc.add(PrintCommandsEvent(commands, settings.paperWidth));
+      return null;
+    } catch (e) {
+      return 'Print error: $e';
+    }
   }
 }

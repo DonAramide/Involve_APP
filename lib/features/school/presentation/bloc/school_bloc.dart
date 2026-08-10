@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -348,6 +349,23 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         emit(state.copyWith(
           students: state.students.map((s) => s.id == fixed.id ? fixed : s).toList(),
         ));
+      } else if (student != null) {
+        // Keep ledger debt aligned with open INV/BILL rows (PMT slips excluded).
+        final hasAcademicBills =
+            invoices.any((inv) => !inv.invoiceNumber.startsWith('PMT-'));
+        final openDebt = _openAcademicDebt(invoices);
+        final ledgerDebt = student.balance > 0 ? student.balance : 0.0;
+        if (hasAcademicBills && (openDebt - ledgerDebt).abs() > 0.01) {
+          final fixed = student.copyWith(balance: openDebt);
+          await repository.updateStudent(fixed);
+          emit(state.copyWith(
+            students: state.students.map((s) => s.id == fixed.id ? fixed : s).toList(),
+          ));
+          debugPrint(
+            '[SchoolBloc] Reconciled ${student.fullName} balance '
+            'ledger=$ledgerDebt → openDebt=$openDebt',
+          );
+        }
       }
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
@@ -514,38 +532,98 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
     try {
       final student = state.students.firstWhere((s) => s.id == event.studentId);
-      final newBalance = student.balance - event.amount;
-      
-      // 1. Update Student Balance in Students table
-      final updatedStudent = student.copyWith(balance: newBalance);
-      await repository.updateStudent(updatedStudent);
+      final amount = event.amount;
+      if (amount <= 0) {
+        throw Exception('Payment amount must be greater than zero.');
+      }
 
-      // 2. Sync with Invoice (Billing Record)
-      final activeTerm = state.terms.where((t) => t.isActive).firstOrNull ?? state.terms.firstOrNull;
+      // Snapshot ledger before applying this payment (for transaction details).
+      final beforeSnap = await repository.getStudentById(student.id!) ?? student;
+      final debtBefore = beforeSnap.balance > 0 ? beforeSnap.balance : 0.0;
+      final creditBefore = beforeSnap.creditBalance;
+
+      final activeTerm =
+          state.terms.where((t) => t.isActive).firstOrNull ?? state.terms.firstOrNull;
       final invoices = await invoiceRepository.getInvoicesByStudentId(student.id!);
-      
-      // Look for a "BILL-" for the CURRENT TERM that is not fully paid
-      final existingBill = invoices.firstWhereOrNull((inv) => 
-        inv.invoiceNumber.startsWith('BILL-') && 
-        inv.termId == activeTerm?.id &&
-        inv.paymentStatus != 'Paid'
+
+      // Open academic bills (INV-/BILL-), not prior payment receipts.
+      // Trust owing — do not skip when paymentStatus is a stale "Paid".
+      final unpaid = invoices.where((inv) {
+        if (inv.invoiceNumber.startsWith('PMT-')) return false;
+        final owing = inv.totalAmount - inv.amountPaid;
+        return owing > 0.001;
+      }).toList()
+        ..sort((a, b) {
+          final aTerm = a.termId == activeTerm?.id ? 0 : 1;
+          final bTerm = b.termId == activeTerm?.id ? 0 : 1;
+          if (aTerm != bTerm) return aTerm.compareTo(bTerm);
+          final aBill = a.invoiceNumber.startsWith('BILL-') ? 0 : 1;
+          final bBill = b.invoiceNumber.startsWith('BILL-') ? 0 : 1;
+          if (aBill != bBill) return aBill.compareTo(bBill);
+          return a.dateCreated.compareTo(b.dateCreated);
+        });
+
+      var remaining = amount;
+      var appliedToBills = 0.0;
+
+      for (final inv in unpaid) {
+        if (remaining <= 0.001) break;
+        if (inv.id == null) continue;
+        final owing = inv.totalAmount - inv.amountPaid;
+        final pay = remaining < owing ? remaining : owing;
+        if (pay <= 0.001) continue;
+        await invoiceRepository.recordPayment(inv.id!, pay, event.method);
+        remaining -= pay;
+        appliedToBills += pay;
+      }
+
+      final latest = await repository.getStudentById(student.id!) ?? student;
+      final refreshed = await invoiceRepository.getInvoicesByStudentId(student.id!);
+      final openDebt = _openAcademicDebt(refreshed);
+
+      var credit = latest.creditBalance;
+      if (remaining > 0.001) {
+        credit += remaining;
+      }
+
+      // Keep ledger in sync with open bills so the red Balance chip clears after PAY.
+      await repository.updateStudent(
+        latest.copyWith(balance: openDebt, creditBalance: credit < 0 ? 0.0 : credit),
       );
 
-      if (existingBill != null) {
-        // UPDATE EXISTING BILL
-        final updatedBill = existingBill.copyWith(
-          amountPaid: existingBill.amountPaid + event.amount,
-          balanceAmount: existingBill.balanceAmount - event.amount,
-          paymentStatus: event.method == 'Transfer' ? 'Pending' : ((existingBill.balanceAmount - event.amount) <= 0 ? 'Paid' : 'Partial'),
-          paymentMethod: event.method, // Update to latest payment method
-        );
-        await invoiceRepository.updateInvoice(updatedBill);
-      } else {
-        // FALLBACK: CREATE PAYMENT RECEIPT (If no bill found)
-        final activeYear = state.academicYears.where((y) => y.isActive).firstOrNull ?? state.academicYears.firstOrNull;
-        final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+      // Always write a Cash/POS payment slip for the full amount (receipt + print).
+      // Bill rows are still updated via recordPayment; this slip does not change balance again.
+      Invoice? receipt;
+      final method = event.method;
+      final shouldIssueSlip = method == 'Cash' ||
+          method == 'POS' ||
+          (appliedToBills <= 0.001 && remaining > 0.001);
 
-        final invoice = Invoice(
+      if (shouldIssueSlip && amount > 0.001) {
+        final activeYear = state.academicYears.where((y) => y.isActive).firstOrNull ??
+            state.academicYears.firstOrNull;
+        final sClass = state.classes.firstWhereOrNull((c) => c.id == student.classId);
+        final remark = (event.remarks ?? '').trim();
+        final slipLabel = remark.isEmpty
+            ? (appliedToBills > 0.001 && remaining > 0.001
+                ? 'School Fees Payment (part overpaid to credit)'
+                : appliedToBills <= 0.001 && remaining > 0.001
+                    ? 'School Fees Payment (credit)'
+                    : 'School Fees Payment')
+            : 'School Fees Payment $remark';
+
+        final balanceMeta = jsonEncode({
+          'balanceBefore': debtBefore,
+          'creditBefore': creditBefore,
+          'balanceAfter': openDebt,
+          'creditAfter': credit < 0 ? 0.0 : credit,
+          'appliedToBills': appliedToBills,
+          'toCredit': remaining > 0 ? remaining : 0.0,
+          'paymentAmount': amount,
+          'method': method,
+        });
+
+        receipt = Invoice(
           invoiceNumber: 'PMT-${DateTime.now().millisecondsSinceEpoch}',
           dateCreated: DateTime.now(),
           customerName: student.fullName,
@@ -558,40 +636,100 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           termName: activeTerm?.name,
           academicYearId: activeYear?.id,
           academicYearName: activeYear?.name,
-          subtotal: event.amount,
+          subtotal: amount,
           taxAmount: 0,
           discountAmount: 0,
-          totalAmount: student.balance,
-          amountPaid: event.amount,
-          balanceAmount: newBalance,
-          paymentStatus: event.method == 'Transfer' ? 'Pending' : (newBalance <= 0 ? 'Paid' : 'Partial'),
-          paymentMethod: event.method,
+          totalAmount: amount,
+          amountPaid: amount,
+          balanceAmount: 0,
+          paymentStatus: method == 'Transfer' ? 'Pending' : 'Paid',
+          paymentMethod: method,
           businessMode: 'school',
           items: [
             InvoiceItem(
               item: Item(
-                name: 'School Fees Payment ${event.remarks ?? ""}',
+                name: slipLabel.trim(),
                 category: ItemCategory.service,
-                price: event.amount,
+                price: amount,
                 stockQty: 0,
                 type: 'service',
                 businessMode: 'school',
               ),
               quantity: 1,
-              unitPrice: event.amount,
+              unitPrice: amount,
               type: 'service',
+              serviceMeta: balanceMeta,
             ),
           ],
         );
-        await invoiceRepository.saveInvoice(invoice);
+
+        await invoiceRepository.saveInvoice(
+          receipt,
+          adjustStudentBalance: false,
+        );
+
+        // Best-effort push to admin web (does not block local success).
+        if (financeRepository != null) {
+          try {
+            await financeRepository!.syncSchoolPayment({
+              'localInvoiceNumber': receipt.invoiceNumber,
+              'syncId': receipt.syncId,
+              'admissionNumber': student.admissionNumber,
+              'studentKey': 'stu-${student.admissionNumber}',
+              'studentName': student.fullName,
+              'className': sClass?.name,
+              'amount': amount,
+              'amountPaid': amount,
+              'paymentMethod': method,
+              'paymentStatus': receipt.paymentStatus,
+              'balanceBefore': debtBefore,
+              'creditBefore': creditBefore,
+              'balanceAfter': openDebt,
+              'creditAfter': credit < 0 ? 0.0 : credit,
+              'appliedToBills': appliedToBills,
+              'toCredit': remaining > 0 ? remaining : 0.0,
+              'remarks': remark.isEmpty ? null : remark,
+              'paidAt': receipt.dateCreated.toIso8601String(),
+              'metadata': {
+                'source': 'student_profile_pay',
+                'businessMode': 'school',
+              },
+            });
+          } catch (e) {
+            debugPrint('[SchoolBloc] syncSchoolPayment soft-failed: $e');
+          }
+        }
       }
-      
-      emit(state.copyWith(status: SchoolStatus.success));
+
+      debugPrint(
+        '[SchoolBloc] Pay ₦$amount for ${student.fullName}: '
+        'bills=$appliedToBills overpay=$remaining openDebt=$openDebt',
+      );
+
+      emit(state.copyWith(
+        status: SchoolStatus.success,
+        isLoading: false,
+        lastPaymentReceipt: receipt,
+      ));
       add(LoadSchoolData());
-      add(LoadStudentRecordsEvent(event.studentId)); // Refresh invoices list
+      add(LoadStudentRecordsEvent(event.studentId));
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(
+        error: e.toString(),
+        status: SchoolStatus.failure,
+        isLoading: false,
+        clearLastPaymentReceipt: true,
+      ));
     }
+  }
+
+  /// Outstanding academic debt from INV/BILL rows (excludes PMT payment slips).
+  double _openAcademicDebt(List<Invoice> invoices) {
+    return invoices.fold<double>(0, (sum, inv) {
+      if (inv.invoiceNumber.startsWith('PMT-')) return sum;
+      final owing = inv.totalAmount - inv.amountPaid;
+      return sum + (owing > 0 ? owing : 0);
+    });
   }
 
   Future<void> _onProvisionVirtualAccount(ProvisionStudentVirtualAccountEvent event, Emitter<SchoolState> emit) async {
@@ -677,8 +815,9 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final invoices = await invoiceRepository.getInvoicesByStudentId(student.id!);
       final unpaid = invoices
           .where((inv) {
+            if (inv.invoiceNumber.startsWith('PMT-')) return false;
             final owing = inv.totalAmount - inv.amountPaid;
-            return owing > 0.001 && inv.paymentStatus != 'Paid';
+            return owing > 0.001;
           })
           .toList()
         ..sort((a, b) {
@@ -688,10 +827,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
           return a.dateCreated.compareTo(b.dateCreated);
         });
 
-      final invoiceDebt = unpaid.fold<double>(0, (sum, inv) {
-        final owing = inv.totalAmount - inv.amountPaid;
-        return sum + (owing > 0 ? owing : 0);
-      });
+      final invoiceDebt = _openAcademicDebt(unpaid);
       final ledgerDebt = student.balance > 0 ? student.balance : 0.0;
       final debtToClear = invoiceDebt > 0.001 ? invoiceDebt : ledgerDebt;
 
@@ -767,16 +903,13 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
               type: 'service',
             ),
           ],
-        ));
+        ), adjustStudentBalance: false);
         creditLeft -= amountToClear;
         clearedTotal += amountToClear;
       }
 
       final refreshed = await invoiceRepository.getInvoicesByStudentId(student.id!);
-      final remainingDebt = refreshed.fold<double>(0, (sum, inv) {
-        final owing = inv.totalAmount - inv.amountPaid;
-        return sum + (owing > 0 ? owing : 0);
-      });
+      final remainingDebt = _openAcademicDebt(refreshed);
 
       final updatedStudent = student.copyWith(
         balance: remainingDebt,

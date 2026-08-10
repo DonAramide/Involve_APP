@@ -25,6 +25,8 @@ class SchoolState extends Equatable {
   final bool isLoading;
   final String? error;
   final SchoolStatus status;
+  /// Most recent Cash/POS payment slip (for success popup + print).
+  final Invoice? lastPaymentReceipt;
 
   const SchoolState({
     this.academicYears = const [],
@@ -45,6 +47,7 @@ class SchoolState extends Equatable {
     this.isLoading = false,
     this.error,
     this.status = SchoolStatus.initial,
+    this.lastPaymentReceipt,
   });
 
   AcademicYear? get activeYear => academicYears.where((y) => y.isCurrent).firstOrNull ?? academicYears.firstOrNull;
@@ -69,6 +72,8 @@ class SchoolState extends Equatable {
     bool? isLoading,
     String? error,
     SchoolStatus? status,
+    Invoice? lastPaymentReceipt,
+    bool clearLastPaymentReceipt = false,
   }) {
     return SchoolState(
       academicYears: academicYears ?? this.academicYears,
@@ -89,6 +94,9 @@ class SchoolState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       error: error,
       status: status ?? this.status,
+      lastPaymentReceipt: clearLastPaymentReceipt
+          ? null
+          : (lastPaymentReceipt ?? this.lastPaymentReceipt),
     );
   }
 
@@ -111,6 +119,7 @@ class SchoolState extends Equatable {
         nextAdmissionNumber,
         isLoading,
         error,
-        status
+        status,
+        lastPaymentReceipt,
       ];
 }

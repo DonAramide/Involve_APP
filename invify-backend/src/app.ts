@@ -37,6 +37,7 @@ import { WebhookController } from './controllers/webhook.controller';
 import { ReconciliationController } from './controllers/reconciliation.controller';
 import { StudentController } from './controllers/student.controller';
 import { SchoolSyncController } from './controllers/school-sync.controller';
+import { SchoolPaymentsController } from './controllers/school-payments.controller';
 import { PayoutController } from './controllers/payout.controller';
 import { ExecutiveFinanceController } from './controllers/finance.controller';
 import { DefaultersController } from './controllers/defaulters.controller';
@@ -669,6 +670,38 @@ app.get(
   authenticate,
   checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   SchoolSyncController.getRoster,
+);
+
+// School payments + disputes (device Cash/POS → tenant admin web)
+app.post(
+  '/api/school/payments/sync',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  SchoolPaymentsController.syncPayments,
+);
+app.get(
+  '/api/school/payments',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  SchoolPaymentsController.listPayments,
+);
+app.post(
+  '/api/school/payment-disputes',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  SchoolPaymentsController.raiseDispute,
+);
+app.get(
+  '/api/school/payment-disputes',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  SchoolPaymentsController.listDisputes,
+);
+app.patch(
+  '/api/school/payment-disputes/:id',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'finance_staff']),
+  SchoolPaymentsController.updateDispute,
 );
 
 // CRM Routes

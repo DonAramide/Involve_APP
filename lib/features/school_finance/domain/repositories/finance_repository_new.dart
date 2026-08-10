@@ -227,6 +227,27 @@ class FinanceRepository {
     );
   }
 
+  /// Push a school student Cash/POS payment so tenant admin web can list it.
+  Future<void> syncSchoolPayment(Map<String, dynamic> payment) async {
+    await _client.post(
+      '/api/school/payments/sync',
+      data: {'payment': payment},
+    );
+  }
+
+  /// Raise a payment dispute visible on tenant admin web.
+  Future<Map<String, dynamic>> raiseSchoolPaymentDispute(
+    Map<String, dynamic> dispute,
+  ) async {
+    final response = await _client.post(
+      '/api/school/payment-disputes',
+      data: dispute,
+    );
+    return response.data is Map
+        ? Map<String, dynamic>.from(response.data as Map)
+        : <String, dynamic>{};
+  }
+
   /// Listens to global financial events (e.g. payment successes).
   Stream<FinanceRealtimeEvent> watchGlobalEvents() {
     return _realtime.watchGlobalEvents();

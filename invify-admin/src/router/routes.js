@@ -340,6 +340,18 @@ const routes = [
       { path: 'finance/fraud', component: () => import('pages/finance/FraudMonitoringCenterPage.vue'), meta: { workspace: 'finance', title: 'Fraud Monitoring', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'finance/tenant-health', component: () => import('pages/finance/TenantFinancialHealthCenterPage.vue'), meta: { workspace: 'finance', title: 'Tenant Financial Health', permission: 'admin_deploy', requiresAuth: true } },
       { path: 'finance/compliance', component: () => import('pages/finance/ComplianceCenterPage.vue'), meta: { workspace: 'finance', title: 'Compliance Center', permission: 'admin_deploy', requiresAuth: true } },
+      {
+        path: 'finance/school-payments',
+        component: () => import('pages/school/SchoolPaymentsPage.vue'),
+        meta: {
+          workspace: 'finance',
+          title: 'School Payments & Disputes',
+          permission: 'admin_deploy',
+          requiresAuth: true,
+          platformScope: true,
+          keywords: ['school', 'payments', 'disputes', 'cash', 'pos', 'student fees'],
+        },
+      },
       
       // Executive Command Center
       { path: 'executive', component: () => import('pages/executive/ExecutiveCommandCenterPage.vue'), meta: { workspace: 'ai', title: 'Executive Command Center', permission: 'admin_deploy', requiresAuth: true } },
@@ -441,6 +453,7 @@ const routes = [
 
       // School roster synced from Flutter Web Sync
       { path: 'school-roster', component: () => import('pages/school/AcademicsPage.vue'), meta: { title: 'School Roster', requiresAuth: true } },
+      { path: 'school-payments', component: () => import('pages/school/SchoolPaymentsPage.vue'), meta: { title: 'School Payments', requiresAuth: true } },
       
       // Dynamic School Mode Routes nested under Tenant Layout namespace
       { path: 'curriculum', component: () => import('pages/CurriculumPage.vue'), meta: { requiresAuth: true } },

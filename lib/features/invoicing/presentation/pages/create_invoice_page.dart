@@ -199,16 +199,24 @@ class _MobileCartButton extends StatelessWidget {
               context: context,
               isScrollControlled: true,
               backgroundColor: Colors.transparent,
-              builder: (context) => DraggableScrollableSheet(
+              builder: (sheetContext) => DraggableScrollableSheet(
                 initialChildSize: 0.85,
                 minChildSize: 0.5,
                 maxChildSize: 1.0,
-                builder: (_, controller) => Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                builder: (_, controller) => Scaffold(
+                  // Local scaffold so SnackBars/toasts appear above the cart sheet
+                  backgroundColor: Colors.transparent,
+                  body: Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: _CartSummary(
+                      isSidePanel: false,
+                      scrollController: controller,
+                    ),
                   ),
-                  child: _CartSummary(isSidePanel: false, scrollController: controller),
                 ),
               ),
             );
@@ -931,24 +939,38 @@ class _CartSummary extends StatelessWidget {
                         _buildSummaryRow(context, 'Total Amount', state.total, settings?.currency ?? '₦', isTotal: true),
                         const SizedBox(height: 12),
                         const Divider(),
-                        ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            state.customerName != null 
-                              ? '${state.customerName}${state.customerPhone != null ? " (${state.customerPhone})" : ""}'
-                              : (settings?.assignToCustomerLabel ?? 'Add Customer Name & Phone'), 
-                            style: TextStyle(color: state.customerName != null ? Colors.black : Colors.blue)
-                          ),
-                          subtitle: state.customerAddress != null ? Text(state.customerAddress!) : null,
-                          leading: Icon(Icons.person_outline, color: state.customerName != null ? Theme.of(context).colorScheme.primary : Colors.grey),
-                          trailing: const Icon(Icons.edit, size: 16),
-                          onTap: () => _showCustomerDialog(context, state.customerName, state.customerPhone, state.customerAddress),
-                        ),
                         if (settings?.businessMode == 'school') ...[
+                          _buildSchoolAssigneeSection(context, state, settings),
                           const Divider(),
                           _buildSchoolInfoTile(context, state),
-                        ],
+                        ] else
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(
+                              state.customerName != null
+                                  ? '${state.customerName}${state.customerPhone != null ? " (${state.customerPhone})" : ""}'
+                                  : (settings?.assignToCustomerLabel ??
+                                      'Add Customer Name & Phone'),
+                              style: TextStyle(
+                                  color: state.customerName != null
+                                      ? Colors.black
+                                      : Colors.blue),
+                            ),
+                            subtitle: state.customerAddress != null
+                                ? Text(state.customerAddress!)
+                                : null,
+                            leading: Icon(Icons.person_outline,
+                                color: state.customerName != null
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.grey),
+                            trailing: const Icon(Icons.edit, size: 16),
+                            onTap: () => _showCustomerDialog(
+                                context,
+                                state.customerName,
+                                state.customerPhone,
+                                state.customerAddress),
+                          ),
                         if (settings?.warrantyEnabled == true && settings?.businessMode != 'school') ...[
                           const Divider(),
                           Padding(
@@ -967,6 +989,35 @@ class _CartSummary extends StatelessWidget {
                               onChanged: (val) {
                                 context.read<InvoiceBloc>().add(UpdateWarrantyDuration(val));
                               },
+                            ),
+                          ),
+                        ],
+                        if (settings?.businessMode == 'school' &&
+                            state.customerName?.trim().isNotEmpty != true) ...[
+                          const SizedBox(height: 8),
+                          Material(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.info_outline,
+                                      size: 18, color: Colors.orange.shade800),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Select a student or add an external customer before checkout.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.orange.shade900,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -1033,9 +1084,181 @@ class _CartSummary extends StatelessWidget {
   }
 
   void _showPreview(BuildContext context) {
+    final settings = context.read<SettingsBloc>().state.settings;
+    final invoiceState = context.read<InvoiceBloc>().state;
+    if (settings?.businessMode == 'school') {
+      final assigned = invoiceState.customerName?.trim().isNotEmpty == true;
+      if (!assigned) {
+        // Dialog sits above the cart modal sheet (SnackBar would paint behind it).
+        showDialog<void>(
+          context: context,
+          useRootNavigator: true,
+          builder: (ctx) => AlertDialog(
+            icon: Icon(Icons.person_outline,
+                color: Colors.orange.shade800, size: 36),
+            title: const Text('Who is this bill for?'),
+            content: const Text(
+              'Assign a roster student or add an external customer/student before checkout so the receipt has their details.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+    }
     showDialog(
       context: context,
-      builder: (_) => InvoicePreviewDialog(invoiceBloc: context.read<InvoiceBloc>()),
+      builder: (_) =>
+          InvoicePreviewDialog(invoiceBloc: context.read<InvoiceBloc>()),
+    );
+  }
+
+  Widget _buildSchoolAssigneeSection(
+    BuildContext context,
+    InvoiceState state,
+    AppSettings? settings,
+  ) {
+    final hasAssignee = state.customerName?.trim().isNotEmpty == true;
+    final isRosterStudent = state.studentId != null;
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hasAssignee)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.colorScheme.primary.withOpacity(0.2),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isRosterStudent ? Icons.school_outlined : Icons.person_add_alt_1,
+                  color: theme.colorScheme.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isRosterStudent
+                            ? 'Student (roster)'
+                            : 'External customer/student',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        state.customerName!,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      if (state.customerPhone?.isNotEmpty == true)
+                        Text(
+                          state.customerPhone!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      if (!isRosterStudent &&
+                          state.customerAddress?.isNotEmpty == true)
+                        Text(
+                          state.customerAddress!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      if (isRosterStudent &&
+                          state.admissionNumber?.isNotEmpty == true)
+                        Text(
+                          'ID: ${state.admissionNumber}${state.className != null ? ' · ${state.className}' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            settings?.assignToCustomerLabel ?? 'Assign to Student',
+            style: TextStyle(
+              color: isRosterStudent ? Colors.black : Colors.blue,
+              fontWeight: isRosterStudent ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+          subtitle: Text(
+            isRosterStudent
+                ? 'Tap to change student'
+                : 'Pick from school roster',
+            style: const TextStyle(fontSize: 11),
+          ),
+          leading: Icon(
+            Icons.school_outlined,
+            color: isRosterStudent ? theme.colorScheme.primary : Colors.grey,
+          ),
+          trailing: const Icon(Icons.chevron_right, size: 18),
+          onTap: () => _showStudentPicker(context),
+        ),
+        ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          title: Text(
+            settings?.assignExternalCustomerLabel ??
+                'Add External Customer/Student',
+            style: TextStyle(
+              color: hasAssignee && !isRosterStudent ? Colors.black : Colors.blue,
+              fontWeight: hasAssignee && !isRosterStudent
+                  ? FontWeight.w600
+                  : FontWeight.normal,
+            ),
+          ),
+          subtitle: const Text(
+            'First & last name, phone (email optional)',
+            style: TextStyle(fontSize: 11),
+          ),
+          leading: Icon(
+            Icons.person_add_alt_1,
+            color: hasAssignee && !isRosterStudent
+                ? theme.colorScheme.primary
+                : Colors.grey,
+          ),
+          trailing: const Icon(Icons.edit, size: 16),
+          onTap: () => _showExternalCustomerDialog(
+            context,
+            currentName: !isRosterStudent ? state.customerName : null,
+            currentPhone: !isRosterStudent ? state.customerPhone : null,
+            currentEmail: !isRosterStudent ? state.customerAddress : null,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1438,6 +1661,133 @@ Future<ServiceCustomer?> _showCustomerPicker(BuildContext context) async {
   );
 }
 
+void _showExternalCustomerDialog(
+  BuildContext context, {
+  String? currentName,
+  String? currentPhone,
+  String? currentEmail,
+}) {
+  final formKey = GlobalKey<FormState>();
+  final parts = (currentName ?? '').trim().split(RegExp(r'\s+'));
+  final firstController = TextEditingController(
+    text: parts.isNotEmpty ? parts.first : '',
+  );
+  final lastController = TextEditingController(
+    text: parts.length > 1 ? parts.sublist(1).join(' ') : '',
+  );
+  final phoneController = TextEditingController(text: currentPhone ?? '');
+  final emailController = TextEditingController(text: currentEmail ?? '');
+  final invoiceBloc = context.read<InvoiceBloc>();
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('External Customer / Student'),
+      content: Form(
+        key: formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Use this for walk-in or non-roster payers. Details appear on the receipt.',
+                style: TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: firstController,
+                decoration: const InputDecoration(
+                  labelText: 'First Name *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                textCapitalization: TextCapitalization.words,
+                autofocus: true,
+                validator: (val) =>
+                    (val == null || val.trim().isEmpty) ? 'First name required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: lastController,
+                decoration: const InputDecoration(
+                  labelText: 'Last Name *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.badge_outlined),
+                ),
+                textCapitalization: TextCapitalization.words,
+                validator: (val) =>
+                    (val == null || val.trim().isEmpty) ? 'Last name required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
+                  hintText: 'e.g. 08012345678',
+                ),
+                keyboardType: TextInputType.phone,
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Phone number required';
+                  }
+                  final digitsOnly = val.replaceAll(RegExp(r'\D'), '');
+                  if (digitsOnly.length < 11 || digitsOnly.length > 15) {
+                    return 'Phone must be 11 to 15 digits';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email (optional)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                validator: (val) {
+                  final email = val?.trim() ?? '';
+                  if (email.isEmpty) return null;
+                  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                    return 'Enter a valid email';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('CANCEL'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (formKey.currentState?.validate() ?? false) {
+              final first = firstController.text.trim();
+              final last = lastController.text.trim();
+              final email = emailController.text.trim();
+              invoiceBloc.add(UpdateCustomerInfo(
+                name: '$first $last',
+                phone: phoneController.text.trim(),
+                address: email.isEmpty ? null : email,
+                clearSchoolLink: true,
+              ));
+              Navigator.pop(ctx);
+            }
+          },
+          child: const Text('SAVE'),
+        ),
+      ],
+    ),
+  );
+}
+
 void _showStudentPicker(BuildContext context) {
   final settings = context.read<SettingsBloc>().state.settings;
   final invoiceBloc = context.read<InvoiceBloc>();
@@ -1572,6 +1922,7 @@ void _showStudentPicker(BuildContext context) {
                           invoiceBloc.add(UpdateCustomerInfo(
                             name: student.fullName,
                             phone: student.parentPhone,
+                            address: null,
                           ));
                           final term = state.activeTerm;
                           final year = state.activeYear;

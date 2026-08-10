@@ -21,14 +21,25 @@ class ReceiptService {
     if (_customFontData != null) {
       return pw.Font.ttf(ByteData.sublistView(_customFontData!));
     }
+    // Prefer bundled assets — network/PdfGoogleFonts made Receipt Preview hang for seconds.
     try {
-      final response = await http.get(Uri.parse('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf')).timeout(const Duration(seconds: 3));
+      final data = await rootBundle.load('assets/fonts/NotoSans-Regular.ttf');
+      _customFontData = data.buffer.asUint8List();
+      return pw.Font.ttf(ByteData.sublistView(_customFontData!));
+    } catch (_) {
+      // Fall through
+    }
+    try {
+      final response = await http
+          .get(Uri.parse(
+              'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Regular.ttf'))
+          .timeout(const Duration(seconds: 2));
       if (response.statusCode == 200) {
         _customFontData = response.bodyBytes;
         return pw.Font.ttf(ByteData.sublistView(_customFontData!));
       }
-    } catch (e) {
-      // Fallback
+    } catch (_) {
+      // Fall through
     }
     return await PdfGoogleFonts.notoSansRegular();
   }
@@ -38,15 +49,36 @@ class ReceiptService {
       return pw.Font.ttf(ByteData.sublistView(_customBoldFontData!));
     }
     try {
-      final response = await http.get(Uri.parse('https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf')).timeout(const Duration(seconds: 3));
+      final data = await rootBundle.load('assets/fonts/NotoSans-Bold.ttf');
+      _customBoldFontData = data.buffer.asUint8List();
+      return pw.Font.ttf(ByteData.sublistView(_customBoldFontData!));
+    } catch (_) {
+      // Fall through
+    }
+    try {
+      final response = await http
+          .get(Uri.parse(
+              'https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans-Bold.ttf'))
+          .timeout(const Duration(seconds: 2));
       if (response.statusCode == 200) {
         _customBoldFontData = response.bodyBytes;
         return pw.Font.ttf(ByteData.sublistView(_customBoldFontData!));
       }
-    } catch (e) {
-      // Fallback
+    } catch (_) {
+      // Fall through
     }
     return await PdfGoogleFonts.notoSansBold();
+  }
+
+  /// Display total for PDF — payment slips / overpays should not show a lower TOTAL than PAID.
+  double _pdfDisplayTotal(Invoice invoice, bool useCustomPrices) {
+    if (useCustomPrices && invoice.totalPrintAmount != null) {
+      return invoice.totalPrintAmount!;
+    }
+    if (invoice.invoiceNumber.startsWith('PMT-') && invoice.amountPaid > invoice.totalAmount) {
+      return invoice.amountPaid;
+    }
+    return invoice.totalAmount;
   }
 
   Future<Uint8List> generateReceiptPdf(Invoice invoice, AppSettings settings, {bool? useCustomPricesOverride, String? receiptTitle, UserPlan? userPlan}) async {
@@ -225,7 +257,7 @@ class ReceiptService {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Text(invoice.amountPaid > 0 && invoice.amountPaid >= invoice.totalAmount ? 'PAID AMOUNT' : 'EXPECTED AMOUNT', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                  pw.Text('${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', 
+                  pw.Text('${settings.currency} ${CurrencyFormatter.format(_pdfDisplayTotal(invoice, useCustomPrices))}', 
                       style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
                 ],
               ),
@@ -251,7 +283,7 @@ class ReceiptService {
                     alignment: pw.Alignment.centerRight,
                     child: pw.Text(
                       'Amount in Words: ${NumberToWords.convert(
-                        useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                        _pdfDisplayTotal(invoice, useCustomPrices),
                         currency: settings.currencyName,
                         subunit: settings.currencySubunit,
                       )} Only', 
@@ -439,7 +471,7 @@ class ReceiptService {
                               _summaryRow('SALES TAX (${(settings.taxRate * 100).toStringAsFixed(0)}%)', CurrencyFormatter.format(invoice.taxAmount)),
                             if (invoice.discountAmount > 0)
                               _summaryRow('DISCOUNT', '-${CurrencyFormatter.format(invoice.discountAmount)}'),
-                            _summaryRow(invoice.amountPaid > 0 && invoice.amountPaid >= invoice.totalAmount ? 'PAID AMOUNT' : 'EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', isBold: true),
+                            _summaryRow(invoice.amountPaid > 0 && invoice.amountPaid >= invoice.totalAmount ? 'PAID AMOUNT' : 'EXPECTED AMOUNT', '${settings.currency} ${CurrencyFormatter.format(_pdfDisplayTotal(invoice, useCustomPrices))}', isBold: true),
                             if (invoice.balanceAmount > 0) ...[
                               _summaryRow('PAID AMOUNT', CurrencyFormatter.format(invoice.amountPaid)),
                               _summaryRow('BALANCE DUE', CurrencyFormatter.format(invoice.balanceAmount), isBold: true),
@@ -452,7 +484,7 @@ class ReceiptService {
                             alignment: pw.Alignment.centerRight,
                             child: pw.Text(
                               'Amount in Words: ${NumberToWords.convert(
-                                useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                                _pdfDisplayTotal(invoice, useCustomPrices),
                                 currency: settings.currencyName,
                                 subunit: settings.currencySubunit,
                               )}',
@@ -641,9 +673,11 @@ class ReceiptService {
               pw.Table(
                 border: pw.TableBorder.all(color: PdfColors.black, width: 1),
                 columnWidths: {
-                  0: const pw.FlexColumnWidth(0.8),
-                  1: const pw.FlexColumnWidth(5),
-                  2: const pw.FlexColumnWidth(1.5),
+                  0: const pw.FlexColumnWidth(0.7),
+                  1: const pw.FlexColumnWidth(3.8),
+                  2: const pw.FlexColumnWidth(0.7),
+                  3: const pw.FlexColumnWidth(1.2),
+                  4: const pw.FlexColumnWidth(1.4),
                 },
                 children: [
                   pw.TableRow(
@@ -651,6 +685,8 @@ class ReceiptService {
                     children: [
                       _schoolHeaderCell('NO.'),
                       _schoolHeaderCell('FEE DESCRIPTION'),
+                      _schoolHeaderCell('QTY', align: pw.Alignment.center),
+                      _schoolHeaderCell('RATE', align: pw.Alignment.centerRight),
                       _schoolHeaderCell('AMOUNT', align: pw.Alignment.centerRight),
                     ],
                   ),
@@ -659,11 +695,14 @@ class ReceiptService {
                     final item = entry.value;
                     final usePrint = useCustomPrices && item.printPrice != null;
                     final unitPrice = usePrint ? item.printPrice! : item.unitPrice;
+                    final lineAmount = usePrint ? item.totalPrint : item.total;
                     return pw.TableRow(
                       children: [
                         _schoolDataCell((index + 1).toString().padLeft(2, '0'), align: pw.Alignment.center),
                         _schoolDataCell(item.item.name),
+                        _schoolDataCell(item.quantity.toString(), align: pw.Alignment.center),
                         _schoolDataCell(CurrencyFormatter.format(unitPrice), align: pw.Alignment.centerRight),
+                        _schoolDataCell(CurrencyFormatter.format(lineAmount), align: pw.Alignment.centerRight),
                       ],
                     );
                   }).toList(),
@@ -671,6 +710,8 @@ class ReceiptService {
                   if (invoice.items.length < 7)
                     ...List.generate(7 - invoice.items.length, (i) => pw.TableRow(
                       children: [
+                        _schoolDataCell(''),
+                        _schoolDataCell(''),
                         _schoolDataCell(''),
                         _schoolDataCell(''),
                         _schoolDataCell(''),
@@ -726,7 +767,7 @@ class ReceiptService {
                             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                             children: [
                               pw.Text('TOTAL:', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                              pw.Text('${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', 
+                              pw.Text('${settings.currency} ${CurrencyFormatter.format(_pdfDisplayTotal(invoice, useCustomPrices))}', 
                                   style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 14)),
                             ],
                           ),
@@ -753,7 +794,15 @@ class ReceiptService {
                               crossAxisAlignment: pw.CrossAxisAlignment.end,
                               children: [
                                 _schoolSummaryRow('PAID AMOUNT:', CurrencyFormatter.format(invoice.amountPaid)),
-                                _schoolSummaryRow('Due:', CurrencyFormatter.format(invoice.balanceAmount)),
+                                _schoolSummaryRow(
+                                  'Due:',
+                                  CurrencyFormatter.format(
+                                    invoice.invoiceNumber.startsWith('PMT-')
+                                        ? 0.0
+                                        : (invoice.totalAmount - invoice.amountPaid)
+                                            .clamp(0.0, double.infinity),
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -763,7 +812,7 @@ class ReceiptService {
                           alignment: pw.Alignment.centerRight,
                           child: pw.Text(
                             'Amount in Words: ${NumberToWords.convert(
-                              useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                              _pdfDisplayTotal(invoice, useCustomPrices),
                               currency: settings.currencyName,
                               subunit: settings.currencySubunit,
                             )}',
@@ -916,9 +965,11 @@ class ReceiptService {
               pw.Table(
                 border: pw.TableBorder.all(color: primaryColor, width: 1),
                 columnWidths: {
-                  0: const pw.FlexColumnWidth(0.8),
-                  1: const pw.FlexColumnWidth(5),
-                  2: const pw.FlexColumnWidth(1.5),
+                  0: const pw.FlexColumnWidth(0.7),
+                  1: const pw.FlexColumnWidth(3.8),
+                  2: const pw.FlexColumnWidth(0.7),
+                  3: const pw.FlexColumnWidth(1.2),
+                  4: const pw.FlexColumnWidth(1.4),
                 },
                 children: [
                   pw.TableRow(
@@ -926,6 +977,8 @@ class ReceiptService {
                     children: [
                       _schoolHeaderCell('NO.'),
                       _schoolHeaderCell('FEE DESCRIPTION'),
+                      _schoolHeaderCell('QTY', align: pw.Alignment.center),
+                      _schoolHeaderCell('RATE', align: pw.Alignment.centerRight),
                       _schoolHeaderCell('AMOUNT', align: pw.Alignment.centerRight),
                     ],
                   ),
@@ -934,12 +987,15 @@ class ReceiptService {
                     final item = entry.value;
                     final usePrint = useCustomPrices && item.printPrice != null;
                     final unitPrice = usePrint ? item.printPrice! : item.unitPrice;
+                    final lineAmount = usePrint ? item.totalPrint : item.total;
                     return pw.TableRow(
                       decoration: index % 2 == 1 ? pw.BoxDecoration(color: accentColor) : null,
                       children: [
                         _schoolDataCell((index + 1).toString().padLeft(2, '0'), align: pw.Alignment.center),
                         _schoolDataCell(item.item.name),
+                        _schoolDataCell(item.quantity.toString(), align: pw.Alignment.center),
                         _schoolDataCell(CurrencyFormatter.format(unitPrice), align: pw.Alignment.centerRight),
+                        _schoolDataCell(CurrencyFormatter.format(lineAmount), align: pw.Alignment.centerRight),
                       ],
                     );
                   }).toList(),
@@ -948,6 +1004,8 @@ class ReceiptService {
                     ...List.generate(7 - invoice.items.length, (i) => pw.TableRow(
                       decoration: (i + invoice.items.length) % 2 == 1 ? pw.BoxDecoration(color: accentColor) : null,
                       children: [
+                        _schoolDataCell(''),
+                        _schoolDataCell(''),
                         _schoolDataCell(''),
                         _schoolDataCell(''),
                         _schoolDataCell(''),
@@ -993,8 +1051,13 @@ class ReceiptService {
                             color: accentColor,
                             child: _schoolSummaryRow('Discount:', '-${CurrencyFormatter.format(invoice.discountAmount)}'),
                           ),
-                        pw.SizedBox(height: 5),
-                        _schoolSummaryRow('VAT Tax (0%):', CurrencyFormatter.format(invoice.taxAmount)),
+                        if (invoice.taxAmount > 0) ...[
+                          pw.SizedBox(height: 5),
+                          _schoolSummaryRow(
+                            'VAT Tax (${(settings.taxRate * 100).toStringAsFixed(0)}%):',
+                            CurrencyFormatter.format(invoice.taxAmount),
+                          ),
+                        ],
                         pw.Container(
                           height: 40,
                           margin: const pw.EdgeInsets.only(top: 10),
@@ -1004,7 +1067,7 @@ class ReceiptService {
                             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                             children: [
                               pw.Text('TOTAL:', style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 14)),
-                              pw.Text('${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', 
+                              pw.Text('${settings.currency} ${CurrencyFormatter.format(_pdfDisplayTotal(invoice, useCustomPrices))}', 
                                   style: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 14)),
                             ],
                           ),
@@ -1031,7 +1094,15 @@ class ReceiptService {
                               crossAxisAlignment: pw.CrossAxisAlignment.end,
                               children: [
                                 _schoolSummaryRow('PAID AMOUNT:', CurrencyFormatter.format(invoice.amountPaid)),
-                                _schoolSummaryRow('Due:', CurrencyFormatter.format(invoice.balanceAmount)),
+                                _schoolSummaryRow(
+                                  'Due:',
+                                  CurrencyFormatter.format(
+                                    invoice.invoiceNumber.startsWith('PMT-')
+                                        ? 0.0
+                                        : (invoice.totalAmount - invoice.amountPaid)
+                                            .clamp(0.0, double.infinity),
+                                  ),
+                                ),
                               ],
                             ),
                           ],
@@ -1041,7 +1112,7 @@ class ReceiptService {
                           alignment: pw.Alignment.centerRight,
                           child: pw.Text(
                             'Amount in Words: ${NumberToWords.convert(
-                              useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                              _pdfDisplayTotal(invoice, useCustomPrices),
                               currency: settings.currencyName,
                               subunit: settings.currencySubunit,
                             )}',
@@ -1151,17 +1222,19 @@ class ReceiptService {
                   verticalInside: const pw.BorderSide(color: PdfColors.black, width: 1),
                 ),
                 columnWidths: {
-                  0: const pw.FixedColumnWidth(30),
+                  0: const pw.FixedColumnWidth(28),
                   1: const pw.FlexColumnWidth(4),
-                  2: const pw.FixedColumnWidth(80),
-                  3: const pw.FixedColumnWidth(80),
+                  2: const pw.FixedColumnWidth(36),
+                  3: const pw.FixedColumnWidth(70),
+                  4: const pw.FixedColumnWidth(80),
                 },
                 children: [
                    pw.TableRow(
                     children: [
                       _academicCell('', align: pw.Alignment.center),
                       _academicCell('FEE TYPE', isBold: true, align: pw.Alignment.center),
-                      _academicCell('CODE', isBold: true, align: pw.Alignment.center),
+                      _academicCell('QTY', isBold: true, align: pw.Alignment.center),
+                      _academicCell('RATE', isBold: true, align: pw.Alignment.center),
                       _academicCell('AMOUNT (=${settings.currency})', isBold: true, align: pw.Alignment.center),
                     ],
                   ),
@@ -1170,12 +1243,14 @@ class ReceiptService {
                     final item = entry.value;
                     final usePrint = useCustomPrices && item.printPrice != null;
                     final unitPrice = usePrint ? item.printPrice! : item.unitPrice;
+                    final lineAmount = usePrint ? item.totalPrint : item.total;
                     return pw.TableRow(
                       children: [
                         _academicCell((index + 1).toString(), align: pw.Alignment.center),
                         _academicCell(item.item.name),
-                        _academicCell(''),
+                        _academicCell(item.quantity.toString(), align: pw.Alignment.center),
                         _academicCell(CurrencyFormatter.format(unitPrice), align: pw.Alignment.centerRight),
+                        _academicCell(CurrencyFormatter.format(lineAmount), align: pw.Alignment.centerRight),
                       ],
                     );
                   }).toList(),
@@ -1184,8 +1259,9 @@ class ReceiptService {
                     children: [
                       _academicCell(''),
                       _academicCell(''),
+                      _academicCell(''),
                       _academicCell(invoice.amountPaid > 0 && invoice.amountPaid >= invoice.totalAmount ? 'PAID AMOUNT' : 'EXPECTED AMOUNT', isBold: true, align: pw.Alignment.centerRight),
-                      _academicCell(CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount), isBold: true, align: pw.Alignment.centerRight),
+                      _academicCell(CurrencyFormatter.format(_pdfDisplayTotal(invoice, useCustomPrices)), isBold: true, align: pw.Alignment.centerRight),
                     ],
                   ),
                 ],
@@ -1201,7 +1277,7 @@ class ReceiptService {
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         _academicSimpleRow('The total sum of:', NumberToWords.convert(
-                          useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                          _pdfDisplayTotal(invoice, useCustomPrices),
                           currency: settings.currencyName,
                           subunit: settings.currencySubunit,
                         )),
@@ -1411,7 +1487,7 @@ class ReceiptService {
                       
                       _voucherRow('Received from', invoice.customerName?.toUpperCase() ?? 'N/A'),
                        _voucherRow('The sum of', NumberToWords.convert(
-                        useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount,
+                        _pdfDisplayTotal(invoice, useCustomPrices),
                         currency: settings.currencyName,
                         subunit: settings.currencySubunit,
                       )),
@@ -1463,7 +1539,7 @@ class ReceiptService {
                                pw.Container(
                                  padding: const pw.EdgeInsets.all(10),
                                  decoration: pw.BoxDecoration(border: pw.Border.all(color: greenTheme, width: 2)),
-                                 child: pw.Text('${settings.currency} ${CurrencyFormatter.format(useCustomPrices && invoice.totalPrintAmount != null ? invoice.totalPrintAmount! : invoice.totalAmount)}', 
+                                 child: pw.Text('${settings.currency} ${CurrencyFormatter.format(_pdfDisplayTotal(invoice, useCustomPrices))}', 
                                      style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: greenTheme)),
                                ),
                                pw.SizedBox(height: 20),

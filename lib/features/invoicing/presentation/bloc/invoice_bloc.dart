@@ -200,11 +200,40 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
   }
 
   void _onUpdateCustomer(UpdateCustomerInfo event, Emitter<InvoiceState> emit) {
-    emit(state.copyWith(
+    emit(InvoiceState(
+      items: state.items,
+      subtotal: state.subtotal,
+      tax: state.tax,
+      discount: state.discount,
+      discountType: state.discountType,
+      total: state.total,
+      isSaving: state.isSaving,
+      isSaved: state.isSaved,
+      error: state.error,
+      taxRate: state.taxRate,
+      taxEnabled: state.taxEnabled,
+      discountEnabled: state.discountEnabled,
+      isGeneratingAccount: state.isGeneratingAccount,
+      paymentIntent: state.paymentIntent,
       customerName: event.name,
       customerId: event.customerId,
       customerPhone: event.phone,
       customerAddress: event.address,
+      paymentMethod: state.paymentMethod,
+      staffId: state.staffId,
+      staffName: state.staffName,
+      businessMode: state.businessMode,
+      studentId: event.clearSchoolLink ? null : state.studentId,
+      classId: event.clearSchoolLink ? null : state.classId,
+      termId: state.termId,
+      academicYearId: state.academicYearId,
+      admissionNumber: event.clearSchoolLink ? null : state.admissionNumber,
+      className: event.clearSchoolLink ? null : state.className,
+      termName: state.termName,
+      academicYearName: state.academicYearName,
+      studentImage: event.clearSchoolLink ? null : state.studentImage,
+      paymentSuccess: state.paymentSuccess,
+      warrantyDuration: state.warrantyDuration,
     ));
   }
 

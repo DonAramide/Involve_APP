@@ -881,6 +881,7 @@ const activeNavigationTree = computed(() => {
         { label: 'Financial Ledger', path: '/finance/ledger', icon: 'account_balance_wallet', color: 'amber-4', badge: 'SOURCE', badgeBg: 'amber-10', badgeColor: 'amber-3' },
         { label: 'Reconciliation', path: '/finance/reconciliation', icon: 'fact_check', color: 'green-4' },
         { label: 'Settlements', path: '/finance/settlements', icon: 'payments', color: 'indigo-4' },
+        { label: 'School Payments', path: '/finance/school-payments', icon: 'school', color: 'teal-4', badge: 'DISPUTES', badgeBg: 'teal-10', badgeColor: 'teal-2' },
         { label: 'Audit Engine', path: '/finance/audit', icon: 'policy', color: 'red-4' }
       ]
     

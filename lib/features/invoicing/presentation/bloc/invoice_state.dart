@@ -46,9 +46,17 @@ class UpdateCustomerInfo extends InvoiceEvent {
   final String? customerId;
   final String? phone;
   final String? address;
-  UpdateCustomerInfo({this.name, this.customerId, this.phone, this.address});
+  /// When true, clears linked school student fields (keeps active term/year).
+  final bool clearSchoolLink;
+  UpdateCustomerInfo({
+    this.name,
+    this.customerId,
+    this.phone,
+    this.address,
+    this.clearSchoolLink = false,
+  });
   @override
-  List<Object?> get props => [name, customerId, phone, address];
+  List<Object?> get props => [name, customerId, phone, address, clearSchoolLink];
 }
 
 class UpdatePaymentMethod extends InvoiceEvent {

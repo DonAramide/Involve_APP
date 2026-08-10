@@ -2,8 +2,10 @@ import '../entities/invoice.dart';
 import '../entities/stock_return.dart';
 
 abstract class InvoiceRepository {
-  Future<void> saveInvoice(Invoice invoice);
+  Future<void> saveInvoice(Invoice invoice, {bool adjustStudentBalance = true});
   Future<void> updateInvoice(Invoice invoice);
+  /// Apply an additional payment to an existing invoice and reduce student/customer ledger debt.
+  Future<void> recordPayment(int invoiceId, double additionalAmount, String method);
   Future<List<Invoice>> getAllInvoices();
   Future<Invoice?> getInvoiceById(int id);
   Future<List<Invoice>> getInvoicesByDateRange(DateTime start, DateTime end);
