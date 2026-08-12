@@ -41,7 +41,9 @@
           @click="toggleStatus" 
           class="q-mr-sm text-weight-bold" 
         />
-        <q-btn outline color="red-5" icon="lock_reset" label="Reset Password" @click="resetPassword" class="q-mr-sm text-weight-bold" />
+        <q-btn outline color="red-5" icon="lock_reset" label="Generate System Password" @click="resetPassword" class="q-mr-sm text-weight-bold">
+          <q-tooltip>Generate a recovery password for device System Access when the local password is forgotten</q-tooltip>
+        </q-btn>
         <q-btn 
           color="red-10" 
           icon="lock" 
@@ -984,7 +986,7 @@
         </q-card-section>
         <q-card-section class="q-pa-lg text-center">
           <div class="text-caption text-grey-4 q-mb-md">
-            The password for the primary tenant owner has been reset. Please provide them with this temporary password securely. They will be required to change it upon next login.
+            Share this System Access recovery password with the tenant securely. Online terminals will sync it automatically; offline devices must connect to the internet and open System Access again.
           </div>
           <div class="q-pa-md bg-dark rounded-borders border-cyan text-h4 font-mono text-cyan-3" style="letter-spacing: 3px;">
             {{ tempPassword }}
@@ -1569,18 +1571,38 @@ const openEditModal = () => {
   $q.notify({ type: 'info', message: 'Edit tenant is not fully implemented yet.' });
 };
 
-const resetPassword = () => {
-  // Generate random 10 char alphanumeric password
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#';
-  let pass = '';
-  for(let i=0; i<10; i++) {
-    pass += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  tempPassword.value = pass;
-  
-  // Here we would call an API like adminApi.resetTenantPassword(tenant.value.id, tempPassword.value)
-  // For now, just show the generated modal
-  showPasswordDialog.value = true;
+const resetPassword = async () => {
+  if (!tenant.value?.id) return;
+
+  $q.dialog({
+    title: 'Generate Device System Password',
+    message:
+      'This creates a recovery password for terminals that forgot their System Access password. Share it securely with the tenant. Devices must be online to sync it.',
+    cancel: true,
+    persistent: true,
+    ok: { label: 'Generate', color: 'red-5' },
+  }).onOk(async () => {
+    try {
+      const { data } = await adminApi.resetTenantSystemPassword(tenant.value.id);
+      const password = data?.password;
+      if (!password) {
+        $q.notify({ type: 'negative', message: data?.error || 'Failed to generate password' });
+        return;
+      }
+      tempPassword.value = password;
+      tenant.value.system_access_password = password;
+      showPasswordDialog.value = true;
+      $q.notify({
+        type: 'positive',
+        message: 'System access password generated and pushed to online devices.',
+      });
+    } catch (e) {
+      $q.notify({
+        type: 'negative',
+        message: e?.response?.data?.error || 'Failed to generate system access password',
+      });
+    }
+  });
 };
 
 const copyTempPassword = () => {

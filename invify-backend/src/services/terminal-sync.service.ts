@@ -211,7 +211,7 @@ export class TerminalSyncService {
         const { data: tenant } = await supabaseAdmin
           .from('tenants')
           .select(
-            'id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code, is_emergency_locked, emergency_lock_code, status',
+            'id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code, is_emergency_locked, emergency_lock_code, status, system_access_password',
           )
           .eq('id', resolvedTenantId)
           .maybeSingle();
@@ -228,6 +228,7 @@ export class TerminalSyncService {
       isEmergencyLocked: !!tenantDetails?.is_emergency_locked,
       emergencyLockCode: tenantDetails?.emergency_lock_code || null,
       tenantStatus: tenantDetails?.status || null,
+      systemAccessPassword: tenantDetails?.system_access_password || null,
     };
 
     // Step 3: USER_DEVICE — no bank TID / MPOS bundle

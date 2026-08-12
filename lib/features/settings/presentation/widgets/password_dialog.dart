@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/device_info_service.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
 import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
 
@@ -14,6 +16,7 @@ class PasswordDialog extends StatefulWidget {
 class _PasswordDialogState extends State<PasswordDialog> {
   final _controller = TextEditingController();
   bool _isLocked = false;
+  bool _syncingRecovery = false;
   int _failedAttempts = 0;
   String? _errorMessage;
   bool _hasPopped = false;
@@ -21,11 +24,36 @@ class _PasswordDialogState extends State<PasswordDialog> {
   @override
   void initState() {
     super.initState();
-    // Check if system is locked
     final settings = widget.bloc.state.settings;
     if (settings != null) {
       _isLocked = settings.isLocked;
       _failedAttempts = settings.failedAttempts;
+    }
+  }
+
+  Future<void> _syncRecoveryPassword() async {
+    setState(() {
+      _syncingRecovery = true;
+      _errorMessage = null;
+    });
+    try {
+      final deviceId = await DeviceInfoService.getDeviceSuffix();
+      await TerminalSyncService.syncTerminalConfig(deviceId: deviceId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Checked with server. If your admin generated a password, enter it below.'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage =
+            'Could not reach the server. Connect to the internet, then ask your tenant admin to generate a System Password in the web dashboard.';
+      });
+    } finally {
+      if (mounted) setState(() => _syncingRecovery = false);
     }
   }
 
@@ -40,17 +68,14 @@ class _PasswordDialogState extends State<PasswordDialog> {
             _failedAttempts = state.settings!.failedAttempts;
           });
         }
-        
-        // Update error message
+
         if (state.error != null) {
           setState(() {
             _errorMessage = state.error;
           });
-          // Clear text field on error
           _controller.clear();
         }
-        
-        // Close dialog on successful unlock/authorization
+
         if (state.isAuthorized && !_hasPopped) {
           _hasPopped = true;
           Navigator.of(context, rootNavigator: true).pop(true);
@@ -69,10 +94,9 @@ class _PasswordDialogState extends State<PasswordDialog> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Enter unlock code:',
+                  'Connect to the internet and contact your tenant admin / check the web dashboard for a generated System Password, then enter it below.',
                   style: TextStyle(fontSize: 12),
                 ),
-                const SizedBox(height: 4),
                 const SizedBox(height: 8),
               ] else if (_failedAttempts > 0) ...[
                 Container(
@@ -97,6 +121,11 @@ class _PasswordDialogState extends State<PasswordDialog> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Forgot password? Connect to the internet and ask your tenant admin to generate a System Password in the web dashboard.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[700]),
                 ),
                 const SizedBox(height: 8),
               ],
@@ -125,13 +154,31 @@ class _PasswordDialogState extends State<PasswordDialog> {
               ],
               TextField(
                 controller: _controller,
-                obscureText: !_isLocked, // Show text for unlock code
+                obscureText: !_isLocked,
                 autofocus: true,
                 onSubmitted: (_) => _handleSubmit(),
                 decoration: InputDecoration(
-                  labelText: _isLocked ? 'Unlock Code' : 'System Password',
+                  labelText: _isLocked ? 'Recovery / Unlock Password' : 'System Password',
                   hintText: null,
-                  errorText: null, // Clear default error text
+                  errorText: null,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _syncingRecovery ? null : _syncRecoveryPassword,
+                  icon: _syncingRecovery
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cloud_sync, size: 16),
+                  label: Text(
+                    _syncingRecovery ? 'Checking server...' : 'Sync recovery password',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 ),
               ),
             ],
@@ -153,9 +200,9 @@ class _PasswordDialogState extends State<PasswordDialog> {
 
   void _handleSubmit() {
     setState(() {
-      _errorMessage = null; // Clear previous error
+      _errorMessage = null;
     });
-    
+
     if (_isLocked) {
       widget.bloc.add(UnlockSystem(_controller.text));
     } else {

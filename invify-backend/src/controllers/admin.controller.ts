@@ -739,9 +739,79 @@ export class AdminController {
   static async resetTenantPasswords(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      
-      // Implement password reset broadcast/logic
-      return res.status(200).json({ success: true, message: 'Password reset initiated' });
+      const bodyPassword = typeof req.body?.password === 'string' ? req.body.password.trim() : '';
+
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#';
+      let generated = bodyPassword;
+      if (!generated) {
+        generated = '';
+        for (let i = 0; i < 10; i++) {
+          generated += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+      }
+
+      const { data, error } = await supabaseAdmin
+        .from('tenants')
+        .update({
+          system_access_password: generated,
+          system_access_password_updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select('id, name')
+        .maybeSingle();
+
+      if (error) {
+        // Column may not exist yet on older staging DBs — soft-fail with clear message
+        if (String(error.message || '').includes('system_access_password')) {
+          return res.status(500).json({
+            error:
+              'system_access_password column missing. Apply migration 20260812180000_tenant_system_access_password.sql',
+          });
+        }
+        throw error;
+      }
+
+      try {
+        const { GovAuditService } = require('../services/gov-audit.service');
+        const user = (req as any).user || {};
+        const ip =
+          (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+          req.socket.remoteAddress ||
+          '127.0.0.1';
+        await GovAuditService.logAction({
+          id: require('crypto').randomUUID(),
+          timestamp: new Date().toISOString(),
+          module: 'GOVERNANCE',
+          action: 'SYSTEM_ACCESS_PASSWORD_RESET',
+          user_email: user.email || 'unknown',
+          user_name: user.name || user.email?.split('@')[0] || 'Admin',
+          ip_address: ip,
+          target: id,
+          status: 'success',
+          tenant_id: id,
+          metadata: { tenant_name: data?.name || null, password_set: true },
+        });
+      } catch (auditErr) {
+        console.warn('[AdminController] resetTenantPasswords audit log failed:', auditErr);
+      }
+
+      try {
+        const { io } = require('../app');
+        io.to(`tenant:${id}`).emit('system_access_password_reset', {
+          password: generated,
+          tenantId: id,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (socketErr) {
+        console.warn('[AdminController] resetTenantPasswords socket emit failed:', socketErr);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Device system access password generated. Share it with the tenant securely.',
+        password: generated,
+        tenantId: id,
+      });
     } catch (error: any) {
       console.error('[AdminController] resetTenantPasswords Error:', error.message);
       return res.status(500).json({ error: error.message });

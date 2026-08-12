@@ -41,13 +41,19 @@ class SecurityService {
     
     if (stored == null) {
       // Default: AdminPass123! hashed
-      return hashedInput == _hash('AdminPass123!');
+      if (hashedInput == _hash('AdminPass123!')) return true;
+    } else if (stored == hashedInput) {
+      return true;
     }
-    if (stored == hashedInput) return true;
 
-    // Emergency master (same key used by the lockout unlock-code flow).
-    // Lets support recover when the custom system password is unknown.
-    return input == 'admin123invify';
+    // Tenant-admin recovery password (from dashboard generate / terminal sync / socket).
+    final recovery = await getRecoveryPassword();
+    if (recovery != null && recovery.isNotEmpty && input == recovery) {
+      await setPassword(input);
+      return true;
+    }
+
+    return false;
   }
 
   /// Clears the stored system password so [verifyPassword] falls back to AdminPass123!.
@@ -58,6 +64,20 @@ class SecurityService {
     } catch (e) {
       return false;
     }
+  }
+
+  static const _recoveryPasswordKey = 'tenant_system_access_recovery_password';
+
+  Future<void> setRecoveryPassword(String? password) async {
+    if (password == null || password.trim().isEmpty) {
+      await _storage.delete(key: _recoveryPasswordKey);
+      return;
+    }
+    await _storage.write(key: _recoveryPasswordKey, value: password.trim());
+  }
+
+  Future<String?> getRecoveryPassword() async {
+    return _storage.read(key: _recoveryPasswordKey);
   }
   
   Future<String?> getStoredPassword() async {

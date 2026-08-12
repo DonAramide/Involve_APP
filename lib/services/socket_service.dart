@@ -6,6 +6,7 @@ import 'package:involve_app/features/dashboard/presentation/widgets/notification
 import 'package:involve_app/features/services/domain/services/customer_wallet_credit_service.dart';
 import 'package:involve_app/features/school_finance/domain/services/payment_catch_up_service.dart';
 import 'package:involve_app/services/terminal_sync_service.dart';
+import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'dart:developer';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
@@ -197,6 +198,28 @@ class SocketService {
         if (navigatorKey?.currentContext != null) {
           showEmergencyLockScreen(navigatorKey!.currentContext!, passcode);
         }
+      }
+    });
+
+    _socket!.on('system_access_password_reset', (data) async {
+      debugPrint('[SocketService] System access password reset received: $data');
+      try {
+        final password = data is Map ? data['password']?.toString() : null;
+        if (password == null || password.isEmpty) return;
+        await SecurityService().setRecoveryPassword(password);
+        if (navigatorKey?.currentContext != null) {
+          ScaffoldMessenger.of(navigatorKey!.currentContext!).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'A new System Access recovery password was issued by your admin. Use it if you forgot the local password.',
+              ),
+              backgroundColor: Color(0xFF10B981),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint('[SocketService] system_access_password_reset error: $e');
       }
     });
 

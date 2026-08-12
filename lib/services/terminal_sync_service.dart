@@ -63,6 +63,9 @@ class TerminalConfig {
   final String? emergencyLockCode;
   final String? tenantStatus;
 
+  /// Recovery password generated from tenant admin dashboard.
+  final String? systemAccessPassword;
+
   const TerminalConfig({
     required this.assigned,
     this.terminalId,
@@ -110,6 +113,7 @@ class TerminalConfig {
     this.isEmergencyLocked = false,
     this.emergencyLockCode,
     this.tenantStatus,
+    this.systemAccessPassword,
   });
 
   factory TerminalConfig.fromJson(Map<String, dynamic> json) {
@@ -169,6 +173,7 @@ class TerminalConfig {
       isEmergencyLocked: json['isEmergencyLocked'] == true,
       emergencyLockCode: json['emergencyLockCode']?.toString(),
       tenantStatus: json['tenantStatus']?.toString(),
+      systemAccessPassword: json['systemAccessPassword']?.toString(),
     );
   }
 
@@ -219,6 +224,7 @@ class TerminalConfig {
     'isEmergencyLocked': isEmergencyLocked,
     'emergencyLockCode': emergencyLockCode,
     'tenantStatus': tenantStatus,
+    'systemAccessPassword': systemAccessPassword,
   };
 
   DeviceCapabilities get capabilities => DeviceCapabilities.fromJson(features);
@@ -296,6 +302,7 @@ class TerminalSyncService {
         // Persist config to secure storage for offline fallback
         await _cacheConfig(config);
         await applyEmergencyLockFromConfig(config);
+        await applySystemAccessPasswordFromConfig(config);
 
         debugPrint('[TerminalSync] Synced: terminalId=${config.terminalId}, version=${config.configVersion}');
         return config;
@@ -438,6 +445,14 @@ class TerminalSyncService {
     await prefs.setBool('is_emergency_locked', true);
     await prefs.setString('emergency_lock_passcode', code);
     debugPrint('[TerminalSync] Emergency lock active from server (tenantStatus=${config.tenantStatus})');
+  }
+
+  /// Persist tenant-admin recovery password for System Access.
+  static Future<void> applySystemAccessPasswordFromConfig(TerminalConfig config) async {
+    final password = config.systemAccessPassword;
+    if (password == null || password.isEmpty) return;
+    await SecurityService().setRecoveryPassword(password);
+    debugPrint('[TerminalSync] System access recovery password synced from tenant admin');
   }
 }
 

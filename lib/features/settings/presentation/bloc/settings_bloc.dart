@@ -337,7 +337,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     // Check if system is locked
     if (currentSettings.isLocked) {
       debugPrint('SettingsBloc: System is LOCKED');
-      emit(state.copyWith(error: 'System is locked. Use unlock code.', isAuthorized: false));
+      emit(state.copyWith(error: 'System is locked. Use the recovery password from your tenant admin dashboard.', isAuthorized: false));
       return;
     }
 
@@ -387,7 +387,8 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       await repository.updateSettings(lockedSettings);
       emit(state.copyWith(
         settings: lockedSettings,
-        error: 'System locked! Too many failed attempts. Use unlock code.',
+        error:
+            'System locked! Connect to the internet and ask your tenant admin to generate a System Password in the web dashboard.',
       ));
     } else {
       // Just increment failed attempts
@@ -404,16 +405,26 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     final currentSettings = state.settings;
     if (currentSettings == null) return;
 
-    // Get admin password hash from secure storage
     final adminPasswordHash = await securityService.getStoredPassword();
     if (adminPasswordHash == null) {
       emit(state.copyWith(error: 'Admin password not set'));
       return;
     }
 
-    // Validate unlock code
-    if (_validateUnlockCode(event.unlockCode, adminPasswordHash)) {
-      // Unlock system and reset failed attempts
+    final code = event.unlockCode.trim();
+    final recovery = await securityService.getRecoveryPassword();
+
+    // Plain recovery password from tenant admin dashboard (preferred when locked).
+    final matchedPlainRecovery =
+        recovery != null && recovery.isNotEmpty && code == recovery;
+
+    final matchedUnlockCode =
+        await _validateUnlockCode(code, adminPasswordHash, recovery);
+
+    if (matchedPlainRecovery || matchedUnlockCode) {
+      if (matchedPlainRecovery) {
+        await securityService.setPassword(code);
+      }
       final unlockedSettings = currentSettings.copyWith(
         failedAttempts: 0,
         isLocked: false,
@@ -427,7 +438,10 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
         successMessage: 'System unlocked successfully!',
       ));
     } else {
-      emit(state.copyWith(error: 'Invalid unlock code'));
+      emit(state.copyWith(
+        error:
+            'Invalid unlock code. Connect to the internet and ask your tenant admin to generate a System Password in the web dashboard.',
+      ));
     }
   }
 
@@ -440,79 +454,56 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     emit(state.copyWith(settings: resetSettings));
   }
 
-  bool _validateUnlockCode(String unlockCode, String adminPasswordHash) {
+  Future<bool> _validateUnlockCode(
+    String unlockCode,
+    String adminPasswordHash,
+    String? recoveryPassword,
+  ) async {
     final parts = unlockCode.split('/');
     if (parts.length != 3) {
       debugPrint('❌ Unlock code format invalid. Expected 3 parts, got ${parts.length}');
       return false;
     }
-    
-    final now = DateTime.now();
-    final expectedDate = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
 
-    final dateStr = parts[0]; // YYYYMMDD
-    final timeStr = parts[1]; // HHmm
+    final now = DateTime.now();
+    final expectedDate =
+        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+
+    final dateStr = parts[0];
+    final timeStr = parts[1];
     final password = parts[2];
-    
-    debugPrint('🔓 Validating unlock code (HASHED VERSION):');
-    debugPrint('  Date: $dateStr');
-    debugPrint('  Time: $timeStr');
-    
-    // The password part of the unlock code MUST match either:
-    // 1. The HASH of the current system password (adminPasswordHash)
-    // 2. The HASH of the emergency master key
-    
-    final hashedInput = sha256.convert(utf8.encode(password + "INVIFY-SALT-2024-SECURE-STAY-SAFE")).toString();
-    
-    if (hashedInput != adminPasswordHash) {
-        // Fallback to emergency master key with its own salt
-        final emergencyHashedInput = sha256.convert(utf8.encode(password + "EMERGENCY-SALT-2024")).toString();
-        const expectedEmergencyHash = "5e470cc7d7a7601a4c847e0af92fc63e0adde5dbfb22a257498359420797fe37"; // Hashed 'admin123invify' + 'EMERGENCY-SALT-2024'
-        
-        if (emergencyHashedInput != expectedEmergencyHash) {
-             debugPrint('❌ Access Key mismatch');
-             _logRecommendedCode(unlockCode, now, expectedDate);
-             return false;
-        }
-    }
-    debugPrint('✅ Access Key correct');
-    
-    // Validate date (current date)
-    if (dateStr != expectedDate) {
-      debugPrint('❌ Date mismatch. Expected: $expectedDate, Got: $dateStr');
-      _logRecommendedCode(unlockCode, now, expectedDate);
+
+    final hashedInput =
+        sha256.convert(utf8.encode(password + "INVIFY-SALT-2024-SECURE-STAY-SAFE")).toString();
+
+    final passwordOk = hashedInput == adminPasswordHash ||
+        (recoveryPassword != null &&
+            recoveryPassword.isNotEmpty &&
+            password == recoveryPassword);
+
+    if (!passwordOk) {
+      debugPrint('❌ Access Key mismatch — need current system password or dashboard recovery password');
       return false;
     }
-    debugPrint('✅ Date correct');
-    
-    // Validate time (current hour and minute with ±10 minute tolerance)
+
+    if (dateStr != expectedDate) {
+      debugPrint('❌ Date mismatch. Expected: $expectedDate, Got: $dateStr');
+      return false;
+    }
+
+    if (timeStr.length < 4) return false;
     final currentMinute = now.hour * 60 + now.minute;
     final inputHour = int.tryParse(timeStr.substring(0, 2)) ?? -1;
     final inputMinute = int.tryParse(timeStr.substring(2, 4)) ?? -1;
     final inputTotalMinutes = inputHour * 60 + inputMinute;
-    
     final timeDifference = (currentMinute - inputTotalMinutes).abs();
-    
-    debugPrint('  Current time: ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}');
-    debugPrint('  Input time: ${inputHour.toString().padLeft(2, '0')}:${inputMinute.toString().padLeft(2, '0')}');
-    debugPrint('  Time difference: $timeDifference minutes');
-    
+
     if (timeDifference > 10) {
       debugPrint('❌ Time difference too large (>10 minutes)');
-      _logRecommendedCode(unlockCode, now, expectedDate);
       return false;
     }
-    
-    debugPrint('✅ Time within tolerance');
-    debugPrint('🎉 Unlock code validated successfully!');
-    return true;
-  }
 
-  void _logRecommendedCode(String inputCode, DateTime now, String expectedDate) {
-    final expectedCode = '$expectedDate/${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}/admin123invify';
-    debugPrint('🔓 Unlock Debug:');
-    debugPrint('   Input:    $inputCode');
-    debugPrint('   Expected: $expectedCode');
+    return true;
   }
 
   Future<void> _onVerifySuperAdminPassword(VerifySuperAdminPassword event, Emitter<SettingsState> emit) async {

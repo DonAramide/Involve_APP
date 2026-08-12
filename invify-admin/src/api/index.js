@@ -182,6 +182,7 @@ export const adminApi = {
   blockUserDevice: (id) => api.post('/api/admin/user-devices/block', { id }),
   triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
   emergencyLock: (data) => api.post('/api/admin/emergency-lock', data),
+  resetTenantSystemPassword: (id, data) => api.post(`/admin/tenants/${id}/reset-passwords`, data || {}),
 
   // Virtual Accounts Management
   getVirtualAccounts: () => api.get('/api/finance/virtual-accounts'),
