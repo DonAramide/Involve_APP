@@ -1,6 +1,10 @@
 <!-- invify-admin/src/pages/governance/LoginPage.vue -->
 <template>
-  <q-layout class="bg-main text-main row items-center justify-center fit relative-position" style="min-height: 100vh;">
+  <q-layout
+    class="bg-main text-main relative-position"
+    :class="isAdminPortal ? 'row items-center justify-center fit' : 'tenant-login-shell'"
+    style="min-height: 100vh;"
+  >
     <!-- Floating Premium Theme Toggle -->
     <div class="absolute-top-right q-pa-md z-max">
       <q-btn 
@@ -16,32 +20,59 @@
       </q-btn>
     </div>
 
-    <q-page-container class="fit row items-center justify-center q-pa-md">
-      
-      <!-- AUTHENTICATION FORM BOX -->
-      <div class="auth-card bg-panel enterprise-panel q-pa-xl column op-gap-24 shadow-2" style="width: 100%; max-width: 460px;">
+    <!-- Split shell: tenant = promo + form; admin = centered form only -->
+    <div :class="isAdminPortal ? 'admin-centered-shell' : 'tenant-split-container'">
+      <aside v-if="!isAdminPortal" class="tenant-promo-pane" aria-label="Invify product highlights">
+        <div
+          class="tenant-promo-fill"
+          :style="{ backgroundImage: `url(${tenantPromoSlides[promoIndex].src})` }"
+          aria-hidden="true"
+        />
+        <img
+          :key="promoIndex"
+          :src="tenantPromoSlides[promoIndex].src"
+          :alt="tenantPromoSlides[promoIndex].alt"
+          class="tenant-promo-img"
+        />
+        <div class="tenant-promo-dots">
+          <button
+            v-for="(slide, idx) in tenantPromoSlides"
+            :key="slide.id"
+            type="button"
+            class="tenant-promo-dot"
+            :class="{ active: promoIndex === idx }"
+            :aria-label="`Show slide ${idx + 1}`"
+            @click="goToPromoSlide(idx)"
+          />
+        </div>
+      </aside>
+
+      <div :class="isAdminPortal ? 'admin-auth-pane' : 'tenant-auth-pane'">
+        <div
+          class="auth-card bg-panel enterprise-panel column shadow-2"
+          :class="isAdminPortal ? 'q-pa-xl op-gap-24' : 'auth-card--tenant q-pa-md op-gap-12'"
+          :style="authCardStyle"
+        >
         
         <!-- Platform Branding & Level Indicator -->
         <div class="column items-center text-center">
-          <div class="row items-center justify-center op-gap-8 no-wrap q-mb-sm">
-            <img :src="logoImg" alt="Invify Logo" style="height: 40px; width: auto;" class="q-mr-xs" />
-            <span class="text-h5 text-main text-weight-bold tracking-wide">INVIFY <span class="text-blue-5">OPS_CORE</span></span>
+          <div class="row items-center justify-center op-gap-8 no-wrap" :class="isAdminPortal ? 'q-mb-sm' : 'q-mb-xs'">
+            <img
+              :src="logoImg"
+              alt="Invify Logo"
+              class="q-mr-xs"
+              :style="isAdminPortal ? 'height: 40px; width: auto;' : 'height: 28px; width: auto;'"
+            />
+            <span
+              class="text-main text-weight-bold tracking-wide"
+              :class="isAdminPortal ? 'text-h5' : 'text-h6'"
+            >
+              INVIFY <span class="text-blue-5">{{ portalBrandAccent }}</span>
+            </span>
           </div>
-          <div class="text-caption text-muted">Enterprise Multi-Tenant Identity & Access Governance Hub</div>
-        </div>
-
-        <!-- Dynamic Identity Tier Federation Switcher -->
-        <div class="bg-subpanel q-pa-xs rounded-borders border-main row items-center op-gap-2 no-wrap overflow-x-auto">
-          <q-btn 
-            v-for="tier in authTiers" 
-            :key="tier.id" 
-            flat 
-            dense 
-            size="xs" 
-            :label="tier.label" 
-            :class="['col q-py-xs text-weight-bold rounded-borders transition-all', activeTier === tier.id ? 'bg-panel text-blue-5 border-active' : 'text-muted']" 
-            @click="switchAuthTier(tier.id)" 
-          />
+          <div class="text-caption text-muted" :class="{ 'tenant-subtitle-compact': !isAdminPortal }">
+            {{ portalSubtitle }}
+          </div>
         </div>
 
         <!-- System Alerts / Dynamic Fallback Indicator Banners -->
@@ -83,7 +114,7 @@
               :dark="prefs.isDarkMode"
               filled
               dense
-              type="password"
+              :type="showForceResetPassword ? 'text' : 'password'"
               placeholder="••••••••••••"
               class="bg-subpanel text-main rounded-borders"
               lazy-rules
@@ -91,6 +122,14 @@
             >
               <template v-slot:prepend>
                 <q-icon name="lock_open" size="xs" color="grey-6" />
+              </template>
+              <template v-slot:append>
+                <q-icon
+                  :name="showForceResetPassword ? 'visibility_off' : 'visibility'"
+                  size="xs"
+                  class="cursor-pointer text-grey-6"
+                  @click="showForceResetPassword = !showForceResetPassword"
+                />
               </template>
             </q-input>
           </div>
@@ -101,7 +140,7 @@
               :dark="prefs.isDarkMode"
               filled
               dense
-              type="password"
+              :type="showForceResetConfirmPassword ? 'text' : 'password'"
               placeholder="••••••••••••"
               class="bg-subpanel text-main rounded-borders"
               lazy-rules
@@ -109,6 +148,14 @@
             >
               <template v-slot:prepend>
                 <q-icon name="lock" size="xs" color="grey-6" />
+              </template>
+              <template v-slot:append>
+                <q-icon
+                  :name="showForceResetConfirmPassword ? 'visibility_off' : 'visibility'"
+                  size="xs"
+                  class="cursor-pointer text-grey-6"
+                  @click="showForceResetConfirmPassword = !showForceResetConfirmPassword"
+                />
               </template>
             </q-input>
           </div>
@@ -133,35 +180,41 @@
         </q-form>
 
         <!-- STATE 1D: PASSWORD RESET DEMANDING OTP -->
-        <q-form @submit.prevent="executeOtpResetPassword" class="column op-gap-16" v-else-if="pendingOtpResetState">
+        <q-form @submit.prevent="onRecoveryPrimaryAction" class="column op-gap-16" v-else-if="pendingOtpResetState">
           <div class="bg-blue-focus border-blue q-pa-md rounded-borders text-center column op-gap-8" style="background-color: rgba(33, 150, 243, 0.08); border: 1px solid rgba(33, 150, 243, 0.2);">
             <q-icon name="mail_lock" size="md" color="blue-5" class="self-center" />
             <div class="text-main text-weight-bold text-caption">OTP Password Recovery Gateway</div>
             <div class="text-metric-sm text-muted">
-              Specify your operator email address. A secure one-time verification OTP will be required.
+              <template v-if="recoveryStep === 'email'">
+                Specify your operator email address. A secure one-time verification OTP will be emailed to you.
+              </template>
+              <template v-else-if="recoveryStep === 'verify'">
+                Enter the 6-digit recovery code we sent to <strong class="text-main">{{ otpForm.email }}</strong>.
+              </template>
+              <template v-else>
+                Recovery email verified. Choose a new secure passphrase to finish.
+              </template>
             </div>
           </div>
 
-          <div>
+          <!-- Step 1: Email -->
+          <div v-if="recoveryStep === 'email'">
             <div class="text-caption text-muted q-mb-xs">Email Address *</div>
             <q-input
               v-model="otpForm.email"
               :dark="prefs.isDarkMode"
               filled
               dense
+              type="email"
               placeholder="operator@IIPS.app"
               class="bg-subpanel text-main rounded-borders"
               lazy-rules
               :rules="[val => !!val || 'Specify email address']"
-              :disable="otpDispatched"
-            >
-              <template v-slot:append>
-                <q-btn flat dense color="blue-5" label="Request OTP" @click="requestOtpCode" :disable="otpDispatched || loading" class="text-caption text-weight-bold" />
-              </template>
-            </q-input>
+            />
           </div>
 
-          <div v-if="otpDispatched" class="column op-gap-12">
+          <!-- Step 2: Validate OTP -->
+          <div v-else-if="recoveryStep === 'verify'" class="column op-gap-12">
             <div>
               <div class="text-caption text-muted q-mb-xs">One-Time OTP Verification Code *</div>
               <q-input
@@ -169,13 +222,37 @@
                 :dark="prefs.isDarkMode"
                 filled
                 dense
+                mask="######"
                 placeholder="Enter 6-digit OTP code"
                 class="bg-subpanel text-main rounded-borders font-mono"
+                autofocus
                 lazy-rules
-                :rules="[val => !!val || 'Specify verification code']"
+                :rules="[val => (val && val.length === 6) || 'Enter the 6-digit code']"
               />
             </div>
+            <div class="row items-center justify-between">
+              <q-btn
+                v-if="resendCooldownRemaining <= 0"
+                flat
+                dense
+                color="blue-5"
+                label="Resend OTP"
+                class="text-caption"
+                :disable="loading"
+                @click="requestOtpCode"
+              />
+              <span
+                v-else
+                class="text-caption text-muted font-mono"
+              >
+                Resend OTP in {{ resendCountdownLabel }}
+              </span>
+              <span class="text-metric-sm text-muted">Code expires in 10 minutes</span>
+            </div>
+          </div>
 
+          <!-- Step 3: New password -->
+          <div v-else class="column op-gap-12">
             <div>
               <div class="text-caption text-muted q-mb-xs">New Secure Passphrase *</div>
               <q-input
@@ -183,12 +260,24 @@
                 :dark="prefs.isDarkMode"
                 filled
                 dense
-                type="password"
+                :type="showRecoveryPassword ? 'text' : 'password'"
                 placeholder="••••••••••••"
                 class="bg-subpanel text-main rounded-borders"
+                autofocus
                 lazy-rules
                 :rules="[val => !!val || 'Password required', val => val.length >= 6 || 'At least 6 characters']"
-              />
+              >
+                <template v-slot:append>
+                  <q-icon
+                    :name="showRecoveryPassword ? 'visibility_off' : 'visibility'"
+                    size="xs"
+                    class="cursor-pointer text-grey-6"
+                    @click="showRecoveryPassword = !showRecoveryPassword"
+                  >
+                    <q-tooltip>{{ showRecoveryPassword ? 'Hide passphrase' : 'Show passphrase' }}</q-tooltip>
+                  </q-icon>
+                </template>
+              </q-input>
             </div>
 
             <div>
@@ -198,12 +287,23 @@
                 :dark="prefs.isDarkMode"
                 filled
                 dense
-                type="password"
+                :type="showRecoveryConfirmPassword ? 'text' : 'password'"
                 placeholder="••••••••••••"
                 class="bg-subpanel text-main rounded-borders"
                 lazy-rules
                 :rules="[val => !!val || 'Confirm password required', val => val === otpForm.newPassword || 'Passwords mismatch']"
-              />
+              >
+                <template v-slot:append>
+                  <q-icon
+                    :name="showRecoveryConfirmPassword ? 'visibility_off' : 'visibility'"
+                    size="xs"
+                    class="cursor-pointer text-grey-6"
+                    @click="showRecoveryConfirmPassword = !showRecoveryConfirmPassword"
+                  >
+                    <q-tooltip>{{ showRecoveryConfirmPassword ? 'Hide passphrase' : 'Show passphrase' }}</q-tooltip>
+                  </q-icon>
+                </template>
+              </q-input>
             </div>
           </div>
 
@@ -211,34 +311,40 @@
             <q-btn
               flat
               color="grey-6"
-              label="Back to Login"
+              :label="recoveryStep === 'email' ? 'Back to Login' : 'Back'"
               class="col"
-              @click="pendingOtpResetState = false"
+              @click="onRecoveryBack"
               :disable="loading"
             />
             <q-btn
               type="submit"
               color="blue-5"
-              label="Reset Passphrase"
+              :label="recoveryPrimaryLabel"
               class="col text-weight-bold"
               unelevated
               :loading="loading"
-              :disable="!otpDispatched"
             />
           </div>
         </q-form>
 
         <!-- STATE 1: STANDARD CREDENTIALS ENTRY -->
-        <q-form @submit.prevent="executeLoginPass" class="column op-gap-16" v-else-if="!pendingChallengeState && !pendingOtpResetState && activeTier !== 'sso'">
+        <q-form
+          @submit.prevent="executeLoginPass"
+          class="column"
+          :class="isAdminPortal ? 'op-gap-16' : 'op-gap-10'"
+          v-else-if="!pendingChallengeState && !pendingOtpResetState"
+        >
           
           <div>
-            <div class="text-caption text-muted q-mb-xs">Operator Account Identity *</div>
+            <div class="text-caption text-muted q-mb-xs">
+              {{ isAdminPortal ? 'Operator Account Identity *' : 'Tenant Admin Identity *' }}
+            </div>
             <q-input
               v-model="form.email"
               :dark="prefs.isDarkMode"
               filled
               dense
-              :placeholder="activeTier === 'pro' ? 'customer@IIPS.app' : 'e.g. sysadmin@IIPS.app'"
+              :placeholder="isAdminPortal ? 'e.g. ops@IIPS.app' : 'e.g. admin@yourschool.com'"
               class="bg-subpanel text-main rounded-borders"
               autofocus
               lazy-rules
@@ -283,12 +389,11 @@
           </div>
 
           <!-- Quick Test Tiers Switcher for Enterprise Demo validation -->
-          <div class="column op-gap-4 q-pt-xs">
+          <div v-if="isAdminPortal" class="column op-gap-4 q-pt-xs">
             <span class="text-metric-mono text-muted" style="font-size: 9px;">PRESETS FOR ISOLATED ENVIRONMENT TESTING:</span>
             <div class="row op-gap-4">
               <q-btn dense flat size="xs" color="blue-5" label="[Tier: Super Admin]" @click="fillPreset('superadmin@IIPS.app', 'AdminPass123!', 'SUPER_ADMIN')" class="bg-subpanel q-px-xs text-metric-sm" />
               <q-btn dense flat size="xs" color="amber-5" label="[Tier: Staff Tier]" @click="fillPreset('staff@IIPS.app', 'StaffPass123!', 'STAFF')" class="bg-subpanel q-px-xs text-metric-sm" />
-              <q-btn dense flat size="xs" color="muted" label="[Tier: Tenant Op]" @click="fillPreset('operator@IIPS.app', 'UserPass123!', 'TENANT_OPERATOR')" class="bg-subpanel q-px-xs text-metric-sm" />
             </div>
           </div>
 
@@ -297,50 +402,14 @@
             type="submit"
             color="blue-5"
             label="Initialize Handshake Authentication"
-            class="full-width q-mt-sm text-weight-bold tracking-wide"
+            class="full-width text-weight-bold tracking-wide"
+            :class="isAdminPortal ? 'q-mt-sm' : 'q-mt-xs'"
             unelevated
             :loading="loading"
             :disable="lockoutRemainingMs > 0"
           />
 
         </q-form>
-
-        <!-- STATE 1B: ENTERPRISE SSO / FEDERATION GATEWAY -->
-        <div class="column op-gap-12 text-center q-py-md" v-else-if="activeTier === 'sso'">
-          <span class="text-metric-sm text-muted">Select upstream Zero-Trust Identity Provider context engine:</span>
-          
-          <div class="column op-gap-8">
-            <q-btn flat color="indigo-5" class="bg-subpanel border-main full-width row justify-start q-px-md" @click="simulateSsoFlow('SAML 2.0 Identity Platform')">
-              <div class="row items-center op-gap-12 no-wrap fit">
-                <q-icon name="account_balance" size="xs" color="indigo-5" />
-                <span class="text-caption text-main text-weight-bold">SAML 2.0 Federation Engine</span>
-              </div>
-            </q-btn>
-            
-            <q-btn flat color="blue-5" class="bg-subpanel border-main full-width row justify-start q-px-md" @click="simulateSsoFlow('Okta Identity Cloud')">
-              <div class="row items-center op-gap-12 no-wrap fit">
-                <q-icon name="cloud" size="xs" color="blue-5" />
-                <span class="text-caption text-main text-weight-bold">Okta Identity Federation Core</span>
-              </div>
-            </q-btn>
-            
-            <q-btn flat color="amber-5" class="bg-subpanel border-main full-width row justify-start q-px-md" @click="simulateSsoFlow('Microsoft Azure AD')">
-              <div class="row items-center op-gap-12 no-wrap fit">
-                <q-icon name="window" size="xs" color="blue-5" />
-                <span class="text-caption text-main text-weight-bold">Microsoft Azure AD Workspaces</span>
-              </div>
-            </q-btn>
-            
-            <q-btn flat color="green-5" class="bg-subpanel border-main full-width row justify-start q-px-md" @click="simulateSsoFlow('Google Workspace')">
-              <div class="row items-center op-gap-12 no-wrap fit">
-                <q-icon name="public" size="xs" color="red-5" />
-                <span class="text-caption text-main text-weight-bold">Google Cloud Identity Mesh</span>
-              </div>
-            </q-btn>
-          </div>
-
-          <span class="text-metric-mono text-muted q-mt-xs" style="font-size: 9px;">PREPARED NATIVELY FOR UNIFIED SESSION HANDSHAKE ENVELOPE INGESTION</span>
-        </div>
 
         <!-- STATE 2: INLINE TOTP MFA CHALLENGE ENTRY -->
         <q-form @submit.prevent="executeMfaVerification" class="column op-gap-16" v-else>
@@ -394,7 +463,7 @@
         </q-form>
 
         <!-- Developer Testing Gateway Shortcuts -->
-        <div class="column items-center q-mt-sm">
+        <div v-if="isAdminPortal" class="column items-center q-mt-sm">
           <q-btn 
             flat 
             dense 
@@ -408,7 +477,10 @@
         </div>
 
         <!-- Dynamic Context Boundary Stamp -->
-        <div class="border-top q-pt-md text-center text-metric-sm text-muted column op-gap-2">
+        <div
+          v-if="isAdminPortal"
+          class="border-top q-pt-md text-center text-metric-sm text-muted column op-gap-2"
+        >
           <span>AES-GCM // TLS 1.3 Transport Encrypted Streams</span>
           <span>Zero Frontend Authorization Autonomy Enforced</span>
         </div>
@@ -477,12 +549,12 @@
             </q-card-actions>
           </q-card>
         </q-dialog>
-
-    </q-page-container>
+      </div>
+    </div>
   </q-layout>
 </template>
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import logoImg from '../../assets/logo_transparent.png'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
@@ -497,6 +569,10 @@ const { prefs, toggleTheme } = useOperatorPreferences()
 
 const loading = ref(false)
 const showPassword = ref(false)
+const showRecoveryPassword = ref(false)
+const showRecoveryConfirmPassword = ref(false)
+const showForceResetPassword = ref(false)
+const showForceResetConfirmPassword = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
@@ -505,6 +581,59 @@ const showDeviceApprovalDialog = ref(false)
 const approvalDeviceId = ref('')
 const approvalUserEmail = ref('')
 
+const isAdminPortal = computed(() => {
+  const portal = route.meta?.portal || (route.path.startsWith('/tenant/login') ? 'tenant' : 'admin')
+  return portal === 'admin'
+})
+
+const activeTier = computed(() => (isAdminPortal.value ? 'staff' : 'admin'))
+
+const portalBrandAccent = computed(() => (isAdminPortal.value ? 'OPS_CORE' : 'TENANT'))
+const portalSubtitle = computed(() =>
+  isAdminPortal.value
+    ? 'Platform operators & staff identity gateway'
+    : 'Tenant owners & school / business admin gateway'
+)
+
+const PROMO_ROTATE_MS = 18000
+const promoIndex = ref(0)
+let promoTimer = null
+
+const tenantPromoSlides = [
+  { id: 'retail', src: '/login-promo/retail.png', alt: 'Boost your small retail business with Invify' },
+  { id: 'service', src: '/login-promo/service.png', alt: 'Elevate your service business with Invify' },
+  { id: 'school', src: '/login-promo/school.png', alt: 'Streamline school fees collection with Invify' }
+]
+
+const authCardStyle = computed(() => ({
+  width: '100%',
+  maxWidth: '460px'
+}))
+
+function stopPromoCarousel() {
+  if (promoTimer) {
+    clearInterval(promoTimer)
+    promoTimer = null
+  }
+}
+
+function startPromoCarousel() {
+  stopPromoCarousel()
+  promoTimer = setInterval(() => {
+    promoIndex.value = (promoIndex.value + 1) % tenantPromoSlides.length
+  }, PROMO_ROTATE_MS)
+}
+
+function goToPromoSlide(idx) {
+  promoIndex.value = idx
+  if (!isAdminPortal.value) startPromoCarousel()
+}
+
+watch(isAdminPortal, (admin) => {
+  if (admin) stopPromoCarousel()
+  else startPromoCarousel()
+})
+
 onMounted(() => {
   let storedId = localStorage.getItem('invify_browser_device_id')
   if (!storedId) {
@@ -512,6 +641,12 @@ onMounted(() => {
     localStorage.setItem('invify_browser_device_id', storedId)
   }
   deviceId.value = storedId
+  if (!isAdminPortal.value) startPromoCarousel()
+})
+
+onUnmounted(() => {
+  clearResendCooldown()
+  stopPromoCarousel()
 })
 
 function copyApprovalId() {
@@ -522,13 +657,25 @@ function copyApprovalId() {
   })
 }
 
-const activeTier = ref('staff')
-const authTiers = [
-  { id: 'staff', label: 'Operators / Staff' },
-  { id: 'admin', label: 'Tenant Admins' },
-  { id: 'pro', label: 'Pro Customers' },
-  { id: 'sso', label: 'Enterprise SSO' }
-]
+const PLATFORM_STAFF_ROLES = new Set([
+  'SUPER_ADMIN',
+  'STAFF',
+  'ADMIN_FINANCE',
+  'ADMIN_TREASURY',
+  'ADMIN_RISK',
+  'ADMIN_OPS',
+  'ADMIN_EXECUTIVE',
+  'ADMIN_DEPLOY'
+])
+
+function roleMatchesPortal(roleRaw, adminPortal) {
+  const roles = String(roleRaw || '')
+    .split(',')
+    .map((r) => r.trim().toUpperCase().replace(/-/g, '_'))
+    .filter(Boolean)
+  const isStaff = roles.some((r) => PLATFORM_STAFF_ROLES.has(r))
+  return adminPortal ? isStaff : !isStaff
+}
 
 const form = ref({
   email: '',
@@ -551,13 +698,6 @@ const challengeContextMessage = ref('')
 const lockoutRemainingMs = ref(0)
 const failedAttemptsCount = ref(0)
 
-const switchAuthTier = (tId) => {
-  activeTier.value = tId
-  errorMessage.value = ''
-  successMessage.value = ''
-  pendingChallengeState.value = false
-}
-
 const fillPreset = (emailStr, passStr, roleClaim) => {
   form.value.email = emailStr
   form.value.password = passStr
@@ -573,84 +713,238 @@ const otpForm = ref({
   newPassword: '',
   confirmPassword: ''
 })
+/** Recovery wizard: email → verify OTP → set password */
+const recoveryStep = ref('email') // 'email' | 'verify' | 'password'
 const otpDispatched = ref(false)
-const generatedOtpCode = ref('')
+const otpVerified = ref(false)
+/** Seconds before Resend OTP is shown again (user-requested ~60s cooldown). */
+const RESEND_OTP_COOLDOWN_SEC = 60
+const resendCooldownRemaining = ref(0)
+let resendCooldownTimer = null
+
+const resendCountdownLabel = computed(() => {
+  const s = Math.max(0, resendCooldownRemaining.value)
+  const mm = String(Math.floor(s / 60)).padStart(2, '0')
+  const ss = String(s % 60).padStart(2, '0')
+  return `${mm}:${ss}`
+})
+
+const clearResendCooldown = () => {
+  if (resendCooldownTimer) {
+    clearInterval(resendCooldownTimer)
+    resendCooldownTimer = null
+  }
+  resendCooldownRemaining.value = 0
+}
+
+const startResendCooldown = (seconds = RESEND_OTP_COOLDOWN_SEC) => {
+  clearResendCooldown()
+  resendCooldownRemaining.value = seconds
+  resendCooldownTimer = setInterval(() => {
+    if (resendCooldownRemaining.value <= 1) {
+      clearResendCooldown()
+      return
+    }
+    resendCooldownRemaining.value -= 1
+  }, 1000)
+}
+
+const recoveryPrimaryLabel = computed(() => {
+  if (recoveryStep.value === 'email') return 'Request OTP'
+  if (recoveryStep.value === 'verify') return 'Validate Recovery Code'
+  return 'Reset Passphrase'
+})
 
 const triggerRecoveryHint = () => {
   errorMessage.value = ''
   successMessage.value = ''
   pendingOtpResetState.value = true
+  recoveryStep.value = 'email'
   otpDispatched.value = false
-  generatedOtpCode.value = ''
-  otpForm.value.email = form.value.email
+  otpVerified.value = false
+  clearResendCooldown()
+  otpForm.value = {
+    email: form.value.email || '',
+    otpCode: '',
+    newPassword: '',
+    confirmPassword: ''
+  }
 }
 
-const requestOtpCode = () => {
-  if (!otpForm.value.email) {
-    errorMessage.value = 'Specify a valid email address to route OTP.'
+const onRecoveryBack = () => {
+  errorMessage.value = ''
+  successMessage.value = ''
+  if (recoveryStep.value === 'password') {
+    recoveryStep.value = 'verify'
+    otpVerified.value = false
     return
   }
+  if (recoveryStep.value === 'verify') {
+    recoveryStep.value = 'email'
+    otpDispatched.value = false
+    otpForm.value.otpCode = ''
+    clearResendCooldown()
+    return
+  }
+  pendingOtpResetState.value = false
+  clearResendCooldown()
+}
+
+const onRecoveryPrimaryAction = async () => {
+  if (recoveryStep.value === 'email') {
+    await requestOtpCode()
+    return
+  }
+  if (recoveryStep.value === 'verify') {
+    await verifyRecoveryOtp()
+    return
+  }
+  await executeOtpResetPassword()
+}
+
+const requestOtpCode = async () => {
+  if (resendCooldownRemaining.value > 0) {
+    errorMessage.value = `Please wait ${resendCountdownLabel.value} before requesting another OTP.`
+    return
+  }
+
+  const email = String(otpForm.value.email || '').trim().toLowerCase()
+  if (!email || !email.includes('@')) {
+    errorMessage.value = 'Specify a valid email address to route OTP.'
+    successMessage.value = ''
+    return
+  }
+
   loading.value = true
   errorMessage.value = ''
-  setTimeout(() => {
-    loading.value = false
+  successMessage.value = ''
+  otpForm.value.email = email
+
+  try {
+    const API_BASE = import.meta.env.VITE_API_URL || ''
+    await axios.post(`${API_BASE}/api/auth/send-email-otp`, {
+      email,
+      purpose: 'PASSWORD_RESET'
+    })
     otpDispatched.value = true
-    generatedOtpCode.value = Math.floor(100000 + Math.random() * 900000).toString()
-    successMessage.value = `OTP Code successfully dispatched! Use validation code: ${generatedOtpCode.value}`
-  }, 800)
+    otpVerified.value = false
+    recoveryStep.value = 'verify'
+    startResendCooldown()
+    successMessage.value = `Recovery OTP sent to ${email}. Check your inbox (and spam).`
+  } catch (err) {
+    errorMessage.value =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message ||
+      'Failed to send recovery OTP. Please try again.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const verifyRecoveryOtp = async () => {
+  const email = String(otpForm.value.email || '').trim().toLowerCase()
+  const code = String(otpForm.value.otpCode || '').trim()
+  if (!email) {
+    errorMessage.value = 'Email is missing. Go back and request OTP again.'
+    return
+  }
+  if (code.length !== 6) {
+    errorMessage.value = 'Enter the 6-digit recovery code from your email.'
+    return
+  }
+
+  loading.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  try {
+    const API_BASE = import.meta.env.VITE_API_URL || ''
+    const res = await axios.post(`${API_BASE}/api/auth/verify-email-otp`, {
+      email,
+      code,
+      otp: code,
+      purpose: 'PASSWORD_RESET'
+    })
+
+    if (res.data?.success === false) {
+      throw new Error(res.data?.error || 'Invalid or expired verification code.')
+    }
+
+    otpVerified.value = true
+    recoveryStep.value = 'password'
+    successMessage.value = 'Recovery email verified. Set your new passphrase.'
+  } catch (err) {
+    otpVerified.value = false
+    errorMessage.value =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message ||
+      'Invalid or expired recovery code. Request a new OTP.'
+  } finally {
+    loading.value = false
+  }
 }
 
 const executeOtpResetPassword = async () => {
-  if (otpForm.value.otpCode !== generatedOtpCode.value) {
-    errorMessage.value = 'Security verification failed: Invalid OTP code signature.'
+  if (!otpVerified.value) {
+    errorMessage.value = 'Validate your recovery code before setting a new passphrase.'
     return
   }
   if (otpForm.value.newPassword !== otpForm.value.confirmPassword) {
     errorMessage.value = 'Passphrase entries do not match.'
     return
   }
-  
+  if (!otpForm.value.newPassword || otpForm.value.newPassword.length < 6) {
+    errorMessage.value = 'Password must be at least 6 characters.'
+    return
+  }
+
   loading.value = true
   errorMessage.value = ''
   successMessage.value = ''
-  
+
   try {
-    // Retrieve userId via email check, or use mock fallback
-    let userId = 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382'; // Olive UUID
-    if (otpForm.value.email === 'sysadmin@IIPS.app' || otpForm.value.email === 'superadmin@iips.app') {
-      userId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479'; // Admin UUID
-    }
-    
     const API_BASE = import.meta.env.VITE_API_URL || ''
+    const email = String(otpForm.value.email || '').trim().toLowerCase()
+
     const res = await axios.post(`${API_BASE}/api/auth/reset-password`, {
-      userId: userId,
+      email,
+      // OTP already validated in previous step; backend trusts fresh VERIFIED session
+      recoveryVerified: true,
       newPassword: otpForm.value.newPassword
     })
-    
-    successMessage.value = res.data.message || 'Passphrase personalized successfully. You can now authenticate.'
+
+    successMessage.value =
+      res.data.message || 'Passphrase updated successfully. You can now sign in.'
+    form.value.email = email
     pendingOtpResetState.value = false
+    recoveryStep.value = 'email'
     otpForm.value = { email: '', otpCode: '', newPassword: '', confirmPassword: '' }
     otpDispatched.value = false
+    otpVerified.value = false
+    clearResendCooldown()
   } catch (err) {
-    errorMessage.value = err.response?.data?.error || err.message || 'Failed to authorize passphrase change.'
+    const raw =
+      err?.response?.data?.error ||
+      err?.response?.data?.message ||
+      err?.message ||
+      'Failed to authorize passphrase change.'
+    const lower = String(raw).toLowerCase()
+    if (
+      err?.response?.data?.code === 'SAME_AS_PREVIOUS_PASSWORD' ||
+      lower.includes('same as your previous') ||
+      lower.includes('same password') ||
+      lower.includes('different from the old')
+    ) {
+      errorMessage.value =
+        'New password cannot be the same as your previous password. Please choose a different passphrase.'
+    } else {
+      errorMessage.value = raw
+    }
   } finally {
     loading.value = false
   }
-}
-
-const simulateSsoFlow = (providerName) => {
-  loading.value = true
-  successMessage.value = `Negotiating OpenID Connect token parameters upstream targeting ${providerName}...`
-  errorMessage.value = ''
-  
-  setTimeout(() => {
-    // Generate valid test payload natively
-    finalizeAuthenticatedSession({
-      token: `sso_mock_jwt_${Date.now()}`,
-      refreshToken: `sso_refresh_${Date.now()}`,
-      user: { role: 'SUPER_ADMIN', email: `federated_operator@IIPS.app` }
-    })
-  }, 800)
 }
 
 const executeLoginPass = async () => {
@@ -666,6 +960,7 @@ const executeLoginPass = async () => {
     const res = await axios.post(`${API_BASE}/api/auth/login`, {
       email: form.value.email,
       password: form.value.password,
+      portal: isAdminPortal.value ? 'admin' : 'tenant',
       isolationTier: activeTier.value,
       deviceId: deviceId.value
     })
@@ -694,6 +989,13 @@ const executeLoginPass = async () => {
       }
     } else if (res.data?.token) {
       // Set explicit MFA clearance variables cleanly
+      const role = res.data?.user?.role || res.data?.role || ''
+      if (!roleMatchesPortal(role, isAdminPortal.value)) {
+        errorMessage.value = isAdminPortal.value
+          ? 'This account belongs to a tenant workspace. Use /tenant/login.'
+          : 'This account belongs to platform Admin / Ops. Use /admin/login.'
+        return
+      }
       localStorage.setItem('mfa_status_verified', 'true')
       finalizeAuthenticatedSession(res.data)
     }
@@ -720,6 +1022,15 @@ const executeLoginPass = async () => {
       } else {
         if (err.response?.status === 401) {
           errorMessage.value = 'Invalid user name or password'
+        } else if (
+          err.response?.data?.code === 'WRONG_LOGIN_PORTAL' ||
+          err.response?.data?.error === 'WRONG_LOGIN_PORTAL'
+        ) {
+          errorMessage.value =
+            err.response?.data?.message ||
+            (isAdminPortal.value
+              ? 'This account belongs to a tenant workspace. Use /tenant/login.'
+              : 'This account belongs to platform Admin / Ops. Use /admin/login.')
         } else {
           errorMessage.value = err.response?.data?.error || err.response?.data?.message || err.message || 'Authentication handshakes rejected due to origin validation blocks.'
         }
@@ -847,5 +1158,163 @@ const finalizeAuthenticatedSession = (tokenData) => {
 }
 .transition-all {
   transition: all 0.2s ease;
+}
+
+.op-gap-8 { gap: 8px; }
+.op-gap-10 { gap: 10px; }
+.op-gap-12 { gap: 12px; }
+.op-gap-16 { gap: 16px; }
+.op-gap-24 { gap: 24px; }
+
+.tenant-login-shell {
+  position: relative !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+.admin-centered-shell {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.admin-auth-pane {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tenant-split-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.tenant-promo-pane {
+  position: relative;
+  flex: 1 1 50%;
+  width: 50%;
+  height: 100%;
+  background: #e8eef5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.tenant-promo-fill {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  filter: blur(18px) saturate(1.05);
+  transform: scale(1.08);
+  opacity: 0.9;
+}
+
+.tenant-promo-img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  display: block;
+}
+
+.tenant-promo-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.tenant-promo-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.28);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.tenant-promo-dot.active {
+  background: #1976d2;
+  transform: scale(1.25);
+}
+
+.tenant-auth-pane {
+  flex: 1 1 50%;
+  width: 50%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: auto;
+  background: inherit;
+}
+
+.auth-card--tenant {
+  width: 100%;
+  max-width: 460px;
+}
+
+.tenant-subtitle-compact {
+  font-size: 11px;
+  line-height: 1.3;
+  max-width: 280px;
+}
+
+.tenant-login-shell .auth-card--tenant :deep(.q-field--dense .q-field__control) {
+  height: 40px;
+}
+
+@media (max-width: 900px) {
+  .tenant-login-shell {
+    height: auto !important;
+    max-height: none;
+    overflow: auto;
+  }
+
+  .tenant-split-container {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .tenant-promo-pane {
+    width: 100%;
+    height: 40vh;
+    flex: 0 0 auto;
+  }
+
+  .tenant-auth-pane {
+    width: 100%;
+    height: auto;
+    flex: 1 1 auto;
+    padding: 16px 12px 24px;
+  }
 }
 </style>

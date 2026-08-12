@@ -667,7 +667,7 @@ const copyUserCredentials = () => {
 
 const shareViaWhatsApp = () => {
   const text = encodeURIComponent(
-    `Hello! Your new Invify Enterprise Profile is ready.\n\nEmail: ${form.value.email}\nPassword: ${form.value.password}\n\nPlease access the console at ${window.location.origin}/login\n\nSecurity Notice: You must override this temporary password upon your first login.`
+    `Hello! Your new Invify Enterprise Profile is ready.\n\nEmail: ${form.value.email}\nPassword: ${form.value.password}\n\nPlease access the console at ${window.location.origin}/admin/login\n\nSecurity Notice: You must override this temporary password upon your first login.`
   )
   window.open(`https://wa.me/?text=${text}`, '_blank')
 }
@@ -685,7 +685,7 @@ const goToTenantsMatrix = () => {
 const testNewTenantLogin = () => {
   localStorage.clear()
   sessionStorage.clear()
-  window.location.href = '/login'
+  window.location.href = '/tenant/login'
 }
 </script>
 

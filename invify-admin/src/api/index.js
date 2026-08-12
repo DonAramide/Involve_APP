@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { Notify } from 'quasar';
+import { loginPathForContext } from '../utils/authLoginPaths';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
@@ -80,7 +81,8 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       const currentPath = window.location.pathname;
-      if (currentPath !== '/login') {
+      const loginPath = loginPathForContext({ pathname: currentPath });
+      if (currentPath !== loginPath && currentPath !== '/login' && currentPath !== '/admin/login' && currentPath !== '/tenant/login') {
         localStorage.removeItem('invify_token');
         localStorage.removeItem('invify_refresh_token');
         localStorage.removeItem('operator_role');
@@ -96,7 +98,7 @@ api.interceptors.response.use(
           icon: 'logout'
         });
 
-        window.location.href = '/login';
+        window.location.href = loginPath;
       }
     } else if (error.response && error.response.status === 403) {
       Notify.create({

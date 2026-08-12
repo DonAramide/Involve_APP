@@ -172,6 +172,8 @@ app.post('/public/onboarding/report-issue', OnboardingController.reportIssue);
 // Platform User Authentication & MFA / Recovery
 app.post('/api/auth/login', authLimiter, AuthController.login);
 app.post('/api/auth/reset-password', authLimiter, AuthController.resetPassword);
+app.post('/api/auth/send-email-otp', verificationLimiter, OnboardingController.sendEmailOtp);
+app.post('/api/auth/verify-email-otp', verificationLimiter, OnboardingController.verifyEmailOtp);
 
 // Teacher Invitations (Public)
 app.get('/public/invites/validate/:token', InviteController.validateInvite);

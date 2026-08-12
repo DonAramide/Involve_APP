@@ -149,6 +149,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
+import { loginPathForContext } from '../../utils/authLoginPaths'
 
 const router = useRouter()
 const route = useRoute()
@@ -262,7 +263,8 @@ const finalizeValidatedToken = (tokenObj) => {
 
 const returnToRootAuth = () => {
   sessionStorage.clear()
-  router.push('/login').catch(() => {})
+  const role = localStorage.getItem('operator_role')
+  router.push(loginPathForContext({ role })).catch(() => {})
 }
 </script>
 

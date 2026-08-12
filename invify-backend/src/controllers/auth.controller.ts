@@ -31,6 +31,81 @@ function offlineAuthAllowed(variantService: { isLocal(): boolean; isStaging(): b
   return process.env.OFFLINE_LOCAL_AUTH === 'true' || variantService.isLocal() || variantService.isStaging();
 }
 
+const PLATFORM_STAFF_ROLES = new Set([
+  'SUPER_ADMIN',
+  'STAFF',
+  'ADMIN_FINANCE',
+  'ADMIN_TREASURY',
+  'ADMIN_RISK',
+  'ADMIN_OPS',
+  'ADMIN_EXECUTIVE',
+  'ADMIN_DEPLOY',
+]);
+
+function normalizeLoginPortal(raw: unknown, isolationTier?: unknown): 'admin' | 'tenant' | null {
+  const portal = String(raw || '').trim().toLowerCase();
+  if (portal === 'admin' || portal === 'ops' || portal === 'staff') return 'admin';
+  if (portal === 'tenant' || portal === 'owner') return 'tenant';
+
+  const tier = String(isolationTier || '').trim().toLowerCase();
+  if (tier === 'staff' || tier === 'sso') return 'admin';
+  if (tier === 'admin' || tier === 'pro') return 'tenant';
+  return null;
+}
+
+function isPlatformStaffRole(roleRaw: unknown): boolean {
+  const roles = String(roleRaw || '')
+    .split(',')
+    .map((r) => r.trim().toUpperCase().replace(/-/g, '_'))
+    .filter(Boolean);
+  return roles.some((r) => PLATFORM_STAFF_ROLES.has(r));
+}
+
+/** Reject cross-portal login (tenant creds on /admin/login and vice versa). */
+function assertPortalRoleAllowed(
+  portal: 'admin' | 'tenant' | null,
+  role: unknown,
+): { ok: true } | { ok: false; status: number; body: Record<string, string> } {
+  if (!portal) {
+    return {
+      ok: false,
+      status: 400,
+      body: {
+        error: 'PORTAL_REQUIRED',
+        message: 'Login portal is required. Use /admin/login or /tenant/login.',
+        code: 'PORTAL_REQUIRED',
+      },
+    };
+  }
+
+  const isStaff = isPlatformStaffRole(role);
+  if (portal === 'admin' && !isStaff) {
+    return {
+      ok: false,
+      status: 403,
+      body: {
+        error: 'WRONG_LOGIN_PORTAL',
+        message:
+          'This account belongs to a tenant workspace. Sign in at /tenant/login.',
+        code: 'WRONG_LOGIN_PORTAL',
+      },
+    };
+  }
+  if (portal === 'tenant' && isStaff) {
+    return {
+      ok: false,
+      status: 403,
+      body: {
+        error: 'WRONG_LOGIN_PORTAL',
+        message:
+          'This account belongs to platform Admin / Ops. Sign in at /admin/login.',
+        code: 'WRONG_LOGIN_PORTAL',
+      },
+    };
+  }
+  return { ok: true };
+}
+
 function resolveOfflineIdentity(emailRaw: string): {
   role: string;
   tenantId: string;
@@ -154,10 +229,19 @@ export class AuthController {
    */
   static async login(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
+      const { email, password, portal, isolationTier } = req.body;
+      const loginPortal = normalizeLoginPortal(portal, isolationTier);
 
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password are required' });
+      }
+
+      if (!loginPortal) {
+        return res.status(400).json({
+          error: 'PORTAL_REQUIRED',
+          message: 'Login portal is required. Use /admin/login or /tenant/login.',
+          code: 'PORTAL_REQUIRED',
+        });
       }
 
       // 0. Check Maintenance Mode Global Lockout
@@ -196,6 +280,10 @@ export class AuthController {
         }
         console.log(`[AuthController] OFFLINE_LOCAL_AUTH is true. Bypassing Supabase for: ${email}`);
         const identity = resolveOfflineIdentity(email);
+        const portalGate = assertPortalRoleAllowed(loginPortal, identity.role);
+        if (!portalGate.ok) {
+          return res.status(portalGate.status).json(portalGate.body);
+        }
         const mockToken = buildOfflineToken(email, identity);
         
         const check = await validateDeviceOrBlock(identity.userId, email, req);
@@ -237,6 +325,10 @@ export class AuthController {
               `[AuthController] Issuing offline login token for ${email} (Supabase connect timeout)`,
             );
             const identity = resolveOfflineIdentity(email);
+            const portalGate = assertPortalRoleAllowed(loginPortal, identity.role);
+            if (!portalGate.ok) {
+              return res.status(portalGate.status).json(portalGate.body);
+            }
             const mockToken = buildOfflineToken(email, identity);
             const check = await validateDeviceOrBlock(identity.userId, email, req);
             if (!check.allowed) {
@@ -270,6 +362,10 @@ export class AuthController {
         if (devAccounts.includes(normalizedEmail) && variantService.isLocal()) {
           console.log(`[AuthController] Dev sandbox credentials bypass activated for: ${normalizedEmail}`);
           const identity = resolveOfflineIdentity(normalizedEmail);
+          const portalGate = assertPortalRoleAllowed(loginPortal, identity.role);
+          if (!portalGate.ok) {
+            return res.status(portalGate.status).json(portalGate.body);
+          }
           const mockToken = buildOfflineToken(email, identity);
           
           const check = await validateDeviceOrBlock(identity.userId, email, req);
@@ -331,6 +427,17 @@ export class AuthController {
         profile.tenant_id = SYSTEM_TENANT_UUID;
       }
 
+      const portalGate = assertPortalRoleAllowed(loginPortal, profile.role);
+      if (!portalGate.ok) {
+        // Valid password but wrong portal — do not issue a session
+        try {
+          await supabase.auth.signOut();
+        } catch (_) {
+          /* ignore */
+        }
+        return res.status(portalGate.status).json(portalGate.body);
+      }
+
       // Check tenant plan restriction for Web Dashboard access
       if (profile.tenant_id && profile.tenant_id !== SYSTEM_TENANT_UUID) {
         const { data: tenant } = await supabaseAdmin
@@ -385,6 +492,13 @@ export class AuthController {
         console.log('[AuthController] Network/Supabase connectivity timeout detected. Activating offline auth fallback...');
         const email = req.body.email;
         const identity = resolveOfflineIdentity(email);
+        const portalGate = assertPortalRoleAllowed(
+          normalizeLoginPortal(req.body.portal, req.body.isolationTier),
+          identity.role,
+        );
+        if (!portalGate.ok) {
+          return res.status(portalGate.status).json(portalGate.body);
+        }
         const mockToken = buildOfflineToken(email, identity);
         
         const check = await validateDeviceOrBlock(identity.userId, email, req);
@@ -421,67 +535,183 @@ export class AuthController {
 
   /**
    * POST /api/auth/reset-password
-   * Sets a new password for the user and clears the require_password_reset flag.
+   *
+   * Supported payloads:
+   * 1) { userId, newPassword } — authenticated / forced first-login reset
+   * 2) { email, code|otp, newPassword } — OTP password recovery (PASSWORD_RESET)
    */
   static async resetPassword(req: Request, res: Response) {
     try {
-      const { userId, newPassword } = req.body;
+      const {
+        userId,
+        email,
+        newPassword,
+        code,
+        otp,
+      } = req.body || {};
 
-      if (!userId || !newPassword) {
-        return res.status(400).json({ error: 'Missing userId or newPassword' });
+      if (!newPassword || String(newPassword).length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters.' });
       }
 
-      // 1. Update password in Supabase Auth (using service_role key power)
-      const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
-        password: newPassword
+      let targetUserId: string | null = userId || null;
+
+      // OTP recovery path: verify email OTP then resolve user by email
+      if (!targetUserId && email) {
+        const otpCode = String(code || otp || '').trim();
+        const normalizedEmail = String(email).trim().toLowerCase();
+        const { verificationService } = require('../services/verification.service');
+
+        // Wizard already verified OTP → trust fresh VERIFIED row (do not re-require PENDING)
+        const alreadyVerified =
+          await verificationService.hasFreshPasswordResetVerification(normalizedEmail);
+
+        if (!alreadyVerified) {
+          if (!otpCode) {
+            return res.status(400).json({
+              error: 'Verify your recovery email OTP before setting a new password.',
+            });
+          }
+          const result = await verificationService.verifyOTPDetailed(
+            normalizedEmail,
+            otpCode,
+            'EMAIL',
+            'PASSWORD_RESET',
+          );
+          if (!result.ok) {
+            return res.status(400).json({
+              error: result.error || 'Invalid or expired verification code.',
+            });
+          }
+        }
+
+        // Resolve auth user id by email
+        const { data: profile, error: profileLookupError } = await supabaseAdmin
+          .from('users')
+          .select('id, email')
+          .ilike('email', normalizedEmail)
+          .maybeSingle();
+
+        if (profileLookupError) {
+          console.warn('[AuthController] users lookup:', profileLookupError.message);
+        }
+
+        if (profile?.id) {
+          targetUserId = profile.id;
+        } else {
+          // Fallback: list auth users (small tenants / local)
+          try {
+            const { data: listed, error: listErr } = await supabaseAdmin.auth.admin.listUsers({
+              page: 1,
+              perPage: 1000,
+            });
+            if (!listErr && listed?.users?.length) {
+              const match = listed.users.find(
+                (u: any) => String(u.email || '').toLowerCase() === normalizedEmail,
+              );
+              if (match?.id) targetUserId = match.id;
+            }
+          } catch (e: any) {
+            console.warn('[AuthController] auth.admin.listUsers failed:', e?.message || e);
+          }
+        }
+
+        if (!targetUserId) {
+          return res.status(404).json({
+            error: 'No account found for that email. Check the address and try again.',
+          });
+        }
+      }
+
+      if (!targetUserId) {
+        return res.status(400).json({ error: 'Missing userId or email for password reset.' });
+      }
+
+      // 1. Update password in Supabase Auth (service_role required for admin API)
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+        password: newPassword,
       });
 
       if (authError) {
+        const authMsg = String(authError.message || '').toLowerCase();
+        const authCode = String((authError as any).code || '').toLowerCase();
+        // Only treat real same-password rejections (not generic "User not allowed")
+        if (
+          authCode === 'same_password' ||
+          authMsg.includes('same password') ||
+          authMsg.includes('different from the old') ||
+          authMsg.includes('should be different') ||
+          authMsg.includes('password should be different')
+        ) {
+          return res.status(400).json({
+            error:
+              'New password cannot be the same as your previous password. Please choose a different passphrase.',
+            code: 'SAME_AS_PREVIOUS_PASSWORD',
+          });
+        }
+
+        console.error(
+          `[AuthController] updateUserById failed for ${targetUserId}:`,
+          authError.message,
+          (authError as any).code || '',
+        );
+
         // Dev sandbox bypass check
         const devMockUserIds = [
           'c3d11b8b-e85d-4f2b-8a8f-2872bc900382', // Olive
-          'f47ac10b-58cc-4372-a567-0e02b2c3d479'  // Admin
+          'f47ac10b-58cc-4372-a567-0e02b2c3d479', // Admin
         ];
-        
-        if (devMockUserIds.includes(userId) || authError.message?.toLowerCase().includes('user not found')) {
-          console.log(`[AuthController] Sandbox recovery bypass triggered for userId: ${userId} (${authError.message})`);
+
+        if (
+          devMockUserIds.includes(targetUserId) ||
+          authMsg.includes('user not found')
+        ) {
+          console.log(
+            `[AuthController] Sandbox recovery bypass triggered for userId: ${targetUserId} (${authError.message})`,
+          );
           return res.status(200).json({
-            message: 'Password reset completed successfully (Sandbox Bypass).'
+            message: 'Password reset completed successfully (Sandbox Bypass).',
           });
         }
 
         return res.status(400).json({ error: authError.message });
       }
 
-      // 2. Clear require_password_reset flag in public users table (using supabaseAdmin to bypass RLS restrictions)
+      // 2. Clear require_password_reset flag in public users table
       const { error: profileError } = await supabaseAdmin
         .from('users')
         .update({ require_password_reset: false })
-        .eq('id', userId);
+        .eq('id', targetUserId);
 
       if (profileError) {
-        return res.status(500).json({ error: profileError.message });
+        console.warn('[AuthController] require_password_reset clear failed:', profileError.message);
       }
 
       return res.status(200).json({
-        message: 'Password reset completed successfully. You can now log in.'
+        message: 'Password reset completed successfully. You can now log in.',
       });
-
     } catch (error: any) {
       console.error('[AuthController] ResetPassword Error:', error.message);
-      
-      const isMockOrBypass = error.message?.includes('Expected parameter to be UUID') || 
-                             error.message?.includes('fetch failed') ||
-                             error.message?.includes('timeout') ||
-                             !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.body.userId);
-                             
+
+      const isMockOrBypass =
+        error.message?.includes('Expected parameter to be UUID') ||
+        error.message?.includes('fetch failed') ||
+        error.message?.includes('timeout') ||
+        (req.body?.userId &&
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            req.body.userId,
+          ));
+
       if (isMockOrBypass) {
-        console.log(`[AuthController] Sandbox / Mock bypass activated for resetPassword (userId: ${req.body.userId})`);
+        console.log(
+          `[AuthController] Sandbox / Mock bypass activated for resetPassword (userId: ${req.body.userId})`,
+        );
         return res.status(200).json({
-          message: 'Password reset completed successfully (Sandbox Recovery Sandbox Bypass). You can now log in.'
+          message:
+            'Password reset completed successfully (Sandbox Recovery Sandbox Bypass). You can now log in.',
         });
       }
-      
+
       return res.status(500).json({ error: error.message });
     }
   }

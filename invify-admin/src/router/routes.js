@@ -14,8 +14,18 @@ const routes = [
   // ==========================================
   {
     path: '/login',
+    component: () => import('pages/governance/LoginPortalChooser.vue'),
+    meta: { isGuest: true, title: 'Choose Login Portal' }
+  },
+  {
+    path: '/admin/login',
     component: () => import('pages/governance/LoginPage.vue'),
-    meta: { isGuest: true, title: 'Enterprise Portal Login' }
+    meta: { isGuest: true, portal: 'admin', title: 'Admin Ops Login' }
+  },
+  {
+    path: '/tenant/login',
+    component: () => import('pages/governance/LoginPage.vue'),
+    meta: { isGuest: true, portal: 'tenant', title: 'Tenant Login' }
   },
   {
     path: '/register',
@@ -162,8 +172,8 @@ const routes = [
       // ==========================================
       // Backward compatibility bindings routing directly to top-level canonical pages
       { 
-        path: 'governance/login', 
-        redirect: '/login'
+        path: 'governance/login',
+        redirect: '/admin/login'
       },
       { 
         path: 'governance/mfa-challenge', 

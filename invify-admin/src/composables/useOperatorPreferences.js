@@ -1,5 +1,6 @@
 // invify-admin/src/composables/useOperatorPreferences.js
 import { ref, watch } from 'vue'
+import { loginPathForContext } from '../utils/authLoginPaths'
 
 const STORAGE_KEY = 'invify_enterprise_operator_prefs'
 
@@ -188,7 +189,7 @@ export function useOperatorPreferences() {
     } catch (e) {}
     
     // Complete page navigation clear guarantees zero memory drift
-    window.location.href = '/login'
+    window.location.href = loginPathForContext()
   }
 
   return {

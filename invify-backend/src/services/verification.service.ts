@@ -161,17 +161,77 @@ export class VerificationService {
     }
 
     if (isValid) {
-      await supabase
+      const { error: verifyUpdateError } = await supabase
         .from('verification_codes')
         .update({
           status: 'VERIFIED',
           verified_at: new Date().toISOString(),
         })
         .eq('id', record.id);
+
+      // If verified_at column is missing, still mark VERIFIED so reset can proceed
+      if (verifyUpdateError) {
+        console.warn(
+          '[VerificationService] VERIFIED update with verified_at failed:',
+          verifyUpdateError.message,
+        );
+        const { error: fallbackError } = await supabase
+          .from('verification_codes')
+          .update({ status: 'VERIFIED' })
+          .eq('id', record.id);
+        if (fallbackError) {
+          console.warn(
+            '[VerificationService] VERIFIED fallback update failed:',
+            fallbackError.message,
+          );
+          return {
+            ok: false,
+            error: 'Unable to complete verification. Please request a new OTP.',
+          };
+        }
+      }
       return { ok: true };
     }
 
     return { ok: false, error: 'Incorrect code. Check the latest email and try again.' };
+  }
+
+  /**
+   * True if this email just completed PASSWORD_RESET OTP verification
+   * (within expiry window). Used so UI can verify first, then set password.
+   */
+  public async hasFreshPasswordResetVerification(email: string): Promise<boolean> {
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized) return false;
+
+    const { data: record, error } = await supabase
+      .from('verification_codes')
+      .select('*')
+      .eq('email', normalized)
+      .eq('channel', 'EMAIL')
+      .eq('purpose', 'PASSWORD_RESET')
+      .eq('status', 'VERIFIED')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[VerificationService] hasFreshPasswordResetVerification:', error.message);
+      return false;
+    }
+    if (!record) return false;
+
+    const now = Date.now();
+    const verifiedAt = record.verified_at
+      ? new Date(record.verified_at).getTime()
+      : 0;
+    const createdAt = record.created_at ? new Date(record.created_at).getTime() : 0;
+    const expiresAt = record.expires_at ? new Date(record.expires_at).getTime() : 0;
+    // Prefer verified_at; fall back to created_at if column missing/null
+    const anchor = verifiedAt || createdAt;
+    const withinVerifyWindow = anchor > 0 && now - anchor < 15 * 60 * 1000;
+    const notPastOriginalExpiry = !expiresAt || now <= expiresAt + 5 * 60 * 1000;
+    return withinVerifyWindow && notPastOriginalExpiry;
   }
 }
 

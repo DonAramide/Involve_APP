@@ -267,7 +267,7 @@ const executeLogout = () => {
   localStorage.removeItem('operator_email')
   localStorage.removeItem('operator_role')
   localStorage.removeItem('tenant_type')
-  router.push('/login')
+  router.push('/tenant/login')
   $q.notify({ type: 'info', message: 'Session closed successfully.' })
 }
 

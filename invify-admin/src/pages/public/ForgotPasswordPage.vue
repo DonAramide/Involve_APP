@@ -49,14 +49,17 @@ async function onSubmit() {
   successMsg.value = '';
   
   try {
-    await axios.post('/api/auth/send-email-otp', { email: email.value, purpose: 'PASSWORD_RESET' });
+    const normalized = email.value.trim().toLowerCase();
+    await axios.post('/api/auth/send-email-otp', {
+      email: normalized,
+      purpose: 'PASSWORD_RESET',
+    });
     successMsg.value = 'Password reset code sent to your email.';
     setTimeout(() => {
-      // Pass email as query param so reset page knows who to verify
-      router.push({ path: '/reset-password', query: { email: email.value } });
-    }, 2000);
+      router.push({ path: '/reset-password', query: { email: normalized } });
+    }, 1200);
   } catch (err: any) {
-    errorMsg.value = err.response?.data?.error || 'Failed to send reset code.';
+    errorMsg.value = err.response?.data?.error || err.response?.data?.message || 'Failed to send reset code.';
   } finally {
     loading.value = false;
   }
