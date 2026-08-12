@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import '../bloc/printer_bloc.dart';
 import '../bloc/printer_state.dart';
 import '../widgets/network_printer_config_dialog.dart';
@@ -736,7 +737,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Pairing error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not pair device.')), backgroundColor: Colors.red),
         );
       }
     }
@@ -891,7 +892,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Load Params error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not load terminal params.')), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -989,7 +990,7 @@ class _PrinterSettingsPageState extends State<PrinterSettingsPage> {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Balance check error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(friendlyApiError(e, fallback: 'Balance check failed.')), backgroundColor: Colors.red),
         );
       }
     } finally {

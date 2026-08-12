@@ -32,6 +32,8 @@ class _ActivationPageState extends State<ActivationPage> {
   final List<TextEditingController> _segmentControllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
+  bool _isStartingTrial = false;
+  bool _showTrialOption = false;
   String? _errorMessage;
   TerminalConfig? _globalConfig;
   bool? _isServerReachable;
@@ -41,6 +43,7 @@ class _ActivationPageState extends State<ActivationPage> {
     super.initState();
     _pingServer();
     _checkOnboarding();
+    _resolveTrialEligibility();
     // Pre-populate business name only if a real name is already saved (not a generic placeholder)
     final settingsState = context.read<SettingsBloc>().state;
     if (settingsState.settings != null) {
@@ -51,6 +54,66 @@ class _ActivationPageState extends State<ActivationPage> {
       }
     }
     _loadGlobalConfig();
+  }
+
+  /// First-time users (no trial started yet) can start a 3-day trial from this page.
+  /// Expired renewals keep activation-code-only flow.
+  Future<void> _resolveTrialEligibility() async {
+    if (widget.isExpired) {
+      if (mounted) setState(() => _showTrialOption = false);
+      return;
+    }
+    final trialStart = await StorageService.getTrialStartDate();
+    if (mounted) {
+      setState(() => _showTrialOption = trialStart == null);
+    }
+  }
+
+  Future<void> _startFreeTrial() async {
+    final businessName = _businessNameController.text.trim();
+    if (businessName.isEmpty) {
+      setState(() => _errorMessage = 'Enter your business name to start the free trial.');
+      return;
+    }
+
+    setState(() {
+      _isStartingTrial = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await StorageService.saveTrialStartDate(DateTime.now());
+      await StorageService.setOnboardingCompleted(true);
+
+      if (!mounted) return;
+      final settingsBloc = context.read<SettingsBloc>();
+      final currentSettings = settingsBloc.state.settings;
+      if (currentSettings != null) {
+        settingsBloc.add(UpdateAppSettings(currentSettings.copyWith(
+          organizationName: businessName,
+        )));
+      }
+      settingsBloc.add(LoadSettings());
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Free 3-day trial activated. Welcome to Invify!'),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const DashboardPage()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isStartingTrial = false;
+          _errorMessage = 'Could not start trial. Please try again.';
+        });
+      }
+    }
   }
 
   Future<void> _loadGlobalConfig() async {
@@ -467,7 +530,7 @@ class _ActivationPageState extends State<ActivationPage> {
                                     width: double.infinity,
                                     height: 56,
                                     child: ElevatedButton(
-                                      onPressed: _isLoading ? null : _activate,
+                                      onPressed: (_isLoading || _isStartingTrial) ? null : _activate,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(0xFF6366F1),
                                         foregroundColor: Colors.white,
@@ -478,6 +541,34 @@ class _ActivationPageState extends State<ActivationPage> {
                                         : const Text('ACTIVATE NOW', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                                     ),
                                   ),
+                                  if (_showTrialOption) ...[
+                                    const SizedBox(height: 16),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 50,
+                                      child: OutlinedButton(
+                                        onPressed: (_isLoading || _isStartingTrial) ? null : _startFreeTrial,
+                                        style: OutlinedButton.styleFrom(
+                                          side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.5)),
+                                          foregroundColor: const Color(0xFF10B981),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                        child: _isStartingTrial
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF10B981)),
+                                            )
+                                          : const Text('START FREE 3-DAY TRIAL', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'First time here? Try Invify free for 3 days — no activation code needed.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                                    ),
+                                  ],
                                   const SizedBox(height: 32),
                                   const Divider(color: Colors.white10),
                                   const SizedBox(height: 16),
@@ -505,7 +596,7 @@ class _ActivationPageState extends State<ActivationPage> {
                                         context,
                                         icon: Icons.email,
                                         label: 'Email Support',
-                                        onTap: () => _launchUrl('mailto:${_globalConfig?.supportEmail ?? 'info.iips.ng@gmail.com'}'),
+                                        onTap: () => _launchUrl('mailto:${_globalConfig?.supportEmail ?? 'support@iips.app'}'),
                                       ),
                                     ],
                                   ),

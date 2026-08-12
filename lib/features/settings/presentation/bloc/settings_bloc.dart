@@ -231,7 +231,7 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
       final trialStart = await StorageService.getTrialStartDate();
       if (trialStart != null) {
         final trialExpiry = trialStart.add(const Duration(days: 3));
-        return UserPlan(planType: 'pro', expiryDate: trialExpiry);
+        return UserPlan(planType: 'free_trial', expiryDate: trialExpiry);
       }
     }
     

@@ -16,23 +16,25 @@
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
             <span class="text-muted">Total Debits:</span>
-            <span class="text-green-4 text-weight-bold">{{ currentCurrency.symbol }}5,000,000</span>
+            <span class="text-green-4 text-weight-bold">{{ currentCurrency.symbol }}{{ formatMoney(totals.debits) }}</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Total Credits:</span>
-            <span class="text-amber-4 text-weight-bold">{{ currentCurrency.symbol }}5,000,000</span>
+            <span class="text-amber-4 text-weight-bold">{{ currentCurrency.symbol }}{{ formatMoney(totals.credits) }}</span>
           </div>
           <div class="row items-center op-gap-8">
             <span class="text-muted">Difference:</span>
-            <q-badge color="green-10" text-color="green-3">{{ currentCurrency.symbol }}0</q-badge>
+            <q-badge :color="totals.diff === 0 ? 'green-10' : 'amber-10'" :text-color="totals.diff === 0 ? 'green-3' : 'amber-3'">
+              {{ currentCurrency.symbol }}{{ formatMoney(Math.abs(totals.diff)) }}
+            </q-badge>
           </div>
-          <q-icon name="check_circle" color="green-4" size="sm" />
+          <q-icon :name="totals.diff === 0 ? 'check_circle' : 'warning'" :color="totals.diff === 0 ? 'green-4' : 'amber-4'" size="sm" />
         </div>
       </div>
 
       <div class="row items-center op-gap-8 no-wrap">
-        <q-btn outline size="xs" color="grey-6" icon="account_balance" label="Run Trial Balance" class="text-caption text-weight-bold" />
-        <q-btn size="xs" color="amber-4" icon="download" label="Export Ledger Data" class="text-caption text-weight-bold text-black" />
+        <q-btn outline size="xs" color="grey-6" icon="refresh" label="Refresh" class="text-caption text-weight-bold" :loading="loading" @click="loadLedger" />
+        <q-btn size="xs" color="amber-4" icon="download" label="Export Ledger Data" class="text-caption text-weight-bold text-black" disable />
       </div>
     </div>
 
@@ -40,26 +42,26 @@
     <div class="row q-col-gutter-sm q-mb-md">
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left">
-          <div class="text-operator-title text-muted">Total Ledger Assets</div>
-          <div class="text-h4 text-metric-mono text-cyan-4">{{ currentCurrency.symbol }}4.2B <span class="text-caption text-muted">System Float</span></div>
+          <div class="text-operator-title text-muted">Ledger Entries</div>
+          <div class="text-h4 text-metric-mono text-cyan-4">{{ ledgerEntries.length }} <span class="text-caption text-muted">ROWS</span></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left">
-          <div class="text-operator-title text-muted">Tenant Liabilities</div>
-          <div class="text-h4 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}3.8B <span class="text-caption text-muted">Held in Wallets</span></div>
+          <div class="text-operator-title text-muted">Total Debits</div>
+          <div class="text-h4 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}{{ formatMoney(totals.debits) }}</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left">
-          <div class="text-operator-title text-muted">Daily Posting Volume</div>
-          <div class="text-h4 text-metric-mono text-amber-5">1.2M <span class="text-caption text-muted">ENTRIES</span></div>
+          <div class="text-operator-title text-muted">Total Credits</div>
+          <div class="text-h4 text-metric-mono text-amber-5">{{ currentCurrency.symbol }}{{ formatMoney(totals.credits) }}</div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left">
-          <div class="text-operator-title text-muted">Ledger Parity State</div>
-          <div class="text-h4 text-metric-mono text-green-4">100% <span class="text-caption text-muted">MATCHED</span></div>
+          <div class="text-operator-title text-muted">Ledger Parity</div>
+          <div class="text-h4 text-metric-mono text-green-4">{{ parityLabel }}</div>
         </div>
       </div>
     </div>
@@ -97,7 +99,11 @@
             <q-btn flat dense size="sm" icon="add" label="Add Account" color="amber-4" />
           </div>
           <q-scroll-area class="col q-pa-md">
+            <div v-if="!coaNodes.length" class="full-height flex flex-center text-muted font-mono q-pa-xl">
+              No chart of accounts configured in live data.
+            </div>
             <q-tree
+              v-else
               :nodes="coaNodes"
               node-key="id"
               default-expand-all
@@ -126,6 +132,9 @@
             :columns="journalCols"
             row-key="id"
             dense
+            :loading="loading"
+            :pagination="{ rowsPerPage: 25 }"
+            :rows-per-page-options="[25, 50, 100]"
             virtual-scroll
             style="height: 100%;"
           >
@@ -153,6 +162,9 @@
             :columns="ledgerCols"
             row-key="id"
             dense
+            :loading="loading"
+            :pagination="{ rowsPerPage: 25 }"
+            :rows-per-page-options="[25, 50, 100]"
             virtual-scroll
             style="height: 100%;"
           >
@@ -182,7 +194,10 @@
         <!-- ACCOUNT BALANCES -->
         <q-tab-panel name="balances" class="q-pa-none column">
           <q-scroll-area class="col q-pa-md">
-            <div class="row q-col-gutter-md">
+            <div v-if="!accountBalances.length" class="full-height flex flex-center text-muted font-mono q-pa-xl">
+              No account balances available from live ledger data.
+            </div>
+            <div class="row q-col-gutter-md" v-else>
               <div class="col-12 col-md-6 col-lg-4" v-for="bal in accountBalances" :key="bal.account">
                 <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                   <div class="row justify-between items-center border-bottom q-pb-sm q-mb-sm">
@@ -221,7 +236,10 @@
         <!-- BATCH EXPLORER -->
         <q-tab-panel name="batches" class="q-pa-none column">
           <q-scroll-area class="col q-pa-md">
-            <div class="row q-col-gutter-md">
+            <div v-if="!batchExplorer.length" class="full-height flex flex-center text-muted font-mono q-pa-xl">
+              No settlement/ledger batches in live data.
+            </div>
+            <div class="row q-col-gutter-md" v-else>
               <div class="col-12 col-md-6 col-lg-4" v-for="batch in batchExplorer" :key="batch.id">
                 <div class="enterprise-subpanel q-pa-md border-muted rounded-borders font-mono">
                   <div class="row justify-between items-center border-bottom q-pb-sm q-mb-sm">
@@ -273,12 +291,12 @@
             <!-- DEBIT -->
             <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-cyan-left" style="width: 280px;" v-if="selectedLedger.type === 'DEBIT'">
               <div class="text-cyan-4 text-weight-bold">Debit Origin</div>
-              <div class="text-muted text-caption">{{ selectedLedger.flow.debit }}</div>
-              <div class="text-green-4 text-weight-bold q-mt-xs">{{ currentCurrency.symbol }}{{ selectedLedger.amount.toLocaleString() }}</div>
+              <div class="text-muted text-caption">{{ selectedLedger.flow?.debit || '—' }}</div>
+              <div class="text-green-4 text-weight-bold q-mt-xs">{{ currentCurrency.symbol }}{{ Number(selectedLedger.amount || 0).toLocaleString() }}</div>
             </div>
             <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-indigo-left" style="width: 280px;" v-else>
               <div class="text-indigo-4 text-weight-bold">Debit Origin</div>
-              <div class="text-muted text-caption">{{ selectedLedger.flow.debit }}</div>
+              <div class="text-muted text-caption">{{ selectedLedger.flow?.debit || '—' }}</div>
             </div>
 
             <div class="q-py-sm"><q-icon name="arrow_downward" color="grey-6" size="sm" /></div>
@@ -294,12 +312,12 @@
             <!-- CREDIT -->
             <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-amber-left" style="width: 280px;" v-if="selectedLedger.type === 'CREDIT'">
               <div class="text-amber-4 text-weight-bold">Credit Destination</div>
-              <div class="text-muted text-caption">{{ selectedLedger.flow.credit }}</div>
-              <div class="text-amber-4 text-weight-bold q-mt-xs">{{ currentCurrency.symbol }}{{ selectedLedger.amount.toLocaleString() }}</div>
+              <div class="text-muted text-caption">{{ selectedLedger.flow?.credit || '—' }}</div>
+              <div class="text-amber-4 text-weight-bold q-mt-xs">{{ currentCurrency.symbol }}{{ Number(selectedLedger.amount || 0).toLocaleString() }}</div>
             </div>
             <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-indigo-left" style="width: 280px;" v-else>
               <div class="text-indigo-4 text-weight-bold">Credit Destination</div>
-              <div class="text-muted text-caption">{{ selectedLedger.flow.credit }}</div>
+              <div class="text-muted text-caption">{{ selectedLedger.flow?.credit || '—' }}</div>
             </div>
           </div>
 
@@ -307,33 +325,36 @@
           <div class="text-operator-title text-muted q-mb-sm">Related Investigation Records</div>
           <div class="enterprise-subpanel border-muted rounded-borders font-mono text-caption q-mb-md">
             <q-list separator dark class="bg-transparent">
-              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related.txn">
+              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related?.txn">
                 <q-item-section avatar><q-badge color="cyan-10" text-color="cyan-3">TXN</q-badge></q-item-section>
                 <q-item-section><q-item-label class="text-cyan-3">{{ selectedLedger.related.txn }}</q-item-label><q-item-label caption>Source Transaction</q-item-label></q-item-section>
               </q-item>
-              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related.set">
+              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related?.set">
                 <q-item-section avatar><q-badge color="indigo-10" text-color="indigo-3">SET</q-badge></q-item-section>
                 <q-item-section><q-item-label class="text-indigo-3">{{ selectedLedger.related.set }}</q-item-label><q-item-label caption>Settlement Batch</q-item-label></q-item-section>
               </q-item>
-              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related.ten">
+              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related?.ten">
                 <q-item-section avatar><q-badge color="grey-9" text-color="grey-4">TEN</q-badge></q-item-section>
                 <q-item-section><q-item-label class="text-grey-4">{{ selectedLedger.related.ten }}</q-item-label><q-item-label caption>Tenant Record</q-item-label></q-item-section>
               </q-item>
-              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related.wal">
+              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related?.wal">
                 <q-item-section avatar><q-badge color="blue-grey-10" text-color="blue-grey-3">WAL</q-badge></q-item-section>
                 <q-item-section><q-item-label class="text-blue-grey-3">{{ selectedLedger.related.wal }}</q-item-label><q-item-label caption>Wallet Entity</q-item-label></q-item-section>
               </q-item>
-              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related.crd">
+              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related?.crd">
                 <q-item-section avatar><q-badge color="amber-10" text-color="amber-3">CRD</q-badge></q-item-section>
                 <q-item-section><q-item-label class="text-amber-3">{{ selectedLedger.related.crd }}</q-item-label><q-item-label caption>Card Instrument</q-item-label></q-item-section>
               </q-item>
-              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related.term">
+              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related?.term">
                 <q-item-section avatar><q-badge color="green-10" text-color="green-3">TRM</q-badge></q-item-section>
                 <q-item-section><q-item-label class="text-green-3">{{ selectedLedger.related.term }}</q-item-label><q-item-label caption>Terminal Device</q-item-label></q-item-section>
               </q-item>
-              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related.aud">
+              <q-item clickable v-ripple class="hover-bg" v-if="selectedLedger.related?.aud">
                 <q-item-section avatar><q-badge color="red-10" text-color="red-3">AUD</q-badge></q-item-section>
                 <q-item-section><q-item-label class="text-red-3">{{ selectedLedger.related.aud }}</q-item-label><q-item-label caption>Audit Engine Log</q-item-label></q-item-section>
+              </q-item>
+              <q-item v-if="!selectedLedger.related?.txn && !selectedLedger.related?.ten">
+                <q-item-section class="text-muted">No related live links on this entry.</q-item-section>
               </q-item>
             </q-list>
           </div>
@@ -349,12 +370,15 @@
 import { useCurrency } from '../../composables/useCurrency';
 const { currentCurrency } = useCurrency();
 
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useQuasar } from 'quasar'
+import { adminApi } from '../../api'
 
-const activeTab = ref('coa')
+const $q = useQuasar()
+const activeTab = ref('ledger')
 const searchQuery = ref('')
+const loading = ref(false)
 
-// CHART OF ACCOUNTS DATA
 const getTypeColor = (type) => {
   const map = {
     ASSET: 'cyan-4',
@@ -366,66 +390,8 @@ const getTypeColor = (type) => {
   return map[type] || 'grey-4'
 }
 
-const coaNodes = ref([
-  {
-    id: '1000-ASSETS',
-    label: 'Platform Assets',
-    icon: 'account_balance',
-    color: 'cyan-4',
-    type: 'ASSET',
-    children: [
-      { id: '1010-PLATFORM-FLOAT', label: 'Primary Payment Gateway Float', icon: 'account_balance_wallet', type: 'ASSET' },
-      { id: '1020-SETTLEMENT-TRANSIT', label: 'In-Transit Settlement Funds', icon: 'sync_alt', type: 'ASSET' },
-      { id: '1030-OPERATING-CASH', label: 'Invify Corporate Operating Cash', icon: 'monetization_on', type: 'ASSET' }
-    ]
-  },
-  {
-    id: '2000-LIABILITIES',
-    label: 'Platform Liabilities',
-    icon: 'credit_card',
-    color: 'indigo-4',
-    type: 'LIABILITY',
-    children: [
-      { id: '2010-MERCHANT-WALLET', label: 'Retail/School Tenant Wallets', icon: 'storefront', type: 'LIABILITY' },
-      { id: '2020-STUDENT-WALLET', label: 'End-User/Student Wallets', icon: 'face', type: 'LIABILITY' },
-      { id: '2030-PENDING-PAYOUT', label: 'Escrow Pending Disbursements', icon: 'payments', type: 'LIABILITY' }
-    ]
-  },
-  {
-    id: '3000-EQUITY',
-    label: 'Platform Equity',
-    icon: 'pie_chart',
-    color: 'purple-4',
-    type: 'EQUITY',
-    children: [
-      { id: '3010-RETAINED-EARNINGS', label: 'Retained Earnings', icon: 'trending_up', type: 'EQUITY' }
-    ]
-  },
-  {
-    id: '4000-REVENUE',
-    label: 'Platform Revenue',
-    icon: 'trending_up',
-    color: 'green-4',
-    type: 'REVENUE',
-    children: [
-      { id: '4010-PROCESSING-FEES', label: 'Transaction Processing Fees', icon: 'receipt', type: 'REVENUE' },
-      { id: '4020-SUBSCRIPTION-REV', label: 'Tenant Subscription Revenue', icon: 'card_membership', type: 'REVENUE' }
-    ]
-  },
-  {
-    id: '5000-EXPENSES',
-    label: 'Platform Expenses',
-    icon: 'trending_down',
-    color: 'red-4',
-    type: 'EXPENSE',
-    children: [
-      { id: '5010-GATEWAY-COSTS', label: 'NIBSS/Switching Gateway Costs', icon: 'router', type: 'EXPENSE' },
-      { id: '5020-SMS-COSTS', label: 'SMS Notification Costs', icon: 'sms', type: 'EXPENSE' }
-    ]
-  }
-])
+const coaNodes = ref([])
 
-// JOURNAL EXPLORER DATA
 const journalCols = [
   { name: 'id', label: 'JOURNAL ID', field: 'id', align: 'left' },
   { name: 'timestamp', label: 'TIMESTAMP', field: 'timestamp', align: 'left' },
@@ -434,74 +400,131 @@ const journalCols = [
   { name: 'status', label: 'STATUS', field: 'status', align: 'center' }
 ]
 
-const journals = ref([
-  { id: 'jrn_992104', timestamp: new Date(Date.now() - 60000).toISOString(), description: 'Wallet Transfer Funding', sourceTxnId: 'tx_98A4F1B3E0C2', status: 'POSTED' },
-  { id: 'jrn_992105', timestamp: new Date(Date.now() - 120000).toISOString(), description: 'POS Terminal Sale', sourceTxnId: 'tx_77B2C9D1E4A5', status: 'POSTED' },
-  { id: 'jrn_992106', timestamp: new Date(Date.now() - 180000).toISOString(), description: 'Daily Settlement Sweeps', sourceTxnId: 'SYS_BATCH_SWEEP', status: 'PENDING' }
-])
+const journals = ref([])
 
-// LEDGER ENTRIES DATA
 const ledgerCols = [
   { name: 'id', label: 'ENTRY ID', field: 'id', align: 'left' },
-  { name: 'journalId', label: 'JOURNAL ID', field: 'journalId', align: 'left' },
-  { name: 'accountId', label: 'ACCOUNT ID', field: 'accountId', align: 'left' },
+  { name: 'journalId', label: 'JOURNAL / REF', field: 'journalId', align: 'left' },
+  { name: 'accountId', label: 'ACCOUNT / TENANT', field: 'accountId', align: 'left' },
   { name: 'debit', label: 'DEBIT', field: 'debit', align: 'right' },
   { name: 'credit', label: 'CREDIT', field: 'credit', align: 'right' },
   { name: 'timestamp', label: 'TIMESTAMP', field: 'timestamp', align: 'right' }
 ]
 
-const ledgerEntries = ref([
-  { 
-    id: 'LED-2026-000001', journalId: 'jrn_992104', accountId: '1010-PLATFORM-FLOAT', type: 'DEBIT', amount: 45000, timestamp: new Date(Date.now() - 60000).toISOString(),
-    flow: { debit: 'Parent Wallet (wal_par_9012)', credit: 'Student Wallet (wal_stu_7482)' },
-    related: { txn: 'TXN-2026-100001', set: 'SET-2026-300001', ten: 'TEN-0001', wal: 'WAL-0005', crd: 'CARD-0008', term: 'TERM-0003', aud: 'AUD-0091' }
-  },
-  { 
-    id: 'LED-2026-000002', journalId: 'jrn_992104', accountId: '2020-STUDENT-WALLET', type: 'CREDIT', amount: 45000, timestamp: new Date(Date.now() - 60000).toISOString(),
-    flow: { debit: 'Parent Wallet (wal_par_9012)', credit: 'Student Wallet (wal_stu_7482)' },
-    related: { txn: 'TXN-2026-100001', set: 'SET-2026-300001', ten: 'TEN-0001', wal: 'WAL-0005', aud: 'AUD-0092' }
-  },
-  { 
-    id: 'LED-2026-000003', journalId: 'jrn_992105', accountId: '1010-PLATFORM-FLOAT', type: 'DEBIT', amount: 1250000, timestamp: new Date(Date.now() - 120000).toISOString(),
-    flow: { debit: 'Customer Card (crd_virt_9941)', credit: 'Merchant Wallet (wal_mer_8832)' },
-    related: { txn: 'TXN-2026-100002', set: 'SET-2026-300002', ten: 'TEN-0002', wal: 'WAL-0009', crd: 'CARD-9941', term: 'TERM-412', aud: 'AUD-0095' }
-  },
-  { 
-    id: 'LED-2026-000004', journalId: 'jrn_992105', accountId: '2010-MERCHANT-WALLET', type: 'CREDIT', amount: 1250000, timestamp: new Date(Date.now() - 120000).toISOString(),
-    flow: { debit: 'Customer Card (crd_virt_9941)', credit: 'Merchant Wallet (wal_mer_8832)' },
-    related: { txn: 'TXN-2026-100002', set: 'SET-2026-300002', ten: 'TEN-0002', wal: 'WAL-0009', crd: 'CARD-9941', term: 'TERM-412', aud: 'AUD-0096' }
-  }
-])
+const ledgerEntries = ref([])
+const batchExplorer = ref([])
+const accountBalances = ref([])
 
-// DRAWER STATE
 const drawerOpen = ref(false)
 const selectedLedger = ref(null)
 
+const totals = computed(() => {
+  let debits = 0
+  let credits = 0
+  for (const e of ledgerEntries.value) {
+    const amt = Number(e.amount || 0)
+    if (e.type === 'DEBIT') debits += amt
+    else credits += amt
+  }
+  return { debits, credits, diff: debits - credits }
+})
+
+const parityLabel = computed(() => {
+  if (!ledgerEntries.value.length) return 'N/A'
+  return totals.value.diff === 0 ? 'BALANCED' : 'UNBALANCED'
+})
+
+function formatMoney(n) {
+  const v = Number(n || 0)
+  if (v >= 1_000_000_000) return B
+  if (v >= 1_000_000) return M
+  return v.toLocaleString()
+}
+
+function mapLedgerRow(row) {
+  const amount = Number(row.amount || row.debit || row.credit || 0)
+  const typeRaw = String(row.entry_type || row.type || (row.debit ? 'DEBIT' : 'CREDIT')).toUpperCase()
+  const type = typeRaw.includes('DEB') ? 'DEBIT' : 'CREDIT'
+  const tenantName = row.tenants?.name || row.tenant_name || null
+  return {
+    id: row.id,
+    journalId: row.journal_id || row.reference || row.batch_id || '—',
+    accountId: tenantName || row.account_code || row.account_id || row.tenant_id || '—',
+    type,
+    amount,
+    timestamp: row.created_at || row.timestamp || null,
+    flow: {
+      debit: row.debit_account || row.description || (type === 'DEBIT' ? (tenantName || 'Debit') : '—'),
+      credit: row.credit_account || row.description || (type === 'CREDIT' ? (tenantName || 'Credit') : '—')
+    },
+    related: {
+      txn: row.payment_id || row.transaction_id || row.reference || null,
+      set: row.settlement_batch_id || null,
+      ten: row.tenant_id || null,
+      wal: row.wallet_id || null,
+      crd: row.card_id || null,
+      term: row.terminal_id || null,
+      aud: null
+    },
+    raw: row
+  }
+}
+
+async function loadLedger() {
+  loading.value = true
+  try {
+    const res = await adminApi.getLedger()
+    const rows = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+    ledgerEntries.value = rows.map(mapLedgerRow)
+
+    const byRef = new Map()
+    for (const e of ledgerEntries.value) {
+      const key = e.journalId || e.id
+      if (!byRef.has(key)) {
+        byRef.set(key, {
+          id: key,
+          timestamp: e.timestamp,
+          description: e.flow?.debit || e.flow?.credit || 'Ledger posting',
+          sourceTxnId: e.related?.txn || '—',
+          status: 'POSTED'
+        })
+      }
+    }
+    journals.value = [...byRef.values()]
+    accountBalances.value = []
+    batchExplorer.value = []
+    coaNodes.value = []
+  } catch (e) {
+    console.error('[GlobalLedger] load failed:', e)
+    ledgerEntries.value = []
+    journals.value = []
+    $q.notify({
+      type: 'negative',
+      message: e?.response?.data?.error || e?.response?.data?.message || 'Failed to load live ledger entries'
+    })
+  } finally {
+    loading.value = false
+  }
+}
+
 const inspectLedger = (row) => {
-  selectedLedger.value = row
+  selectedLedger.value = {
+    ...row,
+    flow: row.flow || { debit: '—', credit: '—' },
+    related: row.related || {}
+  }
   drawerOpen.value = true
 }
 
-// BATCH EXPLORER DATA
-const batchExplorer = ref([
-  { id: 'BATCH-20260531-001', entries: 500, debits: 10000000, credits: 10000000, status: 'Balanced' },
-  { id: 'BATCH-20260531-002', entries: 125, debits: 3450000, credits: 3450000, status: 'Balanced' },
-  { id: 'BATCH-20260531-003', entries: 80, debits: 1200000, credits: 1200000, status: 'Balanced' }
-])
+const inspectJournal = (row) => {
+  const match = ledgerEntries.value.find(e => e.journalId === row.id)
+  if (match) inspectLedger(match)
+}
 
-// ACCOUNT BALANCES DATA
-const accountBalances = ref([
-  { account: 'Student Wallet Float', type: 'LIABILITY', color: 'text-indigo-4', opening: 1000000, movement: 250000, closing: 1250000 },
-  { account: 'Primary Gateway Float', type: 'ASSET', color: 'text-cyan-4', opening: 4200000000, movement: -1500000, closing: 4198500000 },
-  { account: 'Transaction Fees', type: 'REVENUE', color: 'text-green-4', opening: 54000, movement: 12000, closing: 66000 }
-])
-
+onMounted(loadLedger)
 </script>
 
 <style scoped>
-.transaction-table {
-  /* Minimalist density matching enterprise look */
-}
 .transaction-table :deep(th) {
   font-size: 10px;
   font-weight: 700;
@@ -521,6 +544,10 @@ const accountBalances = ref([
 .border-top { border-top: 1px solid var(--enterprise-border); }
 .border-left { border-left: 1px solid var(--enterprise-border); }
 .border-muted { border: 1px solid var(--enterprise-border); }
+
+.drawer-shadow {
+  box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+}
 
 .hover-bg:hover {
   background: rgba(255, 255, 255, 0.03);

@@ -6,6 +6,7 @@ import 'package:involve_app/features/school/domain/entities/lesson_note_models.d
 import 'package:involve_app/features/school/presentation/pages/generate_lesson_wizard_page.dart';
 import 'package:involve_app/features/school/presentation/pages/lesson_note_viewer_page.dart';
 import 'package:involve_app/features/school/data/services/lesson_note_sync_service.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class LessonNotesListPage extends StatefulWidget {
@@ -78,7 +79,7 @@ class _LessonNotesListPageState extends State<LessonNotesListPage> {
                 children: [
                   const Icon(Icons.error_outline, size: 48, color: Colors.red),
                   const SizedBox(height: 16),
-                  Text(state.error!),
+                  Text(friendlyApiError(state.error)),
                   ElevatedButton(
                     onPressed: _loadInitial,
                     child: const Text('Retry'),

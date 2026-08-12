@@ -1,4 +1,5 @@
 import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:involve_app/core/services/finance_api_client.dart';
@@ -48,7 +49,7 @@ class _TwoFactorAuthPageState extends State<TwoFactorAuthPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to generate MFA setup: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not set up 2FA.'))));
       }
     } finally {
       if (mounted) {

@@ -1,14 +1,10 @@
 import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:involve_app/core/widgets/custom_pin_input.dart';
-import 'package:involve_app/core/license/storage_service.dart';
-import 'package:involve_app/features/dashboard/presentation/pages/dashboard_page.dart';
-import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
-import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import '../utils/onboarding_navigator.dart';
+import '../utils/otp_resend_cooldown.dart';
 
 class VerifyWhatsappPage extends StatefulWidget {
   final Map<String, dynamic> payload;
@@ -20,67 +16,98 @@ class VerifyWhatsappPage extends StatefulWidget {
   State<VerifyWhatsappPage> createState() => _VerifyWhatsappPageState();
 }
 
-class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
-  bool _isLoading = false;
+class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendCooldownMixin {
+  bool _isVerifying = false;
+  bool _isResending = false;
   String _currentPin = '';
 
-  Future<void> _verifyOtpAndCompleteOnboarding() async {
-    if (_isLoading) return;
-    
-    if (_currentPin.length < 6) {
+  static const _accent = Color(0xFF10B981);
+
+  @override
+  void initState() {
+    super.initState();
+    // OTP was already sent when this page opened — lock resend for 90s.
+    startResendCooldown();
+  }
+
+  Future<void> _verifyOtpAndCompleteOnboarding([String? pinOverride]) async {
+    if (_isVerifying || _isResending) return;
+
+    final pin = (pinOverride ?? _currentPin).trim();
+    if (pin.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter the 6-digit OTP.')),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isVerifying = true;
+      _currentPin = pin;
+    });
 
     try {
-      final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        validateStatus: (status) => status != null && status < 500,
+      ));
       final phone = widget.payload['phone'];
-      
+
       final verifyUrls = [
         'http://localhost:3004/auth/verify-whatsapp-otp',
         '${AppConfig.baseUrl}/auth/verify-whatsapp-otp',
       ];
 
       bool otpVerified = false;
-      for (var url in verifyUrls) {
+      String? lastError;
+      for (final url in verifyUrls) {
         try {
-          await dio.post(url, data: {'phone': phone, 'code': _currentPin});
-          otpVerified = true;
-          break;
-        } catch (_) {}
+          final response = await dio.post(
+            url,
+            data: {'phone': phone, 'code': pin, 'otp': pin},
+          );
+          if (response.statusCode == 200 && (response.data?['success'] != false)) {
+            otpVerified = true;
+            break;
+          }
+          lastError = extractApiErrorBody(response.data) ??
+              'Invalid or expired WhatsApp code.';
+        } catch (e) {
+          lastError = friendlyApiError(
+            e,
+            fallback: 'Could not verify WhatsApp. Please try again.',
+          );
+        }
       }
 
       if (!otpVerified) {
-        throw Exception('Invalid WhatsApp OTP or server unreachable.');
+        throw Exception(lastError ?? 'Invalid or expired WhatsApp code.');
       }
 
-      setState(() => _isLoading = false);
+      if (!mounted) return;
 
-      if (mounted) {
-        final existingChannels = (widget.payload['completedChannels'] as List<dynamic>?)?.cast<String>() ?? [];
-        widget.payload['completedChannels'] = <String>[...existingChannels, 'WHATSAPP'];
-        await OnboardingNavigator.proceed(context, widget.payload, widget.requiredChannels);
-      }
+      final existingChannels =
+          (widget.payload['completedChannels'] as List<dynamic>?)?.cast<String>() ??
+              [];
+      widget.payload['completedChannels'] = <String>[...existingChannels, 'WHATSAPP'];
+
+      // Keep progress bar visible until navigation completes.
+      await OnboardingNavigator.proceed(context, widget.payload, widget.requiredChannels);
+      if (mounted) setState(() => _isVerifying = false);
     } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: const Color(0xFFEF4444),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isVerifying = false);
+      showFriendlyErrorSnackBar(
+        context,
+        e,
+        fallback: 'Invalid or expired WhatsApp code. Tap Resend OTP and try again.',
+      );
     }
   }
 
   Future<void> _resendOtp() async {
-    setState(() => _isLoading = true);
+    if (_isVerifying || _isResending || !canResendOtp) return;
+    setState(() => _isResending = true);
     try {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
       final phone = widget.payload['phone'];
@@ -90,32 +117,42 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
       ];
 
       bool otpSent = false;
-      for (var url in urls) {
+      String? lastError;
+      for (final url in urls) {
         try {
           await dio.post(url, data: {'phone': phone});
           otpSent = true;
           break;
-        } catch (_) {}
+        } catch (e) {
+          lastError = friendlyApiError(
+            e,
+            fallback: 'Could not resend the WhatsApp code.',
+          );
+        }
       }
-
-      setState(() => _isLoading = false);
 
       if (!otpSent) {
-        throw Exception('Failed to resend WhatsApp OTP. Server unreachable.');
+        throw Exception(lastError ?? 'Could not resend the WhatsApp code.');
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('OTP resent successfully!'), backgroundColor: Colors.green),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isResending = false);
+      startResendCooldown();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('OTP resent successfully! Check WhatsApp.'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isResending = false);
+      showFriendlyErrorSnackBar(
+        context,
+        e,
+        fallback: 'Could not resend the WhatsApp code. Please try again.',
+      );
     }
   }
 
@@ -128,7 +165,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _isVerifying ? null : () => Navigator.of(context).pop(),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -139,7 +176,7 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.chat_bubble_outline, color: Color(0xFF10B981), size: 64),
+              const Icon(Icons.chat_bubble_outline, color: _accent, size: 64),
               const SizedBox(height: 24),
               const Text(
                 'Verify WhatsApp',
@@ -152,14 +189,20 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
                 style: TextStyle(color: Colors.grey[400], fontSize: 14),
               ),
               const SizedBox(height: 40),
-              CustomPinInput(
-                length: 6,
-                onChanged: (pin) => setState(() => _currentPin = pin),
-                onCompleted: (pin) => _verifyOtpAndCompleteOnboarding(),
+              IgnorePointer(
+                ignoring: _isVerifying,
+                child: Opacity(
+                  opacity: _isVerifying ? 0.5 : 1,
+                  child: CustomPinInput(
+                    length: 6,
+                    onChanged: (pin) => setState(() => _currentPin = pin),
+                    onCompleted: (pin) => _verifyOtpAndCompleteOnboarding(pin),
+                  ),
+                ),
               ),
               const SizedBox(height: 40),
-              if (_isLoading)
-                const CircularProgressIndicator(color: Color(0xFF10B981))
+              if (_isVerifying)
+                buildOtpVerifyingProgress(color: _accent)
               else
                 Column(
                   children: [
@@ -167,20 +210,39 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _verifyOtpAndCompleteOnboarding,
+                        onPressed: _isResending ? null : () => _verifyOtpAndCompleteOnboarding(),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
+                          backgroundColor: _accent,
                           foregroundColor: Colors.white,
+                          disabledBackgroundColor: _accent.withOpacity(0.4),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: const Text('VERIFY & ACTIVATE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        child: const Text(
+                          'VERIFY & ACTIVATE',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: _resendOtp,
-                      child: const Text('Didn\'t receive code? Resend OTP', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
-                    ),
+                    if (_isResending)
+                      const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: _accent),
+                      )
+                    else if (!canResendOtp)
+                      Text(
+                        resendCooldownLabel,
+                        style: TextStyle(color: Colors.grey[500], fontWeight: FontWeight.w600),
+                      )
+                    else
+                      TextButton(
+                        onPressed: _resendOtp,
+                        child: const Text(
+                          'Didn\'t receive code? Resend OTP',
+                          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+                        ),
+                      ),
                   ],
                 ),
             ],

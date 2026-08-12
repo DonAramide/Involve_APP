@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
@@ -128,7 +129,7 @@ class ReceiptPreviewPage extends StatelessWidget {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print Error: $e')),
+        SnackBar(content: Text(friendlyApiError(e, fallback: 'Print failed.'))),
       );
     }
   }

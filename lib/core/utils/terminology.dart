@@ -30,6 +30,13 @@ extension BusinessTerminology on AppSettings {
     if (businessMode == 'services') return 'Service Records';
     return 'Sales Records';
   }
+
+  /// Cash / POS / Transfer / Wallet payment ledger (not document history).
+  String get transactionHistoryLabel {
+    if (businessMode == 'school') return 'Payment History';
+    if (businessMode == 'services') return 'Payment History';
+    return 'Transaction History';
+  }
   
   // Plural forms and UI hints
   String get productsLabel {

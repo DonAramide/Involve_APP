@@ -220,11 +220,12 @@ export class OnboardingController {
         res.status(400).json({ error: 'Valid email is required.' });
         return;
       }
-      await verificationService.sendOTP(email, 'EMAIL', purpose);
+      const normalized = email.trim().toLowerCase();
+      await verificationService.sendOTP(normalized, 'EMAIL', purpose);
       res.status(200).json({ success: true, message: 'Verification code sent' });
     } catch (error: any) {
       console.error('[OnboardingController] sendEmailOtp error:', error.message);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ success: false, error: error.message || 'Internal server error' });
     }
   }
 
@@ -233,16 +234,20 @@ export class OnboardingController {
    */
   public static async verifyEmailOtp(req: Request, res: Response): Promise<void> {
     try {
-      const { email, code, purpose = 'SIGNUP' } = req.body;
-      if (!email || !code) {
+      const emailRaw = req.body?.email;
+      // App sends `code`; admin web historically sent `otp`
+      const code = req.body?.code || req.body?.otp;
+      const purpose = req.body?.purpose || 'SIGNUP';
+      if (!emailRaw || !code) {
         res.status(400).json({ error: 'Email and code are required.' });
         return;
       }
-      const isValid = await verificationService.verifyOTP(email, code, 'EMAIL', purpose);
-      if (isValid) {
+      const email = String(emailRaw).trim().toLowerCase();
+      const result = await verificationService.verifyOTPDetailed(email, String(code).trim(), 'EMAIL', purpose);
+      if (result.ok) {
         res.status(200).json({ success: true, message: 'Email verified successfully.' });
       } else {
-        res.status(400).json({ success: false, error: 'Invalid or expired verification code.' });
+        res.status(400).json({ success: false, error: result.error || 'Invalid or expired verification code.' });
       }
     } catch (error: any) {
       console.error('[OnboardingController] verifyEmailOtp error:', error.message);
@@ -260,11 +265,11 @@ export class OnboardingController {
         res.status(400).json({ error: 'Valid phone number is required.' });
         return;
       }
-      await verificationService.sendOTP(phone, 'WHATSAPP', purpose);
+      await verificationService.sendOTP(phone.trim(), 'WHATSAPP', purpose);
       res.status(200).json({ success: true, message: 'Verification code sent' });
     } catch (error: any) {
       console.error('[OnboardingController] sendWhatsappOtp error:', error.message);
-      res.status(500).json({ success: false, error: 'Internal server error' });
+      res.status(500).json({ success: false, error: error.message || 'Internal server error' });
     }
   }
 
@@ -273,16 +278,19 @@ export class OnboardingController {
    */
   public static async verifyWhatsappOtp(req: Request, res: Response): Promise<void> {
     try {
-      const { phone, code, purpose = 'SIGNUP' } = req.body;
-      if (!phone || !code) {
+      const phoneRaw = req.body?.phone;
+      const code = req.body?.code || req.body?.otp;
+      const purpose = req.body?.purpose || 'SIGNUP';
+      if (!phoneRaw || !code) {
         res.status(400).json({ error: 'Phone and code are required.' });
         return;
       }
-      const isValid = await verificationService.verifyOTP(phone, code, 'WHATSAPP', purpose);
-      if (isValid) {
+      const phone = String(phoneRaw).trim();
+      const result = await verificationService.verifyOTPDetailed(phone, String(code).trim(), 'WHATSAPP', purpose);
+      if (result.ok) {
         res.status(200).json({ success: true, message: 'WhatsApp number verified successfully.' });
       } else {
-        res.status(400).json({ success: false, error: 'Invalid or expired verification code.' });
+        res.status(400).json({ success: false, error: result.error || 'Invalid or expired verification code.' });
       }
     } catch (error: any) {
       console.error('[OnboardingController] verifyWhatsappOtp error:', error.message);

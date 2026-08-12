@@ -121,6 +121,12 @@ class LicenseService {
     return DateTime.now().isBefore(trialExpiry);
   }
 
+  /// True when on free 3-day trial only (no Pro / lifetime / activation license).
+  static Future<bool> isOnFreeTrialOnly({String? businessName}) async {
+    if (await isActivated(businessName)) return false;
+    return await isTrialValid();
+  }
+
   static Future<bool> canAccess(String? currentBusinessName) async {
     // 1. Check for valid license
     if (await isActivated(currentBusinessName)) return true;

@@ -73,6 +73,9 @@
       <div class="col-12 col-lg-8">
         <q-card class="bg-card-dark border-grey-9 q-pa-lg fit">
           <div class="text-h6 text-weight-bold text-white q-mb-md">Active Business Operators</div>
+          <div class="text-caption text-grey-5 q-mb-md">
+            Bank columns come from POS Web Sync / Staff save. Use <strong>Pay Salary</strong> to transfer from the tenant wallet.
+          </div>
 
           <q-table
             :rows="operators"
@@ -82,7 +85,20 @@
             flat
             bordered
             class="bg-card-dark"
+            :loading="isLoading"
           >
+            <template v-slot:body-cell-bank="props">
+              <q-td :props="props">
+                <div class="text-caption text-white">{{ props.row.bankName || '—' }}</div>
+                <div class="text-metric-mono text-grey-5 font-mono" style="font-size: 10px;">
+                  {{ props.row.accountNumber || 'No account synced' }}
+                </div>
+                <div class="text-caption text-grey-6" style="font-size: 10px;">
+                  {{ props.row.accountName || '' }}
+                </div>
+              </q-td>
+            </template>
+
             <template v-slot:body-cell-role="props">
               <q-td :props="props">
                 <q-badge 
@@ -111,6 +127,21 @@
 
             <template v-slot:body-cell-actions="props">
               <q-td :props="props" class="text-center row items-center justify-center q-gutter-x-xs">
+                <q-btn
+                  flat
+                  dense
+                  round
+                  size="sm"
+                  color="green-4"
+                  icon="payments"
+                  :disable="!props.row.accountNumber"
+                  @click="openPaySalary(props.row)"
+                >
+                  <q-tooltip class="bg-indigo-10 text-white font-mono">
+                    {{ props.row.accountNumber ? 'Pay Salary from Tenant Wallet' : 'Sync staff bank details from POS first' }}
+                  </q-tooltip>
+                </q-btn>
+
                 <!-- Suspend / Activate Toggle - Disabled if logged-in user is Finance -->
                 <q-btn 
                   flat 
@@ -308,20 +339,78 @@
       </q-card>
     </q-dialog>
 
+    <!-- Pay Staff Salary -->
+    <q-dialog v-model="showPayDialog" backdrop-filter="blur(10px)">
+      <q-card class="q-pa-lg text-white" style="width: 420px; border-radius: 16px; background: #0b0f19; border: 1px solid rgba(255,255,255,0.08);">
+        <div class="text-h6 text-weight-bold q-mb-xs">Pay Staff / Salary</div>
+        <div class="text-caption text-grey-5 q-mb-md">
+          Debits the tenant wallet and transfers to {{ payForm.name }}'s personal bank account.
+        </div>
+
+        <div class="q-pa-sm rounded-borders border-grey-9 q-mb-md bg-black-transparent">
+          <div class="text-caption text-grey-5">Destination</div>
+          <div class="text-weight-bold">{{ payForm.bankName || 'Bank' }} · {{ payForm.accountNumber }}</div>
+          <div class="text-caption text-grey-4">{{ payForm.accountName }}</div>
+        </div>
+
+        <q-input
+          v-model.number="payForm.amount"
+          type="number"
+          dark
+          outlined
+          dense
+          label="Amount (₦)"
+          class="q-mb-sm"
+          prefix="₦"
+        />
+        <q-input
+          v-model="payForm.bankCode"
+          dark
+          outlined
+          dense
+          label="Bank Code (required for transfer)"
+          hint="e.g. 058 for GTBank — required if missing from POS sync"
+          class="q-mb-md"
+        />
+
+        <div class="row justify-end q-gutter-sm">
+          <q-btn flat label="Cancel" color="grey-5" v-close-popup />
+          <q-btn
+            unelevated
+            color="green-9"
+            label="Send Salary"
+            :loading="payingSalary"
+            @click="confirmPaySalary"
+          />
+        </div>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { useTenantUsersStore } from '../stores/tenantUsersStore'
 import { storeToRefs } from 'pinia'
 
 const $q = useQuasar()
 const store = useTenantUsersStore()
-const { activeUserRole, operators, auditLogs } = storeToRefs(store)
+const { activeUserRole, operators, auditLogs, isLoading, payingSalary } = storeToRefs(store)
 
 const showAddDialog = ref(false)
+const showPayDialog = ref(false)
+
+const payForm = ref({
+  id: '',
+  name: '',
+  amount: null,
+  bankName: '',
+  bankCode: '',
+  accountNumber: '',
+  accountName: '',
+})
 
 const newOperator = ref({
   name: '',
@@ -335,10 +424,60 @@ const columns = [
   { name: 'name', label: 'STAFF OPERATOR', field: 'name', align: 'left', sortable: true },
   { name: 'staffId', label: 'STAFF ID', field: 'staffId', align: 'left' },
   { name: 'phone', label: 'PHONE LINK', field: 'phone', align: 'left' },
+  { name: 'bank', label: 'PERSONAL BANK (SALARY)', field: 'accountNumber', align: 'left' },
   { name: 'role', label: 'SECURITY IDENTITY', field: 'role', align: 'center' },
   { name: 'status', label: 'OPERATIONAL STATE', field: 'status', align: 'center' },
   { name: 'actions', label: 'OVERSIGHT ACTIONS', align: 'center' }
 ]
+
+onMounted(() => {
+  store.fetchOperators()
+})
+
+const openPaySalary = (row) => {
+  payForm.value = {
+    id: row.id,
+    name: row.name,
+    amount: null,
+    bankName: row.bankName || '',
+    bankCode: row.bankCode || '',
+    accountNumber: row.accountNumber || '',
+    accountName: row.accountName || row.name || '',
+  }
+  showPayDialog.value = true
+}
+
+const confirmPaySalary = async () => {
+  const amount = Number(payForm.value.amount)
+  if (!amount || amount <= 0) {
+    $q.notify({ type: 'negative', message: 'Enter a valid salary amount.' })
+    return
+  }
+  if (!payForm.value.bankCode) {
+    $q.notify({ type: 'negative', message: 'Bank code is required for Quasar transfer.' })
+    return
+  }
+  try {
+    const result = await store.paySalary({
+      staffId: payForm.value.id,
+      amount,
+      bank_code: payForm.value.bankCode,
+      bank_name: payForm.value.bankName,
+      account_number: payForm.value.accountNumber,
+      account_name: payForm.value.accountName,
+    })
+    showPayDialog.value = false
+    $q.notify({
+      type: 'positive',
+      message: `Salary payout started (${result?.reference || 'pending'}).`,
+    })
+  } catch (e) {
+    $q.notify({
+      type: 'negative',
+      message: e?.response?.data?.error || e?.message || 'Salary payout failed',
+    })
+  }
+}
 
 const toggleOperatorState = (row) => {
   if (activeUserRole.value === 'FINANCE') {

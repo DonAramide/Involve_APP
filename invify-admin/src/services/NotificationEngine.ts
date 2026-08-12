@@ -10,11 +10,18 @@ class NotificationEngineService {
 
   private async fetchNotifications() {
     try {
-      const response = await fetch('/api/v1/notifications', {
+      const response = await fetch('/api/notifications', {
         headers: { Authorization: `Bearer ${localStorage.getItem('supabase_token')}` }
       });
       if (response.ok) {
-        this.notifications.value = await response.json();
+        const payload = await response.json();
+        const rows = Array.isArray(payload) ? payload : (payload?.data || []);
+        this.notifications.value = (Array.isArray(rows) ? rows : []).map((n: any) => ({
+          ...n,
+          // Normalize backend fields for UI helpers
+          status: n.is_read === true || n.status === 'Read' ? 'Read' : 'Unread',
+          priority: n.priority || 'MEDIUM',
+        }));
         this.notifySubscribers();
       }
     } catch (error) {
@@ -24,17 +31,19 @@ class NotificationEngineService {
 
   async send(payload: any) {
     try {
-      const response = await fetch('/api/v1/notifications/send', {
-        method: 'POST',
+      // Backend does not expose a generic /send endpoint; keep best-effort no-op path.
+      const response = await fetch('/api/notifications', {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('supabase_token')}`
         },
-        body: JSON.stringify(payload)
       });
       if (response.ok) {
-        logger.info('Notification sent successfully');
+        logger.info('Notification refresh after send request');
         await this.fetchNotifications();
+      } else {
+        logger.error('Failed to send notification via API', payload);
       }
     } catch (error) {
       logger.error('Failed to send notification via API', error);

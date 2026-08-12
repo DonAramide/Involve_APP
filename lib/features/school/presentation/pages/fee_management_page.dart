@@ -11,6 +11,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_bloc.dart';
 import 'package:involve_app/features/stock/presentation/bloc/stock_state.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class FeeManagementPage extends StatefulWidget {
@@ -54,7 +55,7 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
           BlocListener<SchoolBloc, SchoolState>(
             listener: (context, state) {
               if (state.error != null) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.error!), backgroundColor: Colors.red));
+                showFriendlyErrorSnackBar(context, state.error);
               }
             },
           ),

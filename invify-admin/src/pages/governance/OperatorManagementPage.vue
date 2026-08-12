@@ -85,8 +85,8 @@
           >
             <!-- 1. Identity -->
             <div class="column col-3 no-wrap ellipsis">
-              <span class="text-main text-weight-bold text-caption">{{ op.email }}</span>
-              <span class="text-metric-mono text-muted" style="font-size: 9px;">ID: {{ op.id }}</span>
+              <span class="text-main text-weight-bold text-caption">{{ op.name || op.email }}</span>
+              <span class="text-metric-mono text-muted ellipsis" style="font-size: 9px;">{{ op.email }}</span>
             </div>
 
             <!-- 2. Role Tier -->
@@ -97,8 +97,9 @@
             </div>
 
             <!-- 3. Scope -->
-            <div class="col-2 text-metric-mono text-secondary" style="font-size: 11px;">
-              {{ op.tenantId }}
+            <div class="col-2 column no-wrap">
+              <span class="text-secondary text-caption ellipsis">{{ op.tenantName || 'Global Platform' }}</span>
+              <span class="text-metric-mono text-muted ellipsis" style="font-size: 9px;" v-if="op.tenantId !== 'global-platform'">{{ op.tenantId }}</span>
             </div>
 
             <!-- 4. MFA State -->
@@ -243,23 +244,47 @@ const activeTierTab = ref('ALL')
 const tenants = ref([])
 const baseOperatorsList = ref([])
 
+const mapOperatorTier = (rawRole) => {
+  const r = String(rawRole || '').toLowerCase()
+  if (r === 'super_admin' || r === 'platform_admin') return 'SUPER_ADMIN'
+  if (
+    r === 'internal_staff' ||
+    r.startsWith('admin_') ||
+    r === 'support' ||
+    r === 'agent'
+  ) return 'INTERNAL_STAFF'
+  if (r === 'owner' || r === 'tenant_admin' || r === 'admin') return 'TENANT_ADMIN'
+  if (r === 'pro_customer' || r === 'customer') return 'PRO_CUSTOMER'
+  return 'TENANT_OPERATOR'
+}
+
+const resolveTenantLabel = (tenantId) => {
+  if (!tenantId || tenantId === 'global-platform') return 'Global Platform Boundary'
+  const t = tenants.value.find(x => x.id === tenantId)
+  return t?.name ? `${t.name}` : tenantId
+}
+
 const fetchOperators = async () => {
   try {
     const res = await adminApi.getUsers()
-    const rawUsers = res.data || []
+    const rawUsers = Array.isArray(res.data) ? res.data : (res.data?.data || [])
     baseOperatorsList.value = rawUsers.map(u => ({
       id: u.id,
+      name: u.name || u.full_name || (u.email ? u.email.split('@')[0] : 'Operator'),
       email: u.email,
-      role: (u.role || '').toUpperCase(),
+      role: mapOperatorTier(u.role),
+      rawRole: u.role,
       tenantId: u.tenant_id || 'global-platform',
-      isMfaEnabled: !!u.is_mfa_enabled,
-      status: u.is_active ? 'ACTIVE' : 'SUSPENDED'
+      tenantName: resolveTenantLabel(u.tenant_id),
+      isMfaEnabled: !!(u.is_mfa_enabled || u.mfa_enabled),
+      status: u.is_active === false ? 'SUSPENDED' : 'ACTIVE'
     }))
   } catch (e) {
     console.error('Failed to fetch operators:', e)
+    baseOperatorsList.value = []
     $q.notify({
       type: 'negative',
-      message: 'Failed to retrieve operator profiles from server telemetry context.',
+      message: e?.response?.data?.error || e?.response?.data?.message || 'Failed to retrieve operator profiles from server telemetry context.',
       position: 'bottom-right'
     })
   }
@@ -340,9 +365,12 @@ const executeCreationPipeline = async () => {
 
     baseOperatorsList.value.unshift({
       id: u?.id || `usr-${Date.now()}`,
+      name: u?.name || newOp.value.email.split('@')[0],
       email: u?.email || newOp.value.email,
-      role: (u?.role || newOp.value.role).toUpperCase(),
+      role: mapOperatorTier(u?.role || newOp.value.role),
+      rawRole: u?.role || newOp.value.role,
       tenantId: u?.tenant_id || newOp.value.targetTenantId,
+      tenantName: resolveTenantLabel(u?.tenant_id || newOp.value.targetTenantId),
       isMfaEnabled: !!u?.is_mfa_enabled,
       status: u?.is_active !== false ? 'ACTIVE' : 'SUSPENDED'
     })

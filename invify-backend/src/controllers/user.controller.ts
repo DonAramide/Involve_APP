@@ -1,6 +1,6 @@
 // src/controllers/user.controller.ts
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase';
+import { supabaseAdmin } from '../db/supabase';
 import { UserDeviceService } from '../services/user-device.service';
 import { AuditArchiveService } from '../services/audit-archive.service';
 
@@ -14,25 +14,32 @@ export class UserController {
   static async listUsers(req: Request, res: Response) {
     try {
       const { role, tenantId } = (req as any).user;
-      
-      let query = supabase.from('users').select(`*`);
+      const roleNorm = String(role || '').toLowerCase();
+      const isPlatform =
+        roleNorm === 'super_admin' ||
+        roleNorm === 'internal_staff' ||
+        roleNorm.startsWith('admin_');
 
-      // 1. Isolation Rule
-      if (role !== 'super_admin') {
-        // Tenant Admins only see their users
+      let query = supabaseAdmin.from('users').select('*');
+
+      // Isolation: platform operators see everyone (optional tenant filter).
+      // Tenant admins only see their own tenant.
+      if (!isPlatform) {
+        if (!tenantId) {
+          return res.status(403).json({ error: 'Tenant context required' });
+        }
         query = query.eq('tenant_id', tenantId);
       } else if (req.query.tenantId) {
-        // Super Admins can filter by tenant
         query = query.eq('tenant_id', req.query.tenantId);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(2000);
 
       if (error) throw error;
-      return res.status(200).json(data);
+      return res.status(200).json(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.error('[UserController] listUsers Error:', error.message);
-      return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
+      return res.status(503).json({ error: 'Database unavailable', message: error.message, retryable: true, retryAfterMs: 2000 });
     }
   }
 
@@ -66,7 +73,7 @@ export class UserController {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('users')
         .insert({
           id,
@@ -133,7 +140,7 @@ export class UserController {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('users')
         .update(updates)
         .eq('id', id)

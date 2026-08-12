@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dart:convert';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'invoice_state.dart';
 import '../../domain/entities/invoice.dart';
 import '../../domain/services/invoice_calculation_service.dart';
@@ -40,7 +41,7 @@ class InvoiceBloc extends Bloc<InvoiceEvent, InvoiceState> {
       );
       emit(state.copyWith(isGeneratingAccount: false, paymentIntent: intent));
     } catch (e) {
-      emit(state.copyWith(isGeneratingAccount: false, error: 'Failed to generate account: $e'));
+      emit(state.copyWith(isGeneratingAccount: false, error: friendlyApiError(e, fallback: 'Could not generate account.')));
     }
   }
 

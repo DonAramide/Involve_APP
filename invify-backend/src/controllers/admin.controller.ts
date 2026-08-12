@@ -58,7 +58,7 @@ export class AdminController {
   private static getGlobalSettingsData() {
     return { 
       support_phone: '+234 800 INVIFY',
-      support_email: 'info.iips.ng@gmail.com',
+      support_email: 'support@iips.app',
       support_whatsapp: '+2348023552282',
       broadcast_message: '',
       audit_retention_hours: 72,
@@ -625,6 +625,31 @@ export class AdminController {
         .single();
 
       if (error) throw error;
+
+      try {
+        const { GovAuditService } = require('../services/gov-audit.service');
+        const user = (req as any).user || {};
+        const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+        const statusChange = updates.status
+          ? (String(updates.status).toLowerCase() === 'suspended' ? 'TENANT_SUSPENDED' : 'TENANT_STATUS_UPDATED')
+          : 'TENANT_UPDATED';
+        await GovAuditService.logAction({
+          id: require('crypto').randomUUID(),
+          timestamp: new Date().toISOString(),
+          module: 'GOVERNANCE',
+          action: statusChange,
+          user_email: user.email || 'unknown',
+          user_name: user.name || user.email?.split('@')[0] || 'Admin',
+          ip_address: ip,
+          target: id,
+          status: 'success',
+          tenant_id: id,
+          metadata: { updates, tenant_name: data?.name }
+        });
+      } catch (auditErr) {
+        console.warn('[AdminController] updateTenant audit log failed:', auditErr);
+      }
+
       return res.status(200).json(data);
     } catch (error: any) {
       console.error('[AdminController] updateTenant Error:', error.message);
@@ -645,6 +670,29 @@ export class AdminController {
         .single();
 
       if (error) throw error;
+
+      try {
+        const { GovAuditService } = require('../services/gov-audit.service');
+        const user = (req as any).user || {};
+        const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+        const action = String(status).toLowerCase() === 'suspended' ? 'TENANT_SUSPENDED' : 'TENANT_ACTIVATED';
+        await GovAuditService.logAction({
+          id: require('crypto').randomUUID(),
+          timestamp: new Date().toISOString(),
+          module: 'GOVERNANCE',
+          action,
+          user_email: user.email || 'unknown',
+          user_name: user.name || user.email?.split('@')[0] || 'Admin',
+          ip_address: ip,
+          target: id,
+          status: 'success',
+          tenant_id: id,
+          metadata: { status, tenant_name: data?.name }
+        });
+      } catch (auditErr) {
+        console.warn('[AdminController] updateTenantStatus audit log failed:', auditErr);
+      }
+
       return res.status(200).json(data);
     } catch (error: any) {
       console.error('[AdminController] updateTenantStatus Error:', error.message);
@@ -659,6 +707,28 @@ export class AdminController {
 
       const { error } = await supabaseAdmin.from('tenants').update({ is_emergency_locked: true, emergency_lock_code: passcode }).eq('id', id);
       if (error) throw error;
+
+      try {
+        const { GovAuditService } = require('../services/gov-audit.service');
+        const user = (req as any).user || {};
+        const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+        await GovAuditService.logAction({
+          id: require('crypto').randomUUID(),
+          timestamp: new Date().toISOString(),
+          module: 'GOVERNANCE',
+          action: 'EMERGENCY_LOCK',
+          user_email: user.email || 'unknown',
+          user_name: user.name || user.email?.split('@')[0] || 'Admin',
+          ip_address: ip,
+          target: id,
+          status: 'success',
+          tenant_id: id,
+          metadata: { passcode_set: true }
+        });
+      } catch (auditErr) {
+        console.warn('[AdminController] triggerEmergencyLock audit log failed:', auditErr);
+      }
+
       return res.status(200).json({ success: true });
     } catch (error: any) {
       console.error('[AdminController] triggerEmergencyLock Error:', error.message);

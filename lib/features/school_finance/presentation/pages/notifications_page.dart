@@ -1,6 +1,7 @@
 // lib/features/school_finance/presentation/pages/notifications_page.dart
 
 import 'package:flutter/material.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/notification_repository.dart';
 import '../../../../core/services/service_locator.dart';
 import 'package:intl/intl.dart';
@@ -34,7 +35,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyApiError(e, fallback: 'Something went wrong.'))));
     }
   }
 

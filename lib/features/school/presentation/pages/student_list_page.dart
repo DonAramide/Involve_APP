@@ -7,6 +7,7 @@ import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
 import 'package:involve_app/core/utils/currency_formatter.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import './student_profile_page.dart';
 import 'package:intl/intl.dart';
@@ -54,11 +55,12 @@ class _StudentListPageState extends State<StudentListPage> {
     return BlocListener<SchoolBloc, SchoolState>(
       listener: (context, state) {
         if (state.error != null) {
-          String message = state.error!;
-          if (message.contains('UNIQUE constraint failed') && message.contains('admission_number')) {
+          String message = friendlyApiError(state.error);
+          if (state.error!.contains('UNIQUE constraint failed') &&
+              state.error!.contains('admission_number')) {
             message = 'Admission number already exists. Please try a different one.';
           }
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(message),

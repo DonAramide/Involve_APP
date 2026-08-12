@@ -14,4 +14,8 @@ router.patch('/integrations/:vaultId/credentials/:credentialId/activate', VaultC
 router.delete('/integrations/:vaultId/credentials/:credentialId', VaultController.deleteCredential);
 router.post('/integrations/:vaultId/test', VaultController.testConnection);
 
+// Meta WhatsApp Cloud API (Integration Vault)
+router.put('/meta-whatsapp', VaultController.upsertMetaWhatsApp);
+router.get('/meta-whatsapp/status', VaultController.getMetaWhatsAppStatus);
+
 export default router;

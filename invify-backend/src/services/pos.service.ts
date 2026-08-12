@@ -727,13 +727,24 @@ export class PosService {
     } catch {
       /* ignore */
     }
+    const approved = String(d.status || '').toLowerCase() === 'approved';
+    const settled = String(d.settlement_status || '').toLowerCase() === 'settled';
+    let displayStatus = d.status;
+    if (approved && settled) displayStatus = 'Settled';
+    else if (approved) displayStatus = 'Approved (Unsettled)';
+
     return {
       id: d.id,
       tenantId: d.tenant_id,
       tenantName: d.tenant_name || null,
       terminalId: d.terminal_id,
       amount: Number(d.amount || 0),
-      status: d.status,
+      status: displayStatus,
+      rawStatus: d.status,
+      settlementStatus: d.settlement_status || 'unsettled',
+      settledAt: d.settled_at || null,
+      settlementBatchId: d.settlement_batch_id || null,
+      settlementProcessor: d.settlement_processor || null,
       date: d.date || d.created_at,
       host: d.host,
       maskedPan: d.masked_pan,

@@ -8,6 +8,7 @@ import { AuditService } from '../services/audit.service';
 import { PaymentGatewayConvergenceService } from '../services/gateway.service';
 import { QuasarWebhookService } from '../integrations/quasar/quasar-webhook.service';
 import { QuasarIntegrationStore } from '../integrations/quasar/quasar-integration.store';
+import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
 
 
 
@@ -416,6 +417,27 @@ export class WebhookController {
               console.error('[NotificationService] Deposit notify failed:', e.message);
             }
 
+            // WhatsApp receipt for depositor/customer (non-fatal)
+            try {
+              const depositMeta = event.data?.metadata || {};
+              WhatsAppNotificationService.notifyReceipt({
+                tenantId: resolvedTenantId,
+                customerId: resolvedCustomerId || depositMeta.customerId || null,
+                receiptId: reference,
+                amount: creditAmount,
+                currency: event.data?.currency || 'NGN',
+                recipientPhone:
+                  depositMeta.customerPhone ||
+                  depositMeta.parentPhone ||
+                  depositMeta.phone ||
+                  null,
+                customerName: senderName,
+                reference,
+              });
+            } catch (e: any) {
+              console.error('[WhatsAppNotification] Deposit receipt notify failed (non-fatal):', e?.message || e);
+            }
+
             // Also emit via FinancialEventService so Supabase Realtime / watchGlobalEvents catches it and updates device dashboard / notifies
             try {
               await FinancialEventService.emit({
@@ -625,6 +647,30 @@ export class WebhookController {
     } else {
       const studentName = event.data?.metadata?.studentName || 'Student';
       await NotificationService.notifySchoolAdminOfPayment(tenantId, amount, studentName);
+
+      // Customer/parent WhatsApp receipt (non-fatal; does not affect ledger)
+      try {
+        const meta = event.data?.metadata || {};
+        const recipientPhone =
+          meta.customerPhone ||
+          meta.parentPhone ||
+          meta.phone ||
+          meta.whatsapp ||
+          null;
+        WhatsAppNotificationService.notifyReceipt({
+          tenantId,
+          customerId: meta.customerId || null,
+          invoiceId: meta.invoiceId || null,
+          receiptId: reference,
+          amount,
+          currency: event.data?.currency || 'NGN',
+          recipientPhone,
+          customerName: meta.studentName || meta.customerName || studentName,
+          reference,
+        });
+      } catch (e: any) {
+        console.error('[WhatsAppNotification] Payment receipt notify failed (non-fatal):', e?.message || e);
+      }
     }
     
     // 5. IMMUTABLE AUDIT LOG

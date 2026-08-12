@@ -9,6 +9,8 @@ export class TerminalAuditService {
     oldDeviceId?: string | null;
     newDeviceId?: string | null;
     adminId: string;
+    adminName?: string;
+    tenantId?: string | null;
     reason?: string;
     ipAddress?: string;
     metadata?: any;
@@ -20,9 +22,15 @@ export class TerminalAuditService {
       old_device_id: entry.oldDeviceId || null,
       new_device_id: entry.newDeviceId || null,
       admin_id: entry.adminId,
+      admin_name: entry.adminName || null,
+      tenant_id: entry.tenantId || null,
       reason: entry.reason || null,
       ip_address: entry.ipAddress || null,
-      metadata: entry.metadata || {},
+      metadata: {
+        ...(entry.metadata || {}),
+        ...(entry.tenantId ? { tenant_id: entry.tenantId } : {}),
+        ...(entry.adminName ? { admin_name: entry.adminName } : {})
+      },
       created_at: new Date().toISOString(),
     };
 
@@ -31,6 +39,18 @@ export class TerminalAuditService {
       .insert(record)
       .select()
       .single();
+
+    // If schema lacks tenant_id / admin_name columns, retry without them
+    if (error && /tenant_id|admin_name/i.test(error.message || '')) {
+      const { tenant_id, admin_name, ...legacy } = record as any;
+      const retry = await supabaseAdmin
+        .from('terminal_audit_log')
+        .insert(legacy)
+        .select()
+        .single();
+      if (retry.error) throw retry.error;
+      return retry.data;
+    }
 
     if (error) throw error;
     return data;

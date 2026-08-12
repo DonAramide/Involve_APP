@@ -29,6 +29,10 @@ import 'package:involve_app/features/school_finance/domain/repositories/finance_
 import 'package:involve_app/core/utils/progress_dialog_utils.dart';
 import 'package:involve_app/core/utils/nibss_response_codes.dart';
 import 'package:involve_app/core/utils/iso_response_codes.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
+import 'package:involve_app/core/license/license_service.dart';
+import 'package:involve_app/features/activation/presentation/pages/activation_page.dart';
+import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
 import 'package:involve_app/features/invoicing/domain/templates/pos_receipt_commands.dart';
 import 'package:involve_app/features/invoicing/domain/templates/invoice_template.dart';
 import 'package:involve_app/features/invoicing/domain/templates/template_registry.dart';
@@ -94,7 +98,12 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             context: context,
             builder: (c) => AlertDialog(
               title: const Text('Payment Failed'),
-              content: Text(state.error!),
+              content: Text(
+                friendlyApiError(
+                  state.error,
+                  fallback: 'Payment could not be completed. Please try again.',
+                ),
+              ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(c),
@@ -109,11 +118,35 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
 
         if (state.error != null && state.status == SchoolStatus.failure) {
           setState(() => _awaitingVaProvision = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.error!),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
+          final message = friendlyApiError(
+            state.error,
+            fallback: 'Could not generate virtual account. Please try again.',
+          );
+          final isTrialLock = message.toLowerCase().contains('free trial');
+          showDialog(
+            context: context,
+            builder: (c) => AlertDialog(
+              title: Text(isTrialLock ? 'Free Trial' : 'Virtual Account'),
+              content: Text(message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(c),
+                  child: const Text('OK'),
+                ),
+                if (isTrialLock)
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(c);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ActivationPage(isExpired: false),
+                        ),
+                      );
+                    },
+                    child: const Text('Activate'),
+                  ),
+              ],
             ),
           );
           return;
@@ -1464,6 +1497,16 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
+  Future<void> _onGenerateVirtualAccountPressed(BuildContext context, Student student) async {
+    final orgName = context.read<SettingsBloc>().state.settings?.organizationName;
+    if (await showFreeTrialVaLockedIfNeeded(context, businessName: orgName)) {
+      return;
+    }
+
+    setState(() => _awaitingVaProvision = true);
+    context.read<SchoolBloc>().add(ProvisionStudentVirtualAccountEvent(student.id!));
+  }
+
   Widget _buildVirtualAccountSection(BuildContext context, Student student, {bool isProvisioningVa = false}) {
     final hasVa = student.virtualAccountNumber != null &&
         student.virtualAccountNumber!.trim().isNotEmpty &&
@@ -1515,13 +1558,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-      child: ElevatedButton.icon(
+              child: ElevatedButton.icon(
                 onPressed: isProvisioningVa
                     ? null
-                    : () {
-                        setState(() => _awaitingVaProvision = true);
-          context.read<SchoolBloc>().add(ProvisionStudentVirtualAccountEvent(student.id!));
-        },
+                    : () => _onGenerateVirtualAccountPressed(context, student),
                 icon: isProvisioningVa
                     ? const SizedBox(
                         width: 18,
@@ -1530,9 +1570,9 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                       )
                     : const Icon(Icons.add_card_rounded),
                 label: Text(isProvisioningVa ? 'Generating…' : 'Generate Virtual Account'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.blue.shade800,
-          foregroundColor: Colors.white,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade800,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -2131,14 +2171,6 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                                     statusMessage = null;
                                   });
                                   if (context.mounted) {
-                                    final raw = e is DioException
-                                        ? (e.response?.data is Map
-                                            ? (e.response!.data['message'] ??
-                                                    e.response!.data['error'] ??
-                                                    e.message)
-                                                .toString()
-                                            : (e.message ?? e.toString()))
-                                        : e.toString();
                                     showDialog(
                                       context: context,
                                       builder: (c) => AlertDialog(
@@ -2146,7 +2178,11 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                                           'POS Payment Incomplete',
                                         ),
                                         content: Text(
-                                          raw.replaceFirst('Exception: ', ''),
+                                          friendlyApiError(
+                                            e,
+                                            fallback:
+                                                'Card payment could not be completed. Please try again.',
+                                          ),
                                         ),
                                         actions: [
                                           TextButton(

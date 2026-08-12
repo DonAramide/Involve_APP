@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/customer_history_page.dart';
 import 'package:intl/intl.dart';
@@ -45,7 +46,7 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading customers: $e')),
+          SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not load customers.'))),
         );
       }
     }
@@ -271,7 +272,7 @@ class _CustomerLookupPageState extends State<CustomerLookupPage> {
                 _loadCustomers();
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error saving customer: $e')),
+                  SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not save customer.'))),
                 );
               }
             },

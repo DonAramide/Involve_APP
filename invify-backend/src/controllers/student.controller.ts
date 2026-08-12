@@ -5,6 +5,7 @@ import { getQuasarService } from '../integrations/quasar/factory';
 import { AuditService } from '../services/audit.service';
 import { supabaseAdmin } from '../db/supabase';
 import { isUuid, toQuasarChildUuid } from '../integrations/quasar/quasar-child-id';
+import { rejectIfFreeTrialVa } from '../utils/free-trial-guard';
 
 export class StudentController {
   /**
@@ -23,6 +24,8 @@ export class StudentController {
       if (!tenantId) {
         return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
       }
+
+      if (await rejectIfFreeTrialVa(res, tenantId)) return;
 
       const virtualAccount = await StudentService.getOrCreateVirtualAccount(studentId, tenantId);
       
@@ -49,6 +52,8 @@ export class StudentController {
 
       if (!studentId) return res.status(400).json({ error: 'Student ID is required' });
       if (!tenantId) return res.status(401).json({ error: 'Unauthorized: Tenant context missing' });
+
+      if (await rejectIfFreeTrialVa(res, tenantId)) return;
 
       const first = String(firstName || '').trim() || 'Student';
       const last = String(lastName || '').trim() || String(admissionNumber || studentId).trim() || 'Learner';
@@ -222,10 +227,18 @@ export class StudentController {
       });
     } catch (error: any) {
       console.error('[StudentController] provisionStudentVirtualAccount Error:', error.message);
-      const scopeHint = /sandbox:write|Missing required scope/i.test(String(error.message || ''))
+      const msg = String(error.message || '');
+      if (/econnrefused|connection refused/i.test(msg)) {
+        return res.status(503).json({
+          error:
+            'Payment account service is temporarily unavailable. If you are on Free Trial, activate your license to use Virtual Accounts.',
+          code: 'VA_SERVICE_UNAVAILABLE',
+        });
+      }
+      const scopeHint = /sandbox:write|Missing required scope/i.test(msg)
         ? ' The Quasar tenant API key is missing sandbox:write. Re-issue/rotate the key with sandbox scopes, or run scratch/fix_student_va_scopes.js against the Quasar DB.'
         : '';
-      const uuidHint = /uuid is expected/i.test(String(error.message || ''))
+      const uuidHint = /uuid is expected/i.test(msg)
         ? ' Quasar requires a UUID child id; ensure the backend maps stu-* keys via toQuasarChildUuid.'
         : '';
       return res.status(500).json({

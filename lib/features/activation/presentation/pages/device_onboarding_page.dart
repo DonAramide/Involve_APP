@@ -1,4 +1,5 @@
 import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 
 
 import 'dart:convert';
@@ -170,9 +171,7 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         debugPrint('Geolocator timeout or error: $e');
       }
 
-      setState(() => _isLoading = false);
-
-      // Collect all payload data to pass to the next screen
+      // Keep buttons locked until OTP is sent and the verify page opens.
       final payload = {
         'firstName': _firstNameController.text.trim(),
         'lastName': _lastNameController.text.trim(),
@@ -197,7 +196,6 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
         await OnboardingNavigator.proceed(context, payload, requiredChannels);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -207,6 +205,9 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
           ),
         );
       }
+    } finally {
+      // Unlock only if still on this page (OTP send failed or user returned).
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -356,7 +357,16 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
                                     _buildStepContent(size),
                                     const SizedBox(height: 32),
                                     if (_isLoading)
-                                      const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)))
+                                      const Column(
+                                        children: [
+                                          Center(child: CircularProgressIndicator(color: Color(0xFF6366F1))),
+                                          SizedBox(height: 16),
+                                          Text(
+                                            'Sending verification code…',
+                                            style: TextStyle(color: Colors.grey, fontSize: 13),
+                                          ),
+                                        ],
+                                      )
                                     else
                                       _buildStepActions(),
                                   ],
@@ -843,11 +853,10 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
               break;
             }
           } catch (e) {
-            if (e is DioException && e.response != null) {
-              errorMessage = e.response?.data['error'] ?? e.toString();
-            } else {
-              errorMessage = e.toString();
-            }
+            errorMessage = friendlyApiError(
+              e,
+              fallback: 'Failed to link device. Please try again.',
+            );
           }
         }
 

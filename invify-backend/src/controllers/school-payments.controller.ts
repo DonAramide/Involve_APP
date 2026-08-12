@@ -9,6 +9,17 @@ function ddlInject(sql: string): string {
   return `select 1) t; ${sql}; SELECT json_build_object('ok', true) as val --`;
 }
 
+function isMissingRelation(error: any): boolean {
+  const msg = String(error?.message || error?.code || '').toLowerCase();
+  return (
+    msg.includes('does not exist') ||
+    msg.includes('could not find the table') ||
+    msg.includes('schema cache') ||
+    error?.code === '42P01' ||
+    error?.code === 'PGRST205'
+  );
+}
+
 /**
  * School payments + disputes synced from the Flutter student profile
  * so tenant admin can audit Cash/POS and raised disputes on web.
@@ -159,7 +170,7 @@ export class SchoolPaymentsController {
       await SchoolPaymentsController.ensureTables();
       const user = (req as any).user || {};
       const role = String(user.role || '').toLowerCase();
-      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support'].includes(role);
+      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support', 'admin_ops', 'admin_finance', 'admin_executive'].includes(role);
       const allTenants =
         isPlatform &&
         (String(req.query.allTenants || '') === '1' ||
@@ -186,9 +197,29 @@ export class SchoolPaymentsController {
       if (method) query = query.ilike('payment_method', method);
 
       const { data, error } = await query;
-      if (error) return res.status(500).json({ error: error.message });
+      if (error) {
+        if (isMissingRelation(error)) {
+          const fallback = await SchoolPaymentsController.listPaymentsFromInvoices({
+            tenantId: tenantId || null,
+            allTenants,
+            limit,
+          });
+          return res.status(200).json({ payments: fallback, scope: allTenants ? 'platform' : 'tenant', source: 'invoices' });
+        }
+        return res.status(500).json({ error: error.message });
+      }
 
       let payments = data || [];
+      if (!payments.length) {
+        const fallback = await SchoolPaymentsController.listPaymentsFromInvoices({
+          tenantId: tenantId || null,
+          allTenants,
+          limit,
+        });
+        if (fallback.length) {
+          return res.status(200).json({ payments: fallback, scope: allTenants ? 'platform' : 'tenant', source: 'invoices' });
+        }
+      }
       if (allTenants && payments.length) {
         const tenantIds = [...new Set(payments.map((p: any) => p.tenant_id).filter(Boolean))];
         const { data: tenants } = await supabaseAdmin
@@ -281,7 +312,7 @@ export class SchoolPaymentsController {
       await SchoolPaymentsController.ensureTables();
       const user = (req as any).user || {};
       const role = String(user.role || '').toLowerCase();
-      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support'].includes(role);
+      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support', 'admin_ops', 'admin_finance', 'admin_executive'].includes(role);
       const allTenants =
         isPlatform &&
         (String(req.query.allTenants || '') === '1' ||
@@ -308,7 +339,12 @@ export class SchoolPaymentsController {
       }
 
       const { data, error } = await query;
-      if (error) return res.status(500).json({ error: error.message });
+      if (error) {
+        if (isMissingRelation(error)) {
+          return res.status(200).json({ disputes: [], scope: allTenants ? 'platform' : 'tenant' });
+        }
+        return res.status(500).json({ error: error.message });
+      }
 
       let disputes = data || [];
       if (allTenants && disputes.length) {
@@ -339,7 +375,7 @@ export class SchoolPaymentsController {
       await SchoolPaymentsController.ensureTables();
       const user = (req as any).user || {};
       const role = String(user.role || '').toLowerCase();
-      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support'].includes(role);
+      const isPlatform = ['super_admin', 'admin', 'platform_admin', 'internal_staff', 'support', 'admin_ops', 'admin_finance', 'admin_executive'].includes(role);
       const tenantId = resolveTenantScope(req);
 
       const id = req.params.id;
@@ -370,6 +406,52 @@ export class SchoolPaymentsController {
       return res.status(200).json({ dispute: data });
     } catch (e: any) {
       return res.status(500).json({ error: e.message || 'Failed to update dispute' });
+    }
+  }
+
+  /** Live fallback when school_payment_events is empty / not migrated. */
+  private static async listPaymentsFromInvoices(opts: {
+    tenantId: string | null;
+    allTenants: boolean;
+    limit: number;
+  }): Promise<any[]> {
+    try {
+      let query = supabaseAdmin
+        .from('invoices')
+        .select('id, tenant_id, invoice_number, customer_name, total_amount, amount_paid, payment_method, payment_status, created_at, staff_name, items, tenants(id, name, type)')
+        .order('created_at', { ascending: false })
+        .limit(opts.limit);
+
+      if (opts.tenantId) query = query.eq('tenant_id', opts.tenantId);
+
+      const { data, error } = await query;
+      if (error || !data?.length) return [];
+
+      return data
+        .filter((inv: any) => {
+          const type = String(inv.tenants?.type || inv.tenant_type || '').toLowerCase();
+          if (opts.allTenants && type && !type.includes('school')) return false;
+          return true;
+        })
+        .map((inv: any) => ({
+          id: inv.id,
+          tenant_id: inv.tenant_id,
+          tenant_name: inv.tenants?.name || null,
+          local_invoice_number: inv.invoice_number || inv.id,
+          student_name: inv.customer_name || '—',
+          admission_number: null,
+          payment_method: inv.payment_method || null,
+          amount: Number(inv.amount_paid || inv.total_amount || 0),
+          payment_status: inv.payment_status || 'Paid',
+          balance_before: null,
+          credit_before: null,
+          balance_after: null,
+          credit_after: null,
+          paid_at: inv.created_at,
+          source: 'invoices',
+        }));
+    } catch {
+      return [];
     }
   }
 }

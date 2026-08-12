@@ -4,6 +4,7 @@ import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/school_entities.dart';
 import '../../domain/entities/grading_rule.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ResultEntryPage extends StatefulWidget {
@@ -115,9 +116,7 @@ class _ResultEntryPageState extends State<ResultEntryPage> {
         }
         
         if (state.error != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
-          );
+          showFriendlyErrorSnackBar(context, state.error);
           context.read<SchoolBloc>().add(ResetSchoolStatus());
         }
 

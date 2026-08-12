@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import '../bloc/reconciliation_bloc.dart';
 import '../bloc/reconciliation_event.dart';
 import '../bloc/reconciliation_state.dart';
@@ -414,7 +415,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Retry initiated.')));
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Retry failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyApiError(e, fallback: 'Retry failed.'))));
     }
   }
 
@@ -483,7 +484,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
                               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payment assigned.')));
                             }
                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyApiError(e, fallback: 'Action failed.'))));
                          }
                       },
                       style: ElevatedButton.styleFrom(

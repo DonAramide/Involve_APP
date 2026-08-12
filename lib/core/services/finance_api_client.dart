@@ -11,7 +11,7 @@ import '../license/storage_service.dart';
 import '../license/license_validator.dart';
 import '../license/license_model.dart';
 import '../license/license_service.dart';
-
+import '../utils/api_error_message.dart';
 
 // ── Custom Exceptions ──────────────────────────────────────────────────────────
 
@@ -184,8 +184,9 @@ class ErrorInterceptor extends Interceptor {
           );
         }
 
-        final message = _extractMessage(responseData) ??
-            'Server error (status $statusCode)';
+        final message = extractApiErrorBody(responseData) ??
+            _messageForHttpStatus(statusCode) ??
+            'Server error. Please try again.';
 
         return handler.reject(
           DioException(
@@ -199,16 +200,38 @@ class ErrorInterceptor extends Interceptor {
           ),
         );
       default:
-        return handler.reject(err);
+        return handler.reject(
+          DioException(
+            requestOptions: err.requestOptions,
+            error: ServerException(
+              message: friendlyApiError(err),
+              statusCode: err.response?.statusCode,
+              data: err.response?.data,
+            ),
+            type: err.type,
+          ),
+        );
     }
   }
+}
 
-  String? _extractMessage(dynamic data) {
-    if (data is Map<String, dynamic>) {
-      return data['error']?.toString() ??
-          data['message']?.toString();
-    }
-    return null;
+String? _messageForHttpStatus(int? statusCode) {
+  switch (statusCode) {
+    case 400:
+      return 'Request could not be completed. Please check your details.';
+    case 403:
+      return 'You do not have permission to do that.';
+    case 404:
+      return 'The requested resource was not found.';
+    case 429:
+      return 'Too many attempts. Please wait and try again.';
+    case 500:
+    case 502:
+    case 503:
+    case 504:
+      return 'Server is temporarily unavailable. Please try again shortly.';
+    default:
+      return null;
   }
 }
 
@@ -315,8 +338,12 @@ class FinanceApiClient {
   FinanceApiException _unwrap(DioException e) {
     if (e.error is FinanceApiException) return e.error as FinanceApiException;
     return ServerException(
-      message: e.message ?? 'An unexpected network error occurred.',
+      message: friendlyApiError(
+        e,
+        fallback: 'An unexpected network error occurred.',
+      ),
       statusCode: e.response?.statusCode,
+      data: e.response?.data,
     );
   }
 }

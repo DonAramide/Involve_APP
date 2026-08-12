@@ -22,6 +22,7 @@ import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import 'package:signature/signature.dart';
 import 'two_factor_auth_page.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});
@@ -548,6 +549,7 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     final virtualBankNameController = TextEditingController(text: staff?.virtualBankName);
     final virtualAccountNumberController = TextEditingController(text: staff?.virtualAccountNumber);
     final virtualAccountNameController = TextEditingController(text: staff?.virtualAccountName);
+    final bankCodeController = TextEditingController(text: staff?.bankCode);
     final formKey = GlobalKey<FormState>();
     
     // Default or load role
@@ -622,19 +624,34 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                   ),
                   const SizedBox(height: 20),
                   
-                  // Virtual Account Section
+                  // Staff personal bank (salary / payout destination)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'STAFF VIRTUAL ACCOUNT (OPTIONAL)',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey[700],
-                            letterSpacing: 0.5,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'STAFF PERSONAL BANK ACCOUNT',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[700],
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'For salary / payout transfers (optional)',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         if (staff != null)
@@ -658,7 +675,8 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     controller: virtualBankNameController,
                     style: const TextStyle(color: Colors.black),
                     decoration: const InputDecoration(
-                      labelText: 'Bank Name',
+                      labelText: 'Personal Bank Name',
+                      hintText: 'e.g. GTBank, Access Bank',
                       labelStyle: TextStyle(color: Colors.grey),
                       focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
                     ),
@@ -668,7 +686,8 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     controller: virtualAccountNumberController,
                     style: const TextStyle(color: Colors.black),
                     decoration: const InputDecoration(
-                      labelText: 'Account Number',
+                      labelText: 'Personal Account Number',
+                      hintText: 'Staff salary account number',
                       labelStyle: TextStyle(color: Colors.grey),
                       focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
                     ),
@@ -679,10 +698,23 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     controller: virtualAccountNameController,
                     style: const TextStyle(color: Colors.black),
                     decoration: const InputDecoration(
-                      labelText: 'Account Name',
+                      labelText: 'Personal Account Name',
+                      hintText: 'Name on the staff bank account',
                       labelStyle: TextStyle(color: Colors.grey),
                       focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: bankCodeController,
+                    style: const TextStyle(color: Colors.black),
+                    decoration: const InputDecoration(
+                      labelText: 'Bank Code (for salary transfer)',
+                      hintText: 'e.g. 058 for GTBank',
+                      labelStyle: TextStyle(color: Colors.grey),
+                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 20),
                   
@@ -736,9 +768,11 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     staffCode: pin.isEmpty && staff != null ? staff.staffCode : pin,
                     phone: phoneController.text.trim(),
                     role: selectedRole,
+                    syncId: staff?.syncId,
                     virtualBankName: virtualBankNameController.text.trim().isEmpty ? null : virtualBankNameController.text.trim(),
                     virtualAccountNumber: virtualAccountNumberController.text.trim().isEmpty ? null : virtualAccountNumberController.text.trim(),
                     virtualAccountName: virtualAccountNameController.text.trim().isEmpty ? null : virtualAccountNameController.text.trim(),
+                    bankCode: bankCodeController.text.trim().isEmpty ? null : bankCodeController.text.trim(),
                   );
                   if (staff == null) {
                     context.read<StaffBloc>().add(AddStaff(newStaff));
@@ -746,6 +780,8 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                     context.read<StaffBloc>().add(UpdateStaff(newStaff));
                   }
                   Navigator.pop(ctx);
+                  // ignore: discarded_futures
+                  _pushStaffToCloud(context, extra: newStaff);
                 }
               },
               child: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -754,6 +790,43 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _pushStaffToCloud(BuildContext context, {Staff? extra}) async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 700));
+      final staffList = await context.read<StaffBloc>().repository.getAllStaff();
+      if (staffList.isEmpty && extra == null) return;
+
+      final merged = [
+        ...staffList,
+        if (extra != null &&
+            !staffList.any((s) =>
+                (extra.syncId != null && s.syncId == extra.syncId) ||
+                (s.name == extra.name && s.phone == extra.phone)))
+          extra,
+      ];
+
+      final repo = context.read<FinanceRepository>();
+      final payloads = merged
+          .map((s) => {
+                'syncId': s.syncId,
+                'name': s.name,
+                'staffId': s.staffId,
+                'phone': s.phone,
+                'role': s.role,
+                'isActive': s.isActive,
+                'bankName': s.virtualBankName,
+                'bankCode': s.bankCode,
+                'accountNumber': s.virtualAccountNumber,
+                'accountName': s.virtualAccountName,
+              })
+          .toList();
+
+      await repo.apiClient.post('/api/staff/bulk-sync', data: {'staff': payloads});
+    } catch (e) {
+      debugPrint('Staff cloud sync skipped/failed: $e');
+    }
   }
 
   Widget _buildRoleCard(
@@ -952,6 +1025,11 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     TextEditingController nameController,
     StateSetter dialogSetState,
   ) async {
+    final orgName = dialogContext.read<SettingsBloc>().state.settings?.organizationName;
+    if (await showFreeTrialVaLockedIfNeeded(dialogContext, businessName: orgName)) {
+      return;
+    }
+
     final customNameController = TextEditingController(text: staff.name);
     final phoneController = TextEditingController(text: staff.phone);
     final emailController = TextEditingController();
@@ -1052,16 +1130,20 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                         const SnackBar(content: Text('Staff Virtual Account generated! Click SAVE to apply.')),
                       );
                     } else {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        const SnackBar(content: Text('Failed to generate virtual account.')),
+                      await showVirtualAccountFailureDialog(
+                        dialogContext,
+                        'Failed to provision staff virtual account',
+                        subject: 'staff virtual account',
                       );
                     }
                   }
                 } catch (e) {
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext); // Close loading dialog
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(
-                      SnackBar(content: Text('Failed to generate virtual account: $e')),
+                    await showVirtualAccountFailureDialog(
+                      dialogContext,
+                      e,
+                      subject: 'staff virtual account',
                     );
                   }
                 }

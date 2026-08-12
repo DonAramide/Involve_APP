@@ -5,6 +5,7 @@ import { GovAuditService } from '../services/gov-audit.service';
 import { randomUUID } from 'crypto';
 import { getClient } from '../db/pg';
 import { LedgerService } from '../services/ledger.service';
+import { WhatsAppNotificationService } from '../services/whatsapp-notification.service';
 
 export class InvoiceFacade {
   /**
@@ -18,6 +19,24 @@ export class InvoiceFacade {
     // 2. We do NOT duplicate ledger or audit logic here because processOfflineInvoice already handles it.
     // We only trigger transport-agnostic realtime events that the dashboard might rely on.
     io.to(`tenant:${context.tenantId}`).emit('finance.invoice.created', payload);
+
+    // 3. WhatsApp invoice notification (non-fatal — never rolls back invoice persistence)
+    try {
+      const invoiceId = String(payload.id || payload.invoiceId || payload.syncId || idempotencyKey);
+      WhatsAppNotificationService.notifyInvoiceCreated({
+        tenantId: context.tenantId,
+        customerId: payload.customerId || payload.customer_id || null,
+        invoiceId,
+        invoiceNumber: payload.invoiceNumber || payload.localInvoiceNumber || invoiceId,
+        amount: payload.totalAmount ?? payload.total_amount ?? payload.amount,
+        currency: payload.currency || 'NGN',
+        recipientPhone: payload.customerPhone || payload.customer_phone || null,
+        customerName: payload.customerName || payload.customer_name,
+        dueDate: payload.dueDate || payload.due_date,
+      });
+    } catch (e: any) {
+      console.error('[InvoiceFacade] WhatsApp invoice notify failed (non-fatal):', e?.message || e);
+    }
     
     return { success: true, syncId: payload.syncId };
   }
@@ -123,6 +142,41 @@ export class InvoiceFacade {
       await client.query('COMMIT');
       
       io.to(`tenant:${tenantId}`).emit('finance.invoice.payment_recorded', { invoiceId: id, amount: payload.amount, status: newStatus });
+
+      // WhatsApp receipt notification after COMMIT (non-fatal)
+      try {
+        const receiptId = `pay-${id}-${Date.now()}`;
+        let recipientPhone = payload.customerPhone || payload.customer_phone || null;
+        let customerId = payload.customerId || payload.customer_id || null;
+        let customerName = payload.customerName || payload.customer_name;
+
+        if (!recipientPhone) {
+          const { data: invRow } = await supabaseAdmin
+            .from('invoices')
+            .select('customer_id, customer:customer_id(id, phone, name)')
+            .eq('id', id)
+            .eq('tenant_id', tenantId)
+            .maybeSingle();
+          const customer = (invRow as any)?.customer;
+          recipientPhone = customer?.phone || null;
+          customerId = customerId || customer?.id || invRow?.customer_id || null;
+          customerName = customerName || customer?.name;
+        }
+
+        WhatsAppNotificationService.notifyReceipt({
+          tenantId,
+          invoiceId: id,
+          receiptId,
+          amount: payload.amount,
+          currency: payload.currency || 'NGN',
+          recipientPhone,
+          customerName,
+          customerId,
+          reference: receiptId,
+        });
+      } catch (e: any) {
+        console.error('[InvoiceFacade] WhatsApp receipt notify failed (non-fatal):', e?.message || e);
+      }
       
       return { success: true, newStatus, newBalance };
     } catch (e) {

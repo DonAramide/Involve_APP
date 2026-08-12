@@ -1,75 +1,74 @@
-import { EnterpriseHttpClient } from '../utils/http-client';
-import * as dotenv from 'dotenv';
+import { MetaWhatsAppProvider, WhatsAppConfig, metaWhatsAppProvider } from '../integrations/whatsapp';
+import { WhatsAppNotificationService } from './whatsapp-notification.service';
 
-dotenv.config();
-
+/**
+ * Legacy WhatsAppService façade kept for VerificationService / OTP routes.
+ * Delegates to MetaWhatsAppProvider + WhatsAppNotificationService.
+ * Do not remove — preserves existing auth WhatsApp OTP behaviour.
+ */
 export class WhatsAppService {
-  private readonly baseUrl = 'https://graph.facebook.com/v19.0';
-  private readonly phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  private readonly accessToken = process.env.META_ACCESS_TOKEN;
-  private httpClient = new EnterpriseHttpClient({
-    providerName: 'WhatsApp',
-    timeout: parseInt(process.env.WHATSAPP_TIMEOUT_MS || '5000', 10),
-    maxRetries: 3
-  });
+  private provider: MetaWhatsAppProvider = metaWhatsAppProvider;
 
-  public async sendOtpTemplate(to: string, otp: string): Promise<boolean> {
-    if (!this.phoneNumberId || !this.accessToken) {
-      console.warn('[WhatsAppService] Missing META_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID');
-      // For local development, pretend it sent
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`[WhatsAppService] (Dev) OTP ${otp} would be sent to ${to}`);
-        return true;
-      }
-      throw new Error('WhatsApp configuration missing');
+  public async sendOtpTemplate(to: string, otp: string, tenantId?: string): Promise<boolean> {
+    const result = await WhatsAppNotificationService.sendOtp({
+      recipientPhone: to,
+      otp,
+      tenantId,
+    });
+
+    if (!result.success && process.env.NODE_ENV === 'production') {
+      throw new Error(result.errorMessage || 'Failed to send WhatsApp message');
     }
 
-    try {
-      // Normalize phone number: remove any '+' and leading zeros if needed
-      const normalizedPhone = to.replace(/\+/g, '');
-
-      const payload = {
-        messaging_product: 'whatsapp',
-        to: normalizedPhone,
-        type: 'template',
-        template: {
-          name: 'invify_auth_otp', // Assuming a registered template name
-          language: {
-            code: 'en'
-          },
-          components: [
-            {
-              type: 'body',
-              parameters: [
-                { type: 'text', text: otp }
-              ]
-            },
-            {
-              type: 'button',
-              sub_type: 'url',
-              index: '0',
-              parameters: [
-                { type: 'text', text: otp }
-              ]
-            }
-          ]
-        }
-      };
-
-      const url = `${this.baseUrl}/${this.phoneNumberId}/messages`;
-      await this.httpClient.post(url, payload, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      console.log(`[WhatsAppService] Successfully sent OTP template to ${to}`);
-      return true;
-    } catch (error: any) {
-      console.error(`[WhatsAppService] Failed to send OTP to ${to}:`, error.response?.data || error.message);
-      throw new Error('Failed to send WhatsApp message');
+    if (!result.success) {
+      console.warn(
+        `[WhatsAppService] OTP send failed (non-prod soft-fail) phone=${WhatsAppConfig.maskPhone(to)} code=${result.errorCode || '-'}`
+      );
+      return process.env.NODE_ENV !== 'production';
     }
+
+    return true;
+  }
+
+  public async sendTextMessage(to: string, body: string, tenantId?: string) {
+    return this.provider.sendTextMessage({
+      to,
+      body,
+      context: { tenantId, messageType: 'GENERAL_NOTIFICATION', recipientPhone: to },
+    });
+  }
+
+  public async sendTemplateMessage(
+    to: string,
+    templateName: string,
+    components: any[] = [],
+    tenantId?: string
+  ) {
+    return this.provider.sendTemplateMessage({
+      to,
+      templateName,
+      components,
+      context: { tenantId, messageType: 'GENERAL_NOTIFICATION', recipientPhone: to, templateName },
+    });
+  }
+
+  public async sendDocumentMessage(to: string, link: string, filename?: string, caption?: string, tenantId?: string) {
+    return this.provider.sendDocumentMessage({
+      to,
+      link,
+      filename,
+      caption,
+      context: { tenantId, messageType: 'GENERAL_NOTIFICATION', recipientPhone: to },
+    });
+  }
+
+  public async sendImageMessage(to: string, link: string, caption?: string, tenantId?: string) {
+    return this.provider.sendImageMessage({
+      to,
+      link,
+      caption,
+      context: { tenantId, messageType: 'GENERAL_NOTIFICATION', recipientPhone: to },
+    });
   }
 }
 

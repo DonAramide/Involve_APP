@@ -7584,6 +7584,12 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
   late final GeneratedColumn<String> virtualAccountName =
       GeneratedColumn<String>('virtual_account_name', aliasedName, true,
           type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _bankCodeMeta =
+      const VerificationMeta('bankCode');
+  @override
+  late final GeneratedColumn<String> bankCode = GeneratedColumn<String>(
+      'bank_code', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -7600,7 +7606,8 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
         isDeleted,
         virtualBankName,
         virtualAccountNumber,
-        virtualAccountName
+        virtualAccountName,
+        bankCode
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -7681,6 +7688,10 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
           virtualAccountName.isAcceptableOrUnknown(
               data['virtual_account_name']!, _virtualAccountNameMeta));
     }
+    if (data.containsKey('bank_code')) {
+      context.handle(_bankCodeMeta,
+          bankCode.isAcceptableOrUnknown(data['bank_code']!, _bankCodeMeta));
+    }
     return context;
   }
 
@@ -7721,6 +7732,8 @@ class $StaffTable extends Staff with TableInfo<$StaffTable, StaffTable> {
           data['${effectivePrefix}virtual_account_number']),
       virtualAccountName: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}virtual_account_name']),
+      bankCode: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}bank_code']),
     );
   }
 
@@ -7746,6 +7759,9 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
   final String? virtualBankName;
   final String? virtualAccountNumber;
   final String? virtualAccountName;
+
+  /// Quasar / NIP bank code required for salary transfers
+  final String? bankCode;
   const StaffTable(
       {required this.id,
       required this.name,
@@ -7761,7 +7777,8 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       required this.isDeleted,
       this.virtualBankName,
       this.virtualAccountNumber,
-      this.virtualAccountName});
+      this.virtualAccountName,
+      this.bankCode});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -7797,6 +7814,9 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
     }
     if (!nullToAbsent || virtualAccountName != null) {
       map['virtual_account_name'] = Variable<String>(virtualAccountName);
+    }
+    if (!nullToAbsent || bankCode != null) {
+      map['bank_code'] = Variable<String>(bankCode);
     }
     return map;
   }
@@ -7834,6 +7854,9 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       virtualAccountName: virtualAccountName == null && nullToAbsent
           ? const Value.absent()
           : Value(virtualAccountName),
+      bankCode: bankCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bankCode),
     );
   }
 
@@ -7858,6 +7881,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           serializer.fromJson<String?>(json['virtualAccountNumber']),
       virtualAccountName:
           serializer.fromJson<String?>(json['virtualAccountName']),
+      bankCode: serializer.fromJson<String?>(json['bankCode']),
     );
   }
   @override
@@ -7879,6 +7903,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       'virtualBankName': serializer.toJson<String?>(virtualBankName),
       'virtualAccountNumber': serializer.toJson<String?>(virtualAccountNumber),
       'virtualAccountName': serializer.toJson<String?>(virtualAccountName),
+      'bankCode': serializer.toJson<String?>(bankCode),
     };
   }
 
@@ -7897,7 +7922,8 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           bool? isDeleted,
           Value<String?> virtualBankName = const Value.absent(),
           Value<String?> virtualAccountNumber = const Value.absent(),
-          Value<String?> virtualAccountName = const Value.absent()}) =>
+          Value<String?> virtualAccountName = const Value.absent(),
+          Value<String?> bankCode = const Value.absent()}) =>
       StaffTable(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -7920,6 +7946,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
         virtualAccountName: virtualAccountName.present
             ? virtualAccountName.value
             : this.virtualAccountName,
+        bankCode: bankCode.present ? bankCode.value : this.bankCode,
       );
   StaffTable copyWithCompanion(StaffCompanion data) {
     return StaffTable(
@@ -7944,6 +7971,7 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       virtualAccountName: data.virtualAccountName.present
           ? data.virtualAccountName.value
           : this.virtualAccountName,
+      bankCode: data.bankCode.present ? data.bankCode.value : this.bankCode,
     );
   }
 
@@ -7964,7 +7992,8 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           ..write('isDeleted: $isDeleted, ')
           ..write('virtualBankName: $virtualBankName, ')
           ..write('virtualAccountNumber: $virtualAccountNumber, ')
-          ..write('virtualAccountName: $virtualAccountName')
+          ..write('virtualAccountName: $virtualAccountName, ')
+          ..write('bankCode: $bankCode')
           ..write(')'))
         .toString();
   }
@@ -7985,7 +8014,8 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
       isDeleted,
       virtualBankName,
       virtualAccountNumber,
-      virtualAccountName);
+      virtualAccountName,
+      bankCode);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -8004,7 +8034,8 @@ class StaffTable extends DataClass implements Insertable<StaffTable> {
           other.isDeleted == this.isDeleted &&
           other.virtualBankName == this.virtualBankName &&
           other.virtualAccountNumber == this.virtualAccountNumber &&
-          other.virtualAccountName == this.virtualAccountName);
+          other.virtualAccountName == this.virtualAccountName &&
+          other.bankCode == this.bankCode);
 }
 
 class StaffCompanion extends UpdateCompanion<StaffTable> {
@@ -8023,6 +8054,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
   final Value<String?> virtualBankName;
   final Value<String?> virtualAccountNumber;
   final Value<String?> virtualAccountName;
+  final Value<String?> bankCode;
   const StaffCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -8039,6 +8071,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     this.virtualBankName = const Value.absent(),
     this.virtualAccountNumber = const Value.absent(),
     this.virtualAccountName = const Value.absent(),
+    this.bankCode = const Value.absent(),
   });
   StaffCompanion.insert({
     this.id = const Value.absent(),
@@ -8056,6 +8089,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     this.virtualBankName = const Value.absent(),
     this.virtualAccountNumber = const Value.absent(),
     this.virtualAccountName = const Value.absent(),
+    this.bankCode = const Value.absent(),
   })  : name = Value(name),
         staffCode = Value(staffCode);
   static Insertable<StaffTable> custom({
@@ -8074,6 +8108,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     Expression<String>? virtualBankName,
     Expression<String>? virtualAccountNumber,
     Expression<String>? virtualAccountName,
+    Expression<String>? bankCode,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -8093,6 +8128,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
         'virtual_account_number': virtualAccountNumber,
       if (virtualAccountName != null)
         'virtual_account_name': virtualAccountName,
+      if (bankCode != null) 'bank_code': bankCode,
     });
   }
 
@@ -8111,7 +8147,8 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
       Value<bool>? isDeleted,
       Value<String?>? virtualBankName,
       Value<String?>? virtualAccountNumber,
-      Value<String?>? virtualAccountName}) {
+      Value<String?>? virtualAccountName,
+      Value<String?>? bankCode}) {
     return StaffCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -8128,6 +8165,7 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
       virtualBankName: virtualBankName ?? this.virtualBankName,
       virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
       virtualAccountName: virtualAccountName ?? this.virtualAccountName,
+      bankCode: bankCode ?? this.bankCode,
     );
   }
 
@@ -8180,6 +8218,9 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
     if (virtualAccountName.present) {
       map['virtual_account_name'] = Variable<String>(virtualAccountName.value);
     }
+    if (bankCode.present) {
+      map['bank_code'] = Variable<String>(bankCode.value);
+    }
     return map;
   }
 
@@ -8200,7 +8241,8 @@ class StaffCompanion extends UpdateCompanion<StaffTable> {
           ..write('isDeleted: $isDeleted, ')
           ..write('virtualBankName: $virtualBankName, ')
           ..write('virtualAccountNumber: $virtualAccountNumber, ')
-          ..write('virtualAccountName: $virtualAccountName')
+          ..write('virtualAccountName: $virtualAccountName, ')
+          ..write('bankCode: $bankCode')
           ..write(')'))
         .toString();
   }
@@ -25255,6 +25297,7 @@ typedef $$StaffTableCreateCompanionBuilder = StaffCompanion Function({
   Value<String?> virtualBankName,
   Value<String?> virtualAccountNumber,
   Value<String?> virtualAccountName,
+  Value<String?> bankCode,
 });
 typedef $$StaffTableUpdateCompanionBuilder = StaffCompanion Function({
   Value<int> id,
@@ -25272,6 +25315,7 @@ typedef $$StaffTableUpdateCompanionBuilder = StaffCompanion Function({
   Value<String?> virtualBankName,
   Value<String?> virtualAccountNumber,
   Value<String?> virtualAccountName,
+  Value<String?> bankCode,
 });
 
 final class $$StaffTableReferences
@@ -25349,6 +25393,9 @@ class $$StaffTableFilterComposer extends Composer<_$AppDatabase, $StaffTable> {
   ColumnFilters<String> get virtualAccountName => $composableBuilder(
       column: $table.virtualAccountName,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get bankCode => $composableBuilder(
+      column: $table.bankCode, builder: (column) => ColumnFilters(column));
 
   Expression<bool> stockReturnsRefs(
       Expression<bool> Function($$StockReturnsTableFilterComposer f) f) {
@@ -25428,6 +25475,9 @@ class $$StaffTableOrderingComposer
   ColumnOrderings<String> get virtualAccountName => $composableBuilder(
       column: $table.virtualAccountName,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get bankCode => $composableBuilder(
+      column: $table.bankCode, builder: (column) => ColumnOrderings(column));
 }
 
 class $$StaffTableAnnotationComposer
@@ -25483,6 +25533,9 @@ class $$StaffTableAnnotationComposer
 
   GeneratedColumn<String> get virtualAccountName => $composableBuilder(
       column: $table.virtualAccountName, builder: (column) => column);
+
+  GeneratedColumn<String> get bankCode =>
+      $composableBuilder(column: $table.bankCode, builder: (column) => column);
 
   Expression<T> stockReturnsRefs<T extends Object>(
       Expression<T> Function($$StockReturnsTableAnnotationComposer a) f) {
@@ -25544,6 +25597,7 @@ class $$StaffTableTableManager extends RootTableManager<
             Value<String?> virtualBankName = const Value.absent(),
             Value<String?> virtualAccountNumber = const Value.absent(),
             Value<String?> virtualAccountName = const Value.absent(),
+            Value<String?> bankCode = const Value.absent(),
           }) =>
               StaffCompanion(
             id: id,
@@ -25561,6 +25615,7 @@ class $$StaffTableTableManager extends RootTableManager<
             virtualBankName: virtualBankName,
             virtualAccountNumber: virtualAccountNumber,
             virtualAccountName: virtualAccountName,
+            bankCode: bankCode,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -25578,6 +25633,7 @@ class $$StaffTableTableManager extends RootTableManager<
             Value<String?> virtualBankName = const Value.absent(),
             Value<String?> virtualAccountNumber = const Value.absent(),
             Value<String?> virtualAccountName = const Value.absent(),
+            Value<String?> bankCode = const Value.absent(),
           }) =>
               StaffCompanion.insert(
             id: id,
@@ -25595,6 +25651,7 @@ class $$StaffTableTableManager extends RootTableManager<
             virtualBankName: virtualBankName,
             virtualAccountNumber: virtualAccountNumber,
             virtualAccountName: virtualAccountName,
+            bankCode: bankCode,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) =>

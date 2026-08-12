@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../features/settings/domain/services/security_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Terminal configuration synced from the Invify backend.
@@ -57,6 +58,11 @@ class TerminalConfig {
   final String? deviceRole;
   final Map<String, dynamic>? features;
 
+  /// Server-side emergency lock (catch-up if socket event was missed).
+  final bool isEmergencyLocked;
+  final String? emergencyLockCode;
+  final String? tenantStatus;
+
   const TerminalConfig({
     required this.assigned,
     this.terminalId,
@@ -101,6 +107,9 @@ class TerminalConfig {
     this.deviceCategory,
     this.deviceRole,
     this.features,
+    this.isEmergencyLocked = false,
+    this.emergencyLockCode,
+    this.tenantStatus,
   });
 
   factory TerminalConfig.fromJson(Map<String, dynamic> json) {
@@ -157,6 +166,9 @@ class TerminalConfig {
       deviceCategory: json['deviceCategory']?.toString(),
       deviceRole: json['deviceRole']?.toString(),
       features: json['features'] != null ? Map<String, dynamic>.from(json['features'] as Map) : null,
+      isEmergencyLocked: json['isEmergencyLocked'] == true,
+      emergencyLockCode: json['emergencyLockCode']?.toString(),
+      tenantStatus: json['tenantStatus']?.toString(),
     );
   }
 
@@ -204,6 +216,9 @@ class TerminalConfig {
     'deviceCategory': deviceCategory,
     'deviceRole': deviceRole,
     'features': features,
+    'isEmergencyLocked': isEmergencyLocked,
+    'emergencyLockCode': emergencyLockCode,
+    'tenantStatus': tenantStatus,
   };
 
   DeviceCapabilities get capabilities => DeviceCapabilities.fromJson(features);
@@ -280,6 +295,7 @@ class TerminalSyncService {
 
         // Persist config to secure storage for offline fallback
         await _cacheConfig(config);
+        await applyEmergencyLockFromConfig(config);
 
         debugPrint('[TerminalSync] Synced: terminalId=${config.terminalId}, version=${config.configVersion}');
         return config;
@@ -410,6 +426,18 @@ class TerminalSyncService {
     await _secureStorage.delete(key: _cachedConfigKey);
     await _secureStorage.delete(key: _cachedVersionKey);
     await _secureStorage.delete(key: _lastSyncTimeKey);
+  }
+
+  /// Apply server emergency-lock state (catch-up if socket event was missed).
+  static Future<void> applyEmergencyLockFromConfig(TerminalConfig config) async {
+    if (!config.isEmergencyLocked) return;
+    final code = config.emergencyLockCode;
+    if (code == null || code.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_emergency_locked', true);
+    await prefs.setString('emergency_lock_passcode', code);
+    debugPrint('[TerminalSync] Emergency lock active from server (tenantStatus=${config.tenantStatus})');
   }
 }
 

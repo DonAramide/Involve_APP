@@ -4,48 +4,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invify - School Mode User Guide</title>
+    <title>Invify - School Mode User Manual &amp; Operational Guide</title>
     <style>
         :root {
             --primary: #00838f;
-            --secondary: #3949ab;
+            --primary-dark: #005662;
+            --primary-light: #4fb3bf;
+            --secondary: #1a237e;
+            --secondary-light: #534bae;
             --accent: #ff9800;
-            --text-main: #2c3e50;
-            --text-light: #546e7a;
+            --accent-dark: #c66900;
+            --success: #2e7d32;
+            --info: #0288d1;
+            --warning: #ef6c00;
+            --danger: #c62828;
+            --text-main: #263238;
+            --text-muted: #546e7a;
             --bg-light: #f4f7f6;
-            --white: #ffffff;
-            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --card-bg: #ffffff;
+            --border-color: #e0e6ed;
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
             color: var(--text-main);
             background-color: var(--bg-light);
-            line-height: 1.6;
+            line-height: 1.58;
             margin: 0;
             padding: 0;
+            font-size: 13.5px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 960px;
             margin: 0 auto;
-            background: var(--white);
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
+            background: var(--card-bg);
+            box-shadow: 0 0 45px rgba(0, 0, 0, 0.07);
         }
 
         header {
             position: relative;
-            background: var(--secondary);
-            color: var(--white);
-            text-align: center;
+            background: linear-gradient(135deg, var(--secondary) 0%, #0d47a1 50%, var(--primary-dark) 100%);
+            color: #ffffff;
+            text-align: left;
             overflow: hidden;
         }
 
         header img.header-img {
             width: 100%;
-            height: 300px;
+            height: 240px;
             object-fit: cover;
-            opacity: 0.8;
+            opacity: 0.82;
+            display: block;
         }
 
         .header-content {
@@ -53,133 +69,446 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 40px;
-            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+            padding: 28px 40px;
+            background: linear-gradient(transparent, rgba(10, 25, 47, 0.88));
+        }
+
+        .badge-header {
+            display: inline-block;
+            background: var(--accent);
+            color: #000000;
+            font-size: 0.72em;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 999px;
+            margin-bottom: 6px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
         }
 
         .header-content h1 {
             margin: 0;
-            font-size: 2.5em;
-            letter-spacing: 1px;
+            font-size: 2.3em;
+            letter-spacing: 0.3px;
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.2;
         }
 
         .header-content p {
-            margin: 5px 0 0;
-            opacity: 0.9;
+            margin: 6px 0 0;
+            font-size: 1.05em;
+            opacity: 0.95;
+            color: #e0f2f1;
         }
 
         .content {
-            padding: 40px;
+            padding: 36px 44px 50px;
         }
 
         h2 {
             border-left: 5px solid var(--primary);
-            padding-left: 15px;
-            color: var(--primary);
-            margin-top: 40px;
-            font-size: 1.8em;
+            padding-left: 14px;
+            color: var(--secondary);
+            margin-top: 36px;
+            margin-bottom: 12px;
+            font-size: 1.45em;
+            font-weight: 700;
+            page-break-after: avoid;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        h3 {
+            color: var(--primary-dark);
+            margin: 22px 0 8px;
+            font-size: 1.12em;
+            font-weight: 700;
+            page-break-after: avoid;
+        }
+
+        h4 {
+            color: var(--secondary);
+            margin: 14px 0 6px;
+            font-size: 0.98em;
+            font-weight: 700;
         }
 
         .section-intro {
-            font-size: 1.1em;
-            color: var(--text-light);
-            margin-bottom: 30px;
+            color: var(--text-muted);
+            margin: 0 0 18px;
+            font-size: 1em;
         }
 
+        .toc {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin: 20px 0 30px;
+            page-break-inside: avoid;
+        }
+
+        .toc-title {
+            font-weight: 800;
+            color: var(--secondary);
+            font-size: 1.05em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 24px;
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        .toc li {
+            margin: 3px 0;
+            color: var(--text-muted);
+            font-size: 0.92em;
+        }
+
+        .toc a {
+            color: var(--primary-dark);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .toc a:hover {
+            color: var(--accent-dark);
+            text-decoration: underline;
+        }
+
+        /* Feature Cards */
         .feature-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 20px;
+            gap: 14px;
+            margin-bottom: 24px;
         }
 
         .feature-card {
             display: flex;
             align-items: flex-start;
-            padding: 20px;
-            border-radius: 12px;
-            background: #fff;
-            border: 1px solid #eee;
-            transition: transform 0.2s;
+            padding: 16px 18px;
+            border-radius: 10px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+            page-break-inside: avoid;
         }
 
         .icon-box {
-            min-width: 60px;
-            height: 60px;
-            background: var(--primary);
-            color: white;
-            border-radius: 12px;
+            min-width: 44px;
+            height: 44px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            margin-right: 20px;
+            font-size: 20px;
+            margin-right: 16px;
+            flex-shrink: 0;
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        .feature-details {
+            flex-grow: 1;
         }
 
         .feature-details h3 {
-            margin: 0 0 10px;
+            margin: 0 0 6px;
             color: var(--secondary);
+            font-size: 1.05em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .feature-details p {
             margin: 0;
-            color: var(--text-light);
+            color: var(--text-muted);
+            font-size: 0.95em;
+        }
+
+        .feature-details ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+        }
+
+        .feature-details li {
+            margin: 3px 0;
+            color: var(--text-main);
+            font-size: 0.92em;
+        }
+
+        .feature-details strong {
+            color: var(--text-main);
+        }
+
+        /* Two column layout */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin: 14px 0;
+        }
+
+        .mini-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            background: #fafbfc;
+            page-break-inside: avoid;
+        }
+
+        .mini-card h4 {
+            margin: 0 0 6px;
+            color: var(--secondary);
+            font-size: 0.96em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mini-card p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+
+        /* Callout Boxes */
+        .tip-box,
+        .warn-box,
+        .step-box,
+        .admin-box {
+            padding: 14px 18px;
+            margin: 18px 0;
+            border-radius: 0 10px 10px 0;
+            page-break-inside: avoid;
+            font-size: 0.94em;
         }
 
         .tip-box {
             background: #e0f2f1;
-            border-left: 5px solid #009688;
-            padding: 20px;
-            margin: 30px 0;
-            border-radius: 0 12px 12px 0;
+            border-left: 5px solid var(--primary);
         }
 
         .tip-box strong {
-            color: #00796b;
+            color: var(--primary-dark);
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        .warn-box {
+            background: #fff3e0;
+            border-left: 5px solid var(--warning);
+        }
+
+        .warn-box strong {
+            color: #d84315;
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        .step-box {
+            background: #e8eaf6;
+            border-left: 5px solid var(--secondary);
+        }
+
+        .step-box strong {
+            color: var(--secondary);
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .step-box ol {
+            margin: 6px 0 0;
+            padding-left: 20px;
+            color: var(--text-main);
+        }
+
+        .step-box li {
+            margin: 4px 0;
+        }
+
+        .admin-box {
+            background: #fbe9e7;
+            border-left: 5px solid #d84315;
+        }
+
+        .admin-box strong {
+            color: #bf360c;
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        /* Tables */
+        .menu-table,
+        .status-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0 22px;
+            font-size: 0.92em;
+            page-break-inside: avoid;
+        }
+
+        .menu-table th,
+        .menu-table td,
+        .status-table th,
+        .status-table td {
+            border: 1px solid #e0e6ed;
+            padding: 9px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .menu-table th,
+        .status-table th {
+            background: #eef3f8;
+            color: var(--secondary);
+            font-weight: 700;
+        }
+
+        .menu-table tr:nth-child(even),
+        .status-table tr:nth-child(even) {
+            background: #fbfcfd;
+        }
+
+        /* Status Pills */
+        .pill {
+            display: inline-block;
+            font-size: 0.75em;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .pill-paid { background: #e8f5e9; color: #2e7d32; }
+        .pill-partial { background: #fff3e0; color: #e65100; }
+        .pill-unpaid { background: #ffebee; color: #c62828; }
+        .pill-active { background: #e0f2f1; color: #00695c; }
+        .pill-auth { background: #ede7f6; color: #4527a0; }
+
+        .key-badge {
+            display: inline-block;
+            background: #eceff1;
+            border: 1px solid #cfd8dc;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: #37474f;
+        }
+
+        .page-break {
+            break-before: page;
+            page-break-before: always;
         }
 
         footer {
             text-align: center;
-            padding: 40px;
-            background: #eee;
-            color: #666;
-            font-size: 0.9em;
+            padding: 26px 40px;
+            background: #eceff1;
+            color: #607d8b;
+            font-size: 0.88em;
+            border-top: 1px solid #cfd8dc;
         }
 
-        /* Print styling to force PDF layout */
+        footer p {
+            margin: 4px 0;
+        }
+
+        /* Print Settings for Booklet / PDF */
         @media print {
             body {
-                background: white;
+                background: #ffffff;
+                font-size: 11pt;
+                line-height: 1.45;
             }
 
             .container {
                 box-shadow: none;
                 max-width: 100%;
+                margin: 0;
+                padding: 0;
             }
 
-            .feature-card {
-                break-inside: avoid;
-                padding: 10px;
+            .content {
+                padding: 20px 24px;
             }
 
             header img.header-img {
-                height: 200px;
+                height: 150px;
             }
 
-            .tip-box {
+            .header-content {
+                padding: 16px 24px;
+            }
+
+            .header-content h1 {
+                font-size: 1.8em;
+            }
+
+            .feature-card,
+            .mini-card,
+            .tip-box,
+            .warn-box,
+            .step-box,
+            .admin-box,
+            .menu-table,
+            .status-table {
                 break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .feature-card {
+                padding: 10px 14px;
+                margin-bottom: 8px;
+            }
+
+            h2 {
+                margin-top: 24px;
+                font-size: 1.25em;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            a {
+                color: inherit;
+                text-decoration: none;
             }
         }
 
-        /* Icon Emoji fallbacks */
-        .icon-add_bill::before { content: '🧾'; }
-        .icon-students::before { content: '🎓'; }
-        .icon-history::before { content: '📊'; }
-        .icon-analytics::before { content: '📈'; }
-        .icon-setup::before { content: '🏛️'; }
-        .icon-admin::before { content: '🛡️'; }
-        .icon-reconcile::before { content: '⚖️'; }
+        @media (max-width: 680px) {
+            .content {
+                padding: 20px 16px;
+            }
+
+            .two-col,
+            .toc-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                padding: 20px 16px;
+            }
+        }
     </style>
 </head>
 
@@ -189,103 +518,588 @@
         <header>
             <img src="school_header_new.png" alt="School Mode Header" class="header-img">
             <div class="header-content">
+                <div class="badge-header">School Management Edition · Operational Field Manual</div>
                 <h1>Invify School Mode</h1>
-                <p>Comprehensive User Guide & Operational Manual</p>
+                <p>Comprehensive User Guide, Dashboard Activities &amp; Sub-Menu Operational Manual</p>
             </div>
         </header>
 
         <div class="content">
-            <p class="section-intro">Welcome to the Involve App **School Mode**. This specialized environment is designed for educational institutions to manage fees, students, academic records, and collection analytics with hardened financial integrity.</p>
+            <p class="section-intro">
+                Welcome to <strong>Invify School Mode</strong>. This handbook provides end-to-end instructions for school proprietors, bursars, administrators, and academic staff. It covers all <strong>20 Dashboard Tiles</strong>, dedicated <strong>Sub-Menu Activities</strong> (Finance, Defaulters, Virtual Accounts, Lesson Notes), and operational workflows for seamless term management.
+            </p>
 
-            <div class="tip-box" style="background: #fff3e0; border-color: #ff9800;">
-                <strong style="color: #e65100;">🏁 GETTING STARTED CHECKLIST</strong>
+            <!-- FIRST-TIME SETUP CHECKLIST -->
+            <div class="step-box">
+                <strong>🏁 Quick-Start Sequence (Beginning of Term)</strong>
                 <ol>
-                    <li><strong>Academic Setup:</strong> Define Years and active Terms via the Admin Hub.</li>
-                    <li><strong>Classes & Subjects:</strong> Create grade levels and curriculum items.</li>
-                    <li><strong>Grading Rules:</strong> Set score ranges to enable digital result entry.</li>
-                    <li><strong>Fee Catalog:</strong> Add tuition and other fee items.</li>
-                    <li><strong>Enrolment:</strong> Add students to their respective classes.</li>
+                    <li><strong>Academic Setup:</strong> Open <em>Academic Setup</em> to define the active Academic Year (e.g. 2026/2027) and select the Current Term.</li>
+                    <li><strong>Classes &amp; Subjects:</strong> Configure class arms (e.g. JSS 1 Alpha, Primary 4 Gold) and curriculum subjects.</li>
+                    <li><strong>Fee Catalog &amp; Structure:</strong> In <em>Fee Management</em>, attach tuition, boarding, uniforms, and PTA levies to their respective classes.</li>
+                    <li><strong>Enrollment:</strong> Add or verify students in the <em>Students</em> directory and ensure they are assigned to current classes.</li>
+                    <li><strong>Bill Generation:</strong> Use <em>Fee Management → Batch Billing</em> or <em>New Term Bill</em> to issue bills with automated carry-forward debt.</li>
+                    <li><strong>Hardware Pairing:</strong> Check <em>Printer &amp; MPOS</em> to ensure Bluetooth/USB receipt printers are linked and ready.</li>
                 </ol>
             </div>
 
-            <h2>1. Administrative Hub</h2>
-            <p class="section-intro">Your central control center for system-wide configuration.</p>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="icon-box icon-admin"></div>
-                    <div class="feature-details">
-                        <h3>ADMIN HUB (Gated Access)</h3>
-                        <p>Centralized management for school administrators.
-                        <ul>
-                            <li><strong>System Setup:</strong> Configure Branding, Organization Details, and Preferences.</li>
-                            <li><strong>Quaser Keys:</strong> Manage secure payment integration keys (Master Mode only).</li>
-                            <li><strong>Audit Logs:</strong> Track all administrative actions for transparency.</li>
-                            <li><strong>Academic Structure:</strong> Manage Terms, Classes, and Grading Rules.</li>
-                        </ul>
-                        </p>
-                    </div>
-                </div>
+            <!-- TABLE OF CONTENTS -->
+            <div class="toc">
+                <div class="toc-title">📑 Table of Contents</div>
+                <ul class="toc-grid">
+                    <li><a href="#topbar">1. Top Navigation &amp; Status Bar</a></li>
+                    <li><a href="#grid-overview">2. Dashboard Master Grid Reference</a></li>
+                    <li><a href="#billing-pos">3. New Term Bill &amp; Billing Records</a></li>
+                    <li><a href="#academic-setup">4. Academic Setup &amp; Subject Registry</a></li>
+                    <li><a href="#students-teachers">5. Students &amp; Teachers Management</a></li>
+                    <li><a href="#finance-suite">6. Finance Hub &amp; Executive Dashboard</a></li>
+                    <li><a href="#virtual-accounts">7. Virtual Accounts &amp; Automated Reconciliation</a></li>
+                    <li><a href="#fee-mgmt">8. Fee Structuring &amp; Fee Catalog</a></li>
+                    <li><a href="#result-entry">9. Result Entry &amp; Digital Grading</a></li>
+                    <li><a href="#lesson-notes">10. Lesson Notes &amp; AI Lesson Wizard</a></li>
+                    <li><a href="#hardware">11. Printer, MPOS &amp; Connectivity</a></li>
+                    <li><a href="#admin-security">12. Admin Hub, Cloud Metrics &amp; Security</a></li>
+                    <li><a href="#workflows">13. Standard Operating Procedures (SOPs)</a></li>
+                    <li><a href="#troubleshooting">14. Troubleshooting &amp; FAQ</a></li>
+                </ul>
             </div>
 
-            <h2>2. Finance & Collection Hub</h2>
-            <p class="section-intro">Hardened financial tools for accurate revenue tracking.</p>
+            <!-- 1. TOP BAR -->
+            <h2 id="topbar">1. Top Navigation &amp; Status Bar</h2>
+            <p class="section-intro">
+                The top application bar provides continuous status monitoring and rapid access to core device features:
+            </p>
+
+            <table class="menu-table">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Component</th>
+                        <th style="width: 25%;">Visual Indicator</th>
+                        <th>Function &amp; Activity Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>School Brand &amp; Crest</strong></td>
+                        <td>Logo + Name</td>
+                        <td>Displays the institution's official name and uploaded crest. Configurable in <em>Settings</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Plan Badge</strong></td>
+                        <td><span class="pill pill-active">STANDARD</span> / <span class="pill pill-auth">PRO</span></td>
+                        <td>Indicates active software tier (Standard, Pro, Enterprise) and license status.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Live Clock</strong></td>
+                        <td><code>YYYY-MM-DD HH:mm</code></td>
+                        <td>Ensures all financial ledger postings and receipt timestamps are legally synchronized.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>LAN Peer Sync</strong></td>
+                        <td><span class="key-badge">✓</span> or <span class="key-badge">⇄</span></td>
+                        <td>Shows whether the terminal is acting as the <strong>Sync Master</strong> or connected to other cashier terminals via local WiFi.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cloud Connection</strong></td>
+                        <td>Cloud Icon (Green / Red)</td>
+                        <td>Shows backend cloud heartbeat. Clicking opens the <strong>Sync Configuration Dialog</strong> to toggle real-time invoice and ledger upload.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Theme Mode</strong></td>
+                        <td>Sun / Moon Icon</td>
+                        <td>Toggles between <strong>Light</strong>, <strong>Dark</strong>, and <strong>System Default</strong> themes for comfortable indoor/outdoor operation.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Notification Bell</strong></td>
+                        <td>Bell Icon with counter</td>
+                        <td>Pops up real-time payment alerts, automated bank transfer receipts, and synchronization status updates.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Context Menu (⋮)</strong></td>
+                        <td>3-Dots Menu</td>
+                        <td>Provides direct shortcuts to <strong>About Invify</strong>, <strong>Help &amp; Support</strong>, and this <strong>User Guide</strong>.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 2. DASHBOARD MASTER GRID -->
+            <h2 id="grid-overview" class="page-break">2. Dashboard Master Grid Reference</h2>
+            <p class="section-intro">
+                The School Mode home screen presents 20 dedicated tiles organized into logical administrative, academic, and financial modules. You can drag and drop tiles to customize your layout.
+            </p>
+
+            <table class="menu-table">
+                <thead>
+                    <tr>
+                        <th style="width: 24%;">Tile Name</th>
+                        <th style="width: 16%;">Color / Category</th>
+                        <th>Primary Responsibility</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>NEW TERM BILL</strong></td>
+                        <td>Primary Blue / POS</td>
+                        <td>Issue customized student bills, accept split payments, and print thermal/A4 receipts.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ACADEMIC SETUP</strong></td>
+                        <td>Brown / Academic</td>
+                        <td>Define academic sessions, terms, classes, arms, and grading rule thresholds.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PRINTER &amp; MPOS</strong></td>
+                        <td>Purple / Hardware</td>
+                        <td>Pair Bluetooth/USB thermal printers, test paper cuts, and configure POS card terminals.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>STUDENTS</strong></td>
+                        <td>Indigo / Records</td>
+                        <td>Manage student directory, admissions, parent contacts, virtual accounts, and ledgers.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SUBJECTS</strong></td>
+                        <td>Blue / Academic</td>
+                        <td>Curriculum management, subject codes, department categories, and teacher allocations.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>BILLING RECORDS</strong></td>
+                        <td>Green / Finance</td>
+                        <td>Full invoice audit registry; search by student or date, reprint receipts, or process refunds.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TEACHERS</strong></td>
+                        <td>Deep Purple / HR</td>
+                        <td>Staff directory, subject-teacher assignments, contact info, and permission roles.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TRANSACTION HISTORY</strong></td>
+                        <td>Indigo / Audit</td>
+                        <td>Immutable chronological audit log of all financial receipts, cash movements, and reversals.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>STUDENT ANALYTICS</strong></td>
+                        <td>Blue Accent / BI</td>
+                        <td>Visual reporting on class enrollment, fee collection velocity, and academic grade curves.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CALCULATOR</strong></td>
+                        <td>Teal / Utilities</td>
+                        <td>Built-in financial keypad for fast calculations and change computation without leaving the app.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SETTINGS</strong></td>
+                        <td>Blue Grey / Admin</td>
+                        <td>Configure school profile, address, receipt headers/footers, PIN locks, and currency symbols.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ADMIN HUB</strong></td>
+                        <td>Deep Orange / System</td>
+                        <td>Passcode-gated center for Quaser payment keys, audit trails, and database backup/restore.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CLOUD METRICS</strong></td>
+                        <td>Indigo / System</td>
+                        <td>Real-time synchronization monitor, pending upload queue, and network diagnostics.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>FINANCE ANALYTICS</strong></td>
+                        <td>Blue Accent / Finance</td>
+                        <td>Revenue trend analysis, payment channel distribution (Cash, Transfer, POS), and forecasting.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RECONCILIATION</strong></td>
+                        <td>Teal / Finance</td>
+                        <td>Match unallocated bank deposits with student accounts and resolve discrepancies.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>FINANCE DASHBOARD</strong></td>
+                        <td>Blue Grey / Finance</td>
+                        <td>Executive summary of total receivables, collected funds, outstanding debts, and defaulter tracking.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>FEE MANAGEMENT</strong></td>
+                        <td>Cyan / Billing</td>
+                        <td>Assign fee schedules to classes, set compulsory/optional fees, and run batch bills.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>FEES</strong></td>
+                        <td>Orange / Catalog</td>
+                        <td>Catalog of all chargeable school items (Tuition, Uniforms, Books, Shuttle, PTA).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RESULT ENTRY</strong></td>
+                        <td>Red Accent / Academic</td>
+                        <td>Digital score entry for CA1, CA2, Exams, automated grade computation, and report cards.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>LESSON NOTES</strong></td>
+                        <td>Teal / Teaching</td>
+                        <td>Curriculum lesson planner, rich text editor, AI lesson wizard, and supervisor approvals.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 3. BILLING & POS -->
+            <h2 id="billing-pos">3. New Term Bill &amp; Billing Records</h2>
+            <p class="section-intro">
+                The school's front-desk billing and collection engine operates with offline-first speed and hardened ledger integrity.
+            </p>
+
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-add_bill" style="background: #ff9800;"></div>
+                    <div class="icon-box" style="background: #0288d1;">🧾</div>
                     <div class="feature-details">
-                        <h3>EXECUTIVE FINANCE DASHBOARD</h3>
-                        <p>Real-time visibility into the school's financial health.
+                        <h3>NEW TERM BILL (Student Point of Sale)</h3>
+                        <p>Issue immediate invoices and record fee payments for enrolled students.</p>
                         <ul>
-                            <li><strong>Available Balance:</strong> View the current balance in your internal wallet.</li>
-                            <li><strong>Total Collected:</strong> Aggregated revenue across all payment methods.</li>
-                            <li><strong>Revenue Performance:</strong> Trend analysis of collections over time.</li>
+                            <li><strong>Student Lookup:</strong> Type student name or admission number. The system instantly loads their class and previous debt balance.</li>
+                            <li><strong>Item Selection:</strong> Select required fee items (Tuition, Books, Uniform, Bus). Quantities and custom discounts can be applied.</li>
+                            <li><strong>Carry-Forward Balance:</strong> Any unpaid balance from previous terms is automatically appended to the current bill summary.</li>
+                            <li><strong>Multi-Channel Payment:</strong> Record payments via <em>Cash</em>, <em>Bank Transfer</em>, <em>POS Card Reader</em>, <em>Cheque</em>, or <em>Split Payment</em>.</li>
+                            <li><strong>Instant Receipting:</strong> Automatically triggers 58mm/80mm thermal receipt printing or generates a detailed A4 PDF receipt.</li>
                         </ul>
-                        </p>
                     </div>
                 </div>
 
                 <div class="feature-card">
-                    <div class="icon-box icon-reconcile" style="background: #43a047;"></div>
+                    <div class="icon-box" style="background: #2e7d32;">📊</div>
                     <div class="feature-details">
-                        <h3>RECONCILIATION HUB</h3>
-                        <p>Resolve payment discrepancies and unmatched transactions.
+                        <h3>BILLING RECORDS (Invoice &amp; Receipt Archive)</h3>
+                        <p>Complete historical registry of every bill issued by the bursary department.</p>
                         <ul>
-                            <li><strong>Manual Assignment:</strong> Assign unmatched automated payments to students.</li>
-                            <li><strong>Issue Tracking:</strong> Identify and resolve duplicate or failed payments.</li>
-                            <li><strong>Matched Records:</strong> Audit trail of verified successful transactions.</li>
+                            <li><strong>Multi-Filter Search:</strong> Filter invoices by Term, Class, Payment Status (<span class="pill pill-paid">Paid</span>, <span class="pill pill-partial">Partial</span>, <span class="pill pill-unpaid">Unpaid</span>), or Cashier.</li>
+                            <li><strong>Reprint &amp; Share:</strong> Reprint receipts at any time or share digital PDF receipts directly with parents via WhatsApp or Email.</li>
+                            <li><strong>Audited Reversals:</strong> Authorize refunds or bill adjustments with compulsory audit remark logging to prevent bursary fraud.</li>
                         </ul>
-                        </p>
                     </div>
                 </div>
             </div>
 
             <div class="tip-box">
-                <strong>💡 PRO TIP: Hardened Ledger</strong>
-                The system uses an idempotent ledger. This means every payment is verified and recorded exactly once, preventing accidental double-counting or lost transactions.
+                <strong>💡 PRO TIP: Idempotent Ledger Protection</strong>
+                Invify uses an immutable, idempotent ledger. Even during network drops or power outages, transactions are recorded locally without risk of double-billing or dropped payments.
             </div>
 
-            <h2>3. Academic & Student Administration</h2>
+            <!-- 4. ACADEMIC SETUP & SUBJECTS -->
+            <h2 id="academic-setup" class="page-break">4. Academic Setup &amp; Subject Registry</h2>
+            <p class="section-intro">
+                Define the institutional structure, grading criteria, and curriculum before starting academic operations.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>🏛️ Academic Years &amp; Terms</h4>
+                    <p>Create academic sessions (e.g. 2026/2027) and define 3 active terms: <em>First Term</em>, <em>Second Term</em>, and <em>Third Term</em>. Activating a term automatically sets the default billing and grading scope.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>🏫 Classes &amp; Arms</h4>
+                    <p>Establish grade levels (Creche, Nursery, Primary, JSS, SSS) and create arms (e.g., Primary 1A, Primary 1B). Assign Class Teachers to each arm for automated result compilation.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>📐 Grading Rules</h4>
+                    <p>Configure grade score bands (e.g., 75-100 = A1 Distinction, 70-74 = B2, 65-69 = B3, etc.), GPA points, and auto-generated teacher remarks for report cards.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>📚 Subject Registry</h4>
+                    <p>Register curriculum subjects with standard codes (e.g., MTH101, ENG101). Categorize by department (Sciences, Arts, Commercial) and attach to specific classes.</p>
+                </div>
+            </div>
+
+            <!-- 5. STUDENTS & TEACHERS -->
+            <h2 id="students-teachers">5. Students &amp; Teachers Management</h2>
+            <p class="section-intro">
+                Centralized 360-degree profiles for students, parents, and academic staff.
+            </p>
+
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-students" style="background: #3f51b5;"></div>
+                    <div class="icon-box" style="background: #3f51b5;">🎓</div>
                     <div class="feature-details">
-                        <h3>STUDENT DIRECTORY / PROFILE</h3>
-                        <p>Comprehensive profile management.
+                        <h3>STUDENT DIRECTORY &amp; PROFILE HUB</h3>
+                        <p>Complete academic and financial lifecycle management for every student.</p>
                         <ul>
-                            <li><strong>Billing Records:</strong> View the full ledger of invoices and payments for each student.</li>
-                            <li><strong>Results History:</strong> Digital access to academic performance across all terms.</li>
-                            <li><strong>Parent Contacts:</strong> Integrated tools to call or WhatsApp parents directly.</li>
+                            <li><strong>Student Bio &amp; Photo:</strong> Full name, admission number, date of birth, gender, house/club, and passport photograph.</li>
+                            <li><strong>Parent / Guardian Connect:</strong> Store emergency phone numbers and email with 1-tap WhatsApp and direct phone call buttons.</li>
+                            <li><strong>Financial Ledger Tab:</strong> Real-time statement showing every bill raised, payment made, current balance, and download/print statement button.</li>
+                            <li><strong>Academic History Tab:</strong> Consolidated report cards across past terms showing GPA trajectory and subject breakdowns.</li>
+                            <li><strong>Promotion &amp; Transfer:</strong> Single or batch promote students to next higher class arm at the end of the academic year.</li>
                         </ul>
-                        </p>
                     </div>
                 </div>
+
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #5e35b1;">👨‍🏫</div>
+                    <div class="feature-details">
+                        <h3>TEACHER &amp; STAFF DIRECTORY</h3>
+                        <p>Manage staff records, assigned classes, and pedagogical workloads.</p>
+                        <ul>
+                            <li><strong>Staff Profiles:</strong> Employment IDs, phone contacts, designations, and qualifications.</li>
+                            <li><strong>Teaching Allocations:</strong> Map teachers to specific class arms and subjects for automatic result entry permissions.</li>
+                            <li><strong>Role Assignment:</strong> Designate staff roles (e.g., Subject Teacher, Form Master, Bursar, Administrator).</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. FINANCE SUITE -->
+            <h2 id="finance-suite" class="page-break">6. Finance Hub &amp; Executive Dashboard</h2>
+            <p class="section-intro">
+                Executive-level financial governance, revenue analytics, and collection oversight. Access is secured by staff PIN authorization.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #455a64;">💼</div>
+                    <div class="feature-details">
+                        <h3>EXECUTIVE FINANCE DASHBOARD (Gated: Admin / Finance)</h3>
+                        <p>High-level command center for the school's financial health.</p>
+                        <ul>
+                            <li><strong>Gross Receivables:</strong> Total expected fee revenue for the active term across all enrolled students.</li>
+                            <li><strong>Total Collections:</strong> Real-time aggregated payments received across all bank accounts and cash registers.</li>
+                            <li><strong>Outstanding Debt:</strong> Current uncollected balances and defaulter volume.</li>
+                            <li><strong>Defaulters Management Sub-Menu:</strong> Filter debtors by class or amount, export debtor lists, and send bulk fee reminders.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #00897b;">📈</div>
+                    <div class="feature-details">
+                        <h3>FINANCE ANALYTICS &amp; REVENUE TRENDS</h3>
+                        <p>Deep-dive business intelligence and trend projections.</p>
+                        <ul>
+                            <li><strong>Channel Distribution:</strong> Compare revenue share across Bank Transfers, POS, Cash, and Online Virtual Accounts.</li>
+                            <li><strong>Collection Velocity:</strong> Daily, weekly, and monthly collection curves showing peak payment periods.</li>
+                            <li><strong>Term-on-Term Comparative:</strong> Benchmark current term performance against previous terms to identify revenue leakage.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. VIRTUAL ACCOUNTS & RECONCILIATION -->
+            <h2 id="virtual-accounts">7. Virtual Accounts &amp; Automated Reconciliation</h2>
+            <p class="section-intro">
+                Eliminate manual bank teller confirmation with dedicated student virtual account numbers and intelligent reconciliation.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>🏦 Dedicated Virtual Accounts</h4>
+                    <p>Every student can be assigned a permanent, unique bank account number (e.g. Wema/Moniepoint/Access). When a parent transfers fees to this account, the payment automatically credits the student's ledger instantly.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>⚖️ Reconciliation Hub</h4>
+                    <p>Review incoming bank payments against invoices. Any unallocated deposits (e.g. transfers with missing student names) appear in the <strong>Unmatched Queue</strong> for 1-click assignment to the correct student.</p>
+                </div>
+            </div>
+
+            <div class="admin-box">
+                <strong>🔒 Staff Authorization Required for Financial Modules</strong>
+                To protect institutional records, clicking <em>Finance Dashboard</em>, <em>Finance Analytics</em>, or <em>Reconciliation</em> triggers a staff authentication prompt. Only staff with <strong>ADMIN</strong>, <strong>FINANCE</strong>, or <strong>EXECUTIVE</strong> roles can view these sections.
+            </div>
+
+            <!-- 8. FEE STRUCTURING & CATALOG -->
+            <h2 id="fee-mgmt" class="page-break">8. Fee Structuring &amp; Fee Catalog</h2>
+            <p class="section-intro">
+                Configure flexible fee policies, compulsory vs optional levies, and itemized school charges.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #00acc1;">💳</div>
+                    <div class="feature-details">
+                        <h3>FEE MANAGEMENT (Class Schedules &amp; Batch Billing)</h3>
+                        <p>Define structured fee packages per class arm.</p>
+                        <ul>
+                            <li><strong>Class Fee Rules:</strong> Assign specific fee items to classes (e.g. JSS 1 Tuition = ₦120,000; Laboratory Levy = ₦15,000).</li>
+                            <li><strong>Compulsory vs Optional:</strong> Flag essential fees (Tuition) as compulsory, while making services like School Bus, Lunch, or Clubs optional during billing.</li>
+                            <li><strong>1-Click Batch Bill Generation:</strong> Generate invoices for all students in an entire class or the whole school simultaneously with previous debts carried forward.</li>
+                            <li><strong>Scholarships &amp; Discounts:</strong> Apply fixed or percentage fee waivers to staff children, scholarship recipients, or siblings.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #fb8c00;">📦</div>
+                    <div class="feature-details">
+                        <h3>FEES &amp; PRODUCTS CATALOG (Stock / Items)</h3>
+                        <p>Inventory and price management for chargeable school items.</p>
+                        <ul>
+                            <li><strong>Item Catalog:</strong> Add Tuition, Uniforms, Exercise Books, Cardigans, Badges, ID Cards, and Excursions.</li>
+                            <li><strong>Inventory Tracking:</strong> Track physical stock quantities for uniforms and books with automated reorder alerts.</li>
+                            <li><strong>Category Tagging:</strong> Categorize items under Tuition, Academic Supplies, Uniforms, or Sundry Levies.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 9. RESULT ENTRY & GRADING -->
+            <h2 id="result-entry">9. Result Entry &amp; Digital Grading</h2>
+            <p class="section-intro">
+                Fast, error-free academic assessment compilation with automated grade, position, and remark calculation.
+            </p>
+
+            <div class="step-box">
+                <strong>📝 Step-by-Step Result Recording Procedure</strong>
+                <ol>
+                    <li>Tap <strong>RESULT ENTRY</strong> on the dashboard.</li>
+                    <li>Select the <strong>Academic Year</strong>, <strong>Term</strong>, <strong>Class Arm</strong>, and <strong>Subject</strong>.</li>
+                    <li>Enter scores in the spreadsheet-style grid for <strong>CA 1 (e.g. 20)</strong>, <strong>CA 2 (e.g. 20)</strong>, and <strong>Terminal Exam (e.g. 60)</strong>.</li>
+                    <li>The system automatically computes the <strong>Total (100)</strong>, assigns the <strong>Grade Letter</strong> (A, B, C, D, F) based on grading rules, and updates class rankings.</li>
+                    <li>Tap <strong>Save / Submit</strong>. Class masters can preview and print batch report sheets directly.</li>
+                </ol>
+            </div>
+
+            <!-- 10. LESSON NOTES & AI WIZARD -->
+            <h2 id="lesson-notes" class="page-break">10. Lesson Notes &amp; AI Lesson Wizard</h2>
+            <p class="section-intro">
+                Standardize pedagogical preparation with rich lesson planning tools and AI-assisted generation.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #00796b;">📝</div>
+                    <div class="feature-details">
+                        <h3>LESSON NOTES HUB &amp; AI WIZARD</h3>
+                        <p>Empower teachers to draft, organize, and submit structured lesson plans.</p>
+                        <ul>
+                            <li><strong>AI Lesson Generator Wizard:</strong> Enter Subject, Topic, Class Level, and Duration. The AI wizard generates a complete plan including Behavioral Objectives, Instructional Materials, Introduction, Step-by-Step Delivery, Evaluation Questions, and Summary.</li>
+                            <li><strong>Rich Text Editor:</strong> Teachers can review, customize, and add curriculum notes using standard text formatting tools.</li>
+                            <li><strong>Supervisor Review:</strong> Head teachers can review, approve, or request revisions on submitted notes before class delivery.</li>
+                            <li><strong>Print &amp; Archive:</strong> Print lesson plans for physical inspection binders or archive them digitally across terms.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 11. PRINTER, MPOS & CONNECTIVITY -->
+            <h2 id="hardware">11. Printer, MPOS &amp; Connectivity</h2>
+            <p class="section-intro">
+                Configure peripheral hardware and POS terminals for seamless payment collection and receipting.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>🖨️ Printer Pairing &amp; Setup</h4>
+                    <p>Connect thermal printers via Bluetooth, USB, or LAN (Network). Supports 58mm and 80mm ESC/POS printers, built-in Sunmi POS printers, and desktop A4 printers. Use <em>Test Print</em> to verify alignment.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>💳 MPOS Card Terminal Pairing</h4>
+                    <p>Pair Bluetooth card readers for debit card fee payments. The tile shows dual status indicators: <strong>Green dot</strong> for connected printer and <strong>Blue dot</strong> for configured POS terminal.</p>
+                </div>
+            </div>
+
+            <!-- 12. ADMIN HUB & SECURITY -->
+            <h2 id="admin-security">12. Admin Hub, Cloud Metrics &amp; Security</h2>
+            <p class="section-intro">
+                High-level administration, Quaser payment integrations, database safeguards, and cloud telemetry.
+            </p>
+
+            <div class="admin-box">
+                <strong>🛡️ Admin Hub Passcode Protection</strong>
+                The Admin Hub is strictly gated by the master administrative PIN. This area controls institution-wide parameters, payment keys, and database integrity.
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #e65100;">🛡️</div>
+                    <div class="feature-details">
+                        <h3>ADMIN HUB &amp; SYSTEM CONTROLS</h3>
+                        <p>Core governance and payment architecture.</p>
+                        <ul>
+                            <li><strong>System Setup:</strong> Configure organization profile, default currency, receipt footers, and institutional branding.</li>
+                            <li><strong>Quaser Payment Keys:</strong> Manage merchant API keys and webhooks for automated payment verification.</li>
+                            <li><strong>Database Backup &amp; Restore:</strong> Export full database snapshots to local storage or external drives for disaster recovery.</li>
+                            <li><strong>Audit Logs:</strong> Comprehensive record of administrative activities, price adjustments, score edits, and deletions.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #283593;">☁️</div>
+                    <div class="feature-details">
+                        <h3>CLOUD METRICS &amp; MULTI-DEVICE SYNC</h3>
+                        <p>Real-time telemetry and synchronization health monitoring.</p>
+                        <ul>
+                            <li><strong>Outbox Queue:</strong> Displays transactions pending cloud sync when operating in offline/poor internet environments.</li>
+                            <li><strong>Peer-to-Peer LAN Sync:</strong> Connect multiple cashier and bursary tablets over local Wi-Fi without needing an active internet connection.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 13. SOPS -->
+            <h2 id="workflows" class="page-break">13. Standard Operating Procedures (SOPs)</h2>
+            <p class="section-intro">
+                Recommended step-by-step routines for daily bursary operations and term milestones.
+            </p>
+
+            <div class="two-col">
+                <div class="step-box">
+                    <strong>☀️ Daily Bursary Collection Flow</strong>
+                    <ol>
+                        <li>Power on terminal and verify printer status (Green dot on tile).</li>
+                        <li>Open <strong>New Term Bill</strong>, look up student, select paid fee items.</li>
+                        <li>Record payment channel (Cash, Transfer, POS) and print customer receipt.</li>
+                        <li>At end of day, open <strong>Transaction History</strong> to verify register totals against physical cash in drawer.</li>
+                    </ol>
+                </div>
+                <div class="step-box">
+                    <strong>🏁 End-of-Term Processing Routine</strong>
+                    <ol>
+                        <li>Ensure all subject teachers complete <strong>Result Entry</strong>.</li>
+                        <li>Generate and inspect draft report sheets.</li>
+                        <li>Open <strong>Finance Dashboard → Defaulters</strong> to audit remaining debts.</li>
+                        <li>In <strong>Academic Setup</strong>, create the upcoming term and roll forward balances.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- 14. TROUBLESHOOTING & FAQ -->
+            <h2 id="troubleshooting">14. Troubleshooting &amp; Frequently Asked Questions</h2>
+            
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Issue Observed</th>
+                        <th style="width: 35%;">Probable Cause</th>
+                        <th>Recommended Resolution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Printer status dot is Red</strong></td>
+                        <td>Bluetooth disconnected or printer powered off.</td>
+                        <td>Turn on printer, ensure paper roll is loaded, go to <em>Printer &amp; MPOS</em> and tap <em>Connect</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Student has unrecorded debt</strong></td>
+                        <td>Previous term bill was not generated or unpaid.</td>
+                        <td>Open student profile → <em>Ledger Tab</em> to inspect statement or manually adjust balance with an audited bill.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Bank transfer not reflecting on student</strong></td>
+                        <td>Payment sent without reference or virtual account.</td>
+                        <td>Open <em>Reconciliation Hub</em> → Find the transaction in <em>Unmatched Payments</em> and click <em>Assign to Student</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cannot access Finance / Admin</strong></td>
+                        <td>Insufficient staff role or incorrect PIN.</td>
+                        <td>Verify staff credentials. Admin/Finance privileges must be configured in <em>Teachers &amp; Staff</em> settings.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="tip-box">
+                <strong>💡 Printing this Manual for Staff Distribution</strong>
+                Open this file in Google Chrome, Microsoft Edge, or any modern browser. Press <span class="key-badge">Ctrl + P</span> (or <span class="key-badge">Cmd + P</span> on Mac), select <strong>Save as PDF</strong> or your office printer, set paper size to <strong>A4</strong>, and check <strong>Background graphics</strong> for crisp booklet output.
             </div>
 
         </div>
 
         <footer>
-            <p>&copy; 2026 Invify | Innovative School Management Solutions</p>
-            <p><em>Open this file in your browser and press <strong>Ctrl+P</strong> to Save as PDF for Printing.</em></p>
+            <p><strong>Invify School Management Suite</strong> · Empowering Educational Excellence with Reliable Financial Technology</p>
+            <p>&copy; 2026 Invify. All Rights Reserved. · Version 1.0.0 (Standard &amp; Pro)</p>
         </footer>
     </div>
 

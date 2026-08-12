@@ -63,17 +63,31 @@ export class AuditController {
 
       // Map POS attempts
       for (const pos of posData) {
+        const approved = (pos.status || '').toLowerCase() === 'approved';
+        const settled = (pos.settlement_status || '').toLowerCase() === 'settled';
+        let displayStatus = pos.status || 'Pending';
+        if (approved && settled) {
+          displayStatus = 'Settled';
+        } else if (approved) {
+          displayStatus = 'Approved (Unsettled)';
+        }
+
         unified.push({
           id: pos.id,
           type: 'POS',
           paymentMethod: 'CARD',
           amount: pos.amount || 0,
-          status: pos.status || 'Pending',
+          status: displayStatus,
+          settlementStatus: pos.settlement_status || 'unsettled',
+          settledAt: pos.settled_at || null,
           staffName: pos.staff_name || pos.staffName || 'System',
           date: pos.created_at || pos.date,
           items: pos.items_jsonb || pos.items || [],
           customerName: 'Cardholder',
-          reference: pos.rrn || pos.id
+          reference: pos.rrn || pos.id,
+          rrn: pos.rrn || null,
+          stan: pos.stan || null,
+          terminalId: pos.terminal_id || null,
         });
       }
 

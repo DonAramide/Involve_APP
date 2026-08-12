@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import '../../domain/entities/school_entities.dart';
 
 class TeacherFormDialog extends StatefulWidget {
@@ -70,11 +71,10 @@ class _TeacherFormDialogState extends State<TeacherFormDialog> {
           );
           context.read<SchoolBloc>().add(ResetSchoolStatus());
         } else if (state.status == SchoolStatus.failure) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.error ?? 'Failed to save teacher'),
-              backgroundColor: Colors.red,
-            ),
+          showFriendlyErrorSnackBar(
+            context,
+            state.error,
+            fallback: 'Failed to save teacher',
           );
           context.read<SchoolBloc>().add(ResetSchoolStatus());
         }

@@ -9,6 +9,7 @@ import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.da
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/terminology.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class StudentFinanceProfilePage extends StatefulWidget {
@@ -86,7 +87,7 @@ class _StudentFinanceProfilePageState extends State<StudentFinanceProfilePage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      state.message.replaceAll('Exception: ', '').replaceAll('FinanceApiException: ', ''),
+                      friendlyApiError(state.message, fallback: 'Could not load student finance.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.4),
                     ),

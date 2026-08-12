@@ -171,11 +171,12 @@ export class PayoutController {
 
   /**
    * POST /api/payout/withdraw
-   * Triggers a fund sweep (withdrawal) to the saved bank account.
+   * Triggers a fund sweep (withdrawal) to the saved bank account,
+   * or to an optional explicit destination (staff salary).
    */
   static async withdraw(req: Request, res: Response) {
     const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
-    const { amount } = req.body;
+    const { amount, destination, staffId, metadata } = req.body;
 
     if (!tenantId) {
       return res.status(400).json({ error: 'Tenant ID required' });
@@ -186,10 +187,16 @@ export class PayoutController {
     }
 
     try {
-      const result = await PaymentService.createPayout(tenantId, Number(amount));
+      const result = await PaymentService.createPayout(tenantId, Number(amount), {
+        destination: destination || undefined,
+        metadata: {
+          ...(metadata || {}),
+          ...(staffId ? { staffId, type: metadata?.type || 'staff_salary' } : {}),
+        },
+      });
       return res.status(200).json({
         success: true,
-        message: 'Payout initiated successfully',
+        message: staffId ? 'Staff salary payout initiated successfully' : 'Payout initiated successfully',
         reference: result.reference,
         status: result.status
       });

@@ -101,6 +101,22 @@ class SocketService {
       // Catch up wallet credits + local notifications missed while offline.
       PaymentCatchUpService.instance.scaffoldMessengerKey = scaffoldMessengerKey;
       unawaited(PaymentCatchUpService.instance.runCatchUp());
+
+      // Catch up emergency lock if the live socket event was missed.
+      unawaited(() async {
+        final config = await TerminalSyncService.loadCachedConfig();
+        if (config != null) {
+          await TerminalSyncService.applyEmergencyLockFromConfig(config);
+          if (config.isEmergencyLocked &&
+              config.emergencyLockCode != null &&
+              navigatorKey?.currentContext != null) {
+            showEmergencyLockScreen(
+              navigatorKey!.currentContext!,
+              config.emergencyLockCode!,
+            );
+          }
+        }
+      }());
     });
 
     _socket!.onConnectError((err) {

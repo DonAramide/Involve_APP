@@ -9,9 +9,11 @@ class Staff extends Equatable {
   final String role; // 'STAFF' | 'ADMIN' | 'FINANCE'
   final bool isActive;
   final String? syncId;
+  /// Personal bank for salary (UI label); stored historically as virtual*
   final String? virtualBankName;
   final String? virtualAccountNumber;
   final String? virtualAccountName;
+  final String? bankCode;
 
   const Staff({
     this.id,
@@ -25,6 +27,7 @@ class Staff extends Equatable {
     this.virtualBankName,
     this.virtualAccountNumber,
     this.virtualAccountName,
+    this.bankCode,
   });
 
   Staff copyWith({
@@ -39,6 +42,7 @@ class Staff extends Equatable {
     String? virtualBankName,
     String? virtualAccountNumber,
     String? virtualAccountName,
+    String? bankCode,
   }) {
     return Staff(
       id: id ?? this.id,
@@ -52,9 +56,23 @@ class Staff extends Equatable {
       virtualBankName: virtualBankName ?? this.virtualBankName,
       virtualAccountNumber: virtualAccountNumber ?? this.virtualAccountNumber,
       virtualAccountName: virtualAccountName ?? this.virtualAccountName,
+      bankCode: bankCode ?? this.bankCode,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, staffCode, staffId, phone, role, isActive, syncId, virtualBankName, virtualAccountNumber, virtualAccountName];
+  List<Object?> get props => [
+        id,
+        name,
+        staffCode,
+        staffId,
+        phone,
+        role,
+        isActive,
+        syncId,
+        virtualBankName,
+        virtualAccountNumber,
+        virtualAccountName,
+        bankCode,
+      ];
 }

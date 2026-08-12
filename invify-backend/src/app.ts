@@ -34,10 +34,12 @@ import { AttendanceController } from './controllers/attendance.controller';
 import { InsightsController } from './controllers/insights.controller';
 import { RetentionController } from './controllers/retention.controller';
 import { WebhookController } from './controllers/webhook.controller';
+import { WhatsAppWebhookController } from './controllers/whatsapp-webhook.controller';
 import { ReconciliationController } from './controllers/reconciliation.controller';
 import { StudentController } from './controllers/student.controller';
 import { SchoolSyncController } from './controllers/school-sync.controller';
 import { SchoolPaymentsController } from './controllers/school-payments.controller';
+import { StaffController } from './controllers/staff.controller';
 import { PayoutController } from './controllers/payout.controller';
 import { ExecutiveFinanceController } from './controllers/finance.controller';
 import { DefaultersController } from './controllers/defaulters.controller';
@@ -517,9 +519,9 @@ app.get('/api/v1/wallet', authenticate, checkTenantAccess, WalletController.getB
 app.get('/api/v1/wallet/transactions', authenticate, checkTenantAccess, WalletController.getTransactions);
 
 // Users Management
-app.get('/admin/users', authenticate, checkRole(['super_admin', 'tenant_admin']), UserController.listUsers);
-app.post('/admin/users', authenticate, checkRole(['super_admin', 'tenant_admin']), UserController.createUser);
-app.patch('/admin/users/:id', authenticate, checkRole(['super_admin', 'tenant_admin']), UserController.updateUser);
+app.get('/admin/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.listUsers);
+app.post('/admin/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.createUser);
+app.patch('/admin/users/:id', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.updateUser);
 app.post('/admin/invites', authenticate, checkRole(['tenant_admin', 'owner']), InviteController.sendInvite);
 
 // Curriculum System
@@ -561,6 +563,8 @@ app.post('/webhooks/quasar', WebhookController.handleQuasarWebhook);
 app.post('/webhooks/paystack', WebhookController.handlePaystackWebhook);
 app.post('/webhooks/flutterwave', WebhookController.handleFlutterwaveWebhook);
 app.post('/webhooks/stripe', WebhookController.handleStripeWebhook);
+app.get('/webhooks/whatsapp', WhatsAppWebhookController.verify);
+app.post('/webhooks/whatsapp', WhatsAppWebhookController.handle);
 
 // Reconciliation Endpoints
 app.get('/api/reconciliation', authenticate, checkTenantPermission('reconciliation.view'), ReconciliationController.getReport);
@@ -596,6 +600,40 @@ app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin'
 app.get('/api/finance/quasar-transactions', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin']), ExecutiveFinanceController.getQuasarTransactions);
 app.get('/api/finance/missed-payments', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getMissedPayments);
 app.get('/api/finance/audit/ledger', authenticate, AuditController.getTransactionLedger);
+
+// Card settlement reconciliation (processor file upload → mark Quasar pull settled)
+import {
+  CardSettlementController,
+  cardSettlementUploadMiddleware,
+} from './controllers/card-settlement.controller';
+import { requireAdminMfa } from './middleware/require-admin-mfa.middleware';
+
+app.get(
+  '/api/admin/finance/card-settlement/templates',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'admin', 'finance_staff']),
+  CardSettlementController.listTemplates,
+);
+app.get(
+  '/api/admin/finance/card-settlement/batches',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'admin', 'finance_staff']),
+  CardSettlementController.listBatches,
+);
+app.get(
+  '/api/admin/finance/card-settlement/batches/:id',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'admin', 'finance_staff']),
+  CardSettlementController.getBatch,
+);
+app.post(
+  '/api/admin/finance/card-settlement/upload',
+  authenticate,
+  checkRole(['super_admin', 'owner', 'admin']),
+  requireAdminMfa,
+  cardSettlementUploadMiddleware,
+  CardSettlementController.uploadSettlementFile,
+);
 
 // POS Operations (Medusa | Cpoint-Kimono | NIBSS)
 app.post('/api/pos/transaction', authenticate, PosController.processTransaction);
@@ -648,6 +686,10 @@ app.post('/api/finance/integrity/recompute', authenticate, IntegrityController.r
 app.get('/api/notifications', authenticate, NotificationController.getNotifications);
 app.post('/api/notifications/:id/read', authenticate, NotificationController.markAsRead);
 app.post('/api/notifications/read-all', authenticate, NotificationController.markAllAsRead);
+// Compat aliases used by admin NotificationEngine (historical /api/v1 path)
+app.get('/api/v1/notifications', authenticate, NotificationController.getNotifications);
+app.post('/api/v1/notifications/:id/read', authenticate, NotificationController.markAsRead);
+app.post('/api/v1/notifications/read-all', authenticate, NotificationController.markAllAsRead);
 
 // Student & Finance Core
 app.get('/api/finance/virtual-account/:studentId', authenticate, StudentController.getVirtualAccount);
@@ -676,32 +718,52 @@ app.get(
 app.post(
   '/api/school/payments/sync',
   authenticate,
-  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   SchoolPaymentsController.syncPayments,
 );
 app.get(
   '/api/school/payments',
   authenticate,
-  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   SchoolPaymentsController.listPayments,
 );
 app.post(
   '/api/school/payment-disputes',
   authenticate,
-  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   SchoolPaymentsController.raiseDispute,
 );
 app.get(
   '/api/school/payment-disputes',
   authenticate,
-  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   SchoolPaymentsController.listDisputes,
 );
 app.patch(
   '/api/school/payment-disputes/:id',
   authenticate,
-  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'finance_staff']),
+  checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
   SchoolPaymentsController.updateDispute,
+);
+
+// POS staff roster + personal salary bank (Flutter Web Sync → tenant admin)
+app.post(
+  '/api/staff/bulk-sync',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  StaffController.bulkSync,
+);
+app.get(
+  '/api/staff',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'staff', 'cashier', 'finance_staff']),
+  StaffController.list,
+);
+app.post(
+  '/api/staff/:id/pay-salary',
+  authenticate,
+  checkRole(['super_admin', 'tenant_admin', 'owner', 'admin', 'finance_staff']),
+  StaffController.paySalary,
 );
 
 // CRM Routes
@@ -715,8 +777,13 @@ app.put('/api/v1/crm/customers/:id', authenticate, CustomerController.updateCust
 // GET /api/admin/audit/ledger  ─  Unified multi-source audit ledger
 app.get('/api/admin/audit/ledger', authenticate, checkRole(['super_admin', 'internal_staff']), async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
-    const query = { ...req.query, tenantId };
+    // Platform operators see all activity unless they explicitly filter by tenant/target
+    const explicitTenant =
+      (req.query.tenantId as string) ||
+      (req.query.target as string) ||
+      (req.headers['x-tenant-id'] as string) ||
+      undefined;
+    const query = { ...req.query, tenantId: explicitTenant };
     const result = await GovAuditService.getLedger(query as any);
     res.json({ success: true, ...result });
   } catch (err: any) {
@@ -740,6 +807,7 @@ app.post('/api/admin/audit/log', authenticate, async (req: Request, res: Respons
       location: req.body.location,
       target: req.body.target || '-',
       status: req.body.status || 'success',
+      tenant_id: req.body.tenant_id || req.body.tenantId || null,
       metadata: req.body.metadata || {}
     });
     res.json({ success: true, message: 'Audit entry logged.' });
@@ -765,6 +833,26 @@ app.post('/api/admin/emergency-lock', authenticate, checkRole(['super_admin', 'i
     // Supabase update — sole persistence path (P0-5A: removed JSON fallback)
     const { supabase: sb } = require('./db/supabase');
     await sb.from('tenants').update({ emergency_lock_code: passcode, is_emergency_locked: true }).eq('id', tenant_id);
+
+    try {
+      const user = (req as any).user || {};
+      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.socket.remoteAddress || '127.0.0.1';
+      await GovAuditService.logAction({
+        id: require('crypto').randomUUID(),
+        timestamp: new Date().toISOString(),
+        module: 'GOVERNANCE',
+        action: 'EMERGENCY_LOCK',
+        user_email: user.email || 'unknown',
+        user_name: user.name || user.email?.split('@')[0] || 'Admin',
+        ip_address: ip,
+        target: tenant_id,
+        status: 'success',
+        tenant_id,
+        metadata: { passcode_set: true, source: 'admin_emergency_lock' }
+      });
+    } catch (auditErr) {
+      console.warn('[EmergencyLock] audit log failed:', auditErr);
+    }
 
     process.nextTick(() => {
       io.to(`tenant:${tenant_id}`).emit('emergency_lock', { action: 'lock', passcode });
@@ -935,6 +1023,13 @@ io.use(async (socket, next) => {
 
 io.on('connection', (socket: Socket) => {
   console.log(`[Socket.io] Client connected: ${socket.id} (Tenant: ${socket.data.tenantId})`);
+
+  // Join tenant room immediately so emergency_lock reaches devices even if
+  // the client never emits join_room (or emits it late).
+  if (socket.data.tenantId) {
+    socket.join(`tenant:${socket.data.tenantId}`);
+    console.log(`[Socket.io] Auto-joined tenant:${socket.data.tenantId} for ${socket.id}`);
+  }
   
   // Clients will emit 'join_room' passing their characteristics
   socket.on('join_room', (data: any) => {
@@ -1051,6 +1146,22 @@ if (process.env.NODE_ENV !== 'test') {
         }
       } catch (err: any) {
         console.warn('[Boot] Could not hydrate Quasar webhook secret from vault:', err?.message || err);
+      }
+    })();
+
+    // Hydrate Meta WhatsApp Cloud API config from Integration Vault after boot
+    (async () => {
+      try {
+        const { IntegrationVaultService } = await import('./services/integration-vault.service');
+        for (const envName of ['PRODUCTION', 'SANDBOX'] as const) {
+          const hydrated = await IntegrationVaultService.hydrateMetaWhatsAppFromVault(envName);
+          if (hydrated.length > 0) {
+            console.log(`[Boot] Hydrated Meta WhatsApp from Integration Vault (${envName}): ${hydrated.join(', ')}`);
+            break;
+          }
+        }
+      } catch (err: any) {
+        console.warn('[Boot] Could not hydrate Meta WhatsApp from vault:', err?.message || err);
       }
     })();
   });

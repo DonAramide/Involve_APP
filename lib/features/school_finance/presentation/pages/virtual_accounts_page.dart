@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/features/settings/presentation/bloc/staff_bloc.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../../../core/services/service_locator.dart';
@@ -74,7 +75,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load virtual accounts: $e'),
+            content: Text(friendlyApiError(e, fallback: 'Could not load virtual accounts.')),
             backgroundColor: Colors.red,
           ),
         );
@@ -311,7 +312,7 @@ class _VirtualAccountsPageState extends State<VirtualAccountsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to sweep funds: $e'),
+            content: Text(friendlyApiError(e, fallback: 'Could not sweep funds. Please try again.')),
             backgroundColor: Colors.red,
           ),
         );

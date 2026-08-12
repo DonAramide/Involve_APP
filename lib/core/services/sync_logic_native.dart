@@ -44,8 +44,15 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                   StaffCompanion(
                     name: Value(name),
                     staffCode: Value(_getString(row['staff_code']) ?? ''),
+                    staffId: Value(_getString(row['staff_id'])),
+                    phone: Value(_getString(row['phone'])),
+                    role: Value(_getString(row['role']) ?? 'STAFF'),
                     isActive: Value(row['is_active'] == 1),
                     updatedAt: Value(incomingUpdate),
+                    virtualBankName: Value(_getString(row['virtual_bank_name'])),
+                    virtualAccountNumber: Value(_getString(row['virtual_account_number'])),
+                    virtualAccountName: Value(_getString(row['virtual_account_name'])),
+                    bankCode: Value(_getString(row['bank_code'])),
                   )
                 );
               }
@@ -54,10 +61,17 @@ Future<bool> performSync(AppDatabase database, Uint8List backupBytes) async {
                 StaffCompanion.insert(
                   name: name,
                   staffCode: _getString(row['staff_code']) ?? '',
+                  staffId: Value(_getString(row['staff_id'])),
+                  phone: Value(_getString(row['phone'])),
+                  role: Value(_getString(row['role']) ?? 'STAFF'),
                   isActive: Value(row['is_active'] == 1),
                   syncId: Value(syncId),
                   updatedAt: Value(_getDateTime(row['updated_at'])),
                   createdAt: Value(_getDateTime(row['created_at'])),
+                  virtualBankName: Value(_getString(row['virtual_bank_name'])),
+                  virtualAccountNumber: Value(_getString(row['virtual_account_number'])),
+                  virtualAccountName: Value(_getString(row['virtual_account_name'])),
+                  bankCode: Value(_getString(row['bank_code'])),
                 )
               );
               staffIdMap[oldId] = newId;

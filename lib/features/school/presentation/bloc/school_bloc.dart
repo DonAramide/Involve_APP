@@ -15,6 +15,8 @@ import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
 import 'package:collection/collection.dart';
 import 'package:equatable/equatable.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
+import 'package:involve_app/core/license/license_service.dart';
 
 part 'school_event.dart';
 
@@ -106,7 +108,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       // Run image cleanup in the background to fix CursorWindow issues for existing students
       _cleanupLargeImages();
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString()));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e)));
     }
   }
 
@@ -123,7 +125,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -132,7 +134,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       await repository.setActiveYear(event.id);
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      emit(state.copyWith(error: friendlyApiError(e)));
     }
   }
 
@@ -150,7 +152,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -159,7 +161,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       await repository.setActiveTerm(event.id);
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      emit(state.copyWith(error: friendlyApiError(e)));
     }
   }
 
@@ -170,7 +172,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -181,7 +183,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -193,7 +195,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -202,7 +204,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       await repository.deleteClass(event.id);
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      emit(state.copyWith(error: friendlyApiError(e)));
     }
   }
 
@@ -217,7 +219,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -228,7 +230,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -237,7 +239,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       await repository.deleteStudent(event.id);
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      emit(state.copyWith(error: friendlyApiError(e)));
     }
   }
 
@@ -250,7 +252,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       );
       add(LoadSchoolData());
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      emit(state.copyWith(error: friendlyApiError(e)));
     }
   }
 
@@ -368,7 +370,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
         }
       }
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString()));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e)));
     }
   }
 
@@ -378,7 +380,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final subjects = await repository.getSubjects();
       emit(state.copyWith(subjects: subjects, isLoading: false));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString()));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e)));
     }
   }
 
@@ -389,7 +391,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSubjectsEvent());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -400,7 +402,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadSubjectsEvent());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -409,7 +411,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       await repository.deleteSubject(event.id);
       add(LoadSubjectsEvent());
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      emit(state.copyWith(error: friendlyApiError(e)));
     }
   }
 
@@ -425,7 +427,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       );
       emit(state.copyWith(results: results, isLoading: false));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString()));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e)));
     }
   }
 
@@ -435,7 +437,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       await repository.saveResults(event.results);
       emit(state.copyWith(isLoading: false, status: SchoolStatus.success));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -445,7 +447,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final rules = await repository.getGradingRules();
       emit(state.copyWith(gradingRules: rules, isLoading: false));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString()));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e)));
     }
   }
 
@@ -456,7 +458,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadGradingRules());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -467,7 +469,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       emit(state.copyWith(status: SchoolStatus.success));
       add(LoadGradingRules());
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -476,7 +478,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       await repository.deleteGradingRule(event.id);
       add(LoadGradingRules());
     } catch (e) {
-      emit(state.copyWith(error: e.toString()));
+      emit(state.copyWith(error: friendlyApiError(e)));
     }
   }
 
@@ -495,7 +497,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final teachers = await repository.getTeachers();
       emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -513,7 +515,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final teachers = await repository.getTeachers();
       emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -524,7 +526,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       final teachers = await repository.getTeachers();
       emit(state.copyWith(isLoading: false, teachers: teachers, status: SchoolStatus.success));
     } catch (e) {
-      emit(state.copyWith(isLoading: false, error: e.toString(), status: SchoolStatus.failure));
+      emit(state.copyWith(isLoading: false, error: friendlyApiError(e), status: SchoolStatus.failure));
     }
   }
 
@@ -715,7 +717,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       add(LoadStudentRecordsEvent(event.studentId));
     } catch (e) {
       emit(state.copyWith(
-        error: e.toString(),
+        error: friendlyApiError(e),
         status: SchoolStatus.failure,
         isLoading: false,
         clearLastPaymentReceipt: true,
@@ -735,6 +737,17 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   Future<void> _onProvisionVirtualAccount(ProvisionStudentVirtualAccountEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true, status: SchoolStatus.loading, error: null));
     try {
+      final onFreeTrial = await LicenseService.isOnFreeTrialOnly();
+      if (onFreeTrial) {
+        emit(state.copyWith(
+          isLoading: false,
+          status: SchoolStatus.failure,
+          error:
+              "You can't access Virtual Account generation on Free Trial mode. Please activate your license to continue.",
+        ));
+        return;
+      }
+
       if (financeRepository == null) {
         throw Exception(
           'Dedicated Virtual Account provisioning is only available in online mode. Please check your internet connection.',
@@ -787,10 +800,14 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       add(LoadSchoolData());
       add(LoadStudentRecordsEvent(event.studentId));
     } catch (e) {
-      final errorMsg = e.toString().startsWith('Exception: ')
-          ? e.toString().substring('Exception: '.length)
-          : e.toString();
-      emit(state.copyWith(error: errorMsg, status: SchoolStatus.failure, isLoading: false));
+      emit(state.copyWith(
+        error: friendlyApiError(
+          e,
+          fallback: 'Could not generate virtual account. Please try again.',
+        ),
+        status: SchoolStatus.failure,
+        isLoading: false,
+      ));
     }
   }
 
@@ -926,7 +943,7 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
       add(LoadSchoolData());
       add(LoadStudentRecordsEvent(event.studentId));
     } catch (e) {
-      emit(state.copyWith(error: e.toString(), status: SchoolStatus.failure, isLoading: false));
+      emit(state.copyWith(error: friendlyApiError(e), status: SchoolStatus.failure, isLoading: false));
     }
   }
 

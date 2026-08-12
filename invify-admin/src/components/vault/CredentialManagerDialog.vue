@@ -4,11 +4,13 @@
       <!-- HEADER -->
       <q-card-section class="row items-center border-bottom q-py-md bg-subpanel">
         <div class="row items-center op-gap-16">
-          <q-avatar size="lg" :color="getCategoryColor(integration?.category)" text-color="white" :icon="isQuasar ? 'webhook' : 'hub'" />
+          <q-avatar size="lg" :color="getCategoryColor(integration?.category)" text-color="white" :icon="isQuasar ? 'webhook' : (isMetaWhatsApp ? 'chat' : 'hub')" />
           <div>
             <div class="text-h6 text-weight-bold">{{ integration?.name }} Vault</div>
             <div class="text-caption text-grey-5">
-              {{ isQuasar ? 'Manage Quasar webhook signing secret and payment credentials' : 'Manage credentials, certificates, and environments' }}
+              <template v-if="isQuasar">Manage Quasar webhook signing secret and payment credentials</template>
+              <template v-else-if="isMetaWhatsApp">Manage Meta WhatsApp Cloud API credentials and webhook config</template>
+              <template v-else>Manage credentials, certificates, and environments</template>
             </div>
           </div>
         </div>
@@ -227,6 +229,159 @@
           </div>
         </div>
 
+        <!-- Meta WhatsApp Cloud API panel -->
+        <div v-if="isMetaWhatsApp" class="row q-col-gutter-md q-mb-lg">
+          <div class="col-12 col-md-7">
+            <q-card flat class="enterprise-panel bg-subpanel border-main">
+              <q-card-section>
+                <div class="row justify-between items-start">
+                  <div class="row items-center op-gap-8">
+                    <q-avatar size="md" color="green-9" text-color="green-2" icon="chat" />
+                    <div>
+                      <div class="text-weight-bold text-subtitle1">Meta WhatsApp Cloud API</div>
+                      <div class="text-caption text-grey-5">META_WHATSAPP · {{ activeEnvironment }}</div>
+                    </div>
+                  </div>
+                  <q-chip
+                    dense size="sm"
+                    :color="metaStatus?.ready ? 'green-9' : 'orange-10'"
+                    :text-color="metaStatus?.ready ? 'green-3' : 'orange-2'"
+                  >
+                    {{ metaStatus?.ready ? 'READY' : 'INCOMPLETE' }}
+                  </q-chip>
+                </div>
+
+                <q-separator dark class="q-my-md opacity-20" />
+
+                <div class="row justify-between text-caption text-grey-4 q-mb-sm">
+                  <span>Webhook</span>
+                  <span class="text-cyan-3">{{ metaStatus?.webhookCallbackUrl || 'GET/POST /webhooks/whatsapp' }}</span>
+                </div>
+                <div class="row justify-between text-caption text-grey-4 q-mb-md">
+                  <span>Required keys</span>
+                  <span class="text-white">{{ metaConfiguredCount }}/{{ META_WHATSAPP_KEYS.length }}</span>
+                </div>
+
+                <div class="column op-gap-8 q-mb-md">
+                  <div
+                    v-for="key in META_WHATSAPP_KEYS"
+                    :key="key"
+                    class="row items-center justify-between text-caption"
+                  >
+                    <span class="text-grey-4 text-monospace">{{ key }}</span>
+                    <span :class="metaKeyConfigured(key) ? 'text-green-4' : 'text-orange-4'">
+                      <q-icon :name="metaKeyConfigured(key) ? 'verified' : 'warning'" size="xs" class="q-mr-xs" />
+                      {{ metaKeyConfigured(key) ? 'Configured' : 'Missing' }}
+                    </span>
+                  </div>
+                </div>
+
+                <q-input
+                  outlined dense dark
+                  v-model="metaForm.PUBLIC_API_BASE_URL"
+                  label="PUBLIC_API_BASE_URL"
+                  hint="e.g. https://api.invify.app"
+                  class="q-mb-sm"
+                />
+                <q-input
+                  outlined dense dark
+                  v-model="metaForm.WHATSAPP_GRAPH_API_VERSION"
+                  label="WHATSAPP_GRAPH_API_VERSION"
+                  hint="default v19.0"
+                  class="q-mb-sm"
+                />
+                <q-input
+                  outlined dense dark
+                  v-model="metaForm.WHATSAPP_PHONE_NUMBER_ID"
+                  label="WHATSAPP_PHONE_NUMBER_ID"
+                  class="q-mb-sm"
+                />
+                <q-input
+                  outlined dense dark
+                  v-model="metaForm.WHATSAPP_BUSINESS_ACCOUNT_ID"
+                  label="WHATSAPP_BUSINESS_ACCOUNT_ID"
+                  class="q-mb-sm"
+                />
+                <q-input
+                  outlined dense dark
+                  v-model="metaForm.WHATSAPP_ACCESS_TOKEN"
+                  :type="revealMetaToken ? 'text' : 'password'"
+                  label="WHATSAPP_ACCESS_TOKEN"
+                  autocomplete="new-password"
+                  data-lpignore="true"
+                  class="q-mb-sm"
+                >
+                  <template #append>
+                    <q-btn flat round dense :icon="revealMetaToken ? 'visibility_off' : 'visibility'" @click="revealMetaToken = !revealMetaToken" />
+                  </template>
+                </q-input>
+                <q-input
+                  outlined dense dark
+                  v-model="metaForm.WHATSAPP_APP_SECRET"
+                  :type="revealMetaAppSecret ? 'text' : 'password'"
+                  label="WHATSAPP_APP_SECRET"
+                  autocomplete="new-password"
+                  data-lpignore="true"
+                  class="q-mb-sm"
+                >
+                  <template #append>
+                    <q-btn flat round dense :icon="revealMetaAppSecret ? 'visibility_off' : 'visibility'" @click="revealMetaAppSecret = !revealMetaAppSecret" />
+                  </template>
+                </q-input>
+                <q-input
+                  outlined dense dark
+                  v-model="metaForm.WHATSAPP_WEBHOOK_VERIFY_TOKEN"
+                  :type="revealMetaVerify ? 'text' : 'password'"
+                  label="WHATSAPP_WEBHOOK_VERIFY_TOKEN"
+                  hint="Must match Meta App → WhatsApp → Webhooks → Verify Token"
+                  autocomplete="new-password"
+                  data-lpignore="true"
+                  class="q-mb-md"
+                >
+                  <template #append>
+                    <q-btn flat round dense :icon="revealMetaVerify ? 'visibility_off' : 'visibility'" @click="revealMetaVerify = !revealMetaVerify" />
+                  </template>
+                </q-input>
+
+                <q-btn
+                  unelevated color="green-7" class="full-width"
+                  icon="lock"
+                  label="Save Meta WhatsApp Credentials"
+                  :loading="savingMeta"
+                  :disable="!metaFormHasValues"
+                  @click="saveMetaWhatsApp"
+                />
+              </q-card-section>
+            </q-card>
+          </div>
+
+          <div class="col-12 col-md-5">
+            <q-card flat class="enterprise-panel bg-subpanel border-main">
+              <q-card-section>
+                <div class="row items-center op-gap-8 q-mb-md">
+                  <q-avatar size="md" color="blue-grey-8" text-color="cyan-2" icon="info" />
+                  <div>
+                    <div class="text-weight-bold text-subtitle1">How to configure</div>
+                    <div class="text-caption text-grey-5">Meta App → WhatsApp → Webhooks</div>
+                  </div>
+                </div>
+                <q-separator dark class="q-my-md opacity-20" />
+                <ol class="text-caption text-grey-4 q-pl-md" style="line-height: 1.7;">
+                  <li>Save credentials here for the <strong>PRODUCTION</strong> (or SANDBOX) tab</li>
+                  <li>In Meta Developer Console open WhatsApp → Configuration</li>
+                  <li>Callback URL = <code>{{ metaStatus?.webhookCallbackUrl || '{PUBLIC_API_BASE_URL}/webhooks/whatsapp' }}</code></li>
+                  <li>Verify Token = exact <code>WHATSAPP_WEBHOOK_VERIFY_TOKEN</code> value</li>
+                  <li>Subscribe to field <code>messages</code></li>
+                  <li>Approve templates: OTP, invoice, receipt, payment reminder</li>
+                </ol>
+                <div class="text-caption text-grey-5 q-mt-md">
+                  Empty fields are skipped on save (partial updates allowed). Secrets are never shown after save.
+                </div>
+              </q-card-section>
+            </q-card>
+          </div>
+        </div>
+
         <!-- Credentials Table -->
         <q-card flat class="bg-subpanel border-main">
           <q-table
@@ -369,12 +524,50 @@ const testingAdminCreds = ref(false);
 const adminCredStatus = ref(null);
 const adminLoginPing = ref(null);
 
+const META_WHATSAPP_KEYS = [
+  'PUBLIC_API_BASE_URL',
+  'WHATSAPP_GRAPH_API_VERSION',
+  'WHATSAPP_ACCESS_TOKEN',
+  'WHATSAPP_APP_SECRET',
+  'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+  'WHATSAPP_BUSINESS_ACCOUNT_ID',
+  'WHATSAPP_PHONE_NUMBER_ID',
+];
+
+const metaStatus = ref(null);
+const savingMeta = ref(false);
+const revealMetaToken = ref(false);
+const revealMetaAppSecret = ref(false);
+const revealMetaVerify = ref(false);
+const metaForm = ref({
+  PUBLIC_API_BASE_URL: '',
+  WHATSAPP_GRAPH_API_VERSION: 'v19.0',
+  WHATSAPP_ACCESS_TOKEN: '',
+  WHATSAPP_APP_SECRET: '',
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN: '',
+  WHATSAPP_BUSINESS_ACCOUNT_ID: '',
+  WHATSAPP_PHONE_NUMBER_ID: '',
+});
+
 const newCred = ref({ type: 'API_KEY', key_name: '', value: '', expires_at: '', rotate: false });
 
 const isQuasar = computed(() => {
   const id = String(props.integration?.service_identifier || '').toLowerCase();
   return id === 'quasar' || id === 'quasar_ledger' || id.includes('quasar');
 });
+
+const isMetaWhatsApp = computed(() => {
+  const id = String(props.integration?.service_identifier || '').toUpperCase();
+  return id === 'META_WHATSAPP' || id.includes('WHATSAPP');
+});
+
+const metaFormHasValues = computed(() =>
+  META_WHATSAPP_KEYS.some((k) => String(metaForm.value[k] || '').trim() !== '')
+);
+
+const metaConfiguredCount = computed(() =>
+  META_WHATSAPP_KEYS.filter((k) => metaKeyConfigured(k)).length
+);
 
 const columns = [
   { name: 'key_name', label: 'Version Name', align: 'left', field: 'key_name' },
@@ -391,7 +584,7 @@ const credentialsForEnv = computed(() => {
 });
 
 function getCategoryColor(cat) {
-  const map = { 'COMMUNICATIONS': 'green-6', 'POS': 'cyan-6', 'AI': 'purple-6', 'PAYMENTS': 'teal-6' };
+  const map = { 'COMMUNICATIONS': 'green-6', 'MESSAGING': 'green-6', 'POS': 'cyan-6', 'AI': 'purple-6', 'PAYMENTS': 'teal-6' };
   return map[cat] || 'grey-6';
 }
 
@@ -440,6 +633,59 @@ async function loadAdminCredStatus() {
 function onEnvironmentChange() {
   loadWebhookStatus();
   loadAdminCredStatus();
+  loadMetaWhatsAppStatus();
+}
+
+function metaKeyConfigured(key) {
+  return Boolean(metaStatus.value?.keys?.[key]?.configured);
+}
+
+async function loadMetaWhatsAppStatus() {
+  if (!isMetaWhatsApp.value) return;
+  try {
+    const res = await vaultApi.getMetaWhatsAppStatus(activeEnvironment.value);
+    metaStatus.value = res.data?.data || res.data || null;
+  } catch (err) {
+    console.error(err);
+    metaStatus.value = { ready: false, keys: {}, webhookCallbackUrl: '/webhooks/whatsapp' };
+  }
+}
+
+async function saveMetaWhatsApp() {
+  if (!metaFormHasValues.value) {
+    $q.notify({ type: 'warning', message: 'Enter at least one WhatsApp credential value.' });
+    return;
+  }
+  try {
+    savingMeta.value = true;
+    const payload = { environment: activeEnvironment.value };
+    for (const key of META_WHATSAPP_KEYS) {
+      const val = String(metaForm.value[key] || '').trim();
+      if (val) payload[key] = val;
+    }
+    const res = await vaultApi.saveMetaWhatsAppCredentials(payload);
+    $q.notify({
+      type: 'positive',
+      message: res.data?.message || 'Meta WhatsApp credentials saved to Integration Vault.',
+    });
+    // Clear secrets after save; keep non-secret fields for convenience
+    metaForm.value.WHATSAPP_ACCESS_TOKEN = '';
+    metaForm.value.WHATSAPP_APP_SECRET = '';
+    metaForm.value.WHATSAPP_WEBHOOK_VERIFY_TOKEN = '';
+    revealMetaToken.value = false;
+    revealMetaAppSecret.value = false;
+    revealMetaVerify.value = false;
+    await loadMetaWhatsAppStatus();
+    emit('refresh');
+  } catch (err) {
+    console.error(err);
+    $q.notify({
+      type: 'negative',
+      message: err.response?.data?.error || 'Failed to save Meta WhatsApp credentials.',
+    });
+  } finally {
+    savingMeta.value = false;
+  }
 }
 
 async function saveWebhookSecret() {
@@ -659,10 +905,17 @@ watch(isQuasar, (val) => {
   }
 }, { immediate: true });
 
+watch(isMetaWhatsApp, (val) => {
+  if (val) loadMetaWhatsAppStatus();
+}, { immediate: true });
+
 onMounted(() => {
   if (isQuasar.value) {
     loadWebhookStatus();
     loadAdminCredStatus();
+  }
+  if (isMetaWhatsApp.value) {
+    loadMetaWhatsAppStatus();
   }
 });
 </script>

@@ -52,6 +52,7 @@ class StaffRepositoryImpl implements StaffRepository {
             virtualBankName: Value(staff.virtualBankName),
             virtualAccountNumber: Value(staff.virtualAccountNumber),
             virtualAccountName: Value(staff.virtualAccountName),
+            bankCode: Value(staff.bankCode),
           ),
         );
   }
@@ -79,6 +80,7 @@ class StaffRepositoryImpl implements StaffRepository {
             virtualBankName: Value(staff.virtualBankName),
             virtualAccountNumber: Value(staff.virtualAccountNumber),
             virtualAccountName: Value(staff.virtualAccountName),
+            bankCode: Value(staff.bankCode),
           ),
         );
   }
@@ -123,6 +125,7 @@ class StaffRepositoryImpl implements StaffRepository {
       virtualBankName: row.virtualBankName,
       virtualAccountNumber: row.virtualAccountNumber,
       virtualAccountName: row.virtualAccountName,
+      bankCode: row.bankCode,
     );
   }
 }

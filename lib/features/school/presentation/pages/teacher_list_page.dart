@@ -4,6 +4,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/school/presentation/pages/teacher_profile_page.dart';
 import '../widgets/teacher_form_dialog.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class TeacherListPage extends StatefulWidget {
@@ -30,9 +31,7 @@ class _TeacherListPageState extends State<TeacherListPage> {
       body: BlocListener<SchoolBloc, SchoolState>(
         listener: (context, state) {
           if (state.error != null && state.error!.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
-            );
+            showFriendlyErrorSnackBar(context, state.error);
             context.read<SchoolBloc>().add(ResetSchoolStatus());
           }
         },

@@ -61,7 +61,7 @@ export const useOnboardingStore = defineStore('onboarding', {
       this.setLoading(true);
       this.setError(null);
       try {
-        await axios.post('/auth/verify-email-otp', { email: this.userDetails.email, otp });
+        await axios.post('/auth/verify-email-otp', { email: this.userDetails.email, code: otp, otp });
         this.emailVerified = true;
       } catch (err: any) {
         this.setError(err.response?.data?.message || 'Failed to verify email OTP');
@@ -89,7 +89,7 @@ export const useOnboardingStore = defineStore('onboarding', {
       this.setLoading(true);
       this.setError(null);
       try {
-        await axios.post('/auth/verify-whatsapp-otp', { phone: this.userDetails.phone, otp });
+        await axios.post('/auth/verify-whatsapp-otp', { phone: this.userDetails.phone, code: otp, otp });
         this.phoneVerified = true;
       } catch (err: any) {
         this.setError(err.response?.data?.message || 'Failed to verify WhatsApp OTP');

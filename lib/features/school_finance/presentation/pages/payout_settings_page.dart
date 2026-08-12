@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../../../core/services/service_locator.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
@@ -41,7 +42,7 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
         _bankCodeController.text = settings['bank_code'] ?? '';
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading settings: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not load payout settings.'))));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -60,7 +61,7 @@ class _PayoutSettingsPageState extends State<PayoutSettingsPage> {
       );
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Payout settings saved successfully!'), backgroundColor: Colors.green));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not save payout settings.')), backgroundColor: Colors.red));
     } finally {
       setState(() => _isSaving = false);
     }

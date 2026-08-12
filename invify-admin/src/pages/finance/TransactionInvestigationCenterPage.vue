@@ -12,40 +12,48 @@
           </div>
         </div>
         <q-chip dense color="cyan-10" text-color="cyan-3" class="text-metric-sm q-ma-none font-mono">
-          MASTER_LEDGER_PARITY_CHECK: ENABLED
+          LIVE_DATA
         </q-chip>
       </div>
 
       <div class="row items-center op-gap-8 no-wrap">
-        <q-btn outline size="xs" color="grey-6" icon="filter_list" label="Advanced Filters" class="text-caption text-weight-bold" />
-        <q-btn size="xs" color="cyan-4" icon="download" label="Export Trace" class="text-caption text-weight-bold text-black" />
+        <q-btn
+          outline
+          size="xs"
+          color="grey-6"
+          icon="refresh"
+          label="Refresh"
+          class="text-caption text-weight-bold"
+          :loading="loading"
+          @click="loadTransactions"
+        />
       </div>
     </div>
 
-    <!-- KPIs -->
+    <!-- KPIs (computed from live rows only) -->
     <div class="row q-col-gutter-sm q-mb-md">
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left">
-          <div class="text-operator-title text-muted">Real-Time Volume</div>
-          <div class="text-h4 text-metric-mono text-cyan-4">12,408 <span class="text-caption text-muted">TPS</span></div>
+          <div class="text-operator-title text-muted">Loaded Transactions</div>
+          <div class="text-h4 text-metric-mono text-cyan-4">{{ kpis.total }} <span class="text-caption text-muted">TXNs</span></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left">
-          <div class="text-operator-title text-muted">Pending Reconciliation</div>
-          <div class="text-h4 text-metric-mono text-indigo-4">142 <span class="text-caption text-muted">TXNs</span></div>
+          <div class="text-operator-title text-muted">Pending / Unsettled</div>
+          <div class="text-h4 text-metric-mono text-indigo-4">{{ kpis.pending }} <span class="text-caption text-muted">TXNs</span></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left">
-          <div class="text-operator-title text-muted">Elevated Risk Scores (>75)</div>
-          <div class="text-h4 text-metric-mono text-amber-5">18 <span class="text-caption text-muted">FLAGS</span></div>
+          <div class="text-operator-title text-muted">Failed / Declined</div>
+          <div class="text-h4 text-metric-mono text-amber-5">{{ kpis.failed }} <span class="text-caption text-muted">TXNs</span></div>
         </div>
       </div>
       <div class="col-12 col-sm-6 col-md-3">
         <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left">
-          <div class="text-operator-title text-muted">Unmapped Ledger Entries</div>
-          <div class="text-h4 text-metric-mono text-red-5">0 <span class="text-caption text-muted">ANOMALIES</span></div>
+          <div class="text-operator-title text-muted">Total Volume</div>
+          <div class="text-h4 text-metric-mono text-red-5">{{ currentCurrency.symbol }}{{ formatMoney(kpis.volume) }}</div>
         </div>
       </div>
     </div>
@@ -57,7 +65,7 @@
           <q-icon name="sync_alt" color="cyan-4" size="sm" />
           <span class="text-subtitle2 text-weight-bold">Global Transaction Ledger Explorer</span>
         </div>
-        <q-input dense outlined bg-color="dark" v-model="searchQuery" placeholder="Search TXN ID, Wallet, or Device..." class="text-caption" style="width: 300px;">
+        <q-input dense outlined bg-color="dark" v-model="searchQuery" placeholder="Search TXN ID, tenant, reference..." class="text-caption" style="width: 300px;">
           <template v-slot:append>
             <q-icon name="search" color="grey-5" />
           </template>
@@ -67,10 +75,12 @@
       <q-table
         class="bg-transparent text-main flex-grow-1 transaction-table"
         flat
-        :rows="transactions"
+        :rows="filteredTransactions"
         :columns="columns"
         row-key="id"
+        :loading="loading"
         :pagination="pagination"
+        :rows-per-page-options="[25, 50, 100]"
         dense
         virtual-scroll
         style="height: 100%;"
@@ -80,10 +90,17 @@
             {{ props.value }}
           </q-td>
         </template>
+
+        <template v-slot:body-cell-tenantName="props">
+          <q-td :props="props">
+            <div class="text-main text-weight-medium">{{ props.row.tenantName || '—' }}</div>
+            <div class="text-muted font-mono" style="font-size: 10px;">{{ props.row.tenantId || '—' }}</div>
+          </q-td>
+        </template>
         
         <template v-slot:body-cell-amount="props">
           <q-td :props="props" class="font-mono text-weight-bold" :class="props.row.type === 'CREDIT' ? 'text-green-4' : 'text-amber-4'">
-            {{ props.row.type === 'CREDIT' ? '+' : '-' }}{{ currentCurrency.symbol }}{{ props.value.toLocaleString() }}
+            {{ props.row.type === 'CREDIT' ? '+' : '-' }}{{ currentCurrency.symbol }}{{ Number(props.value || 0).toLocaleString() }}
           </q-td>
         </template>
 
@@ -96,7 +113,10 @@
         
         <template v-slot:body-cell-reconciliationStatus="props">
           <q-td :props="props">
-            <q-badge :color="props.value === 'MATCHED' ? 'green-10' : 'amber-10'" :text-color="props.value === 'MATCHED' ? 'green-3' : 'amber-3'">
+            <q-badge
+              :color="reconBadge(props.value).bg"
+              :text-color="reconBadge(props.value).fg"
+            >
               {{ props.value }}
             </q-badge>
           </q-td>
@@ -109,272 +129,61 @@
             </q-btn>
           </q-td>
         </template>
+
+        <template v-slot:no-data>
+          <div class="full-width row flex-center q-pa-xl text-grey-6">
+            <q-icon size="2em" name="receipt_long" class="q-mr-sm" />
+            <span>{{ loading ? 'Loading transactions…' : 'No live transactions found.' }}</span>
+          </div>
+        </template>
       </q-table>
     </div>
 
     <!-- Deep Inspection Drawer -->
-    <q-drawer v-model="drawerOpen" side="right" overlay bordered class="bg-panel border-left drawer-shadow" :width="850">
+    <q-drawer v-model="drawerOpen" side="right" overlay bordered class="bg-panel border-left drawer-shadow" :width="720">
       <div v-if="selectedTx" class="column full-height">
         
-        <!-- Drawer Header & Health -->
         <div class="q-pa-md border-bottom bg-subpanel">
           <div class="row justify-between items-start q-mb-md">
             <div>
               <div class="row items-center op-gap-8 q-mb-xs">
                 <q-badge color="cyan-10" text-color="cyan-3" label="TXN INVESTIGATION" />
-                <div class="text-h5 font-mono text-main">{{ selectedTx.id }}</div>
+                <div class="text-h6 font-mono text-main">{{ selectedTx.id }}</div>
               </div>
-              <div class="text-caption text-muted font-mono">Ledger Batch: {{ selectedTx.ledgerBatchId }} | Target: {{ selectedTx.walletId }}</div>
+              <div class="text-caption text-muted font-mono">
+                Ref: {{ selectedTx.reference || '—' }} · Provider: {{ selectedTx.provider || '—' }}
+              </div>
             </div>
-            <q-btn flat dense round icon="close" v-close-popup />
-          </div>
-
-          <!-- Transaction Health Pipeline -->
-          <div class="text-operator-title text-muted q-mb-sm">Transaction Health Status</div>
-          <div class="row items-center op-gap-12 font-mono text-caption">
-            <div class="row items-center op-gap-4"><q-icon name="check_circle" color="green-4" size="xs" /><span class="text-white">Created</span></div>
-            <div class="text-muted">→</div>
-            <div class="row items-center op-gap-4"><q-icon name="check_circle" color="green-4" size="xs" /><span class="text-white">Ledger Posted</span></div>
-            <div class="text-muted">→</div>
-            <div class="row items-center op-gap-4"><q-icon name="check_circle" color="green-4" size="xs" /><span class="text-white">Reconciled</span></div>
-            <div class="text-muted">→</div>
-            <div class="row items-center op-gap-4"><q-icon name="check_circle" color="green-4" size="xs" /><span class="text-white">Settlement Gen</span></div>
-            <div class="text-muted">→</div>
-            <div class="row items-center op-gap-4"><q-icon name="warning" color="amber-4" size="xs" /><span class="text-amber-4">Notification Failed</span></div>
+            <q-btn flat dense round icon="close" @click="drawerOpen = false" />
           </div>
         </div>
 
-        <!-- Action Center -->
-        <div class="q-px-md q-py-sm border-bottom bg-dark row items-center op-gap-8">
-          <q-btn size="sm" outline color="cyan-4" icon="account_balance_wallet" label="View Ledger" />
-          <q-btn size="sm" outline color="indigo-4" icon="payments" label="View Settlement" />
-          <q-btn size="sm" outline color="grey-5" icon="history" label="Audit Trail" />
-          <q-btn size="sm" outline color="grey-5" icon="download" label="Export" />
-          <q-space />
-          <q-btn size="sm" color="amber-10" text-color="amber-3" icon="gavel" label="Raise Dispute" class="q-mr-sm" />
-          <q-btn size="sm" color="red-10" text-color="red-3" icon="lock" label="Freeze Wallet" />
-        </div>
-
-        <!-- Drawer Tabs -->
-        <q-tabs v-model="activeTab" dense class="text-grey-5 border-bottom bg-subpanel" active-color="cyan-4" indicator-color="cyan-4" align="left" narrow-indicator>
-          <q-tab name="overview" label="Overview" />
-          <q-tab name="timeline" label="Timeline" />
-          <q-tab name="flow" label="Financial Flow" />
-          <q-tab name="related" label="Related Records" />
-          <q-tab name="ledger" label="Ledger" />
-          <q-tab name="settlement" label="Settlement" />
-          <q-tab name="recon" label="Recon" />
-          <q-tab name="audit" label="Audit" />
-        </q-tabs>
-
-        <!-- Drawer Content -->
         <q-scroll-area class="col q-pa-md">
-          <q-tab-panels v-model="activeTab" animated class="bg-transparent">
-            
-            <!-- OVERVIEW -->
-            <q-tab-panel name="overview" class="q-pa-none">
-              <div class="row q-col-gutter-md">
-                
-                <!-- Financial Core -->
-                <div class="col-12 col-md-6">
-                  <div class="text-operator-title text-muted q-mb-sm">Financial Core</div>
-                  <div class="enterprise-subpanel q-pa-sm border-muted rounded-borders font-mono text-caption">
-                    <div class="row justify-between q-mb-xs"><span>Amount:</span> <span class="text-white text-h6" style="line-height:1">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Currency:</span> <span class="text-white">NGN</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Type:</span> <span :class="selectedTx.type === 'CREDIT' ? 'text-green-4' : 'text-amber-4'">{{ selectedTx.type }}</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Channel:</span> <span class="text-white">{{ selectedTx.channel }}</span></div>
-                  </div>
-                </div>
-
-                <!-- Tenant Context -->
-                <div class="col-12 col-md-6">
-                  <div class="text-operator-title text-muted q-mb-sm">Tenant Context</div>
-                  <div class="enterprise-subpanel q-pa-sm border-muted rounded-borders font-mono text-caption">
-                    <div class="row justify-between q-mb-xs"><span>Tenant ID:</span> <span class="text-cyan-3">{{ selectedTx.tenantId }}</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Name:</span> <span class="text-white">Future Leaders Academy</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Type:</span> <span class="text-white">{{ selectedTx.tenantType }}</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Wallet Bal:</span> <span class="text-green-4">{{ currentCurrency.symbol }}2,500,000</span></div>
-                  </div>
-                </div>
-
-                <!-- Device & Terminal Context -->
-                <div class="col-12 col-md-6">
-                  <div class="text-operator-title text-muted q-mb-sm">Device & Terminal Context</div>
-                  <div class="enterprise-subpanel q-pa-sm border-muted rounded-borders font-mono text-caption">
-                    <div class="row justify-between q-mb-xs"><span>Origin Device:</span> <span class="text-blue-grey-3">{{ selectedTx.deviceId || 'MOBI-XR92' }}</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Terminal ID:</span> <span class="text-blue-grey-3">{{ selectedTx.terminalId || 'POS-2091A' }}</span></div>
-                    <div class="row justify-between q-mb-xs"><span>MPOS Status:</span> <span class="text-green-4">Active</span></div>
-                    <div class="row justify-between q-mb-xs"><span>Last Sync:</span> <span class="text-muted">2 mins ago</span></div>
-                  </div>
-                </div>
-
-                <!-- Fraud & Risk Visual Card -->
-                <div class="col-12 col-md-6">
-                  <div class="text-operator-title text-muted q-mb-sm">Fraud & Intelligence Engine</div>
-                  <div class="enterprise-subpanel q-pa-sm border-muted rounded-borders font-mono text-caption" :class="selectedTx.riskScore > 70 ? 'border-red-left bg-red-10' : 'border-green-left'">
-                    <div class="row justify-between q-mb-sm">
-                      <span>Risk Score:</span> 
-                      <span class="text-weight-bold" :class="selectedTx.riskScore > 70 ? 'text-red-2 text-h6' : 'text-green-4 text-h6'" style="line-height:1">{{ selectedTx.riskScore }}/100</span>
-                    </div>
-                    <div class="row justify-between q-mb-xs">
-                      <span>Anomaly Score:</span> 
-                      <span class="text-white">{{ selectedTx.anomalyScore }}</span>
-                    </div>
-                    <q-separator dark class="q-my-sm opacity-50" />
-                    <div>
-                      <div class="q-mb-xs">Fraud Flags:</div>
-                      <div v-if="selectedTx.fraudFlags === 0" class="text-green-4">✓ No Anomalies Detected</div>
-                      <div v-else class="column op-gap-4">
-                        <div class="text-red-2 row items-center op-gap-4"><q-icon name="warning" /> Velocity Breach (3x/min)</div>
-                        <div class="text-red-2 row items-center op-gap-4"><q-icon name="warning" /> Duplicate Payment Pattern</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-            </q-tab-panel>
-
-            <!-- TIMELINE -->
-            <q-tab-panel name="timeline" class="q-pa-none">
-              <div class="text-operator-title text-muted q-mb-sm">Transaction Lifecycle Timeline</div>
-              <div class="enterprise-subpanel q-pa-md border-muted rounded-borders">
-                <q-timeline color="cyan-4" layout="dense" class="font-mono text-caption">
-                  <q-timeline-entry title="Transaction Created" subtitle="10:01:22" icon="add_circle" />
-                  <q-timeline-entry title="Wallet Debited" subtitle="10:01:23" icon="account_balance_wallet" />
-                  <q-timeline-entry title="Ledger Posted" subtitle="10:01:23" icon="menu_book" color="amber-4" />
-                  <q-timeline-entry title="Settlement Batch Assigned" subtitle="10:01:25" icon="payments" color="indigo-4" />
-                  <q-timeline-entry title="Notification Sent" subtitle="10:01:27" icon="notifications" color="red-4" body="Failed to deliver webhook to tenant." />
-                  <q-timeline-entry title="Transaction Completed" subtitle="10:01:29" icon="check_circle" color="green-4" />
-                </q-timeline>
-              </div>
-            </q-tab-panel>
-
-            <!-- FINANCIAL FLOW -->
-            <q-tab-panel name="flow" class="q-pa-none">
-              <div class="text-operator-title text-muted q-mb-sm">Financial Flow Visualization</div>
-              <div class="enterprise-subpanel q-pa-lg border-muted rounded-borders flex flex-center column font-mono">
-                <div class="q-pa-sm border-muted rounded-borders bg-dark text-center" style="width: 250px;">
-                  <div class="text-amber-4 text-weight-bold">Parent Wallet</div>
-                  <div class="text-muted text-caption">wal_par_9012</div>
-                </div>
-                <div class="q-py-sm"><q-icon name="arrow_downward" color="grey-6" size="sm" /></div>
-                
-                <div class="q-pa-sm border-muted rounded-borders bg-dark text-center" style="width: 250px;">
-                  <div class="text-cyan-4 text-weight-bold">Student Wallet</div>
-                  <div class="text-muted text-caption">wal_stu_7482</div>
-                </div>
-                <div class="q-py-sm"><q-icon name="arrow_downward" color="grey-6" size="sm" /></div>
-
-                <div class="q-pa-sm border-muted rounded-borders bg-dark text-center border-amber-left" style="width: 250px;">
-                  <div class="text-indigo-4 text-weight-bold">School Wallet (Tenant)</div>
-                  <div class="text-muted text-caption">tnt_edu_9421</div>
-                </div>
-                <div class="q-py-sm"><q-icon name="arrow_downward" color="grey-6" size="sm" /></div>
-
-                <div class="q-pa-sm border-muted rounded-borders bg-dark text-center" style="width: 250px;">
-                  <div class="text-green-4 text-weight-bold">Settlement Batch</div>
-                  <div class="text-muted text-caption">stl_batch_4401</div>
-                </div>
-                <div class="q-py-sm"><q-icon name="arrow_downward" color="grey-6" size="sm" /></div>
-
-                <div class="q-pa-sm border-muted rounded-borders bg-dark text-center" style="width: 250px;">
-                  <div class="text-white text-weight-bold">Bank Account</div>
-                  <div class="text-muted text-caption">GTB - 0123456789</div>
-                </div>
-              </div>
-            </q-tab-panel>
-
-            <!-- RELATED RECORDS -->
-            <q-tab-panel name="related" class="q-pa-none">
-              <div class="text-operator-title text-muted q-mb-sm">Related Investigation Records</div>
-              <div class="enterprise-subpanel border-muted rounded-borders font-mono text-caption">
-                <q-list separator dark class="bg-transparent">
-                  <q-item clickable v-ripple class="hover-bg">
-                    <q-item-section avatar><q-badge color="cyan-10" text-color="cyan-3">TXN</q-badge></q-item-section>
-                    <q-item-section><q-item-label class="text-cyan-3">{{ selectedTx.id }}</q-item-label><q-item-label caption>Original Payment</q-item-label></q-item-section>
-                  </q-item>
-                  <q-item clickable v-ripple class="hover-bg">
-                    <q-item-section avatar><q-badge color="amber-10" text-color="amber-3">LED</q-badge></q-item-section>
-                    <q-item-section><q-item-label class="text-amber-3">LED-2001, LED-2002</q-item-label><q-item-label caption>Double-Entry Postings</q-item-label></q-item-section>
-                  </q-item>
-                  <q-item clickable v-ripple class="hover-bg">
-                    <q-item-section avatar><q-badge color="indigo-10" text-color="indigo-3">SET</q-badge></q-item-section>
-                    <q-item-section><q-item-label class="text-indigo-3">{{ selectedTx.settlementBatchId }}</q-item-label><q-item-label caption>Settlement Record</q-item-label></q-item-section>
-                  </q-item>
-                  <q-item clickable v-ripple class="hover-bg">
-                    <q-item-section avatar><q-badge color="grey-9" text-color="grey-4">AUD</q-badge></q-item-section>
-                    <q-item-section><q-item-label class="text-grey-4">AUD-4001</q-item-label><q-item-label caption>Compliance Audit Event</q-item-label></q-item-section>
-                  </q-item>
-                  <q-item clickable v-ripple class="hover-bg">
-                    <q-item-section avatar><q-badge color="red-10" text-color="red-3">NOT</q-badge></q-item-section>
-                    <q-item-section><q-item-label class="text-red-3">NOT-5001</q-item-label><q-item-label caption>Failed Webhook Delivery</q-item-label></q-item-section>
-                  </q-item>
-                </q-list>
-              </div>
-            </q-tab-panel>
-
-            <!-- LEDGER ENTRIES -->
-            <q-tab-panel name="ledger" class="q-pa-none">
-              <div class="text-operator-title text-muted q-mb-sm">Double-Entry Postings (Immutable)</div>
-              <div class="enterprise-subpanel border-muted rounded-borders overflow-hidden">
-                <table class="full-width text-left font-mono text-caption" style="border-collapse: collapse;">
-                  <thead class="bg-dark text-grey-5 border-bottom">
-                    <tr>
-                      <th class="q-pa-sm">Account</th>
-                      <th class="q-pa-sm">Type</th>
-                      <th class="q-pa-sm text-right">Debit</th>
-                      <th class="q-pa-sm text-right">Credit</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr class="border-bottom hover-bg">
-                      <td class="q-pa-sm text-cyan-3">1010-PLATFORM-FLOAT</td>
-                      <td class="q-pa-sm">Asset</td>
-                      <td class="q-pa-sm text-right text-green-4">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</td>
-                      <td class="q-pa-sm text-right text-muted">-</td>
-                    </tr>
-                    <tr class="hover-bg">
-                      <td class="q-pa-sm text-indigo-3">2020-TENANT-WALLET</td>
-                      <td class="q-pa-sm">Liability</td>
-                      <td class="q-pa-sm text-right text-muted">-</td>
-                      <td class="q-pa-sm text-right text-amber-4">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</td>
-                    </tr>
-                  </tbody>
-                  <tfoot class="bg-dark border-top text-weight-bold">
-                    <tr>
-                      <td colspan="2" class="q-pa-sm">PARITY CHECK: MATCHED</td>
-                      <td class="q-pa-sm text-right">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</td>
-                      <td class="q-pa-sm text-right">{{ currentCurrency.symbol }}{{ selectedTx.amount.toLocaleString() }}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </q-tab-panel>
-
-            <!-- SETTLEMENT -->
-            <q-tab-panel name="settlement" class="q-pa-none">
-              <div class="text-operator-title text-muted q-mb-sm">Settlement Orchestration</div>
+          <div class="row q-col-gutter-md">
+            <div class="col-12 col-md-6">
+              <div class="text-operator-title text-muted q-mb-sm">Financial Core</div>
               <div class="enterprise-subpanel q-pa-sm border-muted rounded-borders font-mono text-caption">
-                <div class="row justify-between q-mb-xs"><span>Status:</span> <q-badge color="indigo-10" text-color="indigo-3">{{ selectedTx.settlementStatus }}</q-badge></div>
-                <div class="row justify-between q-mb-xs"><span>Batch ID:</span> <span class="text-indigo-3">{{ selectedTx.settlementBatchId }}</span></div>
-                <div class="row justify-between q-mb-xs"><span>Gateway:</span> <span class="text-white">NIBSS-NIP</span></div>
-                <div class="row justify-between"><span>Clearing Timestamp:</span> <span class="text-muted">Pending EOD</span></div>
+                <div class="row justify-between q-mb-xs"><span>Amount:</span> <span class="text-white text-h6" style="line-height:1">{{ currentCurrency.symbol }}{{ Number(selectedTx.amount || 0).toLocaleString() }}</span></div>
+                <div class="row justify-between q-mb-xs"><span>Type:</span> <span :class="selectedTx.type === 'CREDIT' ? 'text-green-4' : 'text-amber-4'">{{ selectedTx.type }}</span></div>
+                <div class="row justify-between q-mb-xs"><span>Channel:</span> <span class="text-white">{{ selectedTx.channel }}</span></div>
+                <div class="row justify-between q-mb-xs"><span>Status:</span> <span class="text-white">{{ selectedTx.reconciliationStatus }}</span></div>
               </div>
-            </q-tab-panel>
+            </div>
 
-            <!-- RECONCILIATION -->
-            <q-tab-panel name="recon" class="q-pa-none">
-              <div class="text-operator-title text-muted q-mb-sm">Reconciliation Engine Trace</div>
-              <div class="text-caption text-muted italic">Awaiting external bank statement MT940 parsing for parity validation.</div>
-            </q-tab-panel>
-            
-            <q-tab-panel name="audit" class="q-pa-none">
-              <div class="text-operator-title text-muted q-mb-sm">Audit Engine Trace</div>
-              <div class="text-caption text-muted italic">Immutable operational traces mapped successfully.</div>
-            </q-tab-panel>
+            <div class="col-12 col-md-6">
+              <div class="text-operator-title text-muted q-mb-sm">Tenant Context</div>
+              <div class="enterprise-subpanel q-pa-sm border-muted rounded-borders font-mono text-caption">
+                <div class="row justify-between q-mb-xs"><span>Tenant:</span> <span class="text-white">{{ selectedTx.tenantName || '—' }}</span></div>
+                <div class="row justify-between q-mb-xs"><span>Tenant ID:</span> <span class="text-cyan-3">{{ selectedTx.tenantId || '—' }}</span></div>
+                <div class="row justify-between q-mb-xs"><span>Timestamp:</span> <span class="text-white">{{ selectedTx.timestamp }}</span></div>
+              </div>
+            </div>
 
-          </q-tab-panels>
+            <div class="col-12" v-if="selectedTx.raw">
+              <div class="text-operator-title text-muted q-mb-sm">Raw Record</div>
+              <pre class="enterprise-subpanel q-pa-sm border-muted rounded-borders text-secondary font-mono" style="font-size: 10px; white-space: pre-wrap; word-break: break-all;">{{ JSON.stringify(selectedTx.raw, null, 2) }}</pre>
+            </div>
+          </div>
         </q-scroll-area>
       </div>
     </q-drawer>
@@ -386,103 +195,150 @@
 import { useCurrency } from '../../composables/useCurrency';
 const { currentCurrency } = useCurrency();
 
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useQuasar } from 'quasar'
+import { adminApi } from '../../api'
 
+const $q = useQuasar()
 const searchQuery = ref('')
 const drawerOpen = ref(false)
-const activeTab = ref('overview')
 const selectedTx = ref(null)
+const loading = ref(false)
+const transactions = ref([])
+const tenantNameById = ref({})
 
-const pagination = ref({ rowsPerPage: 15 })
+const pagination = ref({ rowsPerPage: 25, sortBy: 'timestamp', descending: true })
 
 const columns = [
   { name: 'id', label: 'TXN ID', field: 'id', align: 'left' },
-  { name: 'timestamp', label: 'TIMESTAMP', field: 'timestamp', align: 'left' },
-  { name: 'tenantId', label: 'TENANT ID', field: 'tenantId', align: 'left' },
-  { name: 'amount', label: 'AMOUNT', field: 'amount', align: 'right' },
+  { name: 'timestamp', label: 'TIMESTAMP', field: 'timestamp', align: 'left', sortable: true },
+  { name: 'tenantName', label: 'TENANT', field: 'tenantName', align: 'left' },
+  { name: 'amount', label: 'AMOUNT', field: 'amount', align: 'right', sortable: true },
   { name: 'channel', label: 'CHANNEL', field: 'channel', align: 'center' },
   { name: 'riskScore', label: 'RISK', field: 'riskScore', align: 'center' },
   { name: 'fraudFlags', label: 'FRAUD FLAGS', field: 'fraudFlags', align: 'center' },
-  { name: 'reconciliationStatus', label: 'RECON STATUS', field: 'reconciliationStatus', align: 'center' },
+  { name: 'reconciliationStatus', label: 'STATUS', field: 'reconciliationStatus', align: 'center' },
   { name: 'actions', label: '', field: 'actions', align: 'right' }
 ]
 
-// Production-grade simulated data strictly adhering to the requested schema
-const transactions = ref([
-  {
-    id: 'tx_98A4F1B3E0C2',
-    tenantId: 'tnt_edu_9421',
-    tenantType: 'School',
-    walletId: 'wal_stu_7482',
-    cardId: null,
-    deviceId: 'dev_mobi_119',
-    terminalId: null,
-    settlementBatchId: 'stl_batch_4401',
-    ledgerBatchId: 'ldg_batch_9921',
-    riskScore: 12,
-    anomalyScore: 0.04,
-    fraudFlags: 0,
-    reconciliationStatus: 'MATCHED',
-    settlementStatus: 'QUEUED',
-    amount: 45000,
-    type: 'CREDIT',
-    channel: 'Wallet Transfer',
-    timestamp: new Date(Date.now() - 1000 * 60 * 2).toISOString()
-  },
-  {
-    id: 'tx_77B2C9D1E4A5',
-    tenantId: 'tnt_ret_5521',
-    tenantType: 'Retail',
-    walletId: 'wal_mer_8832',
-    cardId: 'crd_virt_9941',
-    deviceId: null,
-    terminalId: 'term_pos_412',
-    settlementBatchId: 'stl_batch_4401',
-    ledgerBatchId: 'ldg_batch_9922',
-    riskScore: 84,
-    anomalyScore: 0.92,
-    fraudFlags: 2,
-    reconciliationStatus: 'PENDING',
-    settlementStatus: 'HELD',
-    amount: 1250000,
-    type: 'CREDIT',
-    channel: 'POS Terminal',
-    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString()
-  },
-  {
-    id: 'tx_33C9F2A1D0B7',
-    tenantId: 'tnt_srv_1102',
-    tenantType: 'Service',
-    walletId: 'wal_mer_2210',
-    cardId: null,
-    deviceId: null,
-    terminalId: null,
-    settlementBatchId: 'stl_batch_4400',
-    ledgerBatchId: 'ldg_batch_9918',
-    riskScore: 5,
-    anomalyScore: 0.01,
-    fraudFlags: 0,
-    reconciliationStatus: 'MATCHED',
-    settlementStatus: 'SETTLED',
-    amount: 8500,
-    type: 'DEBIT',
-    channel: 'Bank Transfer',
-    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString()
+const filteredTransactions = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) return transactions.value
+  return transactions.value.filter((t) =>
+    [t.id, t.tenantId, t.tenantName, t.reference, t.channel, t.reconciliationStatus]
+      .join(' ')
+      .toLowerCase()
+      .includes(q)
+  )
+})
+
+const kpis = computed(() => {
+  const rows = transactions.value
+  let pending = 0
+  let failed = 0
+  let volume = 0
+  for (const r of rows) {
+    volume += Number(r.amount || 0)
+    const s = String(r.reconciliationStatus || '').toUpperCase()
+    if (['PENDING', 'UNSETTLED', 'APPROVED (UNSETTLED)', 'HELD', 'QUEUED'].some(x => s.includes(x))) pending += 1
+    if (['FAILED', 'DECLINED', 'ERROR'].some(x => s.includes(x))) failed += 1
   }
-])
+  return { total: rows.length, pending, failed, volume }
+})
+
+function formatMoney(n) {
+  const v = Number(n || 0)
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}B`
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`
+  return v.toLocaleString()
+}
+
+function reconBadge(status) {
+  const s = String(status || '').toUpperCase()
+  if (s.includes('MATCHED') || s.includes('SETTLED') || s.includes('SUCCESS') || s.includes('PAID')) {
+    return { bg: 'green-10', fg: 'green-3' }
+  }
+  if (s.includes('UNSETTLED') || s.includes('APPROVED')) {
+    return { bg: 'amber-10', fg: 'amber-2' }
+  }
+  if (s.includes('FAIL') || s.includes('DECLIN')) {
+    return { bg: 'red-10', fg: 'red-3' }
+  }
+  return { bg: 'amber-10', fg: 'amber-3' }
+}
+
+function mapPaymentRow(p) {
+  const status = String(p.status || p.payment_status || 'PENDING').toUpperCase()
+  const amount = Number(p.amount || p.total_amount || 0)
+  const tenantId = p.tenant_id || p.tenantId || null
+  const tenantName =
+    p.tenants?.name ||
+    p.tenant_name ||
+    tenantNameById.value[tenantId] ||
+    null
+
+  let channel = p.provider || p.payment_method || p.channel || 'Payment'
+  if (/pos|card|emv/i.test(channel)) channel = 'POS Terminal'
+  else if (/wallet/i.test(channel)) channel = 'Wallet Transfer'
+  else if (/transfer|virtual|bank/i.test(channel)) channel = 'Bank Transfer'
+
+  return {
+    id: p.id || p.reference || `pay-${Date.now()}`,
+    tenantId,
+    tenantName,
+    amount,
+    type: amount >= 0 ? 'CREDIT' : 'DEBIT',
+    channel,
+    riskScore: Number(p.risk_score || 0),
+    fraudFlags: Number(p.fraud_flags || 0),
+    reconciliationStatus: status,
+    settlementStatus: p.settlement_status || null,
+    reference: p.reference || p.payment_reference || null,
+    provider: p.provider || null,
+    timestamp: p.created_at || p.updated_at || p.timestamp || null,
+    raw: p
+  }
+}
+
+async function loadTransactions() {
+  loading.value = true
+  try {
+    try {
+      const tenantsRes = await adminApi.getTenants()
+      const tenants = Array.isArray(tenantsRes.data) ? tenantsRes.data : (tenantsRes.data?.data || [])
+      const map = {}
+      for (const t of tenants) {
+        if (t?.id) map[t.id] = t.name || t.agent_code || t.id
+      }
+      tenantNameById.value = map
+    } catch {
+      tenantNameById.value = {}
+    }
+
+    const res = await adminApi.getPayments()
+    const rows = Array.isArray(res.data) ? res.data : (res.data?.data || [])
+    transactions.value = rows.map(mapPaymentRow)
+  } catch (e) {
+    console.error('[TransactionInvestigation] load failed:', e)
+    transactions.value = []
+    $q.notify({
+      type: 'negative',
+      message: e?.response?.data?.error || e?.response?.data?.message || 'Failed to load live transactions'
+    })
+  } finally {
+    loading.value = false
+  }
+}
 
 const inspectTransaction = (row) => {
   selectedTx.value = row
-  activeTab.value = 'overview'
   drawerOpen.value = true
 }
 
+onMounted(loadTransactions)
 </script>
 
 <style scoped>
-.transaction-table {
-  /* Minimalist density matching enterprise look */
-}
 .transaction-table :deep(th) {
   font-size: 10px;
   font-weight: 700;
@@ -499,16 +355,11 @@ const inspectTransaction = (row) => {
 }
 
 .border-bottom { border-bottom: 1px solid var(--enterprise-border); }
-.border-top { border-top: 1px solid var(--enterprise-border); }
 .border-left { border-left: 1px solid var(--enterprise-border); }
 .border-muted { border: 1px solid var(--enterprise-border); }
 
 .drawer-shadow {
   box-shadow: -10px 0 30px rgba(0,0,0,0.5);
-}
-
-.hover-bg:hover {
-  background: rgba(255, 255, 255, 0.03);
 }
 
 .border-cyan-left { border-left: 2px solid #22b8cf !important; }

@@ -15,28 +15,20 @@
         <!-- Settlement Health Score Panel -->
         <div class="enterprise-subpanel q-px-md q-py-xs border-muted rounded-borders row items-center op-gap-16 font-mono text-caption" style="margin-left: 20px;">
           <div class="row items-center op-gap-8">
-            <span class="text-muted">Health Score:</span>
-            <span class="text-green-4 text-weight-bold text-subtitle2">99.7%</span>
+            <span class="text-muted">Batches:</span>
+            <span class="text-green-4 text-weight-bold text-subtitle2">{{ settlementRecords.length }}</span>
           </div>
           <div class="row items-center op-gap-8">
-            <span class="text-muted">Status:</span>
-            <q-badge color="green-10" text-color="green-3">Healthy</q-badge>
+            <span class="text-muted">Selected:</span>
+            <q-badge color="blue-grey-8" text-color="cyan-3">{{ selectedRecords.length }}</q-badge>
           </div>
-          <div class="row items-center op-gap-8">
-            <span class="text-muted">Outstanding Exposure:</span>
-            <span class="text-amber-4 text-weight-bold">{{ currentCurrency.symbol }}12.5M</span>
-          </div>
-          <div class="row items-center op-gap-8">
-            <span class="text-muted">Failed Settlements:</span>
-            <span class="text-red-4 text-weight-bold">0</span>
-          </div>
-          <q-icon name="account_balance" color="green-4" size="sm" />
         </div>
       </div>
 
       <!-- Command Bar Actions -->
       <div class="row items-center op-gap-8 no-wrap">
-        <q-btn outline size="xs" color="grey-6" icon="refresh" label="Refresh Data" class="text-caption text-weight-bold" />
+        <q-btn outline size="xs" color="grey-6" icon="refresh" label="Refresh Data" class="text-caption text-weight-bold" @click="loadBatches" />
+        <q-btn outline size="xs" color="green-4" icon="upload_file" label="Upload Settlement File" class="text-caption text-weight-bold text-black" @click="uploadDialogOpen = true" />
         <q-btn outline size="xs" color="amber-4" icon="approval" label="Pending Approvals (2)" class="text-caption text-weight-bold text-black" @click="activeWorkspaceTab = 'approvals'" />
         <q-btn-dropdown size="xs" color="indigo-4" icon="assessment" label="Reports" class="text-caption text-weight-bold text-white" split>
           <q-list dark class="bg-panel font-mono text-caption border-muted">
@@ -60,40 +52,28 @@
 
     <!-- Treasury KPI Dashboard -->
     <div class="row q-col-gutter-sm q-mb-md">
-      <div class="col-12 col-sm-6 col-md-2">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left cursor-pointer hover-bg">
-          <div class="text-operator-title text-muted">Total Settled Today</div>
-          <div class="text-h5 text-metric-mono text-green-4">{{ currentCurrency.symbol }}4.2B <q-icon name="trending_up" size="xs"/></div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-green-left">
+          <div class="text-operator-title text-muted">Settlement Rows Loaded</div>
+          <div class="text-h5 text-metric-mono text-green-4">{{ settlementRecords.length }}</div>
         </div>
       </div>
-      <div class="col-12 col-sm-6 col-md-2">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left cursor-pointer hover-bg">
-          <div class="text-operator-title text-muted">Pending Settlements</div>
-          <div class="text-h5 text-metric-mono text-amber-5">142</div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-amber-left">
+          <div class="text-operator-title text-muted">Selected for Action</div>
+          <div class="text-h5 text-metric-mono text-amber-5">{{ selectedRecords.length }}</div>
         </div>
       </div>
-      <div class="col-12 col-sm-6 col-md-2">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left cursor-pointer hover-bg">
-          <div class="text-operator-title text-muted">Settlement Volume</div>
-          <div class="text-h5 text-metric-mono text-cyan-4">84,201</div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-cyan-left">
+          <div class="text-operator-title text-muted">Net Amount (Selected)</div>
+          <div class="text-h5 text-metric-mono text-cyan-4">{{ currentCurrency.symbol }}{{ selectedNetAmount.toLocaleString() }}</div>
         </div>
       </div>
-      <div class="col-12 col-sm-6 col-md-2">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-purple-left cursor-pointer hover-bg">
-          <div class="text-operator-title text-muted">Settlement Fees Collected</div>
-          <div class="text-h5 text-metric-mono text-purple-4">{{ currentCurrency.symbol }}1.2M</div>
-        </div>
-      </div>
-      <div class="col-12 col-sm-6 col-md-2">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left cursor-pointer hover-bg">
-          <div class="text-operator-title text-muted">Treasury Float</div>
-          <div class="text-h5 text-metric-mono text-indigo-4">{{ currentCurrency.symbol }}450.5M</div>
-        </div>
-      </div>
-      <div class="col-12 col-sm-6 col-md-2">
-        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-red-left cursor-pointer hover-bg">
-          <div class="text-operator-title text-muted">Failed / Disputed</div>
-          <div class="text-h5 text-metric-mono text-red-4">0 / 2</div>
+      <div class="col-12 col-sm-6 col-md-3">
+        <div class="enterprise-panel op-pa-8 full-height column justify-between bg-panel border-indigo-left">
+          <div class="text-operator-title text-muted">Data Source</div>
+          <div class="text-h5 text-metric-mono text-indigo-4">LIVE</div>
         </div>
       </div>
     </div>
@@ -355,19 +335,34 @@
       </div>
     </q-drawer>
 
+    <CardSettlementUploadDialog
+      v-model="uploadDialogOpen"
+      @uploaded="loadBatches"
+    />
+
   </q-page>
 </template>
 
 <script setup>
 import { useCurrency } from '../../composables/useCurrency';
+import CardSettlementUploadDialog from '../../components/finance/CardSettlementUploadDialog.vue';
+import { cardSettlementApi } from '../../api';
+import { onMounted } from 'vue';
+import { Notify } from 'quasar';
 const { currentCurrency } = useCurrency();
 
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+
+const uploadDialogOpen = ref(false)
 
 const activeWorkspaceTab = ref('batches')
 const activeQueueTab = ref('settled')
 const searchQuery = ref('')
 const selectedRecords = ref([])
+
+const selectedNetAmount = computed(() =>
+  selectedRecords.value.reduce((sum, r) => sum + Number(r.netAmount || r.amount || 0), 0)
+)
 
 const drawerOpen = ref(false)
 const drawerTab = ref('overview')
@@ -393,63 +388,32 @@ const getStatusColor = (status) => {
 // INVESTIGATION GRID DATA
 const settlementCols = [
   { name: 'id', label: 'BATCH ID', field: 'id', align: 'left' },
-  { name: 'reference', label: 'REFERENCE', field: 'reference', align: 'left' },
-  { name: 'tenant', label: 'TENANT', field: 'tenant', align: 'left' },
-  { name: 'tenantType', label: 'TYPE', field: 'tenantType', align: 'left' },
-  { name: 'bank', label: 'BANK', field: 'bank', align: 'left' },
-  { name: 'txnCount', label: 'TXNS', field: 'txnCount', align: 'right' },
-  { name: 'gross', label: 'GROSS (₦)', field: 'grossAmount', align: 'right' },
-  { name: 'fee', label: 'FEE (₦)', field: 'feeAmount', align: 'right' },
-  { name: 'netAmount', label: 'NET PAYOUT (₦)', field: 'netAmount', align: 'right' },
+  { name: 'file_name', label: 'FILE', field: 'file_name', align: 'left' },
+  { name: 'template_type', label: 'TEMPLATE', field: 'template_type', align: 'left' },
+  { name: 'total_rows', label: 'ROWS', field: 'total_rows', align: 'right' },
+  { name: 'matched_count', label: 'MATCHED', field: 'matched_count', align: 'right' },
+  { name: 'unmatched_file_rows', label: 'UNMATCHED', field: 'unmatched_file_rows', align: 'right' },
+  { name: 'uploaded_by_email', label: 'UPLOADED BY', field: 'uploaded_by_email', align: 'left' },
   { name: 'status', label: 'STATUS', field: 'status', align: 'center' },
-  { name: 'riskScore', label: 'RISK', field: 'riskScore', align: 'center' },
-  { name: 'settlementDate', label: 'SETTLED', field: 'settlementDate', align: 'right' }
+  { name: 'created_at', label: 'UPLOADED', field: 'created_at', align: 'right' },
 ]
 
-const settlementRecords = ref([
-  {
-    id: 'SET-20260531-0001',
-    reference: 'STL/260531/0001',
-    tenant: 'Ahmadu Bello University',
-    tenantType: 'SCHOOL',
-    walletId: 'WAL-SCH-0001',
-    bank: 'GTBank',
-    accountMask: '****1234',
-    txnCount: 12500,
-    grossAmount: 45000000,
-    feeAmount: 450000,
-    commissionAmount: 50000,
-    netAmount: 44500000,
-    status: 'SETTLED',
-    approvalStatus: 'APPROVED',
-    riskScore: 5,
-    anomalyScore: 0.01,
-    fraudFlags: [],
-    createdDate: new Date(Date.now() - 86400000).toISOString(),
-    settlementDate: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'SET-20260531-0002',
-    reference: 'STL/260531/0002',
-    tenant: 'Shoprite Mega Store',
-    tenantType: 'RETAIL',
-    walletId: 'WAL-RET-0092',
-    bank: 'Zenith Bank',
-    accountMask: '****8842',
-    txnCount: 3400,
-    grossAmount: 12500000,
-    feeAmount: 125000,
-    commissionAmount: 0,
-    netAmount: 12375000,
-    status: 'PENDING_APPROVAL',
-    approvalStatus: 'PENDING',
-    riskScore: 65,
-    anomalyScore: 0.68,
-    fraudFlags: ['UNUSUAL_VOLUME'],
-    createdDate: new Date(Date.now() - 3600000).toISOString(),
-    settlementDate: 'N/A'
+const settlementRecords = ref([])
+
+async function loadBatches() {
+  try {
+    const res = await cardSettlementApi.listBatches({ limit: 100 })
+    settlementRecords.value = (res.data?.batches || []).map((b) => ({
+      ...b,
+      status: (b.status || 'completed').toUpperCase(),
+      created_at: b.created_at ? new Date(b.created_at).toLocaleString() : 'N/A',
+    }))
+  } catch (e) {
+    Notify.create({ type: 'negative', message: 'Failed to load settlement batches' })
   }
-])
+}
+
+onMounted(loadBatches)
 
 </script>
 

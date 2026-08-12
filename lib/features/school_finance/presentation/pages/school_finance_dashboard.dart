@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import '../bloc/finance_bloc.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../widgets/summary_stat_card.dart';
@@ -99,7 +100,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      state.message.replaceAll('Exception: ', '').replaceAll('FinanceApiException: ', ''),
+                      friendlyApiError(state.message, fallback: 'Could not load finance data.'),
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.4),
                     ),
@@ -416,7 +417,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
       }
     } catch (e) {
       if (mounted) Navigator.pop(context);
-      _showError('Failed to prepare withdrawal: $e');
+      _showError(friendlyApiError(e, fallback: 'Could not prepare withdrawal.'));
     }
   }
 
@@ -449,7 +450,9 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
         context.read<FinanceBloc>().add(RefreshDashboardSummary());
       }
     } catch (e) {
-      if (mounted) _showError('Withdrawal failed: $e');
+      if (mounted) {
+        _showError(friendlyApiError(e, fallback: 'Withdrawal failed. Please try again.'));
+      }
     } finally {
       if (mounted) setState(() => _isWithdrawing = false);
     }

@@ -76,7 +76,7 @@ class _ApiKeyManagementPageState extends State<ApiKeyManagementPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Quaser Settings & Keys')),
+      appBar: AppBar(title: const Text('Quasar Settings & Keys')),
       body: BlocBuilder<AdminBloc, AdminState>(
         builder: (context, state) {
           if (state.isLoading) return const InvifyLoadingIndicator(message: 'FETCHING SECURE CREDENTIALS...');

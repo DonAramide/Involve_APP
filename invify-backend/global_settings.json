@@ -1,12 +1,34 @@
 {
   "support_phone": "+234 800 INVIFY",
-  "support_email": "info.iips.ng@gmail.com",
+  "support_email": "support@iips.app",
   "support_whatsapp": "+2348023552282",
-  "broadcast_message": "sup from broad",
+  "broadcast_message": "Welcome to Invify! Activate with your code or start your free 3-day trial.",
   "audit_retention_hours": 72,
   "enforce_device_control": false,
   "commissions": {
     "globalDefaultOnboardingFee": 10,
     "globalDefaultRevSharePercentage": 5
-  }
+  },
+  "platform_name": "INVIFY ENTERPRISE CORE",
+  "timezone": "UTC",
+  "require_mfa": true,
+  "strict_ip_binding": true,
+  "session_timeout": 15,
+  "primary_color": "#26A69A",
+  "logo_url": "https://cdn.invify.com/enterprise-logo.png",
+  "hide_invify_watermark": false,
+  "is_maintenance_locked": false,
+  "maintenance_message": "System is currently under maintenance. Please try again later.",
+  "meta_access_token": "",
+  "whatsapp_phone_number_id": "",
+  "whatsapp_business_account_id": "",
+  "quasar_client_id": "",
+  "quasar_client_secret": "",
+  "quasar_base_url": "http://192.168.1.193:4000/api/v1",
+  "lesson_ai_api_key": "",
+  "daily_payout_time": "09:09",
+  "manual_dispatch_fee": 9,
+  "manual_dispatch_fee_type": "Percentage (%)",
+  "quasar_pos_encryption_key_base64": "ZLl6+HTj18rnwh5WwNgj1OOhbD7RqZ3kNJQgGIhE1oU=",
+  "quasar_pos_encryption_key_updated_at": "2026-08-08T11:24:04.305Z"
 }

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invify - Service Mode User Guide</title>
+    <title>Invify - Service Mode User Manual</title>
     <style>
         :root {
             --primary: #3949ab;
@@ -14,16 +14,16 @@
             --text-light: #546e7a;
             --bg-light: #f4f7f6;
             --white: #ffffff;
-            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
         }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: var(--text-main);
             background-color: var(--bg-light);
-            line-height: 1.6;
+            line-height: 1.55;
             margin: 0;
             padding: 0;
+            font-size: 14px;
         }
 
         .container {
@@ -43,7 +43,7 @@
 
         header img.header-img {
             width: 100%;
-            height: 300px;
+            height: 260px;
             object-fit: cover;
             opacity: 0.8;
         }
@@ -53,130 +53,273 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 40px;
-            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+            padding: 32px 40px;
+            background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+            text-align: left;
         }
 
         .header-content h1 {
             margin: 0;
-            font-size: 2.5em;
-            letter-spacing: 1px;
+            font-size: 2.2em;
+            letter-spacing: 0.5px;
         }
 
         .header-content p {
-            margin: 5px 0 0;
-            opacity: 0.9;
+            margin: 6px 0 0;
+            opacity: 0.95;
+        }
+
+        .badge {
+            display: inline-block;
+            background: var(--accent);
+            color: #00363a;
+            font-size: 0.75em;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-bottom: 8px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
 
         .content {
-            padding: 40px;
+            padding: 36px 40px 48px;
         }
 
         h2 {
             border-left: 5px solid var(--primary);
-            padding-left: 15px;
+            padding-left: 14px;
             color: var(--primary);
-            margin-top: 40px;
-            font-size: 1.8em;
+            margin-top: 36px;
+            margin-bottom: 10px;
+            font-size: 1.45em;
+            page-break-after: avoid;
+        }
+
+        h3 {
+            color: var(--secondary);
+            margin: 22px 0 8px;
+            font-size: 1.1em;
+            page-break-after: avoid;
         }
 
         .section-intro {
-            font-size: 1.1em;
             color: var(--text-light);
-            margin-bottom: 30px;
+            margin: 0 0 18px;
+        }
+
+        .toc {
+            background: #f7f9fc;
+            border: 1px solid #e6ebf2;
+            border-radius: 12px;
+            padding: 18px 22px;
+            margin: 18px 0 28px;
+        }
+
+        .toc ol {
+            margin: 8px 0 0;
+            padding-left: 22px;
+        }
+
+        .toc li {
+            margin: 4px 0;
+            color: var(--text-light);
+        }
+
+        .toc a {
+            color: var(--primary);
+            text-decoration: none;
         }
 
         .feature-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 20px;
+            gap: 14px;
         }
 
         .feature-card {
             display: flex;
             align-items: flex-start;
-            padding: 20px;
+            padding: 16px 18px;
             border-radius: 12px;
             background: #fff;
             border: 1px solid #eee;
-            transition: transform 0.2s;
+            page-break-inside: avoid;
         }
 
         .icon-box {
-            min-width: 60px;
-            height: 60px;
+            min-width: 48px;
+            height: 48px;
             background: var(--primary);
             color: white;
             border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            margin-right: 20px;
+            font-size: 20px;
+            margin-right: 16px;
+            flex-shrink: 0;
         }
 
         .feature-details h3 {
-            margin: 0 0 10px;
+            margin: 0 0 6px;
             color: var(--secondary);
+            font-size: 1.05em;
         }
 
-        .feature-details p {
+        .feature-details p,
+        .feature-details li {
             margin: 0;
             color: var(--text-light);
+        }
+
+        .feature-details ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+        }
+
+        .feature-details li {
+            margin: 4px 0;
+        }
+
+        .tip-box,
+        .warn-box,
+        .step-box {
+            padding: 16px 18px;
+            margin: 18px 0;
+            border-radius: 0 12px 12px 0;
+            page-break-inside: avoid;
         }
 
         .tip-box {
             background: #e8eaf6;
             border-left: 5px solid #3949ab;
-            padding: 20px;
-            margin: 30px 0;
-            border-radius: 0 12px 12px 0;
         }
 
         .tip-box strong {
             color: #1a237e;
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
+        }
+
+        .warn-box {
+            background: #fff3e0;
+            border-left: 5px solid #ef6c00;
+        }
+
+        .warn-box strong {
+            color: #e65100;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .step-box {
+            background: #e0f7fa;
+            border-left: 5px solid #00bcd4;
+        }
+
+        .step-box strong {
+            color: #006064;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .step-box ol {
+            margin: 6px 0 0;
+            padding-left: 20px;
+            color: var(--text-light);
+        }
+
+        .status-table,
+        .menu-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 20px;
+            font-size: 0.95em;
+            page-break-inside: avoid;
+        }
+
+        .status-table th,
+        .status-table td,
+        .menu-table th,
+        .menu-table td {
+            border: 1px solid #e0e0e0;
+            padding: 10px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .status-table th,
+        .menu-table th {
+            background: #eef1f8;
+            color: var(--secondary);
+        }
+
+        .status-pill {
+            display: inline-block;
+            font-size: 0.75em;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 8px;
+            letter-spacing: 0.03em;
+        }
+
+        .s-pending { background: #eceff1; color: #546e7a; }
+        .s-progress { background: #fff3e0; color: #ef6c00; }
+        .s-ready { background: #e8f5e9; color: #2e7d32; }
+        .s-delivered { background: #e3f2fd; color: #1565c0; }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .mini-card {
+            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 14px 16px;
+            page-break-inside: avoid;
+        }
+
+        .mini-card h4 {
+            margin: 0 0 6px;
+            color: var(--secondary);
+        }
+
+        .mini-card p {
+            margin: 0;
+            color: var(--text-light);
+            font-size: 0.95em;
+        }
+
+        .page-break {
+            break-before: page;
+            page-break-before: always;
         }
 
         footer {
             text-align: center;
-            padding: 40px;
+            padding: 28px 40px;
             background: #eee;
             color: #666;
             font-size: 0.9em;
         }
 
-        /* Print styling to force PDF layout */
         @media print {
-            body {
-                background: white;
-            }
-
-            .container {
-                box-shadow: none;
-                max-width: 100%;
-            }
-
-            .feature-card {
-                break-inside: avoid;
-                padding: 10px;
-            }
-
-            header img.header-img {
-                height: 200px;
-            }
-
-            .tip-box {
-                break-inside: avoid;
-            }
+            body { background: white; font-size: 12pt; }
+            .container { box-shadow: none; max-width: 100%; }
+            .feature-card, .tip-box, .warn-box, .step-box, .mini-card { break-inside: avoid; }
+            header img.header-img { height: 180px; }
+            a { color: inherit; text-decoration: none; }
+            .no-print { display: none !important; }
         }
 
-        /* Icon Emoji fallbacks */
-        .icon-job::before { content: '🛠️'; }
-        .icon-catalog::before { content: '📋'; }
-        .icon-clients::before { content: '🤝'; }
-        .icon-revenue::before { content: '💸'; }
+        @media (max-width: 640px) {
+            .content { padding: 24px 18px; }
+            .two-col { grid-template-columns: 1fr; }
+            .header-content { padding: 24px 18px; }
+        }
     </style>
 </head>
 
@@ -186,104 +329,466 @@
         <header>
             <img src="service_header.png" alt="Service Mode Header" class="header-img">
             <div class="header-content">
+                <div class="badge">Service Mode · Field Manual</div>
                 <h1>Invify Service Mode</h1>
-                <p>User Guide & Operational Manual</p>
+                <p>Short User Manual · Home Menu &amp; Services Dashboard</p>
             </div>
         </header>
 
         <div class="content">
-            <p class="section-intro">Welcome to **Service Mode**. This environment is tailored for service providers, consultants, and professionals. Track your jobs, manage client relationships, and streamline your billing workflow.</p>
+            <p class="section-intro">
+                This booklet is for teams running <strong>Service Mode</strong> — workshops, repairs, sewing,
+                consultancy, and other job-based businesses. It walks through the home screen tiles and every
+                activity inside the <strong>Services Dashboard</strong> sub-menu.
+            </p>
 
-            <div class="tip-box" style="background: #e0f7fa; border-color: #00bcd4;">
-                <strong style="color: #006064;">🏁 SERVICE SETUP CHECKLIST</strong>
+            <div class="step-box">
+                <strong>🏁 First-time setup checklist</strong>
                 <ol>
-                    <li><strong>Service Catalog:</strong> Define your services and hourly rates/fees.</li>
-                    <li><strong>Client Directory:</strong> Import or add your client database.</li>
-                    <li><strong>Organization Details:</strong> Ensure your professional signature and branding are set.</li>
-                    <li><strong>Work Tracking:</strong> Start issuing Job Invoices for completed tasks.</li>
+                    <li><strong>Organization:</strong> Confirm business name, logo, address, and currency in Settings.</li>
+                    <li><strong>Printer &amp; mPOS:</strong> Pair your Bluetooth printer and card reader (if used).</li>
+                    <li><strong>Services Setup:</strong> From Services Dashboard → Setup, add job titles, materials, labor rates, and expense categories.</li>
+                    <li><strong>Customers:</strong> Add clients as you create jobs, or browse them later under Customers.</li>
+                    <li><strong>First job:</strong> Create a New Job, take payment, update status, then print or share the receipt.</li>
                 </ol>
             </div>
 
-            <h2>1. Job & Invoice Management</h2>
-            <p class="section-intro">Your hub for billing professional services.</p>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="icon-box icon-job"></div>
-                    <div class="feature-details">
-                        <h3>NEW JOB / INVOICE</h3>
-                        <p>Generate professional invoices for services rendered.
-                        <ul>
-                            <li><strong>Service Selection:</strong> Pick from your predefined catalog.</li>
-                            <li><strong>Custom Rates:</strong> Adjust fees per job if necessary.</li>
-                            <li><strong>Client Assignment:</strong> Link every job to a specific client profile.</li>
-                            <li><strong>Digital Delivery:</strong> Email or WhatsApp invoices directly to clients.</li>
-                        </ul>
-                        </p>
-                    </div>
-                </div>
+            <div class="toc">
+                <strong>Contents</strong>
+                <ol>
+                    <li><a href="#home">Home screen overview</a></li>
+                    <li><a href="#services-dashboard">Services Dashboard (sub-menu)</a></li>
+                    <li><a href="#new-job">New Job</a></li>
+                    <li><a href="#all-jobs">All Jobs &amp; job details</a></li>
+                    <li><a href="#customers">Customers</a></li>
+                    <li><a href="#setup">Services Setup</a></li>
+                    <li><a href="#analytics">Services Analytics</a></li>
+                    <li><a href="#shared">Shared tools (printer, records, finance)</a></li>
+                    <li><a href="#lifecycle">Job status lifecycle</a></li>
+                    <li><a href="#tips">Quick tips</a></li>
+                </ol>
             </div>
 
-            <h2>2. Service Catalog</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="icon-box icon-catalog" style="background: #00bcd4;"></div>
-                    <div class="feature-details">
-                        <h3>SERVICE DIRECTORY</h3>
-                        <p>Manage what you offer and what it costs.
-                        <ul>
-                            <li><strong>Flat Fees vs. Hourly:</strong> Flexible pricing structures.</li>
-                            <li><strong>Categories:</strong> Group services (e.g., Consulting, Maintenance, Delivery).</li>
-                            <li><strong>Rate History:</strong> Track how your service pricing has evolved.</li>
-                        </ul>
-                        </p>
-                    </div>
-                </div>
-            </div>
+            <!-- 1. HOME -->
+            <h2 id="home">1. Home Screen Overview</h2>
+            <p class="section-intro">
+                After login you land on the main tile grid. In Service Mode the tiles are arranged for job work
+                first, then shared business tools.
+            </p>
+
+            <table class="menu-table">
+                <thead>
+                    <tr>
+                        <th>Tile</th>
+                        <th>What it does</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>SERVICES DASHBOARD</strong></td>
+                        <td>Pipeline overview: revenue collected, active/ready counts, recent jobs, and shortcuts to Customers, Analytics, and Setup.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NEW JOB</strong></td>
+                        <td>Create a work order / job invoice for a customer (saved offline-first).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ALL JOBS</strong></td>
+                        <td>Searchable list of every job with status filters (Pending → Delivered).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CUSTOMERS</strong></td>
+                        <td>Customer directory; open a profile to see their job and payment history.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PRINTER &amp; MPOS</strong></td>
+                        <td>Connect Bluetooth printer and mPOS card reader. Status dots show device health.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SERVICE RECORDS</strong></td>
+                        <td>Historical service / sales style records for completed work and reprints.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PAYMENT HISTORY</strong></td>
+                        <td>Audit trail of payments collected across jobs and channels.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CALCULATOR</strong></td>
+                        <td>Quick on-device calculator for quotes and change.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SETTINGS</strong></td>
+                        <td>Business profile, labels, warranty toggle, currency, sync, and mode options (PIN-protected where configured).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ADMIN HUB</strong></td>
+                        <td>Admin tools and elevated controls (access may require verification).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CLOUD METRICS</strong></td>
+                        <td>Cloud sync / usage metrics (Pro / Cloud tiers).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>FINANCE ANALYTICS</strong></td>
+                        <td>Broader finance views for management (secured).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RECONCILIATION</strong></td>
+                        <td>Executive reconciliation of collections and settlements (secured).</td>
+                    </tr>
+                </tbody>
+            </table>
 
             <div class="tip-box">
-                <strong>💡 PRO TIP: Client Retention</strong>
-                Use the 'Client Profile' to view the total value of all jobs completed for a specific client. This helps you identify your most valuable professional relationships.
+                <strong>Top bar at a glance</strong>
+                Business name and plan badge (e.g. STANDARD) appear on the left. Date/time sits in the center.
+                Cloud and sync icons on the right show online/offline health; the bell opens notifications;
+                the ⋮ menu opens extra actions.
             </div>
 
-            <h2>3. Client Administration</h2>
+            <!-- 2. SERVICES DASHBOARD -->
+            <h2 id="services-dashboard" class="page-break">2. Services Dashboard (Sub-Menu)</h2>
+            <p class="section-intro">
+                Tap <strong>SERVICES DASHBOARD</strong> to open <em>Services Overview</em> — the daily control
+                room for your job pipeline. Pull down to refresh.
+            </p>
+
+            <h3>2.1 Profitability summary</h3>
+            <p class="section-intro">
+                The blue banner at the top shows <strong>amount collected / total job value</strong>.
+                Tap it to jump straight into <strong>Services Analytics</strong>.
+            </p>
+
+            <h3>2.2 Snapshot cards</h3>
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>Revenue</h4>
+                    <p>Sum of all job totals currently loaded.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>Received</h4>
+                    <p>Total payments already recorded against those jobs.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>Active</h4>
+                    <p>Jobs marked <span class="status-pill s-progress">IN_PROGRESS</span>.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>Ready</h4>
+                    <p>Jobs marked <span class="status-pill s-ready">READY</span> for pickup/delivery.</p>
+                </div>
+            </div>
+
+            <h3>2.3 Quick action buttons</h3>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-clients" style="background: #1a1c1e;"></div>
+                    <div class="icon-box" style="background:#9c27b0;">👥</div>
                     <div class="feature-details">
-                        <h3>CLIENT DIRECTORY</h3>
-                        <p>Comprehensive professional relationship management.
-                        <ul>
-                            <li><strong>Activity Ledger:</strong> View all invoices and payment history per client.</li>
-                            <li><strong>Communication:</strong> One-tap access to call or message your clients.</li>
-                            <li><strong>Payment Tracking:</strong> Monitor outstanding invoices and pending payments.</li>
-                        </ul>
-                        </p>
+                        <h3>Customers</h3>
+                        <p>Opens the customer directory from inside the dashboard (same as the home CUSTOMERS tile).</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#2979ff;">📊</div>
+                    <div class="feature-details">
+                        <h3>Analytics</h3>
+                        <p>Revenue trends, expense breakdown, and date-range reporting for the service business.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#ef6c00;">⚙️</div>
+                    <div class="feature-details">
+                        <h3>Setup</h3>
+                        <p>Configure job title presets, material categories, parts/prices, labor rates, and expense categories.</p>
                     </div>
                 </div>
             </div>
 
-            <h2>4. Financial Performance</h2>
+            <h3>2.4 Recent jobs</h3>
+            <p class="section-intro">
+                Shows the latest jobs (up to five). Each row shows title, job ID, remaining balance, and status.
+                Tap a row to open <strong>Job Details</strong>. Use <strong>View All</strong> to open the full All Jobs list.
+            </p>
+
+            <div class="tip-box">
+                <strong>Floating “New Job” button</strong>
+                From Services Overview you can also tap the green <strong>New Job</strong> FAB to create a job without returning to the home grid.
+            </div>
+
+            <!-- 3. NEW JOB -->
+            <h2 id="new-job" class="page-break">3. New Job</h2>
+            <p class="section-intro">
+                Use <strong>NEW JOB</strong> (home tile or dashboard FAB) to open a work order. Jobs save
+                <strong>offline first</strong> (“Save Job Offline”) and sync when the cloud is available.
+            </p>
+
+            <div class="step-box">
+                <strong>Create a job — step by step</strong>
+                <ol>
+                    <li><strong>Customer:</strong> Select an existing client or register a new one (name + phone).</li>
+                    <li><strong>Project photo (optional):</strong> Take a photo or pick from gallery for “before / expected” reference.</li>
+                    <li><strong>Job type / title:</strong> Type freely or pick from presets (e.g. Oil Change, Traditional Dress Sewing).</li>
+                    <li><strong>Description:</strong> Notes, measurements, fabric/parts info.</li>
+                    <li><strong>Pricing:</strong>
+                        <ul>
+                            <li><em>Simple:</em> enter one Total Cost.</li>
+                            <li><em>Detailed Billing:</em> toggle on to split <strong>Workmanship / Labor</strong> and <strong>Materials / Parts</strong>.</li>
+                        </ul>
+                    </li>
+                    <li><strong>Due date:</strong> Optional completion / pickup date.</li>
+                    <li><strong>Warranty:</strong> If enabled in Settings, choose duration (1 Month … 3 Years).</li>
+                    <li>Tap <strong>Save Job Offline</strong>.</li>
+                </ol>
+            </div>
+
+            <div class="warn-box">
+                <strong>Workmanship vs materials</strong>
+                Detailed billing keeps professional fees separate from parts. Labor presets and material prices come from <strong>Services Setup</strong> — configure them once so staff can quote faster.
+            </div>
+
+            <!-- 4. ALL JOBS -->
+            <h2 id="all-jobs">4. All Jobs &amp; Job Details</h2>
+
+            <h3>4.1 All Jobs list</h3>
+            <p class="section-intro">
+                Search by customer name or job ID. Filter chips: <strong>All · Pending · In Progress · Ready · Delivered</strong>.
+                Refresh from the app bar if you need a fresh load from storage.
+            </p>
+
+            <h3>4.2 Job Details actions</h3>
+            <p class="section-intro">
+                Opening a job shows title, status, description, due date, warranty, photo, remaining balance,
+                total cost, and amount paid.
+            </p>
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-revenue" style="background: #f44336;"></div>
+                    <div class="icon-box" style="background:#43a047;">💳</div>
                     <div class="feature-details">
-                        <h3>SERVICE ANALYTICS</h3>
-                        <p>Visual reporting for your professional practice.
-                        <ul>
-                            <li><strong>Revenue by Service:</strong> See which service generates the most income.</li>
-                            <li><strong>Client Acquisition:</strong> Track how your client base is growing.</li>
-                            <li><strong>Collection Efficiency:</strong> Monitor how quickly invoices are being paid.</li>
-                        </ul>
-                        </p>
+                        <h3>Add Payment</h3>
+                        <p>Record a payment against the remaining balance (e.g. cash). The balance and “Received” totals update after confirm.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#fb8c00;">🛣️</div>
+                    <div class="feature-details">
+                        <h3>Status</h3>
+                        <p>Move the job through Pending → In Progress → Ready → Delivered.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#5c6bc0;">🖨️</div>
+                    <div class="feature-details">
+                        <h3>Print Receipt</h3>
+                        <p>Send the job receipt to the paired Bluetooth printer.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#1565c0;">📄</div>
+                    <div class="feature-details">
+                        <h3>Preview / Share PDF</h3>
+                        <p>Generate a professional PDF job invoice to preview, share via WhatsApp/email, or archive.</p>
                     </div>
                 </div>
             </div>
 
+            <p class="section-intro">
+                The <strong>Job Log / Bill Breakdown</strong> section lists workmanship, materials (qty × price),
+                creation events, and payment notes for an audit trail on the job itself.
+            </p>
+
+            <!-- 5. CUSTOMERS -->
+            <h2 id="customers">5. Customers</h2>
+            <p class="section-intro">
+                The directory lists every registered service customer (name and phone). Tap a customer to open
+                their history ledger — past jobs, balances, and related activity. Customers are usually created
+                during <strong>New Job</strong>; you can also add them from the customer picker when creating a job.
+            </p>
+
+            <div class="tip-box">
+                <strong>Client value tip</strong>
+                Use a customer’s history to see outstanding balances before starting another job, and to identify your highest-value clients.
+            </div>
+
+            <!-- 6. SETUP -->
+            <h2 id="setup" class="page-break">6. Services Setup (Dashboard Sub-Menu)</h2>
+            <p class="section-intro">
+                From Services Dashboard → <strong>Setup</strong>, configure the catalogs staff use every day.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box">🏷️</div>
+                    <div class="feature-details">
+                        <h3>Job Titles &amp; Presets</h3>
+                        <p>Common job names (Oil Change, Sewing, AC Service, etc.) for fast autocomplete on New Job.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#9c27b0;">📂</div>
+                    <div class="feature-details">
+                        <h3>Material Categories</h3>
+                        <p>Group parts (Automotive, Building, Fabric, Electronics, etc.).</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#ef6c00;">🧰</div>
+                    <div class="feature-details">
+                        <h3>Materials &amp; Parts</h3>
+                        <p>Define stockable items with default prices for detailed billing.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#43a047;">👷</div>
+                    <div class="feature-details">
+                        <h3>Labor Settings</h3>
+                        <p>Default workmanship / labor fee presets staff can pick while quoting.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#fb8c00;">🌳</div>
+                    <div class="feature-details">
+                        <h3>Expense Categories</h3>
+                        <p>Cost buckets for service expenses (Fuel, Consumables, Subcontract, etc.) used in analytics logging.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. ANALYTICS -->
+            <h2 id="analytics">7. Services Analytics</h2>
+            <p class="section-intro">
+                Open from the dashboard quick action or the profitability banner. Default range is the last 30 days;
+                use the date-range icon to change it.
+            </p>
+            <ul>
+                <li><strong>Summary cards:</strong> Revenue and related performance totals for the selected period.</li>
+                <li><strong>Revenue trend:</strong> Chart of collections over time.</li>
+                <li><strong>Expense breakdown:</strong> Costs by category.</li>
+                <li><strong>Log Service Expense:</strong> Use the chart (+) action to record a service cost against a category.</li>
+            </ul>
+
+            <!-- 8. SHARED -->
+            <h2 id="shared" class="page-break">8. Shared Tools on the Home Grid</h2>
+
+            <h3>8.1 Printer &amp; mPOS</h3>
+            <p class="section-intro">
+                Pair and test your Bluetooth receipt printer and mPOS card reader. The home tile shows small status
+                indicators (e.g. grey / red) so you can see at a glance if a device is offline before taking payment.
+            </p>
+
+            <h3>8.2 Service Records</h3>
+            <p class="section-intro">
+                Historical record of services rendered — useful for reprints, reviews, and end-of-day checks.
+            </p>
+
+            <h3>8.3 Payment History</h3>
+            <p class="section-intro">
+                Cross-job payment audit: when money was taken, how much, and against which activity. Use this when
+                reconciling the cash drawer or mPOS settlement.
+            </p>
+
+            <h3>8.4 Calculator, Settings, Admin Hub</h3>
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>Calculator</h4>
+                    <p>Simple math for quotes and change without leaving the app.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>Settings</h4>
+                    <p>Branding, currency, warranty, labels, sync, and business mode. Some actions need a PIN.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>Admin Hub</h4>
+                    <p>Elevated administration (users, backups, advanced controls as licensed).</p>
+                </div>
+                <div class="mini-card">
+                    <h4>Cloud / Finance / Reconciliation</h4>
+                    <p>Pro/Cloud tools for metrics, management finance, and bank/settlement reconciliation.</p>
+                </div>
+            </div>
+
+            <!-- 9. LIFECYCLE -->
+            <h2 id="lifecycle">9. Job Status Lifecycle</h2>
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Meaning</th>
+                        <th>Typical next step</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="status-pill s-pending">PENDING</span></td>
+                        <td>Job booked / quote accepted; work not started.</td>
+                        <td>Assign technician; move to In Progress when work begins.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-pill s-progress">IN_PROGRESS</span></td>
+                        <td>Actively being worked.</td>
+                        <td>Update materials/payments as needed; mark Ready when done.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-pill s-ready">READY</span></td>
+                        <td>Finished and waiting for customer pickup or delivery.</td>
+                        <td>Collect remaining balance; print/share receipt; mark Delivered.</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-pill s-delivered">DELIVERED</span></td>
+                        <td>Job closed and handed over.</td>
+                        <td>Keep PDF/receipt for records; review analytics.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 10. TIPS -->
+            <h2 id="tips">10. Quick Tips</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#00897b;">☁️</div>
+                    <div class="feature-details">
+                        <h3>Offline-first</h3>
+                        <p>Jobs and payments save locally. Watch the top-bar cloud icon; when it shows healthy, data will sync.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#6a1b9a;">🔁</div>
+                    <div class="feature-details">
+                        <h3>Pull to refresh</h3>
+                        <p>On Services Overview, pull down after taking payments or changing statuses on another device.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#c62828;">🖨️</div>
+                    <div class="feature-details">
+                        <h3>Printer first</h3>
+                        <p>If Print Receipt fails, open Printer &amp; mPOS and confirm the printer is paired before retrying from Job Details.</p>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box" style="background:#1565c0;">✅</div>
+                    <div class="feature-details">
+                        <h3>Ready = notify customer</h3>
+                        <p>When status is Ready, share the PDF or call the customer; collect balance before marking Delivered.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="step-box" style="margin-top: 28px;">
+                <strong>Daily shop routine (suggested)</strong>
+                <ol>
+                    <li>Check Printer &amp; mPOS status dots on the home tile.</li>
+                    <li>Open Services Dashboard — note Active and Ready counts.</li>
+                    <li>Create New Jobs as customers arrive; take deposits via Add Payment.</li>
+                    <li>Move finished work to Ready; print or share PDFs.</li>
+                    <li>End of day: Payment History + Services Analytics; log any expenses.</li>
+                </ol>
+            </div>
         </div>
 
         <footer>
-            <p>&copy; 2026 Invify | Empowering Professionals with Smart Tools</p>
-            <p><em>Open this file in your browser and press <strong>Ctrl+P</strong> to Save as PDF for Printing.</em></p>
+            <p>&copy; 2026 Invify | Service Mode Field Manual</p>
+            <p class="no-print"><em>Open this file in a browser and press <strong>Ctrl+P</strong> → Save as PDF for a short printable booklet.</em></p>
+            <p>Version aligned with app v1.0.0 Service Mode home grid &amp; Services Overview.</p>
         </footer>
     </div>
 

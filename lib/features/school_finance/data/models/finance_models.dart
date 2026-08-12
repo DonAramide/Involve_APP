@@ -114,6 +114,8 @@ class TransactionAuditModel extends Equatable {
   final String paymentMethod;
   final double amount;
   final String status;
+  final String? settlementStatus;
+  final DateTime? settledAt;
   final String staffName;
   final DateTime date;
   final List<dynamic> items;
@@ -126,6 +128,8 @@ class TransactionAuditModel extends Equatable {
     required this.paymentMethod,
     required this.amount,
     required this.status,
+    this.settlementStatus,
+    this.settledAt,
     required this.staffName,
     required this.date,
     required this.items,
@@ -140,6 +144,10 @@ class TransactionAuditModel extends Equatable {
       paymentMethod: json['paymentMethod'] as String? ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
       status: json['status'] as String? ?? 'Pending',
+      settlementStatus: json['settlementStatus'] as String?,
+      settledAt: json['settledAt'] != null
+          ? DateTime.tryParse(json['settledAt'] as String)
+          : null,
       staffName: json['staffName'] as String? ?? 'System',
       date: DateTime.tryParse(json['date'] as String? ?? '') ?? DateTime.now(),
       items: json['items'] as List<dynamic>? ?? [],
@@ -148,6 +156,29 @@ class TransactionAuditModel extends Equatable {
     );
   }
 
+  bool get isCardUnsettled =>
+      type == 'POS' &&
+      (status.toLowerCase().contains('unsettled') ||
+          (settlementStatus ?? 'unsettled').toLowerCase() == 'unsettled');
+
+  bool get isCardSettled =>
+      type == 'POS' &&
+      (status.toLowerCase() == 'settled' ||
+          (settlementStatus ?? '').toLowerCase() == 'settled');
+
   @override
-  List<Object?> get props => [id, type, paymentMethod, amount, status, staffName, date, items, customerName, reference];
+  List<Object?> get props => [
+        id,
+        type,
+        paymentMethod,
+        amount,
+        status,
+        settlementStatus,
+        settledAt,
+        staffName,
+        date,
+        items,
+        customerName,
+        reference,
+      ];
 }

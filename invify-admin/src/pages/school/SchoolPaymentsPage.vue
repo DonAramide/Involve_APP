@@ -60,7 +60,8 @@
             :rows="payments"
             :columns="paymentColumns"
             :loading="loading"
-            :pagination="{ rowsPerPage: 20 }"
+            :pagination="{ rowsPerPage: 25 }"
+            :rows-per-page-options="[25, 50, 100]"
           >
             <template #body-cell-amount="props">
               <q-td :props="props.col">
@@ -105,7 +106,8 @@
             :rows="disputes"
             :columns="disputeColumns"
             :loading="loading"
-            :pagination="{ rowsPerPage: 20 }"
+            :pagination="{ rowsPerPage: 25 }"
+            :rows-per-page-options="[25, 50, 100]"
           >
             <template #body-cell-amount="props">
               <q-td :props="props.col">
@@ -297,25 +299,42 @@ async function loadTenants() {
 
 async function fetchPayments() {
   const { data } = await schoolApi.getPayments({ params: listParams() })
-  payments.value = data?.payments || data || []
+  const rows = data?.payments || data?.data || data || []
+  payments.value = Array.isArray(rows) ? rows : []
 }
 
 async function fetchDisputes() {
   const { data } = await schoolApi.getPaymentDisputes({
     params: listParams({ status: disputeStatus.value }),
   })
-  disputes.value = data?.disputes || data || []
+  const rows = data?.disputes || data?.data || data || []
+  disputes.value = Array.isArray(rows) ? rows : []
 }
 
 async function fetchAll() {
   loading.value = true
+  const errors = []
   try {
-    await Promise.all([fetchPayments(), fetchDisputes()])
+    await fetchPayments()
   } catch (e) {
     console.error(e)
-    $q.notify({ type: 'negative', message: 'Failed to load school payments / disputes' })
+    payments.value = []
+    errors.push(e?.response?.data?.error || e?.response?.data?.message || 'payments')
+  }
+  try {
+    await fetchDisputes()
+  } catch (e) {
+    console.error(e)
+    disputes.value = []
+    errors.push(e?.response?.data?.error || e?.response?.data?.message || 'disputes')
   } finally {
     loading.value = false
+  }
+  if (errors.length === 2) {
+    $q.notify({
+      type: 'negative',
+      message: `Failed to load school payments / disputes: ${errors[0]}`,
+    })
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../bloc/school_bloc.dart';
 import '../bloc/school_state.dart';
 import '../../domain/entities/grading_rule.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 class ManageGradingRulesPage extends StatefulWidget {
@@ -34,9 +35,7 @@ class _ManageGradingRulesPageState extends State<ManageGradingRulesPage> {
       body: BlocConsumer<SchoolBloc, SchoolState>(
         listener: (context, state) {
           if (state.error != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
-            );
+            showFriendlyErrorSnackBar(context, state.error);
           }
         },
         builder: (context, state) {

@@ -183,7 +183,7 @@ export class TerminalSyncService {
 
     // Step 2: support config
     let supportPhone = '+234 800 INVIFY';
-    let supportEmail = 'info.iips.ng@gmail.com';
+    let supportEmail = 'support@iips.app';
     let supportWhatsapp = '+2348023552282';
     let broadcastMessage = '';
 
@@ -210,7 +210,9 @@ export class TerminalSyncService {
       try {
         const { data: tenant } = await supabaseAdmin
           .from('tenants')
-          .select('id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code')
+          .select(
+            'id, name, plan, type, support_phone, support_email, support_whatsapp, agent_code, is_emergency_locked, emergency_lock_code, status',
+          )
           .eq('id', resolvedTenantId)
           .maybeSingle();
         tenantDetails = tenant;
@@ -221,6 +223,12 @@ export class TerminalSyncService {
       if (tenantDetails.support_email) supportEmail = tenantDetails.support_email;
       if (tenantDetails.support_whatsapp) supportWhatsapp = tenantDetails.support_whatsapp;
     }
+
+    const emergencyLock = {
+      isEmergencyLocked: !!tenantDetails?.is_emergency_locked,
+      emergencyLockCode: tenantDetails?.emergency_lock_code || null,
+      tenantStatus: tenantDetails?.status || null,
+    };
 
     // Step 3: USER_DEVICE — no bank TID / MPOS bundle
     if (deviceCategory !== 'COMPANY_DEVICE') {
@@ -240,6 +248,7 @@ export class TerminalSyncService {
         tenantName: tenantDetails?.name || null,
         plan: tenantDetails?.plan || null,
         type: tenantDetails?.type || null,
+        ...emergencyLock,
         features: {
           invoicing: true,
           inventory: true,
@@ -271,8 +280,16 @@ export class TerminalSyncService {
         mposTerminalId: bundle.mpos?.id,
         newDeviceId: deviceId,
         adminId: deviceId,
+        tenantId: resolvedTenantId || bundle.assigned_tenant_id || null,
+        adminName: tenantDetails?.name || undefined,
         reason: 'Mobile device sync',
-        metadata: { serialNumber, androidId, enrollmentKey },
+        metadata: {
+          serialNumber,
+          androidId,
+          enrollmentKey,
+          tenant_id: resolvedTenantId || bundle.assigned_tenant_id || null,
+          tenant_name: tenantDetails?.name || null,
+        },
       });
     }
 
@@ -340,6 +357,7 @@ export class TerminalSyncService {
       businessName: tenantDetails?.name || null,
       plan: tenantDetails?.plan || null,
       type: tenantDetails?.type || null,
+      ...emergencyLock,
       features: {
         invoicing: true,
         inventory: true,

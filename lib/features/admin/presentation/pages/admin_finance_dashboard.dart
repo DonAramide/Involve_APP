@@ -89,7 +89,7 @@ class _AdminFinanceDashboardPageState extends State<AdminFinanceDashboardPage> {
             const SizedBox(width: 12),
             Expanded(child: _BalanceTile(label: 'Cash on Hand', amount: formatter.format(cash), color: Colors.green)),
             const SizedBox(width: 12),
-            Expanded(child: _BalanceTile(label: 'Pending Quaser', amount: formatter.format(pending), color: Colors.orange)),
+            Expanded(child: _BalanceTile(label: 'Pending Quasar', amount: formatter.format(pending), color: Colors.orange)),
           ],
         ),
       ],

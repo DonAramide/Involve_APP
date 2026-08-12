@@ -159,7 +159,7 @@ class _HelpPageState extends State<HelpPage> {
           const SizedBox(height: 16),
           GestureDetector(
             onTap: () async {
-              final Uri emailUri = Uri.parse('mailto:info.iips.ng@gmail.com?subject=Support Request');
+              final Uri emailUri = Uri.parse('mailto:support@iips.app?subject=Support Request');
               if (await canLaunchUrl(emailUri)) {
                 await launchUrl(emailUri);
               }
@@ -168,7 +168,7 @@ class _HelpPageState extends State<HelpPage> {
               child: ListTile(
                 leading: Icon(Icons.email, color: Colors.deepPurple),
                 title: Text('Email Support'),
-                subtitle: Text('info.iips.ng@gmail.com'),
+                subtitle: Text('support@iips.app'),
               ),
             ),
           ),

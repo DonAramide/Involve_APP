@@ -21,6 +21,7 @@ import '../../domain/entities/virtual_account.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/school/domain/repositories/school_repository.dart';
 import 'package:involve_app/features/invoicing/domain/entities/invoice.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 
 part 'finance_event.dart';
 part 'finance_state.dart';
@@ -110,10 +111,10 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
           ));
         } catch (ex) {
           debugPrint('❌ FinanceBloc Profile Offline Fallback Failed: $ex');
-          emit(FinanceError('Failed to load student profile: $e'));
+          emit(FinanceError(friendlyApiError(e, fallback: 'Could not load student profile.')));
         }
       } else {
-        emit(FinanceError('Failed to load student profile: $e'));
+        emit(FinanceError(friendlyApiError(e, fallback: 'Could not load student profile.')));
       }
     }
   }
@@ -135,7 +136,7 @@ class FinanceBloc extends Bloc<FinanceEvent, FinanceState> {
       }
     } catch (e) {
       debugPrint('❌ FinanceBloc: Manual Payment Failed: $e');
-      emit(FinanceError('Failed to record payment: $e'));
+      emit(FinanceError(friendlyApiError(e, fallback: 'Could not record payment.')));
     }
   }
 

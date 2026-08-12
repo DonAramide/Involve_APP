@@ -94,53 +94,76 @@ export class PaymentService {
   }
 
   /**
-   * Initiates a fund sweep (payout) to the school's bank account.
+   * Initiates a fund sweep (payout) to the school's bank account,
+   * or to an explicit destination (e.g. staff salary).
    * Path: POST /payments/payout
    */
-  static async createPayout(tenantId: string, amount: number) {
-    // 1. Fetch School Bank Details
-    let bankDetails: any = null;
-    try {
-      const { data, error } = await supabase
-        .from('payout_settings')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .single();
-      
-      if (!error && data) {
-        bankDetails = data;
-      }
-    } catch (err) {}
+  static async createPayout(
+    tenantId: string,
+    amount: number,
+    options?: {
+      destination?: {
+        account_number: string;
+        bank_code: string;
+        account_name: string;
+        bank_name?: string;
+      };
+      metadata?: Record<string, any>;
+    },
+  ) {
+    const payoutType = options?.metadata?.type || 'fund_sweep';
+    let bankDetails: any = options?.destination || null;
 
+    // 1. Fetch tenant bank details when no explicit destination
     if (!bankDetails) {
-      // Fallback to local cache tenant_payout_settings.json
       try {
-        const filePath = path.join(process.cwd(), 'tenant_payout_settings.json');
-        if (fs.existsSync(filePath)) {
-          const allSettings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-          bankDetails = allSettings[tenantId] || null;
+        const { data, error } = await supabase
+          .from('payout_settings')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .single();
+
+        if (!error && data) {
+          bankDetails = data;
         }
-      } catch (err) {
-        console.error('[PaymentService] Failed to read local tenant payout settings fallback:', err);
+      } catch (err) {}
+
+      if (!bankDetails) {
+        try {
+          const filePath = path.join(process.cwd(), 'tenant_payout_settings.json');
+          if (fs.existsSync(filePath)) {
+            const allSettings = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            bankDetails = allSettings[tenantId] || null;
+          }
+        } catch (err) {
+          console.error('[PaymentService] Failed to read local tenant payout settings fallback:', err);
+        }
       }
     }
 
-    if (!bankDetails) {
-      throw new Error(`Payout failed: No bank details configured for tenant ${tenantId}`);
+    if (!bankDetails?.account_number || !bankDetails?.bank_code || !bankDetails?.account_name) {
+      throw new Error(
+        payoutType === 'staff_salary'
+          ? 'Payout failed: Staff bank details incomplete'
+          : `Payout failed: No bank details configured for tenant ${tenantId}`,
+      );
     }
 
     // 2. Generate unique payout reference
-    const reference = `POUT-${Date.now()}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+    const prefix = payoutType === 'staff_salary' ? 'SAL' : 'POUT';
+    const reference = `${prefix}-${Date.now()}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
     const idempotencyKey = `payout:${reference}`;
 
     // 3. Database Pessimistic Locking & Double Entry
-    // This atomic RPC checks balance and records the double entry
     const { data: ledgerRes, error: ledgerError } = await supabase.rpc('request_payout_with_lock', {
       p_tenant_id: tenantId,
       p_idempotency_key: idempotencyKey,
       p_reference: reference,
-      p_amount: Math.round(amount), // Enforce Integer Kobo
-      p_metadata: { type: 'payout_request' }
+      p_amount: Math.round(amount),
+      p_metadata: {
+        type: payoutType === 'staff_salary' ? 'staff_salary' : 'payout_request',
+        ...(options?.metadata || {}),
+      },
     });
 
     if (ledgerError) {
@@ -157,35 +180,38 @@ export class PaymentService {
         destination: {
           account_number: bankDetails.account_number,
           bank_code: bankDetails.bank_code,
-          account_name: bankDetails.account_name
+          account_name: bankDetails.account_name,
         },
         metadata: {
           tenantId,
-          schoolId: tenantId, // Mapping schoolId to tenantId for SDK requirements
-          type: 'fund_sweep'
-        }
+          schoolId: tenantId,
+          type: payoutType,
+          ...(options?.metadata || {}),
+        },
       });
     } catch (error: any) {
       console.error('[PaymentService] Quasar Transfer Failure:', error.message);
-      // Initiate Reversal logic here if needed, but the webhook handles failed payouts
       throw new Error(`Failed to initiate transfer with Quasar: ${error.message}`);
     }
 
     // 5. Store transaction record (PENDING)
-    const { data: transaction, error: txError } = await supabase
+    const { error: txError } = await supabase
       .from('transactions_log')
       .insert({
         reference,
         tenant_id: tenantId,
-        wallet_id: (ledgerRes as any)?.ledger_id || null, // Storing ledger_id as reference point
+        wallet_id: (ledgerRes as any)?.ledger_id || null,
         amount: Math.round(amount),
-        provider: "quasar",
-        type: "payout",
-        status: "PENDING",
+        provider: 'quasar',
+        type: 'payout',
+        status: 'PENDING',
         metadata: {
           quasar_transfer_id: transfer.reference,
-          destination: bankDetails.account_number
-        }
+          destination: bankDetails.account_number,
+          bank_name: bankDetails.bank_name || null,
+          payout_type: payoutType,
+          ...(options?.metadata || {}),
+        },
       })
       .select()
       .single();
@@ -194,18 +220,22 @@ export class PaymentService {
       console.error('[PaymentService] DB Audit Write Failed:', txError.message);
     }
 
-    // 5. AUDIT LOG
     await AuditService.log({
       eventType: 'payout.initiated' as any,
       reference,
       tenantId,
-      payload: { amount, bankDetails: bankDetails.account_number }
+      payload: {
+        amount,
+        bankDetails: bankDetails.account_number,
+        payoutType,
+        ...(options?.metadata || {}),
+      },
     });
 
     return {
       reference,
-      status: "PENDING",
-      transfer
+      status: 'PENDING',
+      transfer,
     };
   }
 

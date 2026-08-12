@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import '../../domain/repositories/finance_repository_new.dart';
 import '../../../../core/services/service_locator.dart';
 import 'package:intl/intl.dart';
@@ -64,7 +65,7 @@ class _PayoutHistoryPageState extends State<PayoutHistoryPage> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading history: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not load payout history.'))));
     }
   }
 

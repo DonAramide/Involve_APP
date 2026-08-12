@@ -705,7 +705,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       _DashboardMenuItem(
         id: 'transaction_history',
-        title: 'TRANSACTION HISTORY',
+        title: (settings?.transactionHistoryLabel ?? 'Transaction History').toUpperCase(),
         icon: Icons.receipt_long,
         color: Colors.indigo,
         onTap: () => Navigator.push(
@@ -802,8 +802,10 @@ class _DashboardPageState extends State<DashboardPage> {
           },
         ),
         ...allItems.where((i) => [
-          'printer', 
-          'settings', 
+          'sales_records',
+          'transaction_history',
+          'printer',
+          'settings',
           'calculator',
           'admin_hub',
           'cloud_metrics',

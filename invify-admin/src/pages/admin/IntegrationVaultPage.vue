@@ -52,7 +52,7 @@
                   size="md"
                   :color="getCategoryColor(integration.category)"
                   text-color="white"
-                  :icon="isQuasarIntegration(integration) ? 'webhook' : 'hub'"
+                  :icon="isQuasarIntegration(integration) ? 'webhook' : (isMetaWhatsAppIntegration(integration) ? 'chat' : 'hub')"
                 />
                 <div>
                   <div class="text-weight-bold text-subtitle1">{{ integration.name }}</div>
@@ -96,6 +96,23 @@
                 <q-icon :name="quasarAdminCredsConfigured ? 'verified' : 'warning'" class="q-mr-xs" />
                 {{ quasarAdminCredsConfigured ? 'Configured' : 'Missing' }}
               </span>
+            </div>
+            <div
+              class="row justify-between text-caption text-grey-4 q-mb-sm"
+              v-if="isMetaWhatsAppIntegration(integration)"
+            >
+              <span>Cloud API</span>
+              <span :class="metaWhatsAppReady ? 'text-green-4' : 'text-orange-4'">
+                <q-icon :name="metaWhatsAppReady ? 'verified' : 'warning'" class="q-mr-xs" />
+                {{ metaWhatsAppReady ? 'Ready' : 'Incomplete' }}
+              </span>
+            </div>
+            <div
+              class="row justify-between text-caption text-grey-4 q-mb-sm"
+              v-if="isMetaWhatsAppIntegration(integration)"
+            >
+              <span>Keys</span>
+              <span class="text-cyan-3">{{ metaWhatsAppConfiguredCount }}/7 configured</span>
             </div>
             <div class="row justify-between text-caption text-grey-4 q-mb-sm" v-if="integration.integration_usage_analytics?.length">
               <span>Usage Today</span>
@@ -152,6 +169,8 @@ const tenantOptions = ref([]); // real tenants from /admin/tenants
 const searchQuery = ref('');
 const quasarWebhookConfigured = ref(false);
 const quasarAdminCredsConfigured = ref(false);
+const metaWhatsAppReady = ref(false);
+const metaWhatsAppConfiguredCount = ref(0);
 
 const integrations = ref([]);
 const showAddDialog = ref(false);
@@ -210,6 +229,16 @@ async function fetchVault() {
       } catch {
         quasarAdminCredsConfigured.value = false;
       }
+      try {
+        const metaRes = await vaultApi.getMetaWhatsAppStatus('PRODUCTION');
+        const data = metaRes.data?.data || metaRes.data || {};
+        metaWhatsAppReady.value = Boolean(data.ready);
+        const keys = data.keys || {};
+        metaWhatsAppConfiguredCount.value = Object.values(keys).filter((k) => k?.configured).length;
+      } catch {
+        metaWhatsAppReady.value = false;
+        metaWhatsAppConfiguredCount.value = 0;
+      }
     }
   } catch (err) {
     console.error(err);
@@ -253,8 +282,13 @@ function isQuasarIntegration(integration) {
   return id === 'quasar' || id === 'quasar_ledger' || id.includes('quasar');
 }
 
+function isMetaWhatsAppIntegration(integration) {
+  const id = String(integration?.service_identifier || '').toUpperCase();
+  return id === 'META_WHATSAPP' || id.includes('WHATSAPP');
+}
+
 function getCategoryColor(cat) {
-  const map = { 'COMMUNICATIONS': 'green-6', 'POS': 'cyan-6', 'AI': 'purple-6', 'PAYMENTS': 'teal-6' };
+  const map = { 'COMMUNICATIONS': 'green-6', 'MESSAGING': 'green-6', 'POS': 'cyan-6', 'AI': 'purple-6', 'PAYMENTS': 'teal-6' };
   return map[cat] || 'grey-6';
 }
 

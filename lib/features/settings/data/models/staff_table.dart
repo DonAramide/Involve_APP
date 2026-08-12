@@ -17,8 +17,10 @@ class Staff extends Table {
   TextColumn get deviceId => text().nullable()();
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
-  // Virtual Account Columns
+  // Personal salary bank (also used historically as VA snapshot fields)
   TextColumn get virtualBankName => text().nullable()();
   TextColumn get virtualAccountNumber => text().nullable()();
   TextColumn get virtualAccountName => text().nullable()();
+  /// Quasar / NIP bank code required for salary transfers
+  TextColumn get bankCode => text().nullable()();
 }

@@ -358,12 +358,19 @@ class SyncRepositoryImpl implements SyncRepository {
       await db.into(db.staff).insert(StaffCompanion(
         name: Value(remote.name),
         staffCode: Value(remote.staffCode),
+        staffId: Value(remote.staffId),
+        phone: Value(remote.phone),
+        role: Value(remote.role),
         isActive: Value(remote.isActive),
         syncId: Value(remote.syncId),
         updatedAt: Value(remote.updatedAt),
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
+        virtualBankName: Value(remote.virtualBankName),
+        virtualAccountNumber: Value(remote.virtualAccountNumber),
+        virtualAccountName: Value(remote.virtualAccountName),
+        bankCode: Value(remote.bankCode),
       ));
     } else if (remote.updatedAt?.isAfter(
             existing.updatedAt ??
@@ -373,12 +380,19 @@ class SyncRepositoryImpl implements SyncRepository {
           .write(StaffCompanion(
         name: Value(remote.name),
         staffCode: Value(remote.staffCode),
+        staffId: Value(remote.staffId),
+        phone: Value(remote.phone),
+        role: Value(remote.role),
         isActive: Value(remote.isActive),
         syncId: Value(remote.syncId),
         updatedAt: Value(remote.updatedAt),
         createdAt: Value(remote.createdAt),
         deviceId: Value(remote.deviceId),
         isDeleted: Value(remote.isDeleted),
+        virtualBankName: Value(remote.virtualBankName),
+        virtualAccountNumber: Value(remote.virtualAccountNumber),
+        virtualAccountName: Value(remote.virtualAccountName),
+        bankCode: Value(remote.bankCode),
       ));
     }
   }

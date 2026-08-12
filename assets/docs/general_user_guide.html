@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invify - General User Manual &amp; Admin Web Dashboard Guide</title>
+    <style>
+        :root {
+            --primary: #1a237e;
+            --primary-dark: #0d1642;
+            --primary-light: #3949ab;
+            --secondary: #00838f;
+            --secondary-dark: #005662;
+            --accent: #ff9800;
+            --accent-dark: #e65100;
+            --success: #2e7d32;
+            --info: #0288d1;
+            --warning: #ef6c00;
+            --danger: #c62828;
+            --text-main: #263238;
+            --text-muted: #546e7a;
+            --bg-light: #f4f7f6;
+            --card-bg: #ffffff;
+            --border-color: #e0e6ed;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            color: var(--text-main);
+            background-color: var(--bg-light);
+            line-height: 1.58;
+            margin: 0;
+            padding: 0;
+            font-size: 13.5px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            box-shadow: 0 0 45px rgba(0, 0, 0, 0.07);
+        }
+
+        header {
+            position: relative;
+            background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 50%, var(--secondary-dark) 100%);
+            color: #ffffff;
+            text-align: left;
+            overflow: hidden;
+        }
+
+        header img.header-img {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            opacity: 0.85;
+            display: block;
+        }
+
+        .header-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 28px 40px;
+            background: linear-gradient(transparent, rgba(10, 25, 47, 0.90));
+        }
+
+        .badge-header {
+            display: inline-block;
+            background: var(--accent);
+            color: #000000;
+            font-size: 0.72em;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 999px;
+            margin-bottom: 6px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .header-content h1 {
+            margin: 0;
+            font-size: 2.3em;
+            letter-spacing: 0.3px;
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.2;
+        }
+
+        .header-content p {
+            margin: 6px 0 0;
+            font-size: 1.05em;
+            opacity: 0.95;
+            color: #e0f2f1;
+        }
+
+        .content {
+            padding: 36px 44px 50px;
+        }
+
+        h2 {
+            border-left: 5px solid var(--primary-light);
+            padding-left: 14px;
+            color: var(--primary);
+            margin-top: 36px;
+            margin-bottom: 12px;
+            font-size: 1.45em;
+            font-weight: 700;
+            page-break-after: avoid;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        h3 {
+            color: var(--secondary-dark);
+            margin: 22px 0 8px;
+            font-size: 1.12em;
+            font-weight: 700;
+            page-break-after: avoid;
+        }
+
+        h4 {
+            color: var(--primary);
+            margin: 14px 0 6px;
+            font-size: 0.98em;
+            font-weight: 700;
+        }
+
+        .section-intro {
+            color: var(--text-muted);
+            margin: 0 0 18px;
+            font-size: 1em;
+        }
+
+        .toc {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin: 20px 0 30px;
+            page-break-inside: avoid;
+        }
+
+        .toc-title {
+            font-weight: 800;
+            color: var(--primary);
+            font-size: 1.05em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 24px;
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        .toc li {
+            margin: 3px 0;
+            color: var(--text-muted);
+            font-size: 0.92em;
+        }
+
+        .toc a {
+            color: var(--primary-light);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .toc a:hover {
+            color: var(--accent-dark);
+            text-decoration: underline;
+        }
+
+        /* Feature Cards */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .feature-card {
+            display: flex;
+            align-items: flex-start;
+            padding: 16px 18px;
+            border-radius: 10px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+            page-break-inside: avoid;
+        }
+
+        .icon-box {
+            min-width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-right: 16px;
+            flex-shrink: 0;
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        .feature-details {
+            flex-grow: 1;
+        }
+
+        .feature-details h3 {
+            margin: 0 0 6px;
+            color: var(--primary);
+            font-size: 1.05em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .feature-details p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.95em;
+        }
+
+        .feature-details ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+        }
+
+        .feature-details li {
+            margin: 3px 0;
+            color: var(--text-main);
+            font-size: 0.92em;
+        }
+
+        .feature-details strong {
+            color: var(--text-main);
+        }
+
+        /* Two column layout */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin: 14px 0;
+        }
+
+        .mini-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            background: #fafbfc;
+            page-break-inside: avoid;
+        }
+
+        .mini-card h4 {
+            margin: 0 0 6px;
+            color: var(--primary);
+            font-size: 0.96em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mini-card p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+
+        /* Callout Boxes */
+        .tip-box,
+        .warn-box,
+        .step-box,
+        .admin-box {
+            padding: 14px 18px;
+            margin: 18px 0;
+            border-radius: 0 10px 10px 0;
+            page-break-inside: avoid;
+            font-size: 0.94em;
+        }
+
+        .tip-box {
+            background: #e8eaf6;
+            border-left: 5px solid var(--primary-light);
+        }
+
+        .tip-box strong {
+            color: var(--primary);
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        .warn-box {
+            background: #fff3e0;
+            border-left: 5px solid var(--warning);
+        }
+
+        .warn-box strong {
+            color: #d84315;
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        .step-box {
+            background: #e0f2f1;
+            border-left: 5px solid var(--secondary);
+        }
+
+        .step-box strong {
+            color: var(--secondary-dark);
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .step-box ol {
+            margin: 6px 0 0;
+            padding-left: 20px;
+            color: var(--text-main);
+        }
+
+        .step-box li {
+            margin: 4px 0;
+        }
+
+        .admin-box {
+            background: #fbe9e7;
+            border-left: 5px solid #d84315;
+        }
+
+        .admin-box strong {
+            color: #bf360c;
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        /* Tables */
+        .menu-table,
+        .status-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0 22px;
+            font-size: 0.92em;
+            page-break-inside: avoid;
+        }
+
+        .menu-table th,
+        .menu-table td,
+        .status-table th,
+        .status-table td {
+            border: 1px solid #e0e6ed;
+            padding: 9px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .menu-table th,
+        .status-table th {
+            background: #eef3f8;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .menu-table tr:nth-child(even),
+        .status-table tr:nth-child(even) {
+            background: #fbfcfd;
+        }
+
+        /* Status Pills */
+        .pill {
+            display: inline-block;
+            font-size: 0.75em;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .pill-paid { background: #e8f5e9; color: #2e7d32; }
+        .pill-partial { background: #fff3e0; color: #e65100; }
+        .pill-unpaid { background: #ffebee; color: #c62828; }
+        .pill-active { background: #e0f2f1; color: #00695c; }
+        .pill-auth { background: #ede7f6; color: #4527a0; }
+
+        .key-badge {
+            display: inline-block;
+            background: #eceff1;
+            border: 1px solid #cfd8dc;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: #37474f;
+        }
+
+        .page-break {
+            break-before: page;
+            page-break-before: always;
+        }
+
+        footer {
+            text-align: center;
+            padding: 26px 40px;
+            background: #eceff1;
+            color: #607d8b;
+            font-size: 0.88em;
+            border-top: 1px solid #cfd8dc;
+        }
+
+        footer p {
+            margin: 4px 0;
+        }
+
+        /* Print Settings for Booklet / PDF */
+        @media print {
+            body {
+                background: #ffffff;
+                font-size: 11pt;
+                line-height: 1.45;
+            }
+
+            .container {
+                box-shadow: none;
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            .content {
+                padding: 20px 24px;
+            }
+
+            header img.header-img {
+                height: 150px;
+            }
+
+            .header-content {
+                padding: 16px 24px;
+            }
+
+            .header-content h1 {
+                font-size: 1.8em;
+            }
+
+            .feature-card,
+            .mini-card,
+            .tip-box,
+            .warn-box,
+            .step-box,
+            .admin-box,
+            .menu-table,
+            .status-table {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .feature-card {
+                padding: 10px 14px;
+                margin-bottom: 8px;
+            }
+
+            h2 {
+                margin-top: 24px;
+                font-size: 1.25em;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            a {
+                color: inherit;
+                text-decoration: none;
+            }
+        }
+
+        @media (max-width: 680px) {
+            .content {
+                padding: 20px 16px;
+            }
+
+            .two-col,
+            .toc-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                padding: 20px 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <img src="header.png" alt="Invify Master Platform Header" class="header-img">
+            <div class="header-content">
+                <div class="badge-header">Enterprise &amp; Standard Platform Edition · Master Guide</div>
+                <h1>Invify General User Manual</h1>
+                <p>Getting Started, System Settings, Core Features &amp; Admin Web Cloud Dashboard</p>
+            </div>
+        </header>
+
+        <div class="content">
+            <p class="section-intro">
+                Welcome to the <strong>Invify General User Manual</strong>. Invify is a next-generation enterprise business management suite built with an <strong>offline-first architecture</strong>, hardened idempotent financial ledger, local peer-to-peer (LAN) synchronization, and seamless cloud replication. This handbook covers the complete <strong>Getting Started Onboarding</strong>, <strong>All App Settings &amp; Customizations</strong>, and the <strong>Admin Web Cloud Portal</strong>.
+            </p>
+
+            <!-- ONBOARDING & GETTING STARTED CHECKLIST -->
+            <div class="step-box">
+                <strong>🏁 Quick-Start Sequence (First-Time Installation &amp; Onboarding)</strong>
+                <ol>
+                    <li><strong>Initial Launch &amp; Business Mode:</strong> Open Invify on your tablet, POS terminal, or PC. Choose your business operating model (<strong>Retail</strong>, <strong>School</strong>, or <strong>Services</strong>).</li>
+                    <li><strong>Organization Profile:</strong> In <em>Settings</em>, enter your official Business Name, Phone Numbers, Email, Physical Address, and upload your Brand Logo/Crest.</li>
+                    <li><strong>Currency &amp; Financials:</strong> Set your local Currency Symbol (₦, $, £, €, KSh, etc.) and configure your default Tax/VAT rates.</li>
+                    <li><strong>Security &amp; PIN Setup:</strong> Change the default Manager PIN, create Cashier/Staff accounts, and configure the Emergency Lock Screen passcode.</li>
+                    <li><strong>Hardware Pairing:</strong> Connect your Bluetooth/USB thermal receipt printer and card reader in <em>Printer &amp; MPOS</em>.</li>
+                    <li><strong>License Activation:</strong> Enter your Pro activation key or sync your device with the Cloud Admin Portal.</li>
+                </ol>
+            </div>
+
+            <!-- TABLE OF CONTENTS -->
+            <div class="toc">
+                <div class="toc-title">📑 Table of Contents</div>
+                <ul class="toc-grid">
+                    <li><a href="#architecture">1. System Architecture &amp; Offline-First Engine</a></li>
+                    <li><a href="#onboarding">2. Getting Started &amp; Initial Setup Wizard</a></li>
+                    <li><a href="#settings-reference">3. Complete System Settings Reference</a></li>
+                    <li><a href="#security-roles">4. Security, Staff Roles &amp; Emergency Lock</a></li>
+                    <li><a href="#business-modes">5. Business Operating Modes (Retail, School, Services)</a></li>
+                    <li><a href="#hardware-peripherals">6. Printers, MPOS &amp; Peripheral Setup</a></li>
+                    <li><a href="#lan-sync">7. Multi-Till Peer-to-Peer LAN Synchronization</a></li>
+                    <li><a href="#admin-web">8. Admin Web Dashboard &amp; Cloud Portal</a></li>
+                    <li><a href="#virtual-accounts">9. Quaser Gateway, Virtual Accounts &amp; Payouts</a></li>
+                    <li><a href="#backup-recovery">10. Database Backup, Snapshot &amp; Disaster Recovery</a></li>
+                    <li><a href="#best-practices">11. Standard Operating Procedures (SOPs)</a></li>
+                    <li><a href="#troubleshooting">12. Master Troubleshooting Matrix &amp; FAQ</a></li>
+                </ul>
+            </div>
+
+            <!-- 1. SYSTEM ARCHITECTURE -->
+            <h2 id="architecture">1. System Architecture &amp; Offline-First Engine</h2>
+            <p class="section-intro">
+                Invify is engineered to guarantee 100% uptime, even during internet outages, network blackouts, or server maintenance.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>💾 Offline-First Idempotent Ledger</h4>
+                    <p>Every transaction, invoice, result score, or payment is recorded locally into an encrypted, immutable database before any network call. Transactions are never dropped or double-counted.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>📡 Local Area Network (LAN) Peer Sync</h4>
+                    <p>Multiple cashier terminals, bursary tablets, or sales counters synchronize in real-time over a local Wi-Fi router without requiring an active internet connection.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>☁️ Real-Time Cloud Replication</h4>
+                    <p>When internet is available, transactions automatically mirror to the <strong>Invify Cloud Platform</strong> for multi-branch monitoring, automated bank reconciliation, and remote web access.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>🛡️ Enterprise Security &amp; Audit Trail</h4>
+                    <p>All administrative adjustments, price changes, refunds, and permission elevations are permanently recorded in the system audit log with operator timestamps.</p>
+                </div>
+            </div>
+
+            <!-- 2. ONBOARDING & SETUP -->
+            <h2 id="onboarding" class="page-break">2. Getting Started &amp; Initial Setup Wizard</h2>
+            <p class="section-intro">
+                Follow this comprehensive onboarding flow when launching Invify on a new terminal:
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #1a237e;">🚀</div>
+                    <div class="feature-details">
+                        <h3>STEP 1: SELECTING YOUR OPERATING MODE</h3>
+                        <p>Invify adapts its user interface, workflows, and terminology to your industry:</p>
+                        <ul>
+                            <li><strong>Retail Mode:</strong> Supermarkets, boutiques, pharmacies, electronics, grocery, and wholesale stores.</li>
+                            <li><strong>School Mode:</strong> Nursery, Primary, Secondary, High Schools, Colleges, and educational academies.</li>
+                            <li><strong>Service Mode:</strong> Tailoring, repair workshops, salons, professional consultancies, and maintenance services.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #00838f;">🏢</div>
+                    <div class="feature-details">
+                        <h3>STEP 2: BUSINESS IDENTITY &amp; BRANDING</h3>
+                        <p>Configure official store metadata that appears across invoices, thermal slips, and cloud portals:</p>
+                        <ul>
+                            <li><strong>Organization Name:</strong> Official registered trade name.</li>
+                            <li><strong>Logo / Crest:</strong> Upload a high-resolution PNG/JPG image (used on receipts, report cards, and watermarks).</li>
+                            <li><strong>Contact Details:</strong> Phone numbers, email, physical address, and website.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #2e7d32;">💳</div>
+                    <div class="feature-details">
+                        <h3>STEP 3: FINANCIAL &amp; HARDWARE CALIBRATION</h3>
+                        <p>Set up currency, tax rules, and receipt printing:</p>
+                        <ul>
+                            <li><strong>Currency Symbol:</strong> Select your currency (e.g. ₦ Naira, $ USD, £ GBP, € Euro).</li>
+                            <li><strong>Printer Pairing:</strong> Open <em>Printer &amp; MPOS</em>, tap scan, pair your Bluetooth/USB receipt printer, and run a <em>Test Print</em>.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. COMPLETE SETTINGS REFERENCE -->
+            <h2 id="settings-reference" class="page-break">3. Complete System Settings Reference</h2>
+            <p class="section-intro">
+                The <strong>Settings</strong> module (<span class="key-badge">⚙️</span>) provides granular control over operational parameters. Access is PIN-protected.
+            </p>
+
+            <table class="menu-table">
+                <thead>
+                    <tr>
+                        <th style="width: 25%;">Setting Category</th>
+                        <th style="width: 30%;">Configurable Options</th>
+                        <th>Operational Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Business Information</strong></td>
+                        <td>Name, Phone, Email, Address, Website, Logo Upload</td>
+                        <td>Prints on thermal receipts, A4 invoices, student report cards, and displays on the dashboard header.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Business Mode</strong></td>
+                        <td>Retail / School / Service Selector</td>
+                        <td>Switches dashboard tile layout, terminology, and specialized sub-menus.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Custom Terminology</strong></td>
+                        <td>New Sale Label, Stock Label, Sales Records Label, Items Label</td>
+                        <td>Allows full customization of button labels to match store jargon (e.g. "NEW BILL", "FEES", "WORK ORDERS").</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Appearance &amp; Display</strong></td>
+                        <td>Theme Mode (Light / Dark / System), Live Clock, Sync Indicators, Background Logo Watermark</td>
+                        <td>Optimizes screen contrast for indoor cashier desks or outdoor bright light conditions.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>POS &amp; Printing</strong></td>
+                        <td>Thermal Size (58mm / 80mm), Auto-Print on Checkout, Receipt Header, Return Policy Footer, Show Barcodes</td>
+                        <td>Controls receipt formatting, font scaling, automatic paper cutting, and legal disclaimers.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Tax &amp; Currency</strong></td>
+                        <td>Currency Symbol, Currency Code, Default Tax/VAT Rate (%)</td>
+                        <td>Enables automatic tax calculation on checkout and formats monetary values across ledgers.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Network &amp; Cloud Sync</strong></td>
+                        <td>Online Sync Toggle, Auto Upload Invoices, WebSocket Realtime Engine, Master/Client LAN Mode</td>
+                        <td>Manages bandwidth usage, local LAN peer sharing, and cloud data replication frequency.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Database &amp; Maintenance</strong></td>
+                        <td>Export Backup JSON, Restore Snapshot, Clear Cache, Reset All Local Data</td>
+                        <td>Critical for manual offline disaster recovery, terminal migration, and memory optimization.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 4. SECURITY & ROLES -->
+            <h2 id="security-roles">4. Security, Staff Roles &amp; Emergency Lock</h2>
+            <p class="section-intro">
+                Multi-tiered role-based access control (RBAC) ensures strict separation of duties and eliminates unauthorized ledger modifications.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>🛡️ User Role Hierarchy</h4>
+                    <ul>
+                        <li><strong>Super Admin / Proprietor:</strong> Full system control, Quaser payment keys, database restore, license management.</li>
+                        <li><strong>Manager / Admin:</strong> Price overrides, discount authorization, stock valuation, inventory restock, refunds.</li>
+                        <li><strong>Finance / Bursar:</strong> Fee collections, bank reconciliation, debt ledgers, payment matching.</li>
+                        <li><strong>Cashier / Teacher:</strong> Standard POS checkout, student result entry, lesson notes (no financial settings access).</li>
+                    </ul>
+                </div>
+
+                <div class="mini-card">
+                    <h4>🚨 Emergency Lock Screen</h4>
+                    <p>In case of emergency, physical security threats, or unauthorized terminal tampering, activating the <strong>Emergency Lock</strong> immediately freezes all screens behind a secure master passcode. No sales, refunds, or customer data can be accessed until unlocked.</p>
+                </div>
+            </div>
+
+            <!-- 5. BUSINESS MODES OVERVIEW -->
+            <h2 id="business-modes" class="page-break">5. Business Operating Modes Overview</h2>
+            <p class="section-intro">
+                A single Invify installation can seamlessly run across three industry verticals:
+            </p>
+
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Operating Mode</th>
+                        <th style="width: 40%;">Key Features &amp; Modules</th>
+                        <th>Target Establishments</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>RETAIL MODE</strong></td>
+                        <td>Barcode checkout, Stock Restocking, Inventory Valuation at Cost vs Retail, Category Management, Customer Debt Ledgers, Gross Profit Analytics.</td>
+                        <td>Supermarkets, Boutiques, Electronics, Pharmacies, Hardware, Wholesalers.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SCHOOL MODE</strong></td>
+                        <td>Academic Years/Terms, Class Arms, Student Profiles, Fee Management, Batch Billing, Result Entry (CA1/CA2/Exam), Auto Grading, Lesson Notes AI Wizard, Dedicated Virtual Accounts.</td>
+                        <td>Creches, Nursery, Primary, Secondary, High Schools, Colleges, Training Centers.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SERVICE MODE</strong></td>
+                        <td>Job Work Orders, Material vs Workmanship Cost Separation, Service Status Lifecycle (Pending &rarr; Progress &rarr; Ready &rarr; Delivered), Client Service Ledgers.</td>
+                        <td>Automotive Repair, Tailoring, Salons, Engineering, Consultancies, Maintenance.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 6. PRINTERS & HARDWARE -->
+            <h2 id="hardware-peripherals">6. Printers, MPOS &amp; Peripheral Setup</h2>
+            <p class="section-intro">
+                Invify is compatible with industry-standard POS hardware, barcode scanners, and peripheral accessories.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>🖨️ Thermal Receipt Printers</h4>
+                    <p>Supports <strong>58mm</strong> (compact) and <strong>80mm</strong> (standard) ESC/POS printers over <strong>Bluetooth</strong>, <strong>USB OTG</strong>, or <strong>LAN Network (TCP/IP)</strong>. Built-in thermal printers on Android POS devices (Sunmi, POSIFLEX, Telpo) are natively supported with instant paper cutting.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>💳 MPOS Card Readers &amp; Scanners</h4>
+                    <p>Pair wireless MPOS debit card terminals for in-person card payments. USB and Bluetooth laser/2D barcode scanners require zero configuration—simply scan any product barcode to instantly add it to the cart.</p>
+                </div>
+            </div>
+
+            <!-- 7. LAN SYNC -->
+            <h2 id="lan-sync" class="page-break">7. Multi-Till Peer-to-Peer LAN Synchronization</h2>
+            <p class="section-intro">
+                Scale your store or school across multiple checkouts and offices without relying on cloud internet:
+            </p>
+
+            <div class="step-box">
+                <strong>🔗 How to Set Up Multi-Device LAN Sync (No Internet Needed)</strong>
+                <ol>
+                    <li>Connect all terminals (tablets, phones, PCs) to the same local Wi-Fi router or mobile hotspot.</li>
+                    <li>Designate the main terminal as the <strong>Sync Master</strong> (in <em>Settings &rarr; Device Sync</em>).</li>
+                    <li>On other cashier/teacher terminals, tap <strong>Join Master</strong>. The devices will discover each other automatically via local mDNS/IP broadcast.</li>
+                    <li>All sales, student bills, stock deductions, and payments will now sync across all screens in real-time.</li>
+                </ol>
+            </div>
+
+            <!-- 8. ADMIN WEB DASHBOARD -->
+            <h2 id="admin-web">8. Admin Web Dashboard &amp; Cloud Portal</h2>
+            <p class="section-intro">
+                The <strong>Invify Cloud Admin Portal</strong> enables proprietors, executives, and multi-branch managers to monitor and govern operations from any web browser worldwide.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #0d47a1;">🌐</div>
+                    <div class="feature-details">
+                        <h3>EXECUTIVE CLOUD METRICS &amp; MULTI-BRANCH CONSOLE</h3>
+                        <p>Real-time centralized governance from any computer or mobile browser.</p>
+                        <ul>
+                            <li><strong>Global Turnover Dashboard:</strong> View live revenue aggregated across all branches and physical terminals.</li>
+                            <li><strong>Remote Product &amp; Price Updates:</strong> Add new items, update cost/selling prices, or adjust class fee structures on the web—changes push automatically to physical tills.</li>
+                            <li><strong>Consolidated Profit &amp; Loss:</strong> Download comprehensive P&amp;L reports, tax statements, and inventory valuation summaries in Excel, CSV, or PDF.</li>
+                            <li><strong>Live Multi-Terminal Tracking:</strong> Monitor cashier active status, battery level, offline queue count, and shift closing balances remotely.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #00897b;">🏛️</div>
+                    <div class="feature-details">
+                        <h3>STAFF AUDIT TRAILS &amp; CENTRALIZED USER MANAGEMENT</h3>
+                        <p>Oversee all administrative actions across your enterprise.</p>
+                        <ul>
+                            <li><strong>Remote Staff Management:</strong> Create cashier, bursar, and manager logins, assign roles, or remotely revoke terminal access.</li>
+                            <li><strong>Administrative Audit Trail:</strong> Review every discount granted, refund processed, price override, or deleted invoice with operator timestamps.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 9. VIRTUAL ACCOUNTS & SETTLEMENTS -->
+            <h2 id="virtual-accounts" class="page-break">9. Quaser Gateway, Virtual Accounts &amp; Payouts</h2>
+            <p class="section-intro">
+                Automate incoming bank transfers and eliminate manual teller confirmation using integrated payment rails.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>🏦 Dedicated Dynamic &amp; Static Virtual Accounts</h4>
+                    <p>Generate unique, dedicated bank account numbers for students or commercial clients. When a transfer is made, the Invify engine reconciles and credits the ledger automatically in seconds.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>💸 Automated Bank Settlements &amp; Payouts</h4>
+                    <p>Collected funds settle directly into your registered commercial bank account. Track payout batches, platform settlement fees, and transfer reference IDs under <em>Payout History</em>.</p>
+                </div>
+            </div>
+
+            <!-- 10. BACKUP & DISASTER RECOVERY -->
+            <h2 id="backup-recovery">10. Database Backup, Snapshot &amp; Disaster Recovery</h2>
+            <p class="section-intro">
+                Protect your institutional data against hardware loss, device theft, or physical damage.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #d84315;">💾</div>
+                    <div class="feature-details">
+                        <h3>OFFLINE DATABASE SNAPSHOTS &amp; CLOUD BACKUPS</h3>
+                        <p>Maintain complete data independence with portable encrypted backups.</p>
+                        <ul>
+                            <li><strong>Creating a Local Backup:</strong> Go to <em>Settings &rarr; Database &rarr; Export Backup</em>. Save the encrypted JSON file to an SD card, USB drive, or secure email.</li>
+                            <li><strong>Restoring to a New Device:</strong> Install Invify on the new terminal, go to <em>Settings &rarr; Database &rarr; Restore Snapshot</em>, and select your backup file. All products, sales history, student profiles, and ledgers restore in seconds.</li>
+                            <li><strong>Automated Cloud Backups:</strong> For Pro/Standard connected devices, daily encrypted snapshots are automatically preserved in the Invify Cloud.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 11. BEST PRACTICES & SOPS -->
+            <h2 id="best-practices" class="page-break">11. Standard Operating Procedures (SOPs)</h2>
+            <p class="section-intro">
+                Recommended operational workflows for peak efficiency and error prevention.
+            </p>
+
+            <div class="two-col">
+                <div class="step-box">
+                    <strong>☀️ Daily Cashier / Operator Workflow</strong>
+                    <ol>
+                        <li>Log in using your assigned Staff PIN.</li>
+                        <li>Verify that the receipt printer status is active (Green dot on tile).</li>
+                        <li>Count and confirm your opening cash drawer float.</li>
+                        <li>Issue receipts for every transaction; record exact payment methods.</li>
+                        <li>At shift end, print the <strong>Transaction History</strong> summary and balance physical cash against recorded totals.</li>
+                    </ol>
+                </div>
+                <div class="step-box">
+                    <strong>📅 Weekly Manager Maintenance Routine</strong>
+                    <ol>
+                        <li>Audit the <strong>Low Stock</strong> and <strong>Defaulter</strong> lists.</li>
+                        <li>Review the <strong>Reconciliation Hub</strong> to resolve any unallocated transfers.</li>
+                        <li>Perform an offline <strong>Database Backup</strong> and save to external storage.</li>
+                        <li>Inspect the <strong>Audit Logs</strong> for unauthorized voids or overrides.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- 12. MASTER TROUBLESHOOTING MATRIX -->
+            <h2 id="troubleshooting">12. Master Troubleshooting Matrix &amp; FAQ</h2>
+
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th style="width: 28%;">Symptom</th>
+                        <th style="width: 34%;">Underlying Cause</th>
+                        <th>Recommended Solution</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Printer not printing / Red dot</strong></td>
+                        <td>Bluetooth unpaired, thermal paper roll inserted backwards, or printer sleep mode.</td>
+                        <td>Ensure paper feeds from under the roll, power cycle printer, open <em>Printer &amp; MPOS</em> and tap <em>Connect</em>. Run a <em>Test Print</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cloud Icon shows Red (Offline)</strong></td>
+                        <td>No internet connection or online sync disabled.</td>
+                        <td>Normal behavior—Invify continues 100% offline. Invoices queue in the outbox and sync automatically once internet returns.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>LAN Sync not finding other tills</strong></td>
+                        <td>Devices connected to different Wi-Fi networks or router client isolation is ON.</td>
+                        <td>Ensure all devices are on the exact same Wi-Fi SSID/band. Disable "AP Isolation" on the router or use a mobile hotspot.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Forgotten Manager PIN</strong></td>
+                        <td>Security lockout after multiple incorrect attempts.</td>
+                        <td>Use your Super Admin Recovery Passcode or reset the PIN via the <em>Admin Web Cloud Dashboard</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Unmatched Bank Deposit</strong></td>
+                        <td>Customer paid via transfer without specifying reference code.</td>
+                        <td>Open <em>Reconciliation</em> &rarr; Locate payment in <em>Unmatched Queue</em> &rarr; Tap <em>Assign to Customer / Student</em>.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="tip-box">
+                <strong>💡 Printing this Manual for Operations &amp; Staff Training</strong>
+                Open this file in Google Chrome, Microsoft Edge, or Safari. Press <span class="key-badge">Ctrl + P</span> (or <span class="key-badge">Cmd + P</span> on Mac), choose <strong>Save as PDF</strong> or select your office printer, set paper size to <strong>A4</strong>, and check <strong>Background graphics</strong> to generate a complete physical training manual.
+            </div>
+
+        </div>
+
+        <footer>
+            <p><strong>Invify Enterprise Business Management Suite</strong> · Empowering Modern Commerce &amp; Institutions Worldwide</p>
+            <p>&copy; 2026 Invify. All Rights Reserved. · Master Platform Manual Version 1.0.0</p>
+        </footer>
+    </div>
+
+</body>
+
+</html>

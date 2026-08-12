@@ -148,4 +148,82 @@ export class VaultController {
       return res.status(500).json({ success: false, error: error.message });
     }
   }
+
+  /**
+   * PUT /vault/meta-whatsapp
+   * Upsert Meta WhatsApp Cloud API credentials into Integration Vault.
+   * Body may include any of:
+   * PUBLIC_API_BASE_URL, WHATSAPP_GRAPH_API_VERSION, WHATSAPP_ACCESS_TOKEN,
+   * WHATSAPP_APP_SECRET, WHATSAPP_WEBHOOK_VERIFY_TOKEN, WHATSAPP_BUSINESS_ACCOUNT_ID,
+   * WHATSAPP_PHONE_NUMBER_ID, environment?
+   * Never echoes secret values back.
+   */
+  static async upsertMetaWhatsApp(req: Request, res: Response) {
+    try {
+      const body = req.body || {};
+      const environment = body.environment === 'SANDBOX' ? 'SANDBOX' : 'PRODUCTION';
+      const values: Record<string, string> = {};
+
+      for (const key of IntegrationVaultService.META_WHATSAPP_KEYS) {
+        if (body[key] != null && String(body[key]).trim() !== '') {
+          values[key] = String(body[key]).trim();
+        }
+      }
+
+      // Accept legacy alias
+      if (!values.WHATSAPP_ACCESS_TOKEN && body.META_ACCESS_TOKEN) {
+        values.WHATSAPP_ACCESS_TOKEN = String(body.META_ACCESS_TOKEN).trim();
+      }
+
+      if (Object.keys(values).length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Provide at least one of: ${IntegrationVaultService.META_WHATSAPP_KEYS.join(', ')}`,
+        });
+      }
+
+      const result = await IntegrationVaultService.upsertMetaWhatsAppCredentials(values, environment);
+      const status = await IntegrationVaultService.getMetaWhatsAppStatus(environment);
+      const { WhatsAppConfig } = await import('../integrations/whatsapp/WhatsAppConfig');
+      const callbackUrl = await WhatsAppConfig.webhookCallbackUrl();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Meta WhatsApp credentials saved to Integration Vault',
+        data: {
+          vaultId: result.vaultId,
+          environment: result.environment,
+          keysStored: result.keys,
+          status,
+          webhookCallbackUrl: callbackUrl,
+        },
+      });
+    } catch (error: any) {
+      console.error('[VaultController] upsertMetaWhatsApp failed:', error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
+
+  /**
+   * GET /vault/meta-whatsapp/status
+   * Status-only — never returns plaintext secrets.
+   */
+  static async getMetaWhatsAppStatus(req: Request, res: Response) {
+    try {
+      const environment = (req.query.environment as string) === 'SANDBOX' ? 'SANDBOX' : 'PRODUCTION';
+      const status = await IntegrationVaultService.getMetaWhatsAppStatus(environment);
+      const { WhatsAppConfig } = await import('../integrations/whatsapp/WhatsAppConfig');
+      const callbackUrl = await WhatsAppConfig.webhookCallbackUrl();
+      return res.status(200).json({
+        success: true,
+        data: {
+          ...status,
+          webhookCallbackUrl: callbackUrl,
+        },
+      });
+    } catch (error: any) {
+      console.error('[VaultController] getMetaWhatsAppStatus failed:', error.message);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  }
 }

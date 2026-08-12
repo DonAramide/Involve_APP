@@ -183,7 +183,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               runSpacing: 16,
               children: [
                 _ActionTile(
-                  label: 'Quaser Keys',
+                  label: 'Quasar Keys',
                   icon: Icons.vpn_key,
                   onTap: (isMaster && !isBasicOrFree) ? () => _gotoKeys(context) : null,
                   isGated: !isMaster || isBasicOrFree,

@@ -30,8 +30,10 @@ export class VerificationService {
     
     const expiresAt = new Date(Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
-    const email = channel === 'EMAIL' ? identifier : null;
-    const phone = channel === 'WHATSAPP' ? identifier : null;
+    const normalized =
+      channel === 'EMAIL' ? identifier.trim().toLowerCase() : identifier.trim();
+    const email = channel === 'EMAIL' ? normalized : null;
+    const phone = channel === 'WHATSAPP' ? normalized : null;
 
     // Check if there's a recent PENDING OTP for the same channel & identifier to handle Resend Cooldown
     // Rate limiting (60s cooldown, 5/hr max sends) can be done via DB queries here or via express-rate-limit 
@@ -48,7 +50,7 @@ export class VerificationService {
          purpose, 
          status: 'PENDING' 
       })
-      .eq(channel === 'EMAIL' ? 'email' : 'phone', identifier);
+      .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized);
 
     const { error: insertError } = await supabase
       .from('verification_codes')
@@ -73,12 +75,12 @@ export class VerificationService {
     let sent = false;
     if (channel === 'EMAIL') {
       if (purpose === 'PASSWORD_RESET') {
-        sent = await emailService.sendPasswordResetCode(identifier, rawOtp);
+        sent = await emailService.sendPasswordResetCode(normalized, rawOtp);
       } else {
-        sent = await emailService.sendVerificationCode(identifier, rawOtp);
+        sent = await emailService.sendVerificationCode(normalized, rawOtp);
       }
     } else if (channel === 'WHATSAPP') {
-      sent = await whatsappService.sendOtpTemplate(identifier, rawOtp);
+      sent = await whatsappService.sendOtpTemplate(normalized, rawOtp);
     }
 
     return sent;
@@ -90,57 +92,86 @@ export class VerificationService {
     channel: ChannelType,
     purpose: PurposeType
   ): Promise<boolean> {
+    const result = await this.verifyOTPDetailed(identifier, code, channel, purpose);
+    return result.ok;
+  }
+
+  public async verifyOTPDetailed(
+    identifier: string,
+    code: string,
+    channel: ChannelType,
+    purpose: PurposeType
+  ): Promise<{ ok: boolean; error?: string }> {
+    const normalized =
+      channel === 'EMAIL' ? identifier.trim().toLowerCase() : identifier.trim();
+
     // Find the pending OTP
     const { data: record, error } = await supabase
       .from('verification_codes')
       .select('*')
-      .eq(channel === 'EMAIL' ? 'email' : 'phone', identifier)
+      .eq(channel === 'EMAIL' ? 'email' : 'phone', normalized)
       .eq('channel', channel)
       .eq('purpose', purpose)
       .eq('status', 'PENDING')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error || !record) {
-      console.warn(`[VerificationService] No pending OTP found for ${identifier}`);
-      return false;
+    if (error) {
+      console.warn(`[VerificationService] Lookup error for ${normalized}:`, error.message);
+      return { ok: false, error: 'Unable to verify code right now. Please try again.' };
+    }
+
+    if (!record) {
+      console.warn(`[VerificationService] No pending OTP found for ${normalized}`);
+      return {
+        ok: false,
+        error: 'No pending code found. Tap Resend OTP, then enter the newest code.',
+      };
     }
 
     // Check expiry
     const now = new Date();
     if (new Date(record.expires_at) < now) {
       await supabase.from('verification_codes').update({ status: 'EXPIRED' }).eq('id', record.id);
-      return false;
+      return { ok: false, error: 'Code expired. Tap Resend OTP for a new one.' };
     }
 
     // Check attempt limit
     if (record.attempt_count >= this.MAX_RETRIES) {
       await supabase.from('verification_codes').update({ status: 'CANCELLED' }).eq('id', record.id);
-      return false;
+      return { ok: false, error: 'Too many attempts. Tap Resend OTP for a new code.' };
     }
 
     // Increment attempt count
     await supabase
       .from('verification_codes')
-      .update({ attempt_count: record.attempt_count + 1 })
+      .update({ attempt_count: (record.attempt_count || 0) + 1 })
       .eq('id', record.id);
 
-    // Verify bcrypt hash
-    const isValid = await bcrypt.compare(code, record.code);
-    
+    // Verify bcrypt hash (and plaintext fallback for legacy rows)
+    let isValid = false;
+    try {
+      isValid = await bcrypt.compare(code, record.code);
+    } catch (_) {
+      isValid = false;
+    }
+    if (!isValid && record.code === code) {
+      isValid = true;
+    }
+
     if (isValid) {
       await supabase
         .from('verification_codes')
-        .update({ 
+        .update({
           status: 'VERIFIED',
-          verified_at: new Date().toISOString()
+          verified_at: new Date().toISOString(),
         })
         .eq('id', record.id);
-      return true;
+      return { ok: true };
     }
 
-    return false;
+    return { ok: false, error: 'Incorrect code. Check the latest email and try again.' };
   }
 }
 

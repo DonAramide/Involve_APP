@@ -69,7 +69,7 @@
         <q-input
           v-model="filters.search"
           :dark="true" filled dense
-          placeholder="Search user, IP, action, target..."
+          placeholder="Search tenant, user, IP, action, target..."
           class="bg-subpanel col rounded-borders"
           clearable
           @update:model-value="debounceFetch"
@@ -136,19 +136,18 @@
     <div class="enterprise-panel bg-panel col column overflow-hidden border-muted rounded-borders">
 
       <!-- Table Header -->
-      <div class="ledger-thead bg-subpanel q-px-md q-py-xs border-bottom row items-center no-wrap" style="min-width: 900px;">
+      <div class="ledger-thead bg-subpanel q-px-md q-py-xs border-bottom row items-center no-wrap" style="min-width: 980px;">
         <div class="col-2 font-mono text-muted text-caption">TIMESTAMP</div>
         <div class="col-1 font-mono text-muted text-caption">MODULE</div>
         <div class="col-2 font-mono text-muted text-caption">ACTION</div>
+        <div class="col-2 font-mono text-muted text-caption">TENANT</div>
         <div class="col-2 font-mono text-muted text-caption">OPERATOR</div>
-        <div class="col-15 font-mono text-muted text-caption">IP ADDRESS</div>
-        <div class="col-15 font-mono text-muted text-caption">LOCATION</div>
         <div class="col-15 font-mono text-muted text-caption">TARGET</div>
         <div class="col-1 font-mono text-muted text-caption text-right">STATUS</div>
       </div>
 
       <!-- Table Body -->
-      <div class="col q-overflow-y-auto" style="min-width: 900px; max-height: calc(100vh - 380px); overflow-y: auto;">
+      <div class="col q-overflow-y-auto" style="min-width: 980px; max-height: calc(100vh - 380px); overflow-y: auto;">
 
         <!-- Loading State -->
         <div v-if="loading" class="column items-center justify-center q-py-xl">
@@ -194,23 +193,20 @@
               </span>
             </div>
 
+            <!-- Tenant -->
+            <div class="col-2 column no-wrap">
+              <div class="text-main text-weight-medium ellipsis" style="font-size: 11px; max-width: 150px;">
+                {{ log.tenant_name || '—' }}
+              </div>
+              <div class="text-muted ellipsis font-mono" style="font-size: 9px; max-width: 150px;" v-if="log.tenant_id">
+                {{ String(log.tenant_id).slice(0, 8) }}…
+              </div>
+            </div>
+
             <!-- Operator -->
             <div class="col-2 column no-wrap">
-              <div class="text-main text-weight-medium ellipsis" style="font-size: 11px; max-width: 140px;">{{ log.user_name }}</div>
-              <div class="text-muted ellipsis" style="font-size: 9px; max-width: 140px;">{{ log.user_email }}</div>
-            </div>
-
-            <!-- IP Address -->
-            <div class="col-15">
-              <span class="font-mono text-blue-3" style="font-size: 11px;">{{ log.ip_address || '—' }}</span>
-            </div>
-
-            <!-- Location -->
-            <div class="col-15">
-              <div class="row items-center op-gap-4 no-wrap">
-                <q-icon name="location_on" size="10px" :color="log.location === 'Local Network' ? 'grey-5' : 'green-4'" />
-                <span class="text-secondary ellipsis" style="font-size: 10px; max-width: 120px;">{{ log.location || 'Unknown' }}</span>
-              </div>
+              <div class="text-main text-weight-medium ellipsis" style="font-size: 11px; max-width: 150px;">{{ log.user_name || '—' }}</div>
+              <div class="text-muted ellipsis" style="font-size: 9px; max-width: 150px;">{{ log.user_email || '—' }}</div>
             </div>
 
             <!-- Target -->
@@ -269,10 +265,24 @@
           <!-- Detail Fields -->
           <div class="column op-gap-12">
             <div class="detail-section">
+              <div class="detail-section-title">TENANT</div>
+              <div class="bg-subpanel rounded-borders q-pa-sm column op-gap-4">
+                <div class="row items-center justify-between">
+                  <span class="text-muted font-mono" style="font-size: 10px;">NAME</span>
+                  <span class="text-main text-weight-medium" style="font-size: 12px;">{{ selectedLog.tenant_name || 'Platform' }}</span>
+                </div>
+                <div class="row items-center justify-between" v-if="selectedLog.tenant_id">
+                  <span class="text-muted font-mono" style="font-size: 10px;">TENANT ID</span>
+                  <span class="text-muted font-mono" style="font-size: 10px;">{{ selectedLog.tenant_id }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="detail-section">
               <div class="detail-section-title">OPERATOR</div>
               <div class="row items-center op-gap-8">
                 <q-avatar size="32px" color="blue-8" text-color="white" font-size="12px" class="font-mono">
-                  {{ selectedLog.user_name?.charAt(0) || '?' }}
+                  {{ (selectedLog.tenant_name || selectedLog.user_name || '?').charAt(0) }}
                 </q-avatar>
                 <div>
                   <div class="text-main text-weight-medium" style="font-size: 12px;">{{ selectedLog.user_name }}</div>
@@ -355,7 +365,7 @@ const archiving = ref(false)
 const logs = ref([])
 const totalCount = ref(0)
 const page = ref(1)
-const limit = 50
+const limit = 25
 const stats = ref({ total: 0, critical: 0, pending: 0, makerChecker: 0, uniqueIPs: 0 })
 const drawerOpen = ref(false)
 const selectedLog = ref(null)
@@ -569,18 +579,15 @@ async function fetchLogs() {
       logs.value = res.data.data || []
       totalCount.value = res.data.total || 0
       stats.value = res.data.stats || {}
-      if (logs.value.length === 0 && page.value === 1) {
-        // Fallback to mock data for demo
-        logs.value = applyLocalFilters(MOCK_LOGS)
-        totalCount.value = logs.value.length
-        stats.value = { total: MOCK_LOGS.length, critical: 2, pending: 0, makerChecker: 2, uniqueIPs: 4 }
-      }
+    } else {
+      logs.value = []
+      totalCount.value = 0
     }
-  } catch {
-    // Offline fallback
-    logs.value = applyLocalFilters(MOCK_LOGS)
-    totalCount.value = logs.value.length
-    stats.value = { total: MOCK_LOGS.length, critical: 2, pending: 0, makerChecker: 2, uniqueIPs: 4 }
+  } catch (err) {
+    console.warn('[AuditTrail] Failed to load ledger:', err)
+    logs.value = []
+    totalCount.value = 0
+    $q.notify({ type: 'negative', message: 'Failed to load audit trail' })
   } finally {
     loading.value = false
   }
@@ -625,9 +632,9 @@ async function triggerArchive() {
 }
 
 function exportCsv() {
-  const headers = ['ID', 'Timestamp', 'Module', 'Action', 'User Email', 'User Name', 'IP Address', 'Location', 'Target', 'Status']
+  const headers = ['ID', 'Timestamp', 'Module', 'Action', 'Tenant', 'Tenant ID', 'User Name', 'User Email', 'IP Address', 'Location', 'Target', 'Status']
   const rows = logs.value.map(l => [
-    l.id, l.timestamp, l.module, l.action, l.user_email, l.user_name, l.ip_address, l.location, l.target, l.status
+    l.id, l.timestamp, l.module, l.action, l.tenant_name, l.tenant_id, l.user_name, l.user_email, l.ip_address, l.location, l.target, l.status
   ])
   const csv = [headers, ...rows].map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })

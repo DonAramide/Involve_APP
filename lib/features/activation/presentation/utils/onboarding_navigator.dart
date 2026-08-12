@@ -1,7 +1,7 @@
 import 'package:involve_app/core/utils/app_config.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../pages/verify_email_page.dart';
 import '../pages/verify_whatsapp_page.dart';
@@ -36,6 +36,7 @@ class OnboardingNavigator {
       try {
         switch (nextChannel) {
           case 'EMAIL':
+            payload['email'] = (payload['email']?.toString() ?? '').trim().toLowerCase();
             await _sendOtp(dio, payload['email'], 'email');
             nextScreen = VerifyEmailPage(payload: payload, requiredChannels: requiredChannels);
             break;
@@ -51,8 +52,10 @@ class OnboardingNavigator {
         }
       } catch (e) {
         if (isMounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          showFriendlyErrorSnackBar(
+            context,
+            e,
+            fallback: 'Could not send verification code. Please try again.',
           );
         }
         return;
@@ -107,17 +110,19 @@ class OnboardingNavigator {
           break;
         } catch (e) {
           debugPrint('Signup error on $url: $e');
-          if (e is DioException && e.response != null) {
-            debugPrint('Signup backend response: ${e.response?.data}');
-            lastError = e.response?.data['error'] ?? e.response?.data['message'] ?? e.toString();
-          } else {
-            lastError = e.toString();
-          }
+          lastError = friendlyApiError(
+            e,
+            fallback: 'Could not create your account. Please try again.',
+          );
         }
       }
 
       if (!signupSuccess) {
-        throw Exception('Failed to create account. $lastError');
+        throw Exception(
+          lastError.isNotEmpty
+              ? lastError
+              : 'Could not create your account. Please try again.',
+        );
       }
 
       // Mark device as onboarded locally
@@ -151,12 +156,10 @@ class OnboardingNavigator {
       }
     } catch (e) {
       if (isMounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: const Color(0xFFEF4444),
-            behavior: SnackBarBehavior.floating,
-          ),
+        showFriendlyErrorSnackBar(
+          context,
+          e,
+          fallback: 'Could not finish setup. Please try again.',
         );
       }
     }
@@ -169,16 +172,22 @@ class OnboardingNavigator {
     ];
 
     bool otpSent = false;
+    String? lastError;
     for (var url in urls) {
       try {
         await dio.post(url, data: {type == 'email' ? 'email' : 'phone': identifier});
         otpSent = true;
         break;
-      } catch (_) {}
+      } catch (e) {
+        lastError = friendlyApiError(
+          e,
+          fallback: 'Could not send $type verification code.',
+        );
+      }
     }
 
     if (!otpSent) {
-      throw Exception('Failed to send $type OTP. Server unreachable.');
+      throw Exception(lastError ?? 'Could not send $type verification code. Please try again.');
     }
   }
 }

@@ -142,6 +142,7 @@ export const adminApi = {
     api.post(`/api/v1/tenants/${tenantId}/financial-platform/change-vertical`, data),
 
   getLedger: (params) => api.get('/admin/ledger', { params }),
+  getAuditLedger: (params) => api.get('/api/admin/audit/ledger', { params }),
   getPayments: (params) => api.get('/admin/payments', { params }),
   getDashboardStats: () => api.get('/admin/dashboard-stats'),
   getAnalytics: () => api.get('/admin/analytics'),
@@ -174,6 +175,8 @@ export const adminApi = {
   getPayoutBanks: (params) => api.get('/api/payout/banks', { params }),
   resolvePayoutAccount: (data) => api.post('/api/payout/resolve-account', data),
   initiatePayout: (data) => api.post('/api/payout/withdraw', data),
+  getTenantStaff: () => api.get('/api/staff'),
+  payStaffSalary: (id, data) => api.post(`/api/staff/${id}/pay-salary`, data),
   getUserDevices: (params) => api.get('/api/admin/user-devices', { params }),
   approveUserDevice: (id) => api.post('/api/admin/user-devices/approve', { id }),
   blockUserDevice: (id) => api.post('/api/admin/user-devices/block', { id }),
@@ -338,6 +341,16 @@ export const posApi = {
   simulateRoute: (data) => api.post('/admin/pos/simulate', data),
 };
 
+export const cardSettlementApi = {
+  listTemplates: () => api.get('/api/admin/finance/card-settlement/templates'),
+  listBatches: (params) => api.get('/api/admin/finance/card-settlement/batches', { params }),
+  getBatch: (id) => api.get(`/api/admin/finance/card-settlement/batches/${id}`),
+  upload: (formData) =>
+    api.post('/api/admin/finance/card-settlement/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+};
+
 export const searchApi = {
   globalSearch: (q) => api.get(`/api/search?q=${encodeURIComponent(q)}`)
 };
@@ -394,6 +407,10 @@ export const vaultApi = {
     api.put('/api/admin/quasar/admin-credentials', data),
   testQuasarAdminCredentials: (data = {}) =>
     api.post('/api/admin/quasar/admin-credentials/test', data),
+  getMetaWhatsAppStatus: (environment = 'PRODUCTION') =>
+    api.get('/vault/meta-whatsapp/status', { params: { environment } }),
+  saveMetaWhatsAppCredentials: (data) =>
+    api.put('/vault/meta-whatsapp', data),
 };
 
 export const ecsApi = {

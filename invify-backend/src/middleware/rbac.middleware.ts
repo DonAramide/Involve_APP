@@ -40,6 +40,12 @@ export const checkRole = (allowedRoles: string[]) => {
           return next();
         }
       }
+
+      if (userRoles.includes('internal_staff')) {
+        if (path.startsWith('/admin/users') || path.startsWith('/admin/tenants') || path.startsWith('/api/admin/audit')) {
+          return next();
+        }
+      }
       
       if (userRoles.includes('admin_ops')) {
         // admin_ops has privilege "Reissue Cards, Fleet Management"

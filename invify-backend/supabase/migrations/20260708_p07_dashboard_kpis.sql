@@ -1,7 +1,8 @@
 -- 20260708_p07_dashboard_kpis.sql
 -- Creates the v_dashboard_kpis view for live platform metrics
 
-CREATE OR REPLACE VIEW public.v_dashboard_kpis AS
+CREATE OR REPLACE VIEW public.v_dashboard_kpis
+WITH (security_invoker = on) AS
 SELECT 
     (SELECT COUNT(*) FROM public.tenants WHERE status = 'active') as active_tenants,
     (SELECT COUNT(*) FROM public.ledger_entries) as total_transactions,

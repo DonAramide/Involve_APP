@@ -17,6 +17,7 @@ import 'package:involve_app/features/services/domain/services/customer_wallet_cr
 import 'package:involve_app/features/settings/domain/services/security_service.dart';
 import 'package:involve_app/features/invoicing/domain/repositories/invoice_repository.dart';
 import 'package:involve_app/features/invoicing/presentation/pages/receipt_preview_page.dart';
+import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
 
 class CustomerHistoryPage extends StatefulWidget {
   final ServiceCustomer customer;
@@ -1453,6 +1454,11 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
   }
 
   Future<void> _generateVirtualAccount(ServiceCustomer customer) async {
+    final orgName = context.read<SettingsBloc>().state.settings?.organizationName;
+    if (await showFreeTrialVaLockedIfNeeded(context, businessName: orgName)) {
+      return;
+    }
+
     final name = customer.name.trim();
     final nameParts = name.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
     final email = customer.email?.trim() ?? '';
@@ -1737,16 +1743,20 @@ class _CustomerHistoryPageState extends State<CustomerHistoryPage>
             const SnackBar(content: Text('Virtual account generated successfully!')),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Virtual account generation failed or returned empty.')),
+          await showVirtualAccountFailureDialog(
+            context,
+            'Failed to provision customer virtual account',
+            subject: 'customer virtual account',
           );
         }
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to generate virtual account: $e')),
+        await showVirtualAccountFailureDialog(
+          context,
+          e,
+          subject: 'customer virtual account',
         );
       }
     }

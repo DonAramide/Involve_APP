@@ -808,6 +808,7 @@
               { name: 'module', label: 'MODULE', field: 'module', align: 'left' },
               { name: 'action', label: 'ACTION', field: 'action', align: 'left' },
               { name: 'operator', label: 'OPERATOR', field: 'user_name', align: 'left' },
+              { name: 'target', label: 'TARGET', field: 'target', align: 'left' },
               { name: 'ip_address', label: 'IP ADDRESS', field: 'ip_address', align: 'center' },
               { name: 'status', label: 'STATUS', field: 'status', align: 'center' }
             ]"
@@ -815,6 +816,8 @@
             flat
             dark
             class="bg-blue-grey-10"
+            :pagination="{ rowsPerPage: 25 }"
+            :rows-per-page-options="[25, 50, 100]"
           >
             <template v-slot:body-cell-status="props">
               <q-td :props="props">
@@ -825,7 +828,7 @@
             </template>
             <template v-slot:body-cell-action="props">
               <q-td :props="props">
-                <span :class="(props.row.action || '').includes('CREATE') ? 'text-green-3' : ((props.row.action || '').includes('SUSPEND') || (props.row.action || '').includes('DELETE') ? 'text-red-3' : 'text-blue-3')">
+                <span :class="(props.row.action || '').includes('CREATE') ? 'text-green-3' : ((props.row.action || '').includes('SUSPEND') || (props.row.action || '').includes('DELETE') || (props.row.action || '').includes('EMERGENCY') ? 'text-red-3' : 'text-blue-3')">
                   {{ props.row.action }}
                 </span>
               </q-td>
@@ -1347,6 +1350,7 @@ const triggerEmergencyLock = () => {
         tenant.value.emergency_lock_code = passcode
       }
       $q.notify({ type: 'positive', message: 'Emergency lock broadcasted successfully to all devices.' })
+      await fetchDetails()
     } catch (e) {
       console.error(e)
       $q.notify({ type: 'negative', message: 'Failed to broadcast emergency lock.' })
@@ -1603,12 +1607,14 @@ const fetchDetails = async () => {
     certificates.value = data.certificates || []
     registeredDevices.value = data.registeredDevices || []
     
-    // Fetch related audit logs for this tenant (mocked or real)
+    // Fetch related audit logs for this tenant (full multi-source ledger)
     try {
-      const ledger = await adminApi.getLedger({ target: tenant.value.id, limit: 100 })
-      auditRecords.value = ledger.data?.data || ledger.data || []
+      const ledger = await adminApi.getAuditLedger({ tenantId: tenant.value.id, limit: 100 })
+      const payload = ledger.data || {}
+      auditRecords.value = payload.data || []
     } catch (e) {
-      // Ignore if audit ledger fails
+      console.warn('Failed to fetch tenant audit ledger:', e)
+      auditRecords.value = []
     }
 
     try {

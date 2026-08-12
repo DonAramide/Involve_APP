@@ -4,6 +4,7 @@ import 'package:involve_app/features/school/presentation/bloc/school_bloc.dart';
 import 'package:involve_app/features/school/presentation/bloc/school_state.dart';
 import 'package:involve_app/features/school/domain/entities/school_entities.dart';
 import 'package:collection/collection.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
@@ -37,9 +38,7 @@ class _ManageSubjectsPageState extends State<ManageSubjectsPage> {
       body: BlocConsumer<SchoolBloc, SchoolState>(
         listener: (context, state) {
           if (state.error != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.error!), backgroundColor: Colors.red),
-            );
+            showFriendlyErrorSnackBar(context, state.error);
             context.read<SchoolBloc>().add(ResetSchoolStatus());
           }
         },

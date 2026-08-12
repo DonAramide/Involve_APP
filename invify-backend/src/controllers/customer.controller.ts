@@ -5,6 +5,7 @@ import { AuditService } from '../services/audit.service';
 import { customerService } from '../services/customer.service';
 import { CustomerStatus } from '../types/customer.dto';
 import { supabaseAdmin } from '../db/supabase';
+import { rejectIfFreeTrialVa } from '../utils/free-trial-guard';
 
 export class CustomerController {
   /**
@@ -18,6 +19,7 @@ export class CustomerController {
 
       if (!customerId) return res.status(400).json({ error: "Customer ID is required" });
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
+      if (await rejectIfFreeTrialVa(res, tenantId)) return;
 
       if (!name || name.trim().split(/\s+/).length < 2) {
         return res.status(400).json({ error: "Customer's full name (first and last name) is required to provision a virtual account." });
@@ -85,7 +87,7 @@ export class CustomerController {
       });
     } catch (error: any) {
       console.error('[CustomerController] getVirtualAccount Error:', error.message);
-      return res.status(500).json({ error: "Failed to provision customer virtual account" });
+      return res.status(classifyVaProvisionStatus(error)).json(vaProvisionErrorPayload(error, 'customer'));
     }
   }
 
@@ -193,6 +195,7 @@ export class CustomerController {
 
       if (!userId) return res.status(400).json({ error: "Staff User ID is required" });
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
+      if (await rejectIfFreeTrialVa(res, tenantId)) return;
       if (!customLastName || customLastName.trim() === '') {
         return res.status(400).json({ error: "Custom second name is required" });
       }
@@ -264,7 +267,7 @@ export class CustomerController {
       });
     } catch (error: any) {
       console.error('[CustomerController] getStaffVirtualAccount Error:', error.message);
-      return res.status(500).json({ error: "Failed to provision staff virtual account" });
+      return res.status(classifyVaProvisionStatus(error)).json(vaProvisionErrorPayload(error, 'staff'));
     }
   }
 
@@ -602,4 +605,49 @@ function WebHookFormatVaTxns(txns: any[], accountNumber: string) {
       metadata: tx.metadata || {},
     };
   });
+}
+
+function isVaCredentialsError(error: any): boolean {
+  const msg = String(error?.message || error || '').toLowerCase();
+  return (
+    msg.includes('credential') ||
+    msg.includes('quasar_api_key') ||
+    msg.includes('api key') ||
+    msg.includes('not found for tenant') ||
+    msg.includes('not configured') ||
+    msg.includes('sk_test') ||
+    msg.includes('sk_live') ||
+    msg.includes('integration vault') ||
+    msg.includes('unauthorized') ||
+    msg.includes('invalid api key') ||
+    msg.includes('authentication failed')
+  );
+}
+
+function classifyVaProvisionStatus(error: any): number {
+  return isVaCredentialsError(error) ? 503 : 500;
+}
+
+function vaProvisionErrorPayload(error: any, kind: 'staff' | 'customer') {
+  if (isVaCredentialsError(error)) {
+    return {
+      code: 'VA_CREDENTIALS_REQUIRED',
+      error:
+        kind === 'staff'
+          ? 'Virtual account credentials are not activated for this business.'
+          : 'Virtual account credentials are not activated for this business.',
+      action:
+        'Open the Invify Admin web portal → Integration Vault (or Platform Config) and activate / save Quasar VA credentials for this tenant. Then try Generate again.',
+    };
+  }
+
+  return {
+    code: 'VA_PROVISION_FAILED',
+    error:
+      kind === 'staff'
+        ? 'Failed to provision staff virtual account'
+        : 'Failed to provision customer virtual account',
+    action:
+      'If this keeps happening, ask your administrator to confirm VA credentials are activated in the Invify Admin web portal.',
+  };
 }

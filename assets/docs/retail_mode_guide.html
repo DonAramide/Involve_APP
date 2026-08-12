@@ -4,48 +4,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invify - Retail Mode User Guide</title>
+    <title>Invify - Retail Mode User Manual &amp; Operational Guide</title>
     <style>
         :root {
             --primary: #2e7d32;
+            --primary-dark: #1b5e20;
+            --primary-light: #4caf50;
             --secondary: #1a237e;
+            --secondary-light: #3949ab;
             --accent: #f57c00;
-            --text-main: #2c3e50;
-            --text-light: #546e7a;
+            --accent-dark: #e65100;
+            --info: #0288d1;
+            --warning: #ef6c00;
+            --danger: #c62828;
+            --text-main: #263238;
+            --text-muted: #546e7a;
             --bg-light: #f4f7f6;
-            --white: #ffffff;
-            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            --card-bg: #ffffff;
+            --border-color: #e0e6ed;
+        }
+
+        * {
+            box-sizing: border-box;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
             color: var(--text-main);
             background-color: var(--bg-light);
-            line-height: 1.6;
+            line-height: 1.58;
             margin: 0;
             padding: 0;
+            font-size: 13.5px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 960px;
             margin: 0 auto;
-            background: var(--white);
-            box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
+            background: var(--card-bg);
+            box-shadow: 0 0 45px rgba(0, 0, 0, 0.07);
         }
 
         header {
             position: relative;
-            background: var(--secondary);
-            color: var(--white);
-            text-align: center;
+            background: linear-gradient(135deg, var(--secondary) 0%, #0d47a1 50%, var(--primary-dark) 100%);
+            color: #ffffff;
+            text-align: left;
             overflow: hidden;
         }
 
         header img.header-img {
             width: 100%;
-            height: 300px;
+            height: 240px;
             object-fit: cover;
-            opacity: 0.8;
+            opacity: 0.82;
+            display: block;
         }
 
         .header-content {
@@ -53,131 +68,446 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 40px;
-            background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+            padding: 28px 40px;
+            background: linear-gradient(transparent, rgba(10, 25, 47, 0.88));
+        }
+
+        .badge-header {
+            display: inline-block;
+            background: var(--accent);
+            color: #000000;
+            font-size: 0.72em;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 999px;
+            margin-bottom: 6px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
         }
 
         .header-content h1 {
             margin: 0;
-            font-size: 2.5em;
-            letter-spacing: 1px;
+            font-size: 2.3em;
+            letter-spacing: 0.3px;
+            font-weight: 800;
+            color: #ffffff;
+            line-height: 1.2;
         }
 
         .header-content p {
-            margin: 5px 0 0;
-            opacity: 0.9;
+            margin: 6px 0 0;
+            font-size: 1.05em;
+            opacity: 0.95;
+            color: #e8f5e9;
         }
 
         .content {
-            padding: 40px;
+            padding: 36px 44px 50px;
         }
 
         h2 {
             border-left: 5px solid var(--primary);
-            padding-left: 15px;
-            color: var(--primary);
-            margin-top: 40px;
-            font-size: 1.8em;
+            padding-left: 14px;
+            color: var(--secondary);
+            margin-top: 36px;
+            margin-bottom: 12px;
+            font-size: 1.45em;
+            font-weight: 700;
+            page-break-after: avoid;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        h3 {
+            color: var(--primary-dark);
+            margin: 22px 0 8px;
+            font-size: 1.12em;
+            font-weight: 700;
+            page-break-after: avoid;
+        }
+
+        h4 {
+            color: var(--secondary);
+            margin: 14px 0 6px;
+            font-size: 0.98em;
+            font-weight: 700;
         }
 
         .section-intro {
-            font-size: 1.1em;
-            color: var(--text-light);
-            margin-bottom: 30px;
+            color: var(--text-muted);
+            margin: 0 0 18px;
+            font-size: 1em;
         }
 
+        .toc {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px 24px;
+            margin: 20px 0 30px;
+            page-break-inside: avoid;
+        }
+
+        .toc-title {
+            font-weight: 800;
+            color: var(--secondary);
+            font-size: 1.05em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toc-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 24px;
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        .toc li {
+            margin: 3px 0;
+            color: var(--text-muted);
+            font-size: 0.92em;
+        }
+
+        .toc a {
+            color: var(--primary-dark);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .toc a:hover {
+            color: var(--accent-dark);
+            text-decoration: underline;
+        }
+
+        /* Feature Cards */
         .feature-grid {
             display: grid;
             grid-template-columns: 1fr;
-            gap: 20px;
+            gap: 14px;
+            margin-bottom: 24px;
         }
 
         .feature-card {
             display: flex;
             align-items: flex-start;
-            padding: 20px;
-            border-radius: 12px;
-            background: #fff;
-            border: 1px solid #eee;
-            transition: transform 0.2s;
+            padding: 16px 18px;
+            border-radius: 10px;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+            page-break-inside: avoid;
         }
 
         .icon-box {
-            min-width: 60px;
-            height: 60px;
-            background: var(--primary);
-            color: white;
-            border-radius: 12px;
+            min-width: 44px;
+            height: 44px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            margin-right: 20px;
+            font-size: 20px;
+            margin-right: 16px;
+            flex-shrink: 0;
+            color: #ffffff;
+            font-weight: bold;
+        }
+
+        .feature-details {
+            flex-grow: 1;
         }
 
         .feature-details h3 {
-            margin: 0 0 10px;
+            margin: 0 0 6px;
             color: var(--secondary);
+            font-size: 1.05em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .feature-details p {
             margin: 0;
-            color: var(--text-light);
+            color: var(--text-muted);
+            font-size: 0.95em;
+        }
+
+        .feature-details ul {
+            margin: 8px 0 0;
+            padding-left: 18px;
+        }
+
+        .feature-details li {
+            margin: 3px 0;
+            color: var(--text-main);
+            font-size: 0.92em;
+        }
+
+        .feature-details strong {
+            color: var(--text-main);
+        }
+
+        /* Two column layout */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin: 14px 0;
+        }
+
+        .mini-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            background: #fafbfc;
+            page-break-inside: avoid;
+        }
+
+        .mini-card h4 {
+            margin: 0 0 6px;
+            color: var(--secondary);
+            font-size: 0.96em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mini-card p {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.9em;
+        }
+
+        /* Callout Boxes */
+        .tip-box,
+        .warn-box,
+        .step-box,
+        .admin-box {
+            padding: 14px 18px;
+            margin: 18px 0;
+            border-radius: 0 10px 10px 0;
+            page-break-inside: avoid;
+            font-size: 0.94em;
         }
 
         .tip-box {
             background: #e8f5e9;
-            border-left: 5px solid #43a047;
-            padding: 20px;
-            margin: 30px 0;
-            border-radius: 0 12px 12px 0;
+            border-left: 5px solid var(--primary);
         }
 
         .tip-box strong {
-            color: #2e7d32;
+            color: var(--primary-dark);
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        .warn-box {
+            background: #fff3e0;
+            border-left: 5px solid var(--warning);
+        }
+
+        .warn-box strong {
+            color: #d84315;
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        .step-box {
+            background: #e8eaf6;
+            border-left: 5px solid var(--secondary);
+        }
+
+        .step-box strong {
+            color: var(--secondary);
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 700;
+        }
+
+        .step-box ol {
+            margin: 6px 0 0;
+            padding-left: 20px;
+            color: var(--text-main);
+        }
+
+        .step-box li {
+            margin: 4px 0;
+        }
+
+        .admin-box {
+            background: #fbe9e7;
+            border-left: 5px solid #d84315;
+        }
+
+        .admin-box strong {
+            color: #bf360c;
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 700;
+        }
+
+        /* Tables */
+        .menu-table,
+        .status-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 14px 0 22px;
+            font-size: 0.92em;
+            page-break-inside: avoid;
+        }
+
+        .menu-table th,
+        .menu-table td,
+        .status-table th,
+        .status-table td {
+            border: 1px solid #e0e6ed;
+            padding: 9px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .menu-table th,
+        .status-table th {
+            background: #eef3f8;
+            color: var(--secondary);
+            font-weight: 700;
+        }
+
+        .menu-table tr:nth-child(even),
+        .status-table tr:nth-child(even) {
+            background: #fbfcfd;
+        }
+
+        /* Status Pills */
+        .pill {
+            display: inline-block;
+            font-size: 0.75em;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        .pill-paid { background: #e8f5e9; color: #2e7d32; }
+        .pill-partial { background: #fff3e0; color: #e65100; }
+        .pill-unpaid { background: #ffebee; color: #c62828; }
+        .pill-active { background: #e0f2f1; color: #00695c; }
+        .pill-auth { background: #ede7f6; color: #4527a0; }
+
+        .key-badge {
+            display: inline-block;
+            background: #eceff1;
+            border: 1px solid #cfd8dc;
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-family: monospace;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: #37474f;
+        }
+
+        .page-break {
+            break-before: page;
+            page-break-before: always;
         }
 
         footer {
             text-align: center;
-            padding: 40px;
-            background: #eee;
-            color: #666;
-            font-size: 0.9em;
+            padding: 26px 40px;
+            background: #eceff1;
+            color: #607d8b;
+            font-size: 0.88em;
+            border-top: 1px solid #cfd8dc;
         }
 
-        /* Print styling to force PDF layout */
+        footer p {
+            margin: 4px 0;
+        }
+
+        /* Print Settings for Booklet / PDF */
         @media print {
             body {
-                background: white;
+                background: #ffffff;
+                font-size: 11pt;
+                line-height: 1.45;
             }
 
             .container {
                 box-shadow: none;
                 max-width: 100%;
+                margin: 0;
+                padding: 0;
             }
 
-            .feature-card {
-                break-inside: avoid;
-              padding: 10px;
+            .content {
+                padding: 20px 24px;
             }
 
             header img.header-img {
-                height: 200px;
+                height: 150px;
             }
-          
-          .tip-box {
-            break-inside: avoid;
-          }
+
+            .header-content {
+                padding: 16px 24px;
+            }
+
+            .header-content h1 {
+                font-size: 1.8em;
+            }
+
+            .feature-card,
+            .mini-card,
+            .tip-box,
+            .warn-box,
+            .step-box,
+            .admin-box,
+            .menu-table,
+            .status-table {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .feature-card {
+                padding: 10px 14px;
+                margin-bottom: 8px;
+            }
+
+            h2 {
+                margin-top: 24px;
+                font-size: 1.25em;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            a {
+                color: inherit;
+                text-decoration: none;
+            }
         }
 
-        /* Icon Emoji fallbacks */
-        .icon-sales::before { content: '🛒'; }
-        .icon-stock::before { content: '📦'; }
-        .icon-customers::before { content: '👥'; }
-        .icon-analytics::before { content: '📈'; }
-        .icon-setup::before { content: '⚙️'; }
+        @media (max-width: 680px) {
+            .content {
+                padding: 20px 16px;
+            }
+
+            .two-col,
+            .toc-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                padding: 20px 16px;
+            }
+        }
     </style>
 </head>
 
@@ -187,105 +517,484 @@
         <header>
             <img src="retail_header.png" alt="Retail Mode Header" class="header-img">
             <div class="header-content">
+                <div class="badge-header">Retail &amp; POS Edition · Operational Field Manual</div>
                 <h1>Invify Retail Mode</h1>
-                <p>User Guide & Operational Manual</p>
+                <p>Complete User Manual, Dashboard Activities &amp; Sub-Menu Operational Field Guide</p>
             </div>
         </header>
 
         <div class="content">
-            <p class="section-intro">Welcome to **Retail Mode**. This environment is optimized for physical stores and merchandise-based businesses. Manage inventory, track sales, and grow your customer base with precision.</p>
+            <p class="section-intro">
+                Welcome to <strong>Invify Retail Mode</strong>. Engineered for supermarkets, boutiques, electronics shops, pharmacies, wholesalers, and general merchandise retail stores. This manual covers all <strong>13 Dashboard Tiles</strong>, dedicated <strong>Sub-Menu Activities</strong> (Stock Management, Valuation Reports, Customer Debt Ledgers, Financial Analytics), and high-speed point-of-sale workflows.
+            </p>
 
-            <div class="tip-box" style="background: #fff3e0; border-color: #ff9800;">
-                <strong style="color: #e65100;">🏁 RETAIL SETUP CHECKLIST</strong>
+            <!-- FIRST-TIME SETUP CHECKLIST -->
+            <div class="step-box">
+                <strong>🏁 Quick-Start Sequence (Store Setup)</strong>
                 <ol>
-                    <li><strong>Product Catalog:</strong> Add your products with selling and cost prices.</li>
-                    <li><strong>Inventory Inflow:</strong> Record your current stock levels.</li>
-                    <li><strong>Customer Directory:</strong> Build your database of frequent shoppers.</li>
-                    <li><strong>Sales Terminal:</strong> Start recording daily transactions.</li>
+                    <li><strong>Store Profile:</strong> In <em>Settings</em>, set your Business Name, Store Address, Phone Numbers, Currency Symbol (₦, $, £, €), and upload your Logo.</li>
+                    <li><strong>Categories:</strong> Open <em>Stock → Manage Categories</em> to organize items (e.g. Groceries, Drinks, Toiletries, Electronics).</li>
+                    <li><strong>Product Catalog:</strong> Add products with <em>Cost Price</em>, <em>Selling Price</em>, <em>Initial Stock Quantity</em>, and <em>Barcodes</em>.</li>
+                    <li><strong>Hardware Pairing:</strong> Go to <em>Printer &amp; MPOS</em> to link your 58mm/80mm Bluetooth/USB receipt printer and card reader.</li>
+                    <li><strong>Customers:</strong> Add frequent shoppers or wholesale clients in <em>Customer Lookup</em> to track credit sales and loyalty.</li>
+                    <li><strong>First Sale:</strong> Open <em>New Invoice</em>, scan or select products, take payment, and issue a thermal receipt.</li>
                 </ol>
             </div>
 
-            <h2>1. Sales & Transactions</h2>
-            <p class="section-intro">Your point-of-sale hub for daily revenue.</p>
+            <!-- TABLE OF CONTENTS -->
+            <div class="toc">
+                <div class="toc-title">📑 Table of Contents</div>
+                <ul class="toc-grid">
+                    <li><a href="#topbar">1. Top Navigation &amp; Status Bar</a></li>
+                    <li><a href="#grid-overview">2. Dashboard Master Grid Reference</a></li>
+                    <li><a href="#pos-sales">3. New Invoice &amp; Point of Sale (POS)</a></li>
+                    <li><a href="#inventory-suite">4. Stock Management &amp; Category Sub-Menu</a></li>
+                    <li><a href="#inventory-report">5. Inventory Valuation &amp; Stock Reports</a></li>
+                    <li><a href="#customer-lookup">6. Customer Lookup &amp; Debt Ledgers</a></li>
+                    <li><a href="#sales-records">7. Sales Records &amp; Transaction History</a></li>
+                    <li><a href="#printer-mpos">8. Printer, MPOS &amp; Peripheral Setup</a></li>
+                    <li><a href="#finance-reconciliation">9. Finance Analytics &amp; Bank Reconciliation</a></li>
+                    <li><a href="#admin-security">10. Admin Hub, Cloud Metrics &amp; Security</a></li>
+                    <li><a href="#operating-procedures">11. Standard Operating Procedures (SOPs)</a></li>
+                    <li><a href="#troubleshooting">12. Troubleshooting &amp; FAQ</a></li>
+                </ul>
+            </div>
+
+            <!-- 1. TOP BAR -->
+            <h2 id="topbar">1. Top Navigation &amp; Status Bar</h2>
+            <p class="section-intro">
+                The top application bar provides live diagnostic health and quick-access utility controls:
+            </p>
+
+            <table class="menu-table">
+                <thead>
+                    <tr>
+                        <th style="width: 24%;">Element</th>
+                        <th style="width: 24%;">Visual Indicator</th>
+                        <th>Function &amp; Activity Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Business Brand</strong></td>
+                        <td>Logo + Store Name</td>
+                        <td>Displays store branding on both the screen and printed receipt headers.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Plan Badge</strong></td>
+                        <td><span class="pill pill-active">STANDARD</span> / <span class="pill pill-auth">PRO</span></td>
+                        <td>Displays your software edition and active license verification status.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Live Clock</strong></td>
+                        <td><code>YYYY-MM-DD HH:mm</code></td>
+                        <td>Guarantees exact timestamping for sales invoices, cashier shifts, and transaction audits.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>LAN Sync Status</strong></td>
+                        <td><span class="key-badge">✓</span> or <span class="key-badge">⇄</span></td>
+                        <td>Indicates local network peer sync status across multiple cashier tills.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cloud Connection</strong></td>
+                        <td>Cloud Icon (Green / Red)</td>
+                        <td>Shows server connection status. Tap to open the <strong>Sync Configuration Dialog</strong> to toggle online sync.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Theme Mode</strong></td>
+                        <td>Sun / Moon Icon</td>
+                        <td>Switch instantly between <strong>Light</strong>, <strong>Dark</strong>, and <strong>System</strong> modes.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Notification Bell</strong></td>
+                        <td>Bell with badge counter</td>
+                        <td>Alerts you to incoming bank transfers, stock replenishment warnings, and system events.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Context Menu (⋮)</strong></td>
+                        <td>3-Dots Menu</td>
+                        <td>Direct navigation to <strong>About Invify</strong>, <strong>Help &amp; Support</strong>, and this <strong>User Guide</strong>.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 2. DASHBOARD MASTER GRID -->
+            <h2 id="grid-overview" class="page-break">2. Dashboard Master Grid Reference</h2>
+            <p class="section-intro">
+                The Retail Mode home screen features 13 primary operational tiles organized for cashier speed and managerial oversight:
+            </p>
+
+            <table class="menu-table">
+                <thead>
+                    <tr>
+                        <th style="width: 24%;">Tile Name</th>
+                        <th style="width: 16%;">Color / Category</th>
+                        <th>Primary Responsibility</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>NEW INVOICE</strong></td>
+                        <td>Primary Indigo / POS</td>
+                        <td>Fast checkout counter, barcode scanning, cart management, split payments, and receipt generation.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>INVENTORY REPORT</strong></td>
+                        <td>Indigo / Reports</td>
+                        <td>Total stock valuation at cost and selling prices, expected profit margins, and low stock lists.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CUSTOMER LOOKUP</strong></td>
+                        <td>Blue Accent / CRM</td>
+                        <td>Customer directory, purchase history, outstanding debt balances, and WhatsApp statements.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PRINTER &amp; MPOS</strong></td>
+                        <td>Purple / Hardware</td>
+                        <td>Bluetooth/USB thermal receipt pairing, test prints, paper cut control, and MPOS card terminal configuration.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>STOCK</strong></td>
+                        <td>Orange / Inventory</td>
+                        <td>Product catalog, restock entries, category management, barcode mapping, and cost/selling prices.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SALES RECORDS</strong></td>
+                        <td>Green / Sales</td>
+                        <td>Full invoice archive; search by customer or receipt number, reprint receipts, and process refunds.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TRANSACTION HISTORY</strong></td>
+                        <td>Indigo / Audit</td>
+                        <td>Immutable audit trail of all payments, cash receipts, transfers, and end-of-day register totals.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CALCULATOR</strong></td>
+                        <td>Teal / Utilities</td>
+                        <td>On-screen calculator for quick quotes, discounts, and customer change calculation.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SETTINGS</strong></td>
+                        <td>Blue Grey / Admin</td>
+                        <td>Store profile, receipt footer terms, tax/VAT settings, PIN locks, and offline database backups.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>ADMIN HUB</strong></td>
+                        <td>Deep Orange / System</td>
+                        <td>Passcode-gated center for Quaser payment keys, audit trails, and master system preferences.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>CLOUD METRICS</strong></td>
+                        <td>Indigo / System</td>
+                        <td>Real-time cloud sync telemetry, offline outbox monitoring, and database health.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>FINANCE ANALYTICS</strong></td>
+                        <td>Blue Accent / Finance</td>
+                        <td>Revenue curves, gross profit analysis, top-selling products, and cashier performance breakdown.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RECONCILIATION</strong></td>
+                        <td>Teal / Finance</td>
+                        <td>Match bank transfers and card settlements with sales records; resolve unallocated payments.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 3. POS SALES -->
+            <h2 id="pos-sales">3. New Invoice &amp; Point of Sale (POS)</h2>
+            <p class="section-intro">
+                The core billing engine designed for high-volume counter sales with offline-first reliability.
+            </p>
+
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-sales"></div>
+                    <div class="icon-box" style="background: #3949ab;">🛒</div>
                     <div class="feature-details">
-                        <h3>NEW INVOICE / SALE</h3>
-                        <p>Generate receipts for customers.
+                        <h3>NEW INVOICE (Checkout Counter)</h3>
+                        <p>Rapid item scanning, cart adjustments, and flexible multi-channel payment collection.</p>
                         <ul>
-                            <li><strong>Product Search:</strong> Quickly find items by name or category.</li>
-                            <li><strong>Multi-Item Billing:</strong> Add multiple products to a single sale.</li>
-                            <li><strong>Flexible Payment:</strong> Choose Cash, POS, or Bank Transfer.</li>
-                            <li><strong>Instant Receipt:</strong> Print or share the digital invoice.</li>
+                            <li><strong>Barcode Scanning &amp; Quick Search:</strong> Use USB/Bluetooth laser scanners, device camera, or text search to add items in milliseconds.</li>
+                            <li><strong>Cart Adjustments:</strong> Adjust quantities, apply item-level or invoice-level discounts, and toggle tax/VAT.</li>
+                            <li><strong>Customer Assignment:</strong> Attach sales to registered customers to track purchases or record credit/debt sales.</li>
+                            <li><strong>Multi-Channel Payment:</strong> Accept <em>Cash</em>, <em>POS Card</em>, <em>Bank Transfer</em>, <em>Store Credit</em>, or <em>Split Payment</em> (e.g. 50% Cash + 50% Transfer).</li>
+                            <li><strong>Instant Receipt Printing:</strong> Auto-triggers 58mm/80mm thermal slips or generates digital A4 PDF receipts.</li>
                         </ul>
-                        </p>
                     </div>
                 </div>
             </div>
 
-            <h2>2. Inventory & Stock</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <div class="icon-box icon-stock" style="background: #f57c00;"></div>
-                    <div class="feature-details">
-                        <h3>STOCK MANAGEMENT</h3>
-                        <p>Maintain precise control over your merchandise.
-                        <ul>
-                            <li><strong>Inventory Tracking:</strong> Automatic deduction of stock upon sale.</li>
-                            <li><strong>Low Stock Alerts:</strong> Get notified when items need replenishment.</li>
-                            <li><strong>Stock History:</strong> Audit trail of additions and adjustments.</li>
-                            <li><strong>Categories:</strong> Organize products for better reporting.</li>
-                        </ul>
-                        </p>
-                    </div>
+            <div class="step-box">
+                <strong>⚡ 4-Step Cashier Checkout Procedure</strong>
+                <ol>
+                    <li>Tap <strong>NEW INVOICE</strong> from the dashboard or press shortcut key.</li>
+                    <li>Scan products or search and tap items to add to the cart.</li>
+                    <li>Tap <strong>Charge / Pay</strong>, select the payment method, and enter amount tendered.</li>
+                    <li>Collect payment, hand customer the printed receipt and change. The stock is automatically deducted in real time.</li>
+                </ol>
+            </div>
+
+            <!-- 4. INVENTORY & STOCK -->
+            <h2 id="inventory-suite" class="page-break">4. Stock Management &amp; Category Sub-Menu</h2>
+            <p class="section-intro">
+                Complete inventory lifecycle management with cost tracking, profit margin calculation, and category hierarchies.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>📦 Product Registration &amp; Editing</h4>
+                    <p>Enter Product Name, Barcode/SKU, Category, Cost Price, and Selling Price. The system automatically computes your gross profit margin percentage per unit.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>🏷️ Manage Categories Sub-Menu</h4>
+                    <p>Access <em>Stock → Manage Categories</em> to organize merchandise into logical departments (e.g. Beverages, Provisions, Toiletries, Electronics, Fashion).</p>
+                </div>
+                <div class="mini-card">
+                    <h4>📥 Stock In / Restocking</h4>
+                    <p>Record new supplier deliveries. Add incoming quantities to existing stock with updated cost prices to maintain accurate inventory valuation.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>⚠️ Low Stock &amp; Reorder Alerts</h4>
+                    <p>Set reorder threshold levels per item. Products running low are highlighted in orange/red to prevent stockouts.</p>
                 </div>
             </div>
 
             <div class="tip-box">
-                <strong>💡 PRO TIP: Cost vs. Profit</strong>
-                Always enter the 'Cost Price' for your products. The system will automatically calculate your real-time gross profit in the Analytics dashboard.
+                <strong>💡 PRO TIP: Accurate Cost Prices = Accurate Profits</strong>
+                Always record the <em>Cost Price (Purchase Price)</em> for every item. This enables the system to calculate your exact net margins and daily store profitability in <strong>Finance Analytics</strong>.
             </div>
 
-            <h2>3. Customer Relations</h2>
+            <!-- 5. INVENTORY REPORT -->
+            <h2 id="inventory-report">5. Inventory Valuation &amp; Stock Reports</h2>
+            <p class="section-intro">
+                Real-time financial visibility into total merchandise investment and projected revenues.
+            </p>
+
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-customers" style="background: #1a237e;"></div>
+                    <div class="icon-box" style="background: #1a237e;">📊</div>
                     <div class="feature-details">
-                        <h3>CUSTOMER DIRECTORY</h3>
-                        <p>Keep track of your loyal buyers.
+                        <h3>INVENTORY REPORT &amp; VALUATION</h3>
+                        <p>Executive inventory auditing and financial metrics.</p>
                         <ul>
-                            <li><strong>Purchase History:</strong> View what each customer has bought over time.</li>
-                            <li><strong>Contact Management:</strong> Easy access to phone numbers for marketing.</li>
-                            <li><strong>Outstanding Balances:</strong> Track customers who owe for credit sales.</li>
+                            <li><strong>Total Stock Cost:</strong> Total capital currently tied up in physical inventory at purchase cost.</li>
+                            <li><strong>Total Retail Value:</strong> Gross expected revenue when all current merchandise is sold at retail prices.</li>
+                            <li><strong>Projected Gross Profit:</strong> Projected total profit margin across all warehouse and store stock.</li>
+                            <li><strong>Stock Status Breakdown:</strong> Instant counts of <em>In Stock</em>, <em>Low Stock</em>, and <em>Out of Stock</em> lines.</li>
+                            <li><strong>Export &amp; Print:</strong> Export inventory audits to CSV/Excel or print summary valuation sheets.</li>
                         </ul>
-                        </p>
                     </div>
                 </div>
             </div>
 
-            <h2>4. Business Insights</h2>
+            <!-- 6. CUSTOMER LOOKUP -->
+            <h2 id="customer-lookup" class="page-break">6. Customer Lookup &amp; Debt Ledgers</h2>
+            <p class="section-intro">
+                Customer relationship management, credit sales tracking, and direct communication.
+            </p>
+
             <div class="feature-grid">
                 <div class="feature-card">
-                    <div class="icon-box icon-analytics" style="background: #00bcd4;"></div>
+                    <div class="icon-box" style="background: #0288d1;">👥</div>
                     <div class="feature-details">
-                        <h3>RETAIL ANALYTICS</h3>
-                        <p>Data-driven decisions for your store.
+                        <h3>CUSTOMER LOOKUP &amp; CRM DIRECTORY</h3>
+                        <p>Manage buyer profiles, credit limits, and debt collection.</p>
                         <ul>
-                            <li><strong>Top Selling Items:</strong> Identify your most popular products.</li>
-                            <li><strong>Revenue Trends:</strong> Track daily, weekly, and monthly growth.</li>
-                            <li><strong>Profitability Reports:</strong> See your actual margins after costs.</li>
+                            <li><strong>Customer Search:</strong> Instant search by customer name, phone number, or company.</li>
+                            <li><strong>Purchase Ledger:</strong> Detailed chronological history of all invoices and items purchased by the customer.</li>
+                            <li><strong>Outstanding Balance Tracking:</strong> Instantly view debts from credit sales and record partial or full debt repayments.</li>
+                            <li><strong>Direct Communication:</strong> 1-click <strong>WhatsApp Statement</strong> and direct phone calling to follow up on pending payments.</li>
                         </ul>
-                        </p>
                     </div>
                 </div>
+            </div>
+
+            <!-- 7. SALES RECORDS & TRANSACTIONS -->
+            <h2 id="sales-records">7. Sales Records &amp; Transaction History</h2>
+            <p class="section-intro">
+                Complete audit trails for all sales, register receipts, payment methods, and cash balancing.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>🧾 Sales Records (Invoices)</h4>
+                    <p>Search and filter all past sales by Date, Customer, Payment Status (<span class="pill pill-paid">Paid</span>, <span class="pill pill-partial">Partial</span>, <span class="pill pill-unpaid">Unpaid</span>), or Cashier. Reprint customer receipts or send PDF invoices.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>🔍 Transaction History (Audit Trail)</h4>
+                    <p>Immutable chronological log of every monetary event. Displays payment channels (Cash, POS, Transfer), cashier shift totals, and cash-in-drawer reconciliation.</p>
+                </div>
+            </div>
+
+            <div class="warn-box">
+                <strong>⚠️ Refund &amp; Reversal Governance</strong>
+                Sales refunds or item returns require manager authorization and a documented reason. All reversals are permanently logged in the audit trail to eliminate cashier shrinkage.
+            </div>
+
+            <!-- 8. PRINTER & MPOS -->
+            <h2 id="printer-mpos" class="page-break">8. Printer, MPOS &amp; Peripheral Setup</h2>
+            <p class="section-intro">
+                Configure thermal receipt printers, barcode scanners, and wireless payment card readers.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #7b1fa2;">🖨️</div>
+                    <div class="feature-details">
+                        <h3>PRINTER &amp; MPOS CONFIGURATION</h3>
+                        <p>Hardware connectivity management and slip customization.</p>
+                        <ul>
+                            <li><strong>Connection Interfaces:</strong> Supports Bluetooth, USB, Network LAN (ESC/POS), and integrated Sunmi POS thermal printers.</li>
+                            <li><strong>Dual Status Indicator Dots:</strong>
+                                <ul>
+                                    <li><span style="color: #2e7d32; font-weight: bold;">● Green Dot:</span> Receipt printer connected and ready.</li>
+                                    <li><span style="color: #c62828; font-weight: bold;">● Red Dot:</span> Printer disconnected or offline.</li>
+                                    <li><span style="color: #1976d2; font-weight: bold;">● Blue Dot:</span> MPOS card terminal paired.</li>
+                                    <li><span style="color: #757575; font-weight: bold;">● Grey Dot:</span> MPOS terminal not configured.</li>
+                                </ul>
+                            </li>
+                            <li><strong>Receipt Customization:</strong> Configure store header text, address, phone numbers, return policy footer, and receipt logo.</li>
+                            <li><strong>1-Click Test Print:</strong> Verify paper feed, print darkness, and auto-cutter functionality.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 9. FINANCE & RECONCILIATION -->
+            <h2 id="finance-reconciliation">9. Finance Analytics &amp; Bank Reconciliation</h2>
+            <p class="section-intro">
+                Executive financial business intelligence and automated bank settlement matching. Access is secured by staff PIN authorization.
+            </p>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #00897b;">📈</div>
+                    <div class="feature-details">
+                        <h3>FINANCE ANALYTICS (Gated: Admin / Finance)</h3>
+                        <p>Visual business intelligence and store growth analytics.</p>
+                        <ul>
+                            <li><strong>Revenue &amp; Net Profit:</strong> Real-time charts showing total turnover vs gross profit after inventory cost deductions.</li>
+                            <li><strong>Payment Method Breakdown:</strong> Distribution of revenue across Cash, Bank Transfer, POS Card, and Credit.</li>
+                            <li><strong>Top Selling Products:</strong> Identify top-performing product lines by volume and revenue contribution.</li>
+                            <li><strong>Cashier Sales Performance:</strong> Compare sales volume and register accuracy across different staff operators.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-card">
+                    <div class="icon-box" style="background: #00695c;">⚖️</div>
+                    <div class="feature-details">
+                        <h3>RECONCILIATION (Bank &amp; Payment Settlement)</h3>
+                        <p>Verify that money received in your bank matches sales recorded on the till.</p>
+                        <ul>
+                            <li><strong>Transfer Verification:</strong> Match incoming bank transfer alerts against issued receipts.</li>
+                            <li><strong>Unmatched Queue:</strong> Resolve customer payments where bank reference numbers or payer names were unclear.</li>
+                            <li><strong>Discrepancy Audit:</strong> Identify underpayments, overpayments, or duplicate transactions before closing shifts.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="admin-box">
+                <strong>🔒 Staff Authorization Required for Financial Sections</strong>
+                Accessing <em>Finance Analytics</em> or <em>Reconciliation</em> triggers a secure staff authentication prompt. Only accounts with <strong>ADMIN</strong>, <strong>FINANCE</strong>, or <strong>EXECUTIVE</strong> privileges can view financial reports.
+            </div>
+
+            <!-- 10. ADMIN & SECURITY -->
+            <h2 id="admin-security" class="page-break">10. Admin Hub, Cloud Metrics &amp; Security</h2>
+            <p class="section-intro">
+                Master administrative settings, Quaser payment integrations, and cloud sync telemetry.
+            </p>
+
+            <div class="two-col">
+                <div class="mini-card">
+                    <h4>🛡️ Admin Hub (Passcode Protected)</h4>
+                    <p>Manage merchant Quaser API keys, webhook URLs for automated bank transfer confirmation, system reset options, and offline database backup/restore files.</p>
+                </div>
+                <div class="mini-card">
+                    <h4>☁️ Cloud Metrics &amp; Multi-Till Sync</h4>
+                    <p>Monitor real-time websocket server health, review offline pending invoice queues, and manage peer-to-peer LAN synchronization across multiple store checkouts.</p>
+                </div>
+            </div>
+
+            <!-- 11. SOPS -->
+            <h2 id="operating-procedures">11. Standard Operating Procedures (SOPs)</h2>
+            <p class="section-intro">
+                Standard routines for cashiers and store managers to ensure 100% financial and inventory accuracy.
+            </p>
+
+            <div class="two-col">
+                <div class="step-box">
+                    <strong>☀️ Morning Shift Opening Checklist</strong>
+                    <ol>
+                        <li>Power on terminal and verify Bluetooth printer status (<span style="color: #2e7d32; font-weight: bold;">Green dot</span>).</li>
+                        <li>Count opening cash float in the register.</li>
+                        <li>Ensure barcode scanner is plugged in and responding.</li>
+                        <li>Verify that the Live Clock and Sync Status icons are active.</li>
+                    </ol>
+                </div>
+                <div class="step-box">
+                    <strong>🌙 Evening Shift Close &amp; Balancing Flow</strong>
+                    <ol>
+                        <li>Open <strong>Transaction History</strong> to view the daily sales summary.</li>
+                        <li>Count physical cash in the drawer and match against the Cash Total.</li>
+                        <li>Verify POS card terminal settlement slips against the POS Total.</li>
+                        <li>Open <strong>Reconciliation</strong> to confirm all bank transfers.</li>
+                        <li>Perform an offline database backup in <strong>Settings</strong>.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- 12. TROUBLESHOOTING & FAQ -->
+            <h2 id="troubleshooting" class="page-break">12. Troubleshooting &amp; Frequently Asked Questions</h2>
+
+            <table class="status-table">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Issue Observed</th>
+                        <th style="width: 35%;">Probable Cause</th>
+                        <th>Recommended Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Printer dot is Red / Not printing</strong></td>
+                        <td>Bluetooth disconnected, out of paper, or cover open.</td>
+                        <td>Check paper roll, power cycle printer, open <em>Printer &amp; MPOS</em>, and tap <em>Connect</em>. Run a <em>Test Print</em>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Barcode scanner not finding item</strong></td>
+                        <td>Barcode not registered or scanned with extra prefix.</td>
+                        <td>Open <em>Stock</em>, edit the product, tap the barcode field, and rescan the product barcode to map it correctly.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Negative or wrong stock count</strong></td>
+                        <td>Items sold before entering supplier restock invoice.</td>
+                        <td>Open <em>Stock</em>, search the item, and tap <em>Restock / Stock In</em> to update quantity to actual physical count.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Cloud icon shows Red (Offline)</strong></td>
+                        <td>Internet connection down or online sync disabled.</td>
+                        <td>Sales continue uninterrupted offline. When internet is restored, the system automatically syncs pending invoices to the cloud.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Access Denied to Finance Analytics</strong></td>
+                        <td>Staff account lacks Manager/Admin privileges.</td>
+                        <td>Authenticate using an Admin or Finance staff PIN to unlock financial dashboards.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="tip-box">
+                <strong>💡 Printing this Manual for Staff Training</strong>
+                Open this file in Google Chrome, Microsoft Edge, or any modern web browser. Press <span class="key-badge">Ctrl + P</span> (or <span class="key-badge">Cmd + P</span> on Mac), select <strong>Save as PDF</strong> or your office printer, set paper size to <strong>A4</strong>, and check <strong>Background graphics</strong> for a print-ready training booklet.
             </div>
 
         </div>
 
         <footer>
-            <p>&copy; 2026 Invify | Modern Solutions for Modern Retailers</p>
-            <p><em>Open this file in your browser and press <strong>Ctrl+P</strong> to Save as PDF for Printing.</em></p>
+            <p><strong>Invify Retail &amp; POS Management Suite</strong> · Empowering Modern Retailers with Robust Offline-First Technology</p>
+            <p>&copy; 2026 Invify. All Rights Reserved. · Version 1.0.0 (Standard &amp; Pro)</p>
         </footer>
     </div>
 

@@ -358,4 +358,177 @@ export class IntegrationVaultService {
     if (!username || !password) return null;
     return { username, password };
   }
+
+  // ─── Meta WhatsApp Cloud API ───────────────────────────────────────────────
+
+  static readonly META_WHATSAPP_SERVICE = 'META_WHATSAPP';
+
+  static readonly META_WHATSAPP_KEYS = [
+    'PUBLIC_API_BASE_URL',
+    'WHATSAPP_GRAPH_API_VERSION',
+    'WHATSAPP_ACCESS_TOKEN',
+    'WHATSAPP_APP_SECRET',
+    'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+    'WHATSAPP_BUSINESS_ACCOUNT_ID',
+    'WHATSAPP_PHONE_NUMBER_ID',
+  ] as const;
+
+  static async ensureMetaWhatsAppVault(): Promise<string> {
+    const { data: existing } = await supabaseAdmin
+      .from('integration_vault')
+      .select('id')
+      .eq('service_identifier', this.META_WHATSAPP_SERVICE)
+      .eq('scope', 'GLOBAL')
+      .maybeSingle();
+
+    if (existing?.id) return existing.id;
+
+    const created = await this.registerIntegration({
+      service_identifier: this.META_WHATSAPP_SERVICE,
+      name: 'Meta WhatsApp Cloud API',
+      description:
+        'Invify platform WhatsApp Business Account credentials, webhook verify token, and Graph API config.',
+      category: 'MESSAGING',
+      scope: 'GLOBAL',
+      tenant_id: null,
+    });
+    return created.id;
+  }
+
+  /**
+   * Upsert Meta WhatsApp Cloud API config into Integration Vault.
+   * Only non-empty provided keys are written (partial updates allowed).
+   * Also hydrates process.env for immediate use without restart.
+   */
+  static async upsertMetaWhatsAppCredentials(
+    values: Partial<Record<(typeof IntegrationVaultService.META_WHATSAPP_KEYS)[number], string>>,
+    environment: string = 'PRODUCTION',
+  ) {
+    const vaultId = await this.ensureMetaWhatsAppVault();
+    const storedKeys: string[] = [];
+
+    const credentialTypeFor = (key: string): string => {
+      if (key.includes('TOKEN') || key.includes('SECRET') || key.includes('ACCESS')) return 'API_SECRET';
+      if (key.includes('URL')) return 'ENDPOINT';
+      return 'API_KEY';
+    };
+
+    for (const key of this.META_WHATSAPP_KEYS) {
+      const raw = values[key];
+      if (raw == null) continue;
+      const plaintext = String(raw).trim();
+      if (!plaintext) continue;
+
+      await this.addCredential(vaultId, {
+        credential_type: credentialTypeFor(key),
+        environment,
+        plaintext_value: plaintext,
+        key_name: key,
+        rotate_existing: true,
+      });
+
+      // Immediate runtime hydration (no restart)
+      process.env[key] = plaintext;
+      // Backward-compat aliases used by older OTP path
+      if (key === 'WHATSAPP_ACCESS_TOKEN') {
+        process.env.META_ACCESS_TOKEN = plaintext;
+      }
+      storedKeys.push(key);
+    }
+
+    console.log(
+      `[IntegrationVault] Meta WhatsApp credentials stored vaultId=${vaultId} env=${environment} keys=${storedKeys.join(',')}`,
+    );
+
+    return { vaultId, environment, keys: storedKeys };
+  }
+
+  /** Status-only — never returns secrets. */
+  static async getMetaWhatsAppStatus(environment: string = 'PRODUCTION') {
+    const keys: Record<string, { configured: boolean; sources: { runtimeEnv: boolean; integrationVault: boolean } }> = {};
+
+    for (const key of this.META_WHATSAPP_KEYS) {
+      const fromEnv = Boolean(String(process.env[key] || '').trim());
+      // Also treat META_ACCESS_TOKEN as env source for WHATSAPP_ACCESS_TOKEN
+      const fromEnvAlias =
+        key === 'WHATSAPP_ACCESS_TOKEN'
+          ? Boolean(String(process.env.META_ACCESS_TOKEN || '').trim())
+          : false;
+      const fromVault = Boolean(
+        await this.getDecryptedCredential(this.META_WHATSAPP_SERVICE, environment, undefined, key),
+      );
+      // Legacy vault key name
+      const fromVaultLegacy =
+        key === 'WHATSAPP_ACCESS_TOKEN'
+          ? Boolean(
+              await this.getDecryptedCredential(
+                this.META_WHATSAPP_SERVICE,
+                environment,
+                undefined,
+                'META_ACCESS_TOKEN',
+              ),
+            )
+          : false;
+
+      keys[key] = {
+        configured: fromEnv || fromEnvAlias || fromVault || fromVaultLegacy,
+        sources: {
+          runtimeEnv: fromEnv || fromEnvAlias,
+          integrationVault: fromVault || fromVaultLegacy,
+        },
+      };
+    }
+
+    const required = [
+      'WHATSAPP_ACCESS_TOKEN',
+      'WHATSAPP_PHONE_NUMBER_ID',
+      'WHATSAPP_APP_SECRET',
+      'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+    ] as const;
+    const ready = required.every((k) => keys[k]?.configured);
+
+    return {
+      serviceIdentifier: this.META_WHATSAPP_SERVICE,
+      environment,
+      ready,
+      keys,
+      webhookPath: '/webhooks/whatsapp',
+    };
+  }
+
+  /**
+   * Copy ACTIVE vault values into process.env when env is empty.
+   * Safe to call at boot — never logs secret values.
+   */
+  static async hydrateMetaWhatsAppFromVault(environment: string = 'PRODUCTION'): Promise<string[]> {
+    const hydrated: string[] = [];
+    for (const key of this.META_WHATSAPP_KEYS) {
+      if (String(process.env[key] || '').trim()) continue;
+
+      let value = await this.getDecryptedCredential(
+        this.META_WHATSAPP_SERVICE,
+        environment,
+        undefined,
+        key,
+      );
+
+      if (!value && key === 'WHATSAPP_ACCESS_TOKEN') {
+        value = await this.getDecryptedCredential(
+          this.META_WHATSAPP_SERVICE,
+          environment,
+          undefined,
+          'META_ACCESS_TOKEN',
+        );
+      }
+
+      if (value) {
+        process.env[key] = value;
+        if (key === 'WHATSAPP_ACCESS_TOKEN') {
+          process.env.META_ACCESS_TOKEN = value;
+        }
+        hydrated.push(key);
+      }
+    }
+    return hydrated;
+  }
 }

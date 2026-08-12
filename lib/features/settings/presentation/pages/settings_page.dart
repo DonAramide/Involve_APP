@@ -8,6 +8,7 @@ import 'package:image_cropper/image_cropper.dart';
 import 'dart:ui' as ui;
 import '../../../../core/utils/validators.dart';
 import '../../../../core/utils/logo_processor.dart';
+import '../../../../core/utils/api_error_message.dart';
 import '../bloc/settings_bloc.dart';
 import '../bloc/settings_state.dart';
 import '../widgets/password_dialog.dart';
@@ -622,6 +623,37 @@ class _SettingsPageState extends State<SettingsPage> {
             }
           }
 
+          // 3b. Bulk-sync staff (incl. personal salary bank) to tenant admin
+          try {
+            final localStaff = await db.select(db.staff).get();
+            if (localStaff.isNotEmpty) {
+              final staffPayloads = localStaff
+                  .where((s) => s.isDeleted != true)
+                  .map((s) => {
+                        'syncId': s.syncId,
+                        'name': s.name,
+                        'staffId': s.staffId,
+                        'phone': s.phone,
+                        'role': s.role,
+                        'isActive': s.isActive,
+                        'bankName': s.virtualBankName,
+                        'bankCode': s.bankCode,
+                        'accountNumber': s.virtualAccountNumber,
+                        'accountName': s.virtualAccountName,
+                      })
+                  .toList();
+              final staffResult = await client.post(
+                '/api/staff/bulk-sync',
+                data: {'staff': staffPayloads},
+              );
+              debugPrint(
+                'Staff sync result: synced=${staffResult.data?['synced']}, errors=${staffResult.data?['errors']}',
+              );
+            }
+          } catch (staffErr) {
+            debugPrint('Bulk staff sync error: $staffErr');
+          }
+
           // 4. Bulk-sync local invoices (transactions) to Supabase via backend
           final localInvoices = await db.select(db.invoices).get();
           if (localInvoices.isNotEmpty) {
@@ -907,7 +939,7 @@ class _SettingsPageState extends State<SettingsPage> {
         scaffoldMessenger.showSnackBar(const SnackBar(content: Text('Database exported successfully!'), backgroundColor: Colors.green));
       }
     } catch (e) {
-      scaffoldMessenger.showSnackBar(SnackBar(content: Text('Failed to export: $e'), backgroundColor: Colors.red));
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text(friendlyApiError(e, fallback: 'Could not export database.')), backgroundColor: Colors.red));
     }
   }
 
