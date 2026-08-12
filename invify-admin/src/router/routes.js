@@ -19,8 +19,8 @@ const routes = [
   },
   {
     path: '/admin/login',
-    component: () => import('pages/governance/LoginPage.vue'),
-    meta: { isGuest: true, portal: 'admin', title: 'Admin Ops Login' }
+    component: () => import('pages/governance/AdminLoginPage.vue'),
+    meta: { isGuest: true, portal: 'admin', title: 'Super Admin Login' }
   },
   {
     path: '/tenant/login',
