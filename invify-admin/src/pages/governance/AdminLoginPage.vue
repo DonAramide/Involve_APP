@@ -16,11 +16,12 @@
         </div>
         <div class="sac__brand-text">
           <div class="sac__brand-name">INVIFY</div>
-          <div class="sac__brand-sub">Enterprise Platform</div>
+          <div class="sac__brand-sub">{{ t.brandSub }}</div>
         </div>
       </div>
 
       <div class="sac__header-actions">
+        <!-- Dark / Light Theme Toggle -->
         <button
           type="button"
           class="sac__action-pill sac__theme-btn"
@@ -31,10 +32,29 @@
           <q-tooltip>{{ prefs.isDarkMode ? 'Dark Theme Active (Click for Light)' : 'Light Theme Active (Click for Dark)' }}</q-tooltip>
         </button>
 
+        <!-- Interactive Language Selector: English, Yorùbá, Igbo, Hausa -->
         <div class="sac__action-pill sac__lang-select" role="button" tabindex="0" aria-label="Language selector">
           <q-icon name="public" size="15px" class="sac__lang-icon" />
-          <span class="sac__lang-label">English</span>
+          <span class="sac__lang-label">{{ currentLangLabel }}</span>
           <q-icon name="expand_more" size="16px" class="sac__lang-arrow" />
+
+          <q-menu auto-close class="sac__lang-menu" :dark="prefs.isDarkMode">
+            <q-list dense style="min-width: 150px">
+              <q-item
+                v-for="lang in availableLanguages"
+                :key="lang.code"
+                clickable
+                :active="currentLang === lang.code"
+                active-class="text-indigo-4 text-weight-bold"
+                @click="setLanguage(lang.code)"
+              >
+                <q-item-section avatar style="min-width: 28px;">
+                  <span class="sac__lang-flag">{{ lang.flag }}</span>
+                </q-item-section>
+                <q-item-section>{{ lang.label }}</q-item-section>
+              </q-item>
+            </q-list>
+          </q-menu>
         </div>
       </div>
     </header>
@@ -46,12 +66,12 @@
         <div class="sac__left-inner">
           <div class="sac__hero">
             <h1 id="sac-heading" class="sac__h1">
-              <span class="sac__h1-white">Super Admin</span>
-              <span class="sac__h1-accent">Command Center</span>
+              <span class="sac__h1-white">{{ t.superAdmin }}</span>
+              <span class="sac__h1-accent">{{ t.commandCenter }}</span>
             </h1>
 
             <p class="sac__desc">
-              Securely access the Invify orchestration platform. Manage tenants, modules, users, integrations, and enterprise operations from a single unified hub.
+              {{ t.heroDesc }}
             </p>
           </div>
 
@@ -109,7 +129,7 @@
                   <!-- Top Face -->
                   <polygon points="80,24 136,54 80,84 24,54" fill="url(#cubeTopGrad)" stroke="#A5B4FC" stroke-width="1.5" stroke-linejoin="round" />
 
-                  <!-- Left Face with Rocket Glyph -->
+                  <!-- Left Face with Launch Glyph -->
                   <polygon points="24,54 80,84 80,144 24,114" fill="url(#cubeLeftGrad)" stroke="#818CF8" stroke-width="1.5" stroke-linejoin="round" />
                   
                   <!-- Left Face Engraving: Launch / Platform icon -->
@@ -140,15 +160,15 @@
 
           <!-- Factual Platform Security Indicators -->
           <div class="sac__trust-wrap">
-            <div class="sac__trust-label">Enterprise Security Indicators</div>
+            <div class="sac__trust-label">{{ t.trustLabel }}</div>
             <div class="sac__trust-grid">
               <div class="sac__trust-item">
                 <div class="sac__trust-icon-box">
                   <q-icon name="verified_user" size="18px" />
                 </div>
                 <div class="sac__trust-text">
-                  <span class="sac__trust-title">Enterprise Security</span>
-                  <span class="sac__trust-sub">Multi-Layered</span>
+                  <span class="sac__trust-title">{{ t.trust1Title }}</span>
+                  <span class="sac__trust-sub">{{ t.trust1Sub }}</span>
                 </div>
               </div>
 
@@ -157,8 +177,8 @@
                   <q-icon name="lock" size="18px" />
                 </div>
                 <div class="sac__trust-text">
-                  <span class="sac__trust-title">Encrypted Data</span>
-                  <span class="sac__trust-sub">TLS & At-Rest</span>
+                  <span class="sac__trust-title">{{ t.trust2Title }}</span>
+                  <span class="sac__trust-sub">{{ t.trust2Sub }}</span>
                 </div>
               </div>
 
@@ -167,8 +187,8 @@
                   <q-icon name="speed" size="18px" />
                 </div>
                 <div class="sac__trust-text">
-                  <span class="sac__trust-title">Platform Availability</span>
-                  <span class="sac__trust-sub">99.99% Target</span>
+                  <span class="sac__trust-title">{{ t.trust3Title }}</span>
+                  <span class="sac__trust-sub">{{ t.trust3Sub }}</span>
                 </div>
               </div>
 
@@ -177,8 +197,8 @@
                   <q-icon name="policy" size="18px" />
                 </div>
                 <div class="sac__trust-text">
-                  <span class="sac__trust-title">Audited Admin</span>
-                  <span class="sac__trust-sub">Tamper-Evident</span>
+                  <span class="sac__trust-title">{{ t.trust4Title }}</span>
+                  <span class="sac__trust-sub">{{ t.trust4Sub }}</span>
                 </div>
               </div>
             </div>
@@ -203,12 +223,12 @@
                 </defs>
               </svg>
             </div>
-            <h2 class="sac__welcome">Welcome Back</h2>
-            <p class="sac__welcome-sub">Sign in to your super admin account</p>
+            <h2 class="sac__welcome">{{ t.welcome }}</h2>
+            <p class="sac__welcome-sub">{{ t.welcomeSub }}</p>
 
             <div class="sac__secure-divider">
               <span class="sac__secure-line" />
-              <span class="sac__secure-pill">Secure Admin Access</span>
+              <span class="sac__secure-pill">{{ t.secureAdminAccess }}</span>
               <span class="sac__secure-line" />
             </div>
           </div>
@@ -293,14 +313,14 @@
             <div class="sac__form-note">Super Admin Password Recovery</div>
             <template v-if="recoveryStep === 'email'">
               <div class="sac__form-group">
-                <label class="sac__input-label">Email Address</label>
+                <label class="sac__input-label">{{ t.emailLabel }}</label>
                 <q-input
                   v-model="otpForm.email"
                   :dark="prefs.isDarkMode"
                   filled
                   dense
                   type="email"
-                  placeholder="Enter your registered email address"
+                  :placeholder="t.emailPlaceholder"
                   autocomplete="email"
                   class="sac__custom-input"
                   :rules="[emailRule]"
@@ -427,7 +447,7 @@
           <q-form v-else class="sac__form" @submit.prevent="executeLoginPass">
             <!-- Email Field -->
             <div class="sac__form-group">
-              <label class="sac__input-label" for="admin-login-email">Email Address</label>
+              <label class="sac__input-label" for="admin-login-email">{{ t.emailLabel }}</label>
               <q-input
                 id="admin-login-email"
                 v-model="form.email"
@@ -436,7 +456,7 @@
                 dense
                 type="email"
                 autocomplete="username"
-                placeholder="Enter your email address"
+                :placeholder="t.emailPlaceholder"
                 class="sac__custom-input"
                 autofocus
                 :disable="loading || lockoutRemainingMs > 0"
@@ -455,7 +475,7 @@
 
             <!-- Password Field -->
             <div class="sac__form-group">
-              <label class="sac__input-label" for="admin-login-password">Password</label>
+              <label class="sac__input-label" for="admin-login-password">{{ t.passwordLabel }}</label>
               <q-input
                 id="admin-login-password"
                 v-model="form.password"
@@ -464,7 +484,7 @@
                 dense
                 :type="showPassword ? 'text' : 'password'"
                 autocomplete="current-password"
-                placeholder="Enter your password"
+                :placeholder="t.passwordPlaceholder"
                 class="sac__custom-input"
                 :disable="loading || lockoutRemainingMs > 0"
                 lazy-rules
@@ -491,7 +511,7 @@
                 v-model="rememberDevice"
                 dense
                 color="indigo-5"
-                label="Remember this device"
+                :label="t.rememberDevice"
                 class="sac__remember-checkbox"
               />
               <button
@@ -499,7 +519,7 @@
                 class="sac__link-btn"
                 @click="triggerRecoveryHint"
               >
-                Forgot password?
+                {{ t.forgotPassword }}
               </button>
             </div>
 
@@ -511,7 +531,7 @@
             >
               <q-spinner-dots v-if="loading" size="20px" class="q-mr-sm" />
               <q-icon v-else name="lock" size="18px" class="q-mr-sm" />
-              <span>{{ signInLabel }}</span>
+              <span>{{ loading ? t.signingIn : t.signIn }}</span>
             </button>
 
             <!-- Real WebAuthn / Security Key capability only if supported by backend -->
@@ -528,7 +548,7 @@
                 @click="executeWebAuthnLogin"
               >
                 <q-icon name="key" size="18px" class="q-mr-sm" />
-                <span>Sign in with Security Key</span>
+                <span>{{ t.securityKey }}</span>
               </button>
             </template>
 
@@ -538,8 +558,8 @@
                 <q-icon name="verified_user" size="18px" class="sac__notice-icon" />
               </div>
               <div class="sac__notice-copy">
-                <div>All admin sessions are monitored and audited</div>
-                <div class="sac__notice-sub">Unauthorized access is strictly prohibited</div>
+                <div>{{ t.auditNotice1 }}</div>
+                <div class="sac__notice-sub">{{ t.auditNotice2 }}</div>
               </div>
             </div>
           </q-form>
@@ -550,13 +570,13 @@
     <!-- Footer -->
     <footer class="sac__footer">
       <div class="sac__footer-left">
-        © {{ currentYear }} Invify Enterprise Platform. All rights reserved.
+        © {{ currentYear }} {{ t.copyright }}
       </div>
       <div class="sac__footer-right">
-        <span class="sac__footer-link" role="button" tabindex="0">Privacy Policy</span>
-        <span class="sac__footer-link" role="button" tabindex="0">Terms of Service</span>
-        <span class="sac__footer-link" role="button" tabindex="0">Security</span>
-        <span class="sac__footer-link" role="button" tabindex="0">Support</span>
+        <span class="sac__footer-link" role="button" tabindex="0">{{ t.privacy }}</span>
+        <span class="sac__footer-link" role="button" tabindex="0">{{ t.terms }}</span>
+        <span class="sac__footer-link" role="button" tabindex="0">{{ t.security }}</span>
+        <span class="sac__footer-link" role="button" tabindex="0">{{ t.support }}</span>
       </div>
     </footer>
 
@@ -601,41 +621,234 @@ const { prefs, toggleTheme } = useOperatorPreferences()
 
 const currentYear = new Date().getFullYear()
 
-// Feature rows matching reference design layout with factual platform security descriptions
-const platformFeatures = [
+// Language Selector & Multi-Language Dictionary (English, Yorùbá, Igbo, Hausa)
+const availableLanguages = [
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'yo', label: 'Yorùbá', flag: '🇳🇬' },
+  { code: 'ig', label: 'Igbo', flag: '🇳🇬' },
+  { code: 'ha', label: 'Hausa', flag: '🇳🇬' }
+]
+
+const currentLang = ref(localStorage.getItem('invify_login_locale') || 'en')
+
+const currentLangLabel = computed(() => {
+  const match = availableLanguages.find(l => l.code === currentLang.value)
+  return match ? match.label : 'English'
+})
+
+function setLanguage(code) {
+  currentLang.value = code
+  localStorage.setItem('invify_login_locale', code)
+}
+
+const translations = {
+  en: {
+    brandSub: 'Enterprise Platform',
+    superAdmin: 'Super Admin',
+    commandCenter: 'Command Center',
+    heroDesc: 'Securely access the Invify orchestration platform. Manage tenants, modules, users, integrations, and enterprise operations from a single unified hub.',
+    feat1Title: 'Enterprise Grade Security',
+    feat1Body: 'Bank-level encryption, device binding, and multi-layer authentication.',
+    feat2Title: 'Multi-Tenant Orchestration',
+    feat2Body: 'Onboard, manage, and monitor all tenants from a centralized dashboard.',
+    feat3Title: 'Real-time Intelligence',
+    feat3Body: 'Live analytics, system health, and operational insights at your fingertips.',
+    feat4Title: 'Full Platform Control',
+    feat4Body: 'Control modules, permissions, integrations, and system configurations.',
+    trustLabel: 'Enterprise Security Indicators',
+    trust1Title: 'Enterprise Security',
+    trust1Sub: 'Multi-Layered',
+    trust2Title: 'Encrypted Data',
+    trust2Sub: 'TLS & At-Rest',
+    trust3Title: 'Platform Availability',
+    trust3Sub: '99.99% Target',
+    trust4Title: 'Audited Admin',
+    trust4Sub: 'Tamper-Evident',
+    welcome: 'Welcome Back',
+    welcomeSub: 'Sign in to your super admin account',
+    secureAdminAccess: 'Secure Admin Access',
+    emailLabel: 'Email Address',
+    emailPlaceholder: 'Enter your email address',
+    passwordLabel: 'Password',
+    passwordPlaceholder: 'Enter your password',
+    rememberDevice: 'Remember this device',
+    forgotPassword: 'Forgot password?',
+    signIn: 'Sign In to Dashboard',
+    signingIn: 'Signing In...',
+    securityKey: 'Sign in with Security Key',
+    auditNotice1: 'All admin sessions are monitored and audited',
+    auditNotice2: 'Unauthorized access is strictly prohibited',
+    copyright: 'Invify Enterprise Platform. All rights reserved.',
+    privacy: 'Privacy Policy',
+    terms: 'Terms of Service',
+    security: 'Security',
+    support: 'Support'
+  },
+  yo: {
+    brandSub: 'Pẹpẹ Idawọle',
+    superAdmin: 'Oludari Agba',
+    commandCenter: 'Gbongan Aṣẹ',
+    heroDesc: 'Wọle si pẹpẹ iṣakoso Invify ni aabo. Ṣakoso awọn ayalegbe, awọn modulu, awọn olumulo, ati awọn iṣẹ idawọle lati ibi aringbungbun kan.',
+    feat1Title: 'Aabo Ipele Idawọle',
+    feat1Body: 'Idaabobo ipele banki, isopọ ẹrọ, ati ijẹrisi ipele pupọ.',
+    feat2Title: 'Iṣakoso Ayalegbe Pupọ',
+    feat2Body: 'Gba wọle, ṣakoso, ati ṣe abojuto gbogbo awọn ayalegbe lati ibi aṣẹ kanṣoṣo.',
+    feat3Title: 'Oye Akoko Gidi',
+    feat3Body: 'Itupalẹ lẹsẹkẹsẹ, ilera eto, ati oye iṣiṣẹ ni ika rẹ.',
+    feat4Title: 'Iṣakoso Pẹpẹ Ni Kikun',
+    feat4Body: 'Ṣakoso awọn modulu, awọn igbanilaaye, awọn iṣọpọ, ati awọn iṣeto eto.',
+    trustLabel: 'Awọn Afihan Aabo Idawọle',
+    trust1Title: 'Aabo Idawọle',
+    trust1Sub: 'Ipele Pupọ',
+    trust2Title: 'Data Ti A Pa Mọ',
+    trust2Sub: 'TLS & Ibi-ipamọ',
+    trust3Title: 'Wiwa Pẹpẹ',
+    trust3Sub: 'Ifojusun 99.99%',
+    trust4Title: 'Ayẹwo Abojuto',
+    trust4Sub: 'Ailẹfọwọkan',
+    welcome: 'Ẹ Ku Abo Pada',
+    welcomeSub: 'Wọle si akọọlẹ oludari agba rẹ',
+    secureAdminAccess: 'Wiwọle Aabo Oludari',
+    emailLabel: 'Adirẹsi Imeeli',
+    emailPlaceholder: 'Tẹ adirẹsi imeeli rẹ sii',
+    passwordLabel: 'Ọrọigbaniwọle',
+    passwordPlaceholder: 'Tẹ ọrọigbaniwọle rẹ sii',
+    rememberDevice: 'Ranti ẹrọ yii',
+    forgotPassword: 'Gbagbe ọrọigbaniwọle?',
+    signIn: 'Wọle si Gbongan Iṣakoso',
+    signingIn: 'N wọle...',
+    securityKey: 'Wọle pẹlu Kókóro Aabo',
+    auditNotice1: 'Gbogbo awọn igba oludari ni a n ṣe abojuto ati ayẹwo',
+    auditNotice2: 'Wiwọle laigba aṣẹ jẹ eewọ patapata',
+    copyright: 'Pẹpẹ Idawọle Invify. Gbogbo ẹtọ ni a daabobo.',
+    privacy: 'Ilana Aṣiri',
+    terms: 'Awọn Ofin Iṣẹ',
+    security: 'Aabo',
+    support: 'Atilẹyin'
+  },
+  ig: {
+    brandSub: 'Usoro Ụlọ Ọrụ',
+    superAdmin: 'Nnukwu Onye Nlekọta',
+    commandCenter: 'Ebe Nchịkwa',
+    heroDesc: "Nweta usoro nhazi Invify n'enweghị nchegbu. Jikwaa ndị nwe ụlọ, modul, ndị ọrụ, ntinye aka, na ọrụ ụlọ ọrụ site n'otu ebe.",
+    feat1Title: 'Nchekwa Ọkwa Ụlọ Ọrụ',
+    feat1Body: 'Nkwekorita ọkwa ụlọ akụ, nkekọ ngwaọrụ, na nkwenye ọtụtụ ọkwa.',
+    feat2Title: 'Nchikota Ọtụtụ Ndị Nwe Ụlọ',
+    feat2Body: "Banye, jikwaa ma nyochaa ndị nwe ụlọ niile site n'otu ebe nchịkwa.",
+    feat3Title: 'Ọgụgụ Isi Oge Gboo',
+    feat3Body: "Nchịkọta data ozugbo, ahụike sistemụ, na nghọta ọrụ n'aka gị.",
+    feat4Title: 'Nchịkwa Sistemụ Zuru Ezu',
+    feat4Body: 'Jikwaa modul, ikikere, ntinye aka, na nhazi sistemụ.',
+    trustLabel: 'Ihe Ngosi Nchekwa Ụlọ Ọrụ',
+    trust1Title: 'Nchekwa Ụlọ Ọrụ',
+    trust1Sub: 'Ọtụtụ Ọkwa',
+    trust2Title: 'Data Echekwara',
+    trust2Sub: 'TLS & Nchedo',
+    trust3Title: 'Ọnụnọ Usoro',
+    trust3Sub: 'Ebumnuche 99.99%',
+    trust4Title: 'Nyocha Nlekọta',
+    trust4Sub: 'Nchekwa Nkwenye',
+    welcome: 'Nnọọ Ọzọ',
+    welcomeSub: 'Banye na akaụntụ nnukwu onye nlekọta gị',
+    secureAdminAccess: 'Ntinye Nchebe Onye Nlekọta',
+    emailLabel: 'Adreesị Ozi Ịntanetị',
+    emailPlaceholder: 'Tinye adreesị ozi ịntanetị gị',
+    passwordLabel: 'Okwuntughe',
+    passwordPlaceholder: 'Tinye okwuntughe gị',
+    rememberDevice: 'Cheta ngwaọrụ a',
+    forgotPassword: 'Chefuru okwuntughe?',
+    signIn: 'Banye na Ebe Nchịkwa',
+    signingIn: 'Na-abanye...',
+    securityKey: 'Jiri Igodo Nchekwa Banye',
+    auditNotice1: 'A na-enyocha ma na-edekọ oge nlekọta niile',
+    auditNotice2: 'A machibidoro ịbanye na-enweghị ikike kpamkpam',
+    copyright: 'Usoro Ụlọ Ọrụ Invify. Ikike niile echekwara.',
+    privacy: 'Iwu Nzuzo',
+    terms: 'Usoro Ọrụ',
+    security: 'Nchekwa',
+    support: 'Nkwado'
+  },
+  ha: {
+    brandSub: "Dandalin Masana'antu",
+    superAdmin: 'Babban Manaja',
+    commandCenter: 'Cibiyar Umarni',
+    heroDesc: "Shiga dandalin tsara ayyuka na Invify cikin aminci. Gudanar da masu haya, kayayyaki, masu amfani, haɗin kai, da ayyukan masana'antu daga wuri guda.",
+    feat1Title: "Kariyar Matakin Masana'antu",
+    feat1Body: "Boye bayanai matakin banki, daidaita na'ura, da tantancewa mai matakai da yawa.",
+    feat2Title: 'Tsarin Masu Haya Da Yawa',
+    feat2Body: 'Shigar, gudanar, da lura da dukkan masu haya daga cibiyar umarni guda.',
+    feat3Title: 'Fahimtar Lokaci Na Gaskiya',
+    feat3Body: 'Binciken kai tsaye, lafiyar tsarin, da fahimtar aiki a hannunka.',
+    feat4Title: 'Cikakken Ikon Dandali',
+    feat4Body: 'Kula da kayayyaki, izini, haɗin kai, da tsarin aiki.',
+    trustLabel: "Alamomin Tsaron Masana'antu",
+    trust1Title: "Tsaron Masana'antu",
+    trust1Sub: 'Matakai Da Yawa',
+    trust2Title: 'Boyayyen Bayani',
+    trust2Sub: 'TLS & Adanawa',
+    trust3Title: 'Samuwar Dandali',
+    trust3Sub: 'Manufar 99.99%',
+    trust4Title: 'Binciken Gudanarwa',
+    trust4Sub: 'Kariya Daga Sauyi',
+    welcome: 'Barka Da Dawowa',
+    welcomeSub: 'Shiga asusunka na babban manaja',
+    secureAdminAccess: 'Hanyar Shiga Mai Tsaro Ta Manaja',
+    emailLabel: 'Adireshin Imel',
+    emailPlaceholder: 'Shigar da adireshin imel dinka',
+    passwordLabel: 'Kalmar Sirri',
+    passwordPlaceholder: 'Shigar da kalmar sirrinka',
+    rememberDevice: "Tuna wannan na'urar",
+    forgotPassword: 'Ka manta kalmar sirri?',
+    signIn: 'Shiga Cibiyar Gudanarwa',
+    signingIn: 'Ana Shiga...',
+    securityKey: 'Shiga da Mabudin Tsaro',
+    auditNotice1: 'Ana lura da duk lokutan shiga na manaja kuma ana bincika su',
+    auditNotice2: 'An haramta shiga ba tare da izini ba kwata-kwata',
+    copyright: "Dandalin Masana'antu Na Invify. Duk hakki mallaka ne.",
+    privacy: 'Manufar Tsare Sirri',
+    terms: 'Sharuddan Sabis',
+    security: 'Tsaro',
+    support: 'Tallafi'
+  }
+}
+
+const t = computed(() => translations[currentLang.value] || translations.en)
+
+// Feature rows dynamically reacting to chosen language
+const platformFeatures = computed(() => [
   {
-    title: 'Enterprise Grade Security',
-    body: 'Bank-level encryption, device binding, and multi-layer authentication.',
+    title: t.value.feat1Title,
+    body: t.value.feat1Body,
     icon: 'shield',
     iconColor: '#818CF8',
     bgColor: 'rgba(99, 102, 241, 0.12)',
     borderColor: 'rgba(99, 102, 241, 0.25)'
   },
   {
-    title: 'Multi-Tenant Orchestration',
-    body: 'Onboard, manage, and monitor all tenants from a centralized dashboard.',
+    title: t.value.feat2Title,
+    body: t.value.feat2Body,
     icon: 'domain',
     iconColor: '#38BDF8',
     bgColor: 'rgba(56, 189, 248, 0.12)',
     borderColor: 'rgba(56, 189, 248, 0.25)'
   },
   {
-    title: 'Real-time Intelligence',
-    body: 'Live analytics, system health, and operational insights at your fingertips.',
+    title: t.value.feat3Title,
+    body: t.value.feat3Body,
     icon: 'show_chart',
     iconColor: '#34D399',
     bgColor: 'rgba(52, 211, 153, 0.12)',
     borderColor: 'rgba(52, 211, 153, 0.25)'
   },
   {
-    title: 'Full Platform Control',
-    body: 'Control modules, permissions, integrations, and system configurations.',
+    title: t.value.feat4Title,
+    body: t.value.feat4Body,
     icon: 'settings',
     iconColor: '#FBBF24',
     bgColor: 'rgba(251, 191, 36, 0.12)',
     borderColor: 'rgba(251, 191, 36, 0.25)'
   }
-]
+])
 
 const PLATFORM_STAFF_ROLES = new Set([
   'SUPER_ADMIN',
@@ -721,8 +934,6 @@ const recoveryPrimaryLabel = computed(() => {
   if (recoveryStep.value === 'verify') return 'Validate code'
   return 'Reset password'
 })
-
-const signInLabel = computed(() => (loading.value ? 'Signing In...' : 'Sign In to Dashboard'))
 
 async function executeWebAuthnLogin() {
   if (!WEBAUTHN_AVAILABLE) return
@@ -1143,7 +1354,7 @@ watch(rememberDevice, (val) => {
 <style scoped>
 /* ==========================================================================
    SUPER ADMIN COMMAND CENTER - ENTERPRISE AUTHENTICATION GATEWAY
-   Dynamic Theme Support: Dark Mode (Default) & Crisp Light Mode
+   Dynamic Theme Support & Multi-Language Support (EN, YO, IG, HA)
    ========================================================================== */
 
 .sac {
@@ -1346,6 +1557,7 @@ watch(rememberDevice, (val) => {
   color: var(--sac-pill-text);
   transition: all 0.2s ease;
   cursor: pointer;
+  position: relative;
 }
 
 .sac__action-pill:hover {
@@ -1379,6 +1591,16 @@ watch(rememberDevice, (val) => {
 
 .sac__lang-arrow {
   color: var(--sac-text-secondary);
+}
+
+.sac__lang-flag {
+  font-size: 14px;
+}
+
+.sac__lang-menu {
+  border-radius: 12px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
+  overflow: hidden;
 }
 
 /* --------------------------------------------------------------------------
