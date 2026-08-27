@@ -337,12 +337,6 @@ class _FeeManagementPageState extends State<FeeManagementPage> {
         );
 
         await invoiceRepo.saveInvoice(invoice);
-        
-        // Update Student Balance in DB
-        final schoolRepo = context.read<SchoolRepository>();
-        await schoolRepo.updateStudent(student.copyWith(
-          balance: student.balance + total,
-        ));
       }
 
       Navigator.pop(context);

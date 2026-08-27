@@ -15,7 +15,19 @@ const INVALID_TOKEN = 'invalid.jwt.token'
 const BEARER = (t: string) => ({ Authorization: `Bearer ${t}` })
 
 // Helper: any 4xx or 5xx but not a network crash = middleware fired
-const SERVER_RESPONDED = [200, 201, 400, 401, 403, 404, 422, 500]
+const SERVER_RESPONDED = [200, 201, 400, 401, 403, 404, 422, 500, 503]
+const originalOfflineLocalAuth = process.env.OFFLINE_LOCAL_AUTH
+
+beforeAll(() => {
+  // Keep route-registration tests offline; invalid.jwt.token remains explicitly
+  // rejected by auth.middleware and therefore still exercises fail-closed auth.
+  process.env.OFFLINE_LOCAL_AUTH = 'true'
+})
+
+afterAll(() => {
+  if (originalOfflineLocalAuth === undefined) delete process.env.OFFLINE_LOCAL_AUTH
+  else process.env.OFFLINE_LOCAL_AUTH = originalOfflineLocalAuth
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UAT-API-01 — Health Endpoint
@@ -66,13 +78,20 @@ describe('UAT-API-02 | Authentication Routes', () => {
 describe('UAT-API-03 | RBAC — Protected Routes Are Registered', () => {
 
   const protectedRoutes = [
-    { method: 'get', path: '/admin/tenants', label: 'Admin Tenants' },
-    { method: 'get', path: '/admin/users', label: 'Admin Users' },
+    { method: 'get', path: '/admin/tenants', label: 'Admin Tenants (compat)' },
+    { method: 'get', path: '/admin/users', label: 'Admin Users (compat)' },
+    { method: 'get', path: '/api/admin/tenants', label: 'API Admin Tenants' },
+    { method: 'get', path: '/api/admin/users', label: 'API Admin Users' },
+    { method: 'get', path: '/api/admin/agents', label: 'API Admin Agents' },
+    { method: 'get', path: '/api/admin/settings', label: 'API Admin Settings' },
+    { method: 'get', path: '/api/admin/settings/commissions', label: 'API Admin Settings Commissions' },
+    { method: 'get', path: '/api/admin/tenants/00000000-0000-0000-0000-000000000001/details', label: 'API Admin Tenant Details' },
+    { method: 'post', path: '/api/admin/agents/onboard', label: 'API Admin Agent Onboard' },
     { method: 'get', path: '/admin/ledger', label: 'Admin Ledger' },
-    { method: 'get', path: '/admin/audit-logs', label: 'Admin Audit Logs' },
+    { method: 'get', path: '/api/admin/audit-logs', label: 'Admin Audit Logs' },
     { method: 'get', path: '/devices', label: 'Devices' },
-    { method: 'get', path: '/wallet', label: 'Wallet Balance' },
-    { method: 'get', path: '/wallet/transactions', label: 'Wallet Transactions' },
+    { method: 'get', path: '/api/v1/wallet', label: 'Wallet Balance' },
+    { method: 'get', path: '/api/v1/wallet/transactions', label: 'Wallet Transactions' },
     { method: 'get', path: '/api/notifications', label: 'Notifications' },
     { method: 'get', path: '/api/finance/executive-summary', label: 'Executive Finance Summary' },
     { method: 'get', path: '/api/admin/audit/ledger', label: 'Governance Audit Ledger' },
@@ -103,8 +122,13 @@ describe('UAT-API-04 | Auth Middleware — Rejects Invalid Tokens', () => {
   const secureRoutes = [
     { method: 'get', path: '/admin/tenants' },
     { method: 'get', path: '/admin/users' },
+    { method: 'get', path: '/api/admin/tenants' },
+    { method: 'get', path: '/api/admin/users' },
+    { method: 'get', path: '/api/admin/agents' },
+    { method: 'get', path: '/api/admin/settings' },
+    { method: 'patch', path: '/api/admin/users/00000000-0000-0000-0000-000000000001' },
     { method: 'get', path: '/admin/ledger' },
-    { method: 'get', path: '/wallet' },
+    { method: 'get', path: '/api/v1/wallet' },
     { method: 'get', path: '/api/notifications' },
   ]
 

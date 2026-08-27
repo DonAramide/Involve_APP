@@ -54,7 +54,6 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
       final phone = widget.payload['phone'];
 
       final verifyUrls = [
-        'http://localhost:3004/auth/verify-whatsapp-otp',
         '${AppConfig.baseUrl}/auth/verify-whatsapp-otp',
       ];
 
@@ -112,7 +111,6 @@ class _VerifyWhatsappPageState extends State<VerifyWhatsappPage> with OtpResendC
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
       final phone = widget.payload['phone'];
       final urls = [
-        'http://localhost:3004/auth/send-whatsapp-otp',
         '${AppConfig.baseUrl}/auth/send-whatsapp-otp',
       ];
 

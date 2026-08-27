@@ -1,22 +1,43 @@
 version: '3.8'
 
+# Local development compose — intentionally uses host.docker.internal / local redis.
+# Do NOT use this file for staging or production.
+
 services:
   api:
     build:
       context: .
-      target: builder
+      target: runner
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
-      - SUPABASE_URL=http://host.docker.internal:54321
+      - APP_ENV=development
+      - BUILD_VARIANT=LOCAL
+      - PORT=3000
+      - LOCAL_SUPABASE_URL=${LOCAL_SUPABASE_URL:-http://host.docker.internal:54321}
+      - LOCAL_SUPABASE_KEY=${LOCAL_SUPABASE_KEY:-${SUPABASE_KEY}}
+      - LOCAL_SUPABASE_SERVICE_KEY=${LOCAL_SUPABASE_SERVICE_KEY:-${SUPABASE_SERVICE_ROLE_KEY}}
+      - SUPABASE_URL=${LOCAL_SUPABASE_URL:-http://host.docker.internal:54321}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-    volumes:
-      - .:/app
-      - /app/node_modules
-    command: npm run start:dev
+      - JWT_SECRET=${JWT_SECRET:-local-dev-jwt-secret-change-me!!}
+      - SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET:-local-dev-supabase-jwt-secret!}
+      - LICENSE_HMAC_SECRET=${LICENSE_HMAC_SECRET:-local-dev-license-hmac-secret!!}
+      - REDIS_URL=redis://redis:6379
+      - OFFLINE_LOCAL_AUTH=${OFFLINE_LOCAL_AUTH:-false}
+    depends_on:
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/livez').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    restart: unless-stopped

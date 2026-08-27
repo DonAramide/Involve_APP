@@ -15,6 +15,13 @@ registerAuthBootstrapGuard(router)
 // RC2.1.2: Inject enterprise runtime guards
 registerRuntimeGuards(router)
 
+router.afterEach((to) => {
+  const routeTitle = typeof to.meta?.title === 'string' ? to.meta.title.trim() : ''
+  document.title = routeTitle
+    ? routeTitle.startsWith('Invify') ? routeTitle : `${routeTitle} | Invify`
+    : 'Invify - Enterprise Business & Financial Operations Platform'
+})
+
 // Gracefully recover from dynamic import/chunk loading failures due to HMR/network drift or server port changes
 router.onError((error, to) => {
   const isChunkError = error.message.includes('Failed to fetch dynamically imported module') || 

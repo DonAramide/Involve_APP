@@ -2,15 +2,31 @@ import request from 'supertest';
 import app from '../src/app';
 import { supabase } from '../src/db/supabase';
 
+let mockAuthenticatedUser = {
+  id: 'user-abc',
+  email: 'admin@invify.app',
+  role: 'owner',
+  tenantId: 'tenant-123' as string | null,
+};
+
+jest.mock('../src/middleware/auth.middleware', () => ({
+  authenticate: (req: any, _res: any, next: any) => {
+    req.user = { ...mockAuthenticatedUser };
+    next();
+  },
+}));
+
 jest.mock('../src/db/supabase', () => {
   const mockFrom = jest.fn();
-  return {
-    supabase: {
-      from: mockFrom,
-      auth: {
-        getUser: jest.fn()
-      }
+  const client = {
+    from: mockFrom,
+    auth: {
+      getUser: jest.fn()
     }
+  };
+  return {
+    supabase: client,
+    supabaseAdmin: client,
   };
 });
 
@@ -21,9 +37,21 @@ describe('P0-3 Subscription Extensions Integration Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.OFFLINE_MOCK_AUTH = 'false';
+    mockAuthenticatedUser = {
+      id: 'user-abc',
+      email: 'admin@invify.app',
+      role: 'owner',
+      tenantId: 'tenant-123',
+    };
   });
 
   function setupAuth(role: string, tenantId: string | null = 'tenant-123') {
+    mockAuthenticatedUser = {
+      id: 'user-abc',
+      email: 'admin@invify.app',
+      role,
+      tenantId,
+    };
     mockGetUser.mockResolvedValue({
       data: {
         user: {
@@ -150,7 +178,7 @@ describe('P0-3 Subscription Extensions Integration Tests', () => {
       expect(capturedEvent).toBeDefined();
       expect(capturedEvent.event_type).toBe('EXTENDED');
       expect(capturedEvent.days_added).toBe(30);
-      expect(capturedEvent.performed_by).toBe('superadmin@invify.app');
+      expect(capturedEvent.performed_by).toBe('admin@invify.app');
     });
 
     test('Super admin creates new subscription if active does not exist', async () => {

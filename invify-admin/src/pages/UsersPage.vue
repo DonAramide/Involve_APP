@@ -203,6 +203,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useQuasar } from 'quasar'
 import { adminApi } from '../api'
 import axios from 'axios'
+import { joinApiUrl } from '../config/env'
 
 const $q = useQuasar()
 
@@ -293,8 +294,10 @@ const roleColors = {
 
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchText.value.toLowerCase()) || 
-                          u.email.toLowerCase().includes(searchText.value.toLowerCase());
+    const nameVal = (u.name || '').toLowerCase();
+    const emailVal = (u.email || '').toLowerCase();
+    const searchVal = (searchText.value || '').toLowerCase();
+    const matchesSearch = nameVal.includes(searchVal) || emailVal.includes(searchVal);
     const matchesRole = selectedRole.value === 'all' || u.role === selectedRole.value;
     return matchesSearch && matchesRole;
   });
@@ -404,8 +407,7 @@ const forceResetPassword = (user) => {
       return
     }
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || ''
-      await axios.post(`${API_BASE}/api/auth/reset-password`, {
+      await axios.post(joinApiUrl('/api/auth/reset-password'), {
         userId: user.id,
         newPassword: newPassword
       })

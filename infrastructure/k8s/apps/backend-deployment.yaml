@@ -9,8 +9,8 @@ metadata:
     app: invify-backend
 spec:
   ports:
-    - port: 3005
-      targetPort: 3005
+    - port: 3004
+      targetPort: 3004
       protocol: TCP
   selector:
     app: invify-backend
@@ -39,7 +39,7 @@ spec:
         app: invify-backend
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "3005"
+        prometheus.io/port: "3004"
         prometheus.io/path: "/metrics"
     spec:
       # Ensure stateless computing nodes do not share underlying bare-metal machines
@@ -50,10 +50,10 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - invify-backend
+                     - key: app
+                       operator: In
+                       values:
+                         - invify-backend
                 topologyKey: "kubernetes.io/hostname"
       terminationGracePeriodSeconds: 60 # Allows active long-running connection pools to finalize gracefully
       containers:
@@ -64,7 +64,7 @@ spec:
             - name: NODE_ENV
               value: "production"
             - name: PORT
-              value: "3005"
+              value: "3004"
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -86,7 +86,7 @@ spec:
                   name: invify-backend-secrets
                   key: QUEUE_BROKER_URL
           ports:
-            - containerPort: 3005
+            - containerPort: 3004
               name: http-api
           resources:
             requests:

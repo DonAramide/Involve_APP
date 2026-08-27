@@ -378,7 +378,6 @@ import { deviceApi, adminApi } from '../api'
 import { date, useQuasar, copyToClipboard } from 'quasar'
 import logo from '../assets/logo_transparent.png'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
-import { LicenseGenerator } from '../utils/licenseGenerator'
 
 const $q = useQuasar()
 const { prefs } = useOperatorPreferences()
@@ -678,21 +677,22 @@ const reviewDeviceCertificate = async (row) => {
       expiry: expiryDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     }
     
-    // Generate a mathematically valid cryptographic Base32 activation code locally
+    // Generate activation code server-side (HMAC secret never leaves the backend)
     const planIndex = planOptions.find(p => p.label === planName)?.value || 1;
     const deviceSuffix = row.device_suffix || (row.device_id ? row.device_id.substring(Math.max(0, row.device_id.length - 6)).toUpperCase() : '0');
     
-    lastGeneratedCode.value = await LicenseGenerator.generate(
-      businessName,
+    const { data } = await deviceApi.createActivation({
+      tenantId: row.tenant_id || row.tenants?.id,
       durationDays,
       planIndex,
-      deviceSuffix
-    );
+      deviceSuffix,
+    });
+    lastGeneratedCode.value = data?.activation_code || data?.code || data?.activationCode || '';
     
     showSuccessDialog.value = true
     $q.notify({
       type: 'info',
-      message: 'Generated dynamic operational certificate for active edge serial.'
+      message: 'Generated operational certificate via secure server signing.'
     })
   }
 }

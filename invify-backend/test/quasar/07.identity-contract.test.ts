@@ -9,7 +9,10 @@ import { QuasarApiClient } from '../../src/integrations/quasar/quasar-api.client
  * 
  * Ensure QUASAR_BASE_URL is pointing to a QIP-enabled Quasar environment.
  */
-describe('Quasar Identity Contract (QIP)', () => {
+const describeLiveContract =
+  process.env.QUASAR_CONTRACT_TESTS === 'true' ? describe : describe.skip;
+
+describeLiveContract('Quasar Identity Contract (QIP)', () => {
   const baseUrl = process.env.QUASAR_BASE_URL ?? 'http://localhost:4000/api/v1';
 
   // We assume Quasar exposes an endpoint to reflect the resolved IdentityContext for debugging/contract testing.
@@ -34,7 +37,7 @@ describe('Quasar Identity Contract (QIP)', () => {
       expect(identityContext.plane).toBe('service');
       expect(identityContext.actorId).toBeDefined();
     } catch (e: any) {
-      if (e.response?.status === 404) {
+      if (e.response?.status === 404 || e.responseCode === '404') {
         console.warn(`Skipping Service plane contract test: Quasar at ${baseUrl} does not yet implement ${IDENTITY_DEBUG_ENDPOINT}`);
       } else {
         throw e;
@@ -60,7 +63,7 @@ describe('Quasar Identity Contract (QIP)', () => {
       expect(identityContext.plane).toBe('client');
       expect(identityContext.clientId).toBe('INVIFY_RETAIL');
     } catch (e: any) {
-      if (e.response?.status === 404) {
+      if (e.response?.status === 404 || e.responseCode === '404') {
         console.warn(`Skipping Client plane contract test: Quasar at ${baseUrl} does not yet implement ${IDENTITY_DEBUG_ENDPOINT}`);
       } else {
         throw e;
@@ -85,7 +88,7 @@ describe('Quasar Identity Contract (QIP)', () => {
       expect(identityContext.plane).toBe('tenant');
       expect(identityContext.environment).toBe('test');
     } catch (e: any) {
-      if (e.response?.status === 404) {
+      if (e.response?.status === 404 || e.responseCode === '404') {
         console.warn(`Skipping Tenant plane contract test: Quasar at ${baseUrl} does not yet implement ${IDENTITY_DEBUG_ENDPOINT}`);
       } else {
         throw e;

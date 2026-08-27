@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
 import { PaymentService } from '../services/payment.service';
 import { getQuasarService } from '../integrations/quasar/factory';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -46,16 +47,11 @@ export class PayoutController {
 
   /**
    * GET /api/payout/settings
-   * Fetches the saved bank details for the current tenant.
    */
   static async getSettings(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
-
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
     try {
+      const tenantId = resolveAuthoritativeTenantId(req);
+
       const { data, error } = await supabaseAdmin
         .from('payout_settings')
         .select('*')
@@ -65,83 +61,78 @@ export class PayoutController {
       if (error) throw error;
       return res.status(200).json(data || {});
     } catch (error: any) {
+      const status = error.status || 500;
+      if (status !== 500) return res.status(status).json({ error: error.message });
       console.warn('[PayoutController] Supabase getSettings failed. Falling back to local cache:', error.message);
-      const localData = PayoutController.getLocalTenantSettings(tenantId);
-      if (localData) {
-        return res.status(200).json(localData);
-      }
-      // Return empty configuration object on fallback
+      try {
+        const tenantId = resolveAuthoritativeTenantId(req);
+        const localData = PayoutController.getLocalTenantSettings(tenantId);
+        if (localData) return res.status(200).json(localData);
+      } catch (_) { /* ignore */ }
       return res.status(200).json({});
     }
   }
 
   /**
    * POST /api/payout/settings
-   * Upserts bank details for the current tenant.
    */
   static async saveSettings(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
-    const { account_number, bank_code, bank_name, account_name } = req.body;
-
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
-    if (!account_number || !bank_code || !account_name) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Always persist to local file cache first
-    const payload = {
-      tenant_id: tenantId,
-      account_number,
-      bank_code,
-      bank_name,
-      account_name
-    };
-    PayoutController.saveLocalTenantSettings(tenantId, payload);
-
     try {
-      const { data, error } = await supabaseAdmin
-        .from('payout_settings')
-        .upsert({
-          tenant_id: tenantId,
-          account_number,
-          bank_code,
-          bank_name,
-          account_name,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'tenant_id' })
-        .select()
-        .single();
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const { account_number, bank_code, bank_name, account_name } = req.body;
 
-      if (error) throw error;
-      return res.status(200).json({ success: true, settings: data });
+      if (!account_number || !bank_code || !account_name) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      const payload = {
+        tenant_id: tenantId,
+        account_number,
+        bank_code,
+        bank_name,
+        account_name
+      };
+      PayoutController.saveLocalTenantSettings(tenantId, payload);
+
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('payout_settings')
+          .upsert({
+            tenant_id: tenantId,
+            account_number,
+            bank_code,
+            bank_name,
+            account_name,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'tenant_id' })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return res.status(200).json({ success: true, settings: data });
+      } catch (error: any) {
+        console.warn('[PayoutController] Supabase saveSettings failed. Saved to local cache only:', error.message);
+        return res.status(200).json({
+          success: true,
+          settings: {
+            ...payload,
+            updated_at: new Date().toISOString()
+          }
+        });
+      }
     } catch (error: any) {
-      console.warn('[PayoutController] Supabase saveSettings failed. Saved to local cache only:', error.message);
-      return res.status(200).json({
-        success: true,
-        settings: {
-          ...payload,
-          updated_at: new Date().toISOString()
-        }
-      });
+      return res.status(error.status || 500).json({ error: error.message });
     }
   }
 
   /**
    * GET /api/payout/history
-   * Fetches the history of fund sweeps for the school.
    */
   static async getHistory(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
-    const { page = 1, limit = 20 } = req.query;
-
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
     try {
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const { page = 1, limit = 20 } = req.query;
+
       const from = (Number(page) - 1) * Number(limit);
       const to = from + Number(limit) - 1;
 
@@ -164,31 +155,37 @@ export class PayoutController {
         }
       });
     } catch (error: any) {
+      const status = error.status || 500;
       console.error('[PayoutController] getHistory error:', error.message);
-      return res.status(500).json({ error: 'Failed to fetch payout history' });
+      return res.status(status).json({ error: status === 500 ? 'Failed to fetch payout history' : error.message });
     }
   }
 
   /**
    * POST /api/payout/withdraw
-   * Triggers a fund sweep (withdrawal) to the saved bank account,
-   * or to an optional explicit destination (staff salary).
    */
   static async withdraw(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
-    const { amount, destination, staffId, metadata } = req.body;
-
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: 'Valid withdrawal amount required' });
-    }
-
     try {
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const { amount, destination, staffId, metadata } = req.body;
+      const idempotencyKey =
+        (req.headers['idempotency-key'] as string) ||
+        (req.headers['x-idempotency-key'] as string) ||
+        req.body?.idempotencyKey;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: 'Valid withdrawal amount required' });
+      }
+
+      if (destination) {
+        if (!destination.account_number || !destination.bank_code || !destination.account_name) {
+          return res.status(400).json({ error: 'Incomplete destination bank details' });
+        }
+      }
+
       const result = await PaymentService.createPayout(tenantId, Number(amount), {
         destination: destination || undefined,
+        idempotencyKey,
         metadata: {
           ...(metadata || {}),
           ...(staffId ? { staffId, type: metadata?.type || 'staff_salary' } : {}),
@@ -202,7 +199,7 @@ export class PayoutController {
       });
     } catch (error: any) {
       console.error('[PayoutController] initiatePayout error:', error.message);
-      return res.status(400).json({ error: error.message });
+      return res.status(error.status || 400).json({ error: error.message });
     }
   }
 
@@ -210,14 +207,10 @@ export class PayoutController {
    * GET /api/payout/banks
    */
   static async getBanks(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
-    const { country = 'nigeria' } = req.query;
-
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
     try {
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const { country = 'nigeria' } = req.query;
+
       const quasar = await getQuasarService(tenantId);
       const banks = await quasar.getBanks(country as string);
       return res.status(200).json({
@@ -227,7 +220,7 @@ export class PayoutController {
       });
     } catch (error: any) {
       console.error('[PayoutController] getBanks error:', error.message);
-      return res.status(400).json({ error: error.message });
+      return res.status(error.status || 400).json({ error: error.message });
     }
   }
 
@@ -235,18 +228,14 @@ export class PayoutController {
    * POST /api/payout/resolve-account
    */
   static async resolveAccount(req: Request, res: Response) {
-    const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
-    const { account_number, bank_code } = req.body;
-
-    if (!tenantId) {
-      return res.status(400).json({ error: 'Tenant ID required' });
-    }
-
-    if (!account_number || !bank_code) {
-      return res.status(400).json({ error: 'Missing required parameters: account_number, bank_code' });
-    }
-
     try {
+      const tenantId = resolveAuthoritativeTenantId(req);
+      const { account_number, bank_code } = req.body;
+
+      if (!account_number || !bank_code) {
+        return res.status(400).json({ error: 'Missing required parameters: account_number, bank_code' });
+      }
+
       const quasar = await getQuasarService(tenantId);
       const result = await quasar.resolveAccount(account_number, bank_code);
       return res.status(200).json({
@@ -256,7 +245,7 @@ export class PayoutController {
       });
     } catch (error: any) {
       console.error('[PayoutController] resolveAccount error:', error.message);
-      return res.status(400).json({ error: error.message });
+      return res.status(error.status || 400).json({ error: error.message });
     }
   }
 }

@@ -23,11 +23,22 @@ export class DeviceController {
    */
   static async getDevices(req: Request, res: Response) {
     try {
-      // 1. Fetch devices raw data
-      const { data: devices, error: devError } = await supabase
-        .from('devices')
-        .select('*')
-        .order('last_seen', { ascending: false });
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+
+      // 1. Fetch devices raw data (tenant-scoped for non-platform operators)
+      let query = supabase.from('devices').select('*');
+      if (!isPlatform) {
+        if (!user?.tenantId) {
+          return res.status(403).json({ error: 'Tenant context required' });
+        }
+        query = query.eq('tenant_id', user.tenantId);
+      }
+      const { data: devices, error: devError } = await query.order('last_seen', { ascending: false });
 
       if (devError) throw devError;
 
@@ -70,11 +81,22 @@ export class DeviceController {
    */
   static async getActivations(req: Request, res: Response) {
     try {
-      // 1. Fetch activations raw data
-      const { data: activations, error: actError } = await supabase
-        .from('device_activations')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+
+      // 1. Fetch activations raw data (tenant-scoped for non-platform operators)
+      let actQuery = supabase.from('device_activations').select('*');
+      if (!isPlatform) {
+        if (!user?.tenantId) {
+          return res.status(403).json({ error: 'Tenant context required' });
+        }
+        actQuery = actQuery.eq('tenant_id', user.tenantId);
+      }
+      const { data: activations, error: actError } = await actQuery.order('created_at', { ascending: false });
 
       if (actError) throw actError;
 
@@ -728,6 +750,29 @@ export class DeviceController {
   static async getDeviceStatus(req: Request, res: Response) {
     try {
       const { deviceId } = req.params;
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+
+      if (!isPlatform) {
+        if (!user?.tenantId) {
+          return res.status(403).json({ error: 'Tenant context required' });
+        }
+        const { data: owned, error: ownErr } = await supabase
+          .from('devices')
+          .select('device_id')
+          .eq('device_id', deviceId)
+          .eq('tenant_id', user.tenantId)
+          .maybeSingle();
+        if (ownErr) throw ownErr;
+        if (!owned) {
+          return res.status(404).json({ error: 'Device not found' });
+        }
+      }
+
       const { data, error } = await supabase.from('device_status').select('*').eq('device_id', deviceId).single();
       if (error) throw error;
       return res.status(200).json(data);

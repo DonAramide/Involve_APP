@@ -22,6 +22,16 @@ import axios from 'axios';
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+function mockAxiosInstance(requestFn: jest.Mock) {
+  mockedAxios.create.mockReturnValue({
+    request: requestFn,
+    interceptors: {
+      request: { use: jest.fn() },
+      response: { use: jest.fn() },
+    },
+  } as any);
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const ITERATIONS = 100;
@@ -100,7 +110,7 @@ describe('Performance — QFP envelope unwrap (mocked HTTP)', () => {
         data: { id: 'wallet-perf', balance: 99999 },
       },
     });
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
   });
 
   it(`processes ${ITERATIONS} mocked responses in < 1000ms total`, async () => {
@@ -140,7 +150,7 @@ describe('Performance — concurrent load (1000 calls)', () => {
     const requestFn = jest.fn().mockResolvedValue({
       data: { responseCode: '00', responseMessage: 'Success', data: {} },
     });
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 

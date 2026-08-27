@@ -96,6 +96,111 @@ export class InvoiceFacade {
   }
 
   static async recordPayment(tenantId: string, id: string, payload: any) {
+    const applySideEffects = async (newStatus: string, newBalance: number) => {
+      io.to(`tenant:${tenantId}`).emit('finance.invoice.payment_recorded', {
+        invoiceId: id,
+        amount: payload.amount,
+        status: newStatus,
+      });
+
+      try {
+        const receiptId = `pay-${id}-${Date.now()}`;
+        let recipientPhone = payload.customerPhone || payload.customer_phone || null;
+        let customerId = payload.customerId || payload.customer_id || null;
+        let customerName = payload.customerName || payload.customer_name;
+
+        if (!recipientPhone) {
+          const { data: invRow } = await supabaseAdmin
+            .from('invoices')
+            .select('customer_id, customer:customer_id(id, phone, name)')
+            .eq('id', id)
+            .eq('tenant_id', tenantId)
+            .maybeSingle();
+          const customer = (invRow as any)?.customer;
+          recipientPhone = customer?.phone || null;
+          customerId = customerId || customer?.id || invRow?.customer_id || null;
+          customerName = customerName || customer?.name;
+        }
+
+        WhatsAppNotificationService.notifyReceipt({
+          tenantId,
+          invoiceId: id,
+          receiptId,
+          amount: payload.amount,
+          currency: payload.currency || 'NGN',
+          recipientPhone,
+          customerName,
+          customerId,
+          reference: receiptId,
+        });
+      } catch (e: any) {
+        console.error('[InvoiceFacade] WhatsApp receipt notify failed (non-fatal):', e?.message || e);
+      }
+
+      return { success: true, newStatus, newBalance };
+    };
+
+    // Staging/containers often omit DATABASE_URL; use service-role REST path (same as invoice create).
+    if (!process.env.DATABASE_URL) {
+      const { data: inv, error: invErr } = await supabaseAdmin
+        .from('invoices')
+        .select('total_amount, amount_paid, balance_amount, payment_status')
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (invErr || !inv) throw new Error('Invoice not found');
+
+      const newAmountPaid = Number(inv.amount_paid) + Number(payload.amount);
+      const newBalance = Number(inv.total_amount) - newAmountPaid;
+      const newStatus = newBalance <= 0 ? 'Paid' : 'Partial';
+
+      const { error: updErr } = await supabaseAdmin
+        .from('invoices')
+        .update({
+          amount_paid: newAmountPaid,
+          balance_amount: newBalance,
+          payment_status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('tenant_id', tenantId);
+      if (updErr) throw new Error(`Invoice payment update failed: ${updErr.message}`);
+
+      try {
+        await LedgerService.createDoubleEntry({
+          idempotencyKey: randomUUID(),
+          tenantId,
+          reference: `PAY-${id}-${Date.now()}`,
+          entries: [
+            { account: 'EXTERNAL_BANK', type: 'DEBIT', amount: payload.amount },
+            { account: 'USER_WALLET', type: 'CREDIT', amount: payload.amount },
+          ],
+          metadata: {
+            source: 'invoice_payment',
+            invoiceId: id,
+            paymentMethod: payload.paymentMethod,
+          },
+        });
+      } catch (ledgerErr: any) {
+        console.warn('[InvoiceFacade] Ledger recording skipped (non-critical):', ledgerErr?.message || ledgerErr);
+      }
+
+      await GovAuditService.logAction({
+        id: `gov-${Date.now()}-${randomUUID().slice(0, 5)}`,
+        timestamp: new Date().toISOString(),
+        module: 'FINANCIAL',
+        action: 'INVOICE_PAYMENT_RECORDED',
+        user_email: payload.userEmail || 'system',
+        user_name: payload.userName || 'System',
+        ip_address: payload.ip || '127.0.0.1',
+        target: id,
+        status: 'success',
+        metadata: { amount: payload.amount, method: payload.paymentMethod },
+      });
+
+      return applySideEffects(newStatus, newBalance);
+    }
+
     const client = await getClient();
     try {
       await client.query('BEGIN');
@@ -140,45 +245,7 @@ export class InvoiceFacade {
       });
       
       await client.query('COMMIT');
-      
-      io.to(`tenant:${tenantId}`).emit('finance.invoice.payment_recorded', { invoiceId: id, amount: payload.amount, status: newStatus });
-
-      // WhatsApp receipt notification after COMMIT (non-fatal)
-      try {
-        const receiptId = `pay-${id}-${Date.now()}`;
-        let recipientPhone = payload.customerPhone || payload.customer_phone || null;
-        let customerId = payload.customerId || payload.customer_id || null;
-        let customerName = payload.customerName || payload.customer_name;
-
-        if (!recipientPhone) {
-          const { data: invRow } = await supabaseAdmin
-            .from('invoices')
-            .select('customer_id, customer:customer_id(id, phone, name)')
-            .eq('id', id)
-            .eq('tenant_id', tenantId)
-            .maybeSingle();
-          const customer = (invRow as any)?.customer;
-          recipientPhone = customer?.phone || null;
-          customerId = customerId || customer?.id || invRow?.customer_id || null;
-          customerName = customerName || customer?.name;
-        }
-
-        WhatsAppNotificationService.notifyReceipt({
-          tenantId,
-          invoiceId: id,
-          receiptId,
-          amount: payload.amount,
-          currency: payload.currency || 'NGN',
-          recipientPhone,
-          customerName,
-          customerId,
-          reference: receiptId,
-        });
-      } catch (e: any) {
-        console.error('[InvoiceFacade] WhatsApp receipt notify failed (non-fatal):', e?.message || e);
-      }
-      
-      return { success: true, newStatus, newBalance };
+      return applySideEffects(newStatus, newBalance);
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;

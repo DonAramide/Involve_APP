@@ -1,5 +1,13 @@
 import { defineStore } from 'pinia';
-import axios from 'axios';
+import api from '../api';
+
+function apiErrorMessage(err: any, fallback: string): string {
+  if (!err.response) {
+    return 'Unable to reach the Invify service. Please try again when the server is available.';
+  }
+
+  return err.response.data?.error || err.response.data?.message || fallback;
+}
 
 export const useOnboardingStore = defineStore('onboarding', {
   state: () => ({
@@ -35,22 +43,21 @@ export const useOnboardingStore = defineStore('onboarding', {
     },
     
     startEmailCooldown() {
-      // 60 seconds cooldown
-      this.emailResendAvailableAt = Date.now() + 60 * 1000;
+      this.emailResendAvailableAt = Date.now() + 3 * 60 * 1000;
     },
 
     startWhatsappCooldown() {
-      this.whatsappResendAvailableAt = Date.now() + 60 * 1000;
+      this.whatsappResendAvailableAt = Date.now() + 3 * 60 * 1000;
     },
 
     async sendEmailOtp() {
       this.setLoading(true);
       this.setError(null);
       try {
-        await axios.post('/auth/send-email-otp', { email: this.userDetails.email });
+        await api.post('/api/auth/send-email-otp', { email: this.userDetails.email });
         this.startEmailCooldown();
       } catch (err: any) {
-        this.setError(err.response?.data?.message || 'Failed to send email OTP');
+        this.setError(apiErrorMessage(err, 'Failed to send email OTP'));
         throw err;
       } finally {
         this.setLoading(false);
@@ -61,10 +68,10 @@ export const useOnboardingStore = defineStore('onboarding', {
       this.setLoading(true);
       this.setError(null);
       try {
-        await axios.post('/auth/verify-email-otp', { email: this.userDetails.email, code: otp, otp });
+        await api.post('/api/auth/verify-email-otp', { email: this.userDetails.email, code: otp, otp });
         this.emailVerified = true;
       } catch (err: any) {
-        this.setError(err.response?.data?.message || 'Failed to verify email OTP');
+        this.setError(apiErrorMessage(err, 'Failed to verify email OTP'));
         throw err;
       } finally {
         this.setLoading(false);
@@ -75,10 +82,10 @@ export const useOnboardingStore = defineStore('onboarding', {
       this.setLoading(true);
       this.setError(null);
       try {
-        await axios.post('/auth/send-whatsapp-otp', { phone: this.userDetails.phone });
+        await api.post('/auth/send-whatsapp-otp', { phone: this.userDetails.phone });
         this.startWhatsappCooldown();
       } catch (err: any) {
-        this.setError(err.response?.data?.message || 'Failed to send WhatsApp OTP');
+        this.setError(apiErrorMessage(err, 'Failed to send WhatsApp OTP'));
         throw err;
       } finally {
         this.setLoading(false);
@@ -89,10 +96,10 @@ export const useOnboardingStore = defineStore('onboarding', {
       this.setLoading(true);
       this.setError(null);
       try {
-        await axios.post('/auth/verify-whatsapp-otp', { phone: this.userDetails.phone, code: otp, otp });
+        await api.post('/auth/verify-whatsapp-otp', { phone: this.userDetails.phone, code: otp, otp });
         this.phoneVerified = true;
       } catch (err: any) {
-        this.setError(err.response?.data?.message || 'Failed to verify WhatsApp OTP');
+        this.setError(apiErrorMessage(err, 'Failed to verify WhatsApp OTP'));
         throw err;
       } finally {
         this.setLoading(false);
@@ -103,14 +110,14 @@ export const useOnboardingStore = defineStore('onboarding', {
       this.setLoading(true);
       this.setError(null);
       try {
-        await axios.post('/public/onboarding/signup', {
+        await api.post('/auth/register', {
           ...this.userDetails,
           emailVerified: this.emailVerified,
           phoneVerified: this.phoneVerified,
         });
         this.accountActivated = true;
       } catch (err: any) {
-        this.setError(err.response?.data?.error || 'Registration failed');
+        this.setError(apiErrorMessage(err, 'Registration failed'));
         throw err;
       } finally {
         this.setLoading(false);

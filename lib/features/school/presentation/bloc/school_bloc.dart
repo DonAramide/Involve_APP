@@ -259,6 +259,10 @@ class SchoolBloc extends Bloc<SchoolEvent, SchoolState> {
   Future<void> _onLoadStudentRecords(LoadStudentRecordsEvent event, Emitter<SchoolState> emit) async {
     emit(state.copyWith(isLoading: true));
     try {
+      // Heal orphan UNPAID bills that were already collected via
+      // "Previous Term Balance" on a later invoice (Create Invoice path).
+      await invoiceRepository.reconcileStudentCarryForwardSettlements(event.studentId);
+
       final invoices = await invoiceRepository.getInvoicesByStudentId(event.studentId);
       final results = await repository.getResults(studentId: event.studentId);
       

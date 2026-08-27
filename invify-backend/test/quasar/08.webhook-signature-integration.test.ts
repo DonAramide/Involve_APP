@@ -113,7 +113,10 @@ beforeEach(() => {
     data: MOCK_TRANSACTION,
     error: null,
   });
-  const mockEq = jest.fn().mockReturnValue({ single: mockSingle });
+  const mockEq = jest.fn().mockReturnValue({
+    single: mockSingle,
+    maybeSingle: mockSingle,
+  });
   const mockSelect = jest.fn().mockReturnValue({ eq: mockEq });
 
   mockFrom.mockImplementation((table: string) => {

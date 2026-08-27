@@ -150,6 +150,7 @@ import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { loginPathForContext } from '../../utils/authLoginPaths'
+import { joinApiUrl } from '../../config/env'
 
 const router = useRouter()
 const route = useRoute()
@@ -183,7 +184,7 @@ onMounted(() => {
 
 const triggerRemoteSetupGeneration = async (uId) => {
   try {
-    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/mfa/setup', { userId: uId })
+    const res = await axios.post(joinApiUrl('/api/auth/mfa/setup'), { userId: uId })
     if (res.data?.qrCodeUrl) {
       qrCodeDataUrl.value = res.data.qrCodeUrl
       setupSecretString.value = res.data.secret
@@ -201,7 +202,7 @@ const executeMfaSetupVerification = async () => {
   successMessage.value = ''
 
   try {
-    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/mfa/verify', {
+    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
       userId: targetUserId.value,
       tokenCode: totpInput.value,
       pendingSetup: true,
@@ -224,7 +225,7 @@ const executeStandardVerification = async () => {
   successMessage.value = ''
 
   try {
-    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/mfa/verify', {
+    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
       userId: targetUserId.value,
       tokenCode: totpInput.value,
       role: localStorage.getItem('operator_role') || 'SUPER_ADMIN'

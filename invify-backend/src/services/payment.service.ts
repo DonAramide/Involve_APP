@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { getQuasarService } from "../integrations/quasar/factory";
 import { QuasarProvisioningService } from "../integrations/quasar/quasar-provisioning.service";
-import { supabase } from "../db/supabase";
+import { supabase, supabaseAdmin } from "../db/supabase";
 import { AuditService } from "./audit.service";
 import { LedgerService } from "./ledger.service";
 import * as fs from 'fs';
@@ -30,12 +30,37 @@ export class PaymentService {
     walletId: string,
     amount: number,
     studentName: string,
-    metadata?: any
+    metadata?: any,
+    idempotencyKey?: string,
   }) {
-    const { tenantId, walletId, amount, studentName, metadata = {} } = params;
+    const { tenantId, walletId, amount, studentName, metadata = {}, idempotencyKey } = params;
 
-    // 1. Generate unique payment reference
-    const reference = `QNX-${Date.now()}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
+    if (!amount || Number(amount) <= 0) {
+      throw new Error('Invalid payment amount');
+    }
+
+    // Idempotency: return existing intent when client key already used for this tenant
+    if (idempotencyKey) {
+      const { data: existingRows } = await supabase
+        .from('transactions_log')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .contains('metadata', { idempotency_key: idempotencyKey })
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const existing = existingRows?.[0];
+      if (existing) {
+        return {
+          reference: existing.reference,
+          intent: { reference: existing.metadata?.quasar_intent_id || existing.reference },
+          transaction: existing,
+          idempotentReplay: true,
+        };
+      }
+    }
+
+    // 1. Generate unique payment reference (UUID primary; timestamp only as prefix)
+    const reference = `QNX-${crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
 
     // 2. Fetch tenant & Call QuasarService (ApiKey lookup happens in factory)
     // 3. Call QuasarService.createPaymentIntent
@@ -46,7 +71,7 @@ export class PaymentService {
         amount: Math.round(amount),
         reference,
         description: `Fees Payment - Student: ${studentName}`,
-        metadata: { ...metadata, reference, tenantId, studentName } 
+        metadata: { ...metadata, reference, tenantId, studentName, idempotency_key: idempotencyKey }
       });
     } catch (error: any) {
       console.error('[PaymentService] Quasar SDK Failure:', error.message);
@@ -67,7 +92,8 @@ export class PaymentService {
         metadata: {
           ...metadata,
           quasar_intent_id: intent.reference,
-          studentName
+          studentName,
+          ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
         }
       })
       .select()
@@ -75,6 +101,24 @@ export class PaymentService {
 
     if (error) {
       console.error('[PaymentService] DB Audit Write Failed:', error.message);
+      // Unique violation on concurrent duplicate idempotency → re-fetch
+      if (idempotencyKey && (error as any).code === '23505') {
+        const { data: raced } = await supabase
+          .from('transactions_log')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .contains('metadata', { idempotency_key: idempotencyKey })
+          .limit(1)
+          .maybeSingle();
+        if (raced) {
+          return {
+            reference: raced.reference,
+            intent: { reference: raced.metadata?.quasar_intent_id || raced.reference },
+            transaction: raced,
+            idempotentReplay: true,
+          };
+        }
+      }
     }
 
     // 5. IMMUTABLE AUDIT LOG
@@ -82,7 +126,7 @@ export class PaymentService {
       eventType: 'payment.intent.created',
       reference,
       tenantId,
-      payload: { amount: Math.round(amount), studentName, metadata, intent_reference: intent.reference }
+      payload: { amount: Math.round(amount), studentName, metadata, intent_reference: intent.reference, idempotencyKey }
     });
 
     // 6. Return intent to frontend
@@ -109,8 +153,22 @@ export class PaymentService {
         bank_name?: string;
       };
       metadata?: Record<string, any>;
+      idempotencyKey?: string;
     },
   ) {
+    const { FeatureGateService } = await import('../config/build-variant');
+    if (!FeatureGateService.isFeatureEnabled('real_money_payouts')) {
+      const err: any = new Error(
+        'Real-money payouts are disabled for this environment. Set FEATURE_REAL_MONEY_PAYOUTS=true only when intentionally enabling live exits.',
+      );
+      err.status = 403;
+      throw err;
+    }
+
+    if (!amount || Number(amount) <= 0) {
+      throw new Error('Valid payout amount required');
+    }
+
     const payoutType = options?.metadata?.type || 'fund_sweep';
     let bankDetails: any = options?.destination || null;
 
@@ -149,10 +207,12 @@ export class PaymentService {
       );
     }
 
-    // 2. Generate unique payout reference
+    // 2. Generate unique payout reference + client/server idempotency key
     const prefix = payoutType === 'staff_salary' ? 'SAL' : 'POUT';
-    const reference = `${prefix}-${Date.now()}-${crypto.randomUUID().split('-')[0].toUpperCase()}`;
-    const idempotencyKey = `payout:${reference}`;
+    const reference = `${prefix}-${crypto.randomUUID().replace(/-/g, '').slice(0, 16).toUpperCase()}`;
+    const idempotencyKey = options?.idempotencyKey
+      ? `payout:${tenantId}:${options.idempotencyKey}`
+      : `payout:${reference}`;
 
     // 3. Database Pessimistic Locking & Double Entry
     const { data: ledgerRes, error: ledgerError } = await supabase.rpc('request_payout_with_lock', {
@@ -239,14 +299,33 @@ export class PaymentService {
     };
   }
 
-  static async getIntent(reference: string) {
-    const { data: transaction, error } = await supabase
+  /** Prefer reference match; only query id when value looks like a UUID (PostgREST OR with non-UUID id breaks). */
+  private static async findTransactionByRefOrId(referenceOrId: string) {
+    const byRef = await supabaseAdmin
       .from('transactions_log')
       .select('*')
-      .or(`reference.eq.${reference},id.eq.${reference}`)
-      .single();
+      .eq('reference', referenceOrId)
+      .maybeSingle();
+    if (byRef.data) return byRef.data;
 
-    if (error || !transaction) {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        referenceOrId,
+      );
+    if (!isUuid) return null;
+
+    const byId = await supabaseAdmin
+      .from('transactions_log')
+      .select('*')
+      .eq('id', referenceOrId)
+      .maybeSingle();
+    return byId.data || null;
+  }
+
+  static async getIntent(reference: string) {
+    const transaction = await PaymentService.findTransactionByRefOrId(reference);
+
+    if (!transaction) {
       throw new Error(`Transaction not found: ${reference}`);
     }
 
@@ -280,7 +359,7 @@ export class PaymentService {
       const paymentsClient = await QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
       await (paymentsClient as any).client.post(`/payments/intents/${transaction.reference}/cancel`, {});
     } catch (err: any) {
-      console.warn(`[PaymentService] Quasar cancellation endpoint failed, proceeding locally:`, err.message);
+      console.warn(`[PaymentService] Quasar cancellation endpoint failed; marking local intent FAILED without provider confirm:`, err.message);
     }
 
     // Update locally
@@ -307,7 +386,7 @@ export class PaymentService {
   }
 
   static async getHistory(tenantId: string) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('transactions_log')
       .select('*')
       .eq('tenant_id', tenantId)
@@ -320,32 +399,58 @@ export class PaymentService {
     return data || [];
   }
 
-  static async refundIntent(reference: string, amount: number, reason?: string) {
-    const { data: transaction, error } = await supabase
-      .from('transactions_log')
-      .select('*')
-      .or(`reference.eq.${reference},id.eq.${reference}`)
-      .single();
+  static async refundIntent(reference: string, amount: number, reason?: string, clientIdempotencyKey?: string) {
+    const transaction = await PaymentService.findTransactionByRefOrId(reference);
 
-    if (error || !transaction) {
+    if (!transaction) {
       throw new Error(`Transaction not found: ${reference}`);
     }
 
     if (amount <= 0 || amount > transaction.amount) {
-      throw new Error(`Invalid refund amount: ${amount}. Must be greater than 0 and less than or equal to original amount ${transaction.amount}.`);
+      const amountErr: any = new Error(
+        `Invalid refund amount: ${amount}. Must be greater than 0 and less than or equal to original amount ${transaction.amount}.`,
+      );
+      amountErr.status = 400;
+      throw amountErr;
     }
 
-    // Try to trigger refund on Quasar
+    if (clientIdempotencyKey) {
+      const { data: existingRefunds } = await supabaseAdmin
+        .from('transactions_log')
+        .select('*')
+        .eq('tenant_id', transaction.tenant_id)
+        .eq('type', 'refund')
+        .contains('metadata', { idempotency_key: clientIdempotencyKey })
+        .limit(1);
+      if (existingRefunds?.[0]) {
+        return { ...existingRefunds[0], idempotentReplay: true };
+      }
+    }
+
+    // Provider refund MUST succeed before any SUCCESS ledger/financial outcome (fail-closed)
+    let providerRefund: any;
     try {
       const paymentsClient = await QuasarProvisioningService.getPaymentsClient(transaction.tenant_id);
-      await (paymentsClient as any).client.post(`/payments/intents/${transaction.reference}/refunds`, { amount });
+      providerRefund = await (paymentsClient as any).client.post(
+        `/payments/intents/${transaction.reference}/refunds`,
+        { amount: Math.round(amount) },
+      );
     } catch (err: any) {
-      console.warn(`[PaymentService] Quasar refund endpoint failed, proceeding locally:`, err.message);
+      console.error(`[PaymentService] Quasar refund failed — failing closed (no local SUCCESS):`, err.message);
+      await AuditService.log({
+        eventType: 'payment.refund.failed' as any,
+        reference: transaction.reference,
+        tenantId: transaction.tenant_id,
+        payload: { amount, reason, error: err.message },
+      });
+      const failErr: any = new Error(`Refund provider failure: ${err.message}`);
+      failErr.status = 502;
+      throw failErr;
     }
 
-    // Record the refund in transactions_log
-    const refundRef = `REF-${transaction.reference}-${Date.now()}`;
-    const { data: refundTx, error: refundTxErr } = await supabase
+    // Record the refund in transactions_log only after provider confirmation
+    const refundRef = `REF-${transaction.reference}-${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+    const { data: refundTx, error: refundTxErr } = await supabaseAdmin
       .from('transactions_log')
       .insert({
         reference: refundRef,
@@ -357,7 +462,9 @@ export class PaymentService {
         status: "SUCCESS",
         metadata: {
           original_reference: transaction.reference,
-          reason
+          reason,
+          provider_refund: providerRefund?.data || providerRefund || null,
+          ...(clientIdempotencyKey ? { idempotency_key: clientIdempotencyKey } : {}),
         }
       })
       .select()
@@ -368,7 +475,7 @@ export class PaymentService {
     }
 
     // Execute double-entry bookkeeping: Debit merchant wallet, Credit refunds
-    const idempotencyKey = `ledger:refund:${refundRef}`;
+    const idempotencyKey = `ledger:refund:${clientIdempotencyKey || refundRef}`;
     await LedgerService.createDoubleEntry({
       idempotencyKey,
       tenantId: transaction.tenant_id,

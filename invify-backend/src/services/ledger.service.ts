@@ -49,8 +49,8 @@ export class LedgerService {
       identity: { actorId, correlationId, requestId, provider, auditId }
     };
 
-    // 1. Check for existing entry (Idempotency)
-    const { data: existing } = await supabase
+    // 1. Check for existing entry (Idempotency) — must use service role (RLS would miss rows)
+    const { data: existing } = await supabaseAdmin
       .from('ledgers')
       .select('id')
       .eq('idempotency_key', idempotencyKey)
@@ -96,7 +96,7 @@ export class LedgerService {
    * Checks if an idempotency key has already been processed.
    */
   static async exists(idempotencyKey: string): Promise<boolean> {
-    const { count, error } = await supabase
+    const { count, error } = await supabaseAdmin
       .from('ledgers')
       .select('id', { count: 'exact', head: true })
       .eq('idempotency_key', idempotencyKey);

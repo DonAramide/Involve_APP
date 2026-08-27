@@ -79,5 +79,5 @@ kubectl apply -f ../k8s/observability/infrastructure-observability.yaml
 
 echo -e "${CYAN}======================================================================${NC}"
 echo -e "${GREEN}>>> ENVIRONMENT PLATFORM RE-HYDRATED AND SECURED SUCCESSFULLY <<<${NC}"
-echo -e "${CYAN}Verify real-time system operational health dashboards at: https://ops.IIPS.app${NC}"
+echo -e "${CYAN}Verify real-time system operational health dashboards at: https://app.invify.org${NC}"
 echo -e "${CYAN}======================================================================${NC}"

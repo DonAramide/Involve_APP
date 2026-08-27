@@ -213,7 +213,27 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         }
       }
 
-      // 3. Update Student Balance if student is associated with invoice
+      // 3. Carry-forward line items move prior debt onto this invoice.
+      // Settle older open INV/BILL rows so Profile / History stop showing them as Unpaid.
+      // Student ledger math below already subtracts carry-forward — do not adjust balance here.
+      if (invoice.studentId != null && !invoice.invoiceNumber.startsWith('PMT-')) {
+        final carryForwardAmount = _carryForwardAmountFromItems(invoice.items);
+        if (carryForwardAmount > 0.001) {
+          final settleMethod = amountPaid > 0.001
+              ? (paymentMethod ?? invoice.paymentMethod ?? 'Cash')
+              : 'Rolled Forward';
+          await _applyAmountToOpenStudentBills(
+            studentId: invoice.studentId!,
+            amount: carryForwardAmount,
+            excludeInvoiceNumber: invoice.invoiceNumber,
+            onlyBefore: invoice.dateCreated,
+            paymentMethod: settleMethod,
+            now: now,
+          );
+        }
+      }
+
+      // 4. Update Student Balance if student is associated with invoice
       if (adjustStudentBalance && invoice.studentId != null) {
         final double balanceChange;
         
@@ -226,13 +246,8 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           // Calculate the increment: Balance Amount - Carry Forward amounts
           // We do this because the UI adds the old balance as a line item ("Previous Term Balance").
           // If we simply add invoice.balanceAmount to student.balance, we double the debt.
-          double carryForwardAmount = 0.0;
-          for (final item in invoice.items) {
-            if (item.item.name == 'Previous Term Balance') {
-              carryForwardAmount += (item.unitPrice * item.quantity);
-            }
-          }
-          balanceChange = invoice.balanceAmount - carryForwardAmount;
+          final carryForwardAmount = _carryForwardAmountFromItems(invoice.items);
+          balanceChange = balanceAmount - carryForwardAmount;
           print('DEBUG: Bill detected (${invoice.invoiceNumber}). Found Carry Forward: $carryForwardAmount. Final increment: $balanceChange');
         }
         
@@ -261,12 +276,7 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
           // Regular invoice: charge the unpaid portion before wallet auto-apply.
           // Auto-applied credit only updates invoice amountPaid/status for display;
           // customers.balance already nets credit when we add this full unpaid amount.
-          double carryForwardAmount = 0.0;
-          for (final item in invoice.items) {
-            if (item.item.name == 'Previous Term Balance' || item.item.name == 'Previous Balance') {
-              carryForwardAmount += (item.unitPrice * item.quantity);
-            }
-          }
+          double carryForwardAmount = _carryForwardAmountFromItems(invoice.items);
           balanceChange = unpaidBeforeWalletApply - carryForwardAmount;
         }
         
@@ -576,6 +586,130 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
         updatedAt: Value(now),
       ),
     );
+  }
+
+  /// Line items that represent debt rolled from prior open bills.
+  static bool isCarryForwardLineName(String? name) {
+    final n = (name ?? '').trim().toLowerCase();
+    return n == 'previous term balance' ||
+        n == 'previous balance' ||
+        n == 'outstanding balance';
+  }
+
+  double _carryForwardAmountFromItems(List<InvoiceItem> items) {
+    var total = 0.0;
+    for (final item in items) {
+      if (isCarryForwardLineName(item.item.name)) {
+        total += item.unitPrice * item.quantity;
+      }
+    }
+    return total;
+  }
+
+  /// Apply [amount] to older open student INV/BILL rows (FIFO, BILL- first).
+  /// Does not change students.balance — callers own ledger math.
+  Future<double> _applyAmountToOpenStudentBills({
+    required int studentId,
+    required double amount,
+    String? excludeInvoiceNumber,
+    DateTime? onlyBefore,
+    required String paymentMethod,
+    required DateTime now,
+  }) async {
+    if (amount <= 0.001) return 0.0;
+
+    final rows = await (db.select(db.invoices)
+          ..where((t) =>
+              t.studentId.equals(studentId) & t.isDeleted.equals(false)))
+        .get();
+
+    final open = rows.where((r) {
+      if (excludeInvoiceNumber != null &&
+          r.invoiceNumber == excludeInvoiceNumber) {
+        return false;
+      }
+      if (r.invoiceNumber.startsWith('PMT-')) return false;
+      if (onlyBefore != null && !r.dateCreated.isBefore(onlyBefore)) {
+        return false;
+      }
+      final owing = r.totalAmount - r.amountPaid;
+      return owing > 0.001;
+    }).toList()
+      ..sort((a, b) {
+        final aBill = a.invoiceNumber.startsWith('BILL-') ? 0 : 1;
+        final bBill = b.invoiceNumber.startsWith('BILL-') ? 0 : 1;
+        if (aBill != bBill) return aBill.compareTo(bBill);
+        return a.dateCreated.compareTo(b.dateCreated);
+      });
+
+    var remaining = amount;
+    var applied = 0.0;
+
+    for (final row in open) {
+      if (remaining <= 0.001) break;
+      final owing = row.totalAmount - row.amountPaid;
+      final pay = remaining < owing ? remaining : owing;
+      if (pay <= 0.001) continue;
+
+      final newPaid = row.amountPaid + pay;
+      final newBalance =
+          (row.totalAmount - newPaid).clamp(0.0, double.infinity);
+      final newStatus = newBalance <= 0.001
+          ? 'Paid'
+          : (newPaid > 0 ? 'Partial' : 'Unpaid');
+
+      await (db.update(db.invoices)..where((t) => t.id.equals(row.id))).write(
+        InvoicesCompanion(
+          amountPaid: Value(newPaid),
+          balanceAmount: Value(newBalance),
+          paymentStatus: Value(newStatus),
+          paymentMethod: Value(paymentMethod),
+          updatedAt: Value(now),
+        ),
+      );
+      remaining -= pay;
+      applied += pay;
+    }
+
+    return applied;
+  }
+
+  @override
+  Future<bool> reconcileStudentCarryForwardSettlements(int studentId) async {
+    final invoices = await getInvoicesByStudentId(studentId);
+    if (invoices.isEmpty) return false;
+
+    // Newest first so older bills are settled by later carry-forward invoices.
+    final withCarry = invoices
+        .where((inv) =>
+            !inv.invoiceNumber.startsWith('PMT-') &&
+            _carryForwardAmountFromItems(inv.items) > 0.001)
+        .toList()
+      ..sort((a, b) => a.dateCreated.compareTo(b.dateCreated));
+
+    if (withCarry.isEmpty) return false;
+
+    var changed = false;
+    await db.transaction(() async {
+      final now = DateTime.now();
+      for (final inv in withCarry) {
+        final cf = _carryForwardAmountFromItems(inv.items);
+        final settleMethod = inv.amountPaid > 0.001
+            ? (inv.paymentMethod ?? 'Cash')
+            : 'Rolled Forward';
+        final applied = await _applyAmountToOpenStudentBills(
+          studentId: studentId,
+          amount: cf,
+          excludeInvoiceNumber: inv.invoiceNumber,
+          onlyBefore: inv.dateCreated,
+          paymentMethod: settleMethod,
+          now: now,
+        );
+        if (applied > 0.001) changed = true;
+      }
+    });
+
+    return changed;
   }
 
   // New method for partial payments

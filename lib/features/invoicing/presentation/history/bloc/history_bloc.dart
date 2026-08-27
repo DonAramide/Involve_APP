@@ -51,6 +51,26 @@ class HistoryBloc extends Bloc<HistoryEvent, HistoryState> {
         end: event.end,
         customerName: event.customerName,
       );
+
+      // Heal unpaid prior bills already collected via "Previous Term Balance"
+      // on a later invoice (Create Invoice path), then reload if anything changed.
+      final studentIds = invoices
+          .where((inv) => inv.studentId != null)
+          .map((inv) => inv.studentId!)
+          .toSet();
+      var healed = false;
+      for (final studentId in studentIds) {
+        final changed =
+            await getHistory.repository.reconcileStudentCarryForwardSettlements(studentId);
+        if (changed) healed = true;
+      }
+      if (healed) {
+        invoices = await getHistory(
+          start: event.start,
+          end: event.end,
+          customerName: event.customerName,
+        );
+      }
       
       // Apply filters
       if (event.query != null && event.query!.isNotEmpty) {

@@ -112,3 +112,15 @@ class FinanceRealtimeDataSourceImpl implements IFinanceRealtimeDataSource {
   }
 }
 
+/// Used when Supabase was not initialized (offline / missing env in debug).
+class NoOpFinanceRealtimeDataSource implements IFinanceRealtimeDataSource {
+  const NoOpFinanceRealtimeDataSource();
+
+  @override
+  Stream<FinanceRealtimeEvent> watchWalletEvents(String walletId) =>
+      const Stream.empty();
+
+  @override
+  Stream<FinanceRealtimeEvent> watchGlobalEvents() => const Stream.empty();
+}
+

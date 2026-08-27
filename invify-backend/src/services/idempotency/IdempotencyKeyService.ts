@@ -3,32 +3,35 @@ import { ReplayDetectionService } from './ReplayDetectionService';
 
 export class IdempotencyKeyService {
   /**
-   * Validates idempotency key status and request body hash.
+   * Validates idempotency key status and request body hash (tenant + operation scoped).
    * If registration is new, returns null. If duplicate request, returns existing completed record.
    */
   static async validateAndRegister(
+    tenantId: string,
+    operation: string,
     idempotencyKey: string,
     requestPath: string,
     payload: any,
-    replayWindowSeconds = 300
+    replayWindowSeconds = 300,
   ): Promise<IdempotencyKeyRecord | null> {
     if (!idempotencyKey) return null;
+    if (!tenantId) throw new Error('tenantId is required for idempotency registration');
+    if (!operation) throw new Error('operation is required for idempotency registration');
 
     const currentHash = ReplayDetectionService.hashPayload(payload);
-    const existing = await IdempotencyRegistry.getKey(idempotencyKey);
+    const existing = await IdempotencyRegistry.getKeyScoped(tenantId, operation, idempotencyKey);
 
     if (existing) {
-      // 1. Verify Replay Window
       if (!ReplayDetectionService.isWithinReplayWindow(existing.created_at, replayWindowSeconds)) {
         throw new Error('Idempotency key has expired outside of sliding replay window');
       }
 
-      // 2. Replay Attack Check: verify if request payload has been modified
       if (existing.request_hash !== currentHash) {
-        throw new Error('Replay Attack Detected: Request body hash mismatch for identical idempotency key');
+        throw new Error(
+          'Replay Attack Detected: Request body hash mismatch for identical idempotency key',
+        );
       }
 
-      // 3. Status Checks
       if (existing.status === 'PENDING') {
         throw new Error('Concurrent Request Collision: Execution already in progress for this key');
       }
@@ -37,8 +40,7 @@ export class IdempotencyKeyService {
         return existing;
       }
 
-      // If FAILED, we allow a retry by shifting status to PENDING
-      await IdempotencyRegistry.updateKey(idempotencyKey, {
+      await IdempotencyRegistry.updateKeyScoped(tenantId, operation, idempotencyKey, {
         status: 'PENDING',
         request_hash: currentHash,
         request_path: requestPath,
@@ -46,8 +48,9 @@ export class IdempotencyKeyService {
       return null;
     }
 
-    // New key registration
     await IdempotencyRegistry.insertKey({
+      tenant_id: tenantId,
+      operation,
       idempotency_key: idempotencyKey,
       request_path: requestPath,
       request_hash: currentHash,
@@ -57,27 +60,23 @@ export class IdempotencyKeyService {
     return null;
   }
 
-  /**
-   * Save successful execution response details.
-   */
   static async complete(
+    tenantId: string,
+    operation: string,
     idempotencyKey: string,
     responseStatus: number,
-    responseBody: any
+    responseBody: any,
   ): Promise<void> {
     const bodyStr = typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody);
-    await IdempotencyRegistry.updateKey(idempotencyKey, {
+    await IdempotencyRegistry.updateKeyScoped(tenantId, operation, idempotencyKey, {
       status: 'COMPLETED',
       response_status: responseStatus,
       response_body: bodyStr,
     });
   }
 
-  /**
-   * Mark execution as failed, allowing future retry.
-   */
-  static async fail(idempotencyKey: string): Promise<void> {
-    await IdempotencyRegistry.updateKey(idempotencyKey, {
+  static async fail(tenantId: string, operation: string, idempotencyKey: string): Promise<void> {
+    await IdempotencyRegistry.updateKeyScoped(tenantId, operation, idempotencyKey, {
       status: 'FAILED',
     });
   }

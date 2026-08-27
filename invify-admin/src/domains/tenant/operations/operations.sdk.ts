@@ -1,5 +1,6 @@
 import axios from 'axios';
-const api = axios.create({ baseURL: import.meta.env?.VITE_API_BASE_URL || '' });
+import { resolveApiBaseUrl } from '../../../config/env';
+const api = axios.create({ baseURL: resolveApiBaseUrl() });
 
 export interface OperationsResponse<T> {
   success: boolean;

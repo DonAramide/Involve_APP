@@ -41,6 +41,8 @@ import 'package:involve_app/features/school/presentation/bloc/school_state.dart'
 
 import 'package:involve_app/features/settings/domain/entities/settings.dart';
 import 'package:involve_app/core/utils/terminology.dart';
+import 'package:involve_app/services/terminal_sync_service.dart';
+import 'package:involve_app/features/settings/domain/entities/user_plan.dart';
 
 class InvoiceHistoryPage extends StatefulWidget {
   const InvoiceHistoryPage({super.key});
@@ -55,6 +57,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   Timer? _searchDebounce;
+  bool _hasAssignedPosTerminal = false;
 
   @override
   void initState() {
@@ -62,6 +65,44 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     _searchController.addListener(() => setState(() {}));
     _amountController.addListener(() => setState(() {}));
     context.read<HistoryBloc>().add(LoadHistory());
+    _loadPosTerminalGate();
+  }
+
+  Future<void> _loadPosTerminalGate() async {
+    final config = await TerminalSyncService.loadCachedConfig();
+    if (!mounted) return;
+    setState(() {
+      _hasAssignedPosTerminal =
+          config?.posSerialNumber != null && config!.posSerialNumber!.trim().isNotEmpty;
+    });
+  }
+
+  /// POS only when Pro+ and a terminal is assigned to this device.
+  bool _canUsePos(UserPlan? plan) {
+    final isPro = plan?.isPro == true;
+    return isPro && _hasAssignedPosTerminal;
+  }
+
+  List<String> _paymentMethodChoices({required bool includeAll, UserPlan? plan}) {
+    final methods = <String>[
+      if (includeAll) 'All',
+      'Cash',
+      if (_canUsePos(plan)) 'POS',
+      'Transfer',
+      'VirtualAccount',
+    ];
+    return methods;
+  }
+
+  String _paymentMethodLabel(String method) {
+    switch (method) {
+      case 'VirtualAccount':
+        return 'VA Transfer';
+      case 'POS':
+        return 'POS';
+      default:
+        return method;
+    }
   }
 
   @override
@@ -901,17 +942,23 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
     if (state is HistoryLoaded) {
       currentMethod = state.paymentMethod;
     }
+    final plan = context.read<SettingsBloc>().state.userPlan;
+    final methods = _paymentMethodChoices(includeAll: true, plan: plan);
+    final value = methods.contains(currentMethod) ? currentMethod! : 'All';
 
     return DropdownButtonFormField<String>(
-      value: currentMethod ?? 'All',
+      value: value,
       decoration: const InputDecoration(
         border: OutlineInputBorder(),
         filled: true,
         fillColor: Colors.white,
         contentPadding: EdgeInsets.symmetric(horizontal: 10),
       ),
-      items: ['All', 'Cash', 'POS', 'Transfer'].map((method) {
-        return DropdownMenuItem(value: method, child: Text(method, style: const TextStyle(fontSize: 12)));
+      items: methods.map((method) {
+        return DropdownMenuItem(
+          value: method,
+          child: Text(_paymentMethodLabel(method), style: const TextStyle(fontSize: 12)),
+        );
       }).toList(),
       onChanged: (value) {
         if (state is HistoryLoaded) {
@@ -920,7 +967,7 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 end: _selectedRange?.end,
                 query: state.query,
                 amount: state.amount,
-                paymentMethod: value,
+                paymentMethod: value == 'All' ? null : value,
                 paymentStatus: state.paymentStatus,
                 staffId: state.staffId,
                 classId: state.classId,
@@ -1106,49 +1153,63 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
                 builder: (context) {
                   double totalCard = 0;
                   double totalTransfer = 0;
+                  double totalVaTransfer = 0;
                   double totalCash = 0;
                   
                   for (final inv in state.invoices) {
-                    final method = (inv.paymentMethod ?? '').toLowerCase();
+                    final method = (inv.paymentMethod ?? '').toLowerCase().trim();
                     if (method == 'pos' || method == 'card') {
                       totalCard += inv.amountPaid;
-                    } else if (method == 'transfer') {
+                    } else if (method == 'virtualaccount' ||
+                        method == 'va transfer' ||
+                        method.contains('virtual')) {
+                      totalVaTransfer += inv.amountPaid;
+                    } else if (method == 'transfer' ||
+                        method.startsWith('transfer')) {
                       totalTransfer += inv.amountPaid;
                     } else if (method == 'cash') {
                       totalCash += inv.amountPaid;
                     }
                   }
 
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  Widget metric(String label, double amount, Color color) {
+                    return Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            label,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blueGrey,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            CurrencyFormatter.formatWithSymbol(amount, symbol: currency),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return Column(
                     children: [
-                      Column(
+                      Row(
                         children: [
-                          const Text('CARD (POS)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                          Text(
-                            CurrencyFormatter.formatWithSymbol(totalCard, symbol: currency),
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.orange),
-                          ),
-                        ],
-                      ),
-                      Container(height: 20, width: 1, color: Colors.grey[300]),
-                      Column(
-                        children: [
-                          const Text('TRANSFER', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                          Text(
-                            CurrencyFormatter.formatWithSymbol(totalTransfer, symbol: currency),
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.purple),
-                          ),
-                        ],
-                      ),
-                      Container(height: 20, width: 1, color: Colors.grey[300]),
-                      Column(
-                        children: [
-                          const Text('CASH', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.blueGrey)),
-                          Text(
-                            CurrencyFormatter.formatWithSymbol(totalCash, symbol: currency),
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.teal),
-                          ),
+                          metric('CARD (POS)', totalCard, Colors.orange),
+                          Container(height: 28, width: 1, color: Colors.grey[300]),
+                          metric('TRANSFER', totalTransfer, Colors.purple),
+                          Container(height: 28, width: 1, color: Colors.grey[300]),
+                          metric('VA TRANSFER', totalVaTransfer, Colors.indigo),
+                          Container(height: 28, width: 1, color: Colors.grey[300]),
+                          metric('CASH', totalCash, Colors.teal),
                         ],
                       ),
                     ],
@@ -1269,57 +1330,95 @@ class _InvoiceHistoryPageState extends State<InvoiceHistoryPage> {
   }
 
   void _showBalancePaymentDialog(BuildContext context, Invoice invoice) {
-    final controller = TextEditingController(text: invoice.balanceAmount.toString());
-    String selectedMethod = 'Cash';
+    final controller = TextEditingController(
+      text: invoice.balanceAmount.toStringAsFixed(2),
+    );
+    final plan = context.read<SettingsBloc>().state.userPlan;
+    final methods = _paymentMethodChoices(includeAll: false, plan: plan);
+    String selectedMethod = methods.contains('Cash') ? 'Cash' : methods.first;
     final currency = context.read<SettingsBloc>().state.settings?.currency ?? '₦';
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Balance Payment'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency)}'),
-            Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency)}'),
-            Text('Balance: ${CurrencyFormatter.formatWithSymbol(invoice.balanceAmount, symbol: currency)}', 
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-            const Divider(height: 24),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Amount to Pay', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: selectedMethod,
-              items: ['Cash', 'POS', 'Transfer'].map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-              onChanged: (val) => selectedMethod = val!,
-              decoration: const InputDecoration(labelText: 'Method', border: OutlineInputBorder()),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Balance Payment'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Total: ${CurrencyFormatter.formatWithSymbol(invoice.totalAmount, symbol: currency)}'),
+              Text('Paid: ${CurrencyFormatter.formatWithSymbol(invoice.amountPaid, symbol: currency)}'),
+              Text(
+                'Balance: ${CurrencyFormatter.formatWithSymbol(invoice.balanceAmount, symbol: currency)}',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+              ),
+              const Divider(height: 24),
+              TextField(
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Amount to Pay',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: selectedMethod,
+                items: methods
+                    .map(
+                      (m) => DropdownMenuItem(
+                        value: m,
+                        child: Text(_paymentMethodLabel(m)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (val) {
+                  if (val == null) return;
+                  setDialogState(() => selectedMethod = val);
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Method',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              if (!_canUsePos(plan)) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _hasAssignedPosTerminal
+                      ? 'POS requires a Pro plan.'
+                      : 'POS hidden — no terminal assigned yet.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+            ElevatedButton(
+              onPressed: () {
+                final amount = double.tryParse(controller.text) ?? 0.0;
+                if (amount <= 0) return;
+
+                context.read<HistoryBloc>().add(RecordPayment(
+                      invoiceId: invoice.id!,
+                      additionalAmount: amount,
+                      method: selectedMethod,
+                    ));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Payment of ${CurrencyFormatter.formatWithSymbol(amount, symbol: currency)} recorded via ${_paymentMethodLabel(selectedMethod)}',
+                    ),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              },
+              child: const Text('CONFIRM PAYMENT'),
             ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
-          ElevatedButton(
-            onPressed: () {
-              final amount = double.tryParse(controller.text) ?? 0.0;
-              if (amount <= 0) return;
-              
-              context.read<HistoryBloc>().add(RecordPayment(
-                invoiceId: invoice.id!,
-                additionalAmount: amount,
-                method: selectedMethod,
-              ));
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Payment of $currency$amount recorded via $selectedMethod'), backgroundColor: Colors.green),
-              );
-            },
-            child: const Text('CONFIRM PAYMENT'),
-          ),
-        ],
       ),
     );
   }

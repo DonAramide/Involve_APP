@@ -31,7 +31,7 @@
           </div>
           <div class="row justify-between text-caption q-mt-md">
             <span>Server URL:</span>
-            <span class="text-weight-bold text-white">ws://localhost:3004</span>
+            <span class="text-weight-bold text-white">Configured runtime endpoint</span>
           </div>
           <div class="row justify-between text-caption q-mt-sm">
             <span>Uptime:</span>

@@ -271,8 +271,12 @@ class TerminalSyncService {
       
       debugPrint('[TerminalSync] Requesting sync with payload: ${jsonEncode(payload)}');
 
-      final session = Supabase.instance.client.auth.currentSession;
-      String? token = session?.accessToken;
+      String? token;
+      if (AppConfig.supabaseInitialized) {
+        try {
+          token = Supabase.instance.client.auth.currentSession?.accessToken;
+        } catch (_) {}
+      }
       
       // Fallback to offline token if no active Supabase session
       if (token == null || token.isEmpty) {
@@ -342,8 +346,12 @@ class TerminalSyncService {
     required String deviceId,
   }) async {
     try {
-      final session = Supabase.instance.client.auth.currentSession;
-      final token = session?.accessToken;
+      String? token;
+      if (AppConfig.supabaseInitialized) {
+        try {
+          token = Supabase.instance.client.auth.currentSession?.accessToken;
+        } catch (_) {}
+      }
       final headers = {
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true',

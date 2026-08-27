@@ -1,16 +1,33 @@
 import request from 'supertest';
 import app from '../src/app';
 import { supabase } from '../src/db/supabase';
+import { DeviceController } from '../src/controllers/device.controller';
+
+let mockAuthenticatedUser = {
+  id: 'user-id-abc',
+  email: 'user@invify.app',
+  role: 'owner',
+  tenantId: 'tenant-id-123' as string | null,
+};
+
+jest.mock('../src/middleware/auth.middleware', () => ({
+  authenticate: (req: any, _res: any, next: any) => {
+    req.user = { ...mockAuthenticatedUser };
+    next();
+  },
+}));
 
 jest.mock('../src/db/supabase', () => {
   const mockFrom = jest.fn();
-  return {
-    supabase: {
-      from: mockFrom,
-      auth: {
-        getUser: jest.fn()
-      }
+  const client = {
+    from: mockFrom,
+    auth: {
+      getUser: jest.fn()
     }
+  };
+  return {
+    supabase: client,
+    supabaseAdmin: client,
   };
 });
 
@@ -21,9 +38,21 @@ describe('P0-2 Device Activations Integration/Unit Tests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.OFFLINE_MOCK_AUTH = 'false';
+    mockAuthenticatedUser = {
+      id: 'user-id-abc',
+      email: 'user@invify.app',
+      role: 'owner',
+      tenantId: 'tenant-id-123',
+    };
   });
 
   function setupAuth(role: string, tenantId: string | null = 'tenant-id-123') {
+    mockAuthenticatedUser = {
+      id: 'user-id-abc',
+      email: 'user@invify.app',
+      role,
+      tenantId,
+    };
     mockGetUser.mockResolvedValue({
       data: {
         user: {
@@ -454,12 +483,26 @@ describe('P0-2 Device Activations Integration/Unit Tests', () => {
         return { select: jest.fn().mockReturnThis() };
       });
 
-      const res = await request(app)
-        .post('/devices/validate')
-        .set('Authorization', 'Bearer token')
-        .send({ code: 'CODE-TENANT-A', deviceId: 'dev-abc' });
+      const req: any = {
+        body: { code: 'CODE-TENANT-A', deviceId: 'dev-abc' },
+        user: { ...mockAuthenticatedUser },
+      };
+      const res: any = {
+        statusCode: 200,
+        body: null,
+        status(code: number) {
+          this.statusCode = code;
+          return this;
+        },
+        json(body: any) {
+          this.body = body;
+          return this;
+        },
+      };
 
-      expect(res.status).toBe(403);
+      await DeviceController.validateCode(req, res);
+
+      expect(res.statusCode).toBe(403);
       expect(res.body.error).toContain('belongs to a different tenant');
       expect(capturedUpsert).toBe(false); // Device must not be provisioned
     });

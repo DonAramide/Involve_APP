@@ -1,6 +1,7 @@
 // invify-admin/src/composables/useTenantExperience.js
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import { joinApiUrl } from '../config/env'
 import { setCssVar } from 'quasar'
 
 const CACHE_KEY = 'invify_cached_experience_payload'
@@ -56,8 +57,7 @@ export function useTenantExperience() {
     isLoadingContext.value = true
     try {
       const operatorRole = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
-      const API_BASE = import.meta.env.VITE_API_URL || '';
-      const res = await axios.get(`${API_BASE}/api/orchestration/context`, {
+      const res = await axios.get(joinApiUrl('/api/orchestration/context'), {
         params: { tenantId: targetTenantId },
         headers: {
           'X-Tenant-ID': targetTenantId,

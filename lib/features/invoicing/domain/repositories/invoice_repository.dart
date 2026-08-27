@@ -21,6 +21,12 @@ abstract class InvoiceRepository {
   /// This rewrites invoice payment rows only (does not change customer balance).
   Future<void> reconcileWalletCreditOnCustomerInvoices(String customerId);
 
+  /// When newer INV/BILL rows include "Previous Term Balance" (or aliases),
+  /// settle older open student bills so debt is not shown twice.
+  /// Does not change [students.balance] — caller should recompute open debt.
+  /// Returns true if any bill row was updated.
+  Future<bool> reconcileStudentCarryForwardSettlements(int studentId);
+
   // Stock Returns & Replacements
   Future<void> returnItems({
     required int invoiceId,

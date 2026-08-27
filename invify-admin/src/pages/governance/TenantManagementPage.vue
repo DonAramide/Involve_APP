@@ -184,6 +184,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import { adminApi } from '../../api'
 import { useQuasar } from 'quasar'
+import { joinApiUrl } from '../../config/env'
 
 const $q = useQuasar()
 
@@ -240,7 +241,7 @@ const promptImpersonationHandshake = (tenantNode) => {
 const executeImpersonationHandshake = async () => {
   loadingImpersonate.value = true
   try {
-    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/auth/impersonate', {
+    const res = await axios.post(joinApiUrl('/api/auth/impersonate'), {
       targetTenantId: targetTenantRecord.value.id,
       auditReason: auditReasonInput.value
     }, {

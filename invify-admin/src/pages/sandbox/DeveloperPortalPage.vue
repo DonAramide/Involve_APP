@@ -87,7 +87,7 @@
             </p>
             
             <div class="text-subtitle2 text-grey-8 q-mb-xs">Configure Webhook URL</div>
-            <CodeBlock :code="`curl -s -X POST &quot;${baseUrl}/api/v1/sandbox/bootstrap&quot; \\\n  -H &quot;Authorization: Bearer sk_test_your_key_here&quot; \\\n  -H &quot;Content-Type: application/json&quot; \\\n  -d '{\n    &quot;sandboxWebhookUrl&quot;: &quot;http://localhost:3001/webhooks/quasar&quot;\n  }'`" language="bash" />
+            <CodeBlock :code="`curl -s -X POST &quot;${baseUrl}/api/v1/sandbox/bootstrap&quot; \\\n  -H &quot;Authorization: Bearer sk_test_your_key_here&quot; \\\n  -H &quot;Content-Type: application/json&quot; \\\n  -d '{\n    &quot;sandboxWebhookUrl&quot;: &quot;https://webhook.example.invalid/quasar&quot;\n  }'`" language="bash" />
             
             <q-banner rounded class="bg-warning text-dark q-mt-sm">
               <template v-slot:avatar>
@@ -163,8 +163,9 @@
 </template>
 
 <script>
-import { ref, h } from 'vue'
+import { ref, h, computed } from 'vue'
 import { copyToClipboard, useQuasar } from 'quasar'
+import { publicApiOrigin } from '../../config/env'
 
 // Inline CodeBlock Component
 const CodeBlock = {
@@ -203,7 +204,7 @@ export default {
   name: 'DeveloperPortalPage',
   components: { CodeBlock },
   setup () {
-    const baseUrl = ref(import.meta.env.VITE_API_URL || 'http://localhost:3004')
+    const baseUrl = computed(() => publicApiOrigin())
     
     const scrollTo = (id) => {
       const el = document.getElementById(id)

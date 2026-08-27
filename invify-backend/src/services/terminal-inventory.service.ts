@@ -7,6 +7,9 @@ const db = () => supabaseAdmin;
 function _mapAssignmentBundle(data: any) {
   return {
     terminal_id: { tid: data.terminal_id },
+    // Required for TerminalSync ownership / rebind decisions
+    assigned_tenant_id: data.assigned_tenant_id ?? null,
+    assignment_status: data.assignment_status ?? null,
     mpos: data.mpos_terminal_id
       ? {
           id: data.mpos_terminal_id,

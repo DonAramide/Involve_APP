@@ -230,13 +230,17 @@ export class WebhookController {
       }
 
       if (candidateSecrets.length === 0) {
-        pushSecret('whsec_mock_quasar_key');
+        console.error('[Webhook] No Quasar webhook signing secret configured — failing closed');
+        return res.status(503).json({
+          error: 'Webhook signing secret not configured',
+          code: 'WEBHOOK_SECRET_MISSING',
+        });
       } else {
         console.log(`[Webhook] HMAC candidates loaded: ${candidateSecrets.length}`);
       }
 
-      // Hydrate runtime env from first real vault/tenant secret so subsequent requests stay warm
-      if (!process.env.QUASAR_WEBHOOK_SIGNING_SECRET && candidateSecrets[0] && candidateSecrets[0] !== 'whsec_mock_quasar_key') {
+      // Hydrate runtime env from first vault/tenant secret so subsequent requests stay warm
+      if (!process.env.QUASAR_WEBHOOK_SIGNING_SECRET && candidateSecrets[0]) {
         process.env.QUASAR_WEBHOOK_SIGNING_SECRET = candidateSecrets[0];
       }
 
@@ -248,8 +252,9 @@ export class WebhookController {
           break;
         }
       }
-      // Sandbox / local clocks: retry without skew using the same secret pool
-      if (!isValid && event?.data?.sandbox === true) {
+      // Sandbox / local clocks: retry without skew using the same secret pool (LOCAL/STAGING only)
+      const variantService = require('../config/build-variant').BuildVariantService.getInstance();
+      if (!isValid && event?.data?.sandbox === true && !variantService.isProd()) {
         for (const secret of candidateSecrets) {
           if (QuasarWebhookService.verifySignature(rawBody, signature, secret, undefined)) {
             isValid = true;
@@ -258,13 +263,7 @@ export class WebhookController {
           }
         }
       }
-      // Local/dev only: accept Quasar sandbox deliveries so VA credits can be verified end-to-end
-      if (!isValid && event?.data?.sandbox === true && process.env.NODE_ENV !== 'production') {
-        console.warn(
-          '[Webhook] Sandbox HMAC mismatch — accepting in development. Open Integration Vault → Quasar Payments and save the Outbound webhook signing secret.',
-        );
-        isValid = true;
-      }
+      // Never accept unsigned webhooks — removed development HMAC-bypass that set isValid=true
       if (!isValid) {
         console.error('[Security] Webhook HMAC signature mismatch');
         return res.status(401).json({ error: 'Auth failure' });
@@ -502,7 +501,11 @@ export class WebhookController {
    */
   static async handlePaystackWebhook(req: Request, res: Response) {
     const signature = req.headers['x-paystack-signature'] as string;
-    const secret = process.env.PAYSTACK_SECRET_KEY || "sk_test_mock_paystack_key_quasar";
+    const secret = process.env.PAYSTACK_SECRET_KEY;
+    if (!secret) {
+      console.error('[Webhook] PAYSTACK_SECRET_KEY missing — failing closed');
+      return res.status(503).json({ error: 'Webhook signing secret not configured', code: 'WEBHOOK_SECRET_MISSING' });
+    }
     const rawBody = (req as any).rawBody?.toString() || JSON.stringify(req.body);
 
     const isValid = PaymentGatewayConvergenceService.verifyWebhookHMAC(rawBody, signature, secret, "paystack");
@@ -536,7 +539,11 @@ export class WebhookController {
    */
   static async handleFlutterwaveWebhook(req: Request, res: Response) {
     const signature = req.headers['verif-hash'] as string;
-    const secret = process.env.FLW_SECRET_KEY || "flwseck_test_mock_key_quasar";
+    const secret = process.env.FLW_SECRET_HASH || process.env.FLW_SECRET_KEY;
+    if (!secret) {
+      console.error('[Webhook] FLW_SECRET_HASH/FLW_SECRET_KEY missing — failing closed');
+      return res.status(503).json({ error: 'Webhook signing secret not configured', code: 'WEBHOOK_SECRET_MISSING' });
+    }
 
     const isValid = PaymentGatewayConvergenceService.verifyWebhookHMAC("", signature, secret, "flutterwave");
     if (!isValid) {
@@ -569,7 +576,11 @@ export class WebhookController {
    */
   static async handleStripeWebhook(req: Request, res: Response) {
     const signature = req.headers['stripe-signature'] as string;
-    const secret = process.env.STRIPE_WEBHOOK_SECRET || "whsec_mock_secret_quasar";
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!secret) {
+      console.error('[Webhook] STRIPE_WEBHOOK_SECRET missing — failing closed');
+      return res.status(503).json({ error: 'Webhook signing secret not configured', code: 'WEBHOOK_SECRET_MISSING' });
+    }
     const rawBody = (req as any).rawBody?.toString() || JSON.stringify(req.body);
 
     const isValid = PaymentGatewayConvergenceService.verifyWebhookHMAC(rawBody, signature, secret, "stripe");

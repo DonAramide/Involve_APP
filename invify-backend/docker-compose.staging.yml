@@ -1,23 +1,63 @@
 version: '3.8'
 
+# Staging deployment definition — reproducible foundation.
+# Requires environment variables / secrets from the host or secret manager.
+# Does NOT enable live payment providers.
+
 services:
   api:
-    build:
-      context: .
-      target: runner
+    # Prefer pre-built immutable tag (e.g. invify:<git-sha>). Build only if image missing.
+    image: ${STAGING_IMAGE:?STAGING_IMAGE is required — use invify:<git-sha>}
+    pull_policy: never
     ports:
-      - "3000:3000"
+      - "${STAGING_API_PORT:-3000}:3000"
     environment:
       - NODE_ENV=staging
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - APP_ENV=staging
+      - BUILD_VARIANT=STAGING
+      - PORT=3000
+      - GIT_SHA=${GIT_SHA:-unknown}
+      - BUILD_TIMESTAMP=${BUILD_TIMESTAMP:-unknown}
+      - APP_VERSION=${APP_VERSION:-1.0.0}
+      - STAGING_SUPABASE_URL=${STAGING_SUPABASE_URL:?STAGING_SUPABASE_URL is required}
+      - STAGING_SUPABASE_PUBLISHABLE_KEY=${STAGING_SUPABASE_PUBLISHABLE_KEY:?STAGING_SUPABASE_PUBLISHABLE_KEY is required}
+      - STAGING_SUPABASE_SECRET_KEY=${STAGING_SUPABASE_SECRET_KEY:?STAGING_SUPABASE_SECRET_KEY is required}
+      # Staging secrets MUST come from --env-file .env.staging (gitignored).
+      # Do not interpolate mixed host .env JWT_SECRET (may be an insecure default).
+      - SUPABASE_JWT_SECRET=${STAGING_SUPABASE_JWT_SECRET:?STAGING_SUPABASE_JWT_SECRET is required}
+      - JWT_SECRET=${STAGING_JWT_SECRET:?STAGING_JWT_SECRET is required}
+      - LICENSE_HMAC_SECRET=${STAGING_LICENSE_HMAC_SECRET:?STAGING_LICENSE_HMAC_SECRET is required}
       - REDIS_URL=redis://redis:6379
+      - APP_URL=${STAGING_APP_URL:-https://staging.invify.local}
+      # Explicit SPA origins only — never wildcard. Admin/Mobile static hosts below.
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://staging.invify.local:4173,http://staging.invify.local:4174}
+      - QUASAR_BASE_URL=${STAGING_QUASAR_BASE_URL:-}
+      - QUASAR_WEBHOOK_SIGNING_SECRET=${STAGING_QUASAR_WEBHOOK_SIGNING_SECRET:-}
+      - ENABLE_SIMULATOR=${ENABLE_SIMULATOR:-false}
+      - FEATURE_REAL_MONEY_PAYOUTS=false
+      - OFFLINE_LOCAL_AUTH=false
+      - OFFLINE_MOCK_AUTH=false
+      # Single-replica staging: disable in-process financial timers (Phase 4)
+      - ENABLE_INPROCESS_FINANCIAL_WORKERS=${ENABLE_INPROCESS_FINANCIAL_WORKERS:-false}
     depends_on:
-      - redis
-    restart: always
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # Do not publish Redis to the host in staging by default
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: always

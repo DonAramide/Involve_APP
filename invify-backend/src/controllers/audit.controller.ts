@@ -1,11 +1,17 @@
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
 import { PosService } from '../services/pos.service';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
 
 export class AuditController {
   static async getTransactionLedger(req: Request, res: Response) {
     try {
-      const tenantId = req.headers['x-tenant-id'] as string || (req as any).user?.tenantId;
+      let tenantId: string;
+      try {
+        tenantId = resolveAuthoritativeTenantId(req);
+      } catch (err: any) {
+        return res.status(err?.status || 403).json({ error: err?.message || 'Forbidden: Cross-tenant access denied' });
+      }
       if (!tenantId) {
         return res.status(400).json({ error: 'Tenant ID is required' });
       }

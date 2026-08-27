@@ -72,21 +72,64 @@ export class UserController {
       }
     }
 
+    let authId = id;
+
     try {
+      // 1. Check or Provision in Supabase Auth
+      const tempPassword = require('crypto').randomBytes(16).toString('hex');
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: email.trim().toLowerCase(),
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: { role, tenantId: isPlatform ? null : tenantId }
+      });
+
+      if (authError) {
+        if (authError.message.includes('already exists') || authError.message.includes('already registered')) {
+          // Find the existing auth user ID
+          const { data: listedUsers } = await supabaseAdmin.auth.admin.listUsers();
+          const existingUser = listedUsers?.users.find(u => u.email?.toLowerCase() === email.trim().toLowerCase());
+          if (existingUser) {
+            authId = existingUser.id;
+          } else {
+            throw authError;
+          }
+        } else {
+          throw authError;
+        }
+      } else if (authData.user) {
+        authId = authData.user.id;
+      }
+
+      // 2. Insert profile in public.users table
       const { data, error } = await supabaseAdmin
         .from('users')
         .insert({
-          id,
+          id: authId,
           name,
-          email,
+          email: email.trim().toLowerCase(),
           role,
           tenant_id: isPlatform ? null : tenantId,
-          is_active: true
+          is_active: true,
+          require_password_reset: true
         })
         .select()
         .single();
 
       if (error) throw error;
+
+      // 3. Send welcome email and activation code (OTP) via EMAIL with purpose PASSWORD_RESET
+      try {
+        const { emailService } = require('../services/email.service');
+        const { verificationService } = require('../services/verification.service');
+
+        await emailService.sendWelcomeEmail(email.trim().toLowerCase());
+        await verificationService.sendOTP(email.trim().toLowerCase(), 'EMAIL', 'PASSWORD_RESET');
+        console.log(`[UserController] Sent welcome email and activation OTP to: ${email}`);
+      } catch (emailErr: any) {
+        console.warn('[UserController] Failed to send welcome/activation emails:', emailErr.message);
+      }
+
       return res.status(201).json(data);
     } catch (error: any) {
       console.error('[UserController] createUser Error:', error.message);
@@ -106,7 +149,7 @@ export class UserController {
     // Ensure no tenant-override if not super_admin
     if (currentUser.role !== 'super_admin') {
       delete updates.tenant_id;
-      
+
       // Prevent tenant admin from elevating someone to a platform role
       if (updates.role && [
         'super_admin',
@@ -119,6 +162,22 @@ export class UserController {
         'internal_staff'
       ].includes(updates.role)) {
         return res.status(403).json({ error: 'Tenant admins cannot assign platform-level roles' });
+      }
+
+      // Isolation: never mutate users outside the authenticated tenant
+      if (!currentUser.tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' });
+      }
+      const { data: target, error: targetErr } = await supabaseAdmin
+        .from('users')
+        .select('id, tenant_id')
+        .eq('id', id)
+        .maybeSingle();
+      if (targetErr) {
+        return res.status(500).json({ error: targetErr.message });
+      }
+      if (!target || String(target.tenant_id) !== String(currentUser.tenantId)) {
+        return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
       }
     } else {
       // If super_admin, force tenant_id to null for platform roles
@@ -140,12 +199,11 @@ export class UserController {
     }
 
     try {
-      const { data, error } = await supabaseAdmin
-        .from('users')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+      let query = supabaseAdmin.from('users').update(updates).eq('id', id);
+      if (currentUser.role !== 'super_admin') {
+        query = query.eq('tenant_id', currentUser.tenantId);
+      }
+      const { data, error } = await query.select().single();
 
       if (error) throw error;
       return res.status(200).json(data);

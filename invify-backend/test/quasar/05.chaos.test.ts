@@ -20,6 +20,16 @@ import axios from 'axios';
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+function mockAxiosInstance(requestFn: jest.Mock) {
+  mockedAxios.create.mockReturnValue({
+    request: requestFn,
+    interceptors: {
+      request: { use: jest.fn() },
+      response: { use: jest.fn() },
+    },
+  } as any);
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   // Reset shared circuit state so chaos tests don't bleed
@@ -46,7 +56,7 @@ describe('Chaos — complete outage', () => {
 
   it('throws after exhausting all retries on persistent 500', async () => {
     const requestFn = jest.fn().mockRejectedValue(makeServerError(500));
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
@@ -62,7 +72,7 @@ describe('Chaos — complete outage', () => {
     // Force circuit open by injecting enough failures
     // We simulate the open state by checking that the error message matches
     const requestFn = jest.fn().mockRejectedValue(makeServerError(503));
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
@@ -92,7 +102,7 @@ describe('Chaos — intermittent failures', () => {
       .mockRejectedValueOnce(serverErr)
       .mockResolvedValueOnce(successResponse);
 
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
@@ -116,7 +126,7 @@ describe('Chaos — intermittent failures', () => {
       .mockRejectedValueOnce(rateLimitErr)
       .mockResolvedValueOnce(successResponse);
 
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
@@ -132,22 +142,24 @@ describe('Chaos — intermittent failures', () => {
 
 describe('Chaos — corrupted response envelopes', () => {
 
-  it('throws QuasarApiError when responseCode is missing', async () => {
+  it('accepts an explicitly unwrapped response when responseCode is absent', async () => {
     const requestFn = jest.fn().mockResolvedValue({
       data: { message: 'something unexpected' }, // no responseCode
     });
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
-    // Non-"00" code (undefined !== "00") → should throw
-    await expect(client.get('/wallets')).rejects.toThrow(QuasarApiError);
+    // The client supports both QFP envelopes and already-unwrapped controller payloads.
+    await expect(client.get('/wallets')).resolves.toEqual({
+      message: 'something unexpected',
+    });
   });
 
   it('throws QuasarApiError with the responseMessage when non-00', async () => {
     const requestFn = jest.fn().mockResolvedValue({
       data: { responseCode: '42', responseMessage: 'Business validation failed' },
     });
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 
@@ -162,7 +174,7 @@ describe('Chaos — timeout', () => {
 
   it('throws after timeout and counts as a failure', async () => {
     const requestFn = jest.fn().mockRejectedValue(makeTimeoutError());
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({
       baseUrl: 'http://x',
@@ -185,7 +197,7 @@ describe('Chaos — concurrent requests', () => {
         data: { path: config.url },
       },
     }));
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 
@@ -206,7 +218,7 @@ describe('Chaos — concurrent requests', () => {
       correlationIds.push(config.headers['X-Correlation-Id']);
       return { data: { responseCode: '00', responseMessage: 'OK', data: {} } };
     });
-    mockedAxios.create.mockReturnValue({ request: requestFn } as any);
+    mockAxiosInstance(requestFn);
 
     const client = new QuasarApiClient({ baseUrl: 'http://x', tenantAuth: { apiKey: 'sk_test' } });
 

@@ -218,7 +218,7 @@
                 <q-separator dark class="q-my-md opacity-20" />
                 <ol class="text-caption text-grey-4 q-pl-md" style="line-height: 1.7;">
                   <li>Open Quasar Admin → Platform → Webhooks → Outbound</li>
-                  <li>Set Invify service URL to your receiver (e.g. http://127.0.0.1:3004/webhooks/quasar)</li>
+                  <li>Set Invify service URL to your approved HTTPS webhook receiver.</li>
                   <li>Copy the one-time Signing secret → Save Webhook Secret</li>
                   <li>Save Quasar Admin Username/Password here for POS key rotate</li>
                   <li>Click Test Admin Login to verify Quasar accepts those credentials</li>

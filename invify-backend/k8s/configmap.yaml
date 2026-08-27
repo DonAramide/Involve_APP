@@ -4,5 +4,10 @@ metadata:
   name: invify-config
 data:
   NODE_ENV: "production"
+  APP_ENV: "production"
+  BUILD_VARIANT: "PROD"
   PORT: "3000"
   LOG_LEVEL: "info"
+  # Non-secret endpoints must be supplied per deployment (no localhost / staging defaults)
+  # APP_URL: "https://admin.example.com"
+  # SUPABASE_URL: set via Secret / ExternalSecret

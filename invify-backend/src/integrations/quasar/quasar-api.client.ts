@@ -56,7 +56,6 @@ export interface RequestOptions {
 import { SimpleCircuitBreaker, ExponentialBackoffRetryPolicy } from '../../modules/financial-platform/infrastructure/ResiliencePolicies';
 
 const circuitBreaker = new SimpleCircuitBreaker();
-const retryPolicy = new ExponentialBackoffRetryPolicy(3);
 
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -181,7 +180,9 @@ export class QuasarApiClient {
       tenantId: 'quasar'
     };
 
-    const currentRetryPolicy = noRetry ? new ExponentialBackoffRetryPolicy(1) : retryPolicy;
+    const currentRetryPolicy = new ExponentialBackoffRetryPolicy(
+      noRetry ? 1 : Math.max(1, maxRetries),
+    );
 
     try {
       return await circuitBreaker.execute(async () => {
@@ -197,6 +198,9 @@ export class QuasarApiClient {
         }, context);
       }, context);
     } catch (err: any) {
+      if (err instanceof QuasarApiError) {
+        throw err;
+      }
       const status = err?.response?.status ?? 0;
       const axiosData = err?.response?.data as QFPResponse | undefined;
       const message = axiosData?.responseMessage || err.message;

@@ -1081,9 +1081,11 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
   }
 
   Widget _buildPaymentMethodSelector(BuildContext context, InvoiceState state) {
-    final isPosEnabled = _terminalConfig != null &&
+    final plan = context.read<SettingsBloc>().state.userPlan;
+    final hasTerminal = _terminalConfig != null &&
         _terminalConfig!.posSerialNumber != null &&
         _terminalConfig!.posSerialNumber!.isNotEmpty;
+    final isPosEnabled = (plan?.isPro == true) && hasTerminal;
 
     return Column(
       children: [
@@ -1099,28 +1101,37 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
                 CurrencyFormatter.format(state.total);
           },
         ),
-        RadioListTile<String>(
-          title: Row(children: [
-            Text('POS',
-                style: TextStyle(color: isPosEnabled ? null : Colors.grey)),
-            if (!isPosEnabled) ...[
+        if (isPosEnabled)
+          RadioListTile<String>(
+            title: const Text('POS'),
+            value: 'POS',
+            groupValue: state.paymentMethod,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            onChanged: (val) {
+              context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
+              _amountReceivedController.text =
+                  CurrencyFormatter.format(state.total);
+            },
+          )
+        else
+          RadioListTile<String>(
+            title: Row(children: [
+              const Text('POS', style: TextStyle(color: Colors.grey)),
               const SizedBox(width: 8),
-              const Text('(Not Configured)',
-                  style: TextStyle(fontSize: 10, color: Colors.red)),
-            ]
-          ]),
-          value: 'POS',
-          groupValue: state.paymentMethod,
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          onChanged: isPosEnabled
-              ? (val) {
-                  context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-                  _amountReceivedController.text =
-                      CurrencyFormatter.format(state.total);
-                }
-              : null,
-        ),
+              Text(
+                plan?.isPro != true
+                    ? '(Pro + terminal required)'
+                    : '(No terminal assigned)',
+                style: const TextStyle(fontSize: 10, color: Colors.red),
+              ),
+            ]),
+            value: 'POS',
+            groupValue: state.paymentMethod,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            onChanged: null,
+          ),
         RadioListTile<String>(
           title: const Text('Transfer (Personal Company account)'),
           value: 'Transfer',

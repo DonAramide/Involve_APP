@@ -2,6 +2,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { BuildVariantService } from '../config/build-variant';
 dotenv.config();
 
 const s3Client = new S3Client({
@@ -24,6 +25,12 @@ export class S3Service {
    * @returns The public URL of the uploaded file.
    */
   static async uploadFile(fileBuffer: Buffer, originalName: string, mimetype: string, folder: string = 'kyc'): Promise<string> {
+    const variant = BuildVariantService.getInstance();
+    if (variant.isProd() || variant.isStaging()) {
+      if (!process.env.CONTABO_ACCESS_KEY || !process.env.CONTABO_SECRET_KEY || !process.env.CONTABO_ENDPOINT) {
+        throw new Error('Contabo S3 credentials (CONTABO_ACCESS_KEY, CONTABO_SECRET_KEY, CONTABO_ENDPOINT) are required in staging/production');
+      }
+    }
     const bucket = process.env.CONTABO_BUCKET || 'iips.stargazer.bucket';
     const ext = path.extname(originalName) || '.bin';
     const fileName = `${folder}/${uuidv4()}${ext}`;

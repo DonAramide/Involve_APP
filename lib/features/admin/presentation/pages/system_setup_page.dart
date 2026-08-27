@@ -1,4 +1,4 @@
-// lib/features/admin/presentation/pages/system_setup_page.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +23,7 @@ import 'package:signature/signature.dart';
 import 'two_factor_auth_page.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
+import 'package:involve_app/core/utils/api_error_message.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});
@@ -551,245 +552,445 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
     final virtualAccountNameController = TextEditingController(text: staff?.virtualAccountName);
     final bankCodeController = TextEditingController(text: staff?.bankCode);
     final formKey = GlobalKey<FormState>();
-    
-    // Default or load role
+
     String selectedRole = staff?.role ?? 'STAFF';
+
+    List<Map<String, String>> banks = [];
+    String? selectedBankCode = staff?.bankCode?.trim().isNotEmpty == true
+        ? staff!.bankCode!.trim()
+        : null;
+    bool loadingBanks = true;
+    bool banksLoadStarted = false;
+    bool resolvingAccount = false;
+    String? resolveError;
+    Timer? resolveDebounce;
+
+    Future<void> loadBanks(StateSetter dialogSetState) async {
+      try {
+        final repo = context.read<FinanceRepository>();
+        final raw = await repo.getPayoutBanks(country: 'nigeria');
+        final mapped = raw
+            .map((b) {
+              final name = (b['name'] ?? b['bank_name'] ?? b['bankName'] ?? '')
+                  .toString()
+                  .trim();
+              final code = (b['code'] ?? b['bank_code'] ?? b['bankCode'] ?? '')
+                  .toString()
+                  .trim();
+              return {'name': name, 'code': code};
+            })
+            .where((b) => b['name']!.isNotEmpty && b['code']!.isNotEmpty)
+            .toList()
+          ..sort((a, b) => a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase()));
+
+        // If editing with a bank name but missing code, try match by name
+        if ((selectedBankCode == null || selectedBankCode!.isEmpty) &&
+            (staff?.virtualBankName?.trim().isNotEmpty ?? false)) {
+          final needle = staff!.virtualBankName!.trim().toLowerCase();
+          Map<String, String>? match;
+          for (final b in mapped) {
+            final n = b['name']!.toLowerCase();
+            if (n == needle || n.contains(needle)) {
+              match = b;
+              break;
+            }
+          }
+          if (match != null) {
+            selectedBankCode = match['code'];
+            bankCodeController.text = match['code']!;
+            virtualBankNameController.text = match['name']!;
+          }
+        }
+
+        dialogSetState(() {
+          banks = mapped;
+          loadingBanks = false;
+          if (selectedBankCode != null) {
+            final stillThere = banks.any((b) => b['code'] == selectedBankCode);
+            if (!stillThere) selectedBankCode = null;
+          }
+        });
+      } catch (e) {
+        dialogSetState(() {
+          loadingBanks = false;
+          resolveError = friendlyApiError(
+            e,
+            fallback: 'Could not load banks from Quasar. Check connection.',
+          );
+        });
+      }
+    }
+
+    Future<void> resolveAccountName(StateSetter dialogSetState) async {
+      final acct = virtualAccountNumberController.text.trim();
+      final code = (selectedBankCode ?? bankCodeController.text).trim();
+      if (acct.length < 10 || code.isEmpty) {
+        dialogSetState(() {
+          resolvingAccount = false;
+          resolveError = null;
+        });
+        return;
+      }
+
+      dialogSetState(() {
+        resolvingAccount = true;
+        resolveError = null;
+      });
+
+      try {
+        final repo = context.read<FinanceRepository>();
+        final result = await repo.resolvePayoutAccount(
+          accountNumber: acct,
+          bankCode: code,
+        );
+        final resolvedName = (result['account_name'] ??
+                result['accountName'] ??
+                result['AccountName'] ??
+                '')
+            .toString()
+            .trim();
+        dialogSetState(() {
+          if (resolvedName.isNotEmpty) {
+            virtualAccountNameController.text = resolvedName;
+          }
+          resolvingAccount = false;
+          resolveError = resolvedName.isEmpty
+              ? 'Account name not found. Verify bank and account number.'
+              : null;
+        });
+      } catch (e) {
+        dialogSetState(() {
+          resolvingAccount = false;
+          resolveError = friendlyApiError(
+            e,
+            fallback: 'Could not resolve account name. Verify bank and account number.',
+          );
+        });
+      }
+    }
+
+    void scheduleResolve(StateSetter dialogSetState) {
+      resolveDebounce?.cancel();
+      resolveDebounce = Timer(const Duration(milliseconds: 550), () {
+        resolveAccountName(dialogSetState);
+      });
+    }
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, dialogSetState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-          backgroundColor: Colors.white,
-          title: Text(
-            staff == null ? 'Add Staff' : 'Edit Staff',
-            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
-          ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: nameController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: const InputDecoration(
-                      labelText: 'Staff Name',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+        builder: (ctx, dialogSetState) {
+          if (!banksLoadStarted) {
+            banksLoadStarted = true;
+            Future.microtask(() => loadBanks(dialogSetState));
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            backgroundColor: Colors.white,
+            title: Text(
+              staff == null ? 'Add Staff' : 'Edit Staff',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+            ),
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: nameController,
+                      style: const TextStyle(color: Colors.black),
+                      decoration: const InputDecoration(
+                        labelText: 'Staff Name',
+                        labelStyle: TextStyle(color: Colors.grey),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                      ),
+                      validator: (val) => val == null || val.isEmpty ? 'Required' : null,
                     ),
-                    validator: (val) => val == null || val.isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: staffIdController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: const InputDecoration(
-                      labelText: 'Staff ID (Optional)',
-                      hintText: 'e.g., MGT-01',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: staffIdController,
+                      style: const TextStyle(color: Colors.black),
+                      decoration: const InputDecoration(
+                        labelText: 'Staff ID (Optional)',
+                        hintText: 'e.g., MGT-01',
+                        labelStyle: TextStyle(color: Colors.grey),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                      ),
+                      maxLength: 20,
+                      textCapitalization: TextCapitalization.characters,
                     ),
-                    maxLength: 20,
-                    textCapitalization: TextCapitalization.characters,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: codeController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: InputDecoration(
-                      labelText: 'Auth Code (4 digits)',
-                      hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
-                      labelStyle: const TextStyle(color: Colors.grey),
-                      focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: codeController,
+                      style: const TextStyle(color: Colors.black),
+                      decoration: InputDecoration(
+                        labelText: 'Auth Code (4 digits)',
+                        hintText: isCodeHashed ? 'Leave blank to keep current' : 'Enter 4-digit code',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                      ),
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      validator: (val) {
+                        if (staff != null && (val == null || val.isEmpty)) return null;
+                        return (val?.length != 4) ? 'Must be 4 digits' : null;
+                      },
                     ),
-                    keyboardType: TextInputType.number,
-                    maxLength: 4,
-                    validator: (val) {
-                      if (staff != null && (val == null || val.isEmpty)) return null;
-                      return (val?.length != 4) ? 'Must be 4 digits' : null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: phoneController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: const InputDecoration(
-                      labelText: 'Phone Number',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: phoneController,
+                      style: const TextStyle(color: Colors.black),
+                      decoration: const InputDecoration(
+                        labelText: 'Phone Number',
+                        labelStyle: TextStyle(color: Colors.grey),
+                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                      ),
+                      keyboardType: TextInputType.phone,
                     ),
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Staff personal bank (salary / payout destination)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'STAFF PERSONAL BANK ACCOUNT',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey[700],
-                                  letterSpacing: 0.5,
+                    const SizedBox(height: 20),
+
+                    // Staff personal bank (salary / payout destination) — Quasar banks + name enquiry
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'STAFF PERSONAL BANK ACCOUNT',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'For salary / payout transfers (optional)',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey[500],
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Banks & account name from Quasar (optional)',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[500],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (staff != null)
-                          TextButton.icon(
-                            icon: const Icon(Icons.autorenew, size: 14),
-                            label: const Text('GENERATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                            onPressed: () => _generateStaffVirtualAccount(
-                              ctx,
-                              staff,
-                              virtualBankNameController,
-                              virtualAccountNumberController,
-                              virtualAccountNameController,
-                              dialogSetState,
+                              ],
                             ),
                           ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: virtualBankNameController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: const InputDecoration(
-                      labelText: 'Personal Bank Name',
-                      hintText: 'e.g. GTBank, Access Bank',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: virtualAccountNumberController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: const InputDecoration(
-                      labelText: 'Personal Account Number',
-                      hintText: 'Staff salary account number',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: virtualAccountNameController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: const InputDecoration(
-                      labelText: 'Personal Account Name',
-                      hintText: 'Name on the staff bank account',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: bankCodeController,
-                    style: const TextStyle(color: Colors.black),
-                    decoration: const InputDecoration(
-                      labelText: 'Bank Code (for salary transfer)',
-                      hintText: 'e.g. 058 for GTBank',
-                      labelStyle: TextStyle(color: Colors.grey),
-                      focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Elegant 3-Radio Identity Selector Block
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'SECURITY ROLE IDENTITY',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[700],
-                        letterSpacing: 0.5,
+                          if (staff != null)
+                            TextButton.icon(
+                              icon: const Icon(Icons.autorenew, size: 14),
+                              label: const Text('GENERATE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                              onPressed: () => _generateStaffVirtualAccount(
+                                ctx,
+                                staff,
+                                virtualBankNameController,
+                                virtualAccountNumberController,
+                                virtualAccountNameController,
+                                dialogSetState,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _buildRoleCard(dialogSetState, 'Staff', 'STAFF', 'Operational', selectedRole, (val) => selectedRole = val),
-                      const SizedBox(width: 6),
-                      _buildRoleCard(dialogSetState, 'Admin', 'ADMIN', 'Full Access', selectedRole, (val) => selectedRole = val),
-                      const SizedBox(width: 6),
-                      _buildRoleCard(dialogSetState, 'Finance', 'FINANCE', 'Read-Only', selectedRole, (val) => selectedRole = val),
-                    ],
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    if (loadingBanks)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: LinearProgressIndicator(minHeight: 2),
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        value: selectedBankCode != null &&
+                                banks.any((b) => b['code'] == selectedBankCode)
+                            ? selectedBankCode
+                            : null,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Bank',
+                          hintText: 'Select bank',
+                          labelStyle: TextStyle(color: Colors.grey),
+                          focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                        ),
+                        items: banks
+                            .map(
+                              (b) => DropdownMenuItem<String>(
+                                value: b['code'],
+                                child: Text(
+                                  b['name']!,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.black, fontSize: 14),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (code) {
+                          dialogSetState(() {
+                            selectedBankCode = code;
+                            Map<String, String>? match;
+                            for (final b in banks) {
+                              if (b['code'] == code) {
+                                match = b;
+                                break;
+                              }
+                            }
+                            bankCodeController.text = code ?? '';
+                            virtualBankNameController.text = match?['name'] ?? '';
+                            resolveError = null;
+                          });
+                          scheduleResolve(dialogSetState);
+                        },
+                      ),
+                    if (!loadingBanks && banks.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          resolveError ?? 'No banks loaded. Pull to retry by reopening this dialog.',
+                          style: TextStyle(color: Colors.orange[800], fontSize: 11),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: virtualAccountNumberController,
+                      style: const TextStyle(color: Colors.black),
+                      decoration: InputDecoration(
+                        labelText: 'Personal Account Number',
+                        hintText: '10-digit NUBAN',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                        suffixIcon: resolvingAccount
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : null,
+                      ),
+                      keyboardType: TextInputType.number,
+                      maxLength: 10,
+                      onChanged: (_) => scheduleResolve(dialogSetState),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: virtualAccountNameController,
+                      style: const TextStyle(color: Colors.black),
+                      readOnly: resolvingAccount,
+                      decoration: InputDecoration(
+                        labelText: 'Personal Account Name',
+                        hintText: resolvingAccount
+                            ? 'Looking up account name…'
+                            : 'Auto-filled after account number',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
+                        helperText: resolveError,
+                        helperStyle: TextStyle(
+                          color: resolveError != null ? Colors.red[700] : Colors.grey,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        selectedBankCode == null || selectedBankCode!.isEmpty
+                            ? 'Bank code: — (select a bank)'
+                            : 'Bank code: $selectedBankCode',
+                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'SECURITY ROLE IDENTITY',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[700],
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        _buildRoleCard(dialogSetState, 'Staff', 'STAFF', 'Operational', selectedRole, (val) => selectedRole = val),
+                        const SizedBox(width: 6),
+                        _buildRoleCard(dialogSetState, 'Admin', 'ADMIN', 'Full Access', selectedRole, (val) => selectedRole = val),
+                        const SizedBox(width: 6),
+                        _buildRoleCard(dialogSetState, 'Finance', 'FINANCE', 'Read-Only', selectedRole, (val) => selectedRole = val),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEEF2F6),
-                foregroundColor: Colors.blue,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              ),
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  final pin = codeController.text.trim();
-                  final newStaff = Staff(
-                    id: staff?.id,
-                    name: nameController.text.trim(),
-                    staffId: staffIdController.text.trim().isEmpty ? null : staffIdController.text.trim(),
-                    staffCode: pin.isEmpty && staff != null ? staff.staffCode : pin,
-                    phone: phoneController.text.trim(),
-                    role: selectedRole,
-                    syncId: staff?.syncId,
-                    virtualBankName: virtualBankNameController.text.trim().isEmpty ? null : virtualBankNameController.text.trim(),
-                    virtualAccountNumber: virtualAccountNumberController.text.trim().isEmpty ? null : virtualAccountNumberController.text.trim(),
-                    virtualAccountName: virtualAccountNameController.text.trim().isEmpty ? null : virtualAccountNameController.text.trim(),
-                    bankCode: bankCodeController.text.trim().isEmpty ? null : bankCodeController.text.trim(),
-                  );
-                  if (staff == null) {
-                    context.read<StaffBloc>().add(AddStaff(newStaff));
-                  } else {
-                    context.read<StaffBloc>().add(UpdateStaff(newStaff));
-                  }
+            actions: [
+              TextButton(
+                onPressed: () {
+                  resolveDebounce?.cancel();
                   Navigator.pop(ctx);
-                  // ignore: discarded_futures
-                  _pushStaffToCloud(context, extra: newStaff);
-                }
-              },
-              child: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+                },
+                child: const Text('CANCEL', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEEF2F6),
+                  foregroundColor: Colors.blue,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    resolveDebounce?.cancel();
+                    final pin = codeController.text.trim();
+                    final code = (selectedBankCode ?? bankCodeController.text).trim();
+                    final newStaff = Staff(
+                      id: staff?.id,
+                      name: nameController.text.trim(),
+                      staffId: staffIdController.text.trim().isEmpty ? null : staffIdController.text.trim(),
+                      staffCode: pin.isEmpty && staff != null ? staff.staffCode : pin,
+                      phone: phoneController.text.trim(),
+                      role: selectedRole,
+                      syncId: staff?.syncId,
+                      virtualBankName: virtualBankNameController.text.trim().isEmpty
+                          ? null
+                          : virtualBankNameController.text.trim(),
+                      virtualAccountNumber: virtualAccountNumberController.text.trim().isEmpty
+                          ? null
+                          : virtualAccountNumberController.text.trim(),
+                      virtualAccountName: virtualAccountNameController.text.trim().isEmpty
+                          ? null
+                          : virtualAccountNameController.text.trim(),
+                      bankCode: code.isEmpty ? null : code,
+                    );
+                    if (staff == null) {
+                      context.read<StaffBloc>().add(AddStaff(newStaff));
+                    } else {
+                      context.read<StaffBloc>().add(UpdateStaff(newStaff));
+                    }
+                    Navigator.pop(ctx);
+                    // ignore: discarded_futures
+                    _pushStaffToCloud(context, extra: newStaff);
+                  }
+                },
+                child: const Text('SAVE', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
-    );
+    ).whenComplete(() => resolveDebounce?.cancel());
   }
 
   Future<void> _pushStaffToCloud(BuildContext context, {Staff? extra}) async {

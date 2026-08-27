@@ -14,9 +14,15 @@ if (!supabaseUrl || !supabaseKey) {
   console.log(`[Supabase] Active environment target URL: ${supabaseUrl}`);
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseKey || '');
+// LOCAL/test may boot without real keys; never use empty strings (supabase-js throws).
+// Staging/prod already throw in BuildVariantService before reaching here.
+const clientUrl = supabaseUrl || 'http://127.0.0.1:54321';
+const clientKey = supabaseKey || 'local-test-missing-key';
+const clientServiceKey = serviceRoleKey || clientKey;
 
-export const supabaseAdmin = createClient(supabaseUrl || '', serviceRoleKey || supabaseKey || '', {
+export const supabase = createClient(clientUrl, clientKey);
+
+export const supabaseAdmin = createClient(clientUrl, clientServiceKey, {
   auth: {
     persistSession: false,
     autoRefreshToken: false

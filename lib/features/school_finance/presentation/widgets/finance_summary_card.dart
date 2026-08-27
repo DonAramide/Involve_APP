@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class FinanceSummaryCard extends StatelessWidget {
   final String title;
@@ -58,7 +59,7 @@ class FinanceSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '₦${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
+            CurrencyFormatter.formatWithSymbol(amount),
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,

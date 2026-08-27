@@ -355,10 +355,9 @@ const { currentCurrency } = useCurrency();
 import { ref, computed, onMounted } from 'vue'
 import axios from 'axios'
 import { useQuasar } from 'quasar'
+import { joinApiUrl } from '../../config/env'
 
 const $q = useQuasar()
-
-const API_BASE = import.meta.env.VITE_API_URL || 'https://bertie-archegoniate-causelessly.ngrok-free.dev'
 
 const loading = ref(false)
 const archiving = ref(false)
@@ -446,7 +445,7 @@ const MOCK_LOGS = [
     action: 'APPROVAL_GRANTED',
     user_email: 'superadmin@invify.app',
     user_name: 'System Administrator',
-    ip_address: '192.168.1.14',
+    ip_address: '203.0.113.14',
     location: 'Local Network',
     target: 'TERMINAL_ASSIGNMENT:2215850F',
     status: 'approved',
@@ -459,7 +458,7 @@ const MOCK_LOGS = [
     action: 'LOGIN_SUCCESS',
     user_email: 'ops@invify.app',
     user_name: 'Operations Staff',
-    ip_address: '192.168.1.20',
+    ip_address: '203.0.113.20',
     location: 'Local Network',
     target: 'Admin Portal',
     status: 'success',
@@ -472,7 +471,7 @@ const MOCK_LOGS = [
     action: 'DEVICE_BLOCKED',
     user_email: 'superadmin@invify.app',
     user_name: 'System Administrator',
-    ip_address: '192.168.1.14',
+    ip_address: '203.0.113.14',
     location: 'Local Network',
     target: 'dev-UNKN-003 (ops-staff@invify.app)',
     status: 'blocked',
@@ -485,7 +484,7 @@ const MOCK_LOGS = [
     action: 'APPROVAL_REJECTED',
     user_email: 'security@invify.app',
     user_name: 'Security Lead',
-    ip_address: '192.168.1.8',
+    ip_address: '203.0.113.8',
     location: 'Local Network',
     target: 'BULK_PAYOUT_REQUEST:TXN-88811',
     status: 'rejected',
@@ -498,7 +497,7 @@ const MOCK_LOGS = [
     action: 'USER_CREATED',
     user_email: 'superadmin@invify.app',
     user_name: 'System Administrator',
-    ip_address: '192.168.1.14',
+    ip_address: '203.0.113.14',
     location: 'Local Network',
     target: 'new-ops-staff@invify.app',
     status: 'success',
@@ -511,7 +510,7 @@ const MOCK_LOGS = [
     action: 'AUDIT_ARCHIVE_RUN',
     user_email: 'system@invify.internal',
     user_name: 'Invify System',
-    ip_address: '127.0.0.1',
+    ip_address: '203.0.113.1',
     location: 'Local Network',
     target: 'archived_audit_logs.json',
     status: 'success',
@@ -524,7 +523,7 @@ const MOCK_LOGS = [
     action: 'POLICY_UPDATED',
     user_email: 'superadmin@invify.app',
     user_name: 'System Administrator',
-    ip_address: '192.168.1.14',
+    ip_address: '203.0.113.14',
     location: 'Local Network',
     target: 'AML_POLICY_V2',
     status: 'success',
@@ -550,7 +549,7 @@ const MOCK_LOGS = [
     action: 'ASSIGNED',
     user_email: 'superadmin@invify.app',
     user_name: 'System Administrator',
-    ip_address: '192.168.1.14',
+    ip_address: '203.0.113.14',
     location: 'Local Network',
     target: 'TERMINAL:2215850F → DSPREAD-0081',
     status: 'success',
@@ -571,7 +570,7 @@ async function fetchLogs() {
       ...(filters.value.dateFrom && { dateFrom: filters.value.dateFrom }),
       ...(filters.value.dateTo && { dateTo: filters.value.dateTo }),
     }
-    const res = await axios.get(`${API_BASE}/api/admin/audit/ledger`, {
+    const res = await axios.get(joinApiUrl('/api/admin/audit/ledger'), {
       headers: { Authorization: `Bearer ${token}` },
       params
     })
@@ -619,7 +618,7 @@ async function triggerArchive() {
   archiving.value = true
   try {
     const token = localStorage.getItem('invify_token')
-    const res = await axios.post(`${API_BASE}/api/admin/audit/archive`, {}, {
+    const res = await axios.post(joinApiUrl('/api/admin/audit/archive'), {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
     $q.notify({ type: 'positive', message: `Archive sweep complete. ${res.data?.archivedCount ?? 0} records shifted.`, icon: 'archive' })

@@ -1,6 +1,7 @@
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
 import { IntegrationVaultService } from './integration-vault.service';
+import { BuildVariantService } from '../config/build-variant';
 
 dotenv.config();
 
@@ -53,6 +54,10 @@ export class EmailService {
       const pass = (transporter.options as any).auth?.pass;
 
       if (!pass) {
+        const variant = BuildVariantService.getInstance();
+        if (variant.isProd() || variant.isStaging()) {
+          throw new Error('SMTP credentials are required in staging/production');
+        }
         console.warn(`[EmailService] Missing SMTP_PASSWORD in Vault & Env. Mocking email to ${to}: ${subject}`);
         return true;
       }

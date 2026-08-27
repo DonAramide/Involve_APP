@@ -22,7 +22,7 @@ spec:
         - name: backend-api
           image: ghcr.io/invify/invify-backend:v2.1.0-production
           ports:
-            - containerPort: 3005
+            - containerPort: 3004
               name: http-api
           resources:
             requests:
@@ -55,8 +55,8 @@ metadata:
   namespace: invify-production
 spec:
   ports:
-    - port: 3005
-      targetPort: 3005
+    - port: 3004
+      targetPort: 3004
       protocol: TCP
   selector:
     app: invify-backend

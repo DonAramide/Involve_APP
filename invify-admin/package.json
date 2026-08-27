@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
+    "build:staging": "vite build --mode staging",
+    "qa:phase6s27a": "node scripts/phase6s27a-browser-qa.mjs",
+    "qa:phase6s27b": "node scripts/phase6s27b-browser-qa.mjs",
+    "gate:phase6s27c": "node scripts/phase6s27c-endpoint-gate.mjs",
     "test": "jest --forceExit --runInBand --verbose",
     "test:coverage": "jest --forceExit --runInBand --coverage --verbose",
     "test:watch": "jest --watch"
@@ -15,6 +19,7 @@
     "@types/jest": "^29.5.14",
     "@vitejs/plugin-vue": "^5.0.4",
     "jest": "^29.7.0",
+    "playwright": "^1.62.1",
     "sass-embedded": "^1.99.0",
     "ts-jest": "^29.4.11",
     "typescript": "^5.4.5",

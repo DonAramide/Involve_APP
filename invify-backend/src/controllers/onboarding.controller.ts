@@ -4,6 +4,28 @@ import { supabase, supabaseAdmin } from '../db/supabase';
 import { verificationService } from '../services/verification.service';
 import { QuasarProvisioningService } from '../integrations/quasar/quasar-provisioning.service';
 import jwt from 'jsonwebtoken';
+import { BuildVariantService } from '../config/build-variant';
+import { IntegrationVaultService } from '../services/integration-vault.service';
+
+async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
+  const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
+  if (envKey) return envKey;
+
+  try {
+    const environment = BuildVariantService.getInstance().getVariant() === 'PROD' ? 'PRODUCTION' : 'STAGING';
+    const vaultKey = await IntegrationVaultService.getDecryptedCredential('quasar', environment, tenantId);
+    if (vaultKey) return vaultKey;
+  } catch (err: any) {
+    console.warn(`[Vault] Failed to resolve Quasar API key from vault: ${err.message}`);
+  }
+
+  const variant = BuildVariantService.getInstance();
+  if (variant.isProd() || variant.isStaging()) {
+    throw new Error('QUASAR_API_KEY is required in staging/production');
+  }
+
+  return 'demo-key';
+}
 
 function generateTenantCode(phone: string | undefined | null): string {
   const cleanPhone = (phone || '').replace(/\D/g, '');
@@ -125,7 +147,7 @@ export class OnboardingController {
 
       let generatedVa: any = null;
       try {
-        const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
+        const platformApiKey = await resolvePlatformApiKey(tenant.id);
         const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
         const quasar = new QuasarServiceModule(platformApiKey);
         const va = await quasar.createVirtualAccount({
@@ -145,10 +167,14 @@ export class OnboardingController {
         console.error('[OnboardingController] VA generation failed (non-fatal):', vaError.message);
       }
 
+      if (!password || String(password).length < 8) {
+        res.status(400).json({ success: false, error: 'A strong password (min 8 characters) is required' });
+        return;
+      }
       let userId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       try {
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email, password: password || '123456', email_confirm: true,
+          email, password, email_confirm: true,
           user_metadata: { role: 'owner', tenantId: tenant.id }
         });
         if (!authError && authData.user) {
@@ -518,7 +544,14 @@ export class OnboardingController {
         console.warn('[OnboardingController] Welcome email failed (non-fatal):', emailErr.message);
       }
 
-      // Generate offline JWT for local authentication
+      // Generate offline JWT for local authentication — require explicit secret (no fallback)
+      if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
+        res.status(503).json({
+          success: false,
+          error: 'JWT_SECRET is not configured; cannot issue device tokens',
+        });
+        return;
+      }
       const offlineToken = jwt.sign(
         {
           id: finalUserId || require('crypto').randomUUID(),
@@ -526,8 +559,8 @@ export class OnboardingController {
           role: 'owner',
           tenantId: finalTenantId
         },
-        process.env.JWT_SECRET || 'your-super-secret-key-2026',
-        { expiresIn: '10y' } // Effectively non-expiring for offline POS
+        process.env.JWT_SECRET,
+        { expiresIn: '30d' }
       );
 
       res.status(201).json({

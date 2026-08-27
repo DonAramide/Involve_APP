@@ -55,12 +55,55 @@ android/upload-keystore.jks
 # Secret files
 .env
 .env.*
+.env_ex
+**/.env_ex
+!.env.example
+!.env.staging.example
 backend/.env
 **/secrets/
 **/credentials*.json
+**/vault-key-transfer.txt
+**/firebase-*-service-account.json
+**/tenant_payout_settings.json
+invify-backend/_p4_*.txt
+invify-backend/_p4_*.log
+invify-backend/_p4_*.err
+invify-backend/_p4_*.out
 
 # Web / Admin Hub
 **/node_modules/
 **/dist/
 **/.next/
 **/.vite/
+invify-admin/qa-artifacts/
+
+# Runtime and generated release content
+**/uploads/
+**/production-release/
+*.tar.gz
+**/scratch/
+*.zip
+releases/
+
+# Deployment audits and temporary diagnostics
+**/audit-logs/
+**/deployment/**/audit*.log
+**/deployment/**/*audit*.out
+invify-production-audit*/
+audit-v3/
+PHASE_6S*.txt
+PHASE_6S*.md
+*_copy_log.txt
+agent-tools-*.txt
+analyze_output.txt
+git-*.txt
+invify_git_audit.txt
+phase6s6_*.txt
+invify-backend/{check,find,inspect,list,run,test,view,verify,patch,get,fix}_*.ts
+invify-backend/{check,find,inspect,list,run,test,view,verify,patch,get,fix}_*.js
+invify-backend/{clear,fetch}_tenants.ts
+invify-backend/update_integration_status.ts
+invify-backend/scripts/phase4_*.ts
+invify-backend/activate_vault.js
+invify-backend/audit-phase4.js
+invify-production-audit-v2.ps1

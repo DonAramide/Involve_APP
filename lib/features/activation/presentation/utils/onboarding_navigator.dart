@@ -72,7 +72,6 @@ class OnboardingNavigator {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
       
       final signupUrls = [
-        'http://localhost:3004/auth/register',
         '${AppConfig.baseUrl}/auth/register',
       ];
 
@@ -166,9 +165,12 @@ class OnboardingNavigator {
   }
 
   static Future<void> _sendOtp(Dio dio, String identifier, String type) async {
+    // Email OTP is registered on /api/auth/*; WhatsApp OTP remains on /auth/*.
+    final otpPath = type == 'email'
+        ? '/api/auth/send-email-otp'
+        : '/auth/send-$type-otp';
     final urls = [
-      'http://localhost:3004/auth/send-$type-otp',
-      '${AppConfig.baseUrl}/auth/send-$type-otp',
+      '${AppConfig.baseUrl}$otpPath',
     ];
 
     bool otpSent = false;

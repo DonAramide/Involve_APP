@@ -1,11 +1,25 @@
 import { Request, Response } from 'express';
 import { InvoiceFacade } from '../facades/invoice.facade';
 import { randomUUID } from 'crypto';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+
+function tenantFromRequest(req: Request, res: Response): string | null {
+  try {
+    return resolveAuthoritativeTenantId(req);
+  } catch (err: any) {
+    res.status(err?.status || 403).json({
+      success: false,
+      message: err?.message || 'Forbidden: Cross-tenant access denied',
+    });
+    return null;
+  }
+}
 
 export class InvoiceController {
   static async createInvoice(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       const deviceId = (req.headers['x-device-id'] as string) || 'dashboard';
       const correlationId = (req as any).correlationId || req.headers['x-correlation-id'] || randomUUID();
       const idempotencyKey = req.headers['x-idempotency-key'] as string || randomUUID();
@@ -37,7 +51,8 @@ export class InvoiceController {
 
   static async bulkSyncInvoices(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       const deviceId = (req.headers['x-device-id'] as string) || 'dashboard';
       const { invoices } = req.body as { invoices: any[] };
 
@@ -81,7 +96,8 @@ export class InvoiceController {
 
   static async getInvoices(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ success: false, message: 'Tenant ID required' });
       
       const filters = req.query;
@@ -95,7 +111,8 @@ export class InvoiceController {
 
   static async getInvoice(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ success: false, message: 'Tenant ID required' });
       
       const { id } = req.params;
@@ -109,7 +126,8 @@ export class InvoiceController {
 
   static async recordPayment(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ success: false, message: 'Tenant ID required' });
       
       const { id } = req.params;
@@ -131,7 +149,8 @@ export class InvoiceController {
 
   static async getTimeline(req: Request, res: Response) {
     try {
-      const tenantId = (req as any).user?.tenantId || req.headers['x-tenant-id'];
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ success: false, message: 'Tenant ID required' });
       
       const { id } = req.params;

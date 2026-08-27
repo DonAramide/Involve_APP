@@ -831,7 +831,6 @@ class _DeviceOnboardingPageState extends State<DeviceOnboardingPage> {
 
         final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
         final urls = [
-          'http://localhost:3004/auth/link-device',
           '${AppConfig.baseUrl}/auth/link-device',
         ];
 

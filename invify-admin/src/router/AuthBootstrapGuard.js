@@ -57,45 +57,14 @@ export function registerAuthBootstrapGuard(router) {
     const isMfaPending = !!pendingSetupToken || localStorage.getItem('mfa_status_verified') === 'false'
     const isVerifiedSession = !!token && !isMfaPending
 
-    // 2. Intercept direct root invocations (/) to enforce strict deterministic branching
-    if (to.path === '/') {
-      if (!token) {
-        return next('/login')
-      }
-      if (isMfaPending) {
-        return next('/mfa/challenge')
-      }
-      
-      // Strict Tenant Isolation redirection
-      if (!hasPlatformStaffRole(operatorRole)) {
-        return next('/tenant/dashboard')
-      }
-
-      // Fully validated session context -> Restore explicit target or cached preference
-      try {
-        const rawPrefs = localStorage.getItem('invify_enterprise_operator_prefs')
-        if (rawPrefs) {
-          const parsed = JSON.parse(rawPrefs)
-          const wsMap = {
-            fleet: '/fleet/overview',
-            governance: '/governance/compliance',
-            observability: '/observability/streams',
-            ai: '/ai/copilot',
-            deployments: '/deployments/rollouts',
-            apps: '/apps/installed',
-            incidents: '/incidents/active',
-            automation: '/automation/policy',
-            communications: '/communications/broadcast-center',
-            admin: '/admin/settings'
-          }
-          const landing = wsMap[parsed.activeWorkspace] || '/fleet/overview'
-          return next(landing)
-        }
-      } catch (e) {
-        // Fallback gracefully
-      }
-      return next(getHomePath(operatorRole))
+    // 0. Public Website Routes
+    // Extremely conservative public route bypass to ensure public pages never require auth.
+    // Must be evaluated BEFORE any other operational rules.
+    if (to.meta?.isPublic || to.matched.some(record => record.meta?.isPublic)) {
+      return next()
     }
+
+    // (The previous `to.path === '/'` intercept has been removed because the root is now the public homepage.)
 
     // 3. Guest route rules (e.g., /login, /admin/login, /tenant/login)
     if (to.meta?.isGuest) {

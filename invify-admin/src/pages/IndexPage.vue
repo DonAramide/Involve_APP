@@ -200,6 +200,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
+import { joinApiUrl } from '../config/env'
 import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../composables/useOperatorPreferences'
 import ContextualIntelligenceSettingsPanel from '../components/contextual/ContextualIntelligenceSettingsPanel.vue'
@@ -229,8 +230,7 @@ const saving = ref(false)
 
 const loadLookupConfig = async () => {
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.get(`${API_BASE}/public/lookup`)
+    const res = await axios.get(joinApiUrl('/public/lookup'))
     if (res.data) {
       gateways.value = res.data.gateways || []
       industries.value = res.data.industries || []
@@ -263,8 +263,7 @@ const removeIndustry = (index) => {
 const saveLookupData = async () => {
   saving.value = true
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/admin/lookup`, {
+    const res = await axios.post(joinApiUrl('/admin/lookup'), {
       gateways: gateways.value,
       industries: industries.value
     })

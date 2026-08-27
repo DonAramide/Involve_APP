@@ -505,7 +505,7 @@ const executeCommand = async (commandName) => {
   if (!selectedRecon.value) return;
   try {
     $q.loading.show();
-    const res = await reconciliationApi[commandName](selectedRecon.value.id, { reason: 'Admin Action', ip: '127.0.0.1' });
+    const res = await reconciliationApi[commandName](selectedRecon.value.id, { reason: 'Admin Action' });
     $q.notify({ color: 'positive', message: `Command ${commandName} executed successfully` });
     
     // Optimistic Update

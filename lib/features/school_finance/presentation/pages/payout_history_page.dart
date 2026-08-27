@@ -99,7 +99,7 @@ class _PayoutHistoryPageState extends State<PayoutHistoryPage> {
   }
 
   Widget _buildPayoutCard(Map<String, dynamic> item) {
-    final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     final date = DateTime.parse(item['created_at']);
     final status = item['status'] as String;
     

@@ -1,16 +1,32 @@
 import request from 'supertest';
 import app from '../src/app';
 import { supabase } from '../src/db/supabase';
+import { TerminalInventoryService } from '../src/services/terminal-inventory.service';
+import { TerminalAuditService } from '../src/services/terminal-audit.service';
+
+jest.mock('../src/middleware/auth.middleware', () => ({
+  authenticate: (req: any, _res: any, next: any) => {
+    req.user = {
+      id: 'admin-user',
+      email: 'admin@example.com',
+      role: 'super_admin',
+      tenantId: 'tenant-abc',
+    };
+    next();
+  },
+}));
 
 jest.mock('../src/db/supabase', () => {
   const mockFrom = jest.fn();
-  return {
-    supabase: {
-      from: mockFrom,
-      auth: {
-        getUser: jest.fn()
-      }
+  const client = {
+    from: mockFrom,
+    auth: {
+      getUser: jest.fn()
     }
+  };
+  return {
+    supabase: client,
+    supabaseAdmin: client,
   };
 });
 
@@ -21,6 +37,10 @@ describe('P0-4 Terminal Inventory Migration & Integration Suite', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.OFFLINE_MOCK_AUTH = 'false';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   // Test 1: Sync service pairings mapping
@@ -59,11 +79,29 @@ describe('P0-4 Terminal Inventory Migration & Integration Suite', () => {
         if (table === 'users') {
           return { select: () => ({ eq: () => ({ single: jest.fn().mockResolvedValue({ data: { id: 'admin-user', role: 'admin', tenant_id: 'tenant-abc', is_active: true }, error: null }) }) }) };
         }
+        if (table === 'device_registrations') {
+          return {
+            select: () => ({
+              eq: () => ({
+                limit: jest.fn().mockResolvedValue({ data: [mockDevice], error: null })
+              })
+            })
+          };
+        }
         if (table === 'devices') {
-          return { select: () => ({ eq: () => ({ maybeSingle: jest.fn().mockResolvedValue({ data: mockDevice, error: null }) }) }) };
+          return { select: () => ({ eq: () => ({ limit: jest.fn().mockResolvedValue({ data: [mockDevice], error: null }) }) }) };
         }
         if (table === 'terminal_inventory') {
-          return { select: () => ({ eq: () => ({ maybeSingle: jest.fn().mockResolvedValue({ data: mockTerminalAssignment, error: null }) }) }) };
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: jest.fn().mockResolvedValue({ data: mockTerminalAssignment, error: null })
+                }),
+                maybeSingle: jest.fn().mockResolvedValue({ data: mockTerminalAssignment, error: null })
+              })
+            })
+          };
         }
         if (table === 'terminal_audit_log') {
           return { insert: () => ({ select: () => ({ single: jest.fn().mockResolvedValue({ data: { id: 'audit-1' }, error: null }) }) }) };
@@ -104,43 +142,16 @@ describe('P0-4 Terminal Inventory Migration & Integration Suite', () => {
         config_version: 1
       };
 
-      mockFrom.mockImplementation((table: string) => {
-        if (table === 'users') {
-          return { select: () => ({ eq: () => ({ single: jest.fn().mockResolvedValue({ data: { id: 'admin-user', role: 'admin', is_active: true }, error: null }) }) }) };
-        }
-        if (table === 'terminal_inventory') {
-          return {
-            select: () => ({
-              eq: () => ({
-                maybeSingle: jest.fn().mockImplementation((col) => {
-                  return { data: mockTerminal, error: null };
-                })
-              })
-            }),
-            update: () => ({
-              or: () => ({
-                select: () => ({
-                  single: jest.fn().mockResolvedValue({ data: { ...mockTerminal, assignment_status: 'assigned' }, error: null })
-                })
-              }),
-              eq: () => ({
-                select: () => ({
-                  single: jest.fn().mockResolvedValue({ data: { ...mockTerminal, assignment_status: 'unassigned' }, error: null })
-                })
-              })
-            })
-          };
-        }
-        if (table === 'terminal_audit_log') {
-          return { insert: () => ({ select: () => ({ single: jest.fn().mockResolvedValue({ data: { id: 'audit-1' }, error: null }) }) }) };
-        }
-        return { select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), insert: jest.fn().mockReturnThis(), single: jest.fn().mockReturnThis() };
-      });
+      const assignSpy = jest.spyOn(TerminalInventoryService, 'assignHardware')
+        .mockResolvedValue({ ...mockTerminal, assignment_status: 'assigned' } as any);
+      const unassignSpy = jest.spyOn(TerminalInventoryService, 'unassignHardware')
+        .mockResolvedValue({ ...mockTerminal, assignment_status: 'unassigned' } as any);
+      jest.spyOn(TerminalAuditService, 'log').mockResolvedValue(undefined as any);
 
       const assignRes = await request(app)
         .post('/api/admin/inventory/assign')
         .set('Authorization', 'Bearer admin-token')
-        .send({ tenantId: 'tenant-123', serialNumber: 'SN-123' });
+        .send({ tenantId: 'tenant-123', tabletId: 'dev-123', terminalId: 'inv-1' });
 
       expect(assignRes.status).toBe(200);
 
@@ -149,6 +160,12 @@ describe('P0-4 Terminal Inventory Migration & Integration Suite', () => {
         .set('Authorization', 'Bearer admin-token');
 
       expect(unassignRes.status).toBe(200);
+      expect(assignSpy).toHaveBeenCalledWith({
+        tenantId: 'tenant-123',
+        tabletId: 'dev-123',
+        terminalId: 'inv-1'
+      });
+      expect(unassignSpy).toHaveBeenCalledWith('inv-1');
     });
   });
 
@@ -181,7 +198,7 @@ describe('P0-4 Terminal Inventory Migration & Integration Suite', () => {
         if (table === 'tenants') {
           return {
             select: () => ({
-              or: () => ({
+              ilike: () => ({
                 limit: jest.fn().mockResolvedValue({
                   data: [
                     { id: 'tenant-search', name: 'Search Tenant Corp', type: 'retail', status: 'active' }
@@ -221,7 +238,7 @@ describe('P0-4 Terminal Inventory Migration & Integration Suite', () => {
         if (table === 'terminal_inventory') {
           return {
             select: () => ({
-              eq: () => ({
+              in: () => ({
                 eq: jest.fn().mockResolvedValue({
                   data: [
                     { terminal_id: 'TID-1', mpos_terminal_id: 'MPOS-1', terminal_type: 'N3', assigned_device_id: 'dev-1' }
@@ -275,6 +292,18 @@ describe('P0-4 Terminal Inventory Migration & Integration Suite', () => {
           return {
             select: () => ({
               eq: () => ({
+                maybeSingle: jest.fn().mockRejectedValue(timeoutError)
+              })
+            })
+          };
+        }
+        if (table === 'terminal_inventory') {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: () => ({
+                  maybeSingle: jest.fn().mockRejectedValue(timeoutError)
+                }),
                 maybeSingle: jest.fn().mockRejectedValue(timeoutError)
               })
             })

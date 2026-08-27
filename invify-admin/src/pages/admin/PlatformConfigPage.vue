@@ -102,8 +102,8 @@
                   outlined dense dark
                   v-model="mockSettings.quasarBaseUrl"
                   label="Quasar API Base URL"
-                  hint="Must end with /api/v1 — e.g. http://192.168.1.193:4000/api/v1"
-                  placeholder="http://192.168.1.193:4000/api/v1"
+                  hint="Must end with /api/v1 — use the configured Quasar environment URL"
+                  placeholder="https://quasar.example.invalid/api/v1"
                   class="q-mb-md"
                   clearable
                 >
@@ -160,16 +160,6 @@
                   </template>
                   Presets
                   <div class="q-mt-sm column q-gutter-xs">
-                    <q-btn
-                      dense outline color="cyan-4" size="sm" no-caps
-                      label="LAN Quasar :4000"
-                      @click="mockSettings.quasarBaseUrl = 'http://192.168.1.193:4000/api/v1'"
-                    />
-                    <q-btn
-                      dense outline color="cyan-4" size="sm" no-caps
-                      label="Loopback :4000"
-                      @click="mockSettings.quasarBaseUrl = 'http://127.0.0.1:4000/api/v1'"
-                    />
                     <q-btn
                       dense outline color="cyan-4" size="sm" no-caps
                       label="Production"

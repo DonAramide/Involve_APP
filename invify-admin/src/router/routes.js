@@ -90,18 +90,33 @@ const routes = [
     ]
   },
 
+  // ==========================================
+  // PUBLIC WEBSITE
+  // ==========================================
+  {
+    path: '/',
+    component: () => import('layouts/PublicLayout.vue'),
+    children: [
+      { path: '', component: () => import('pages/public/HomePage.vue'), meta: { title: 'Invify - Enterprise Platform', isPublic: true } },
+      { path: 'platform', component: () => import('pages/public/PlatformPage.vue'), meta: { title: 'Platform', isPublic: true } },
+      { path: 'solutions', component: () => import('pages/public/SolutionsPage.vue'), meta: { title: 'Solutions', isPublic: true } },
+      { path: 'features', component: () => import('pages/public/FeaturesPage.vue'), meta: { title: 'Features', isPublic: true } },
+      { path: 'financial-operations', component: () => import('pages/public/FinancialOperationsPage.vue'), meta: { title: 'Financial Operations', isPublic: true } },
+      { path: 'security', component: () => import('pages/public/SecurityPage.vue'), meta: { title: 'Security', isPublic: true } },
+      { path: 'pricing', component: () => import('pages/public/PricingPage.vue'), meta: { title: 'Pricing', isPublic: true } },
+      { path: 'about', component: () => import('pages/public/AboutPage.vue'), meta: { title: 'About Us', isPublic: true } },
+      { path: 'contact', component: () => import('pages/public/ContactPage.vue'), meta: { title: 'Contact', isPublic: true } }
+    ]
+  },
+
   // Master layout bounding verified workspace shells
   {
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      // Direct root fallback handled dynamically by our enterprise router middleware guard
-      { 
-        path: '', 
-        component: () => import('pages/fleet/FleetOverviewPage.vue'),
-        meta: { title: 'Fleet Overview', workspace: 'fleet', permission: 'read_fleet', requiresAuth: true }
-      },
-
+      // Direct root fallback handled by public website above.
+      // All paths below require authentication.
+      
       // ==========================================
       // PRIORITY WORKSPACE 1: FLEET OPERATIONS
       // ==========================================

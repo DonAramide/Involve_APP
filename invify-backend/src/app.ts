@@ -8,11 +8,40 @@ import morgan from 'morgan';
 import * as dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables — pick the correct file based on NODE_ENV
+const _envFile = process.env.NODE_ENV === 'staging'
+  ? '.env.staging'
+  : process.env.NODE_ENV === 'production'
+    ? '.env.production'
+    : '.env';
+dotenv.config({ path: _envFile });
 
-// Bypass Node 18+ strict TLS and IPv6 fetch failures for local Supabase connectivity
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+const isJest = typeof process.env.JEST_WORKER_ID !== 'undefined';
+
+import { BuildVariantService } from './config/build-variant';
+
+// Bypass Node 18+ strict TLS and IPv6 fetch failures ONLY in local mode for local Supabase emulator
+try {
+  const variant = BuildVariantService.getInstance();
+  if (variant.isLocal()) {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  } else {
+    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  }
+} catch {
+  const rawVariant = (process.env.BUILD_VARIANT || '').trim().toUpperCase();
+  const appEnv = (process.env.APP_ENV || '').trim().toLowerCase();
+  const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+  const isProtected = nodeEnv === 'production' || nodeEnv === 'staging' ||
+                      appEnv === 'production' || appEnv === 'staging' ||
+                      rawVariant === 'PROD' || rawVariant === 'STAGING';
+  if (isProtected) {
+    delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  } else {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  }
+}
+
 import dns from 'node:dns';
 dns.setDefaultResultOrder('ipv4first');
 
@@ -67,6 +96,7 @@ import { NightlyReconciliationJob } from './modules/financial-platform/reconcili
 import { DatabaseStore } from './modules/financial-platform/infrastructure/DatabaseStore';
 import { InvestigationQueueService } from './modules/financial-platform/reconciliation/InvestigationQueueService';
 import { QuasarConnector } from './modules/financial-platform/infrastructure/QuasarConnector';
+import { HealthController } from './controllers/health.controller';
 
 import { authenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess, checkTenantPermission } from './middleware/rbac.middleware';
@@ -87,9 +117,19 @@ const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
   : (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:5173']);
 
+function isCorsOriginAllowed(origin?: string): boolean {
+  const isWildcardAllowed = allowedOrigins.includes('*') &&
+    process.env.NODE_ENV !== 'production' &&
+    process.env.NODE_ENV !== 'staging' &&
+    !BuildVariantService.getInstance().isProd() &&
+    !BuildVariantService.getInstance().isStaging();
+
+  return !origin || allowedOrigins.includes(origin) || isWildcardAllowed;
+}
+
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+    if (isCorsOriginAllowed(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -142,23 +182,23 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // 2. ROUTES
 
-// Basic health check
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV
-  });
-});
+// Health contract (Phase 3): /livez (alive), /readyz (traffic-ready), /health (compat)
+app.get('/livez', HealthController.livez);
+app.get('/readyz', HealthController.readyz);
+app.get('/health', HealthController.health);
+// Legacy aliases — same handlers (documented; prefer /livez|/readyz)
+app.get('/liveness', HealthController.livez);
+app.get('/readiness', HealthController.readyz);
+app.get('/healthz', HealthController.livez);
 
-// Payment Endpoints
-app.post('/payments/create', PaymentController.createPayment);
-app.post('/payments/initialize', PaymentController.initializeGatewayCheckout);
-app.post('/payments/intents', PaymentController.createPayment);
-app.get('/payments/intents/:id', PaymentController.getPaymentIntent);
-app.post('/payments/intents/:id/cancel', PaymentController.cancelPaymentIntent);
-app.post('/payments/intents/:id/refund', PaymentController.refundPaymentIntent);
-app.get('/payments/history', PaymentController.getPaymentHistory);
+// Payment Endpoints — authenticated + role-gated; tenant from identity (not client headers)
+app.post('/payments/create', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), checkTenantAccess, PaymentController.createPayment);
+app.post('/payments/initialize', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), checkTenantAccess, PaymentController.initializeGatewayCheckout);
+app.post('/payments/intents', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), checkTenantAccess, PaymentController.createPayment);
+app.get('/payments/intents/:id', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), PaymentController.getPaymentIntent);
+app.post('/payments/intents/:id/cancel', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), PaymentController.cancelPaymentIntent);
+app.post('/payments/intents/:id/refund', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), PaymentController.refundPaymentIntent);
+app.get('/payments/history', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), checkTenantAccess, PaymentController.getPaymentHistory);
 
 // Public Onboarding & System Lookup Data
 app.get('/public/lookup', LookupController.getLookup);
@@ -172,6 +212,8 @@ app.post('/public/onboarding/report-issue', OnboardingController.reportIssue);
 // Platform User Authentication & MFA / Recovery
 app.post('/api/auth/login', authLimiter, AuthController.login);
 app.post('/api/auth/reset-password', authLimiter, AuthController.resetPassword);
+app.post('/api/auth/mfa/setup', authLimiter, AuthController.mfaSetup);
+app.post('/api/auth/mfa/verify', authLimiter, AuthController.mfaVerify);
 app.post('/api/auth/send-email-otp', verificationLimiter, OnboardingController.sendEmailOtp);
 app.post('/api/auth/verify-email-otp', verificationLimiter, OnboardingController.verifyEmailOtp);
 
@@ -186,13 +228,22 @@ app.post('/ai/lesson-note/generate', authenticate, AIController.generateLessonNo
 app.post('/ai/lesson-note/refresh', authenticate, AIController.refreshLessonNote);
 
 // Admin Endpoints
+// Collision SPA vs API: register the same handlers on /admin/* (compat) and /api/admin/* (canonical).
+const registerCollisionAdmin = (
+  method: 'get' | 'post' | 'patch' | 'put' | 'delete',
+  pathAfterAdmin: string,
+  ...handlers: any[]
+) => {
+  (app as any)[method](`/admin${pathAfterAdmin}`, ...handlers);
+  (app as any)[method](`/api/admin${pathAfterAdmin}`, ...handlers);
+};
 
 /** --- SYSTEM ADMIN (SUPER ADMIN ONLY) --- **/
-app.get('/admin/tenants', authenticate, checkRole(['super_admin']), AdminController.listTenants);
-app.post('/admin/tenants', authenticate, checkRole(['super_admin']), AdminController.createTenant);
-app.patch('/admin/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
-app.patch('/admin/tenants/:id/status', authenticate, checkRole(['super_admin']), AdminController.updateTenantStatus);
-app.post('/admin/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);
+registerCollisionAdmin('get', '/tenants', authenticate, checkRole(['super_admin']), AdminController.listTenants);
+registerCollisionAdmin('post', '/tenants', authenticate, checkRole(['super_admin']), AdminController.createTenant);
+registerCollisionAdmin('patch', '/tenants/:id', authenticate, checkRole(['super_admin']), AdminController.updateTenant);
+registerCollisionAdmin('patch', '/tenants/:id/status', authenticate, checkRole(['super_admin']), AdminController.updateTenantStatus);
+registerCollisionAdmin('post', '/tenants/:id/emergency-lock', authenticate, checkRole(['super_admin']), AdminController.triggerEmergencyLock);
 app.post('/admin/reconciliation/run-job', authenticate, checkRole(['super_admin']), async (req: Request, res: Response) => {
   try {
     const targetDate = (req.query.date as string) || new Date().toISOString().split('T')[0];
@@ -221,23 +272,17 @@ app.get('/api/dashboard/governance', authenticate, checkRole(['super_admin', 'ad
 app.get('/api/dashboard/analytics', authenticate, checkRole(['super_admin', 'admin']), DashboardController.getAnalytics);
 
 // Admin Agent Onboarding routes
-app.post('/admin/agents/onboard', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.onboardAgent);
-app.get('/admin/agents', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.listAgents);
-app.get('/admin/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.getAgent);
-app.patch('/admin/agents/:id/status', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateAgentStatus);
-// Commisssions and messaging can stay on AgentController if they were there, wait, let me just comment them out if they don't exist on AdminAgentController or keep them as is if they do exist on AgentController.
-// Actually, earlier view_file showed AdminAgentController only has onboardAgent, listAgents, getAgent, updateAgentStatus, getAuditLogs.
-// Wait, what about updateAgentKyc, getAgentCommissions, updateAgentCommissions, messageAgent, messageAgentTenants? Let me remove AgentController from them or check if they exist.
-// Ah, let's keep the existing ones that weren't failing but fix listAgents and getAgentProfile.
+registerCollisionAdmin('post', '/agents/onboard', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.onboardAgent);
+registerCollisionAdmin('get', '/agents', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.listAgents);
+registerCollisionAdmin('get', '/agents/:id', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.getAgent);
+registerCollisionAdmin('patch', '/agents/:id/status', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateAgentStatus);
+registerCollisionAdmin('patch', '/agents/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateKycStatus);
+registerCollisionAdmin('get', '/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.getCommissions);
+registerCollisionAdmin('patch', '/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.updateCommissions);
+registerCollisionAdmin('post', '/agents/:id/message', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageAgent);
+registerCollisionAdmin('post', '/agents/:id/message-tenants', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageTenants);
 
-app.patch('/admin/agents/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.updateKycStatus);
-app.get('/admin/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.getCommissions);
-app.patch('/admin/agents/:id/commissions', authenticate, checkRole(['super_admin']), AdminAgentController.updateCommissions);
-app.post('/admin/agents/:id/message', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageAgent);
-app.post('/admin/agents/:id/message-tenants', authenticate, checkRole(['super_admin', 'admin']), AdminAgentController.messageTenants);
-
-
-app.post('/admin/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
+registerCollisionAdmin('post', '/tenants/:id/reset-passwords', authenticate, checkRole(['super_admin']), AdminController.resetTenantPasswords);
 
 // Quasar Connectivity & Integration Health
 app.get('/api/admin/quasar/health', authenticate, checkRole(['super_admin', 'admin']), QuasarHealthController.getHealthReport);
@@ -415,10 +460,10 @@ app.get('/cloud-metrics/alerts', authenticate, cloudMetricsController.getAlerts)
 app.get('/api/payout/platform-settings', authenticate, AdminController.getPlatformPayoutSettingsPublic);
 
 // Global Settings (Super Admin Only)
-app.get('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.getGlobalSettings);
-app.patch('/admin/settings', authenticate, checkRole(['super_admin']), AdminController.updateGlobalSettings);
-app.get('/admin/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.getGlobalCommissions);
-app.patch('/admin/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.updateGlobalCommissions);
+registerCollisionAdmin('get', '/settings', authenticate, checkRole(['super_admin']), AdminController.getGlobalSettings);
+registerCollisionAdmin('patch', '/settings', authenticate, checkRole(['super_admin']), AdminController.updateGlobalSettings);
+registerCollisionAdmin('get', '/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.getGlobalCommissions);
+registerCollisionAdmin('patch', '/settings/commissions', authenticate, checkRole(['super_admin']), AdminController.updateGlobalCommissions);
 app.post('/admin/broadcast', authenticate, checkRole(['super_admin']), AdminController.sendBroadcast);
 
 // Quasar POS encryption key (card switch ICC crypto)
@@ -508,11 +553,11 @@ app.get('/admin/analytics', authenticate, checkRole(['super_admin']), AnalyticsC
 app.get('/api/search', authenticate, SearchController.performGlobalSearch);
 
 /** --- FINANCIAL REVIEWS (SUPER ADMIN + TENANT ADMIN) --- **/
-app.get('/admin/tenants/:id/details', authenticate, checkTenantAccess, AdminController.getTenantDetails);
-app.post('/admin/tenants/:id/provision-va', authenticate, checkTenantAccess, AdminController.provisionVirtualAccount);
-app.post('/admin/tenants/:id/provision-virtual-account', authenticate, checkTenantAccess, AdminController.provisionVirtualAccount);
-app.post('/admin/tenants/:id/students/:studentId/provision-va', authenticate, checkTenantAccess, AdminController.provisionStudentVirtualAccount);
-app.post('/admin/tenants/:id/customers/:customerId/provision-va', authenticate, checkTenantAccess, AdminController.provisionCustomerVirtualAccount);
+registerCollisionAdmin('get', '/tenants/:id/details', authenticate, checkTenantAccess, AdminController.getTenantDetails);
+registerCollisionAdmin('post', '/tenants/:id/provision-va', authenticate, checkTenantAccess, AdminController.provisionVirtualAccount);
+registerCollisionAdmin('post', '/tenants/:id/provision-virtual-account', authenticate, checkTenantAccess, AdminController.provisionVirtualAccount);
+registerCollisionAdmin('post', '/tenants/:id/students/:studentId/provision-va', authenticate, checkTenantAccess, AdminController.provisionStudentVirtualAccount);
+registerCollisionAdmin('post', '/tenants/:id/customers/:customerId/provision-va', authenticate, checkTenantAccess, AdminController.provisionCustomerVirtualAccount);
 app.get('/admin/ledger', authenticate, checkTenantAccess, AdminController.listLedger);
 app.get('/admin/payments', authenticate, checkTenantAccess, AdminController.listPayments);
 
@@ -521,9 +566,9 @@ app.get('/api/v1/wallet', authenticate, checkTenantAccess, WalletController.getB
 app.get('/api/v1/wallet/transactions', authenticate, checkTenantAccess, WalletController.getTransactions);
 
 // Users Management
-app.get('/admin/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.listUsers);
-app.post('/admin/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.createUser);
-app.patch('/admin/users/:id', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.updateUser);
+registerCollisionAdmin('get', '/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.listUsers);
+registerCollisionAdmin('post', '/users', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.createUser);
+registerCollisionAdmin('patch', '/users/:id', authenticate, checkRole(['super_admin', 'internal_staff', 'tenant_admin', 'owner', 'admin']), UserController.updateUser);
 app.post('/admin/invites', authenticate, checkRole(['tenant_admin', 'owner']), InviteController.sendInvite);
 
 // Curriculum System
@@ -590,12 +635,12 @@ app.post('/api/reconciliation/:id/retry', authenticate, checkTenantPermission('r
 app.post('/api/reconciliation/:id/lock', authenticate, checkTenantPermission('reconciliation.lock'), ReconciliationController.lock);
 app.post('/api/reconciliation/:id/unlock', authenticate, checkTenantPermission('reconciliation.unlock'), ReconciliationController.unlock);
 // Payout Configuration
-app.get('/api/payout/settings', authenticate, PayoutController.getSettings);
-app.post('/api/payout/settings', authenticate, PayoutController.saveSettings);
-app.post('/api/payout/withdraw', authenticate, PayoutController.withdraw);
-app.get('/api/payout/history', authenticate, PayoutController.getHistory);
-app.get('/api/payout/banks', authenticate, PayoutController.getBanks);
-app.post('/api/payout/resolve-account', authenticate, PayoutController.resolveAccount);
+app.get('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.getSettings);
+app.post('/api/payout/settings', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.saveSettings);
+app.post('/api/payout/withdraw', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_treasury']), checkTenantAccess, PayoutController.withdraw);
+app.get('/api/payout/history', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury', 'finance_staff']), checkTenantAccess, PayoutController.getHistory);
+app.get('/api/payout/banks', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.getBanks);
+app.post('/api/payout/resolve-account', authenticate, checkRole(['super_admin', 'owner', 'tenant_admin', 'admin', 'admin_finance', 'admin_treasury']), checkTenantAccess, PayoutController.resolveAccount);
 
 // Executive Dashboard
 app.get('/api/finance/executive-summary', authenticate, checkRole(['super_admin', 'tenant_admin', 'finance_staff', 'owner', 'admin', 'staff', 'cashier']), ExecutiveFinanceController.getSummary);
@@ -899,58 +944,106 @@ const server = http.createServer(app);
 
 export const io = new SocketIOServer(server, {
   cors: {
-    origin: '*',
+    origin: (origin, callback) => {
+      if (isCorsOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST']
   }
 });
 
 io.use(async (socket, next) => {
   try {
+    const { isMockTokenAllowed, isMockAuthAllowed } = require('./config/constants');
+    const { BuildVariantService } = require('./config/build-variant');
+    const { verifySupabaseAccessToken, verifyWithSharedSecrets, peekAlg, supabaseProjectUrl } = require('./utils/supabase-jwt');
     const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
-    
-    // OFFLINE MOCK AUTH BYPASS — for local device sessions (no Supabase session)
+
+    // LOCAL-only mock socket auth (impossible in staging/production via isMockTokenAllowed)
     if (token === 'mock-super-admin') {
-      const tenantId = socket.handshake.auth?.tenantId || 
-                       socket.handshake.query?.tenantId as string ||
-                       socket.handshake.headers?.['x-tenant-id'] as string;
-      console.warn(`[Socket.io] mock-super-admin socket bypass. tenantId=${tenantId}`);
-      socket.data.user = { id: 'mock-super-admin', role: 'admin', tenant_id: tenantId };
+      if (!isMockTokenAllowed()) {
+        return next(new Error('Authentication error: mock tokens are not allowed in this environment'));
+      }
+      const tenantId =
+        socket.handshake.auth?.tenantId ||
+        (socket.handshake.query?.tenantId as string) ||
+        null;
+      console.warn(`[Socket.io] LOCAL mock-super-admin socket bypass. tenantId=${tenantId}`);
+      socket.data.user = { id: 'mock-super-admin', role: 'super_admin', tenant_id: tenantId };
       socket.data.tenantId = tenantId;
       return next();
     }
 
-    // OFFLINE LOCAL AUTH BYPASS — for locally-signed JWT tokens
-    if (process.env.OFFLINE_LOCAL_AUTH === 'true' && token && token.includes('local_dev_signature')) {
-      const b64Payload = token.split('.')[1];
-      if (b64Payload) {
-        const decoded = JSON.parse(Buffer.from(b64Payload, 'base64').toString('utf-8'));
-        socket.data.user = decoded;
-        socket.data.tenantId = decoded.tenantId;
-        return next();
-      }
+    // Reject unsigned legacy offline tokens everywhere (including LOCAL — use signed JWT_SECRET tokens)
+    if (token && String(token).includes('local_dev_signature')) {
+      return next(new Error('Authentication error: unsigned offline tokens are no longer accepted'));
     }
 
     if (!token) {
       return next(new Error('Authentication error: Missing token'));
     }
 
-    const { supabaseAdmin } = require('./db/supabase');
-    const jwt = require('jsonwebtoken');
-    
-    // Decode token instead of using supabase.auth.getUser since it might be an offline token
-    const jwtPayload = jwt.decode(token);
-    if (!jwtPayload) {
-      return next(new Error('Authentication error: Malformed token'));
+    const variant = BuildVariantService.getInstance();
+    const requiresVerify =
+      variant.isStaging() ||
+      variant.isProd() ||
+      process.env.NODE_ENV === 'production' ||
+      process.env.APP_ENV === 'production';
+
+    const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET;
+    const localJwtSecret = process.env.JWT_SECRET;
+    let jwtPayload: any = null;
+
+    if (requiresVerify) {
+      const alg = peekAlg(token);
+      const isAsymmetric = alg.startsWith('ES') || alg.startsWith('RS') || alg.startsWith('PS');
+
+      if (isAsymmetric) {
+        const base = supabaseProjectUrl();
+        if (!base) {
+          return next(new Error('Authentication error: SUPABASE_URL required for asymmetric JWT'));
+        }
+      } else {
+        if (!supabaseJwtSecret || supabaseJwtSecret.length < 16) {
+          return next(new Error('Authentication error: JWT verification secret not configured'));
+        }
+      }
+      try {
+        jwtPayload = await verifySupabaseAccessToken(token);
+      } catch {
+        return next(new Error('Authentication error: Invalid or expired token'));
+      }
+    } else {
+      // LOCAL: verify with JWKS/HS first, then JWT_SECRET — never decode-only
+      try {
+        jwtPayload = await verifySupabaseAccessToken(token);
+      } catch {
+        const secrets = [supabaseJwtSecret, localJwtSecret].filter(
+          (s) => typeof s === 'string' && s.length >= 16,
+        ) as string[];
+        if (secrets.length === 0) {
+          return next(new Error('Authentication error: JWT verification secret not configured'));
+        }
+        try {
+          jwtPayload = verifyWithSharedSecrets(token, secrets);
+        } catch {
+          return next(new Error('Authentication error: Invalid or expired token'));
+        }
+      }
     }
-    
+
     const userId = jwtPayload.sub || jwtPayload.id;
     const userEmail = jwtPayload.email || jwtPayload.user_metadata?.email || '';
     if (!userId) {
       return next(new Error('Authentication error: Missing subject claim'));
     }
 
-    let profile = null;
-    let profileErr = null;
+    const { supabaseAdmin } = require('./db/supabase');
+    let profile: any = null;
+    let profileErr: any = null;
     const socketDbTimeoutMs = Number(process.env.AUTH_DB_TIMEOUT_MS || 8000);
     try {
       const byIdPromise = supabaseAdmin
@@ -989,30 +1082,25 @@ io.use(async (socket, next) => {
     }
 
     if (profileErr || !profile) {
+      // Staging/prod: fail closed — no claim/handshake privilege escalation
+      if (requiresVerify) {
+        return next(new Error('Authentication error: User profile not found'));
+      }
+      // LOCAL only: least-privilege claim fallback (never admin/super_admin by default)
       const fallbackTenantId =
         jwtPayload.tenant_id ||
         jwtPayload.tenantId ||
         jwtPayload.app_metadata?.tenantId ||
         jwtPayload.user_metadata?.tenantId ||
-        socket.handshake.auth?.tenantId ||
-        (socket.handshake.query?.tenantId as string);
-      if (fallbackTenantId) {
-        console.warn(
-          `[Socket.io] User profile not found for ${userId}. Using JWT/handshake tenantId=${fallbackTenantId}.`,
-        );
-        profile = { tenant_id: fallbackTenantId, role: jwtPayload.role || 'admin' };
-      } else if (process.env.NODE_ENV === 'development' || process.env.OFFLINE_MOCK_AUTH === 'true') {
-        console.warn(
-          `[Socket.io] User profile not found in DB for user ${userId}. Falling back to dev mock profile.`,
-        );
-        profile = {
-          tenant_id:
-            jwtPayload.tenant_id || jwtPayload.tenantId || '71ac6795-6c26-4efd-80db-12bfe4126b47',
-          role: 'admin',
-        };
-      } else {
+        null;
+      if (!fallbackTenantId) {
         return next(new Error('Authentication error: User profile not found'));
       }
+      const claimRole = String(jwtPayload.role || 'owner').toLowerCase();
+      profile = {
+        tenant_id: fallbackTenantId,
+        role: claimRole === 'super_admin' || claimRole === 'admin' ? 'owner' : claimRole,
+      };
     }
 
     socket.data.user = { id: userId, ...profile };
@@ -1068,63 +1156,87 @@ io.on('connection', (socket: Socket) => {
 
 // OS Telemetry Polling Loop (Server Metrics for Contabo)
 import * as os from 'os';
-setInterval(() => {
-  // Simple CPU usage estimation based on load average
-  const cpus = os.cpus();
-  const loadAvg = os.loadavg()[0]; // 1 minute load average
-  const cpuUsage = Math.min(100, Math.round((loadAvg / cpus.length) * 100));
-  
-  const totalMem = os.totalmem();
-  const freeMem = os.freemem();
-  const usedMem = totalMem - freeMem;
-  const memoryUsage = Math.round((usedMem / totalMem) * 100);
+if (!isJest) {
+  // OS Telemetry Polling Loop (Server Metrics for Contabo)
+  setInterval(() => {
+    // Simple CPU usage estimation based on load average
+    const cpus = os.cpus();
+    const loadAvg = os.loadavg()[0]; // 1 minute load average
+    const cpuUsage = Math.min(100, Math.round((loadAvg / cpus.length) * 100));
 
-  // Broadcast real server telemetry to connected clients
-  io.to('all').emit('system_telemetry', {
-    cpu: { label: 'CPU Usage', value: cpuUsage, color: cpuUsage > 80 ? 'red-4' : 'cyan-4' },
-    memory: { label: 'Memory Usage', value: memoryUsage, color: memoryUsage > 80 ? 'red-4' : 'purple-4' },
-    storage: { label: 'Disk Space', value: 32, color: 'teal-4' }, // Still mocked as os doesn't support disk natively without external lib
-    network: { label: 'Network I/O', value: Math.floor(Math.random() * 40) + 10, color: 'amber-4' } // Simulated dynamic
-  });
-}, 5000);
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const memoryUsage = Math.round((usedMem / totalMem) * 100);
+
+    // Broadcast real server telemetry to connected clients
+    io.to('all').emit('system_telemetry', {
+      cpu: { label: 'CPU Usage', value: cpuUsage, color: cpuUsage > 80 ? 'red-4' : 'cyan-4' },
+      memory: { label: 'Memory Usage', value: memoryUsage, color: memoryUsage > 80 ? 'red-4' : 'purple-4' },
+      storage: { label: 'Disk Space', value: 32, color: 'teal-4' }, // Still mocked as os doesn't support disk natively without external lib
+      network: { label: 'Network I/O', value: Math.floor(Math.random() * 40) + 10, color: 'amber-4' } // Simulated dynamic
+    });
+  }, 5000);
 
 
-// Run audit logs archival sweep periodically (once every 1 hour)
-setInterval(() => {
-  AuditArchiveService.runArchiving().catch((err: any) => {
-    console.error('[AuditArchive] Scheduled sweep failed:', err.message);
-  });
-}, 60 * 60 * 1000);
+  // Run audit logs archival sweep periodically (once every 1 hour)
+  setInterval(() => {
+    AuditArchiveService.runArchiving().catch((err: any) => {
+      console.error('[AuditArchive] Scheduled sweep failed:', err.message);
+    });
+  }, 60 * 60 * 1000);
 
-// Run an initial sweep 10 seconds after boot to process any existing stale records
-setTimeout(() => {
-  AuditArchiveService.runArchiving().catch((err: any) => {
-    console.error('[AuditArchive] Initial boot sweep failed:', err.message);
-  });
-}, 10000);
+  // Run an initial sweep 10 seconds after boot to process any existing stale records
+  setTimeout(() => {
+    AuditArchiveService.runArchiving().catch((err: any) => {
+      console.error('[AuditArchive] Initial boot sweep failed:', err.message);
+    });
+  }, 10000);
 
-// Seed sample governance audit logs on first boot
-setTimeout(() => {
-  try { GovAuditService.seedSampleLogs(); } catch {}
-}, 3000);
+  // Seed sample governance audit logs ONLY in LOCAL (never staging/prod)
+  setTimeout(() => {
+    try {
+      const { BuildVariantService } = require('./config/build-variant');
+      if (BuildVariantService.getInstance().isLocal()) {
+        GovAuditService.seedSampleLogs();
+      }
+    } catch {}
+  }, 3000);
+}
 
 // Only bind to a port when NOT running inside Jest/Supertest
-if (process.env.NODE_ENV !== 'test') {
-  // Run Nightly Reconciliation Job periodically (once every 24 hours)
-  setInterval(() => {
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() - 1); // Yesterday's date
-    const dateStr = targetDate.toISOString().split('T')[0];
-    
-    const dbStore = new DatabaseStore();
-    const quasarConnector = new QuasarConnector(null, null);
-    const investigationQueueService = new InvestigationQueueService(dbStore, console);
-    const job = new NightlyReconciliationJob(quasarConnector, dbStore, investigationQueueService, console);
-    
-    job.run(dateStr).catch((err: any) => {
-      console.error('[NightlyReconciliation] Scheduled job failed:', err.message);
-    });
-  }, 24 * 60 * 60 * 1000);
+if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+  try {
+    const { assertSecureBootConfiguration } = require('./config/security-boot');
+    assertSecureBootConfiguration();
+  } catch (bootErr: any) {
+    console.error(bootErr?.message || bootErr);
+    process.exit(1);
+  }
+
+  const { BuildVariantService } = require('./config/build-variant');
+  const isProdVariant = BuildVariantService.getInstance().isProd();
+
+  // Financial in-process jobs: off unless explicitly enabled (strictly forbidden in production)
+  if (process.env.ENABLE_INPROCESS_FINANCIAL_WORKERS === 'true' && !isProdVariant) {
+    setInterval(() => {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() - 1);
+      const dateStr = targetDate.toISOString().split('T')[0];
+
+      const dbStore = new DatabaseStore();
+      const quasarConnector = new QuasarConnector(null, null);
+      const investigationQueueService = new InvestigationQueueService(dbStore, console);
+      const job = new NightlyReconciliationJob(quasarConnector, dbStore, investigationQueueService, console);
+
+      job.run(dateStr).catch((err: any) => {
+        console.error('[NightlyReconciliation] Scheduled job failed:', err.message);
+      });
+    }, 24 * 60 * 60 * 1000);
+    console.log('[Workers] In-process financial workers ENABLED');
+  } else {
+    console.log(`[Workers] In-process financial workers DISABLED${isProdVariant ? ' (strictly forbidden in production)' : ''}`);
+  }
 
   server.listen(PORT as number, '0.0.0.0', () => {
     console.log(`🚀 Invify SaaS (TS) running on port ${PORT} in ${process.env.NODE_ENV} mode`);

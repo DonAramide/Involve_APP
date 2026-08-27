@@ -34,13 +34,13 @@ spec:
             memory: "1Gi"
         livenessProbe:
           httpGet:
-            path: /liveness
+            path: /livez
             port: 3000
           initialDelaySeconds: 15
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /readiness
+            path: /readyz
             port: 3000
           initialDelaySeconds: 5
           periodSeconds: 10

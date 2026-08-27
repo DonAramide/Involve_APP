@@ -4,6 +4,14 @@ import { supabase, supabaseAdmin } from '../db/supabase';
 import { UserDeviceService } from '../services/user-device.service';
 import { SYSTEM_TENANT_UUID } from '../config/constants';
 import { GovAuditService } from '../services/gov-audit.service';
+import { authenticator } from 'otplib';
+import QRCode from 'qrcode';
+import {
+  consumeMfaChallenge,
+  issueMfaChallenge,
+  MfaChallengeError,
+  validateMfaChallenge,
+} from '../services/mfa-challenge.service';
 
 /** Love School (device / JWT from live tablet sessions). */
 const LOVE_SCHOOL_TENANT_ID = '0e9ccdf3-f96b-4914-8aed-76165655ad01';
@@ -26,9 +34,16 @@ function isAuthConnectivityFailure(err: any): boolean {
 }
 
 function offlineAuthAllowed(variantService: { isLocal(): boolean; isStaging(): boolean; isProd(): boolean }): boolean {
-  if (variantService.isProd()) return false;
-  // Explicit flag, or auto when Supabase is down in local/staging.
-  return process.env.OFFLINE_LOCAL_AUTH === 'true' || variantService.isLocal() || variantService.isStaging();
+  // LOCAL only — never staging or production, even on connectivity failure
+  if (variantService.isProd() || variantService.isStaging()) return false;
+  if (
+    process.env.NODE_ENV === 'production' ||
+    process.env.APP_ENV === 'production' ||
+    process.env.BUILD_PROFILE === 'production'
+  ) {
+    return false;
+  }
+  return process.env.OFFLINE_LOCAL_AUTH === 'true' && variantService.isLocal();
 }
 
 const PLATFORM_STAFF_ROLES = new Set([
@@ -111,17 +126,13 @@ function resolveOfflineIdentity(emailRaw: string): {
   tenantId: string;
   userId: string;
 } {
+  // LOCAL-only helper. Never elevates to SUPER_ADMIN based on email substring heuristics.
   const email = (emailRaw || '').trim().toLowerCase();
-  if (
-    email === 'sysadmin@iips.app' ||
-    email === 'superadmin@iips.app' ||
-    email === 'averyd777@gmail.com' ||
-    email.includes('admin@iips')
-  ) {
+  if (email === 'olive@invify.com') {
     return {
-      role: 'SUPER_ADMIN',
-      tenantId: SYSTEM_TENANT_UUID,
-      userId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      role: 'TENANT_OPERATOR',
+      tenantId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
+      userId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
     };
   }
   if (
@@ -134,20 +145,7 @@ function resolveOfflineIdentity(emailRaw: string): {
       userId: LOVE_SCHOOL_OWNER_ID,
     };
   }
-  if (email === 'olive@invify.com') {
-    return {
-      role: 'TENANT_OPERATOR',
-      tenantId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
-      userId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
-    };
-  }
-  if (email.includes('admin') || email.includes('iips')) {
-    return {
-      role: 'SUPER_ADMIN',
-      tenantId: SYSTEM_TENANT_UUID,
-      userId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
-    };
-  }
+  // Default least-privilege local sandbox identity (not super_admin)
   return {
     role: 'TENANT_OPERATOR',
     tenantId: 'c3d11b8b-e85d-4f2b-8a8f-2872bc900382',
@@ -156,19 +154,22 @@ function resolveOfflineIdentity(emailRaw: string): {
 }
 
 function buildOfflineToken(email: string, identity: { role: string; tenantId: string; userId: string }): string {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
-  const payload = Buffer.from(
-    JSON.stringify({
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 16) {
+    throw new Error('JWT_SECRET is required to issue local offline tokens');
+  }
+  const jwt = require('jsonwebtoken');
+  return jwt.sign(
+    {
       id: identity.userId,
+      sub: identity.userId,
       email,
       role: identity.role,
       tenantId: identity.tenantId,
-      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7,
-    }),
-  )
-    .toString('base64')
-    .replace(/=/g, '');
-  return `${header}.${payload}.local_dev_signature`;
+    },
+    secret,
+    { expiresIn: '7d', algorithm: 'HS256' },
+  );
 }
 
 async function validateDeviceOrBlock(userId: string, email: string, req: Request): Promise<{ allowed: boolean; errorResponse?: any }> {
@@ -220,6 +221,54 @@ async function validateDeviceOrBlock(userId: string, email: string, req: Request
   } catch (err) {
     return { allowed: true };
   }
+}
+
+const MFA_CHALLENGE_COOKIE = 'invify_mfa_challenge';
+
+function readMfaChallengeToken(req: Request): string {
+  const bodyToken = req.body?.challengeToken || req.body?.setupToken;
+  if (typeof bodyToken === 'string' && bodyToken.trim()) return bodyToken.trim();
+
+  const cookieHeader = req.headers.cookie || '';
+  for (const entry of cookieHeader.split(';')) {
+    const separator = entry.indexOf('=');
+    if (separator < 0) continue;
+    const name = entry.slice(0, separator).trim();
+    if (name === MFA_CHALLENGE_COOKIE) {
+      return decodeURIComponent(entry.slice(separator + 1).trim());
+    }
+  }
+  return '';
+}
+
+function setMfaChallengeCookie(res: Response, token: string): void {
+  const variant = require('../config/build-variant').BuildVariantService.getInstance();
+  const protectedEnvironment =
+    process.env.NODE_ENV === 'staging' ||
+    process.env.NODE_ENV === 'production' ||
+    process.env.APP_ENV === 'staging' ||
+    process.env.APP_ENV === 'production' ||
+    variant.isStaging() ||
+    variant.isProd();
+  res.cookie(MFA_CHALLENGE_COOKIE, token, {
+    httpOnly: true,
+    secure: protectedEnvironment,
+    sameSite: 'strict',
+    maxAge: 5 * 60 * 1000,
+    path: '/api/auth/mfa',
+  });
+}
+
+function clearMfaChallengeCookie(res: Response): void {
+  res.clearCookie(MFA_CHALLENGE_COOKIE, { path: '/api/auth/mfa' });
+}
+
+function mfaErrorResponse(res: Response, error: unknown): Response {
+  if (error instanceof MfaChallengeError) {
+    return res.status(error.status).json({ error: error.code, message: error.message });
+  }
+  console.error('[MFA] Error:', error instanceof Error ? error.message : error);
+  return res.status(500).json({ error: 'MFA_OPERATION_FAILED', message: 'MFA operation failed' });
 }
 
 export class AuthController {
@@ -351,15 +400,15 @@ export class AuthController {
           return res.status(503).json({
             error: 'AUTH_SERVICE_UNAVAILABLE',
             message:
-              'Cannot reach Supabase Auth (connect timeout). Check network/VPN/firewall to *.supabase.co:443, or set OFFLINE_LOCAL_AUTH=true for local/staging.',
+              'Cannot reach Supabase Auth (connect timeout). Check network/VPN/firewall to *.supabase.co:443. Offline auth is LOCAL-only (OFFLINE_LOCAL_AUTH=true + BUILD_VARIANT=LOCAL).',
             retryable: true,
           });
         }
 
-        // Dynamic Developer Bypass for local environment sandbox presets
-        const devAccounts = ['olive@invify.com', 'sysadmin@iips.app', 'superadmin@iips.app', 'averyd777@gmail.com'];
+        // Dynamic Developer Bypass for local environment sandbox presets (LOCAL only; no email→super_admin)
+        const devAccounts = ['olive@invify.com'];
         const normalizedEmail = (email || '').trim().toLowerCase();
-        if (devAccounts.includes(normalizedEmail) && variantService.isLocal()) {
+        if (devAccounts.includes(normalizedEmail) && variantService.isLocal() && process.env.OFFLINE_LOCAL_AUTH === 'true') {
           console.log(`[AuthController] Dev sandbox credentials bypass activated for: ${normalizedEmail}`);
           const identity = resolveOfflineIdentity(normalizedEmail);
           const portalGate = assertPortalRoleAllowed(loginPortal, identity.role);
@@ -420,12 +469,7 @@ export class AuthController {
         return res.status(403).json({ error: 'User profile not found' });
       }
 
-      // Hard override for superadmin dev accounts in case the DB is misconfigured
-      const normalizedLoginEmail = (email || '').trim().toLowerCase();
-      if (normalizedLoginEmail === 'sysadmin@iips.app' || normalizedLoginEmail === 'superadmin@iips.app' || normalizedLoginEmail === 'averyd777@gmail.com') {
-        profile.role = 'super_admin';
-        profile.tenant_id = SYSTEM_TENANT_UUID;
-      }
+      // Roles come solely from persisted users.role — no email-based elevation
 
       const portalGate = assertPortalRoleAllowed(loginPortal, profile.role);
       if (!portalGate.ok) {
@@ -467,10 +511,62 @@ export class AuthController {
         });
       }
 
-      // 4. Return complete JWT Session
+      // 4. Return complete JWT Session (if MFA not required)
       const check = await validateDeviceOrBlock(profile.id, profile.email, req);
       if (!check.allowed) {
         return res.status(403).json(check.errorResponse);
+      }
+
+      const isPlatformRole = [
+        'super_admin',
+        'admin_finance',
+        'admin_treasury',
+        'admin_risk',
+        'admin_ops',
+        'admin_executive',
+        'admin_deploy',
+        'internal_staff'
+      ].includes(profile.role);
+
+      if (isPlatformRole) {
+        const pendingSession = {
+          token: authData.session.access_token,
+          refreshToken: authData.session.refresh_token,
+        };
+
+        // Enforce setup if not enabled
+        if (!profile.mfa_enabled) {
+          let setupToken: string;
+          try {
+            setupToken = issueMfaChallenge(profile.id, 'setup', pendingSession).token;
+          } catch (error) {
+            return mfaErrorResponse(res, error);
+          }
+          setMfaChallengeCookie(res, setupToken);
+          return res.status(200).json({
+            requiresMfaSetup: true,
+            setupToken,
+            challengeToken: setupToken,
+            userId: profile.id,
+            role: profile.role
+          });
+        } else {
+          // Enforce 2FA challenge if enabled
+          let challengeToken: string;
+          try {
+            challengeToken = issueMfaChallenge(profile.id, 'verify', pendingSession).token;
+          } catch (error) {
+            return mfaErrorResponse(res, error);
+          }
+          setMfaChallengeCookie(res, challengeToken);
+          return res.status(200).json({
+            requires2FA: true,
+            challengeToken,
+            userId: profile.id,
+            role: profile.role,
+            message: 'MFA challenge required'
+          });
+        }
       }
 
       return res.status(200).json({
@@ -656,24 +752,6 @@ export class AuthController {
           (authError as any).code || '',
         );
 
-        // Dev sandbox bypass check
-        const devMockUserIds = [
-          'c3d11b8b-e85d-4f2b-8a8f-2872bc900382', // Olive
-          'f47ac10b-58cc-4372-a567-0e02b2c3d479', // Admin
-        ];
-
-        if (
-          devMockUserIds.includes(targetUserId) ||
-          authMsg.includes('user not found')
-        ) {
-          console.log(
-            `[AuthController] Sandbox recovery bypass triggered for userId: ${targetUserId} (${authError.message})`,
-          );
-          return res.status(200).json({
-            message: 'Password reset completed successfully (Sandbox Bypass).',
-          });
-        }
-
         return res.status(400).json({ error: authError.message });
       }
 
@@ -692,27 +770,7 @@ export class AuthController {
       });
     } catch (error: any) {
       console.error('[AuthController] ResetPassword Error:', error.message);
-
-      const isMockOrBypass =
-        error.message?.includes('Expected parameter to be UUID') ||
-        error.message?.includes('fetch failed') ||
-        error.message?.includes('timeout') ||
-        (req.body?.userId &&
-          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-            req.body.userId,
-          ));
-
-      if (isMockOrBypass) {
-        console.log(
-          `[AuthController] Sandbox / Mock bypass activated for resetPassword (userId: ${req.body.userId})`,
-        );
-        return res.status(200).json({
-          message:
-            'Password reset completed successfully (Sandbox Recovery Sandbox Bypass). You can now log in.',
-        });
-      }
-
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Password reset failed' });
     }
   }
 
@@ -784,6 +842,134 @@ export class AuthController {
     } catch (error: any) {
       console.error('[AuthController] verifyWhatsappOtp error:', error.message);
       res.status(400).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /api/auth/mfa/setup
+   * Generates TOTP secret and QR code URL for setup.
+   */
+  static async mfaSetup(req: Request, res: Response) {
+    try {
+      const requestedUserId =
+        typeof req.body?.userId === 'string' && req.body.userId.trim()
+          ? req.body.userId.trim()
+          : undefined;
+      const setupChallenge = validateMfaChallenge(
+        readMfaChallengeToken(req),
+        'setup',
+        requestedUserId,
+      );
+
+      // Claim before any database mutation. Concurrent/replayed setup requests fail closed.
+      const pendingSession = consumeMfaChallenge(setupChallenge);
+      const userId = setupChallenge.userId;
+
+      const { data: profile, error: profileErr } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileErr || !profile) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Always rotate an incomplete enrollment secret; never disclose a stored secret.
+      const secret = authenticator.generateSecret();
+      const { error: updateErr } = await supabaseAdmin
+        .from('users')
+        .update({ mfa_secret: secret, mfa_enabled: false })
+        .eq('id', userId);
+      if (updateErr) {
+        console.error('[MfaSetup] Failed to store MFA secret:', updateErr.message);
+        return res.status(500).json({ error: 'Failed to prepare MFA setup' });
+      }
+
+      const otpAuthUrl = authenticator.keyuri(profile.email, 'Invify Admin', secret);
+      const qrCodeUrl = await QRCode.toDataURL(otpAuthUrl);
+      const verificationChallenge = issueMfaChallenge(userId, 'verify', pendingSession);
+      setMfaChallengeCookie(res, verificationChallenge.token);
+
+      // Raw secret is returned only in this password-authenticated, single-user enrollment flow.
+      return res.status(200).json({
+        secret,
+        qrCodeUrl,
+        challengeToken: verificationChallenge.token,
+      });
+    } catch (error) {
+      return mfaErrorResponse(res, error);
+    }
+  }
+
+  /**
+   * POST /api/auth/mfa/verify
+   * Verifies OTP code and activates MFA if setup. Returns the cached session.
+   */
+  static async mfaVerify(req: Request, res: Response) {
+    try {
+      const requestedUserId =
+        typeof req.body?.userId === 'string' && req.body.userId.trim()
+          ? req.body.userId.trim()
+          : undefined;
+      const tokenCode = req.body?.tokenCode || req.body?.code;
+      if (!tokenCode) {
+        return res.status(400).json({ error: 'MFA code is required' });
+      }
+      const verificationChallenge = validateMfaChallenge(
+        readMfaChallengeToken(req),
+        'verify',
+        requestedUserId,
+      );
+      const userId = verificationChallenge.userId;
+
+      const { data: profile, error: profileErr } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileErr || !profile) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const secret = profile.mfa_secret;
+      if (!secret) {
+        return res.status(400).json({ error: 'MFA not initialized' });
+      }
+
+      const cleanToken = String(tokenCode).trim();
+      if (!authenticator.verify({ token: cleanToken, secret })) {
+        return res.status(400).json({ message: 'Invalid or expired 2FA code' });
+      }
+
+      if (!profile.mfa_enabled) {
+        const { error: updateErr } = await supabaseAdmin
+          .from('users')
+          .update({ mfa_enabled: true })
+          .eq('id', userId);
+        if (updateErr) {
+          console.error('[MfaVerify] Failed to update mfa_enabled:', updateErr.message);
+          return res.status(500).json({ error: 'Failed to enable MFA' });
+        }
+      }
+
+      // Consuming after successful TOTP verification enforces one-time session release.
+      const session = consumeMfaChallenge(verificationChallenge);
+      clearMfaChallengeCookie(res);
+
+      return res.status(200).json({
+        token: session.token,
+        refreshToken: session.refreshToken,
+        user: {
+          id: profile.id,
+          email: profile.email,
+          role: profile.role || 'tenant_admin',
+          tenantId: profile.tenant_id
+        }
+      });
+    } catch (error) {
+      return mfaErrorResponse(res, error);
     }
   }
 }

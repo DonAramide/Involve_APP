@@ -261,7 +261,7 @@ class _ReconciliationPageState extends State<ReconciliationPage> with SingleTick
   }
 
   Widget _buildPaymentCard(Map<String, dynamic> item, dynamic settings) {
-    final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     final date = DateTime.parse(item['createdAt']);
     final isIssue = item['issueType'] == 'duplicate_payment' || item['issueType'] == 'provider_mismatch';
     final isUnmatched = item['issueType'] != null && !isIssue;

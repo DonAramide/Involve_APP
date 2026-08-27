@@ -1,13 +1,12 @@
 import axios from 'axios';
 import { Notify } from 'quasar';
 import { loginPathForContext } from '../utils/authLoginPaths';
+import { resolveApiBaseUrl } from '../config/env';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: resolveApiBaseUrl(),
   timeout: 30000,
-  headers: {
-    'ngrok-skip-browser-warning': 'true'
-  }
+  headers: {}
 });
 
 function decodeJwtPayload(token) {
@@ -128,12 +127,12 @@ export const referralApi = {
 
 export const adminApi = {
   // Tenant CRUD
-  getTenants: (params) => api.get('/admin/tenants', { params }),
-  createTenant: (data) => api.post('/admin/tenants', data),
-  updateTenant: (id, data) => api.patch(`/admin/tenants/${id}`, data),
-  getTenantDetails: (id) => api.get(`/admin/tenants/${id}/details`),
+  getTenants: (params) => api.get('/api/admin/tenants', { params }),
+  createTenant: (data) => api.post('/api/admin/tenants', data),
+  updateTenant: (id, data) => api.patch(`/api/admin/tenants/${id}`, data),
+  getTenantDetails: (id) => api.get(`/api/admin/tenants/${id}/details`),
   getTenantKyc: (id) => api.get(`/api/tenant/${id}/kyc`),
-  provisionVirtualAccount: (id) => api.post(`/admin/tenants/${id}/provision-virtual-account`),
+  provisionVirtualAccount: (id) => api.post(`/api/admin/tenants/${id}/provision-virtual-account`),
   
   // Financial Platform Tenant Operations
   getFinancialPlatformHealth: (tenantId) => api.get(`/api/v1/tenants/${tenantId}/financial-platform/health`),
@@ -150,14 +149,14 @@ export const adminApi = {
   getAnalytics: () => api.get('/admin/analytics'),
   
   // Users Management
-  getUsers: (params) => api.get('/admin/users', { params }),
-  createUser: (data) => api.post('/admin/users', data),
-  updateUser: (id, data) => api.patch(`/admin/users/${id}`, data),
+  getUsers: (params) => api.get('/api/admin/users', { params }),
+  createUser: (data) => api.post('/api/admin/users', data),
+  updateUser: (id, data) => api.patch(`/api/admin/users/${id}`, data),
   sendInvite: (data) => api.post('/admin/invites', data),
   getProfile: () => api.get('/admin/profile'),
   updateProfile: (data) => api.patch('/admin/profile', data),
-  getGlobalSettings: () => api.get('/admin/settings'),
-  updateGlobalSettings: (data) => api.patch('/admin/settings', data),
+  getGlobalSettings: () => api.get('/api/admin/settings'),
+  updateGlobalSettings: (data) => api.patch('/api/admin/settings', data),
   listQuasarIntegrations: () => api.get('/admin/quasar/integrations'),
   getQuasarHealth: () => api.get('/api/admin/quasar/health'),
   pingQuasar: () => api.get('/api/admin/quasar/health/live'),
@@ -184,7 +183,7 @@ export const adminApi = {
   blockUserDevice: (id) => api.post('/api/admin/user-devices/block', { id }),
   triggerAuditArchiving: () => api.post('/api/admin/audit/archive'),
   emergencyLock: (data) => api.post('/api/admin/emergency-lock', data),
-  resetTenantSystemPassword: (id, data) => api.post(`/admin/tenants/${id}/reset-passwords`, data || {}),
+  resetTenantSystemPassword: (id, data) => api.post(`/api/admin/tenants/${id}/reset-passwords`, data || {}),
 
   // Virtual Accounts Management
   getVirtualAccounts: () => api.get('/api/finance/virtual-accounts'),
@@ -193,11 +192,11 @@ export const adminApi = {
   getQuasarTransactions: (params) => api.get('/api/finance/quasar-transactions', { params }),
 
   // Commissions
-  listAgents: (params) => api.get('/admin/agents', { params }),
-  getGlobalCommissions: () => api.get('/admin/settings/commissions'),
-  updateGlobalCommissions: (data) => api.patch('/admin/settings/commissions', data),
-  getAgentCommissions: (id) => api.get(`/admin/agents/${id}/commissions`),
-  updateAgentCommissions: (id, data) => api.patch(`/admin/agents/${id}/commissions`, data),
+  listAgents: (params) => api.get('/api/admin/agents', { params }),
+  getGlobalCommissions: () => api.get('/api/admin/settings/commissions'),
+  updateGlobalCommissions: (data) => api.patch('/api/admin/settings/commissions', data),
+  getAgentCommissions: (id) => api.get(`/api/admin/agents/${id}/commissions`),
+  updateAgentCommissions: (id, data) => api.patch(`/api/admin/agents/${id}/commissions`, data),
 
   // Support & Complaints
   getComplaints: () => api.get('/api/admin/complaints'),

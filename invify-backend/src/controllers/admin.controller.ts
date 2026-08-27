@@ -4,6 +4,28 @@ import { supabase, supabaseAdmin } from '../db/supabase';
 import { WalletService } from '../services/wallet.service';
 import { PDFService } from '../services/pdf.service';
 import { BillingService } from '../services/billing.service';
+import { BuildVariantService } from '../config/build-variant';
+import { IntegrationVaultService } from '../services/integration-vault.service';
+
+async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
+  const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
+  if (envKey) return envKey;
+
+  try {
+    const environment = BuildVariantService.getInstance().getVariant() === 'PROD' ? 'PRODUCTION' : 'STAGING';
+    const vaultKey = await IntegrationVaultService.getDecryptedCredential('quasar', environment, tenantId);
+    if (vaultKey) return vaultKey;
+  } catch (err: any) {
+    console.warn(`[Vault] Failed to resolve Quasar API key from vault: ${err.message}`);
+  }
+
+  const variant = BuildVariantService.getInstance();
+  if (variant.isProd() || variant.isStaging()) {
+    throw new Error('QUASAR_API_KEY is required in staging/production');
+  }
+
+  return 'demo-key';
+}
 
 export class AdminController {
 
@@ -567,7 +589,7 @@ export class AdminController {
 
       // Generate Virtual Account for Tenant using Quasar SDK
       try {
-        const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
+        const platformApiKey = await resolvePlatformApiKey(data.id);
         const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
         const quasar = new QuasarServiceModule(platformApiKey);
         
@@ -871,6 +893,19 @@ export class AdminController {
   static async getTenantDetails(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+
+      // Tenant operators may only inspect their own tenant (path :id is not trusted).
+      if (!isPlatform) {
+        if (!user?.tenantId || String(user.tenantId) !== String(id)) {
+          return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
+        }
+      }
 
       // Parallel fetch for deep insights
       const [tenantRes, usersRes, walletInfo, usageRes, certRes] = await Promise.all([
@@ -949,7 +984,7 @@ export class AdminController {
       const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
+      const platformApiKey = await resolvePlatformApiKey(tenant.id);
       const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
       const quasar = new QuasarServiceModule(platformApiKey);
       const platformId = 'platform-admin-owner-id';
@@ -991,7 +1026,7 @@ export class AdminController {
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
-          const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
+          const platformApiKey = await resolvePlatformApiKey(id);
           const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
           const quasar = new QuasarServiceModule(platformApiKey);
           const platformId = 'platform-admin-owner-id';
@@ -1021,7 +1056,7 @@ export class AdminController {
       // In real scenario, verify student exists in backend DB too.
       // Here we just provision directly for the given studentId under this tenant.
       
-      const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
+      const platformApiKey = await resolvePlatformApiKey(tenant.id);
       const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
       const quasar = new QuasarServiceModule(platformApiKey);
       const platformId = 'platform-admin-owner-id'; // or tenant's subaccount id
@@ -1076,7 +1111,7 @@ export class AdminController {
 
       if (process.env.OFFLINE_LOCAL_AUTH === 'true') {
         try {
-          const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
+          const platformApiKey = await resolvePlatformApiKey(id);
           const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
           const quasar = new QuasarServiceModule(platformApiKey);
           const platformId = 'platform-admin-owner-id';
@@ -1103,7 +1138,7 @@ export class AdminController {
       const { data: tenant, error: fetchErr } = await supabaseAdmin.from('tenants').select('*').eq('id', id).single();
       if (fetchErr || !tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      const platformApiKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY || 'demo-key';
+      const platformApiKey = await resolvePlatformApiKey(tenant.id);
       const QuasarServiceModule = require('../integrations/quasar/quasar.service').QuasarService;
       const quasar = new QuasarServiceModule(platformApiKey);
       const platformId = 'platform-admin-owner-id';
@@ -1133,15 +1168,26 @@ export class AdminController {
   static async listLedger(req: Request, res: Response) {
     try {
       const { tenantId, startDate, endDate, reference } = req.query;
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isSuperAdmin = role === 'super_admin';
 
       let query = supabaseAdmin
         .from('ledger_entries')
-        .select(`
-          *,
-          tenants (name)
-        `);
+        .select('*');
 
-      if (tenantId) query = query.eq('tenant_id', tenantId);
+      if (!isSuperAdmin) {
+        if (!user?.tenantId) {
+          return res.status(403).json({ error: 'Tenant context required' });
+        }
+        if (tenantId && String(tenantId) !== String(user.tenantId)) {
+          return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
+        }
+        query = query.eq('tenant_id', user.tenantId);
+      } else if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
       if (reference) query = query.ilike('reference', `%${reference}%`);
       if (startDate) query = query.gte('created_at', startDate);
       if (endDate) query = query.lte('created_at', endDate);
@@ -1163,15 +1209,26 @@ export class AdminController {
   static async listPayments(req: Request, res: Response) {
     try {
       const { tenantId, status, provider, reference, startDate, endDate } = req.query;
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isSuperAdmin = role === 'super_admin';
 
       let query = supabaseAdmin
-        .from('payments')
-        .select(`
-          *,
-          tenants (name)
-        `);
+        .from('transactions_log')
+        .select('*');
 
-      if (tenantId) query = query.eq('tenant_id', tenantId);
+      if (!isSuperAdmin) {
+        if (!user?.tenantId) {
+          return res.status(403).json({ error: 'Tenant context required' });
+        }
+        if (tenantId && String(tenantId) !== String(user.tenantId)) {
+          return res.status(403).json({ error: 'Forbidden: Cross-tenant access denied' });
+        }
+        query = query.eq('tenant_id', user.tenantId);
+      } else if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
       if (status) query = query.eq('status', status);
       if (provider) query = query.eq('provider', provider);
       if (reference) query = query.ilike('reference', `%${reference}%`);

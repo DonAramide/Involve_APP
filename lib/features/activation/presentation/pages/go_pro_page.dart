@@ -38,10 +38,9 @@ class _GoProPageState extends State<GoProPage> {
         'plan': 'premium'
       };
 
-      // Try local host ports (resilient fallbacks for Android/iOS emulators and localhost)
+      // Resolve API base from AppConfig (environment-scoped; no hardcoded LAN fallbacks)
       final urls = [
         '${AppConfig.baseUrl}/public/onboarding/provision',
-        'http://localhost:3004/public/onboarding/provision',
       ];
 
       Response? response;

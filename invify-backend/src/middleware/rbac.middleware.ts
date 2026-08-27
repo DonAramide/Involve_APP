@@ -33,16 +33,18 @@ export const checkRole = (allowedRoles: string[]) => {
     // This allows specific platform staff roles to access administrative routes relevant to their function
     if (allowedLower.includes('super_admin')) {
       const path = req.path.toLowerCase();
+      const isAdminSurface = (legacyPrefix: string) =>
+        path.startsWith(legacyPrefix) || path.startsWith(`/api${legacyPrefix}`);
       
       if (userRoles.includes('admin_deploy') || userRoles.includes('owner') || userRoles.includes('admin')) {
         // Platform operators: Release Channels, Global Settings, POS Switchboard
-        if (path.startsWith('/admin/settings') || path.startsWith('/api/admin/apk') || path.startsWith('/admin/pos') || path.startsWith('/admin/commissions') || path.startsWith('/admin/tenants') || path.startsWith('/admin/users')) {
+        if (isAdminSurface('/admin/settings') || path.startsWith('/api/admin/apk') || path.startsWith('/admin/pos') || path.startsWith('/admin/commissions') || isAdminSurface('/admin/tenants') || isAdminSurface('/admin/users') || isAdminSurface('/admin/agents')) {
           return next();
         }
       }
 
       if (userRoles.includes('internal_staff')) {
-        if (path.startsWith('/admin/users') || path.startsWith('/admin/tenants') || path.startsWith('/api/admin/audit')) {
+        if (isAdminSurface('/admin/users') || isAdminSurface('/admin/tenants') || path.startsWith('/api/admin/audit')) {
           return next();
         }
       }

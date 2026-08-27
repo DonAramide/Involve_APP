@@ -1,5 +1,6 @@
 // lib/features/school_finance/domain/repositories/finance_repository_new.dart
 
+import 'package:dio/dio.dart';
 import '../../../../core/services/finance_api_client.dart';
 import '../../data/models/finance_models.dart';
 import '../../domain/entities/virtual_account.dart'; // Reusing this as it's already well-defined
@@ -381,8 +382,21 @@ class FinanceRepository {
 
   /// Fetches all generated virtual accounts for the tenant.
   /// GET /api/finance/virtual-accounts
-  Future<List<Map<String, dynamic>>> getVirtualAccounts() async {
-    final response = await _client.get('/api/finance/virtual-accounts');
+  ///
+  /// [timeout] defaults to 8s so offline / unreachable servers fail fast
+  /// (UI is offline-first and can show local VAs without waiting on Dio's
+  /// global 30s / 2min timeouts).
+  Future<List<Map<String, dynamic>>> getVirtualAccounts({
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final response = await _client.get(
+      '/api/finance/virtual-accounts',
+      options: Options(
+        connectTimeout: timeout,
+        sendTimeout: timeout,
+        receiveTimeout: timeout,
+      ),
+    );
     final List<dynamic> data = response.data as List<dynamic>;
     return data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
   }
@@ -420,5 +434,43 @@ class FinanceRepository {
       data: {'amount': amount},
     );
     return response.data as Map<String, dynamic>;
+  }
+
+  /// Quasar-backed bank list for payout / salary destinations.
+  /// GET /api/payout/banks
+  Future<List<Map<String, dynamic>>> getPayoutBanks({String country = 'nigeria'}) async {
+    final response = await _client.get(
+      '/api/payout/banks',
+      queryParameters: {'country': country},
+    );
+    final body = response.data;
+    final data = body is Map ? body['data'] : null;
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+    return const [];
+  }
+
+  /// Resolve account name via Quasar name enquiry.
+  /// POST /api/payout/resolve-account
+  Future<Map<String, dynamic>> resolvePayoutAccount({
+    required String accountNumber,
+    required String bankCode,
+  }) async {
+    final response = await _client.post(
+      '/api/payout/resolve-account',
+      data: {
+        'account_number': accountNumber.trim(),
+        'bank_code': bankCode.trim(),
+      },
+    );
+    final body = response.data;
+    if (body is Map && body['data'] is Map) {
+      return Map<String, dynamic>.from(body['data'] as Map);
+    }
+    return body is Map ? Map<String, dynamic>.from(body) : <String, dynamic>{};
   }
 }

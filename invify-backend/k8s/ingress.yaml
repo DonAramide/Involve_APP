@@ -9,10 +9,10 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - api.invify.app
+    - api.invify.org
     secretName: invify-tls
   rules:
-  - host: api.invify.app
+  - host: api.invify.org
     http:
       paths:
       - path: /

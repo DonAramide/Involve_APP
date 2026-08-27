@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import '../../domain/entities/daily_revenue.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 
 class ModernRevenueChart extends StatelessWidget {
@@ -70,7 +71,7 @@ class ModernRevenueChart extends StatelessWidget {
                 return touchedSpots.map((spot) {
                   final date = data[spot.x.toInt()].date;
                   return LineTooltipItem(
-                    '$date\n₦${spot.y.toStringAsFixed(0)}',
+                    '$date\n${CurrencyFormatter.formatWithSymbol(spot.y)}',
                     const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   );
                 }).toList();

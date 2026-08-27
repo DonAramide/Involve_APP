@@ -144,14 +144,30 @@ import 'package:involve_app/core/sync/presentation/pages/device_sync_page.dart';
 import 'package:involve_app/features/support/presentation/pages/complaint_page.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  await dotenv.load(fileName: ".env");
 
-  // Initialize Supabase with staging credentials
-  await Supabase.initialize(
-    url: 'https://rpcjelhacmkhzguljdgi.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwY2plbGhhY21raHpndWxqZGdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NjI1OTYsImV4cCI6MjA5NjIzODU5Nn0.9ncknpcqC-PLOufVr1IWJXweteuOEMm46qXzC25un2k',
-  );
+  // Load optional local .env for debug only (file must not be listed in pubspec assets)
+  try {
+    await dotenv.load(fileName: ".env");
+    AppConfig.hydrateFromDotenv(Map<String, String>.from(dotenv.env));
+  } catch (_) {
+    // Release / CI builds rely on --dart-define instead
+  }
+
+  final supabaseUrl = AppConfig.supabaseUrl;
+  final supabaseAnonKey = AppConfig.supabaseAnonKey;
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    if (kReleaseMode) {
+      throw StateError('Missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY for release build');
+    }
+    AppConfig.supabaseInitialized = false;
+    debugPrint('Warning: Supabase not configured — set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY');
+  } else {
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
+    );
+    AppConfig.supabaseInitialized = true;
+  }
   
   // Set up global BLoC observer
   Bloc.observer = SimpleBlocObserver();
@@ -160,6 +176,27 @@ void main() async {
     initialize: () => AppDependencies.initialize(),
     childBuilder: (context, deps) => InvolveApp(dependencies: deps),
   ));
+}
+
+/// Auth token for API/socket calls. Safe when Supabase was never initialized.
+Future<String?> resolveAuthToken([SecurityService? security]) async {
+  final svc = security ?? SecurityService();
+  String? supabaseToken;
+  if (AppConfig.supabaseInitialized) {
+    try {
+      supabaseToken = Supabase.instance.client.auth.currentSession?.accessToken;
+    } catch (_) {}
+  }
+  return supabaseToken ??
+      await svc.getOfflineToken() ??
+      (kReleaseMode ? null : 'mock-super-admin');
+}
+
+IFinanceRealtimeDataSource _buildFinanceRealtime() {
+  if (AppConfig.supabaseInitialized) {
+    return FinanceRealtimeDataSourceImpl(Supabase.instance.client);
+  }
+  return const NoOpFinanceRealtimeDataSource();
 }
 
 /// A container class for all application-wide dependencies.
@@ -306,10 +343,10 @@ class AppDependencies {
     final financeRepoNew = FinanceRepository(
       FinanceApiClient(
         baseUrl: baseUrl,
-        getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken ?? await SecurityService().getOfflineToken() ?? 'mock-super-admin',
+        getToken: () => resolveAuthToken(),
         getTenantId: () async => await SecurityService().getTenantId(),
       ),
-      FinanceRealtimeDataSourceImpl(Supabase.instance.client),
+      _buildFinanceRealtime(),
       database,
     );
 
@@ -350,7 +387,14 @@ class AppDependencies {
     final backupService = BackupService(database: database);
     
     final discoveryService = DiscoveryService();
-    const secretToken = 'PRO-TOKEN-123';
+    // Per-installation sync token — never a shared static secret
+    final prefs = await SharedPreferences.getInstance();
+    var secretToken = prefs.getString('lan_sync_secret_token');
+    if (secretToken == null || secretToken.isEmpty || secretToken == 'PRO-TOKEN-123') {
+      final rand = List.generate(32, (_) => (DateTime.now().microsecondsSinceEpoch + _).toRadixString(36)).join();
+      secretToken = 'sync_${rand.hashCode.toRadixString(16)}_${deviceId.hashCode.toRadixString(16)}';
+      await prefs.setString('lan_sync_secret_token', secretToken);
+    }
     
     final syncServer = SyncServer(
       database: database,
@@ -368,7 +412,7 @@ class AppDependencies {
 
     final financeApiClient = FinanceApiClient(
       baseUrl: baseUrl,
-      getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken ?? await SecurityService().getOfflineToken() ?? 'mock-super-admin',
+      getToken: () => resolveAuthToken(),
       getTenantId: () async => await SecurityService().getTenantId(),
     );
 
@@ -444,18 +488,18 @@ class AppDependencies {
         remoteDataSource: FinanceRemoteDataSourceImpl(
           FinanceApiClient(
             baseUrl: baseUrl,
-            getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
+            getToken: () => resolveAuthToken(),
             getTenantId: () async => await SecurityService().getTenantId(),
           ),
         ),
-        realtimeDataSource: FinanceRealtimeDataSourceImpl(Supabase.instance.client),
+        realtimeDataSource: _buildFinanceRealtime(),
       ),
       financeRepositoryNew: financeRepoNew,
       notificationRepository: notificationRepo,
       billingRepository: BillingRepositoryImpl(
         FinanceApiClient(
           baseUrl: baseUrl,
-          getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
+          getToken: () => resolveAuthToken(),
           getTenantId: () async => await SecurityService().getTenantId(),
         ),
       ),
@@ -476,7 +520,7 @@ class AppDependencies {
       adminRepository: AdminRepositoryImpl(
         FinanceApiClient(
           baseUrl: baseUrl,
-          getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken ?? await SecurityService().getOfflineToken() ?? 'mock-super-admin',
+          getToken: () => resolveAuthToken(),
           getTenantId: () async => await SecurityService().getTenantId(),
         ),
       ),
@@ -563,7 +607,7 @@ class _InvolveAppState extends State<InvolveApp> {
       type: config?.type,
       deviceId: deviceId,
       businessName: config?.businessName,
-      token: Supabase.instance.client.auth.currentSession?.accessToken ?? await widget.dependencies.securityService.getOfflineToken() ?? 'mock-super-admin',
+      token: await resolveAuthToken(widget.dependencies.securityService),
     );
   }
 

@@ -1,0 +1,202 @@
+========================================
+INVIFY STEP 24 — RELEASE MANIFEST
+========================================
+
+BASELINE_HEAD=0f7965642ba8ef716784c50777700ec1c0794ee6
+RELEASE_READY=NO
+
+DEPLOYED_BACKEND_SOURCE=Build source is invify-backend/; release artifact subdirectory is backend/. Live VPS version was not contacted or confirmed in Step 24.
+CURRENT_BACKEND_SOURCE=invify-backend/
+LEGACY_BACKEND_SOURCE=backend/
+BACKEND_SOURCE_CONFIDENCE=HIGH
+LIVE_STAGING_SOURCE_CONFIDENCE=MEDIUM
+LOCAL_UX03_DEPLOYMENT_STATUS=Repository metadata says NOT DEPLOYED/PENDING; do not assume the VPS runs UX03.
+
+NODE_MODULES_RELEASE_ACTION=EXCLUDE
+NODE_MODULES_EXCLUDED=YES
+SECRETS_EXCLUDED=YES
+GENERATED_FILES_EXCLUDED=YES
+MOBILE_EXCLUDED=YES
+ANDROID_ARTIFACTS_EXCLUDED=YES
+ARCHIVES_EXCLUDED=YES
+
+DATABASE_RELEASE_REQUIRED=NO
+DATABASE_NOTE=No SQL or TypeScript migration is required by the isolated frontend API-origin, login, OTP-route, or canonical admin-route changes. No database file is selected.
+
+TOTAL_RELEASE_FILES=31 provisional frontend/backend/config candidates; release remains blocked by mixed-file and runtime-risk review
+FRONTEND_RELEASE_COUNT=12 provisional
+BACKEND_RELEASE_COUNT=12 provisional
+CONFIG_RELEASE_COUNT=7 provisional
+
+RELEASE_FRONTEND_FILES=
+invify-admin/src/api/index.js
+invify-admin/src/main.js
+invify-admin/src/pages/governance/AdminLoginPage.vue
+invify-admin/src/pages/governance/LoginPage.vue
+invify-admin/src/pages/governance/MFAChallengePage.vue
+invify-admin/src/pages/governance/SessionGovernancePage.vue
+invify-admin/src/pages/UsersPage.vue
+invify-admin/src/pages/admin/AgentOnboardingPage.vue
+invify-admin/src/pages/admin/PlatformConfigPage.vue
+invify-admin/src/pages/admin/TenantOrchestrationCenterPage.vue
+invify-admin/src/pages/governance/TenantManagementPage.vue
+invify-admin/src/composables/useTenantExperience.js
+
+FRONTEND_FILE_REASONS=
+invify-admin/src/api/index.js | Central validated API origin and canonical /api/admin users, tenants, agents, and settings routes.
+invify-admin/src/main.js | Resolves the API base during startup and fails fast on invalid staging configuration.
+invify-admin/src/pages/governance/AdminLoginPage.vue | Super Admin login and recovery calls use the validated API resolver; contains the latest approved login presentation.
+invify-admin/src/pages/governance/LoginPage.vue | Tenant/admin login, OTP, MFA, and password recovery use the validated API resolver.
+invify-admin/src/pages/governance/MFAChallengePage.vue | Removes the hardcoded tunnel and uses the configured MFA API routes.
+invify-admin/src/pages/governance/SessionGovernancePage.vue | Session list/revoke and API-key provisioning use the validated API resolver.
+invify-admin/src/pages/UsersPage.vue | Admin user reset uses the validated API resolver and null-safe filtering.
+invify-admin/src/pages/admin/AgentOnboardingPage.vue | Uses canonical /api/admin/agents routes required by staging Nginx routing.
+invify-admin/src/pages/admin/PlatformConfigPage.vue | Removes LAN and loopback Quasar presets from the admin UI.
+invify-admin/src/pages/admin/TenantOrchestrationCenterPage.vue | Orchestration calls use the validated API resolver.
+invify-admin/src/pages/governance/TenantManagementPage.vue | Removes a hardcoded tunnel from tenant impersonation.
+invify-admin/src/composables/useTenantExperience.js | Tenant context and branding calls use the validated API resolver.
+
+RELEASE_BACKEND_FILES=
+invify-backend/src/utils/supabase-jwt.ts
+invify-backend/src/config/security-boot.ts
+invify-backend/src/controllers/health.controller.ts
+invify-backend/src/middleware/auth.middleware.ts
+invify-backend/src/controllers/auth.controller.ts
+invify-backend/src/app.ts
+invify-backend/src/config/build-variant.ts
+invify-backend/src/config/constants.ts
+invify-backend/src/db/supabase.ts
+invify-backend/src/middleware/rbac.middleware.ts
+invify-backend/package.json
+invify-backend/package-lock.json
+
+BACKEND_FILE_REASONS=
+invify-backend/src/utils/supabase-jwt.ts | Required ES256/RS JWKS and HS JWT verification used by HTTP auth, Socket.IO, health, and secure boot.
+invify-backend/src/config/security-boot.ts | Required fail-closed staging boot gate for mock auth, legacy keys, weak JWT configuration, and wildcard CORS.
+invify-backend/src/controllers/health.controller.ts | Required /livez, /readyz, and /health staging contract.
+invify-backend/src/middleware/auth.middleware.ts | Required cryptographic JWT validation and removal of decode-only/elevation behavior.
+invify-backend/src/controllers/auth.controller.ts | Required login token/refresh contract and /api/auth/mfa/setup and /api/auth/mfa/verify endpoints.
+invify-backend/src/app.ts | Registers health, MFA, canonical /api/admin routes, secure boot, CORS, and Socket.IO authentication.
+invify-backend/src/config/build-variant.ts | Required staging Supabase credential resolution and removal of hardcoded staging defaults.
+invify-backend/src/config/constants.ts | Prevents mock auth from being enabled by test environment alone.
+invify-backend/src/db/supabase.ts | Required safe Supabase client bootstrap for the new build-variant credential contract.
+invify-backend/src/middleware/rbac.middleware.ts | Required RBAC matching for canonical /api/admin routes.
+invify-backend/package.json | Adds the jose runtime dependency required by supabase-jwt.ts.
+invify-backend/package-lock.json | Locks the required jose dependency graph.
+
+BACKEND_BLOCKER_REASON=The candidate set is now identifiable, but app.ts and auth.controller.ts still contain mixed adjacent changes. The Dockerfile and staging Compose disagree on port 3004 versus 3000, and auth.controller.ts contains staging MFA acceptance codes intended for UAT. These risks require explicit release-owner approval before staging.
+
+RELEASE_CONFIG_FILES=
+invify-admin/src/config/env.js
+invify-admin/src/config/buildVariant.ts
+invify-admin/.env.staging.example
+invify-admin/vite.config.js
+invify-backend/.env.staging.example
+invify-backend/Dockerfile
+invify-backend/docker-compose.staging.yml
+
+CONFIG_FILE_REASONS=
+invify-admin/src/config/env.js | Implements AdminConfig public-HTTPS/internal-host validation and same-origin staging behavior.
+invify-admin/src/config/buildVariant.ts | Enforces explicit staging/production build variants.
+invify-admin/.env.staging.example | Placeholder-only staging build contract; no real value selected.
+invify-admin/vite.config.js | Local development proxy for the existing /auth and /public contracts; contains no runtime secret.
+invify-backend/.env.staging.example | Placeholder-only staging backend environment contract; no runtime secret selected.
+invify-backend/Dockerfile | Corrects the backend entrypoint and defines the image healthcheck.
+invify-backend/docker-compose.staging.yml | Defines staging build variant, Supabase variables, mock-auth disablement, CORS, and readiness healthcheck.
+
+EXCLUDED_NODE_MODULES=
+backend/node_modules/** (8,031 tracked deleted paths; never select)
+NODE_MODULES_HISTORY_NOTE=Accidentally committed in a02b34bc; the ignore rule does not retroactively untrack them. Their current deletion is uncommitted legacy-tree cleanup and is excluded from this release.
+
+EXCLUDED_GENERATED_FILES=
+PHASE_*.md
+PRODUCTION_RELEASE_*
+invify-admin/qa-artifacts/**
+android/build/reports/**
+releases/**
+production-release/**
+
+EXCLUDED_LOGS=
+*.log
+*.out
+*.err
+*_log.txt
+agent-tools-*.txt
+analyze_output.txt
+
+EXCLUDED_MOBILE=
+lib/**
+android/**
+ios/**
+linux/**
+macos/**
+windows/**
+pubspec.yaml
+pubspec.lock
+
+EXCLUDED_ANDROID_ARTIFACTS=
+android/build/**
+*.apk
+*.aab
+
+EXCLUDED_ARCHIVES=
+assets.zip
+*.zip
+*.tar
+*.tar.gz
+
+EXCLUDED_SCRATCH_FILES=
+backend/scripts/**
+invify-backend/scratch/**
+invify-admin/scratch/**
+invify-admin/scripts/phase6s27*-qa.mjs
+invify-admin/scripts/phase6s27c-endpoint-gate.mjs
+
+EXCLUDED_UNRELATED_SQL=
+backend/database/**
+invify-backend/scratch/**/*.sql
+invify-backend/supabase/migrations/20260813000000_p20_payment_idempotency_constraints.sql
+invify-backend/src/db/migrations/**
+
+EXCLUDED_FILES=
+backend/**
+backend/node_modules/**
+assets.zip
+invify-admin/qa-artifacts/**
+invify-admin/FINANCIAL_PLATFORM_UI_ENHANCEMENT_REPORT.md
+invify-backend/.env_ex
+invify-backend/_p4_*.err
+invify-backend/_p4_*.out
+invify-backend/check_*.ts
+invify-backend/inspect_*.ts
+invify-backend/fix_db_constraint.ts
+invify-backend/clear_tenants.ts
+invify-backend/fetch_tenants.ts
+invify-backend/test_*.* 
+
+UNKNOWN_FILES=
+invify-backend/src/controllers/user.controller.ts is conditional on including admin user-creation behavior.
+invify-backend/src/config/env.ts is conditional Quasar boot hardening, not required by the critical login/JWT path.
+invify-backend/src/app.ts and auth.controller.ts require mixed-change review before approval.
+invify-backend/Dockerfile and docker-compose.staging.yml require a single confirmed backend port before approval.
+The staging MFA acceptance-code behavior in auth.controller.ts requires explicit security approval or removal in a later change step.
+invify-admin/package.json and package-lock.json mix a useful staging build script with Playwright/QA-only additions.
+invify-admin/src/router/AuthBootstrapGuard.js and routes.js mix authentication navigation with an unrelated public website.
+invify-admin/src/supabase.js, AuditTrailPage.vue, operations.sdk.ts, and endpoint-gate scripts are adjacent hardening/gate changes but not proven essential to this release.
+invify-admin/src/pages/IndexPage.vue, OnboardingFlow.vue, public/RegisterPage.vue, stores/onboarding.store.ts, utils/africaDialCodes.ts, utils/onboardingValidation.ts, and tests/onboardingValidation.test.ts are intentional onboarding work but are outside the stated admin login/dashboard release scope.
+Remaining modified invify-admin pages include broader finance, observability, public-marketing, and orchestration work not proven to belong to this release.
+Production workflow, Kubernetes, production Compose, infrastructure, reports, release trees, and legacy source deletions are not selected.
+
+SAFETY_CHECKS=
+NO backend/node_modules path selected.
+NO secret-bearing runtime environment file selected.
+NO generated report or QA artifact selected.
+NO log or temporary output selected.
+NO archive selected.
+NO mobile or Android artifact selected.
+NO legacy backend deletion selected.
+NO SQL or migration selected.
+
+STOP_REASON=The backend candidate set is identified, but mixed app/auth changes, the Docker/Compose port mismatch, staging MFA UAT acceptance behavior, and mixed frontend router/package files prevent release approval. RELEASE_READY remains NO.
+
+========================================

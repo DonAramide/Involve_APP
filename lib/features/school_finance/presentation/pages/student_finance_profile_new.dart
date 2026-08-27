@@ -166,7 +166,7 @@ class _FinancialSummaryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
 
     return Column(
       children: [
@@ -360,7 +360,7 @@ class _TransactionList extends StatelessWidget {
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final tx = transactions[index];
-        final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+        final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
         final dateFormat = DateFormat('MMM dd, yyyy');
 
         return Container(

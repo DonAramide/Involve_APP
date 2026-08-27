@@ -77,8 +77,8 @@
                   filled
                   :dark="prefs.isDarkMode"
                   label="Quasar API Base URL"
-                  hint="Ends with /api/v1 — e.g. http://192.168.1.193:4000/api/v1"
-                  placeholder="http://192.168.1.193:4000/api/v1"
+                  hint="Ends with /api/v1 — use the configured Quasar environment URL"
+                  placeholder="https://quasar.example.invalid/api/v1"
                   clearable
                   class="q-mb-md"
                 />
@@ -88,10 +88,6 @@
                   <div class="font-mono text-cyan-3 text-caption q-mt-xs">{{ quasarIccPreview }}</div>
                 </div>
                 <div class="row q-gutter-sm">
-                  <q-btn dense outline color="purple-4" label="LAN :4000" no-caps
-                    @click="quasarBaseUrl = 'http://192.168.1.193:4000/api/v1'" :dark="prefs.isDarkMode" />
-                  <q-btn dense outline color="purple-4" label="127.0.0.1:4000" no-caps
-                    @click="quasarBaseUrl = 'http://127.0.0.1:4000/api/v1'" :dark="prefs.isDarkMode" />
                   <q-btn dense outline color="purple-4" label="Production" no-caps
                     @click="quasarBaseUrl = 'https://api-quasar.iips.app/api/v1'" :dark="prefs.isDarkMode" />
                 </div>

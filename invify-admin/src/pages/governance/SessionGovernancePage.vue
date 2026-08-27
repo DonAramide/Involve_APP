@@ -210,6 +210,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { joinApiUrl } from '../../config/env'
 
 const activeViewTab = ref('SESSIONS')
 
@@ -240,7 +241,7 @@ onMounted(() => {
 
 const fetchLiveSessions = async () => {
   try {
-    const res = await axios.get('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/sessions', {
+    const res = await axios.get(joinApiUrl('/api/governance/sessions'), {
       headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
     })
     if (res.data?.sessions && Array.isArray(res.data.sessions)) {
@@ -257,7 +258,7 @@ const fetchLiveSessions = async () => {
 const revokeSessionStream = async (keyStr) => {
   loadingTarget.value = keyStr
   try {
-    await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/sessions/revoke', { tokenKey: keyStr }, {
+    await axios.post(joinApiUrl('/api/governance/sessions/revoke'), { tokenKey: keyStr }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }
     })
     // Remove element instantly
@@ -274,7 +275,7 @@ const executeApiKeyProvision = async () => {
   loadingApi.value = true
   lastApiKeyPlaintext.value = ''
   try {
-    const res = await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/api-keys', {
+    const res = await axios.post(joinApiUrl('/api/governance/api-keys'), {
       targetTenantId: apiForm.value.targetTenantId,
       label: apiForm.value.label
     }, {
@@ -296,7 +297,7 @@ const executeApiKeyProvision = async () => {
 const executePlatformLockdown = async () => {
   loadingKillSwitch.value = true
   try {
-    await axios.post('https://bertie-archegoniate-causelessly.ngrok-free.dev/api/governance/emergency/kill-switch', {
+    await axios.post(joinApiUrl('/api/governance/emergency/kill-switch'), {
       masterConfirmationCode: killSwitchInput.value
     }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('invify_token')}` }

@@ -468,6 +468,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   indicatorTooltip: item.indicatorTooltip,
                   secondaryIndicatorColor: item.secondaryIndicatorColor,
                   secondaryIndicatorTooltip: item.secondaryIndicatorTooltip,
+                  isLocked: item.isLocked,
                 )).toList(),
               );
 
@@ -644,10 +645,59 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  /// Trial + Basic tiers (anything that is not a paid Pro/Standard/Lifetime plan).
+  bool _isTrialOrBasicPlan(UserPlan? plan) =>
+      plan == null || plan.isBasic || plan.isFreeTrial;
+
+  void _showFeaturePlanLock(BuildContext context, String featureName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.orange.shade800),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Feature Locked')),
+          ],
+        ),
+        content: Text(
+          '$featureName is available on Pro plans.\n\n'
+          'Trial and Basic users can activate a license to unlock this module.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('NOT NOW'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushNamed(context, '/go_pro');
+            },
+            child: const Text('GO PRO'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushNamed(context, ActivationPage.routeName);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('ACTIVATE'),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<_DashboardMenuItem> _getMenuItems(BuildContext context, AppSettings? settings, PrinterState printerState, UserPlan? userPlan) {
     final isSchool = settings?.businessMode == 'school';
     final isServices = settings?.businessMode == 'services';
     final isBasicTier = userPlan == null || userPlan.isBasic;
+    final lockTrialBasic = _isTrialOrBasicPlan(userPlan);
     
     final allItems = <_DashboardMenuItem>[
       if (!isSchool) ...[
@@ -843,7 +893,10 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'FINANCE DASHBOARD',
           icon: Icons.dashboard_customize,
           color: Colors.blueGrey,
-          onTap: () => _verifyAndNavigateToFinance(context, '/school_finance'),
+          isLocked: lockTrialBasic,
+          onTap: lockTrialBasic
+              ? () => _showFeaturePlanLock(context, 'Finance Dashboard')
+              : () => _verifyAndNavigateToFinance(context, '/school_finance'),
         ),
         _DashboardMenuItem(
           id: 'academic_setup',
@@ -885,7 +938,10 @@ class _DashboardPageState extends State<DashboardPage> {
           title: 'LESSON NOTES',
           icon: Icons.note_alt,
           color: Colors.teal,
-          onTap: () => Navigator.pushNamed(context, '/lesson_notes_list'),
+          isLocked: lockTrialBasic,
+          onTap: lockTrialBasic
+              ? () => _showFeaturePlanLock(context, 'Lesson Notes')
+              : () => Navigator.pushNamed(context, '/lesson_notes_list'),
         ),
       ]);
     }
@@ -921,14 +977,16 @@ class _DashboardPageState extends State<DashboardPage> {
     String? indicatorTooltip,
     Color? secondaryIndicatorColor,
     String? secondaryIndicatorTooltip,
+    bool isLocked = false,
   }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final tileColor = isLocked ? Colors.grey : color;
 
     return Card(
       key: key,
       elevation: 4,
-      shadowColor: color.withOpacity(0.3),
+      shadowColor: tileColor.withOpacity(0.3),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       color: isDark ? theme.colorScheme.surface : Colors.white,
       child: InkWell(
@@ -943,10 +1001,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.12),
+                      color: tileColor.withOpacity(0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(icon, size: 32, color: color),
+                    child: Icon(icon, size: 32, color: tileColor),
                   ),
                   const SizedBox(height: 12),
                   Padding(
@@ -957,7 +1015,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold, 
                         fontSize: 12, 
-                        color: isDark ? Colors.white.withOpacity(0.9) : Colors.grey[800],
+                        color: isDark
+                            ? Colors.white.withOpacity(isLocked ? 0.55 : 0.9)
+                            : (isLocked ? Colors.grey[500] : Colors.grey[800]),
                         letterSpacing: 0.5,
                       ),
                       maxLines: 2,
@@ -967,7 +1027,21 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            if (indicatorColor != null || secondaryIndicatorColor != null)
+            if (isLocked)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Icon(Icons.lock, size: 14, color: Colors.orange.shade800),
+                ),
+              )
+            else if (indicatorColor != null || secondaryIndicatorColor != null)
               Positioned(
                 top: 16,
                 right: 16,
@@ -1078,6 +1152,7 @@ class _DashboardMenuItem {
   final String? indicatorTooltip;
   final Color? secondaryIndicatorColor;
   final String? secondaryIndicatorTooltip;
+  final bool isLocked;
 
   _DashboardMenuItem({
     required this.id,
@@ -1089,5 +1164,6 @@ class _DashboardMenuItem {
     this.indicatorTooltip,
     this.secondaryIndicatorColor,
     this.secondaryIndicatorTooltip,
+    this.isLocked = false,
   });
 }

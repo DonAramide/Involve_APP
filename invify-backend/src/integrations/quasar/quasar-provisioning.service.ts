@@ -35,7 +35,7 @@ export interface ProvisionMerchantResult {
 }
 
 const INVIFY_WEBHOOK_URL =
-  process.env.INVIFY_QUASAR_WEBHOOK_URL ?? 'https://api.invify.app/webhooks/quasar';
+  process.env.INVIFY_QUASAR_WEBHOOK_URL ?? 'https://api.invify.org/webhooks/quasar';
 
 export class QuasarProvisioningService {
 

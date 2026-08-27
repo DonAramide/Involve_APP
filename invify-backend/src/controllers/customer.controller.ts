@@ -6,6 +6,17 @@ import { customerService } from '../services/customer.service';
 import { CustomerStatus } from '../types/customer.dto';
 import { supabaseAdmin } from '../db/supabase';
 import { rejectIfFreeTrialVa } from '../utils/free-trial-guard';
+import { resolveAuthoritativeTenantId } from '../utils/finance-tenant';
+
+function tenantFromRequest(req: Request, res: Response): string | null {
+  try {
+    return resolveAuthoritativeTenantId(req);
+  } catch (err: any) {
+    const status = err?.status || 403;
+    res.status(status).json({ error: err?.message || 'Forbidden: Cross-tenant access denied' });
+    return null;
+  }
+}
 
 export class CustomerController {
   /**
@@ -14,7 +25,8 @@ export class CustomerController {
   static async getVirtualAccount(req: Request, res: Response) {
     try {
       const { customerId } = req.params;
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       const { name, email, phone } = req.body;
 
       if (!customerId) return res.status(400).json({ error: "Customer ID is required" });
@@ -93,7 +105,8 @@ export class CustomerController {
 
   static async searchCustomers(req: Request, res: Response) {
     try {
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
 
       const options = {
@@ -117,7 +130,8 @@ export class CustomerController {
 
   static async getCustomerSummary(req: Request, res: Response) {
     try {
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       const customerId = req.params.id;
       if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
 
@@ -133,7 +147,8 @@ export class CustomerController {
 
   static async createCustomer(req: Request, res: Response) {
     try {
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
 
       const customer = await customerService.createCustomer(tenantId, req.body);
@@ -146,7 +161,8 @@ export class CustomerController {
 
   static async bulkSyncCustomers(req: Request, res: Response) {
     try {
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       const { customers } = req.body as { customers: any[] };
 
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
@@ -175,7 +191,8 @@ export class CustomerController {
 
   static async updateCustomer(req: Request, res: Response) {
     try {
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       const customerId = req.params.id;
       if (!tenantId) return res.status(401).json({ error: "Unauthorized" });
 
@@ -190,7 +207,8 @@ export class CustomerController {
   static async getStaffVirtualAccount(req: Request, res: Response) {
     try {
       const { userId } = req.params;
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       const { customLastName, email, phone } = req.body;
 
       if (!userId) return res.status(400).json({ error: "Staff User ID is required" });
@@ -273,7 +291,8 @@ export class CustomerController {
 
   static async listTenantVirtualAccounts(req: Request, res: Response) {
     try {
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
 
       // 1. Fetch Customers with virtual accounts
@@ -396,7 +415,8 @@ export class CustomerController {
   static async getVirtualAccountTransactions(req: Request, res: Response) {
     try {
       const { accountNumber } = req.params;
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
       if (!accountNumber) return res.status(400).json({ error: "accountNumber is required" });
 
@@ -427,7 +447,8 @@ export class CustomerController {
     try {
       const { accountNumber } = req.params;
       const { amount } = req.body;
-      const tenantId = (req.headers['x-tenant-id'] as string) || (req as any).user?.tenantId;
+      const tenantId = tenantFromRequest(req, res);
+      if (!tenantId) return;
       if (!tenantId) return res.status(401).json({ error: "Unauthorized: Tenant context missing" });
       if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid sweep amount" });
 

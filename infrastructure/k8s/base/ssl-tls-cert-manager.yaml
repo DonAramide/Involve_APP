@@ -33,10 +33,10 @@ spec:
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
-  commonName: api.IIPS.app
+  commonName: api.invify.org
   dnsNames:
-    - api.IIPS.app
-    - ops.IIPS.app
+    - api.invify.org
+    - app.invify.org
     - stream.IIPS.app
   privateKey:
     algorithm: RSA

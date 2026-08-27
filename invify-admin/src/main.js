@@ -2,8 +2,10 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { Quasar, Notify, Dialog, Loading } from 'quasar'
 import axios from 'axios'
+import { resolveApiBaseUrl } from './config/env'
 
-axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true'
+// Ensure API base is resolved early (fails fast in staging/prod if missing)
+axios.defaults.baseURL = resolveApiBaseUrl()
 
 import '@quasar/extras/material-icons/material-icons.css'
 import 'quasar/src/css/index.sass'

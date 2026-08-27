@@ -2,6 +2,28 @@ import { Request, Response } from 'express';
 import { leadService } from '../services/lead.service';
 import { supabase } from '../../../db/supabase';
 import { integrationEngine } from '../../../services/integration-engine.service';
+import { BuildVariantService } from '../../../config/build-variant';
+import { IntegrationVaultService } from '../../../services/integration-vault.service';
+
+async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
+  const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
+  if (envKey) return envKey;
+
+  try {
+    const environment = BuildVariantService.getInstance().getVariant() === 'PROD' ? 'PRODUCTION' : 'STAGING';
+    const vaultKey = await IntegrationVaultService.getDecryptedCredential('quasar', environment, tenantId);
+    if (vaultKey) return vaultKey;
+  } catch (err: any) {
+    console.warn(`[Vault] Failed to resolve Quasar API key from vault: ${err.message}`);
+  }
+
+  const variant = BuildVariantService.getInstance();
+  if (variant.isProd() || variant.isStaging()) {
+    throw new Error('QUASAR_API_KEY is required in staging/production');
+  }
+
+  return 'demo-key';
+}
 
 export class LeadController {
   static async create(req: Request, res: Response) {
@@ -92,7 +114,7 @@ export class LeadController {
 
       // Try virtual account creation using Quasar SDK
       try {
-        const platformApiKey = process.env.QUASER_API_KEY || 'demo-key';
+        const platformApiKey = await resolvePlatformApiKey(tenant.id);
         const QuasarServiceModule = require('../../../integrations/quasar/quasar.service').QuasarService;
         const quasar = new QuasarServiceModule(platformApiKey);
         const platformId = 'platform-admin-owner-id';

@@ -116,7 +116,7 @@ flutter:
     - assets/docs/
     - assets/sounds/
     - assets/fonts/
-    - .env
+    # NOTE: Do NOT package .env — secrets/config must not ship inside release binaries.
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

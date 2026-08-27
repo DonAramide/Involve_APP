@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Allow: /platform
+Allow: /solutions
+Allow: /features
+Allow: /financial-operations
+Allow: /security
+Allow: /pricing
+Allow: /about
+Allow: /contact
+
+Disallow: /admin/
+Disallow: /tenant/
+Disallow: /fleet/
+Disallow: /finance/
+Disallow: /governance/
+
+Sitemap: https://invify.org/sitemap.xml

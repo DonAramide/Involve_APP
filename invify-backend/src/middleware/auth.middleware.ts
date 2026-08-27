@@ -1,18 +1,19 @@
 // src/middleware/auth.middleware.ts
 import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin } from '../db/supabase';
-import { isMockTokenAllowed, isMockAuthAllowed, SYSTEM_USER_UUID, SYSTEM_TENANT_UUID } from '../config/constants';
-import jwt from 'jsonwebtoken';
+import { isMockTokenAllowed, isMockAuthAllowed, SYSTEM_USER_UUID } from '../config/constants';
+import { BuildVariantService } from '../config/build-variant';
+import { verifySupabaseAccessToken, verifyWithSharedSecrets, peekAlg, supabaseProjectUrl } from '../utils/supabase-jwt';
 
 /**
  * Middleware: Supabase JWT Verification
- * Extracts the token, verifies it with Supabase, and populates req.user.
  *
- * Security model:
- *  - All mock/bypass paths are gated by isMockTokenAllowed() or isMockAuthAllowed().
- *  - Both guards return false unconditionally in STAGING and PROD.
- *  - Slow/unavailable DB: use short timeout + profile cache + JWT-claim fallback
- *    (never hang ~90s then 503).
+ * Security model (Phase 2 / Phase 4):
+ *  - Staging/Production: JWT MUST be cryptographically verified (HS via SUPABASE_JWT_SECRET,
+ *    ES/RS via project JWKS). Missing secret → 503 fail-closed for HS path; missing URL → 503 for JWKS.
+ *  - LOCAL/test only: mock bypasses gated by isMockTokenAllowed / isMockAuthAllowed.
+ *  - Never auto-elevate to super_admin.
+ *  - Never trust email hardcodes for role elevation.
  */
 
 const PROFILE_TTL_MS = Number(process.env.AUTH_PROFILE_CACHE_TTL_MS || 5 * 60 * 1000);
@@ -80,6 +81,19 @@ function isTimeoutError(err: any): boolean {
   );
 }
 
+function requiresVerifiedJwt(): boolean {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    process.env.APP_ENV === 'production' ||
+    process.env.BUILD_PROFILE === 'production'
+  ) {
+    return true;
+  }
+  const variant = BuildVariantService.getInstance();
+  return variant.isStaging() || variant.isProd();
+}
+
+/** Least-privilege claims from JWT — never super_admin from absence of data. */
 function claimsFromJwt(jwtPayload: any, userId: string, userEmail: string): CachedProfile {
   let role =
     jwtPayload.role === 'authenticated' || !jwtPayload.role
@@ -87,6 +101,14 @@ function claimsFromJwt(jwtPayload: any, userId: string, userEmail: string): Cach
         jwtPayload.user_metadata?.role ||
         'owner'
       : jwtPayload.role;
+
+  // Strip accidental privilege escalation from unverified claim shapes
+  if (String(role).toLowerCase() === 'super_admin' && !jwtPayload.app_metadata?.role && !jwtPayload.user_metadata?.role) {
+    // Only trust super_admin if explicitly set in app/user metadata from a verified token;
+    // still prefer DB profile. For claim fallback use least privilege.
+    role = 'owner';
+  }
+
   let tenantId =
     jwtPayload.tenantId ||
     jwtPayload.tenant_id ||
@@ -97,24 +119,71 @@ function claimsFromJwt(jwtPayload: any, userId: string, userEmail: string): Cach
     null;
   if (tenantId === 'undefined' || tenantId === 'null') tenantId = null;
 
-  const normalizedEmail = (userEmail || '').trim().toLowerCase();
-  if (
-    normalizedEmail === 'sysadmin@iips.app' ||
-    normalizedEmail === 'superadmin@iips.app' ||
-    normalizedEmail === 'averyd777@gmail.com'
-  ) {
-    role = 'super_admin';
-    tenantId = SYSTEM_TENANT_UUID;
-  }
-
   return {
     id: userId,
     email: userEmail,
-    role: String(role || 'owner'),
+    role: String(role || 'owner').toLowerCase() === 'super_admin' ? 'owner' : String(role || 'owner'),
     tenant_id: tenantId,
     is_active: true,
     name: jwtPayload.user_metadata?.full_name || 'User',
   };
+}
+
+async function verifyBearerToken(token: string): Promise<any> {
+  const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET;
+  const localJwtSecret = process.env.JWT_SECRET;
+
+  if (requiresVerifiedJwt()) {
+    // Staging/prod: asymmetric (ES256) via JWKS, or HS256 via legacy JWT secret.
+    const alg = peekAlg(token);
+    const isAsymmetric = alg.startsWith('ES') || alg.startsWith('RS') || alg.startsWith('PS');
+
+    if (isAsymmetric) {
+      const base = supabaseProjectUrl();
+      if (!base) {
+        const err: any = new Error('Authentication misconfigured: SUPABASE_URL required for asymmetric JWT');
+        err.status = 503;
+        err.code = 'JWT_JWKS_URL_MISSING';
+        throw err;
+      }
+      return verifySupabaseAccessToken(token);
+    } else {
+      if (!supabaseJwtSecret || supabaseJwtSecret.length < 16) {
+        const err: any = new Error('Authentication misconfigured: SUPABASE_JWT_SECRET required');
+        err.status = 503;
+        err.code = 'JWT_SECRET_MISSING';
+        throw err;
+      }
+      return verifySupabaseAccessToken(token);
+    }
+  }
+
+  // LOCAL / test: try Supabase verifier first (HS + JWKS), then JWT_SECRET for offline tokens
+  try {
+    return await verifySupabaseAccessToken(token);
+  } catch (primary: any) {
+    if (primary?.code === 'JWT_SECRET_MISSING' || primary?.code === 'JWT_JWKS_URL_MISSING') {
+      // fall through to local secret
+    } else if (!localJwtSecret) {
+      throw primary;
+    }
+  }
+
+  if (localJwtSecret && localJwtSecret.length >= 16) {
+    try {
+      return verifyWithSharedSecrets(token, [localJwtSecret]);
+    } catch {
+      const err: any = new Error('Invalid or expired token');
+      err.status = 401;
+      throw err;
+    }
+  }
+
+  // LOCAL without secrets: still refuse decode-only (fail closed for forged tokens)
+  const err: any = new Error('JWT verification secret not configured');
+  err.status = 503;
+  err.code = 'JWT_SECRET_MISSING';
+  throw err;
 }
 
 export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
@@ -134,28 +203,33 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         return next();
       }
 
-      if (authHeader && authHeader.startsWith('Bearer mock-super-admin')) {
+      if (authHeader && (authHeader.startsWith('Bearer mock-super-admin') || authHeader === 'Bearer mock-admin-token')) {
         console.warn('[AuthMiddleware] Developer mock-super-admin auth bypass triggered.');
         (req as any).user = {
           id: SYSTEM_USER_UUID,
           email: 'superadmin@invify.app',
           role: 'super_admin',
-          tenantId: req.headers['x-tenant-id'] || null,
+          tenantId: null,
         };
         return next();
       }
     }
 
-    if (isMockAuthAllowed() && authHeader !== 'Bearer invalid.jwt.token') {
+    // Offline blanket bypass ONLY when OFFLINE_LOCAL_AUTH=true AND local/test guards pass.
+    // NODE_ENV=test alone must NOT accept arbitrary Bearer tokens.
+    if (
+      isMockAuthAllowed() &&
+      process.env.OFFLINE_LOCAL_AUTH === 'true' &&
+      authHeader &&
+      authHeader.startsWith('Bearer ') &&
+      authHeader !== 'Bearer invalid.jwt.token'
+    ) {
       console.warn('[AuthMiddleware] Developer offline auth bypass triggered.');
       (req as any).user = {
         id: SYSTEM_USER_UUID,
         email: 'superadmin@invify.app',
         role: 'super_admin',
-        tenantId:
-          req.headers['x-tenant-id'] === 'undefined' || req.headers['x-tenant-id'] === 'null'
-            ? null
-            : req.headers['x-tenant-id'] || null,
+        tenantId: null,
       };
       return next();
     }
@@ -166,23 +240,23 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
     const token = authHeader.split(' ')[1];
 
+    // Reject known unsigned / mock markers outside LOCAL mock gates
+    if (token === 'mock-super-admin' || token.includes('local_dev_signature')) {
+      if (!isMockTokenAllowed() && !isMockAuthAllowed()) {
+        return res.status(401).json({ error: 'Invalid or expired token' });
+      }
+    }
+
     try {
-      let jwtPayload: any = null;
-      const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET;
-      if (supabaseJwtSecret) {
-        try {
-          jwtPayload = jwt.verify(token, supabaseJwtSecret) as any;
-        } catch {
-          return res.status(401).json({ error: 'Invalid or expired token' });
-        }
-      } else {
-        jwtPayload = jwt.decode(token) as any;
-        if (!jwtPayload) {
-          return res.status(401).json({ error: 'Malformed token' });
-        }
-        if (jwtPayload.exp && jwtPayload.exp < Math.floor(Date.now() / 1000)) {
-          return res.status(401).json({ error: 'Token has expired' });
-        }
+      let jwtPayload: any;
+      try {
+        jwtPayload = await verifyBearerToken(token);
+      } catch (verifyErr: any) {
+        const status = verifyErr.status || 401;
+        return res.status(status).json({
+          error: verifyErr.message || 'Invalid or expired token',
+          code: verifyErr.code,
+        });
       }
 
       const userId = jwtPayload.sub || jwtPayload.id;
@@ -191,7 +265,6 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         return res.status(401).json({ error: 'Token missing subject claim' });
       }
 
-      // Fast path: warm cache (avoids hammering Supabase when it is slow)
       const cached = getCachedProfile(userId, userEmail);
       if (cached) {
         if (!cached.is_active) {
@@ -239,27 +312,23 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         if (isTimeoutError(err)) {
           dbTimedOut = true;
           console.error(
-            `[AuthMiddleware] Supabase users database query timed out (${DB_TIMEOUT_MS}ms). Falling back to JWT/cache.`,
+            `[AuthMiddleware] Supabase users database query timed out (${DB_TIMEOUT_MS}ms).`,
           );
         } else {
           throw err;
         }
       }
 
+      // On DB timeout: least-privilege claim fallback ONLY in LOCAL; staging/prod fail closed
       if (dbTimedOut && !profile) {
-        const fallback = claimsFromJwt(jwtPayload, userId, userEmail);
-        // Prefer x-tenant-id from mobile/admin when JWT lacks tenant
-        const headerTenant = req.headers['x-tenant-id'];
-        if (
-          !fallback.tenant_id &&
-          headerTenant &&
-          headerTenant !== 'undefined' &&
-          headerTenant !== 'null'
-        ) {
-          fallback.tenant_id = String(headerTenant);
+        if (requiresVerifiedJwt()) {
+          return res.status(503).json({
+            error: 'Authentication service temporarily unavailable. Please retry.',
+          });
         }
+        const fallback = claimsFromJwt(jwtPayload, userId, userEmail);
         console.warn(
-          `[AuthMiddleware] Using JWT-claim fallback user=${fallback.id} role=${fallback.role} tenant=${fallback.tenant_id || 'n/a'}`,
+          `[AuthMiddleware] LOCAL JWT-claim fallback user=${fallback.id} role=${fallback.role} tenant=${fallback.tenant_id || 'n/a'}`,
         );
         (req as any).user = {
           id: fallback.id,
@@ -272,7 +341,11 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
       if (profileError && !profile) {
         if (isTimeoutError(profileError)) {
-          console.error('[AuthMiddleware] Supabase users database query timed out.');
+          if (requiresVerifiedJwt()) {
+            return res.status(503).json({
+              error: 'Authentication service temporarily unavailable. Please retry.',
+            });
+          }
           const fallback = claimsFromJwt(jwtPayload, userId, userEmail);
           (req as any).user = {
             id: fallback.id,
@@ -289,13 +362,24 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         }
       }
 
+      // Missing profile: NEVER auto-create as super_admin. Reject or create least-privilege owner.
       if (!profile) {
-        let decodedRole =
-          jwtPayload.role === 'authenticated' || !jwtPayload.role
-            ? 'super_admin'
-            : jwtPayload.role || 'super_admin';
-        let decodedTenantId = jwtPayload.tenantId || jwtPayload.user_metadata?.tenantId || null;
+        const leastRole = 'owner';
+        let decodedTenantId =
+          jwtPayload.tenantId ||
+          jwtPayload.tenant_id ||
+          jwtPayload.app_metadata?.tenantId ||
+          jwtPayload.user_metadata?.tenantId ||
+          null;
         if (decodedTenantId === 'undefined' || decodedTenantId === 'null') decodedTenantId = null;
+
+        // Staging/prod: require explicit provisioning — do not auto-insert privileged users
+        if (requiresVerifiedJwt()) {
+          return res.status(403).json({
+            error: 'User profile not provisioned in Invify. Contact an administrator.',
+            code: 'PROFILE_NOT_PROVISIONED',
+          });
+        }
 
         try {
           const { data: newProfile, error: insertError } = await withTimeout(
@@ -304,10 +388,10 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
               .insert({
                 id: userId,
                 email: userEmail,
-                role: decodedRole,
+                role: leastRole,
                 tenant_id: decodedTenantId,
                 is_active: true,
-                name: jwtPayload.user_metadata?.full_name || 'Admin User',
+                name: jwtPayload.user_metadata?.full_name || 'User',
               })
               .select()
               .single(),
@@ -317,40 +401,19 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
           if (insertError) {
             console.warn(
-              `[AuthMiddleware] Could not auto-create user profile. Using JWT claims: ${decodedRole}`,
+              `[AuthMiddleware] Could not auto-create user profile (least privilege). Rejecting.`,
             );
-            (req as any).user = {
-              id: userId,
-              email: userEmail,
-              role: decodedRole,
-              tenantId: decodedTenantId,
-            };
-            return next();
+            return res.status(403).json({ error: 'User profile not found in Invify' });
           }
           profile = newProfile;
         } catch (insertErr: any) {
           console.warn(
-            `[AuthMiddleware] Auto-create timed out/failed. Using JWT claims: ${insertErr.message}`,
+            `[AuthMiddleware] Auto-create timed out/failed: ${insertErr.message}`,
           );
-          (req as any).user = {
-            id: userId,
-            email: userEmail,
-            role: decodedRole,
-            tenantId: decodedTenantId,
-          };
-          return next();
+          return res.status(503).json({
+            error: 'Authentication service temporarily unavailable. Please retry.',
+          });
         }
-      }
-
-      const normalizedEmail = (userEmail || profile.email || '').trim().toLowerCase();
-      if (
-        normalizedEmail === 'sysadmin@iips.app' ||
-        normalizedEmail === 'superadmin@iips.app' ||
-        normalizedEmail === 'averyd777@gmail.com'
-      ) {
-        profile.role = 'super_admin';
-        profile.tenant_id = SYSTEM_TENANT_UUID;
-        profile.is_active = true;
       }
 
       if (!profile.is_active) {

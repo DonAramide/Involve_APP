@@ -24,7 +24,11 @@ export class VerificationService {
     tenantId?: string
   ): Promise<boolean> {
     const rawOtp = this.generateOTP();
-    console.log(`[DEV OTP BYPASS] Generated OTP for ${identifier}: ${rawOtp}`);
+    const variant = require('../config/build-variant').BuildVariantService.getInstance();
+    if (variant.isLocal() && process.env.LOG_OTP_IN_LOCAL === 'true') {
+      console.log(`[LOCAL OTP] Generated OTP for ${identifier} (value redacted unless LOG_OTP_IN_LOCAL explicitly used)`);
+      console.log(`[LOCAL OTP] code=${rawOtp}`);
+    }
     const saltRounds = 10;
     const hashedOtp = await bcrypt.hash(rawOtp, saltRounds);
     

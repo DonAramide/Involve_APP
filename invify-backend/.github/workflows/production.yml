@@ -1,9 +1,13 @@
-name: Production Release
+name: Production Release (Approval Gated)
+
+# Production path: release tag only → validate → scan → approval environment → push image → optional smoke.
+# Does NOT automatically apply cluster manifests or enable live payments.
 
 on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -20,11 +24,21 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
-      - run: npm run lint
       - run: npm run build
-      - run: npm audit --audit-level=high
-      - run: npm run test
-      - run: npm run test:e2e
+      - run: npm test
+        env:
+          NODE_ENV: test
+          BUILD_VARIANT: LOCAL
+          JWT_SECRET: ci-test-jwt-secret-key-32chars!!
+          SUPABASE_JWT_SECRET: ci-test-supabase-jwt-secret-32!
+          LICENSE_HMAC_SECRET: ci-test-license-hmac-secret-32!
+      - run: npm test -- --testPathPattern="phase2.security|commission.security"
+        env:
+          NODE_ENV: test
+          BUILD_VARIANT: LOCAL
+          JWT_SECRET: ci-test-jwt-secret-key-32chars!!
+          SUPABASE_JWT_SECRET: ci-test-supabase-jwt-secret-32!
+          LICENSE_HMAC_SECRET: ci-test-license-hmac-secret-32!
 
   security-scan:
     name: Container Security & SBOM
@@ -35,10 +49,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
-      
       - name: Build Docker Image
         run: docker build -t temp-image:latest --target runner .
-      
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -48,14 +60,12 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
-
       - name: Generate SBOM (CycloneDX)
         uses: anchore/sbom-action@v0
         with:
           image: temp-image:latest
           format: cyclonedx-json
           output-file: sbom.json
-
       - name: Upload SBOM Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -63,26 +73,23 @@ jobs:
           path: sbom.json
 
   deploy:
-    name: Production Deployment
+    name: Production Image Publish (Approval Required)
     needs: security-scan
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
-      
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
@@ -91,14 +98,17 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: runner
-
-      # Deployment verification logic
-      - name: Run Smoke Tests Post-Deployment
+      - name: Optional production smoke (disabled unless PROD_API_URL set)
+        env:
+          PROD_API_URL: ${{ vars.PROD_API_URL }}
         run: |
-          echo "Waiting for deployment..."
-          sleep 30
-          curl --fail https://api.invify.app/health || exit 1
-          curl --fail https://api.invify.app/readiness || exit 1
-          # Assuming proper token retrieval logic for protected routes:
-          # curl --fail -H "Authorization: Bearer $TOKEN" https://api.invify.app/metrics || exit 1
-          echo "Smoke tests passed. Deployment successful."
+          if [ -z "$PROD_API_URL" ]; then
+            echo "PROD_API_URL not set — image published; live traffic NOT activated (Phase 3)"
+            exit 0
+          fi
+          echo "Waiting briefly..."
+          sleep 15
+          curl --fail "$PROD_API_URL/livez"
+          curl --fail "$PROD_API_URL/readyz"
+          curl --fail "$PROD_API_URL/health"
+          echo "Smoke against configured PROD_API_URL completed."

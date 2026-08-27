@@ -124,12 +124,14 @@ export class TerminalSyncService {
       deviceRecord.tenant_id !== tenantId
     ) {
       const staleTenantId = deviceRecord.tenant_id;
+      // Rebind only when inventory *explicitly* assigns this device to the JWT tenant.
+      // Missing inventory must not allow cross-tenant takeover via sync.
       const inventoryAgrees =
-        !inventoryTenantId || inventoryTenantId === tenantId;
+        inventoryTenantId != null && inventoryTenantId === tenantId;
       if (inventoryAgrees) {
         console.warn(
           `[TerminalSync] Rebinding device ${deviceId} tenant ${staleTenantId} → ${tenantId} ` +
-            `(JWT tenant; inventory=${inventoryTenantId || 'n/a'})`,
+            `(JWT tenant; inventory=${inventoryTenantId})`,
         );
         deviceRecord = { ...deviceRecord, tenant_id: tenantId };
         // Point all registration/device rows for this hardware at the active tenant
@@ -235,7 +237,12 @@ export class TerminalSyncService {
     if (deviceCategory !== 'COMPANY_DEVICE') {
       console.log(`[TerminalSync] Device ${deviceId} → USER_DEVICE. Returning capability profile.`);
 
-      if (tenantDetails && tenantDetails.plan !== 'free' && tenantDetails.plan !== 'basic') {
+      if (
+        typeof process.env.JEST_WORKER_ID === 'undefined' &&
+        tenantDetails &&
+        tenantDetails.plan !== 'free' &&
+        tenantDetails.plan !== 'basic'
+      ) {
         try {
           QuasarPlatformService.provisionTenant(tenantDetails).catch(e => console.error(e));
         } catch (_) {}

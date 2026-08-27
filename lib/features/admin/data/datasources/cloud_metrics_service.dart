@@ -9,13 +9,19 @@ class CloudMetricsService {
   final String baseUrl = AppConfig.baseUrl;
 
   Future<Map<String, String>> _getHeaders() async {
-    // In a real scenario, fetch the JWT token from Supabase/Auth Service
-    // For now, using the mock token to bypass auth or a generic Bearer
+    final token = await _resolveAuthToken();
     return {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer mock-admin-token',
-      'ngrok-skip-browser-warning': 'true',
+      'Authorization': 'Bearer $token',
     };
+  }
+
+  Future<String> _resolveAuthToken() async {
+    final token = await SecurityService().getOfflineToken();
+    if (token == null || token.isEmpty) {
+      throw StateError('No authentication token available for cloud metrics');
+    }
+    return token;
   }
 
   Future<Map<String, dynamic>> getOverview() async {

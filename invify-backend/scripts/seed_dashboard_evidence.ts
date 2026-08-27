@@ -2,8 +2,21 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const supabaseUrl = process.env.STAGING_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.STAGING_SUPABASE_KEY || process.env.SUPABASE_KEY || '';
+let supabaseUrl = '';
+let supabaseKey = '';
+
+if (process.env.BUILD_VARIANT === 'STAGING' || process.env.APP_ENV === 'staging') {
+  supabaseUrl = process.env.STAGING_SUPABASE_URL || '';
+  supabaseKey = process.env.STAGING_SUPABASE_SECRET_KEY || '';
+} else {
+  supabaseUrl = process.env.LOCAL_SUPABASE_URL || process.env.SUPABASE_URL || '';
+  supabaseKey = process.env.LOCAL_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+}
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error("Missing Supabase credentials for seeding");
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

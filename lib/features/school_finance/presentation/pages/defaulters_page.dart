@@ -133,7 +133,7 @@ class _DefaultersPageState extends State<DefaultersPage> {
   }
 
   Widget _buildDefaulterCard(Map<String, dynamic> item, AppSettings? settings) {
-    final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+    final currencyFormat = NumberFormat.currency(symbol: '₦', decimalDigits: 2);
     final outstanding = item['outstanding'] as double;
     
     return Container(

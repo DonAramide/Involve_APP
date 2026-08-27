@@ -19,7 +19,14 @@ function getMasterKey(): Buffer {
 
   const keyHex = process.env.VAULT_MASTER_KEY;
   if (!keyHex) {
-    if (process.env.NODE_ENV === 'production') {
+    const rawVariant = (process.env.BUILD_VARIANT || '').trim().toUpperCase();
+    const appEnv = (process.env.APP_ENV || '').trim().toLowerCase();
+    const nodeEnv = (process.env.NODE_ENV || '').trim().toLowerCase();
+    const isProtected = nodeEnv === 'production' || nodeEnv === 'staging' ||
+                        appEnv === 'production' || appEnv === 'staging' ||
+                        rawVariant === 'PROD' || rawVariant === 'STAGING';
+
+    if (isProtected) {
       throw new Error('FATAL: VAULT_MASTER_KEY is not set in environment.');
     } else {
       console.warn('WARNING: Using insecure fallback master key for development ONLY.');

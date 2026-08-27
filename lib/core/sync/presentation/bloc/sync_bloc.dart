@@ -255,7 +255,7 @@ class SyncBloc extends Bloc<SyncEvent, SyncState> {
         deviceId: deviceId,
         deviceName: 'Device $deviceId',
         isMaster: state.isMaster,
-        authToken: 'PRO-TOKEN-123',
+        authToken: syncServer.secretToken,
       );
     }
 

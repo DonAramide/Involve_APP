@@ -150,9 +150,7 @@ class PaymentCatchUpService {
                 metadata['studentName'] ??
                 'a payer')
             .toString();
-        final formatted = amount == amount.roundToDouble()
-            ? amount.toStringAsFixed(0)
-            : amount.toStringAsFixed(2);
+        final formatted = amount.toStringAsFixed(2);
         await NotificationInbox.add(
           message: credited
               ? '₦$formatted received from $sender (synced)'
@@ -186,9 +184,7 @@ class PaymentCatchUpService {
       if (applied > 0) {
         unawaited(PaymentAlertSound.play());
         if (showBanner) {
-          final formatted = totalAmount == totalAmount.roundToDouble()
-              ? totalAmount.toStringAsFixed(0)
-              : totalAmount.toStringAsFixed(2);
+          final formatted = totalAmount.toStringAsFixed(2);
           scaffoldMessengerKey?.currentState?.showSnackBar(
             SnackBar(
               content: Text(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/financial_transaction.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 import '../pages/student_finance_profile.dart';
 
 class GlobalTransactionTile extends StatelessWidget {
@@ -91,7 +92,7 @@ class GlobalTransactionTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '${isCredit ? "+" : ""}₦${transaction.amount.toStringAsFixed(0)}',
+                      '${isCredit ? "+" : ""}${CurrencyFormatter.formatWithSymbol(transaction.amount)}',
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: isCredit ? Colors.green : Colors.black87,

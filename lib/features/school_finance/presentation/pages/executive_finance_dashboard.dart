@@ -19,6 +19,7 @@ import 'package:involve_app/services/socket_service.dart';
 import 'reconciliation_page.dart';
 import 'virtual_accounts_page.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 
 class ExecutiveFinanceDashboard extends StatefulWidget {
   const ExecutiveFinanceDashboard({super.key});
@@ -506,7 +507,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
   }
 
   Widget _buildKpiCard(String label, dynamic value, IconData icon, Color color) {
-    final formatter = NumberFormat.currency(symbol: '₦', decimalDigits: 0);
+    final amount = (value is num) ? value.toDouble() : double.tryParse('$value') ?? 0.0;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -524,7 +525,7 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
             children: [
               Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500)),
               Text(
-                formatter.format(value ?? 0),
+                CurrencyFormatter.formatWithSymbol(amount),
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: -0.5),
               ),
             ],
@@ -593,7 +594,11 @@ class _ExecutiveFinanceDashboardState extends State<ExecutiveFinanceDashboard> {
             ),
           ),
           Text(
-            '₦${NumberFormat('#,###').format(item['amount'])}',
+            CurrencyFormatter.formatWithSymbol(
+              (item['amount'] is num)
+                  ? (item['amount'] as num).toDouble()
+                  : double.tryParse('${item['amount']}') ?? 0.0,
+            ),
             style: const TextStyle(fontWeight: FontWeight.w900),
           ),
         ],

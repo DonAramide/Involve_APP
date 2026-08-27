@@ -2,11 +2,21 @@
 import * as admin from 'firebase-admin';
 import { supabase } from '../db/supabase';
 
+import { BuildVariantService } from '../config/build-variant';
+
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
   try {
-    const serviceAccount = JSON.parse(process.env.FCM_SERVICE_ACCOUNT_JSON || '{}');
+    const serviceAccountStr = process.env.FCM_SERVICE_ACCOUNT_JSON || '';
+    let serviceAccount: any = {};
+    if (serviceAccountStr) {
+      serviceAccount = JSON.parse(serviceAccountStr);
+    }
     if (Object.keys(serviceAccount).length === 0) {
+      const variant = BuildVariantService.getInstance();
+      if (variant.isProd() || variant.isStaging()) {
+        throw new Error('[NotificationService] Refusing to start: FCM_SERVICE_ACCOUNT_JSON is required in staging/production');
+      }
       console.warn('[NotificationService] FCM_SERVICE_ACCOUNT_JSON is missing or empty.');
     } else {
       admin.initializeApp({
@@ -16,6 +26,10 @@ if (!admin.apps.length) {
     }
   } catch (error) {
     console.error('[NotificationService] Failed to initialize Firebase Admin:', error);
+    const variant = BuildVariantService.getInstance();
+    if (variant.isProd() || variant.isStaging()) {
+      throw error; // Fail closed in prod/staging
+    }
   }
 }
 

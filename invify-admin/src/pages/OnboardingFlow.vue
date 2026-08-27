@@ -483,6 +483,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar, copyToClipboard } from 'quasar'
 import axios from 'axios'
+import { joinApiUrl } from '../config/env'
 import logoImg from '../assets/logo_transparent.png'
 
 const router = useRouter()
@@ -539,8 +540,7 @@ const gateways = ref([
 
 const loadLookupData = async () => {
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.get(`${API_BASE}/public/lookup`)
+    const res = await axios.get(joinApiUrl('/public/lookup'))
     if (res.data) {
       if (res.data.gateways && res.data.gateways.length > 0) {
         // gateways.value = res.data.gateways // Hardcoded to Quasar
@@ -591,8 +591,7 @@ const handleProvisioningStart = async () => {
   await addLog('🧬 Provisioning [ORGANIZATION] DB schemas and isolated tables...', 'text-indigo-4', 700)
   
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/public/onboarding/provision`, {
+    const res = await axios.post(joinApiUrl('/public/onboarding/provision'), {
       email: form.value.email,
       password: form.value.password,
       businessName: form.value.businessName,
@@ -630,8 +629,7 @@ const handleProvisioningStart = async () => {
 const reportIssueToAdmin = async () => {
   reportingIssue.value = true
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    await axios.post(`${API_BASE}/public/onboarding/report-issue`, {
+    await axios.post(joinApiUrl('/public/onboarding/report-issue'), {
       tenantName: form.value.businessName,
       email: form.value.email,
       phone: form.value.phone,

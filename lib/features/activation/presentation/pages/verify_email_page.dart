@@ -56,8 +56,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
       ));
 
       final verifyUrls = [
-        'http://localhost:3004/auth/verify-email-otp',
-        '${AppConfig.baseUrl}/auth/verify-email-otp',
+        '${AppConfig.baseUrl}/api/auth/verify-email-otp',
       ];
 
       String? lastError;
@@ -115,8 +114,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> with OtpResendCooldow
     try {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 10)));
       final urls = [
-        'http://localhost:3004/auth/send-email-otp',
-        '${AppConfig.baseUrl}/auth/send-email-otp',
+        '${AppConfig.baseUrl}/api/auth/send-email-otp',
       ];
 
       bool sent = false;

@@ -28,6 +28,14 @@ export default defineConfig({
         // backend listens on 0.0.0.0 (IPv4), which surfaces as ECONNREFUSED.
         target: 'http://127.0.0.1:3004',
         changeOrigin: true
+      },
+      '/public': {
+        target: 'http://127.0.0.1:3004',
+        changeOrigin: true
+      },
+      '/auth': {
+        target: 'http://127.0.0.1:3004',
+        changeOrigin: true
       }
     }
   }

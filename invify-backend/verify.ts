@@ -1,12 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
-dotenv.config();
+import * as path from 'path';
+import * as fs from 'fs';
 
-const SUPABASE_URL = process.env.STAGING_SUPABASE_URL || 'https://rpcjelhacmkhzguljdgi.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.STAGING_SUPABASE_SERVICE_KEY;
+const stagingEnvPath = path.join(__dirname, '.env.staging');
+if (fs.existsSync(stagingEnvPath)) {
+  dotenv.config({ path: stagingEnvPath });
+} else {
+  dotenv.config();
+}
 
-if (!SUPABASE_SERVICE_KEY) {
-  console.error("Missing SUPABASE_SERVICE_ROLE_KEY");
+const SUPABASE_URL = process.env.STAGING_SUPABASE_URL || '';
+const SUPABASE_SERVICE_KEY = process.env.STAGING_SUPABASE_SECRET_KEY || '';
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
+  console.error("Missing STAGING_SUPABASE_URL or STAGING_SUPABASE_SECRET_KEY in environment");
   process.exit(1);
 }
 

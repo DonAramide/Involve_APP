@@ -10,11 +10,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
+import { resolveMigrationSupabaseCredentials } from './migration-env';
 
 dotenv.config();
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rpcjelhacmkhzguljdgi.supabase.co';
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '';
+const { url: SUPABASE_URL, serviceKey: SUPABASE_SERVICE_KEY } = resolveMigrationSupabaseCredentials();
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 

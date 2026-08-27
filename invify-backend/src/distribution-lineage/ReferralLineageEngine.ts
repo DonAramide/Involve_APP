@@ -18,7 +18,16 @@ export interface OnboardingLineageRecord {
 }
 
 export class ReferralLineageEngine {
-  private readonly SECRET_KEY = process.env.AGENT_LINEAGE_SECRET || 'fallback_secret_for_hashing';
+  private readonly SECRET_KEY = (() => {
+    const key = process.env.AGENT_LINEAGE_SECRET;
+    if (!key || key.length < 16) {
+      if (process.env.NODE_ENV === 'production' || process.env.BUILD_VARIANT === 'PROD' || process.env.BUILD_VARIANT === 'STAGING') {
+        throw new Error('AGENT_LINEAGE_SECRET is required');
+      }
+      return crypto.randomBytes(32).toString('hex');
+    }
+    return key;
+  })();
 
   /**
    * Initializes a replay-safe, immutable onboarding attribution record.

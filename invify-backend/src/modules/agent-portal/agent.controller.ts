@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { io } from '../../app';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { supabase } from '../../db/supabase';
+import { BuildVariantService } from '../../config/build-variant';
 
 import { agentRepository } from './repositories/agent.repository';
 
@@ -113,7 +114,7 @@ export class AgentController {
       }
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: 'http://localhost:3000/agent/reset-password',
+        redirectTo: BuildVariantService.getInstance().getAgentPortalUrl(),
       });
 
       if (error) {

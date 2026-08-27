@@ -7,6 +7,7 @@ import '../widgets/summary_stat_card.dart';
 import '../widgets/modern_revenue_chart.dart';
 import '../widgets/global_transaction_tile.dart';
 import 'package:intl/intl.dart';
+import 'package:involve_app/core/utils/currency_formatter.dart';
 import 'package:involve_app/core/utils/terminology.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
@@ -141,14 +142,14 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                       delegate: SliverChildListDelegate([
                         SummaryStatCard(
                           title: 'Total Revenue',
-                          value: '₦${NumberFormat('#,###').format(summary.totalRevenue)}',
+                          value: CurrencyFormatter.formatWithSymbol(summary.totalRevenue),
                           icon: Icons.account_balance_wallet,
                           color: Colors.blue,
                           subtitle: 'Current Year',
                         ),
                         SummaryStatCard(
                           title: 'Outstanding',
-                          value: '₦${NumberFormat('#,###').format(summary.outstandingFees)}',
+                          value: CurrencyFormatter.formatWithSymbol(summary.outstandingFees),
                           icon: Icons.warning_amber_rounded,
                           color: Colors.orange,
                           subtitle: settings?.businessMode == 'school' ? 'Due Fees' : 'Pending',
@@ -369,7 +370,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
                   const SizedBox(height: 24),
 
                   Text(
-                    'Available: ₦${NumberFormat('#,###').format(summary.totalRevenue)}',
+                    'Available: ${CurrencyFormatter.formatWithSymbol(summary.totalRevenue)}',
                     style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
                   ),
                   const SizedBox(height: 12),
@@ -426,7 +427,7 @@ class _SchoolFinanceDashboardPageState extends State<SchoolFinanceDashboardPage>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Final Confirmation'),
-        content: Text('Are you sure you want to withdraw ₦${NumberFormat('#,###').format(amount)} to your saved bank account? This action cannot be reversed.'),
+        content: Text('Are you sure you want to withdraw ${CurrencyFormatter.formatWithSymbol(amount)} to your saved bank account? This action cannot be reversed.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(

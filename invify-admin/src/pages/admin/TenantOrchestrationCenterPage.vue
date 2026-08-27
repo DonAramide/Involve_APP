@@ -423,8 +423,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import axios from 'axios'
+import { joinApiUrl } from '../../config/env'
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
 import { useTenantExperience } from '../../composables/useTenantExperience'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import EnterpriseManualTooltip from '../../components/common/EnterpriseManualTooltip.vue'
@@ -530,7 +530,7 @@ const executeBaselineProvisioning = async () => {
   isProvisioning.value = true
   try {
     const token = localStorage.getItem('invify_token') || ''
-    const res = await axios.post(`${API_BASE}/api/orchestration/onboarding/provision`, {
+    const res = await axios.post(joinApiUrl('/api/orchestration/onboarding/provision'), {
       tenantId: selectedTenantId.value,
       industryType: onboardingIndustry.value,
       planTier: onboardingTier.value
@@ -561,7 +561,7 @@ const executeBaselineProvisioning = async () => {
 const toggleOptionalModule = async (modId) => {
   try {
     const token = localStorage.getItem('invify_token') || ''
-    const res = await axios.post(`${API_BASE}/api/orchestration/modules/enable`, {
+    const res = await axios.post(joinApiUrl('/api/orchestration/modules/enable'), {
       tenantId: selectedTenantId.value,
       moduleIdentifier: modId,
       customConfig: { toggledViaUI: true }
@@ -592,7 +592,7 @@ const toggleOptionalModule = async (modId) => {
 const elevatePlanTier = async (targetTier) => {
   try {
     const token = localStorage.getItem('invify_token') || ''
-    const res = await axios.post(`${API_BASE}/api/orchestration/tiers/elevate`, {
+    const res = await axios.post(joinApiUrl('/api/orchestration/tiers/elevate'), {
       tenantId: selectedTenantId.value,
       targetTierId: targetTier
     }, {

@@ -551,13 +551,28 @@
         </q-dialog>
       </div>
     </div>
+
+    <!-- Footer -->
+    <footer class="tenant__footer" v-if="!isAdminPortal">
+      <div class="tenant__footer-left">
+        © {{ currentYear }} Invify Enterprise Platform. All rights reserved. <span class="q-ml-sm text-grey-6 text-weight-medium">version 1.0.0</span>
+      </div>
+      <div class="tenant__footer-right">
+        <span class="tenant__footer-link" role="button" tabindex="0">Privacy Policy</span>
+        <span class="tenant__footer-link" role="button" tabindex="0">Terms of Service</span>
+        <span class="tenant__footer-link" role="button" tabindex="0">Security</span>
+        <span class="tenant__footer-link" role="button" tabindex="0">Support</span>
+      </div>
+    </footer>
   </q-layout>
 </template>
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import logoImg from '../../assets/logo_transparent.png'
+const currentYear = new Date().getFullYear()
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import { joinApiUrl } from '../../config/env'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
 import { useQuasar, copyToClipboard } from 'quasar'
 
@@ -821,8 +836,7 @@ const requestOtpCode = async () => {
   otpForm.value.email = email
 
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    await axios.post(`${API_BASE}/api/auth/send-email-otp`, {
+    await axios.post(joinApiUrl('/api/auth/send-email-otp'), {
       email,
       purpose: 'PASSWORD_RESET'
     })
@@ -859,8 +873,7 @@ const verifyRecoveryOtp = async () => {
   successMessage.value = ''
 
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/api/auth/verify-email-otp`, {
+    const res = await axios.post(joinApiUrl('/api/auth/verify-email-otp'), {
       email,
       code,
       otp: code,
@@ -905,10 +918,9 @@ const executeOtpResetPassword = async () => {
   successMessage.value = ''
 
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
     const email = String(otpForm.value.email || '').trim().toLowerCase()
 
-    const res = await axios.post(`${API_BASE}/api/auth/reset-password`, {
+    const res = await axios.post(joinApiUrl('/api/auth/reset-password'), {
       email,
       // OTP already validated in previous step; backend trusts fresh VERIFIED session
       recoveryVerified: true,
@@ -955,9 +967,7 @@ const executeLoginPass = async () => {
   successMessage.value = ''
 
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    // Dispatch network request natively targeting backend API
-    const res = await axios.post(`${API_BASE}/api/auth/login`, {
+    const res = await axios.post(joinApiUrl('/api/auth/login'), {
       email: form.value.email,
       password: form.value.password,
       portal: isAdminPortal.value ? 'admin' : 'tenant',
@@ -1046,8 +1056,7 @@ const executeMfaVerification = async () => {
   errorMessage.value = ''
 
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/api/auth/mfa/verify`, {
+    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
       userId: activeUserId.value,
       tokenCode: form.value.totpCode,
       role: activeUserRole.value
@@ -1070,8 +1079,7 @@ const executeResetPassword = async () => {
   successMessage.value = ''
   
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/api/auth/reset-password`, {
+    const res = await axios.post(joinApiUrl('/api/auth/reset-password'), {
       userId: activeUserId.value,
       newPassword: resetForm.value.newPassword
     })
@@ -1290,6 +1298,39 @@ const finalizeAuthenticatedSession = (tokenData) => {
   height: 40px;
 }
 
+.tenant__footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: rgba(10, 10, 12, 0.45);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.tenant__footer-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.tenant__footer-link {
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.tenant__footer-link:hover {
+  color: #ffffff;
+}
+
 @media (max-width: 900px) {
   .tenant-login-shell {
     height: auto !important;
@@ -1298,6 +1339,7 @@ const finalizeAuthenticatedSession = (tokenData) => {
   }
 
   .tenant-split-container {
+    position: relative;
     flex-direction: column;
     height: auto;
     min-height: 100vh;
@@ -1314,7 +1356,22 @@ const finalizeAuthenticatedSession = (tokenData) => {
     width: 100%;
     height: auto;
     flex: 1 1 auto;
-    padding: 16px 12px 24px;
+    padding: 16px 12px 64px; /* extra bottom padding for relative footer */
+  }
+
+  .tenant__footer {
+    position: relative;
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+    padding: 16px 12px;
+    background: #0a0a0c;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .tenant__footer-right {
+    gap: 12px;
+    justify-content: center;
   }
 }
 </style>

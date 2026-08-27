@@ -209,19 +209,10 @@
       <!-- Right Column: Login Card -->
       <section class="sac__right">
         <div class="sac__card" role="region" aria-label="Super admin sign in">
-          <!-- Card Header with Shield -->
+          <!-- Card Header with Logo -->
           <div class="sac__card-head">
-            <div class="sac__shield-badge">
-              <svg class="sac__shield-svg" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M14 3L23 7V13.5C23 19.3 19.1 24.2 14 25.5C8.9 24.2 5 19.3 5 13.5V7L14 3Z" fill="url(#shieldGrad)" stroke="#818CF8" stroke-width="1.5" stroke-linejoin="round" />
-                <path d="M10 13.5L13 16.5L18 11.5" stroke="#E0E7FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                <defs>
-                  <linearGradient id="shieldGrad" x1="5" y1="3" x2="23" y2="25.5" gradientUnits="userSpaceOnUse">
-                    <stop stop-color="#6366F1" stop-opacity="0.7" />
-                    <stop offset="1" stop-color="#3B82F6" stop-opacity="0.3" />
-                  </linearGradient>
-                </defs>
-              </svg>
+            <div class="sac__logo-badge">
+              <img :src="logoImg" alt="Invify" style="height: 48px; width: auto;" />
             </div>
             <h2 class="sac__welcome">{{ t.welcome }}</h2>
             <p class="sac__welcome-sub">{{ t.welcomeSub }}</p>
@@ -570,7 +561,7 @@
     <!-- Footer -->
     <footer class="sac__footer">
       <div class="sac__footer-left">
-        © {{ currentYear }} {{ t.copyright }}
+        © {{ currentYear }} {{ t.copyright }} <span class="q-ml-sm text-grey-6 text-weight-medium">version 1.0.0</span>
       </div>
       <div class="sac__footer-right">
         <span class="sac__footer-link" role="button" tabindex="0">{{ t.privacy }}</span>
@@ -610,6 +601,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
+import { joinApiUrl } from '../../config/env'
 import { useQuasar, copyToClipboard } from 'quasar'
 import logoImg from '../../assets/logo_transparent.png'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
@@ -1075,8 +1067,7 @@ async function requestOtpCode() {
   successMessage.value = ''
   otpForm.value.email = email
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    await axios.post(`${API_BASE}/api/auth/send-email-otp`, {
+    await axios.post(joinApiUrl('/api/auth/send-email-otp'), {
       email,
       purpose: 'PASSWORD_RESET'
     })
@@ -1102,8 +1093,7 @@ async function verifyRecoveryOtp() {
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/api/auth/verify-email-otp`, {
+    const res = await axios.post(joinApiUrl('/api/auth/verify-email-otp'), {
       email,
       code,
       otp: code,
@@ -1137,9 +1127,8 @@ async function executeOtpResetPassword() {
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
     const email = String(otpForm.value.email || '').trim().toLowerCase()
-    const res = await axios.post(`${API_BASE}/api/auth/reset-password`, {
+    const res = await axios.post(joinApiUrl('/api/auth/reset-password'), {
       email,
       recoveryVerified: true,
       newPassword: otpForm.value.newPassword
@@ -1185,8 +1174,7 @@ async function executeLoginPass() {
   successMessage.value = ''
 
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/api/auth/login`, {
+    const res = await axios.post(joinApiUrl('/api/auth/login'), {
       email: String(form.value.email || '').trim().toLowerCase(),
       password: form.value.password,
       portal: 'admin',
@@ -1263,8 +1251,7 @@ async function executeMfaVerification() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/api/auth/mfa/verify`, {
+    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
       userId: activeUserId.value,
       tokenCode: form.value.totpCode,
       role: activeUserRole.value
@@ -1287,8 +1274,7 @@ async function executeResetPassword() {
   errorMessage.value = ''
   successMessage.value = ''
   try {
-    const API_BASE = import.meta.env.VITE_API_URL || ''
-    const res = await axios.post(`${API_BASE}/api/auth/reset-password`, {
+    const res = await axios.post(joinApiUrl('/api/auth/reset-password'), {
       userId: activeUserId.value,
       newPassword: resetForm.value.newPassword
     })
@@ -1925,17 +1911,10 @@ watch(rememberDevice, (val) => {
   margin-bottom: 24px;
 }
 
-.sac__shield-badge {
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  background: var(--sac-shield-bg);
-  border: 1px solid rgba(129, 140, 248, 0.35);
-  box-shadow: 0 0 24px rgba(99, 102, 241, 0.25);
-  display: grid;
-  place-items: center;
+.sac__logo-badge {
+  display: flex;
+  justify-content: center;
   margin: 0 auto 16px;
-  transition: background 0.3s ease;
 }
 
 .sac__shield-svg {

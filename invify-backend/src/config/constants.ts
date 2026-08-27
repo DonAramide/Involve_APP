@@ -60,8 +60,8 @@ export function isMockAuthAllowed(): boolean {
   if (variantService.isStaging() || variantService.isProd()) {
     return false;
   }
-  // Local: require OFFLINE_LOCAL_AUTH or NODE_ENV=test
-  return process.env.OFFLINE_LOCAL_AUTH === 'true' || process.env.NODE_ENV === 'test';
+  // Local: require OFFLINE_LOCAL_AUTH explicitly (NODE_ENV=test does NOT enable blanket auth bypass)
+  return process.env.OFFLINE_LOCAL_AUTH === 'true';
 }
 
 /**
