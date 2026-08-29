@@ -149,6 +149,31 @@ export class UserController {
         console.warn('[UserController] Failed to trigger welcome/activation emails:', emailErr.message);
       }
 
+      // 4. Record Governance Audit Log
+      try {
+        const { GovAuditService } = require('../services/gov-audit.service');
+        const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+        GovAuditService.logAction({
+          id: require('crypto').randomUUID(),
+          timestamp: new Date().toISOString(),
+          module: 'USER_MGMT',
+          action: 'USER_ACCESS_CREATED',
+          user_email: currentUser?.email || 'system',
+          user_name: currentUser?.name || currentUser?.email?.split('@')[0] || 'Admin Operator',
+          ip_address: String(ip),
+          target: email,
+          status: 'success',
+          tenant_id: isPlatform ? null : tenantId,
+          metadata: {
+            created_user_id: authId,
+            assigned_role: role,
+            tenant_id: isPlatform ? null : tenantId
+          }
+        }).catch((auditErr: any) => console.warn('[UserController] createUser audit log error:', auditErr.message));
+      } catch (auditErr: any) {
+        console.warn('[UserController] createUser audit log failed:', auditErr.message);
+      }
+
       return res.status(201).json(data);
     } catch (error: any) {
       console.error('[UserController] createUser Error:', error.message);
@@ -269,6 +294,32 @@ export class UserController {
         } catch (emailErr: any) {
           console.warn('[UserController] Failed to trigger profile update email:', emailErr.message);
         }
+      }
+
+      // Record Governance Audit Log
+      try {
+        const { GovAuditService } = require('../services/gov-audit.service');
+        const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+        GovAuditService.logAction({
+          id: require('crypto').randomUUID(),
+          timestamp: new Date().toISOString(),
+          module: 'USER_MGMT',
+          action: 'USER_IDENTITY_UPDATED',
+          user_email: currentUser?.email || 'system',
+          user_name: currentUser?.name || currentUser?.email?.split('@')[0] || 'Admin Operator',
+          ip_address: String(ip),
+          target: data.email || id,
+          status: 'success',
+          tenant_id: data.tenant_id,
+          metadata: {
+            updated_user_id: id,
+            updated_fields: updates,
+            new_role: data.role,
+            is_active: data.is_active
+          }
+        }).catch((auditErr: any) => console.warn('[UserController] updateUser audit log error:', auditErr.message));
+      } catch (auditErr: any) {
+        console.warn('[UserController] updateUser audit log failed:', auditErr.message);
       }
 
       return res.status(200).json(data);

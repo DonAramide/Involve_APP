@@ -280,8 +280,36 @@ function dispatchLoginSecurityAlert(req: Request, user: { name?: string; email: 
     }).catch((err: any) => {
       console.warn('[AuthController] Failed to send login security alert:', err.message);
     });
+
+    // Write audit event to GovAuditService ledger
+    const actionType = (user.role && user.role.startsWith('admin_')) || user.role === 'super_admin'
+      ? 'ADMIN_LOGIN_SUCCESS'
+      : 'USER_LOGIN_SUCCESS';
+
+    GovAuditService.logAction({
+      id: require('crypto').randomUUID(),
+      timestamp: new Date().toISOString(),
+      module: 'AUTH',
+      action: actionType,
+      user_email: user.email,
+      user_name: user.name || user.email.split('@')[0],
+      ip_address: ip,
+      location,
+      target: portal,
+      status: 'success',
+      metadata: {
+        device_id: String(deviceId),
+        user_agent: String(userAgent),
+        portal,
+        role: user.role
+      }
+    }).then(() => {
+      console.log(`[AuthController] Audit log recorded for login: ${user.email}`);
+    }).catch((err: any) => {
+      console.warn('[AuthController] Failed to record login audit log:', err.message);
+    });
   } catch (err: any) {
-    console.warn('[AuthController] Failed to trigger login alert email:', err.message);
+    console.warn('[AuthController] Failed to trigger login alert email / audit log:', err.message);
   }
 }
 
