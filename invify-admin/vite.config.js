@@ -27,7 +27,9 @@ export default defineConfig({
         // Prefer IPv4 — `localhost` can resolve to ::1 on Windows while the
         // backend listens on 0.0.0.0 (IPv4), which surfaces as ECONNREFUSED.
         target: 'http://127.0.0.1:3004',
-        changeOrigin: true
+        changeOrigin: true,
+        timeout: 15 * 60 * 1000,
+        proxyTimeout: 15 * 60 * 1000,
       },
       '/public': {
         target: 'http://127.0.0.1:3004',

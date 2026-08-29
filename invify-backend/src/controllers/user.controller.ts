@@ -251,23 +251,29 @@ export class UserController {
 
       if (error) throw error;
 
-      // Sync user metadata with Supabase Auth if role or name changed
-      if (updates.role || updates.name) {
-        supabaseAdmin.auth.admin.updateUserById(id, {
+      // Generate default temporary password for updated user access
+      const defaultPassword = req.body.password || `Invify@${Math.floor(100000 + Math.random() * 900000)}`;
+
+      // Sync password & user metadata with Supabase Auth and enforce first-login password reset
+      try {
+        await supabaseAdmin.auth.admin.updateUserById(id, {
+          password: defaultPassword,
           user_metadata: {
             name: data.name,
             role: data.role,
             tenantId: data.tenant_id
           }
-        }).catch((err: any) => {
-          console.warn('[UserController] Failed to sync auth user_metadata:', err.message);
         });
+        await supabaseAdmin.from('users').update({ require_password_reset: true }).eq('id', id);
+      } catch (authSyncErr: any) {
+        console.warn('[UserController] Failed to sync auth user_metadata / password:', authSyncErr.message);
       }
 
-      // Send Profile / Identity update confirmation email in background
+      // Send Profile / Identity update confirmation email with default password in background
       if (data?.email) {
         try {
           const { emailService } = require('../services/email.service');
+          const { verificationService } = require('../services/verification.service');
           const isPlatformRole = [
             'super_admin',
             'admin_finance',
@@ -281,13 +287,17 @@ export class UserController {
 
           const loginUrl = isPlatformRole ? 'https://staging.invify.org/admin/login' : 'https://staging.invify.org/tenant/login';
 
-          emailService.sendProfileUpdateEmail(data.email, {
-            name: data.name || data.email.split('@')[0],
-            role: data.role,
-            isActive: data.is_active !== false,
-            loginUrl
-          }).then(() => {
-            console.log(`[UserController] Sent profile update notification email to: ${data.email}`);
+          Promise.allSettled([
+            emailService.sendProfileUpdateEmail(data.email, {
+              name: data.name || data.email.split('@')[0],
+              role: data.role,
+              defaultPassword,
+              isActive: data.is_active !== false,
+              loginUrl
+            }),
+            verificationService.sendOTP(data.email.trim().toLowerCase(), 'EMAIL', 'PASSWORD_RESET')
+          ]).then(() => {
+            console.log(`[UserController] Sent profile update notification email with default password to: ${data.email}`);
           }).catch((emailErr: any) => {
             console.warn('[UserController] Failed to send profile update email:', emailErr.message);
           });

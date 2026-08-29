@@ -6,6 +6,8 @@ import { ApkVaultService } from '../services/apk-vault.service';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 export const apkUploadMiddleware = upload.single('file');
 
+const APK_UPLOAD_TIMEOUT_MS = 15 * 60 * 1000;
+
 const s3Client = new S3Client({
   endpoint: process.env.CONTABO_ENDPOINT || '',
   region: process.env.CONTABO_REGION || 'usc1',
@@ -31,6 +33,8 @@ export class ApkController {
   }
 
   static async uploadApk(req: Request, res: Response) {
+    req.setTimeout(APK_UPLOAD_TIMEOUT_MS);
+    res.setTimeout(APK_UPLOAD_TIMEOUT_MS);
     try {
       const file = req.file;
       const { name, packageName, version, targetSlotId } = req.body;

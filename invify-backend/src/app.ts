@@ -953,6 +953,9 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 
 // 5. START SERVER
 const server = http.createServer(app);
+// APK vault uploads (~100MB+) plus Contabo PUT can exceed Node's 5-minute default.
+server.requestTimeout = 15 * 60 * 1000;
+server.timeout = 15 * 60 * 1000;
 
 export const io = new SocketIOServer(server, {
   cors: {

@@ -233,6 +233,7 @@ export class EmailService {
       name?: string;
       role?: string;
       tenantName?: string;
+      defaultPassword?: string;
       isActive?: boolean;
       loginUrl?: string;
     }
@@ -242,6 +243,23 @@ export class EmailService {
     const role = options?.role ? options.role.replace(/_/g, ' ').toUpperCase() : 'STAFF';
     const loginUrl = options?.loginUrl || 'https://staging.invify.org/admin/login';
     const statusText = options?.isActive !== false ? 'ACTIVE' : 'SUSPENDED';
+    const defaultPassword = options?.defaultPassword;
+
+    let passwordRow = '';
+    let passwordNotice = '';
+    if (defaultPassword) {
+      passwordRow = `
+            <tr>
+              <td style="padding: 6px 0; font-weight: bold; color: #333;">Default Password:</td>
+              <td style="padding: 6px 0; font-family: monospace; font-size: 15px; color: #d32f2f; font-weight: bold;">${defaultPassword}</td>
+            </tr>
+      `;
+      passwordNotice = `
+          <p style="margin: 16px 0 0 0; font-size: 13px; color: #555;">
+            ⚠️ <strong>First-Time Login Notice:</strong> Please use the default temporary password above to sign in. For your security, you will be required to set your own permanent password upon your first sign-in.
+          </p>
+      `;
+    }
 
     const body = `
       <div style="font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -261,6 +279,7 @@ export class EmailService {
               <td style="padding: 6px 0; font-weight: bold;">Account Email:</td>
               <td style="padding: 6px 0; font-family: monospace; font-size: 15px; color: #0d47a1;">${to}</td>
             </tr>
+            ${passwordRow}
             <tr>
               <td style="padding: 6px 0; font-weight: bold;">Access Level / Role:</td>
               <td style="padding: 6px 0;"><span style="background: #e8eaf6; color: #283593; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 12px;">${role}</span></td>
@@ -274,6 +293,7 @@ export class EmailService {
               <td style="padding: 6px 0;"><a href="${loginUrl}" style="color: #3949ab; text-decoration: none; font-weight: 600;">${loginUrl}</a></td>
             </tr>
           </table>
+          ${passwordNotice}
         </div>
 
         <div style="text-align: center; margin: 25px 0;">

@@ -60,6 +60,15 @@
                     <q-btn flat dense size="sm" icon="upgrade" color="amber-4" @click="openUpdateDialog(slot - 1)">
                       <q-tooltip class="bg-amber-10 text-amber-2 text-caption">Upload New Version</q-tooltip>
                     </q-btn>
+                    <q-btn
+                      flat dense size="sm"
+                      icon="content_copy"
+                      color="cyan-3"
+                      :disable="!apkVault[slot - 1].s3Url || apkVault[slot - 1].status === 'UPLOADING'"
+                      @click="copyDownloadLink(apkVault[slot - 1])"
+                    >
+                      <q-tooltip class="bg-cyan-10 text-cyan-2 text-caption">Copy download link</q-tooltip>
+                    </q-btn>
                     <q-btn flat dense size="sm" class="q-mx-md" icon="edit_link" color="cyan-4" @click="promptEditUrl(slot - 1)">
                       <q-tooltip class="bg-cyan-10 text-cyan-2 text-caption">Edit Download URL</q-tooltip>
                     </q-btn>
@@ -364,7 +373,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Notify, useQuasar } from 'quasar'
+import { Notify, useQuasar, copyToClipboard } from 'quasar'
 import api from 'src/api'
 
 const $q = useQuasar()
@@ -414,6 +423,22 @@ const openUpdateDialog = (index) => {
   targetSlotIndex.value = index
   resetNewApk()
   uploadDialogOpen.value = true
+}
+
+const APK_UPLOAD_TIMEOUT_MS = 15 * 60 * 1000
+
+const copyDownloadLink = async (apk) => {
+  const url = String(apk?.s3Url || '').trim()
+  if (!url) {
+    Notify.create({ type: 'warning', message: 'No download URL yet. Wait for the upload to finish.', position: 'bottom-right' })
+    return
+  }
+  try {
+    await copyToClipboard(url)
+    Notify.create({ type: 'positive', message: 'APK download link copied', position: 'bottom-right' })
+  } catch {
+    Notify.create({ type: 'negative', message: 'Could not copy the download link', position: 'bottom-right' })
+  }
 }
 
 const promptEditUrl = (index) => {
@@ -506,6 +531,7 @@ const commitApkToVault = async () => {
     version: newApk.value.version,
     size: newApk.value.fileRef ? `${(newApk.value.fileRef.size / 1024 / 1024).toFixed(1)} MB` : '—',
     status: 'UPLOADING',
+    s3Url: '',
     uploadProgress: 0,
     installCount: 0,
     uninstallCount: 0,
@@ -526,9 +552,13 @@ const commitApkToVault = async () => {
   try {
     const { data } = await api.post('/api/admin/apk/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: APK_UPLOAD_TIMEOUT_MS,
       onUploadProgress: (progressEvent) => {
-        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-        apkVault.value[finalIndex].uploadProgress = percentCompleted
+        const total = progressEvent.total || newApk.value.fileRef?.size || 0
+        const percentCompleted = total ? Math.round((progressEvent.loaded * 100) / total) : 0
+        if (apkVault.value[finalIndex]) {
+          apkVault.value[finalIndex].uploadProgress = Math.min(99, percentCompleted)
+        }
       }
     })
     
@@ -537,10 +567,16 @@ const commitApkToVault = async () => {
     Notify.create({ type: 'positive', message: `APK [${data.name}] committed to vault successfully`, position: 'bottom-right' })
   } catch (error) {
     Notify.create({ type: 'negative', message: `Upload failed: ${error.response?.data?.error || error.message}`, position: 'bottom-right' })
-    if (targetSlotIndex.value === null) {
-      apkVault.value.pop() // Remove optimistic new slot on error
-    } else {
-      apkVault.value[finalIndex].status = 'ERROR'
+    try {
+      const { data } = await api.get('/api/admin/apk')
+      apkVault.value = data.vault || []
+      deploymentLog.value = data.logs || []
+    } catch {
+      if (targetSlotIndex.value === null) {
+        apkVault.value.pop()
+      } else if (apkVault.value[finalIndex]) {
+        apkVault.value[finalIndex].status = 'ERROR'
+      }
     }
   }
 
