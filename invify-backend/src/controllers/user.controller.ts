@@ -75,22 +75,30 @@ export class UserController {
     let authId = id;
 
     try {
-      // 1. Check or Provision in Supabase Auth
-      const tempPassword = require('crypto').randomBytes(16).toString('hex');
+      // 1. Check or Provision in Supabase Auth with default temporary password
+      const defaultPassword = req.body.password || `Invify@${Math.floor(100000 + Math.random() * 900000)}`;
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: email.trim().toLowerCase(),
-        password: tempPassword,
+        password: defaultPassword,
         email_confirm: true,
         user_metadata: { role, tenantId: isPlatform ? null : tenantId }
       });
 
       if (authError) {
-        if (authError.message.includes('already exists') || authError.message.includes('already registered')) {
+        const errorMsg = (authError.message || '').toLowerCase();
+        if (
+          errorMsg.includes('already exists') ||
+          errorMsg.includes('already registered') ||
+          errorMsg.includes('already been registered') ||
+          errorMsg.includes('already_registered')
+        ) {
           // Find the existing auth user ID
           const { data: listedUsers } = await supabaseAdmin.auth.admin.listUsers();
           const existingUser = listedUsers?.users.find(u => u.email?.toLowerCase() === email.trim().toLowerCase());
           if (existingUser) {
             authId = existingUser.id;
+            // Update auth password to the default password
+            await supabaseAdmin.auth.admin.updateUserById(authId, { password: defaultPassword });
           } else {
             throw authError;
           }
@@ -101,33 +109,44 @@ export class UserController {
         authId = authData.user.id;
       }
 
-      // 2. Insert profile in public.users table
+      // 2. Insert or update profile in public.users table
       const { data, error } = await supabaseAdmin
         .from('users')
-        .insert({
+        .upsert({
           id: authId,
-          name,
+          name: name || email.split('@')[0],
           email: email.trim().toLowerCase(),
           role,
           tenant_id: isPlatform ? null : tenantId,
           is_active: true,
           require_password_reset: true
-        })
+        }, { onConflict: 'id' })
         .select()
         .single();
 
       if (error) throw error;
 
-      // 3. Send welcome email and activation code (OTP) via EMAIL with purpose PASSWORD_RESET
+      // 3. Send welcome email with credentials & attached manual + activation OTP in background (non-blocking)
       try {
         const { emailService } = require('../services/email.service');
         const { verificationService } = require('../services/verification.service');
+        const loginUrl = isPlatform ? 'https://staging.invify.org/admin/login' : 'https://staging.invify.org/tenant/login';
 
-        await emailService.sendWelcomeEmail(email.trim().toLowerCase());
-        await verificationService.sendOTP(email.trim().toLowerCase(), 'EMAIL', 'PASSWORD_RESET');
-        console.log(`[UserController] Sent welcome email and activation OTP to: ${email}`);
+        Promise.allSettled([
+          emailService.sendWelcomeEmail(email.trim().toLowerCase(), {
+            name: name || email.split('@')[0],
+            role,
+            defaultPassword,
+            loginUrl
+          }),
+          verificationService.sendOTP(email.trim().toLowerCase(), 'EMAIL', 'PASSWORD_RESET')
+        ]).then(() => {
+          console.log(`[UserController] Sent welcome credentials email and activation OTP to: ${email}`);
+        }).catch((emailErr: any) => {
+          console.warn('[UserController] Failed to send welcome/activation emails:', emailErr.message);
+        });
       } catch (emailErr: any) {
-        console.warn('[UserController] Failed to send welcome/activation emails:', emailErr.message);
+        console.warn('[UserController] Failed to trigger welcome/activation emails:', emailErr.message);
       }
 
       return res.status(201).json(data);
@@ -206,6 +225,52 @@ export class UserController {
       const { data, error } = await query.select().single();
 
       if (error) throw error;
+
+      // Sync user metadata with Supabase Auth if role or name changed
+      if (updates.role || updates.name) {
+        supabaseAdmin.auth.admin.updateUserById(id, {
+          user_metadata: {
+            name: data.name,
+            role: data.role,
+            tenantId: data.tenant_id
+          }
+        }).catch((err: any) => {
+          console.warn('[UserController] Failed to sync auth user_metadata:', err.message);
+        });
+      }
+
+      // Send Profile / Identity update confirmation email in background
+      if (data?.email) {
+        try {
+          const { emailService } = require('../services/email.service');
+          const isPlatformRole = [
+            'super_admin',
+            'admin_finance',
+            'admin_treasury',
+            'admin_risk',
+            'admin_ops',
+            'admin_executive',
+            'admin_deploy',
+            'internal_staff'
+          ].includes(data.role);
+
+          const loginUrl = isPlatformRole ? 'https://staging.invify.org/admin/login' : 'https://staging.invify.org/tenant/login';
+
+          emailService.sendProfileUpdateEmail(data.email, {
+            name: data.name || data.email.split('@')[0],
+            role: data.role,
+            isActive: data.is_active !== false,
+            loginUrl
+          }).then(() => {
+            console.log(`[UserController] Sent profile update notification email to: ${data.email}`);
+          }).catch((emailErr: any) => {
+            console.warn('[UserController] Failed to send profile update email:', emailErr.message);
+          });
+        } catch (emailErr: any) {
+          console.warn('[UserController] Failed to trigger profile update email:', emailErr.message);
+        }
+      }
+
       return res.status(200).json(data);
     } catch (error: any) {
       console.error('[UserController] updateUser Error:', error.message);

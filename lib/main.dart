@@ -147,8 +147,10 @@ void main() async {
 
   // Load optional local .env for debug only (file must not be listed in pubspec assets)
   try {
-    await dotenv.load(fileName: ".env");
-    AppConfig.hydrateFromDotenv(Map<String, String>.from(dotenv.env));
+    if (!kIsWeb) {
+      await dotenv.load(fileName: ".env");
+      AppConfig.hydrateFromDotenv(Map<String, String>.from(dotenv.env));
+    }
   } catch (_) {
     // Release / CI builds rely on --dart-define instead
   }

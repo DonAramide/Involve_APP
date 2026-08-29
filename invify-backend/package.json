@@ -5,8 +5,8 @@
   "main": "src/app.js",
   "scripts": {
     "start": "node dist/app.js",
-    "dev": "nodemon --watch src src/app.ts",
-    "dev:staging": "cross-env NODE_ENV=staging nodemon --watch src src/app.ts",
+    "dev": "nodemon --watch src --exec ts-node --transpile-only src/app.ts",
+    "dev:staging": "cross-env NODE_ENV=staging nodemon --watch src --exec ts-node --transpile-only src/app.ts",
     "build": "node --max-old-space-size=4096 ./node_modules/typescript/bin/tsc",
     "test": "jest --runInBand",
     "test:watch": "jest --watch"

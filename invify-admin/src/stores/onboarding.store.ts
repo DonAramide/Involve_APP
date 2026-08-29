@@ -1,5 +1,10 @@
 import { defineStore } from 'pinia';
 import api from '../api';
+import {
+  defaultOnboardingChannels,
+  emailVerificationRequired,
+  whatsappVerificationRequired,
+} from '../utils/onboardingChannels';
 
 function apiErrorMessage(err: any, fallback: string): string {
   if (!err.response) {
@@ -19,6 +24,8 @@ export const useOnboardingStore = defineStore('onboarding', {
       phone: '',
       password: '',
     },
+
+    requiredChannels: defaultOnboardingChannels(),
     
     // Verification State
     emailVerified: false,
@@ -34,12 +41,29 @@ export const useOnboardingStore = defineStore('onboarding', {
     error: null as string | null,
   }),
 
+  getters: {
+    emailRequired: (state) => emailVerificationRequired(state.requiredChannels),
+    whatsappRequired: (state) => whatsappVerificationRequired(state.requiredChannels),
+  },
+
   actions: {
     setLoading(status: boolean) {
       this.isLoading = status;
     },
     setError(err: string | null) {
       this.error = err;
+    },
+
+    async fetchOnboardingSettings() {
+      try {
+        const { data } = await api.get('/settings/onboarding');
+        const channels = Array.isArray(data?.requiredChannels)
+          ? data.requiredChannels
+          : defaultOnboardingChannels();
+        this.requiredChannels = channels;
+      } catch {
+        this.requiredChannels = defaultOnboardingChannels();
+      }
     },
     
     startEmailCooldown() {

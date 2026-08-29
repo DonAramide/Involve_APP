@@ -707,6 +707,7 @@ const resetForm = ref({
 })
 const activeUserId = ref(null)
 const activeUserRole = ref('SUPER_ADMIN')
+const challengeToken = ref('')
 const challengeContextMessage = ref('')
 
 // Brute Force metrics simulation
@@ -985,6 +986,7 @@ const executeLoginPass = async () => {
       // MFA Gateway triggered
       activeUserId.value = res.data.userId
       activeUserRole.value = res.data.role || activeUserRole.value
+      challengeToken.value = res.data.challengeToken || ''
       
       if (res.data.requiresMfaSetup) {
         // Cache short-lived configuration access inside window parameters safely
@@ -1059,6 +1061,7 @@ const executeMfaVerification = async () => {
     const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
       userId: activeUserId.value,
       tokenCode: form.value.totpCode,
+      challengeToken: challengeToken.value,
       role: activeUserRole.value
     })
 

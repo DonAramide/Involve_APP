@@ -1,24 +1,17 @@
-// src/app.ts (network-stabilized)
+// src/app.ts (reloaded)
 import express, { Request, Response, NextFunction } from 'express';
 import * as http from 'http';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import * as dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+import { loadEnv } from './config/load-env';
+import { BuildVariantService } from './config/build-variant';
 
-// Load environment variables — pick the correct file based on NODE_ENV
-const _envFile = process.env.NODE_ENV === 'staging'
-  ? '.env.staging'
-  : process.env.NODE_ENV === 'production'
-    ? '.env.production'
-    : '.env';
-dotenv.config({ path: _envFile });
+loadEnv();
 
 const isJest = typeof process.env.JEST_WORKER_ID !== 'undefined';
-
-import { BuildVariantService } from './config/build-variant';
 
 // Bypass Node 18+ strict TLS and IPv6 fetch failures ONLY in local mode for local Supabase emulator
 try {
@@ -98,7 +91,7 @@ import { InvestigationQueueService } from './modules/financial-platform/reconcil
 import { QuasarConnector } from './modules/financial-platform/infrastructure/QuasarConnector';
 import { HealthController } from './controllers/health.controller';
 
-import { authenticate } from './middleware/auth.middleware';
+import { authenticate, optionalAuthenticate } from './middleware/auth.middleware';
 import { checkRole, checkTenantAccess, checkTenantPermission } from './middleware/rbac.middleware';
 import { correlationIdMiddleware } from './middleware/correlation.middleware';
 
@@ -118,13 +111,30 @@ const allowedOrigins = process.env.CORS_ORIGINS
   : (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:3000', 'http://localhost:5173']);
 
 function isCorsOriginAllowed(origin?: string): boolean {
-  const isWildcardAllowed = allowedOrigins.includes('*') &&
-    process.env.NODE_ENV !== 'production' &&
-    process.env.NODE_ENV !== 'staging' &&
-    !BuildVariantService.getInstance().isProd() &&
-    !BuildVariantService.getInstance().isStaging();
+  if (!origin) return true; // Mobile native clients, curl, server-to-server
 
-  return !origin || allowedOrigins.includes(origin) || isWildcardAllowed;
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  // In non-production (LOCAL or STAGING development), allow localhost, 127.0.0.1, and private LAN IPs on any port
+  let isStrictProd = false;
+  try {
+    isStrictProd = process.env.NODE_ENV === 'production' || BuildVariantService.getInstance().isProd();
+  } catch {
+    isStrictProd = process.env.NODE_ENV === 'production';
+  }
+
+  if (!isStrictProd) {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return true;
+    }
+    if (/^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$/.test(origin)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 app.use(cors({
@@ -132,7 +142,7 @@ app.use(cors({
     if (isCorsOriginAllowed(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, false);
     }
   },
   credentials: true
@@ -214,6 +224,8 @@ app.post('/api/auth/login', authLimiter, AuthController.login);
 app.post('/api/auth/reset-password', authLimiter, AuthController.resetPassword);
 app.post('/api/auth/mfa/setup', authLimiter, AuthController.mfaSetup);
 app.post('/api/auth/mfa/verify', authLimiter, AuthController.mfaVerify);
+app.post('/api/auth/refresh', authLimiter, AuthController.refresh);
+app.post('/api/auth/logout', authLimiter, AuthController.logout);
 app.post('/api/auth/send-email-otp', verificationLimiter, OnboardingController.sendEmailOtp);
 app.post('/api/auth/verify-email-otp', verificationLimiter, OnboardingController.verifyEmailOtp);
 
@@ -360,7 +372,7 @@ import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.post('/api/tenant/kyc/upload', authenticate, upload.single('file'), TenantKycController.uploadKyc);
-app.get('/api/tenant/:id/kyc', authenticate, checkRole(['super_admin', 'admin']), TenantKycController.getKycDocuments);
+app.get('/api/tenant/:id/kyc', authenticate, TenantKycController.getKycDocuments);
 
 // Agent Portal Routes
 app.post('/api/agent/register', AgentController.register);
@@ -535,8 +547,8 @@ app.get('/api/devices/:deviceId/status', authenticate, DeviceController.getDevic
 app.get('/api/devices/:deviceId/telemetry', authenticate, DeviceController.getDeviceTelemetry);
 app.get('/api/devices/:deviceId/alerts', authenticate, DeviceController.getDeviceAlerts);
 
-// Terminal Sync (Public for mobile app)
-app.post('/api/mobile/terminal/sync', authenticate, TerminalController.mobileSync);
+// Terminal Sync (Public / Onboarding for mobile app)
+app.post('/api/mobile/terminal/sync', optionalAuthenticate, TerminalController.mobileSync);
 app.post('/api/mobile/terminal/keyexchange-success', TerminalController.keyExchangeSuccess);
 app.get('/api/mobile/terminal/status', TerminalController.mobileStatus);
 
@@ -948,10 +960,11 @@ export const io = new SocketIOServer(server, {
       if (isCorsOriginAllowed(origin)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(null, false);
       }
     },
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
+    credentials: true
   }
 });
 

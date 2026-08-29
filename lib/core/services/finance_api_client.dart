@@ -242,7 +242,7 @@ String? _messageForHttpStatus(int? statusCode) {
 /// Usage:
 /// ```dart
 /// final client = FinanceApiClient(
-///   baseUrl: 'https://api.invify.co/api',
+///   baseUrl: AppConfig.baseUrl,
 ///   getToken: () async => Supabase.instance.client.auth.currentSession?.accessToken,
 ///   getTenantId: () async => prefs.getString('school_id'),
 /// );

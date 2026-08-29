@@ -1,10 +1,9 @@
 // src/db/supabase.ts
 import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
-
+import { loadEnv } from '../config/load-env';
 import { BuildVariantService } from '../config/build-variant';
+
+loadEnv();
 
 const { url: supabaseUrl, key: supabaseKey, serviceRoleKey } = BuildVariantService.getInstance().getSupabaseConfig();
 

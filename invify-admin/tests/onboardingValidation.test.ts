@@ -5,6 +5,11 @@ import {
   passwordRule,
   buildE164,
 } from '../src/utils/onboardingValidation';
+import {
+  defaultOnboardingChannels,
+  emailVerificationRequired,
+  whatsappVerificationRequired,
+} from '../src/utils/onboardingChannels';
 
 describe('onboardingValidation', () => {
   test('rejects incomplete emails', () => {
@@ -27,5 +32,19 @@ describe('onboardingValidation', () => {
 
   test('emailRule surfaces a useful message', () => {
     expect(emailRule('bad@x')).not.toBe(true);
+  });
+});
+
+describe('onboardingChannels', () => {
+  test('WhatsApp verification is off by default', () => {
+    expect(defaultOnboardingChannels()).toEqual(['EMAIL']);
+    expect(whatsappVerificationRequired(defaultOnboardingChannels())).toBe(false);
+    expect(emailVerificationRequired(defaultOnboardingChannels())).toBe(true);
+  });
+
+  test('WhatsApp is required only when the server includes WHATSAPP', () => {
+    expect(whatsappVerificationRequired(['EMAIL'])).toBe(false);
+    expect(whatsappVerificationRequired(['EMAIL', 'WHATSAPP'])).toBe(true);
+    expect(whatsappVerificationRequired(undefined)).toBe(false);
   });
 });

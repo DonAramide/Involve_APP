@@ -192,7 +192,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
-import { adminApi } from '../api'
+import { adminApi, api } from '../api'
+import { logoutAuthenticatedSession } from '../auth/session'
 
 const router = useRouter()
 const $q = useQuasar()
@@ -262,11 +263,8 @@ const loadTenantDetails = async () => {
   }
 }
 
-const executeLogout = () => {
-  localStorage.removeItem('invify_token')
-  localStorage.removeItem('operator_email')
-  localStorage.removeItem('operator_role')
-  localStorage.removeItem('tenant_type')
+const executeLogout = async () => {
+  await logoutAuthenticatedSession(api, { redirect: false })
   router.push('/tenant/login')
   $q.notify({ type: 'info', message: 'Session closed successfully.' })
 }

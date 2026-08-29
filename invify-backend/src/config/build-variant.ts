@@ -158,7 +158,9 @@ export class BuildVariantService {
     if (!url || !key || !serviceRoleKey) {
       if (this.isStaging()) {
         throw new Error(
-          `[BuildVariantService] STAGING requires STAGING_SUPABASE_URL, STAGING_SUPABASE_PUBLISHABLE_KEY, and STAGING_SUPABASE_SECRET_KEY`,
+          `[BuildVariantService] STAGING requires STAGING_SUPABASE_URL, STAGING_SUPABASE_PUBLISHABLE_KEY, and STAGING_SUPABASE_SECRET_KEY. ` +
+            `For local laptop use BUILD_VARIANT=LOCAL and npm run dev. ` +
+            `For staging, copy .env.staging.example to .env.staging and run npm run dev:staging.`,
         );
       }
       if (this.isProd()) {

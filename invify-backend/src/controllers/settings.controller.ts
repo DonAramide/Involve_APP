@@ -1,22 +1,15 @@
 import { Request, Response } from 'express';
 import { supabaseAdmin } from '../db/supabase';
+import {
+  resolveOnboardingVerification,
+  sanitizeRequiredChannels,
+} from '../services/onboarding-settings.service';
 
 export class SettingsController {
   public static async getOnboardingSettings(req: Request, res: Response): Promise<void> {
     try {
-      const { data, error } = await supabaseAdmin
-        .from('onboarding_settings')
-        .select('required_channels')
-        .eq('id', 1)
-        .single();
-
-      if (error || !data) {
-        // Fallback defaults if the table isn't seeded or has an error
-        res.status(200).json({ requiredChannels: ['EMAIL'] });
-        return;
-      }
-
-      res.status(200).json({ requiredChannels: data.required_channels || [] });
+      const settings = await resolveOnboardingVerification();
+      res.status(200).json(settings);
     } catch (error: any) {
       console.error('[SettingsController] getOnboardingSettings error:', error.message);
       res.status(500).json({ error: 'Internal server error' });
@@ -32,21 +25,22 @@ export class SettingsController {
         return;
       }
 
-      const { data, error } = await supabaseAdmin
+      const sanitized = sanitizeRequiredChannels(requiredChannels);
+
+      const { error } = await supabaseAdmin
         .from('onboarding_settings')
-        .update({
-          required_channels: requiredChannels,
+        .upsert({
+          id: 1,
+          required_channels: sanitized,
           updated_at: new Date().toISOString()
-        })
-        .eq('id', 1)
-        .select()
-        .single();
+        });
 
       if (error) {
         throw error;
       }
 
-      res.status(200).json({ requiredChannels: data.required_channels });
+      const settings = await resolveOnboardingVerification();
+      res.status(200).json(settings);
     } catch (error: any) {
       console.error('[SettingsController] updateOnboardingSettings error:', error.message);
       res.status(500).json({ error: 'Internal server error' });

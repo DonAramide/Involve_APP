@@ -12,6 +12,12 @@ import {
   MfaChallengeError,
   validateMfaChallenge,
 } from '../services/mfa-challenge.service';
+import {
+  AuthSessionError,
+  exchangeRefreshToken,
+  peekTokenSubject,
+  revokeProviderSession,
+} from '../services/auth-session.service';
 
 /** Love School (device / JWT from live tablet sessions). */
 const LOVE_SCHOOL_TENANT_ID = '0e9ccdf3-f96b-4914-8aed-76165655ad01';
@@ -220,6 +226,62 @@ async function validateDeviceOrBlock(userId: string, email: string, req: Request
     return { allowed: true };
   } catch (err) {
     return { allowed: true };
+  }
+}
+
+function dispatchLoginSecurityAlert(req: Request, user: { name?: string; email: string; role?: string }) {
+  try {
+    const { emailService } = require('../services/email.service');
+    const forwarded = req.headers['x-forwarded-for'];
+    let ip = '';
+    if (typeof forwarded === 'string') {
+      ip = forwarded.split(',')[0].trim();
+    } else if (Array.isArray(forwarded) && forwarded.length > 0) {
+      ip = forwarded[0].trim();
+    } else {
+      ip = (req.headers['x-real-ip'] as string) || req.socket.remoteAddress || req.ip || '127.0.0.1';
+    }
+
+    if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+      ip = '127.0.0.1';
+    }
+
+    const deviceId = req.body?.deviceId || req.headers['x-device-id'] || 'Web Browser (Default Device)';
+    const userAgent = req.headers['user-agent'] || 'Web Browser';
+
+    const city = (req.headers['cf-ipcity'] || req.headers['x-client-city']) as string;
+    const country = (req.headers['cf-ipcountry'] || req.headers['x-client-country'] || req.headers['x-country-name'] || req.headers['x-country-code']) as string;
+
+    let location = '';
+    if (city && country) {
+      location = `${city}, ${country}`;
+    } else if (country) {
+      location = country;
+    } else if (ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+      location = 'Local Network / Development Environment';
+    } else {
+      location = 'Detected via IP Address';
+    }
+
+    const portal = req.body?.portal === 'admin' || (user.role && user.role.startsWith('admin_')) || user.role === 'super_admin' || user.role === 'internal_staff'
+      ? 'Invify Super Admin Portal'
+      : 'Invify Business & Tenant Portal';
+
+    emailService.sendLoginAlertEmail(user.email, {
+      name: user.name || user.email.split('@')[0],
+      ipAddress: ip,
+      deviceId: String(deviceId),
+      userAgent: String(userAgent),
+      location,
+      loginTime: new Date().toUTCString(),
+      portal
+    }).then(() => {
+      console.log(`[AuthController] Sent login security alert to: ${user.email}`);
+    }).catch((err: any) => {
+      console.warn('[AuthController] Failed to send login security alert:', err.message);
+    });
+  } catch (err: any) {
+    console.warn('[AuthController] Failed to trigger login alert email:', err.message);
   }
 }
 
@@ -569,6 +631,12 @@ export class AuthController {
         }
       }
 
+      dispatchLoginSecurityAlert(req, {
+        name: profile.name,
+        email: profile.email,
+        role: profile.role
+      });
+
       return res.status(200).json({
         token: authData.session.access_token,
         refreshToken: authData.session.refresh_token,
@@ -601,6 +669,11 @@ export class AuthController {
         if (!check.allowed) {
           return res.status(403).json(check.errorResponse);
         }
+
+        dispatchLoginSecurityAlert(req, {
+          email: email,
+          role: identity.role
+        });
 
         return res.status(200).json({
           token: mockToken,
@@ -958,6 +1031,12 @@ export class AuthController {
       const session = consumeMfaChallenge(verificationChallenge);
       clearMfaChallengeCookie(res);
 
+      dispatchLoginSecurityAlert(req, {
+        name: profile.name,
+        email: profile.email,
+        role: profile.role
+      });
+
       return res.status(200).json({
         token: session.token,
         refreshToken: session.refreshToken,
@@ -971,5 +1050,50 @@ export class AuthController {
     } catch (error) {
       return mfaErrorResponse(res, error);
     }
+  }
+
+  /**
+   * POST /api/auth/refresh
+   * Thin facade over Supabase Auth refresh-token rotation. Does not mint custom JWTs.
+   */
+  static async refresh(req: Request, res: Response) {
+    try {
+      const authorization = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+      const currentAccess = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+      const boundUserId = peekTokenSubject(currentAccess);
+      const session = await exchangeRefreshToken(req.body?.refreshToken, boundUserId);
+      return res.status(200).json({
+        token: session.token,
+        refreshToken: session.refreshToken,
+        user: session.user,
+      });
+    } catch (error) {
+      if (error instanceof AuthSessionError) {
+        return res.status(error.status).json({ error: error.code, message: error.message });
+      }
+      return res.status(401).json({
+        error: 'REFRESH_TOKEN_INVALID',
+        message: 'Refresh token is invalid or expired',
+      });
+    }
+  }
+
+  /**
+   * POST /api/auth/logout
+   * Best-effort Supabase session revocation, then always succeeds so the client can clear storage.
+   */
+  static async logout(req: Request, res: Response) {
+    clearMfaChallengeCookie(res);
+    const authorization = typeof req.headers.authorization === 'string' ? req.headers.authorization : '';
+    const accessToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+    try {
+      await revokeProviderSession({
+        refreshToken: req.body?.refreshToken,
+        accessToken,
+      });
+    } catch {
+      // Local logout remains authoritative even if the provider is unreachable.
+    }
+    return res.status(200).json({ ok: true });
   }
 }

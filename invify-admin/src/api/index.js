@@ -2,6 +2,7 @@ import axios from 'axios';
 import { Notify } from 'quasar';
 import { loginPathForContext } from '../utils/authLoginPaths';
 import { resolveApiBaseUrl } from '../config/env';
+import { attachSessionInterceptors, readAccessToken } from '../auth/session';
 
 const api = axios.create({
   baseURL: resolveApiBaseUrl(),
@@ -62,7 +63,7 @@ function resolveClientTenantId() {
 }
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('invify_token');
+  const token = readAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -75,44 +76,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      const currentPath = window.location.pathname;
-      const loginPath = loginPathForContext({ pathname: currentPath });
-      if (currentPath !== loginPath && currentPath !== '/login' && currentPath !== '/admin/login' && currentPath !== '/tenant/login') {
-        localStorage.removeItem('invify_token');
-        localStorage.removeItem('invify_refresh_token');
-        localStorage.removeItem('operator_role');
-        localStorage.removeItem('operator_email');
-        localStorage.removeItem('mfa_status_verified');
-        localStorage.removeItem('impersonation_context');
-
-        Notify.create({
-          type: 'negative',
-          message: 'Session Expired: You have been logged out. Please log in again.',
-          position: 'top-right',
-          timeout: 4500,
-          icon: 'logout'
-        });
-
-        window.location.href = loginPath;
-      }
-    } else if (error.response && error.response.status === 403) {
-      Notify.create({
-        type: 'warning',
-        message: 'Access Restricted: This feature is out of your control or operates in Read-Only mode for your role.',
-        position: 'top-right',
-        timeout: 4000,
-        icon: 'lock'
-      });
-      // Keep rejecting so callers can keep their default empty object/array shape.
-      // (Resolving `{ data: [] }` broke pages that expect an object, e.g. school roster.)
-    }
-    return Promise.reject(error);
-  }
-);
+attachSessionInterceptors(api, { Notify, loginPathForContext });
 
 export const onboardingApi = {
   signup: (data) => api.post('/public/onboarding/signup', data), // PUBLIC (Supports referralCode)

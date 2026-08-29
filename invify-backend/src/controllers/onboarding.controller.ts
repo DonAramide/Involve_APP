@@ -6,6 +6,7 @@ import { QuasarProvisioningService } from '../integrations/quasar/quasar-provisi
 import jwt from 'jsonwebtoken';
 import { BuildVariantService } from '../config/build-variant';
 import { IntegrationVaultService } from '../services/integration-vault.service';
+import { resolveOnboardingVerification } from '../services/onboarding-settings.service';
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -342,8 +343,10 @@ export class OnboardingController {
         return;
       }
 
-      const emailVerificationRequired = process.env.AUTH_EMAIL_VERIFICATION_REQUIRED !== 'false';
-      const whatsappVerificationRequired = process.env.AUTH_WHATSAPP_VERIFICATION_REQUIRED === 'true';
+      const {
+        emailVerificationRequired,
+        whatsappVerificationRequired,
+      } = await resolveOnboardingVerification();
 
       if (emailVerificationRequired && !emailVerified) {
         res.status(400).json({ success: false, error: 'Email verification is required to complete registration.' });

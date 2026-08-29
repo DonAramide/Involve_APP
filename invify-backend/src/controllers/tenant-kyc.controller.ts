@@ -71,7 +71,17 @@ export class TenantKycController {
 
   static async getKycDocuments(req: Request, res: Response) {
     try {
-      const tenantId = req.params.id || (req as any).user?.id;
+      const user = (req as any).user || {};
+      const role = String(user.role || '').toLowerCase();
+      const isAdmin = role === 'super_admin' || role === 'admin';
+      const ownTenantId = user.tenantId || user.id;
+      const requestedId = req.params.id;
+
+      if (!isAdmin && requestedId && requestedId !== ownTenantId && requestedId !== user.id) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+      }
+
+      const tenantId = isAdmin ? (requestedId || ownTenantId) : ownTenantId;
       if (!tenantId) {
         return res.status(400).json({ success: false, message: 'Tenant ID is required' });
       }

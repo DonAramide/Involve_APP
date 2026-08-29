@@ -451,3 +451,40 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     return res.status(500).json({ error: 'Authentication processing failed' });
   }
 };
+
+export const optionalAuthenticate = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    (req as any).user = null;
+    return next();
+  }
+  try {
+    let responded = false;
+    const proxyRes: any = {
+      status: (code: number) => {
+        responded = true;
+        return {
+          json: () => {
+            (req as any).user = null;
+            return next();
+          }
+        };
+      },
+      json: () => {
+        responded = true;
+        (req as any).user = null;
+        return next();
+      }
+    };
+    await authenticate(req, proxyRes, (err?: any) => {
+      if (responded) return;
+      if (err) {
+        (req as any).user = null;
+      }
+      return next();
+    });
+  } catch {
+    (req as any).user = null;
+    return next();
+  }
+};

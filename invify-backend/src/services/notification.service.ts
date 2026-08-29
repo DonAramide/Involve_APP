@@ -1,13 +1,42 @@
 // src/services/notification.service.ts
 import * as admin from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 import { supabase } from '../db/supabase';
 
 import { BuildVariantService } from '../config/build-variant';
 
+function resolveFcmServiceAccountJson(): string {
+  const inline = (process.env.FCM_SERVICE_ACCOUNT_JSON || '').trim();
+  if (inline) return inline;
+
+  const variant = BuildVariantService.getInstance();
+  const pathCandidates: string[] = [];
+  const explicitPath = (process.env.FCM_SERVICE_ACCOUNT_PATH || process.env.GOOGLE_APPLICATION_CREDENTIALS || '').trim();
+  if (explicitPath) pathCandidates.push(explicitPath);
+
+  // Laptop staging: Windows cannot reliably store multiline JSON in .env files.
+  if (variant.isStaging()) {
+    pathCandidates.push(
+      path.resolve(process.cwd(), 'firebase-staging-service-account.json'),
+      path.resolve(process.cwd(), '..', 'firebase-staging-service-account.json'),
+    );
+  }
+
+  for (const candidate of pathCandidates) {
+    const resolved = path.isAbsolute(candidate) ? candidate : path.resolve(process.cwd(), candidate);
+    if (!fs.existsSync(resolved)) continue;
+    console.log(`[NotificationService] Loaded FCM service account from ${resolved}`);
+    return fs.readFileSync(resolved, 'utf8');
+  }
+
+  return '';
+}
+
 // Initialize Firebase Admin SDK
 if (!admin.apps.length) {
   try {
-    const serviceAccountStr = process.env.FCM_SERVICE_ACCOUNT_JSON || '';
+    const serviceAccountStr = resolveFcmServiceAccountJson();
     let serviceAccount: any = {};
     if (serviceAccountStr) {
       serviceAccount = JSON.parse(serviceAccountStr);
@@ -15,7 +44,9 @@ if (!admin.apps.length) {
     if (Object.keys(serviceAccount).length === 0) {
       const variant = BuildVariantService.getInstance();
       if (variant.isProd() || variant.isStaging()) {
-        throw new Error('[NotificationService] Refusing to start: FCM_SERVICE_ACCOUNT_JSON is required in staging/production');
+        throw new Error(
+          '[NotificationService] Refusing to start: FCM_SERVICE_ACCOUNT_JSON or FCM_SERVICE_ACCOUNT_PATH is required in staging/production',
+        );
       }
       console.warn('[NotificationService] FCM_SERVICE_ACCOUNT_JSON is missing or empty.');
     } else {

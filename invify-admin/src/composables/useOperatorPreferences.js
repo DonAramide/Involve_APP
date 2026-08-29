@@ -1,6 +1,7 @@
 // invify-admin/src/composables/useOperatorPreferences.js
 import { ref, watch } from 'vue'
-import { loginPathForContext } from '../utils/authLoginPaths'
+import { logoutAuthenticatedSession } from '../auth/session'
+import api from '../api'
 
 const STORAGE_KEY = 'invify_enterprise_operator_prefs'
 
@@ -179,17 +180,7 @@ export function useOperatorPreferences() {
   }
 
   const executeLogout = async () => {
-    try {
-      localStorage.removeItem('invify_token')
-      localStorage.removeItem('invify_refresh_token')
-      localStorage.removeItem('operator_role')
-      localStorage.removeItem('operator_email')
-      localStorage.removeItem('mfa_status_verified')
-      sessionStorage.clear()
-    } catch (e) {}
-    
-    // Complete page navigation clear guarantees zero memory drift
-    window.location.href = loginPathForContext()
+    await logoutAuthenticatedSession(api, { redirect: true })
   }
 
   return {

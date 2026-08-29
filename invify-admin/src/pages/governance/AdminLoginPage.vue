@@ -879,6 +879,7 @@ const pendingResetState = ref(false)
 const pendingOtpResetState = ref(false)
 const activeUserId = ref(null)
 const activeUserRole = ref('SUPER_ADMIN')
+const challengeToken = ref('')
 const challengeContextMessage = ref('')
 const lockoutRemainingMs = ref(0)
 const failedAttemptsCount = ref(0)
@@ -1193,6 +1194,7 @@ async function executeLoginPass() {
     if (res.status === 202 || res.data?.requiresMfaSetup || res.data?.requires2FA) {
       activeUserId.value = res.data.userId
       activeUserRole.value = res.data.role || activeUserRole.value
+      challengeToken.value = res.data.challengeToken || ''
       if (res.data.requiresMfaSetup) {
         sessionStorage.setItem('mfa_setup_token', res.data.setupToken)
         sessionStorage.setItem('mfa_setup_userId', res.data.userId)
@@ -1254,6 +1256,7 @@ async function executeMfaVerification() {
     const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
       userId: activeUserId.value,
       tokenCode: form.value.totpCode,
+      challengeToken: challengeToken.value,
       role: activeUserRole.value
     })
     if (res.data?.token) {

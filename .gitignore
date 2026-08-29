@@ -55,11 +55,16 @@ android/upload-keystore.jks
 # Secret files
 .env
 .env.*
+env
+env.*
+env.staging
+env.production
 .env_ex
 **/.env_ex
 !.env.example
 !.env.staging.example
 backend/.env
+invify-backend/env
 **/secrets/
 **/credentials*.json
 **/vault-key-transfer.txt

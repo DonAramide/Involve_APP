@@ -1,4 +1,4 @@
-name: involve_app
+﻿name: involve_app
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -116,7 +116,7 @@ flutter:
     - assets/docs/
     - assets/sounds/
     - assets/fonts/
-    # NOTE: Do NOT package .env — secrets/config must not ship inside release binaries.
+    # NOTE: Do NOT package .env â€” secrets/config must not ship inside release binaries.
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

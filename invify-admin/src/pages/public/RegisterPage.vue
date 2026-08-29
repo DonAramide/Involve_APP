@@ -195,6 +195,7 @@
 
         <!-- Step 2: Email Verification -->
         <q-step
+          v-if="store.emailRequired"
           :name="2"
           title="Verify Email"
           icon="email"
@@ -236,8 +237,9 @@
           </q-form>
         </q-step>
 
-        <!-- Step 3: WhatsApp Verification -->
+        <!-- Step 3: WhatsApp Verification (server-configurable; default off) -->
         <q-step
+          v-if="store.whatsappRequired"
           :name="3"
           title="Verify WhatsApp"
           icon="phone"
@@ -441,9 +443,11 @@ async function onGoogleSignup() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   const savedTheme = window.localStorage.getItem('invify_public_dark_mode');
   setTheme(savedTheme === 'true');
+
+  await store.fetchOnboardingSettings();
 
   timerId = setInterval(() => {
     now.value = Date.now();
@@ -471,11 +475,24 @@ const whatsappResendDisabled = computed(() => store.whatsappResendAvailableAt > 
 const emailResendLabel = computed(() => formatResendLabel(store.emailResendAvailableAt));
 const whatsappResendLabel = computed(() => formatResendLabel(store.whatsappResendAvailableAt));
 
+async function finishRegistration() {
+  await store.completeRegistration();
+  step.value = 4;
+}
+
 async function onAccountDetailsSubmit() {
   try {
-    // Attempt to send the first OTP via email
-    await store.sendEmailOtp();
-    step.value = 2; // Proceed to Email Verification
+    if (store.emailRequired) {
+      await store.sendEmailOtp();
+      step.value = 2;
+      return;
+    }
+    if (store.whatsappRequired) {
+      await store.sendWhatsappOtp();
+      step.value = 3;
+      return;
+    }
+    await finishRegistration();
   } catch (err) {
     // Error handled by store
   }
@@ -492,8 +509,12 @@ async function onResendEmailOtp() {
 async function onEmailVerifySubmit() {
   try {
     await store.verifyEmailOtp(emailOtp.value);
-    step.value = 3;
-    await store.sendWhatsappOtp();
+    if (store.whatsappRequired) {
+      step.value = 3;
+      await store.sendWhatsappOtp();
+      return;
+    }
+    await finishRegistration();
   } catch (err) {
     // Email verify failure stays on step 2; WhatsApp send failure is shown on step 3.
   }
@@ -510,10 +531,7 @@ async function onResendWhatsappOtp() {
 async function onWhatsappVerifySubmit() {
   try {
     await store.verifyWhatsappOtp(whatsappOtp.value);
-    
-    // Finally, register the user
-    await store.completeRegistration();
-    step.value = 4; // Proceed to Success Screen
+    await finishRegistration();
   } catch (err) {
     // Error handled by store
   }

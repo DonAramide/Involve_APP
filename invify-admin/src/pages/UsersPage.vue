@@ -326,18 +326,25 @@ const fetchUsers = async () => {
 }
 
 const inviteMember = async () => {
+  if (!inviteEmail.value || !inviteEmail.value.trim()) {
+    $q.notify({ type: 'warning', message: 'Please enter an email address.' })
+    return
+  }
   sending.value = true
   try {
-    const { data } = await adminApi.sendInvite({ email: inviteEmail.value })
+    const { data } = await adminApi.sendInvite({ email: inviteEmail.value.trim() })
     if (data.inviteLink) {
       lastInviteLink.value = data.inviteLink
-    }
-    // We don't automatically close the modal if they need the link in dev mode
-    if (!data.inviteLink) {
-       showInvite.value = false
-       inviteEmail.value = ''
+      $q.notify({ type: 'info', message: 'Invitation link generated.' })
+    } else {
+      showInvite.value = false
+      inviteEmail.value = ''
+      $q.notify({ type: 'positive', message: 'Invitation sent successfully.' })
     }
     fetchUsers()
+  } catch (error) {
+    const msg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to send invite.'
+    $q.notify({ type: 'negative', message: msg })
   } finally {
     sending.value = false
   }
@@ -359,24 +366,39 @@ const openModal = (user = null) => {
 }
 
 const saveUser = async () => {
+  if (!form.value.email || !form.value.email.trim()) {
+    $q.notify({ type: 'warning', message: 'Email address is required.' })
+    return
+  }
+  if (!form.value.name || !form.value.name.trim()) {
+    $q.notify({ type: 'warning', message: 'Full name is required.' })
+    return
+  }
+
   saving.value = true
   try {
     const isPlatform = isPlatformRole(form.value.role)
     const payload = {
       ...form.value,
+      email: form.value.email.trim().toLowerCase(),
       tenantId: isPlatform ? null : form.value.tenantId
     }
     if (isEditing.value) {
       await adminApi.updateUser(form.value.id, { 
-        name: form.value.name, 
+        name: form.value.name.trim(), 
         role: form.value.role, 
         tenant_id: isPlatform ? null : form.value.tenantId 
       })
+      $q.notify({ type: 'positive', message: 'User updated successfully.' })
     } else {
       await adminApi.createUser(payload)
+      $q.notify({ type: 'positive', message: 'User access created successfully.' })
     }
     modalVisible.value = false
     fetchUsers()
+  } catch (error) {
+    const msg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to save user.'
+    $q.notify({ type: 'negative', message: msg })
   } finally {
     saving.value = false
   }
@@ -385,8 +407,11 @@ const saveUser = async () => {
 const toggleStatus = async (user) => {
   try {
     await adminApi.updateUser(user.id, { is_active: !user.is_active })
+    $q.notify({ type: 'positive', message: `User status updated to ${!user.is_active ? 'Active' : 'Inactive'}` })
     fetchUsers()
-  } catch (error) {}
+  } catch (error) {
+    $q.notify({ type: 'negative', message: 'Failed to update user status.' })
+  }
 }
 
 const forceResetPassword = (user) => {

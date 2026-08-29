@@ -38,7 +38,7 @@
                 </q-item-section>
                 <q-item-section>
                   <q-item-label>WhatsApp Verification</q-item-label>
-                  <q-item-label caption class="text-grey-5">Send a verification code via WhatsApp message</q-item-label>
+                  <q-item-label caption class="text-grey-5">Send a verification code via WhatsApp. Off by default; enable here to require it during web and mobile onboarding.</q-item-label>
                 </q-item-section>
                 <q-item-section side>
                   <q-toggle color="green" v-model="channels.whatsapp" />
