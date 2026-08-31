@@ -1195,15 +1195,16 @@ async function executeLoginPass() {
       activeUserId.value = res.data.userId
       activeUserRole.value = res.data.role || activeUserRole.value
       challengeToken.value = res.data.challengeToken || ''
-      sessionStorage.setItem('mfa_challenge_token', challengeToken.value)
       sessionStorage.setItem('mfa_challenge_userId', res.data.userId || '')
       sessionStorage.setItem('operator_role', activeUserRole.value)
       if (res.data.requiresMfaSetup) {
-        sessionStorage.setItem('mfa_setup_token', res.data.setupToken)
+        sessionStorage.setItem('mfa_setup_token', res.data.setupToken || res.data.challengeToken)
         sessionStorage.setItem('mfa_setup_userId', res.data.userId)
+        sessionStorage.removeItem('mfa_challenge_token')
         router.push('/mfa/challenge').catch(() => {})
         return
       }
+      sessionStorage.setItem('mfa_challenge_token', challengeToken.value)
       pendingChallengeState.value = true
       challengeContextMessage.value =
         res.data.message || 'Enter the 6-digit code from your authenticator app.'

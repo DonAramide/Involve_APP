@@ -11,8 +11,13 @@ export function registerRuntimeGuards(router) {
       to.path.startsWith('/error') ||
       to.path.startsWith('/suspended') ||
       to.path.startsWith('/upgrade') ||
-      to.path.startsWith('/unauthorized')
+      to.path.startsWith('/unauthorized') ||
+      to.path.startsWith('/mfa/')
     ) {
+      return next();
+    }
+
+    if (!localStorage.getItem('invify_token')) {
       return next();
     }
 

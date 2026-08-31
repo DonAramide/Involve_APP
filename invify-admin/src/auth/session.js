@@ -26,7 +26,24 @@ export const SESSION_STORAGE_KEYS = [
   'supabase_token',
 ];
 
-export const SESSION_STORAGE_TRANSIENT_KEYS = ['mfa_setup_token', 'mfa_setup_userId'];
+export const SESSION_STORAGE_TRANSIENT_KEYS = [
+  'mfa_setup_token',
+  'mfa_setup_userId',
+  'mfa_challenge_token',
+  'mfa_challenge_userId',
+];
+
+export function isMfaChallengePending() {
+  if (typeof sessionStorage === 'undefined') return false;
+  try {
+    return !!(
+      sessionStorage.getItem('mfa_setup_token') ||
+      sessionStorage.getItem('mfa_challenge_token')
+    );
+  } catch {
+    return false;
+  }
+}
 
 const AUTH_PATH_MARKERS = [
   '/api/auth/login',
@@ -194,6 +211,12 @@ export function attachSessionInterceptors(api, { Notify, loginPathForContext } =
       }
 
       if (status !== 401) {
+        return Promise.reject(error);
+      }
+
+      // Login succeeded but MFA is still pending — no access token yet.
+      // A 401 from runtime/config must not wipe the MFA challenge.
+      if (isMfaChallengePending() && !readAccessToken()) {
         return Promise.reject(error);
       }
 

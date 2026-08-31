@@ -186,15 +186,25 @@ onMounted(() => {
 
 const triggerRemoteSetupGeneration = async (uId) => {
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/setup'), { userId: uId })
+    const setupToken = sessionStorage.getItem('mfa_setup_token') || ''
+    const res = await axios.post(
+      joinApiUrl('/api/auth/mfa/setup'),
+      { userId: uId, challengeToken: setupToken, setupToken },
+      { withCredentials: true },
+    )
     if (res.data?.qrCodeUrl) {
       qrCodeDataUrl.value = res.data.qrCodeUrl
       setupSecretString.value = res.data.secret
     }
+    if (res.data?.challengeToken) {
+      sessionStorage.setItem('mfa_challenge_token', res.data.challengeToken)
+      sessionStorage.removeItem('mfa_setup_token')
+    }
   } catch (err) {
-    // Render working offline visualization block directly
-    setupSecretString.value = 'JBSWY3DPEHPK3PXP'
-    // Draw pure simulated canvas data code directly if offline
+    errorMessage.value =
+      err.response?.data?.message ||
+      'MFA setup failed. Sign in again at /admin/login so a new QR code can be issued.'
+    setupSecretString.value = ''
   }
 }
 
@@ -204,13 +214,17 @@ const executeMfaSetupVerification = async () => {
   successMessage.value = ''
 
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
-      userId: targetUserId.value,
-      tokenCode: totpInput.value,
-      challengeToken: sessionStorage.getItem('mfa_challenge_token') || sessionStorage.getItem('mfa_setup_token') || '',
-      pendingSetup: true,
-      role: sessionStorage.getItem('operator_role') || 'SUPER_ADMIN'
-    })
+    const res = await axios.post(
+      joinApiUrl('/api/auth/mfa/verify'),
+      {
+        userId: targetUserId.value,
+        tokenCode: totpInput.value,
+        challengeToken: sessionStorage.getItem('mfa_challenge_token') || '',
+        pendingSetup: true,
+        role: sessionStorage.getItem('operator_role') || 'SUPER_ADMIN'
+      },
+      { withCredentials: true },
+    )
 
     if (res.data?.token) {
       finalizeValidatedToken(res.data)
@@ -228,12 +242,16 @@ const executeStandardVerification = async () => {
   successMessage.value = ''
 
   try {
-    const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
-      userId: targetUserId.value,
-      tokenCode: totpInput.value,
-      challengeToken: sessionStorage.getItem('mfa_challenge_token') || '',
-      role: localStorage.getItem('operator_role') || 'SUPER_ADMIN'
-    })
+    const res = await axios.post(
+      joinApiUrl('/api/auth/mfa/verify'),
+      {
+        userId: targetUserId.value,
+        tokenCode: totpInput.value,
+        challengeToken: sessionStorage.getItem('mfa_challenge_token') || '',
+        role: localStorage.getItem('operator_role') || 'SUPER_ADMIN'
+      },
+      { withCredentials: true },
+    )
 
     if (res.data?.token) {
       finalizeValidatedToken(res.data)

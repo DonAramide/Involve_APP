@@ -331,7 +331,7 @@ function readMfaChallengeToken(req: Request): string {
   return '';
 }
 
-function setMfaChallengeCookie(res: Response, token: string): void {
+function setMfaChallengeCookie(res: Response, token: string, req?: Request) {
   const variant = require('../config/build-variant').BuildVariantService.getInstance();
   const protectedEnvironment =
     process.env.NODE_ENV === 'staging' ||
@@ -340,9 +340,12 @@ function setMfaChallengeCookie(res: Response, token: string): void {
     process.env.APP_ENV === 'production' ||
     variant.isStaging() ||
     variant.isProd();
+  const forwardedProto = String(req?.headers?.['x-forwarded-proto'] || '').split(',')[0].trim();
+  const requestIsHttps = !!(req && (req.secure || forwardedProto === 'https'));
   res.cookie(MFA_CHALLENGE_COOKIE, token, {
     httpOnly: true,
-    secure: protectedEnvironment,
+    // LAN admin is HTTP; Secure cookies are dropped by the browser on http://192.168.x
+    secure: protectedEnvironment && requestIsHttps,
     sameSite: 'strict',
     maxAge: 5 * 60 * 1000,
     path: '/api/auth/mfa',
@@ -632,7 +635,7 @@ export class AuthController {
           } catch (error) {
             return mfaErrorResponse(res, error);
           }
-          setMfaChallengeCookie(res, setupToken);
+          setMfaChallengeCookie(res, setupToken, req);
           return res.status(200).json({
             requiresMfaSetup: true,
             setupToken,
@@ -648,7 +651,7 @@ export class AuthController {
           } catch (error) {
             return mfaErrorResponse(res, error);
           }
-          setMfaChallengeCookie(res, challengeToken);
+          setMfaChallengeCookie(res, challengeToken, req);
           return res.status(200).json({
             requires2FA: true,
             challengeToken,
@@ -990,7 +993,7 @@ export class AuthController {
       const otpAuthUrl = authenticator.keyuri(profile.email, 'Invify Admin', secret);
       const qrCodeUrl = await QRCode.toDataURL(otpAuthUrl);
       const verificationChallenge = issueMfaChallenge(userId, 'verify', pendingSession);
-      setMfaChallengeCookie(res, verificationChallenge.token);
+      setMfaChallengeCookie(res, verificationChallenge.token, req);
 
       // Raw secret is returned only in this password-authenticated, single-user enrollment flow.
       return res.status(200).json({

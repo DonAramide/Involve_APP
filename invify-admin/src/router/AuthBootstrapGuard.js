@@ -51,10 +51,12 @@ export function registerAuthBootstrapGuard(router) {
     const token = localStorage.getItem('invify_token')
     const operatorRole = localStorage.getItem('operator_role') || 'SUPER_ADMIN'
     const pendingSetupToken = sessionStorage.getItem('mfa_setup_token')
+    const pendingChallengeToken = sessionStorage.getItem('mfa_challenge_token')
+    const pendingMfaToken = pendingSetupToken || pendingChallengeToken
     
     // Evaluate if token verification demands Multi-Factor challenge clearance
     // If token exists but an explicit flag requires challenge resolution, or setup tokens exist
-    const isMfaPending = !!pendingSetupToken || localStorage.getItem('mfa_status_verified') === 'false'
+    const isMfaPending = !!pendingMfaToken || localStorage.getItem('mfa_status_verified') === 'false'
     const isVerifiedSession = !!token && !isMfaPending
 
     // 0. Public Website Routes
@@ -76,7 +78,7 @@ export function registerAuthBootstrapGuard(router) {
 
     // 4. Multi-Factor Challenge Boundary rules (/mfa/challenge)
     if (to.path.startsWith('/mfa/challenge')) {
-      if (!token && !pendingSetupToken) {
+      if (!token && !pendingMfaToken) {
         return next(getLoginPath(from.path || '/'))
       }
       if (isVerifiedSession) {
