@@ -1106,10 +1106,15 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
 
   Widget _buildPaymentMethodSelector(BuildContext context, InvoiceState state) {
     final plan = context.read<SettingsBloc>().state.userPlan;
+    final isPro = plan?.isPro == true ||
+        plan?.isLifetime == true ||
+        plan?.planType == 'enterprise' ||
+        plan?.planType == 'premium' ||
+        (plan?.isValid == true && !plan!.isBasic && plan.planType != 'free_trial');
     final hasTerminal = _terminalConfig != null &&
         _terminalConfig!.posSerialNumber != null &&
         _terminalConfig!.posSerialNumber!.isNotEmpty;
-    final isPosEnabled = (plan?.isPro == true) && hasTerminal;
+    final isPosEnabled = isPro && hasTerminal;
 
     return Column(
       children: [
@@ -1144,8 +1149,8 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
               const Text('POS', style: TextStyle(color: Colors.grey)),
               const SizedBox(width: 8),
               Text(
-                plan?.isPro != true
-                    ? '(Pro + terminal required)'
+                !isPro
+                    ? '(Pro Plan required)'
                     : '(No terminal assigned)',
                 style: const TextStyle(fontSize: 10, color: Colors.red),
               ),
@@ -1156,32 +1161,66 @@ class _InvoicePreviewDialogState extends State<InvoicePreviewDialog> {
             contentPadding: EdgeInsets.zero,
             onChanged: null,
           ),
-        RadioListTile<String>(
-          title: const Text('Transfer (Personal Company account)'),
-          value: 'Transfer',
-          groupValue: state.paymentMethod,
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          onChanged: (val) {
-            context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text =
-                CurrencyFormatter.format(state.total);
-          },
-        ),
-        RadioListTile<String>(
-          title: const Text('Pay with Transfer (Virtual Account)',
-              style:
-                  TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-          value: 'VirtualAccount',
-          groupValue: state.paymentMethod,
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          onChanged: (val) {
-            context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
-            _amountReceivedController.text =
-                CurrencyFormatter.format(state.total);
-          },
-        ),
+        if (isPro)
+          RadioListTile<String>(
+            title: const Text('Transfer (Personal Company account)'),
+            value: 'Transfer',
+            groupValue: state.paymentMethod,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            onChanged: (val) {
+              context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
+              _amountReceivedController.text =
+                  CurrencyFormatter.format(state.total);
+            },
+          )
+        else
+          RadioListTile<String>(
+            title: Row(children: const [
+              Text('Transfer (Personal Company account)', style: TextStyle(color: Colors.grey)),
+              SizedBox(width: 8),
+              Text(
+                '(Pro Plan required)',
+                style: TextStyle(fontSize: 10, color: Colors.red),
+              ),
+            ]),
+            value: 'Transfer',
+            groupValue: state.paymentMethod,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            onChanged: null,
+          ),
+        if (isPro)
+          RadioListTile<String>(
+            title: const Text('Pay with Transfer (Virtual Account)',
+                style:
+                    TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+            value: 'VirtualAccount',
+            groupValue: state.paymentMethod,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            onChanged: (val) {
+              context.read<InvoiceBloc>().add(UpdatePaymentMethod(val));
+              _amountReceivedController.text =
+                  CurrencyFormatter.format(state.total);
+            },
+          )
+        else
+          RadioListTile<String>(
+            title: Row(children: const [
+              Text('Pay with Transfer (Virtual Account)', style: TextStyle(color: Colors.grey)),
+              SizedBox(width: 8),
+              Text(
+                '(Pro Plan required)',
+                style: TextStyle(fontSize: 10, color: Colors.red),
+              ),
+            ]),
+            value: 'VirtualAccount',
+            groupValue: state.paymentMethod,
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            onChanged: null,
+          ),
         RadioListTile<String>(
           title: const Text('Customer Wallet/Credit',
               style:
