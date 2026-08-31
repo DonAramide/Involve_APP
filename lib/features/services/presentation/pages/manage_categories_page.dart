@@ -27,11 +27,32 @@ class _ManageCategoriesPageState extends State<ManageCategoriesPage> {
   }
 
   void _addCategory() {
-    if (_categoryController.text.isNotEmpty) {
-      context.read<ServicesBloc>().add(AddMaterialCategory(_categoryController.text));
-      _categoryController.clear();
-      FocusScope.of(context).unfocus();
+    final text = _categoryController.text.trim();
+    if (text.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Category Name Required'),
+            ],
+          ),
+          content: const Text('Please enter the category name in the text box.'),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
     }
+    context.read<ServicesBloc>().add(AddMaterialCategory(text));
+    _categoryController.clear();
+    FocusScope.of(context).unfocus();
   }
 
   @override

@@ -124,15 +124,46 @@ class _AddCategoryFormState extends State<_AddCategoryForm> {
     super.dispose();
   }
 
+  void _showEmptyCategoryDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.deepPurple),
+            SizedBox(width: 8),
+            Text('Category Name Required'),
+          ],
+        ),
+        content: const Text('Please enter the product category name in the text box.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _focusNode.requestFocus();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _submit() {
-    print('Submit called. Text: ${_controller.text}'); // Debug
-    if (_controller.text.isNotEmpty) {
-      final businessMode = context.read<SettingsBloc>().state.settings?.businessMode;
-      context.read<StockBloc>().add(AddCategory(_controller.text, businessMode: businessMode));
-      _controller.clear();
-      // Keep focus for rapid entry
-      _focusNode.requestFocus();
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      _showEmptyCategoryDialog();
+      return;
     }
+    final businessMode = context.read<SettingsBloc>().state.settings?.businessMode;
+    context.read<StockBloc>().add(AddCategory(text, businessMode: businessMode));
+    _controller.clear();
+    // Keep focus for rapid entry
+    _focusNode.requestFocus();
   }
 
   @override

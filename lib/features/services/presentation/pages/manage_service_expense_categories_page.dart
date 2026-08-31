@@ -28,11 +28,31 @@ class _ManageServiceExpenseCategoriesPageState extends State<ManageServiceExpens
 
   void _addCategory() {
     final name = _nameController.text.trim();
-    if (name.isNotEmpty) {
-      context.read<ServicesBloc>().add(AddServiceExpenseCategory(name));
-      _nameController.clear();
-      FocusScope.of(context).unfocus();
+    if (name.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.blue),
+              SizedBox(width: 8),
+              Text('Category Name Required'),
+            ],
+          ),
+          content: const Text('Please enter the category name in the text box.'),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
     }
+    context.read<ServicesBloc>().add(AddServiceExpenseCategory(name));
+    _nameController.clear();
+    FocusScope.of(context).unfocus();
   }
 
   @override
