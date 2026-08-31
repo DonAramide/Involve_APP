@@ -1,13 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/utils/logo_processor.dart';
 import '../../../settings/presentation/bloc/settings_bloc.dart';
 import '../../../settings/presentation/bloc/settings_state.dart';
@@ -16,14 +13,13 @@ import '../../../settings/presentation/bloc/staff_state.dart';
 import '../../../settings/domain/entities/settings.dart';
 import '../../../settings/domain/entities/staff.dart';
 import '../../../settings/presentation/widgets/upgrade_dialog.dart';
-import '../../../settings/presentation/widgets/super_admin_password_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:involve_app/core/widgets/invify_loading_indicator.dart';
 import 'package:signature/signature.dart';
 import 'two_factor_auth_page.dart';
 import 'package:involve_app/features/school_finance/domain/repositories/finance_repository_new.dart';
 import 'package:involve_app/core/widgets/va_credentials_required_dialog.dart';
-import 'package:involve_app/core/utils/api_error_message.dart';
+import 'package:involve_app/core/utils/nigerian_banks.dart';
 
 class SystemSetupPage extends StatefulWidget {
   const SystemSetupPage({super.key});
@@ -668,12 +664,16 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
             .toList()
           ..sort((a, b) => a['name']!.toLowerCase().compareTo(b['name']!.toLowerCase()));
 
+        final effectiveBanks = mapped.isNotEmpty
+            ? mapped
+            : kDefaultNigerianBanks.map((e) => Map<String, String>.from(e)).toList();
+
         // If editing with a bank name but missing code, try match by name
         if ((selectedBankCode == null || selectedBankCode!.isEmpty) &&
             (staff?.virtualBankName?.trim().isNotEmpty ?? false)) {
           final needle = staff!.virtualBankName!.trim().toLowerCase();
           Map<String, String>? match;
-          for (final b in mapped) {
+          for (final b in effectiveBanks) {
             final n = b['name']!.toLowerCase();
             if (n == needle || n.contains(needle)) {
               match = b;
@@ -688,8 +688,9 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
         }
 
         dialogSetState(() {
-          banks = mapped;
+          banks = effectiveBanks;
           loadingBanks = false;
+          resolveError = null;
           if (selectedBankCode != null) {
             final stillThere = banks.any((b) => b['code'] == selectedBankCode);
             if (!stillThere) selectedBankCode = null;
@@ -698,10 +699,8 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
       } catch (e) {
         dialogSetState(() {
           loadingBanks = false;
-          resolveError = friendlyApiError(
-            e,
-            fallback: 'Could not load banks from Quasar. Check connection.',
-          );
+          banks = kDefaultNigerianBanks.map((e) => Map<String, String>.from(e)).toList();
+          resolveError = null;
         });
       }
     }
@@ -737,19 +736,16 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
         dialogSetState(() {
           if (resolvedName.isNotEmpty) {
             virtualAccountNameController.text = resolvedName;
+            resolveError = null;
+          } else {
+            resolveError = 'Account name not found. You can enter the account name manually.';
           }
           resolvingAccount = false;
-          resolveError = resolvedName.isEmpty
-              ? 'Account name not found. Verify bank and account number.'
-              : null;
         });
       } catch (e) {
         dialogSetState(() {
           resolvingAccount = false;
-          resolveError = friendlyApiError(
-            e,
-            fallback: 'Could not resolve account name. Verify bank and account number.',
-          );
+          resolveError = 'Auto-lookup unavailable (profile pending on web). You can enter account name manually.';
         });
       }
     }
@@ -971,12 +967,13 @@ class _SystemSetupPageState extends State<SystemSetupPage> {
                         labelText: 'Personal Account Name',
                         hintText: resolvingAccount
                             ? 'Looking up account name…'
-                            : 'Auto-filled after account number',
+                            : 'Enter account name (or auto-fills)',
                         labelStyle: const TextStyle(color: Colors.grey),
                         focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.blue)),
                         helperText: resolveError,
+                        helperMaxLines: 2,
                         helperStyle: TextStyle(
-                          color: resolveError != null ? Colors.red[700] : Colors.grey,
+                          color: resolveError != null ? Colors.orange[800] : Colors.grey,
                           fontSize: 11,
                         ),
                       ),

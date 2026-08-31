@@ -80,6 +80,12 @@ String? _mapNetworkish(String text) {
   if (t.contains('certificate') || t.contains('handshake') || t.contains('ssl')) {
     return 'Secure connection failed. Please try again later.';
   }
+  if (t.contains('endpoint not found') ||
+      t.contains('route not found') ||
+      t.contains('cannot get') ||
+      t.contains('cannot post')) {
+    return 'This service is currently unavailable or pending profile completion on the web portal.';
+  }
   return null;
 }
 
@@ -233,6 +239,9 @@ bool _looksTechnical(String text) {
       t.contains('clientexception') ||
       t.contains('formatexception') ||
       t.contains('null check operator') ||
+      t.contains('endpoint not found') ||
+      t.contains('cannot get') ||
+      t.contains('cannot post') ||
       t.contains('econnrefused') ||
       t.contains('econnreset') ||
       t.contains('enotfound') ||

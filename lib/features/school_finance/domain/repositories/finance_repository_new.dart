@@ -8,6 +8,7 @@ import 'package:involve_app/features/stock/data/datasources/app_database.dart';
 import 'package:drift/drift.dart';
 
 import '../../data/datasources/finance_realtime_data_source.dart';
+import 'package:involve_app/core/utils/nigerian_banks.dart';
 
 /// FinanceRepository provides a high-level API to interact with the Invify Finance backend.
 /// It focuses on data transformation and strong typing.
@@ -436,22 +437,28 @@ class FinanceRepository {
     return response.data as Map<String, dynamic>;
   }
 
-  /// Quasar-backed bank list for payout / salary destinations.
+  /// Quasar-backed bank list for payout / salary destinations with resilient fallback.
   /// GET /api/payout/banks
   Future<List<Map<String, dynamic>>> getPayoutBanks({String country = 'nigeria'}) async {
-    final response = await _client.get(
-      '/api/payout/banks',
-      queryParameters: {'country': country},
-    );
-    final body = response.data;
-    final data = body is Map ? body['data'] : null;
-    if (data is List) {
-      return data
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
+    try {
+      final response = await _client.get(
+        '/api/payout/banks',
+        queryParameters: {'country': country},
+      );
+      final body = response.data;
+      final data = body is Map ? body['data'] : null;
+      if (data is List && data.isNotEmpty) {
+        return data
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+    } catch (_) {
+      // Gracefully fall back to comprehensive local bank directory if server endpoint is offline/pending onboarding
     }
-    return const [];
+    return kDefaultNigerianBanks
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   /// Resolve account name via Quasar name enquiry.
