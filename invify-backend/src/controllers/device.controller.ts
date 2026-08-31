@@ -31,23 +31,54 @@ export class DeviceController {
         role.startsWith('admin_');
 
       // 1. Fetch devices raw data (tenant-scoped for non-platform operators)
-      let query = supabase.from('devices').select('*');
-      if (!isPlatform) {
-        if (!user?.tenantId) {
-          return res.status(403).json({ error: 'Tenant context required' });
+      const buildDeviceQuery = () => {
+        let q = supabaseAdmin.from('devices').select('*');
+        if (!isPlatform) {
+          q = q.eq('tenant_id', user.tenantId);
         }
-        query = query.eq('tenant_id', user.tenantId);
+        return q;
+      };
+      if (!isPlatform && !user?.tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' });
       }
-      const { data: devices, error: devError } = await query.order('last_seen', { ascending: false });
-
+      let { data: devices, error: devError } = await buildDeviceQuery().order('last_seen', { ascending: false });
+      if (devError) {
+        const retry = await buildDeviceQuery();
+        devices = retry.data;
+        devError = retry.error;
+      }
       if (devError) throw devError;
 
-      // 2. Fetch related tenants in-memory to bypass database foreign key relationship caching issues
-      const tenantIds = Array.from(new Set((devices || []).map(d => d.tenant_id).filter(Boolean)));
+      let registrationQuery = supabaseAdmin.from('device_registrations').select('*');
+      if (!isPlatform) {
+        registrationQuery = registrationQuery.eq('tenant_id', user.tenantId);
+      }
+      const { data: registrations } = await registrationQuery;
+
+      const byId = new Map<string, any>();
+      (devices || []).forEach((d: any) => {
+        const key = String(d.device_id || d.id || '');
+        if (key) byId.set(key, d);
+      });
+      (registrations || []).forEach((r: any) => {
+        const key = String(r.device_id || '');
+        if (!key || byId.has(key)) return;
+        byId.set(key, {
+          device_id: r.device_id,
+          tenant_id: r.tenant_id,
+          status: String(r.status || 'ACTIVE').toUpperCase() === 'ACTIVE' ? 'ACTIVE' : r.status,
+          last_seen: r.updated_at || r.created_at || null,
+          device_info: { agent_code: r.agent_code, location: r.location },
+          device_name: r.owner_name || r.device_id,
+        });
+      });
+      const mergedDevices = Array.from(byId.values());
+
+      const tenantIds = Array.from(new Set(mergedDevices.map(d => d.tenant_id).filter(Boolean)));
       const tenantsMap = new Map<string, { name: string; plan: string }>();
 
       if (tenantIds.length > 0) {
-        const { data: tenants, error: tenError } = await supabase
+        const { data: tenants, error: tenError } = await supabaseAdmin
           .from('tenants')
           .select('id, name, plan')
           .in('id', tenantIds);
@@ -59,8 +90,7 @@ export class DeviceController {
         }
       }
 
-      // 3. Map tenant details back to devices matching the shape expected by the frontend
-      const enrichedDevices = (devices || []).map(device => ({
+      const enrichedDevices = mergedDevices.map(device => ({
         ...device,
         tenants: tenantsMap.get(device.tenant_id) || null,
       }));
@@ -71,6 +101,57 @@ export class DeviceController {
         return res.status(503).json({ error: 'Database unavailable', retryable: true, retryAfterMs: 2000 });
       }
       console.error('[DeviceController] getDevices Error:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * GET /api/devices/connected
+   * Live Socket.io sessions on this Node process (not the registered-fleet table).
+   */
+  static async getConnectedPresence(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      const role = String(user?.role || '').toLowerCase();
+      const isPlatform =
+        role === 'super_admin' ||
+        role === 'internal_staff' ||
+        role.startsWith('admin_');
+      if (!isPlatform && !user?.tenantId) {
+        return res.status(403).json({ error: 'Tenant context required' });
+      }
+
+      const { io } = require('../app');
+      const sockets = await io.fetchSockets();
+      const byDevice = new Map<string, { deviceId: string; tenantId: string | null; socketId: string }>();
+
+      for (const sock of sockets) {
+        const tenantId = sock.data?.tenantId || sock.handshake?.auth?.tenantId || null;
+        if (!isPlatform && tenantId !== user.tenantId) continue;
+
+        const deviceId = String(
+          sock.data?.deviceId ||
+            sock.handshake?.auth?.deviceId ||
+            '',
+        ).trim();
+        if (!deviceId) continue;
+        if (!byDevice.has(deviceId)) {
+          byDevice.set(deviceId, {
+            deviceId,
+            tenantId,
+            socketId: sock.id,
+          });
+        }
+      }
+
+      const devices = Array.from(byDevice.values());
+      return res.status(200).json({
+        connectedDevices: devices.length,
+        sockets: sockets.length,
+        devices,
+      });
+    } catch (error: any) {
+      console.error('[DeviceController] getConnectedPresence Error:', error.message);
       return res.status(500).json({ error: error.message });
     }
   }

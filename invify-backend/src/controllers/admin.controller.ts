@@ -6,6 +6,7 @@ import { PDFService } from '../services/pdf.service';
 import { BillingService } from '../services/billing.service';
 import { BuildVariantService } from '../config/build-variant';
 import { IntegrationVaultService } from '../services/integration-vault.service';
+import { NotificationService } from '../services/notification.service';
 
 async function resolvePlatformApiKey(tenantId?: string): Promise<string> {
   const envKey = process.env.QUASAR_API_KEY || process.env.QUASER_API_KEY;
@@ -842,44 +843,76 @@ export class AdminController {
 
   /**
    * POST /admin/broadcast
-   * Sends a real-time socket.io broadcast message to terminals/apps.
+   * Sends a real-time socket.io broadcast and/or FCM push to terminals/apps.
+   * Omit `channels` (or include `websocket`) for the historical socket path.
+   * Include `fcm` to fan out via Firebase — requires FCM_SERVICE_ACCOUNT_JSON
+   * or FCM_SERVICE_ACCOUNT_PATH on the backend env.
    */
   static async sendBroadcast(req: Request, res: Response) {
     try {
-      const { message, targetType, targetValue } = req.body;
+      const { message, targetType, targetValue, title, channels, fcmPriority } = req.body;
       if (!message) return res.status(400).json({ error: "Message is required" });
 
+      const requestedChannels = Array.isArray(channels) && channels.length > 0
+        ? channels.map((c: string) => String(c).toLowerCase())
+        : ['websocket'];
+      const sendSocket = requestedChannels.includes('websocket');
+      const sendFcm = requestedChannels.includes('fcm');
+
       const { io } = require('../app');
-      
-      if (targetType === 'agent' && targetValue) {
+      let room: string | undefined;
+      let socketMessage: string | undefined;
+
+      if (sendSocket && targetType === 'agent' && targetValue) {
         const { data: agentTenants } = await supabaseAdmin.from('tenants').select('id').eq('agent_code', targetValue);
         const tenantList = agentTenants || [];
         console.log(`[AdminController] Emitting broadcast to ${tenantList.length} tenants under agent: ${targetValue}`);
         tenantList.forEach((tenant: any) => {
           io.to(`tenant:${tenant.id}`).emit('app_broadcast', { message, timestamp: new Date().toISOString() });
         });
-        return res.status(200).json({ success: true, message: `Broadcast sent to ${tenantList.length} tenants under agent ${targetValue}` });
+        socketMessage = `Broadcast sent to ${tenantList.length} tenants under agent ${targetValue}`;
+      } else if (sendSocket) {
+        room = 'all';
+
+        if (targetType === 'tenant' && targetValue) {
+          room = `tenant:${targetValue}`;
+        } else if (targetType === 'plan' && targetValue) {
+          room = `plan:${String(targetValue).toLowerCase()}`;
+        } else if (targetType === 'type' && targetValue) {
+          room = `type:${String(targetValue).toLowerCase()}`;
+        }
+
+        console.log(`[AdminController] Sending Broadcast!`);
+        console.log(`[AdminController] Input parameters -> Type: ${targetType}, Value: ${targetValue}`);
+        console.log(`[AdminController] Emitting broadcast to formatted socket room: ${room}`);
+        io.to(room).emit('app_broadcast', {
+          message,
+          timestamp: new Date().toISOString()
+        });
+        socketMessage = 'Broadcast sent successfully';
       }
 
-      let room = 'all';
-
-      if (targetType === 'tenant' && targetValue) {
-        room = `tenant:${targetValue}`;
-      } else if (targetType === 'plan' && targetValue) {
-        room = `plan:${String(targetValue).toLowerCase()}`;
-      } else if (targetType === 'type' && targetValue) {
-        room = `type:${String(targetValue).toLowerCase()}`;
+      let fcm: any = null;
+      if (sendFcm) {
+        const tenantId = targetType === 'tenant' && targetValue ? String(targetValue) : undefined;
+        fcm = await NotificationService.sendToFleet({
+          title: title || 'Invify Broadcast',
+          body: message,
+          tenantId,
+          priority: fcmPriority === 'normal' ? 'normal' : 'high',
+          data: {
+            type: 'admin_broadcast',
+            targetType: String(targetType || 'all'),
+          },
+        });
       }
 
-      console.log(`[AdminController] Sending Broadcast!`);
-      console.log(`[AdminController] Input parameters -> Type: ${targetType}, Value: ${targetValue}`);
-      console.log(`[AdminController] Emitting broadcast to formatted socket room: ${room}`);
-      io.to(room).emit('app_broadcast', {
-        message,
-        timestamp: new Date().toISOString()
+      return res.status(200).json({
+        success: true,
+        room,
+        message: socketMessage || (sendFcm ? 'FCM dispatch attempted' : 'Broadcast sent successfully'),
+        fcm,
       });
-
-      return res.status(200).json({ success: true, room, message: 'Broadcast sent successfully' });
     } catch (error: any) {
       console.error('[AdminController] sendBroadcast Error:', error.message);
       return res.status(500).json({ error: error.message });

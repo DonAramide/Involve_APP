@@ -38,6 +38,19 @@ export default defineConfig({
       '/auth': {
         target: 'http://127.0.0.1:3004',
         changeOrigin: true
+      },
+      '/devices': {
+        target: 'http://127.0.0.1:3004',
+        changeOrigin: true
+      },
+      '/admin': {
+        target: 'http://127.0.0.1:3004',
+        changeOrigin: true
+      },
+      '/socket.io': {
+        target: 'http://127.0.0.1:3004',
+        changeOrigin: true,
+        ws: true
       }
     }
   }

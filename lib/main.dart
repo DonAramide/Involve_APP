@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:involve_app/core/utils/app_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -163,6 +164,7 @@ void main() async {
       AppConfig.supabaseInitialized = false;
       debugPrint('Warning: Supabase not configured — set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY');
     } else {
+      debugPrint('[AppConfig] API baseUrl=${AppConfig.baseUrl} env=${AppConfig.environmentName}');
       await Supabase.initialize(
         url: supabaseUrl,
         anonKey: supabaseAnonKey,
@@ -183,7 +185,33 @@ void main() async {
   ));
 }
 
+/// True when [token] is a JWT whose `exp` is still in the future (60s skew).
+bool _jwtLooksUsable(String? token) {
+  if (token == null || token.isEmpty) return false;
+  if (token == 'mock-super-admin') return !kReleaseMode;
+  final parts = token.split('.');
+  if (parts.length < 2) return false;
+  try {
+    var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+    final remainder = payload.length % 4;
+    if (remainder > 0) payload += '=' * (4 - remainder);
+    final map = jsonDecode(utf8.decode(base64.decode(payload))) as Map<String, dynamic>;
+    final exp = map['exp'];
+    if (exp is num) {
+      final expiry = DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000, isUtc: true);
+      return expiry.isAfter(DateTime.now().toUtc().subtract(const Duration(seconds: 60)));
+    }
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Auth token for API/socket calls. Safe when Supabase was never initialized.
+///
+/// Onboarded tablets store an HS256 device JWT (`offlineToken`). A leftover or
+/// expired Supabase session must not win — that is the red-cloud
+/// "Invalid or expired token" loop.
 Future<String?> resolveAuthToken([SecurityService? security]) async {
   final svc = security ?? SecurityService();
   String? supabaseToken;
@@ -192,9 +220,24 @@ Future<String?> resolveAuthToken([SecurityService? security]) async {
       supabaseToken = Supabase.instance.client.auth.currentSession?.accessToken;
     } catch (_) {}
   }
-  return supabaseToken ??
-      await svc.getOfflineToken() ??
-      (kReleaseMode ? null : 'mock-super-admin');
+  final offline = await svc.getOfflineToken();
+  if (_jwtLooksUsable(offline)) {
+    debugPrint('[Auth] Using onboard device token');
+    return offline;
+  }
+  if (_jwtLooksUsable(supabaseToken)) {
+    debugPrint('[Auth] Using Supabase session token');
+    return supabaseToken;
+  }
+  if (offline != null && offline.isNotEmpty) {
+    debugPrint('[Auth] Onboard token present but expired; sending it anyway');
+    return offline;
+  }
+  if (supabaseToken != null && supabaseToken.isNotEmpty) {
+    debugPrint('[Auth] Supabase token present but expired; sending it anyway');
+    return supabaseToken;
+  }
+  return kReleaseMode ? null : 'mock-super-admin';
 }
 
 IFinanceRealtimeDataSource _buildFinanceRealtime() {
@@ -603,6 +646,9 @@ class _InvolveAppState extends State<InvolveApp> {
     } else {
       debugPrint('[Socket Initialization] Using cached config. tenantId: ${config.tenantId}, plan: ${config.plan}, type: ${config.type}');
     }
+
+    socketService.tokenProvider =
+        () => resolveAuthToken(widget.dependencies.securityService);
 
     // Attempt to connect immediately with cached or updated details
     socketService.initializeSocket(

@@ -78,7 +78,7 @@
                 :rules="[val => val.length === 6 || 'Verification format must equal exactly 6 digits']"
               />
               <div class="text-center text-metric-sm text-muted q-mt-xs">
-                Simulated passing setup tokens: <span class="text-blue-5 cursor-pointer" @click="totpInput = '000000'">000000</span> or <span class="text-blue-5 cursor-pointer" @click="totpInput = '123456'">123456</span>
+                Use the current 6-digit code from Google Authenticator, Authy, or Microsoft Authenticator. Dummy codes are rejected.
               </div>
             </div>
 
@@ -117,7 +117,7 @@
               :rules="[val => val.length === 6 || 'Verification code must equal exactly 6 digits']"
             />
             <div class="text-center text-metric-sm text-muted q-mt-xs">
-              Simulated validation keys: <span class="text-blue-5 cursor-pointer" @click="totpInput = '000000'">000000</span> or <span class="text-blue-5 cursor-pointer" @click="totpInput = '123456'">123456</span>
+              Use the current 6-digit code from your authenticator app. Dummy codes like 000000 are rejected.
             </div>
           </div>
 
@@ -168,17 +168,19 @@ const qrCodeDataUrl = ref('')
 const setupSecretString = ref('')
 
 onMounted(() => {
-  // Check session storage bounds tracking redirect parameter triggers
   const cachedSetupToken = sessionStorage.getItem('mfa_setup_token')
   const cachedUserId = sessionStorage.getItem('mfa_setup_userId')
+  const cachedChallenge = sessionStorage.getItem('mfa_challenge_token')
+  const cachedChallengeUser = sessionStorage.getItem('mfa_challenge_userId')
 
   if (cachedSetupToken && cachedUserId) {
     isSetupMode.value = true
     targetUserId.value = cachedUserId
     triggerRemoteSetupGeneration(cachedUserId)
+  } else if (cachedChallenge && cachedChallengeUser) {
+    targetUserId.value = cachedChallengeUser
   } else {
-    // If target context missing, route gracefully back to standard login screen
-    targetUserId.value = localStorage.getItem('operator_userId') || 'usr-fallback-admin'
+    errorMessage.value = 'MFA challenge is required. Sign in again at /admin/login, then enter the authenticator code on that page.'
   }
 })
 
@@ -205,6 +207,7 @@ const executeMfaSetupVerification = async () => {
     const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
       userId: targetUserId.value,
       tokenCode: totpInput.value,
+      challengeToken: sessionStorage.getItem('mfa_challenge_token') || sessionStorage.getItem('mfa_setup_token') || '',
       pendingSetup: true,
       role: sessionStorage.getItem('operator_role') || 'SUPER_ADMIN'
     })
@@ -228,6 +231,7 @@ const executeStandardVerification = async () => {
     const res = await axios.post(joinApiUrl('/api/auth/mfa/verify'), {
       userId: targetUserId.value,
       tokenCode: totpInput.value,
+      challengeToken: sessionStorage.getItem('mfa_challenge_token') || '',
       role: localStorage.getItem('operator_role') || 'SUPER_ADMIN'
     })
 
@@ -253,6 +257,8 @@ const finalizeValidatedToken = (tokenObj) => {
   // Clear pending setup session hooks
   sessionStorage.removeItem('mfa_setup_token')
   sessionStorage.removeItem('mfa_setup_userId')
+  sessionStorage.removeItem('mfa_challenge_token')
+  sessionStorage.removeItem('mfa_challenge_userId')
 
   successMessage.value = 'Multi-factor gateway attested securely. Unlocking platform controls...'
 

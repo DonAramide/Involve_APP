@@ -148,13 +148,29 @@ async function verifyBearerToken(token: string): Promise<any> {
       }
       return verifySupabaseAccessToken(token);
     } else {
-      if (!supabaseJwtSecret || supabaseJwtSecret.length < 16) {
-        const err: any = new Error('Authentication misconfigured: SUPABASE_JWT_SECRET required');
+      if ((!supabaseJwtSecret || supabaseJwtSecret.length < 16) &&
+          (!localJwtSecret || localJwtSecret.length < 16)) {
+        const err: any = new Error('Authentication misconfigured: JWT verification secret not configured');
         err.status = 503;
         err.code = 'JWT_SECRET_MISSING';
         throw err;
       }
-      return verifySupabaseAccessToken(token);
+      try {
+        return await verifySupabaseAccessToken(token);
+      } catch (primary: any) {
+        if (primary?.code === 'JWT_SECRET_MISSING' || primary?.code === 'JWT_JWKS_URL_MISSING') {
+          if (!localJwtSecret || localJwtSecret.length < 16) throw primary;
+        }
+        const secrets = [localJwtSecret, supabaseJwtSecret].filter(
+          (s) => typeof s === 'string' && s.length >= 16,
+        ) as string[];
+        if (secrets.length === 0) throw primary;
+        try {
+          return verifyWithSharedSecrets(token, secrets);
+        } catch {
+          throw primary;
+        }
+      }
     }
   }
 
@@ -373,8 +389,23 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
           null;
         if (decodedTenantId === 'undefined' || decodedTenantId === 'null') decodedTenantId = null;
 
-        // Staging/prod: require explicit provisioning — do not auto-insert privileged users
+        // Staging/prod: onboarded device JWTs carry tenantId+owner and may have
+        // no users row (token `id` is not a Supabase auth uid). Accept the
+        // verified claims the same way Socket.io does — do not auto-insert.
         if (requiresVerifiedJwt()) {
+          const claimRole = String(jwtPayload.role || 'owner').toLowerCase();
+          const isDeviceOwnerClaim =
+            !!decodedTenantId &&
+            ['owner', 'tenant_admin', 'staff'].includes(claimRole);
+          if (isDeviceOwnerClaim) {
+            (req as any).user = {
+              id: userId,
+              email: userEmail,
+              role: claimRole,
+              tenantId: decodedTenantId,
+            };
+            return next();
+          }
           return res.status(403).json({
             error: 'User profile not provisioned in Invify. Contact an administrator.',
             code: 'PROFILE_NOT_PROVISIONED',

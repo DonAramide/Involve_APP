@@ -16,7 +16,7 @@
       <div class="row items-center op-gap-8">
         <div class="bg-panel-darker q-px-sm q-py-xs rounded-borders border-muted text-metric-mono text-secondary text-caption row items-center op-gap-4">
           <span class="inline-box" :class="isOverrideActive ? 'bg-red-5' : 'bg-cyan-4'"></span>
-          <span>SLA TIMEOUT MONITOR: ACTIVE</span>
+          <span>SLA TIMEOUT MONITOR: {{ slaMonitorLabel }}</span>
         </div>
 
         <q-toggle
@@ -224,7 +224,9 @@
               <q-icon name="science" color="amber-4" size="xs" />
               <span class="text-operator-title text-amber-3">Pre-Flight Simulation Engine (Dry-Run)</span>
             </div>
-            <q-badge color="blue-grey-9" text-color="grey-4" class="text-metric-sm">DETERMINISTIC</q-badge>
+            <q-badge color="blue-grey-9" text-color="grey-4" class="text-metric-sm">
+              {{ fleetLoading ? 'LOADING FLEET' : (preflightResult.hydrated ? 'LIVE FLEET' : 'NO FLEET DATA') }}
+            </q-badge>
           </div>
 
           <div class="column q-pa-md op-gap-8">
@@ -237,14 +239,24 @@
               {{ preflightResult.simulationReport }}
             </div>
 
+            <div class="row items-center justify-between q-px-xs">
+              <span class="text-metric-sm text-grey-5">CONNECTED NOW (LIVE SOCKETS)</span>
+              <span class="text-metric-mono text-weight-bold" :class="connectedNow > 0 ? 'text-green-4' : 'text-grey-5'" style="font-size: 16px;">
+                {{ connectedNow }}
+              </span>
+            </div>
+            <div class="text-metric-sm text-grey-6" v-if="connectedDeviceIds.length">
+              {{ connectedDeviceIds.join(', ') }}
+            </div>
+
             <div class="row q-col-gutter-xs q-mt-xs">
               <div class="col-4 column">
-                <span class="text-metric-sm text-grey-5">REACHABLE DEVICES</span>
+                <span class="text-metric-sm text-grey-5">REGISTERED DEVICES</span>
                 <span class="text-metric-mono text-white text-weight-bold" style="font-size: 14px;">{{ preflightResult.devicesCount.toLocaleString() }}</span>
               </div>
               <div class="col-4 column text-center">
                 <span class="text-metric-sm text-grey-5">AFFECTED TENANTS</span>
-                <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 14px;">{{ preflightResult.tenantsCount }} Array</span>
+                <span class="text-metric-mono text-cyan-3 text-weight-bold" style="font-size: 14px;">{{ preflightResult.tenantsCount }}</span>
               </div>
               <div class="col-4 column text-right">
                 <span class="text-metric-sm text-grey-5">REGION FEDERATION</span>
@@ -273,26 +285,32 @@
                 <span class="text-green-4">Fast-Lane Dispatch (&lt;100ms)</span>
                 <span class="text-metric-mono text-white">{{ analyticsData.histograms.under100ms }} pkts</span>
               </div>
-              <q-linear-progress dark :value="0.75" color="green-4" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
+              <q-linear-progress dark :value="histogramShares.under100" color="green-4" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
 
               <div class="row items-center justify-between text-metric-sm q-mt-xs">
                 <span class="text-cyan-3">Standard Latency Bounds (&lt;500ms)</span>
                 <span class="text-metric-mono text-white">{{ analyticsData.histograms.under500ms }} pkts</span>
               </div>
-              <q-linear-progress dark :value="0.20" color="cyan-4" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
+              <q-linear-progress dark :value="histogramShares.under500" color="cyan-4" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
 
               <div class="row items-center justify-between text-metric-sm q-mt-xs">
                 <span class="text-red-4">SLA Timeout Breaches (&gt;1000ms)</span>
                 <span class="text-metric-mono text-red-3">{{ analyticsData.histograms.over1000ms }} pkts</span>
               </div>
-              <q-linear-progress dark :value="0.05" color="red-5" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
+              <q-linear-progress dark :value="histogramShares.over1000" color="red-5" class="rounded-borders bg-[#070c14]" style="height: 6px;" />
             </div>
 
             <!-- Convergence Matrix Grid -->
             <div class="bg-[#070c14] q-pa-sm rounded-borders border-muted column q-mt-xs">
               <span class="text-metric-sm text-grey-5 q-mb-xs">REGIONAL CONVERGENCE VECTORS</span>
+              <div
+                class="text-caption text-grey-6 font-mono"
+                v-if="Object.keys(analyticsData.regionalConvergence || {}).length === 0"
+              >
+                No delivery samples yet
+              </div>
               <div class="row items-center justify-between text-caption font-mono" v-for="(ratio, reg) in analyticsData.regionalConvergence" :key="reg">
-                <span class="text-grey-4">Federation Region: [{{ reg }}]</span>
+                <span class="text-grey-4">Region: [{{ reg }}]</span>
                 <span class="text-cyan-3 text-weight-bold">{{ ratio }} OK</span>
               </div>
             </div>
@@ -317,7 +335,7 @@
           <span class="text-operator-title text-white">Immutable Broadcast Lineage & Execution Audits</span>
         </div>
         <div class="row items-center op-gap-4">
-          <span class="text-metric-mono text-grey-4">SHA-256 INTEGRITY: VERIFIED</span>
+          <span class="text-metric-mono text-grey-4">{{ auditIntegrityLabel }}</span>
           <q-btn flat dense size="xs" color="red-3" label="Reset Ledger" @click="clearAuditRecords" />
         </div>
       </div>
@@ -363,7 +381,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { useOperatorPreferences } from '../../composables/useOperatorPreferences'
@@ -375,7 +393,7 @@ import { pushDispatcherSingleton } from '../../services/broadcast/PushNotificati
 import { deliveryTrackerSingleton, TrackingStates } from '../../services/broadcast/BroadcastDeliveryTracker'
 import { targetingEngineSingleton } from '../../services/broadcast/DeliveryTargetingEngine'
 import { auditGovernanceSingleton } from '../../services/broadcast/BroadcastAuditGovernance'
-import { adminApi } from '../../api'
+import { adminApi, deviceApi } from '../../api'
 
 // Ensure transport gateways register with the orchestration engine
 void realtimeGatewaySingleton
@@ -392,7 +410,9 @@ const auditSectionRef = ref(null)
 // State variables
 const isOverrideActive = ref(false)
 const isExecutingBroadcast = ref(false)
-const activeOperator = ref("sysadmin@IIPS.app")
+const fleetLoading = ref(false)
+const activeOperator = ref(localStorage.getItem('operator_email') || '')
+const activeOperatorRole = ref(localStorage.getItem('operator_role') || '')
 
 // Form structures
 const composerForm = reactive({
@@ -435,19 +455,63 @@ const launcherModeOptions = [
 
 // Pre-flight Dry Run state computations
 const preflightResult = ref({
-  devicesCount: 142850,
-  tenantsCount: 48,
-  regionsCount: 7,
-  simulationReport: "Initializing dry-run expression parsing arrays...",
-  isHighImpact: true
+  devicesCount: 0,
+  tenantsCount: 0,
+  regionsCount: 0,
+  simulationReport: "Loading registered devices and tenants...",
+  isHighImpact: false,
+  hydrated: false,
 })
+
+const connectedNow = ref(0)
+const connectedDeviceIds = ref([])
+let connectedPollTimer = null
+
+const unwrapList = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.items)) return payload.items
+  return []
+}
 
 const triggerPreflightSimulation = () => {
   const scopes = {
     tenants: composerForm.tenantScope === "global" ? [] : [composerForm.tenantScope],
-    quarantineState: composerForm.severity === "EMERGENCY" ? "QUARANTINED" : "ANY"
+    quarantineState: "ANY"
   }
   preflightResult.value = targetingEngineSingleton.evaluateTargetFootprint(scopes)
+}
+
+const loadLiveFleetSnapshot = async () => {
+  fleetLoading.value = true
+  try {
+    const [devRes, tenRes, liveRes] = await Promise.all([
+      deviceApi.getDevices().catch((err) => {
+        console.warn('[BroadcastCenter] Devices load failed:', err)
+        return { data: [] }
+      }),
+      adminApi.getTenants({ limit: 1000 }).catch((err) => {
+        console.warn('[BroadcastCenter] Tenants load failed:', err)
+        return { data: [] }
+      }),
+      deviceApi.getConnectedPresence().catch((err) => {
+        console.warn('[BroadcastCenter] Live sockets load failed:', err)
+        return { data: { connectedDevices: 0, devices: [] } }
+      }),
+    ])
+    targetingEngineSingleton.hydrateFleet({
+      devices: unwrapList(devRes.data),
+      tenants: unwrapList(tenRes.data),
+    })
+    const live = liveRes.data || {}
+    connectedNow.value = Number(live.connectedDevices || 0)
+    connectedDeviceIds.value = Array.isArray(live.devices)
+      ? live.devices.map((d) => d.deviceId).filter(Boolean)
+      : []
+    triggerPreflightSimulation()
+  } finally {
+    fleetLoading.value = false
+  }
 }
 
 // Helpers
@@ -523,10 +587,14 @@ const executeOperationalBroadcast = async () => {
 
   isExecutingBroadcast.value = true
 
+  try {
   // 1. Evaluate strict RBAC authorization assertions
-  const authCheck = auditGovernanceSingleton.authorizeBroadcastAction(activeOperator.value, composerForm.severity)
+  const authCheck = auditGovernanceSingleton.authorizeBroadcastAction(
+    activeOperator.value,
+    composerForm.severity,
+    activeOperatorRole.value,
+  )
   if (!authCheck.authorized) {
-    isExecutingBroadcast.value = false
     $q?.notify({ message: authCheck.error, color: "red-10", textColor: "white", icon: "block" })
     return
   }
@@ -546,14 +614,17 @@ const executeOperationalBroadcast = async () => {
     locationContext: null,  // not available in admin console (web browser context)
     targetScopes: {
       tenants: composerForm.tenantScope === "global" ? [] : [composerForm.tenantScope],
-      quarantineState: composerForm.severity === "EMERGENCY" ? "QUARANTINED" : "ANY"
+      quarantineState: "ANY"
     }
   })
 
   // 2. Evaluate dual-authorization approval workflow blocks
-  const workflow = auditGovernanceSingleton.evaluateApprovalWorkflow(envelope, activeOperator.value)
+  const workflow = auditGovernanceSingleton.evaluateApprovalWorkflow(
+    envelope,
+    activeOperator.value,
+    activeOperatorRole.value,
+  )
   if (workflow.requiresApproval) {
-    isExecutingBroadcast.value = false
     auditGovernanceSingleton.appendAuditRecord(envelope, activeOperator.value, "STAGED_AWAITING_REVIEW")
     refreshAuditRecords()
     $q?.notify({
@@ -621,8 +692,18 @@ const executeOperationalBroadcast = async () => {
       color: "red-10", textColor: "white", icon: "error"
     })
   }
-
-  isExecutingBroadcast.value = false
+  } catch (err) {
+    console.error('[BroadcastCenter] Dispatch failed:', err)
+    $q?.notify({
+      message: 'Dispatch failed',
+      caption: err?.message || String(err),
+      color: 'red-10',
+      textColor: 'white',
+      icon: 'error',
+    })
+  } finally {
+    isExecutingBroadcast.value = false
+  }
 }
 
 // Table structures
@@ -638,6 +719,31 @@ const auditColumns = [
 
 const auditRecords = ref([])
 const analyticsData = ref(deliveryTrackerSingleton.getDeliveryAnalytics())
+
+const histogramShares = computed(() => {
+  const h = analyticsData.value?.histograms || {}
+  const total = (h.under100ms || 0) + (h.under500ms || 0) + (h.over1000ms || 0)
+  if (!total) return { under100: 0, under500: 0, over1000: 0 }
+  return {
+    under100: h.under100ms / total,
+    under500: h.under500ms / total,
+    over1000: h.over1000ms / total,
+  }
+})
+
+const slaMonitorLabel = computed(() => {
+  const tracked = analyticsData.value?.activeTrackedCount || 0
+  return tracked > 0 ? 'ACTIVE' : 'IDLE'
+})
+
+const auditIntegrityLabel = computed(() => {
+  const count = auditRecords.value.length
+  if (count === 0) return 'AUDIT LEDGER: EMPTY'
+  const signed = auditRecords.value.filter((row) => row.lineageSignature).length
+  return signed === count
+    ? `SHA-256: ${signed} SIGNED`
+    : `LEDGER: ${count} LOCAL RECORD(S)`
+})
 
 const refreshAnalytics = () => {
   analyticsData.value = deliveryTrackerSingleton.getDeliveryAnalytics()
@@ -687,16 +793,21 @@ watch(() => route.query?.tab, (newTab) => {
 onMounted(() => {
   triggerPreflightSimulation()
   refreshAuditRecords()
-  
-  // Seed sample initial transaction audit lines to demonstrate full feature layout immediately
-  if (auditRecords.value.length === 0) {
-    const seedEnv = BroadcastFactory.createPersistentMaintenanceBanner("global", "Initial enterprise baseline ingestion check initialized.")
-    auditGovernanceSingleton.appendAuditRecord(seedEnv, activeOperator.value, "DELIVERED_STANDARD")
-    refreshAuditRecords()
-  }
-
-  // Evaluate initial programmatic deep target parameters
+  loadLiveFleetSnapshot()
   handleTabNavigation(route.query?.tab)
+  connectedPollTimer = setInterval(() => {
+    deviceApi.getConnectedPresence().then((res) => {
+      const live = res.data || {}
+      connectedNow.value = Number(live.connectedDevices || 0)
+      connectedDeviceIds.value = Array.isArray(live.devices)
+        ? live.devices.map((d) => d.deviceId).filter(Boolean)
+        : []
+    }).catch(() => {})
+  }, 10000)
+})
+
+onUnmounted(() => {
+  if (connectedPollTimer) clearInterval(connectedPollTimer)
 })
 </script>
 

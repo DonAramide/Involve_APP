@@ -1,73 +1,74 @@
 /**
  * BROADCAST AUDIT & SECURITY GOVERNANCE LAYER
- * Enforces zero-trust RBAC capability assertions, immutable ledger audits,
+ * Enforces RBAC using the signed-in operator role, immutable ledger audits,
  * operational approval barriers, and high-severity override authorizations.
  */
+
+const BROADCAST_ROLES = new Set([
+  'SUPER_ADMIN',
+  'ADMIN',
+  'PLATFORM_ADMIN',
+  'INTERNAL_STAFF',
+]);
+
+const OVERRIDE_ROLES = new Set([
+  'SUPER_ADMIN',
+  'PLATFORM_ADMIN',
+]);
+
+function normalizeRole(role) {
+  return String(role || '').toUpperCase().trim();
+}
 
 class BroadcastAuditGovernance {
   constructor() {
     this.auditLineageStore = [];
     this.pendingApprovals = new Map();
-    
-    // Standard immutable capability matrices mapping authorized operator boundaries
-    this.operatorRoles = new Map([
-      ["sysadmin@IIPS.app", { role: "SUPER_ADMIN", capabilities: new Set(["soc_communications", "override_approvals", "read_telemetry"]) }],
-      ["soc-analyst@IIPS.app", { role: "SOC_ANALYST", capabilities: new Set(["soc_communications"]) }],
-      ["compliance-auditor@IIPS.app", { role: "AUDITOR", capabilities: new Set(["read_telemetry"]) }]
-    ]);
-
     this.isEmergencyOverrideEngaged = false;
   }
 
-  /**
-   * Asserts whether the active invoking context holds sufficient RBAC execution privileges
-   */
-  authorizeBroadcastAction(operatorId, targetSeverity) {
-    const profile = this.operatorRoles.get(operatorId);
-    if (!profile) {
-      return { authorized: false, error: "Unauthenticated context block. Operator identity unrecognized." };
+  authorizeBroadcastAction(operatorId, targetSeverity, operatorRole) {
+    if (!operatorId) {
+      return { authorized: false, error: 'Unauthenticated context. Sign in before dispatching broadcasts.' };
     }
 
-    if (!profile.capabilities.has("soc_communications")) {
-      return { authorized: false, error: `RBAC access denial. Operator role [${profile.role}] lacks mandatory capability token: soc_communications` };
+    const role = normalizeRole(operatorRole);
+    if (!BROADCAST_ROLES.has(role)) {
+      return {
+        authorized: false,
+        error: `RBAC access denial. Role [${role || 'UNKNOWN'}] cannot dispatch fleet broadcasts.`,
+      };
     }
 
-    // High severity attempts require explicit authorization clearance logic
-    if (["EMERGENCY", "CRITICAL"].includes(targetSeverity) && profile.role === "AUDITOR") {
-      return { authorized: false, error: "High-severity broadcast execution restricted to SOC operators and system administrators." };
+    if (['EMERGENCY', 'CRITICAL'].includes(targetSeverity) && !OVERRIDE_ROLES.has(role) && !this.isEmergencyOverrideEngaged) {
+      return {
+        authorized: false,
+        error: 'High-severity broadcast execution is restricted to super administrators unless SOC override is armed.',
+      };
     }
 
     return { authorized: true, error: null };
   }
 
-  /**
-   * Evaluates if a staged envelope requires dual-authorization secondary supervisor gating
-   */
-  evaluateApprovalWorkflow(envelope, operatorId) {
-    if (this.isEmergencyOverrideEngaged || envelope.severity === "EMERGENCY") {
-      // SOC emergency protocols bypass standard approval gates to prevent life-safety delays
-      return { requiresApproval: false, status: "BYPASSED_EMERGENCY_PROTOCOL" };
+  evaluateApprovalWorkflow(envelope, operatorId, operatorRole) {
+    if (this.isEmergencyOverrideEngaged || envelope.severity === 'EMERGENCY') {
+      return { requiresApproval: false, status: 'BYPASSED_EMERGENCY_PROTOCOL' };
     }
 
-    const profile = this.operatorRoles.get(operatorId);
-    if (profile?.capabilities.has("override_approvals")) {
-      return { requiresApproval: false, status: "AUTO_APPROVED_BY_CAPABILITY" };
+    if (OVERRIDE_ROLES.has(normalizeRole(operatorRole))) {
+      return { requiresApproval: false, status: 'AUTO_APPROVED_BY_CAPABILITY' };
     }
 
-    // Staged pending verification block
     this.pendingApprovals.set(envelope.broadcastId, {
       envelope,
       submittedBy: operatorId,
       submittedAt: Date.now(),
-      status: "PENDING_SECONDARY_REVIEW"
+      status: 'PENDING_SECONDARY_REVIEW',
     });
 
-    return { requiresApproval: true, status: "STAGED_AWAITING_REVIEW" };
+    return { requiresApproval: true, status: 'STAGED_AWAITING_REVIEW' };
   }
 
-  /**
-   * Commits an immutable line appending deterministic transmission parameters directly
-   */
   appendAuditRecord(envelope, operatorId, deliveryStatus) {
     const ledgerLine = {
       auditId: `AUD-${Date.now()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`,
@@ -78,16 +79,15 @@ class BroadcastAuditGovernance {
       launcherMode: envelope.launcherMode,
       issuedBy: operatorId,
       timestamp: Date.now(),
-      statusString: deliveryStatus
+      statusString: deliveryStatus,
     };
 
-    // Immutably append to top of collection array buffer
     this.auditLineageStore.unshift(ledgerLine);
     if (this.auditLineageStore.length > 500) {
-      this.auditLineageStore.pop(); // Restrain unbounded in-memory leakage growth
+      this.auditLineageStore.pop();
     }
 
-    console.log(`[AUDIT GOVERNANCE] Committed immutable broadcast action receipt -> Log Sequence: ${ledgerLine.auditId}`);
+    console.log(`[AUDIT GOVERNANCE] Committed broadcast receipt -> ${ledgerLine.auditId}`);
     return ledgerLine;
   }
 
@@ -97,7 +97,7 @@ class BroadcastAuditGovernance {
 
   toggleEmergencyOverride(engaged) {
     this.isEmergencyOverrideEngaged = engaged;
-    console.warn(`[AUDIT GOVERNANCE] Master SOC emergency execution override set to -> ${engaged}`);
+    console.warn(`[AUDIT GOVERNANCE] SOC emergency override set to -> ${engaged}`);
   }
 
   resetGovernanceState() {

@@ -3,6 +3,12 @@ import 'package:flutter/foundation.dart';
 /// Explicit mobile environment: development | staging | production
 enum AppEnvironment { development, staging, production }
 
+/// Single place to point a **debug** laptop/tablet build at the local Node API.
+/// Change this when your PC LAN IP changes. Ignored for release / staging / production.
+const String kDebugLaptopApiBaseUrl = 'http://192.168.1.193:3004';
+
+const String kStagingApiBaseUrl = 'https://staging.invify.org';
+
 class AppConfig {
   /// Compile-time environment identifier.
   /// Pass: --dart-define=APP_ENV=development|staging|production
@@ -60,7 +66,12 @@ class AppConfig {
       }
     } catch (_) {}
 
-    return 'https://staging.invify.org';
+    // Debug development: talk to the laptop API over HTTP (no TLS cert).
+    if (isDevelopment && !kReleaseMode) {
+      return kDebugLaptopApiBaseUrl;
+    }
+
+    return kStagingApiBaseUrl;
   }
 
   static String get baseUrl3000 {

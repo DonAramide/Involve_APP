@@ -193,7 +193,8 @@ export const aiApi = {
 };
 
 export const deviceApi = {
-  getDevices: () => api.get('/devices'),
+  getDevices: () => api.get('/api/devices'),
+  getConnectedPresence: () => api.get('/api/devices/connected'),
   getActivations: () => api.get('/devices/activations'),
   createActivation: (data) => api.post('/devices/activations', data),
   validateCode: (data) => api.post('/devices/validate', data),

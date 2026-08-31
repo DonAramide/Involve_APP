@@ -538,6 +538,18 @@ export class OnboardingController {
         }).then(({ error: devErr }) => {
           if (devErr) console.warn('[OnboardingController] device_registrations insert failed (non-fatal):', devErr.message);
         });
+
+        await supabaseAdmin.from('devices').upsert({
+          device_id: effectiveDeviceId,
+          tenant_id: finalTenantId,
+          status: 'ACTIVE',
+          is_active: true,
+          platform: 'android',
+          device_name: `${firstName} ${lastName}`.trim() || effectiveDeviceId,
+          last_seen: new Date().toISOString(),
+        }, { onConflict: 'device_id' }).then(({ error: fleetErr }) => {
+          if (fleetErr) console.warn('[OnboardingController] devices fleet upsert failed (non-fatal):', fleetErr.message);
+        });
       }
 
       try {
@@ -555,12 +567,14 @@ export class OnboardingController {
         });
         return;
       }
+      const deviceSubject = finalUserId || require('crypto').randomUUID();
       const offlineToken = jwt.sign(
         {
-          id: finalUserId || require('crypto').randomUUID(),
+          sub: deviceSubject,
+          id: deviceSubject,
           email: email,
           role: 'owner',
-          tenantId: finalTenantId
+          tenantId: finalTenantId,
         },
         process.env.JWT_SECRET,
         { expiresIn: '30d' }

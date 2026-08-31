@@ -1,6 +1,6 @@
 // src/controllers/search.controller.ts
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase';
+import { supabaseAdmin } from '../db/supabase';
 
 export class SearchController {
   
@@ -61,7 +61,7 @@ export class SearchController {
       const user = (req as any).user;
       
       try {
-        let q = supabase
+        let q = supabaseAdmin
           .from('terminal_inventory')
           .select('terminal_id, mpos_terminal_id, terminal_type, bank_name')
           .or(`terminal_id.ilike.%${query}%,mpos_terminal_id.ilike.%${query}%,pos_serial_number.ilike.%${query}%`);
@@ -82,7 +82,7 @@ export class SearchController {
       let tenants: any[] = [];
       try {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(query);
-        let q = supabase
+        let q = supabaseAdmin
           .from('tenants')
           .select('id, name, type, status');
           

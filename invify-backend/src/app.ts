@@ -535,6 +535,8 @@ app.post('/admin/devices/:deviceId/upgrade-to-company', authenticate, checkRole(
 
 // Device Activation Hub Endpoints
 app.get('/devices', authenticate, DeviceController.getDevices);
+app.get('/api/devices', authenticate, DeviceController.getDevices);
+app.get('/api/devices/connected', authenticate, DeviceController.getConnectedPresence);
 app.get('/devices/activations', authenticate, DeviceController.getActivations);
 app.post('/devices/activations', authenticate, DeviceController.createActivation);
 app.post('/devices/validate', DeviceController.validateCode);
@@ -1032,14 +1034,31 @@ io.use(async (socket, next) => {
           return next(new Error('Authentication error: SUPABASE_URL required for asymmetric JWT'));
         }
       } else {
-        if (!supabaseJwtSecret || supabaseJwtSecret.length < 16) {
+        if ((!supabaseJwtSecret || supabaseJwtSecret.length < 16) &&
+            (!localJwtSecret || localJwtSecret.length < 16)) {
           return next(new Error('Authentication error: JWT verification secret not configured'));
         }
       }
       try {
         jwtPayload = await verifySupabaseAccessToken(token);
       } catch {
-        return next(new Error('Authentication error: Invalid or expired token'));
+        // Mobile onboarding issues HS256 tokens with JWT_SECRET, not Supabase access tokens.
+        const secrets = [localJwtSecret, supabaseJwtSecret].filter(
+          (s) => typeof s === 'string' && s.length >= 16,
+        ) as string[];
+        if (secrets.length === 0) {
+          return next(new Error('Authentication error: Invalid or expired token'));
+        }
+        try {
+          jwtPayload = verifyWithSharedSecrets(token, secrets);
+          console.warn(`[Socket.io] Accepted device token alg=${alg} via JWT_SECRET fallback`);
+        } catch (verifyErr: any) {
+          const cause = verifyErr?.cause || verifyErr;
+          console.warn(
+            `[Socket.io] Device token rejected alg=${alg} reason=${cause?.name || cause?.message || 'verify_failed'}`,
+          );
+          return next(new Error('Authentication error: Invalid or expired token'));
+        }
       }
     } else {
       // LOCAL: verify with JWKS/HS first, then JWT_SECRET — never decode-only
@@ -1107,21 +1126,23 @@ io.use(async (socket, next) => {
     }
 
     if (profileErr || !profile) {
-      // Staging/prod: fail closed — no claim/handshake privilege escalation
-      if (requiresVerify) {
-        return next(new Error('Authentication error: User profile not found'));
-      }
-      // LOCAL only: least-privilege claim fallback (never admin/super_admin by default)
       const fallbackTenantId =
         jwtPayload.tenant_id ||
         jwtPayload.tenantId ||
         jwtPayload.app_metadata?.tenantId ||
         jwtPayload.user_metadata?.tenantId ||
         null;
+      const claimRole = String(jwtPayload.role || 'owner').toLowerCase();
+      const isDeviceOwnerClaim =
+        !!fallbackTenantId &&
+        ['owner', 'tenant_admin', 'staff'].includes(claimRole);
+
+      if (requiresVerify && !isDeviceOwnerClaim) {
+        return next(new Error('Authentication error: User profile not found'));
+      }
       if (!fallbackTenantId) {
         return next(new Error('Authentication error: User profile not found'));
       }
-      const claimRole = String(jwtPayload.role || 'owner').toLowerCase();
       profile = {
         tenant_id: fallbackTenantId,
         role: claimRole === 'super_admin' || claimRole === 'admin' ? 'owner' : claimRole,
@@ -1137,6 +1158,10 @@ io.use(async (socket, next) => {
 });
 
 io.on('connection', (socket: Socket) => {
+  const handshakeDeviceId = socket.handshake.auth?.deviceId;
+  if (handshakeDeviceId) {
+    socket.data.deviceId = String(handshakeDeviceId);
+  }
   console.log(`[Socket.io] Client connected: ${socket.id} (Tenant: ${socket.data.tenantId})`);
 
   // Join tenant room immediately so emergency_lock reaches devices even if
@@ -1156,7 +1181,11 @@ io.on('connection', (socket: Socket) => {
     }
     if (data.plan) { socket.join(`plan:${String(data.plan).toLowerCase()}`); joined.push(`plan:${data.plan}`); }
     if (data.type) { socket.join(`type:${String(data.type).toLowerCase()}`); joined.push(`type:${data.type}`); }
-    if (data.deviceId) { socket.join(`device:${data.deviceId}`); joined.push(`device:${data.deviceId}`); }
+    if (data.deviceId) {
+      socket.data.deviceId = String(data.deviceId);
+      socket.join(`device:${data.deviceId}`);
+      joined.push(`device:${data.deviceId}`);
+    }
     if (data.businessName) { socket.join(`business:${data.businessName}`); joined.push(`business:${data.businessName}`); }
     socket.join('all');
     console.log(`[Socket.io] Client ${socket.id} joined rooms: ${joined.join(', ')}`);
