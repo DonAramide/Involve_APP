@@ -94,83 +94,142 @@ class _InventoryReportPageState extends State<InventoryReportPage> {
       appBar: AppBar(
         title: Text(settings?.businessMode == 'school' ? 'Fee Analysis' : 'Inventory Report'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            tooltip: 'Export CSV',
-            onPressed: () => _exportReport(context),
+          Tooltip(
+            message: 'Export CSV',
+            child: InkWell(
+              onTap: () => _exportReport(context),
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.share, size: 20),
+                    SizedBox(height: 2),
+                    Text('Export', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.print_outlined),
-            tooltip: 'Thermal Print',
-            onPressed: () {
-              final state = context.read<StockBloc>().state;
-              final settingsState = context.read<SettingsBloc>().state;
-              
-              if (state is InventoryReportLoaded && settingsState.settings != null) {
-                final commands = ReportGenerator.buildInventoryThermalCommands(
-                  reportData: state.report,
-                  settings: settingsState.settings!,
-                  dateRange: _dateRange != null 
-                    ? InvReportDateRange(start: _dateRange!.start, end: _dateRange!.end)
-                    : null,
-                );
+          Tooltip(
+            message: 'Thermal Print',
+            child: InkWell(
+              onTap: () {
+                final state = context.read<StockBloc>().state;
+                final settingsState = context.read<SettingsBloc>().state;
                 
-                context.read<PrinterBloc>().add(PrintCommandsEvent(
-                  commands, 
-                  settingsState.settings!.paperWidth
-                ));
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Sent to printer...')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please wait for data to load.')),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.print),
-            tooltip: 'Print PDF',
-            onPressed: () async {
-              final state = context.read<StockBloc>().state;
-              final settingsState = context.read<SettingsBloc>().state;
-              if (state is InventoryReportLoaded && settingsState.settings != null) {
-                try {
-                  await ReportGenerator.generateInventoryReport(
+                if (state is InventoryReportLoaded && settingsState.settings != null) {
+                  final commands = ReportGenerator.buildInventoryThermalCommands(
                     reportData: state.report,
                     settings: settingsState.settings!,
                     dateRange: _dateRange != null 
                       ? InvReportDateRange(start: _dateRange!.start, end: _dateRange!.end)
                       : null,
                   );
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Print failed: ${e.toString()}')),
-                    );
-                  }
+                  
+                  context.read<PrinterBloc>().add(PrintCommandsEvent(
+                    commands, 
+                    settingsState.settings!.paperWidth
+                  ));
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Sent to printer...')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please wait for data to load.')),
+                  );
                 }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please wait for data to load.')),
-                );
-              }
-            },
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.print_outlined, size: 20),
+                    SizedBox(height: 2),
+                    Text('Print', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.date_range),
-            onPressed: _selectDateRange,
+          Tooltip(
+            message: 'Print PDF',
+            child: InkWell(
+              onTap: () async {
+                final state = context.read<StockBloc>().state;
+                final settingsState = context.read<SettingsBloc>().state;
+                if (state is InventoryReportLoaded && settingsState.settings != null) {
+                  try {
+                    await ReportGenerator.generateInventoryReport(
+                      reportData: state.report,
+                      settings: settingsState.settings!,
+                      dateRange: _dateRange != null 
+                        ? InvReportDateRange(start: _dateRange!.start, end: _dateRange!.end)
+                        : null,
+                    );
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Print failed: ${e.toString()}')),
+                      );
+                    }
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please wait for data to load.')),
+                  );
+                }
+              },
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.picture_as_pdf, size: 20),
+                    SizedBox(height: 2),
+                    Text('PDF', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Tooltip(
+            message: 'Date Range',
+            child: InkWell(
+              onTap: _selectDateRange,
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.date_range, size: 20),
+                    SizedBox(height: 2),
+                    Text('Date', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
           ),
           if (_dateRange != null)
             IconButton(
               icon: const Icon(Icons.clear),
+              tooltip: 'Clear Date Filter',
               onPressed: () {
                 setState(() => _dateRange = null);
                 _loadReport();
               },
             ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(

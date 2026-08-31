@@ -45,6 +45,44 @@ class _StockManagementPageState extends State<StockManagementPage> {
     return 'General Store';
   }
 
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    Color? color,
+    String? tooltip,
+    double iconSize = 20,
+  }) {
+    return Tooltip(
+      message: tooltip ?? label,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5.0, vertical: 4.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: iconSize, color: color),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: color,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,17 +99,19 @@ class _StockManagementPageState extends State<StockManagementPage> {
     return Scaffold(
       appBar: AppBar(
         title: BlocBuilder<SettingsBloc, SettingsState>(
-          builder: (context, state) => Text(state.settings?.stockLabel ?? 'Stock Management'),
+          builder: (context, state) => Text(
+            state.settings?.stockLabel ?? 'Stock',
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
         ),
         actions: [
           BlocBuilder<SettingsBloc, SettingsState>(
             builder: (context, state) {
               if (state.settings?.businessMode == 'school') return const SizedBox.shrink();
-              return IconButton(
-                icon: Icon(
-                  _showLowStockOnly ? Icons.filter_list_off : Icons.filter_list,
-                  color: _showLowStockOnly ? Colors.orange : null,
-                ),
+              return _buildActionButton(
+                icon: _showLowStockOnly ? Icons.filter_list_off : Icons.filter_list,
+                label: _showLowStockOnly ? 'All Items' : 'Low Stock',
+                color: _showLowStockOnly ? Colors.orange : null,
                 tooltip: _showLowStockOnly ? 'Show All Items' : 'Show Low Stock Only',
                 onPressed: () {
                   setState(() {
@@ -82,8 +122,9 @@ class _StockManagementPageState extends State<StockManagementPage> {
             },
           ),
           BlocBuilder<SettingsBloc, SettingsState>(
-            builder: (context, settingsState) => IconButton(
-              icon: const Icon(Icons.category, size: 28),
+            builder: (context, settingsState) => _buildActionButton(
+              icon: Icons.category_outlined,
+              label: settingsState.settings?.categoryLabel ?? 'Categories',
               tooltip: 'Manage ${settingsState.settings?.categoryLabel ?? 'Categories'}',
               onPressed: () => _verifyAndExecute(
                 context,
@@ -94,16 +135,18 @@ class _StockManagementPageState extends State<StockManagementPage> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.assessment_outlined),
+          _buildActionButton(
+            icon: Icons.assessment_outlined,
+            label: 'Inventory',
             tooltip: 'Inventory Report',
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const InventoryReportPage()),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.show_chart),
+          _buildActionButton(
+            icon: Icons.show_chart,
+            label: 'Profit',
             tooltip: 'Profit Report',
             onPressed: () => _verifyAndExecute(
               context,
@@ -113,26 +156,32 @@ class _StockManagementPageState extends State<StockManagementPage> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.payments_outlined),
+          _buildActionButton(
+            icon: Icons.payments_outlined,
+            label: 'Expense',
             tooltip: 'Log Expense',
             onPressed: () => _verifyAndExecute(
               context,
               () => _showLogExpenseDialog(context),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add, size: 32),
-            onPressed: () => _verifyAndExecute(
-              context,
-              () => _showItemDialog(context),
+          BlocBuilder<SettingsBloc, SettingsState>(
+            builder: (context, settingsState) => _buildActionButton(
+              icon: Icons.add_circle_outline,
+              label: 'Add ${settingsState.settings?.productLabel ?? 'Item'}',
+              tooltip: 'Add ${settingsState.settings?.productLabel ?? 'Item'}',
+              onPressed: () => _verifyAndExecute(
+                context,
+                () => _showItemDialog(context),
+              ),
             ),
           ),
           BlocBuilder<SettingsBloc, SettingsState>(
             builder: (context, state) {
               if (state.settings?.businessMode != 'school') return const SizedBox.shrink();
-              return IconButton(
-                icon: const Icon(Icons.school_outlined),
+              return _buildActionButton(
+                icon: Icons.school_outlined,
+                label: 'Setup',
                 tooltip: 'Academic Setup (Years/Terms/Classes)',
                 onPressed: () => _verifyAndExecute(
                   context,
@@ -141,6 +190,7 @@ class _StockManagementPageState extends State<StockManagementPage> {
               );
             },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: BlocBuilder<SettingsBloc, SettingsState>(

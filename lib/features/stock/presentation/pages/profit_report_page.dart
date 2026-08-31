@@ -6,7 +6,6 @@ import '../bloc/stock_state.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:involve_app/features/settings/presentation/bloc/settings_state.dart';
 import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:collection/collection.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -109,26 +108,70 @@ class _ProfitReportPageState extends State<ProfitReportPage> {
           appBar: AppBar(
             title: const Text('Profit Report'),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.picture_as_pdf),
-                tooltip: 'Export PDF',
-                onPressed: () {
-                  final state = context.read<StockBloc>().state;
-                  if (state is ProfitReportLoaded) _exportToPdf(state);
-                },
+              Tooltip(
+                message: 'Export PDF',
+                child: InkWell(
+                  onTap: () {
+                    final state = context.read<StockBloc>().state;
+                    if (state is ProfitReportLoaded) _exportToPdf(state);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.picture_as_pdf, size: 20),
+                        SizedBox(height: 2),
+                        Text('PDF', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.print),
-                tooltip: 'Print Thermal',
-                onPressed: () {
-                  final state = context.read<StockBloc>().state;
-                  if (state is ProfitReportLoaded) _printThermal(state);
-                },
+              Tooltip(
+                message: 'Print Thermal',
+                child: InkWell(
+                  onTap: () {
+                    final state = context.read<StockBloc>().state;
+                    if (state is ProfitReportLoaded) _printThermal(state);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.print, size: 20),
+                        SizedBox(height: 2),
+                        Text('Print', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.calendar_today),
-                onPressed: () => _selectDateRange(context),
+              Tooltip(
+                message: 'Select Date Range',
+                child: InkWell(
+                  onTap: () => _selectDateRange(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.calendar_today, size: 20),
+                        SizedBox(height: 2),
+                        Text('Date', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
+              const SizedBox(width: 4),
             ],
           ),
           body: BlocBuilder<StockBloc, StockState>(

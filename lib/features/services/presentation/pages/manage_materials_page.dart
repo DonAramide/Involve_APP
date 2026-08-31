@@ -41,16 +41,45 @@ class _ManageMaterialsPageState extends State<ManageMaterialsPage> {
       appBar: AppBar(
         title: const Text('Materials & Parts'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-            onPressed: _loadData,
+          Tooltip(
+            message: 'Refresh',
+            child: InkWell(
+              onTap: _loadData,
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.refresh, size: 20),
+                    SizedBox(height: 2),
+                    Text('Refresh', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'Add Material',
-            onPressed: () => _showMaterialDialog(context),
+          Tooltip(
+            message: 'Add Material',
+            child: InkWell(
+              onTap: () => _showMaterialDialog(context),
+              borderRadius: BorderRadius.circular(8),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.add_circle_outline, size: 20),
+                    SizedBox(height: 2),
+                    Text('Add', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
